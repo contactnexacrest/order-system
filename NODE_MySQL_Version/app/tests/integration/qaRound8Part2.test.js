@@ -128,17 +128,18 @@ describe('QA Round 8, part 2', () => {
   test('with e-mail sending off the digest sends nothing and keeps the day', async () => {
     const person = await personWithAReview();
     const date = day('04');
-    const before = await companySettingsRepository.get('mail_sending_enabled');
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    const before = await companySettingsRepository.get('email_testing_mode');
+    await require('../../src/services/emailPolicy').setSwitchForTest('staff_daily_summary', 'staff', false); // D-280: this e-mail switched off in Admin › E-mail settings
     let result;
     try {
       dailyDigestService.setSender(null);
       result = await dailyDigestService.run(date);
     } finally {
-      await companySettingsRepository.set('mail_sending_enabled', before);
+      await companySettingsRepository.set('email_testing_mode', before);
+      await require('../../src/services/emailPolicy').setSwitchForTest('staff_daily_summary', 'staff', true);
     }
     expect(result).toEqual({ sent: 0, skipped: 0, failed: 0, mailOff: true });
-    expect(dailyDigestService.summary(result)).toBe('Daily digest: e-mail sending is off — nothing sent.');
+    expect(dailyDigestService.summary(result)).toBe('Daily digest: the daily summary e-mail is switched off in Admin › E-mail settings — nothing sent.');
     expect(await digestRows(person, date)).toBe(0);
   });
 

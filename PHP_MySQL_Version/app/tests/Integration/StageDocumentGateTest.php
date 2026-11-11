@@ -32,14 +32,14 @@ final class StageDocumentGateTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('email_testing_mode');
         $this->userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $this->userId;
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        CompanySettingsRepository::set('email_testing_mode', $this->originalMailSendingEnabled, null);
         unset($_SESSION['_auth_user_id']);
         $_POST = [];
         parent::tearDown();
@@ -54,7 +54,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testADraftDocumentBlocksItsStageAndApprovalUnblocksItWhileMailIsOff(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->orderAtStage2();
 
         $blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 2);
@@ -70,7 +70,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testWhileMailIsOnABuyerDocumentMustBeSentNotJustApproved(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $orderId = $this->orderAtStage2();
         $documentId = $this->createTestDocument($orderId, 'BUYERPO', 'approved');
 
@@ -82,7 +82,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testAnInternalDocumentOnlyNeedsApprovalEvenWhileMailIsOn(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $orderId = $this->orderAtStage2();
         $this->createTestDocument($orderId, 'SUPPO', 'approved');
 
@@ -91,7 +91,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testConfirmBuyerPoReceivedIsRefusedUntilTheBuyerPoIsApproved(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->orderAtStage2();
         $this->createTestDocument($orderId, 'BUYERPO', 'draft');
         OrderBuyerPoDocumentRepository::attach($orderId, $this->createTestFile($orderId));
@@ -105,7 +105,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testWhileMailIsOnApprovingTheQuotationDoesNotPassStage1(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
         $reviewer = $this->createTestUser('Export Executive');
@@ -119,7 +119,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testWhileMailIsOffApprovingTheQuotationPassesStage1(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
         $reviewer = $this->createTestUser('Export Executive');
@@ -133,7 +133,7 @@ final class StageDocumentGateTest extends DbTestCase
 
     public function testWhileMailIsOnTheBuyerCannotAcknowledgeAnApprovedButUnsentOc(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         for ($stage = 1; $stage <= 3; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, $this->userId);

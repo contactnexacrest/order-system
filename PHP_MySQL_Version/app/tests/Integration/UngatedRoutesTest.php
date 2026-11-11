@@ -189,6 +189,13 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /associate/catalogue/{}/price associate +csrf',
         'POST /associate/profile associate +csrf',
         'POST /associate/set-password/{} public +csrf',
+        // D-282 / D-283 (11 Nov 2026): the associate's forgot-password, "Stay logged in" and "Forget all remembered computers".
+        'GET /associate/forgot-password public',
+        'POST /associate/forgot-password public +csrf',
+        'POST /keep-alive staff +csrf',
+        'POST /client/keep-alive client +csrf',
+        'POST /associate/keep-alive associate +csrf',
+        'POST /account/forget-computers staff +csrf',
         'POST /quotation-details/verify public +csrf',
     ];
 
@@ -447,7 +454,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(42, $checked); // D-265: + POST /account/backup-codes
+        self::assertSame(44, $checked); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers
         self::assertSame([], $wrong);
     }
 
@@ -468,7 +475,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(17, $checked);
+        self::assertSame(18, $checked); // D-283: + /client/keep-alive
         self::assertSame([], $wrong);
     }
 
@@ -492,7 +499,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(24, $checked);
+        self::assertSame(25, $checked); // D-283: + /associate/keep-alive
         self::assertSame([], $wrong);
     }
 
@@ -560,7 +567,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(69, $checked); // D-265: + 5 login-code POSTs
+        self::assertSame(74, $checked); // D-265: + 5 login-code POSTs; D-282/D-283: + 5
         self::assertSame([], $wrong);
     }
 
@@ -611,7 +618,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(39, $checked); // D-265: + GET /client/login/code
+        self::assertSame(40, $checked); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password
         self::assertSame([], $failed);
     }
 

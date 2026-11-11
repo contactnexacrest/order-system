@@ -32,14 +32,17 @@ final class AssociateAuth
                 header('Location: /associate/login');
                 return false;
             }
-            $timeout = (int) (CompanySettingsRepository::get('session_timeout_minutes') ?? '30');
+            // D-283: the associates' own idle timeout (Admin › Settings › Security, default 2 hours).
             $last = $_SESSION[self::LAST_ACTIVITY_KEY] ?? null;
-            if ($last !== null && (time() - $last) > $timeout * 60) {
+            if (\App\Services\SessionTimeouts::idleExpired('associate', $last !== null ? (int) $last : null)) {
                 AssociatePortalService::logout();
+                unset($_SESSION[self::LAST_ACTIVITY_KEY]);
+                \App\Helpers\Flash::set('info', 'You were signed out after ' . \App\Services\SessionTimeouts::describeMinutes(\App\Services\SessionTimeouts::idleMinutes('associate')) . ' without activity. Please log in again.');
                 header('Location: /associate/login');
                 return false;
             }
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
+            \App\Services\SessionTimeouts::markPage('associate');
             $viewAs = AssociatePortalService::viewAsStaffId() !== null;
             // QA ACC-10: a password changed or reset since this session logged in ends it.
             if (!$viewAs && ((int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true) || !AssociatePortalService::sessionPasswordStillCurrent($a['password_hash'] ?? null))) {
@@ -47,7 +50,8 @@ final class AssociateAuth
                 header('Location: /associate/login');
                 return false;
             }
-            if ($viewAs && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            if ($viewAs && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+                && rtrim((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH), '/') !== '/associate/keep-alive') {
                 http_response_code(403);
                 echo 'Read-only: you are viewing this portal as staff.';
                 return false;

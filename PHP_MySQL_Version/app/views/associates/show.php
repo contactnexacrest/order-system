@@ -54,27 +54,48 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   </div>
 
   <div class="section" id="portal">
-    <h2>Portal login link and personal code</h2>
-    <p>Portal: <b><?= (int) $a['portal_enabled'] === 1 ? 'on' : 'off' ?></b><?php if (!empty($a['last_login_at'])): ?> · last login <?= $__d($a['last_login_at']) ?><?php endif; ?>
-      <?php if ($codeLink): ?><br>Quotation link (with their code): <code><?= htmlspecialchars($codeLink) ?></code><?php endif; ?></p>
-    <div class="btn-row">
-      <form method="post" action="/associates/<?= $id ?>/portal/invite" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm"><?= (int) $a['portal_enabled'] === 1 ? 'Resend portal login link' : 'Send portal login link' ?></button></form>
-      <?php if ((int) $a['portal_enabled'] === 1): ?><form method="post" action="/associates/<?= $id ?>/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form><?php endif; ?>
+    <?php // Owner decision D-282 (11 Nov 2026, points 2 + 5, mockup access.png): three blocks — Portal login · Quotation link · Personal code. ?>
+    <div class="portal-block" data-testid="associate-portal-login">
+      <h3>Portal login</h3>
+      <p>Portal: <span class="badge <?= (int) $a['portal_enabled'] === 1 ? 'badge-active' : 'badge-optional' ?>"><?= (int) $a['portal_enabled'] === 1 ? 'On' : 'Off' ?></span>
+        <span class="muted small"><?= !empty($a['password_hash']) ? 'Password set' : 'Password not set yet' ?> · <?= !empty($a['last_login_at']) ? 'last login ' . htmlspecialchars(Dates::human((string) $a['last_login_at'])) : 'never logged in' ?></span></p>
+      <p class="small"><b>Login page — send this to the associate any time</b></p>
+      <?php $__copyLink = \App\Services\AssociateService::loginUrl(); $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; ?>
+      <p class="muted small">On this page they log in, or click "Forgot password?" to get a new link by e-mail themselves.</p>
+      <div class="btn-row">
+        <form method="post" action="/associates/<?= $id ?>/portal/invite" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Send set-password link</button></form>
+        <?php if ((int) $a['portal_enabled'] === 1): ?><form method="post" action="/associates/<?= $id ?>/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form><?php endif; ?>
+      </div>
     </div>
-    <?php // Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). ?>
-    <form method="post" action="/associates/<?= $id ?>/code" class="inline-form" data-confirm="Set a new personal code for this associate?">
-      <?= Csrf::field() ?>
-      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. DEMO"></label>
-      <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
-      <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
-      <button type="submit" class="btn-sm btn-secondary">Set code</button>
-    </form>
+
+    <?php if ($codeLink): ?>
+    <div class="portal-block" data-testid="associate-quotation-link">
+      <h3>Quotation link (with Associate code)</h3>
+      <?php $__copyLink = $codeLink; $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; ?>
+      <p class="muted small">Buyers who ask for a quotation through this link are registered as this associate's clients.</p>
+    </div>
+    <?php endif; ?>
+
+    <div class="portal-block" data-testid="associate-personal-code">
+      <h3>Personal code</h3>
+      <p>Current code: <b><?= !empty($a['personal_code']) ? htmlspecialchars((string) $a['personal_code']) : '— none yet' ?></b></p>
+      <?php // Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). ?>
+      <form method="post" action="/associates/<?= $id ?>/code" data-confirm="Set a new personal code for this associate?">
+        <?= Csrf::field() ?>
+        <div class="portal-block-code-form">
+          <label>New code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. DEMO"></label>
+          <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
+          <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
+        </div>
+        <p style="margin-top:14px"><button type="submit" class="btn-sm">Set code</button></p>
+      </form>
     <?php if (!empty($codes)): ?>
       <table class="list"><tr><th>Code</th><th>From</th><th>To</th><th>Status</th></tr>
         <?php foreach ($codes as $__c): ?><tr><td style="font-family:monospace"><?= htmlspecialchars((string) $__c['code']) ?></td><td><?= $__d($__c['issued_at']) ?></td><td><?= $__d($__c['retired_at']) ?></td>
           <td><?= !empty($__c['blocked_at']) ? 'Blocked — ' . htmlspecialchars((string) $__c['blocked_reason']) : ($__c['code'] === ($a['personal_code'] ?? '') ? 'Current' : 'Still accepted (old links)') ?></td></tr><?php endforeach; ?>
       </table>
     <?php endif; ?>
+    </div>
   </div>
   <?php if (isset($portalAccess)) { require __DIR__ . '/_portal_access.php'; } // D-261 ?>
   <?php endif; ?>

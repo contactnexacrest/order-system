@@ -36,6 +36,10 @@ final class SettingsController
         // Owner points 5/8/9 (2 Nov 2026): edited on its own page with its own rules (/settings/document-cleanup).
         unset($grouped[\App\Controllers\DocumentCleanupController::CATEGORY]);
         unset($grouped[\App\Services\SopAccessService::SETTING_CATEGORY]); // D-266: switched on Admin › SOP access
+        // D-280: testing mode is set on Admin › E-mail settings (one place only).
+        if (isset($grouped['mail'])) {
+            $grouped['mail'] = array_values(array_filter($grouped['mail'], static fn (array $r): bool => $r['setting_key'] !== 'email_testing_mode'));
+        }
         $user = AuthService::currentUser();
         View::render('settings/index', [
             'grouped' => $grouped,
@@ -162,7 +166,7 @@ final class SettingsController
         // submission.
         $valueErrors = [];
         foreach ($toApply as $key => $change) {
-            $error = SettingValueValidator::check($byKey[$key]['value_type'], $change['new']);
+            $error = SettingValueValidator::check($byKey[$key]['value_type'], $change['new'], (string) $key); // D-283: key ranges
             if ($error !== null) {
                 $valueErrors[] = "{$key} {$error}";
             }

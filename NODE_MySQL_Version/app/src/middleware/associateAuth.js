@@ -20,14 +20,18 @@ function required() {
       res.redirect('/associate/login');
       return;
     }
-    const timeout = parseInt((await companySettingsRepository.get('session_timeout_minutes')) ?? '30', 10);
+    // D-283: the associates' own idle timeout (Admin › Settings › Security, default 2 hours).
+    const sessionTimeouts = require('../services/sessionTimeouts');
     const last = req.session[LAST_ACTIVITY_KEY] ?? null;
-    if (last !== null && (Date.now() - last) > timeout * 60000) {
+    if (await sessionTimeouts.idleExpired('associate', last)) {
       await associatePortalService.logout(req);
+      delete req.session[LAST_ACTIVITY_KEY];
+      require('../helpers/flash').set(req, 'info', `You were signed out after ${sessionTimeouts.describeMinutes(await sessionTimeouts.idleMinutes('associate'))} without activity. Please log in again.`);
       res.redirect('/associate/login');
       return;
     }
     req.session[LAST_ACTIVITY_KEY] = Date.now();
+    await sessionTimeouts.markPage(req, 'associate');
     const viewAs = associatePortalService.viewAsStaffId(req) !== null;
     // QA ACC-10: a password changed or reset since this session logged in ends it.
     if (!viewAs && (Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status) || !associatePortalService.sessionPasswordStillCurrent(req, a.password_hash))) {
@@ -35,7 +39,7 @@ function required() {
       res.redirect('/associate/login');
       return;
     }
-    if (viewAs && req.method === 'POST') {
+    if (viewAs && req.method === 'POST' && String(req.path || '').replace(/\/+$/, '') !== '/associate/keep-alive') {
       res.status(403).send('Read-only: you are viewing this portal as staff.');
       return;
     }

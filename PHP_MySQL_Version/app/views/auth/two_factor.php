@@ -11,7 +11,8 @@
       <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus placeholder="e.g. 123456">
     </label>
     <?php if (!empty($rememberDays)): ?>
-      <label class="full"><input type="checkbox" name="remember_browser" value="1"> Remember this browser for <?= (int) $rememberDays ?> day(s) — only on a computer that is yours</label>
+      <label class="full"><input type="checkbox" name="remember_browser" value="1"> This is my own office computer — don't ask for the code here for <?= (int) $rememberDays ?> day(s)</label>
+      <p class="muted small" style="margin-top:-6px">Tick only on a computer nobody else uses. A password change forgets it; you can also forget all remembered computers under My Account.</p>
     <?php endif; ?>
     <button type="submit">Verify</button>
   </form>

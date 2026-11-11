@@ -97,12 +97,25 @@ lock out a real client login.
 
 ### Resetting a client's portal password
 
+**Client portal login block (owner, 11 Nov 2026, D-282).** The client's page
+shows **Client portal login**: whether the portal account is active, when it
+was created and the last login; the login page `/client/login` with a
+**Copy** button (send it to the buyer any time — they can use "Forgot your
+password?" there themselves); **Send set-password link** (a new link valid
+72 hours, works once, e-mailed to the buyer and also shown with Copy);
+**Reset with a temporary password**; and **Log in as this client**. Before
+the first advance clears there is no portal account yet and the block says
+so. When the portal is opened at advance clearance, the screen says whether
+the invite e-mail really went out and shows the set-password link to copy;
+the invite also gives the permanent login page. Buyers are signed out after
+2 hours without activity (D-283).
+
 A client who's genuinely locked out — forgot their password and can't
 follow (or receive) the "Forgot password" email link — has no self-service
 way back in, and impersonation doesn't help either (the client's own
 Change Password form still needs their *current* password, which staff
 never know). For exactly this case, that same client's staff-side page
-("Client Portal Access" section) has a **Reset client-portal password**
+(**Client portal login** block, D-282) has a **Reset with a temporary password**
 action: enter a reason, and it generates a one-time temporary password,
 shown once in the success banner for staff to hand over directly (phone,
 in person — never emailed automatically, since the client typically

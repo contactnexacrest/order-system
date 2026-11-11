@@ -547,8 +547,11 @@ associate's page (Link a client already on file).
 
 To end the "portal link" confusion the screens, e-mails and messages use:
 
-- **Portal login link** — the associate's own link to set the password of
-  their portal (staff button: *Send / Resend portal login link*).
+- **Set-password link** — the associate's own one-use link (72 hours) to set
+  the password of their portal (staff button: *Send set-password link*; the
+  link is also shown with **Copy**, D-282). The **login page** itself is
+  always `/associate/login` (shown with Copy on the associate page); there
+  the associate can use **Forgot password?** to get a new link by e-mail.
 - **Quotation link (with your code)** — `…/quotation-details?code=NXA-…`, for
   any buyer; the buyer registers with the associate's personal code.
 - **Buyer registration link** — `…/invite/<token>`, made by the associate for
@@ -601,8 +604,12 @@ Activation of the associate stays as before.
    never an error code. Too many tries from one connection are slowed down.
 3. Staff are notified; the registration waits under **Registrations**.
    **Accept** creates the associate (status *Invited*, INR for India, USD
-   abroad) and e-mails the portal login link. **Reject** needs a reason
-   (10–300 characters), which is e-mailed to the person.
+   abroad) and e-mails the set-password link (always sent — a MUST e-mail;
+   valid 72 hours, works once; the e-mail also gives the permanent login
+   page). The screen says whether the e-mail really went out and shows the
+   link with **Copy**, so you can also send it by WhatsApp. **Reject** needs
+   a reason (10–300 characters), which is e-mailed to the person (the screen
+   says if it was not).
 4. After the first login the associate completes the profile (address, PAN,
    GSTIN), bank details and KYC documents; the portal home reminds them
    until everything is in and accepted.

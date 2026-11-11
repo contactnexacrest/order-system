@@ -57,6 +57,13 @@ const EXPECTED = [
   'POST /associate/catalogue/{}/price associate +csrf',
   'POST /associate/profile associate +csrf',
   'POST /associate/set-password/{} public +csrf',
+  // D-282 / D-283 (11 Nov 2026): the associate's forgot-password, "Stay logged in" and "Forget all remembered computers".
+  'GET /associate/forgot-password public',
+  'POST /associate/forgot-password public +csrf',
+  'POST /keep-alive staff +csrf',
+  'POST /client/keep-alive client +csrf',
+  'POST /associate/keep-alive associate +csrf',
+  'POST /account/forget-computers staff +csrf',
   'POST /quotation-details/verify public +csrf',
   'GET / staff',
   'GET /2fa public',
@@ -333,7 +340,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(42); // D-265: + POST /account/backup-codes
+    expect(checked).toBe(44); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -345,7 +352,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/client/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(17);
+    expect(checked).toBe(18); // D-283: + /client/keep-alive
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -387,7 +394,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(24);
+    expect(checked).toBe(25); // D-283: + /associate/keep-alive
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -421,7 +428,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(69); // D-265: + 5 login-code POSTs
+    expect(checked).toBe(74); // D-265: + 5 login-code POSTs; D-282/D-283: + 5
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -450,7 +457,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(39); // D-265: + GET /client/login/code
+    expect(checked).toBe(40); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password
     expect(failed).toEqual([]);
   }, 120000);
 

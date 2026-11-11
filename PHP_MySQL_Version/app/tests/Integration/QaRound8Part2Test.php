@@ -153,16 +153,17 @@ final class QaRound8Part2Test extends DbTestCase
     {
         $person = $this->personWithAReview();
         $date = '2098-02-' . sprintf('%02d', random_int(10, 28));
-        $before = CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        $before = CompanySettingsRepository::get('email_testing_mode');
+        \App\Services\EmailPolicy::setSwitchForTest('staff_daily_summary', 'staff', false); // D-280: this e-mail switched off in Admin › E-mail settings
         try {
             DailyDigestService::setSender(null);
             $result = DailyDigestService::run($date);
         } finally {
-            CompanySettingsRepository::set('mail_sending_enabled', $before);
+            CompanySettingsRepository::set('email_testing_mode', $before);
+            \App\Services\EmailPolicy::setSwitchForTest('staff_daily_summary', 'staff', true);
         }
         self::assertSame(['sent' => 0, 'skipped' => 0, 'failed' => 0, 'mail_off' => true], $result);
-        self::assertSame('Daily digest: e-mail sending is off — nothing sent.', DailyDigestService::summary($result));
+        self::assertSame('Daily digest: the daily summary e-mail is switched off in Admin › E-mail settings — nothing sent.', DailyDigestService::summary($result));
         self::assertSame(0, $this->digestRows($person, $date));
     }
 

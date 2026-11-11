@@ -160,7 +160,7 @@ final class AssociatePortalRoutesTest extends DbTestCase
         $ok = $this->call('POST', "/associate/set-password/{$token}", ['new_password' => 'Route1234567', 'confirm_password' => 'Route1234567']);
         self::assertSame(['success', 'Password set. Log in with your e-mail and the new password.'], [$ok['type'], $ok['flash']]);
         self::assertTrue(password_verify('Route1234567', (string) AssociateRepository::find((int) $a['id'])['password_hash']));
-        self::assertSame('This link has expired or was already used. Ask NexaCrest for a new one.',
+        self::assertSame('This link has expired or was already used. Use "Forgot password?" on the login page to get a new one.',
             $this->call('POST', "/associate/set-password/{$token}", ['new_password' => 'Other1234567', 'confirm_password' => 'Other1234567'])['flash'], 'the link works once');
     }
 
@@ -316,8 +316,8 @@ final class AssociatePortalRoutesTest extends DbTestCase
 
     public function testOcSentToBuyer(): void
     {
-        $original = CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        $original = CompanySettingsRepository::get('email_testing_mode');
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         try {
             $orderId = $this->createTestOrder($this->createTestClient());
             $this->asStaff();
@@ -341,7 +341,7 @@ final class AssociatePortalRoutesTest extends DbTestCase
             $this->asStaff();
             self::assertSame('This Order Confirmation is already marked as sent to the buyer.', $this->call('POST', "/orders/{$orderId}/oc-sent-to-buyer")['flash']);
         } finally {
-            CompanySettingsRepository::set('mail_sending_enabled', $original, null);
+            CompanySettingsRepository::set('email_testing_mode', $original, null);
         }
     }
 

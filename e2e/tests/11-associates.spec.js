@@ -49,12 +49,13 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.getByRole('button', { name: 'Change status' }).click();
     await expect(page.locator('.alert-success')).toContainText('Status changed to Active.');
 
-    await page.getByRole('button', { name: 'Send portal login link' }).click();
+    // D-282: "Send set-password link"; the flash says truthfully whether it was e-mailed, and always shows the link with Copy.
+    await page.getByRole('button', { name: 'Send set-password link' }).click();
     const flash = await page.locator('.alert-success').innerText();
-    expect(flash).toContain(`Portal login link e-mailed to ${ASSOCIATE_EMAIL}.`);
-    const m = flash.match(/link: (\S+)/);
-    expect(m).not.toBeNull();
-    await page.goto(new URL(m[1]).pathname);
+    expect(flash).toContain(ASSOCIATE_EMAIL);
+    const link = await page.locator('.alert-success [data-copy]').getAttribute('data-copy');
+    expect(link).toContain('/associate/set-password/');
+    await page.goto(new URL(link).pathname);
     await page.getByLabel(/^New password/).fill(PASSWORD);
     await page.getByLabel('Re-enter the new password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Set password' }).click();

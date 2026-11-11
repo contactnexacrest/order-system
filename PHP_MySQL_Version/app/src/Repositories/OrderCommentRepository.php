@@ -85,7 +85,9 @@ final class OrderCommentRepository
             return 'e-mailed';
         }
         return match ($comment['email_status'] ?? null) {
-            'sending_off' => 'not e-mailed — e-mail sending is switched off in Admin',
+            'sending_off' => 'not e-mailed — e-mail sending is switched off in Admin', // posts from before D-280
+            'testing_mode' => 'not e-mailed — testing mode holds e-mails to buyers and suppliers', // D-280
+            'switched_off' => 'not e-mailed — this e-mail is switched off in Admin › E-mail settings', // D-280
             'no_email'    => 'not e-mailed — no client e-mail on file',
             'failed'      => 'not e-mailed — the e-mail could not be sent',
             default       => 'not e-mailed',

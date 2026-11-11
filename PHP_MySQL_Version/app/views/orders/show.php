@@ -416,6 +416,7 @@ $isLcPayment = ($order['payment_method'] ?? 'CASH_ADVANCE') === 'LC';
 // action — a document counts as sent once approved
 // (EmailDispatchService::markSentIfMailDisabled()).
 $mailSendingEnabled = \App\Services\EmailDispatchService::mailSendingEnabled();
+$messageMailOn = \App\Services\EmailPolicy::allows('buyer_messages', 'buyer'); // D-280: order messages have their own switch
 $lcConfirmed = $orderLcDetails && $orderLcDetails['lc_confirmed_at'] !== null;
 $buyerAcknowledged = $stage4 && $stage4['status'] === 'gate_passed';
 $ocDocGenerated = (bool) array_filter($documents, static fn(array $d): bool => $d['document_type_code'] === 'OC');
@@ -2070,7 +2071,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php endif; ?>
 
               <?php if ($d['status'] === 'approved' && !$mailSendingEnabled): ?>
-                <p class="muted">Email sending is turned off (Settings), so there is no Send to Buyer — documents approved from now on count as sent automatically. Send this PDF to the buyer yourself.</p>
+                <p class="muted">Document e-mails to the buyer are held (testing mode, or switched off in Admin › E-mail settings), so there is no Send to Buyer — documents approved from now on count as sent automatically. Send this PDF to the buyer yourself.</p>
               <?php elseif ($d['status'] === 'approved'): ?>
                 <?php if ($hasPendingSend): ?>
                   <p class="muted">A send to the buyer is already in progress for this document (see above) — no new send can be submitted until it's sent, rejected, or fails.</p>
@@ -2078,7 +2079,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <p><a href="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/send" class="btn-sm btn-accent">Send to Buyer (deferred, 2-level approval)</a></p>
                 <?php endif; ?>
               <?php elseif ($d['status'] === 'sent'): ?>
-                <p class="muted"><?= $mailSendingEnabled || !empty($emailLogs) ? 'Already sent to buyer.' : 'Counted as sent on approval (email sending is off) — send the PDF to the buyer yourself.' ?></p>
+                <p class="muted"><?= $mailSendingEnabled || !empty($emailLogs) ? 'Already sent to buyer.' : 'Counted as sent on approval (document e-mails to the buyer are held) — send the PDF to the buyer yourself.' ?></p>
               <?php elseif ($d['status'] === 'superseded'): ?>
                 <p class="muted small">This revision is INVALID — superseded. It can no longer be sent; see the latest revision instead.</p>
               <?php else: ?>
@@ -2095,7 +2096,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <?php // Owner decision (2026-10-26, t4): pinned open above the five sections — the client conversation is needed at every step. ?>
   <details class="step-card step-card-reference" id="order-updates" open>
     <summary><h2>Order Communication <small class="muted">(with the client — any time)</small><?php if ($comments): ?> <span class="phase-pill"><?= count($comments) ?> message<?= count($comments) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
-    <p class="muted">A running conversation with the client for this order. <?php if ($mailSendingEnabled): ?>Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment).<?php else: ?><strong>Email sending is turned off</strong> — anything you post here appears in the client's portal only; the client is NOT emailed.<?php endif; ?> Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
+    <p class="muted">A running conversation with the client for this order. <?php if ($messageMailOn): ?>Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment).<?php else: ?><strong>Order messages to the buyer are not e-mailed now</strong> (testing mode, or switched off in Admin › E-mail settings) — anything you post here appears in the client's portal only; the client is NOT emailed.<?php endif; ?> Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
     <div class="chat-thread">
       <?php if (empty($comments)): ?>
         <p class="chat-empty">No updates posted yet.</p>
@@ -2136,7 +2137,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <textarea name="body" data-required-unless="attachments[]" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…" aria-label="Write an update for the client"></textarea>
       <div class="chat-post-form-row">
         <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf" aria-label="Attachments">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…"><?= $mailSendingEnabled ? 'Post &amp; email client' : 'Post to client portal' ?></button>
+        <button type="submit" class="btn-sm" data-loading-text="Posting…"><?= $messageMailOn ? 'Post &amp; email client' : 'Post to client portal' ?></button>
       </div>
     </form>
     <?php endif; ?>

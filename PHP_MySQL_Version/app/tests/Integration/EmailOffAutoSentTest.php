@@ -29,12 +29,12 @@ final class EmailOffAutoSentTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('email_testing_mode');
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        CompanySettingsRepository::set('email_testing_mode', $this->originalMailSendingEnabled, null);
         unset($_SESSION['_auth_user_id']);
         parent::tearDown();
     }
@@ -54,7 +54,7 @@ final class EmailOffAutoSentTest extends DbTestCase
 
     public function testApprovedQuotationCountsAsSentWhenMailIsOff(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
 
@@ -69,7 +69,7 @@ final class EmailOffAutoSentTest extends DbTestCase
 
     public function testApprovedQuotationStaysApprovedWhenMailIsOn(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
 
@@ -80,7 +80,7 @@ final class EmailOffAutoSentTest extends DbTestCase
 
     public function testInternalNeverShownToBuyerDocumentIsNotMarkedSent(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'SUPPO', 'approved');
 
@@ -91,7 +91,7 @@ final class EmailOffAutoSentTest extends DbTestCase
 
     public function testOrderConfirmationMarkedSentOnApprovalDoesNotStartTheClockYet(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $orderId = $this->createTestOrder($this->createTestClient());
         $documentId = $this->createTestDocument($orderId, 'OC', 'approved');
 
@@ -125,18 +125,18 @@ final class EmailOffAutoSentTest extends DbTestCase
         $this->createTestDocument($orderId, 'QT', 'approved');
         $_SESSION['_auth_user_id'] = $userId;
 
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         ob_start();
         (new OrderController())->show(['id' => (string) $orderId]);
         $mailOn = ob_get_clean();
 
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         ob_start();
         (new OrderController())->show(['id' => (string) $orderId]);
         $mailOff = ob_get_clean();
 
         self::assertStringContainsString('Send to Buyer (deferred', $mailOn);
         self::assertStringNotContainsString('Send to Buyer (deferred', $mailOff);
-        self::assertStringContainsString('Email sending is turned off', $mailOff);
+        self::assertStringContainsString('Document e-mails to the buyer are held', $mailOff);
     }
 }

@@ -258,7 +258,7 @@ async function sendDetailsLink(req, res) {
     return;
   }
   const sent = await vendorDetailsService.sendDetailsLink('supplier', id, req.user.id);
-  flash.set(req, 'success', `Vendor Details Link ${sent.emailedTo ? `emailed to ${sent.emailedTo}` : 'generated'}: ${sent.link}`);
+  flash.set(req, 'success', sent.message, sent.link); // D-280
   res.redirect(`/suppliers/${id}/edit#vendor-details-link`);
 }
 

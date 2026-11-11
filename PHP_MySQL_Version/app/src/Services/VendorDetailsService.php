@@ -72,9 +72,14 @@ final class VendorDetailsService
                     . "Please keep a cancelled cheque or bank letter ready; our team may ask for it to verify the account. The link works once and for 30 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], false, 'supplier_links', 'supplier');
+        } else {
+            $sent = false;
         }
-        AuditLogRepository::log($userId, 'VENDOR_DETAILS_LINK_GENERATED', $meta['table'], $id, null, null, null, $email !== '' ? 'Emailed to ' . $email : 'No email on file — hand the link over directly');
-        return ['link' => $link, 'emailed_to' => $email !== '' ? $email : null];
+        AuditLogRepository::log($userId, 'VENDOR_DETAILS_LINK_GENERATED', $meta['table'], $id, null, null, null,
+            $sent ? 'Emailed to ' . $email : ($email !== '' ? 'Not e-mailed (' . EmailPolicy::notSentReason('supplier_links', 'supplier') . ') — hand the link over directly' : 'No email on file — hand the link over directly'));
+        // D-280: emailed_to only when the e-mail really went out.
+        return ['link' => $link, 'emailed_to' => $sent ? $email : null, 'email' => $email !== '' ? $email : null,
+            'message' => EmailDispatchService::linkMailOutcome('Vendor Details Link', $email !== '' ? $email : null, $sent, $link, 'supplier_links', 'supplier')];
     }
 }

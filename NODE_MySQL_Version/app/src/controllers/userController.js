@@ -108,6 +108,7 @@ async function editForm(req, res) {
   // D-259: the team incentive switch (only the MD changes it).
   const incentiveService = require('../services/incentiveService');
   res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst(), agreementCard,
+    rememberedCount: await require('../services/rememberBrowserService').countFor(target.id), // D-283
     incentiveEligible: await incentiveService.isEligible(target.id),
     incentiveDesignation: await incentiveService.designationEligibility(target.id),
     incentiveCanEdit: await incentiveService.isMd(req.user),
@@ -351,4 +352,17 @@ function generateTempPassword() {
   return crypto.randomBytes(12).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-module.exports = { index, create, editForm, update, toggleActive, archive, unarchive, deleteUser, forceResetPassword };
+/** D-283: Admin forgets every computer remembered for this person's login code. */
+async function forgetComputers(req, res) {
+  const userId = parseInt(req.params.id, 10);
+  if (!(await userRepository.findById(userId))) {
+    res.status(404).send('User not found.');
+    return;
+  }
+  const n = await require('../services/rememberBrowserService').forgetAll(userId);
+  await auditLogRepository.log(req.user.id, 'LOGIN_BROWSERS_FORGOTTEN', 'users', userId, null, String(n), '0', 'By an administrator (Users › Edit)');
+  flash.set(req, 'success', `${n === 1 ? '1 remembered computer' : `${n} remembered computers`} forgotten — the e-mailed login code is asked again at the next login.`);
+  res.redirect(`/users/${userId}/edit`);
+}
+
+module.exports = { index, create, editForm, update, toggleActive, archive, unarchive, deleteUser, forceResetPassword, forgetComputers };

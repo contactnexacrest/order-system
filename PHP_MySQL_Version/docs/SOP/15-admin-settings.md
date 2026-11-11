@@ -29,11 +29,60 @@ them.
 Every staff member, in every role, and every buyer enters a 6-digit code
 e-mailed at each login. It cannot be switched off for anyone; the Users list
 shows "2FA: Required". Admin's only choice is **Admin → Settings → Security →
-`login_remember_browser_days`** (default **0** = the code at every login, which
-is recommended; at most 90). Above 0, staff (never buyers or associates) see
-"Remember this browser" on the code screen and skip the code on that browser
-for that many days. A password change or reset forgets every remembered
-browser; putting the setting back to 0 ends them all at once.
+`login_remember_browser_days`** (default **30**, 0–90; 0 = the code at every
+login). Above 0, staff (never buyers or associates) see **"This is my own
+office computer"** on the code screen and skip the code on that computer for
+that many days (D-283). A password change or reset forgets every remembered
+computer; putting the setting back to 0 ends them all at once. **Forget all
+remembered computers**: each person on My Account, and Admin for any person
+in Users → Edit (both audit-logged).
+
+### Staying logged in (owner, 11 Nov 2026, D-283)
+
+**Admin → Settings → Security** has one idle timeout per area:
+`session_timeout_staff_minutes` (**240** = 4 hours), `session_timeout_client_minutes`
+(buyers, **120**) and `session_timeout_associate_minutes` (associates, **120**),
+each 5 to 1440 minutes; and `session_absolute_staff_hours` (**12**, 1 to 24):
+staff log in again at least this often, however active. The app now keeps
+these itself — the server no longer drops a session after about 24 minutes.
+Two minutes before an idle sign-out every page shows "You will be signed out
+soon" with **Stay logged in**; before the 12-hour limit it only warns.
+
+### E-mail settings (owner, 11 Nov 2026, D-280 / D-281)
+
+**Admin → E-mail settings** lists every e-mail the app sends, with one switch
+per audience (Staff, Associate, Buyer, Supplier). Saving needs a reason and is
+in the Audit Log.
+
+- **MUST** (locked on, cannot be switched off): login codes, set-password
+  invites (buyer portal and associate portal), forgot-password links (staff,
+  buyers, associates), the "bank details changed — if this wasn't you" alert,
+  the backup-code alert, the quotation verification code.
+- **SHOULD** (on when installed): everything else — documents, links and
+  messages to buyers, supplier links, every associate e-mail, staff approvals
+  (one e-mail per approval), buyer/supplier/associate actions, compliance
+  alerts, Zoho failures, the daily summary, "order assigned / department owner".
+- **OPTIONAL** (off when installed): only the copy of buyer documents to the
+  associate who introduced the buyer.
+- **Testing mode — hold all e-mails to buyers and suppliers** (top of the page;
+  replaces the old "mail sending" switch): while on, buyer and supplier
+  e-mails are not sent and the screens say so and show the link to copy;
+  staff and associate e-mails and every MUST e-mail still go out. While buyer
+  document e-mails are held there is no Send to Buyer: an approved document
+  counts as sent and staff send the PDF themselves.
+- **Who on the staff side gets an e-mail.** Only the people of the event's
+  department on that order (its department owner and the department's
+  assignees). Nobody from that department on the order: the department's
+  manager, with "please assign someone"; no manager: the Managing Director.
+  The MD, ED and Order Coordinator see routine events in the app only.
+- **E. Company compliance alerts — who is told.** For LUT, RCMC, agreements,
+  TDS, merchant-trade RBI limits, the ECGC policy and the monthly eBRC list,
+  choose a **responsible person** and a **backup** (for leave). Not set: the
+  department's manager, then the MD.
+
+The screen never says "e-mailed" when nothing was sent; links (set-password,
+PI form, Buyer Action, Payment Action, Supplier Action, Vendor Details) are
+shown with a **Copy** button so you can send them yourself.
 
 **Backup codes.** The MD, ED, Admin and any Super Admin make 10 emergency
 backup codes on **My Account** (current password needed). They are shown once

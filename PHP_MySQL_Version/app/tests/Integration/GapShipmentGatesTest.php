@@ -45,7 +45,7 @@ final class GapShipmentGatesTest extends DbTestCase
         $_FILES = [];
         $_SESSION = [];
         Flash::pull();
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        CompanySettingsRepository::set('email_testing_mode', '1');
         parent::tearDown();
     }
 
@@ -276,7 +276,7 @@ final class GapShipmentGatesTest extends DbTestCase
         self::assertStringStartsWith('Order Confirmation marked as sent to the buyer. If the buyer does not respond by ', $message);
         self::assertSame('This Order Confirmation is already marked as sent to the buyer.', $this->call('markOcSentToBuyer', $orderId));
 
-        CompanySettingsRepository::set('mail_sending_enabled', '1');
-        self::assertSame('E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.', $this->call('markOcSentToBuyer', $orderId));
+        CompanySettingsRepository::set('email_testing_mode', '0');
+        self::assertSame('Document e-mails to the buyer are on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.', $this->call('markOcSentToBuyer', $orderId));
     }
 }

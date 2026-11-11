@@ -1486,6 +1486,150 @@
     });
   }
 
+  // Owner decision D-280 (11 Nov 2026): a link shown with a Copy button
+  // (<button data-copy="…">) — set-password links, PI form / payment links,
+  // the permanent login pages. Copies the value and says "Copied".
+  function copyText(value) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(value);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) { resolve(); } else { reject(new Error('copy refused')); }
+      } catch (err) {
+        document.body.removeChild(ta);
+        reject(err);
+      }
+    });
+  }
+
+  function initCopyButtons() {
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-copy]') : null;
+      if (!btn) return;
+      e.preventDefault();
+      var original = btn.getAttribute('data-copy-label') || btn.textContent;
+      btn.setAttribute('data-copy-label', original);
+      copyText(btn.getAttribute('data-copy') || '').then(function () {
+        btn.textContent = 'Copied';
+      }, function () {
+        btn.textContent = 'Select and copy it';
+      });
+      setTimeout(function () { btn.textContent = original; }, 2000);
+    });
+  }
+
+  // Owner decision D-283 (11 Nov 2026): a warning 2 minutes before the idle
+  // logout, with "Stay logged in". Pages inside a signed-in area carry
+  // <meta name="session-idle" content="<idle seconds>" data-warn data-keepalive
+  // data-login data-csrf [data-absolute-left]>. Activity in another tab of the
+  // same browser counts too (shared through localStorage when it is there).
+  // The staff 12-hour limit cannot be extended: that warning only says so.
+  function initIdleWarning() {
+    var meta = document.querySelector('meta[name="session-idle"]');
+    if (!meta) return;
+    var idle = parseInt(meta.getAttribute('content'), 10) || 0;
+    if (idle <= 0) return;
+    var warn = parseInt(meta.getAttribute('data-warn'), 10) || 120;
+    var absAttr = meta.getAttribute('data-absolute-left');
+    var absoluteEnd = absAttr !== null && absAttr !== '' ? Date.now() + parseInt(absAttr, 10) * 1000 : null;
+    var keepalive = meta.getAttribute('data-keepalive');
+    var login = meta.getAttribute('data-login') || '/';
+    var csrf = meta.getAttribute('data-csrf') || '';
+    var storeKey = 'session-last-activity:' + keepalive;
+    var last = Date.now();
+    var box = null;
+    var timer = null;
+
+    function readShared() {
+      try {
+        var v = parseInt(window.localStorage.getItem(storeKey), 10);
+        if (v > last) last = v;
+      } catch (err) { /* no storage: this tab only */ }
+    }
+    function writeShared() {
+      try { window.localStorage.setItem(storeKey, String(last)); } catch (err) { /* ignore */ }
+    }
+    function build() {
+      if (box) return box;
+      box = document.createElement('div');
+      box.className = 'idle-warning';
+      box.setAttribute('role', 'alertdialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-labelledby', 'idle-warning-title');
+      box.hidden = true;
+      box.innerHTML = '<div class="idle-warning-box">'
+        + '<h2 id="idle-warning-title">You will be signed out soon</h2>'
+        + '<p class="idle-warning-text"></p>'
+        + '<div class="btn-row"><button type="button" class="idle-warning-stay">Stay logged in</button></div>'
+        + '</div>';
+      document.body.appendChild(box);
+      box.querySelector('.idle-warning-stay').addEventListener('click', stay);
+      return box;
+    }
+    function show(text, canStay) {
+      build();
+      box.querySelector('.idle-warning-text').textContent = text;
+      box.querySelector('.idle-warning-stay').hidden = !canStay;
+      box.hidden = false;
+      if (canStay) box.querySelector('.idle-warning-stay').focus();
+    }
+    function hide() {
+      if (box) box.hidden = true;
+    }
+    function stay() {
+      var body = '_csrf=' + encodeURIComponent(csrf);
+      fetch(keepalive, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body: body
+      }).then(function (r) {
+        var type = r.headers.get('Content-Type') || '';
+        if (!r.ok || type.indexOf('application/json') === -1) throw new Error('signed out');
+        return r.json();
+      }).then(function (data) {
+        if (!data || !data.ok) throw new Error('signed out');
+        last = Date.now();
+        writeShared();
+        hide();
+      }).catch(function () {
+        window.location.href = login;
+      });
+    }
+    function tick() {
+      readShared();
+      var now = Date.now();
+      var idleLeft = Math.round((last + idle * 1000 - now) / 1000);
+      var absLeft = absoluteEnd !== null ? Math.round((absoluteEnd - now) / 1000) : null;
+      if (idleLeft <= 0 || (absLeft !== null && absLeft <= 0)) {
+        clearInterval(timer);
+        window.location.href = login;
+        return;
+      }
+      if (absLeft !== null && absLeft <= warn && absLeft <= idleLeft) {
+        show('For security, staff log in again after a set number of hours. You will be signed out in about '
+          + Math.max(1, Math.ceil(absLeft / 60)) + ' minute(s) — save your work now.', false);
+      } else if (idleLeft <= warn) {
+        show('You have not done anything for a while. You will be signed out in about '
+          + Math.max(1, Math.ceil(idleLeft / 60)) + ' minute(s).', true);
+      } else {
+        hide();
+      }
+    }
+    writeShared();
+    timer = setInterval(tick, 5000);
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -1536,6 +1680,8 @@
     initFocusLink();
     initFloorNotes();
     initPatternFromSelect();
+    initCopyButtons(); // D-280
+    initIdleWarning(); // D-283
   }
 
   if (document.readyState === 'loading') {

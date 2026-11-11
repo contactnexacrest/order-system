@@ -1712,7 +1712,8 @@ async function show(req, res) {
       // Owner decision: with email sending off there is no "Send to Buyer"
       // action — a document counts as sent once approved
       // (emailDispatchService.markSentIfMailDisabled()).
-      mailSendingEnabled: (await companySettingsRepository.get('mail_sending_enabled')) !== '0',
+      mailSendingEnabled: await require('../services/emailDispatchService').mailSendingEnabled(), // D-280: buyer document e-mails on
+      messageMailOn: await require('../services/emailPolicy').allows('buyer_messages', 'buyer'), // D-280: order messages have their own switch
       buyerPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_buyer_po')) === '1',
       supplierPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_supplier_po')) === '1',
       products: await orderProductRepository.forOrder(orderId),
@@ -2019,11 +2020,11 @@ async function generatePiFormLink(req, res) {
         + 'This link works for 30 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body, { kind: 'buyer_links', audience: 'buyer' });
   }
 
   await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('PI-stage form link', clientEmail, sent, link));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('PI-stage form link', clientEmail, sent, link), link);
   res.redirect(linkReturnUrl(orderId, 'step-5a-pi-form-link'));
 }
 
@@ -2068,11 +2069,11 @@ async function generateBuyerActionLink(req, res) {
         + 'This link works for 90 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body, { kind: 'buyer_links', audience: 'buyer' });
   }
 
   await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Buyer Action link', clientEmail, sent, link));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Buyer Action link', clientEmail, sent, link), link);
   // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
   res.redirect(linkReturnUrl(orderId, returnAnchor));
 }
@@ -2105,11 +2106,11 @@ async function generatePaymentActionLink(req, res) {
         + 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body, { kind: 'buyer_links', audience: 'buyer' });
   }
 
   await auditLogRepository.log(user.id, 'PAYMENT_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Payment Action link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Payment Action link', clientEmail, sent, link));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Payment Action link', clientEmail, sent, link), link);
   res.redirect(linkReturnUrl(orderId, linkReturnAnchor(req, 'step-5d-payment-record')));
 }
 
@@ -2589,11 +2590,12 @@ async function clearAdvancePayment(req, res) {
   // Client portal access is provisioned here, and only here — see
   // clientPortalService's docblock. No-op if this client already has a
   // login from an earlier order.
-  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
+  const provisionOut = {}; // D-280: the invite link, shown to copy
+  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId, provisionOut);
 
   const baseMessage = `Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.${shortNote}`;
   if (provisionStatus === 'provisioned') {
-    flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
+    flash.set(req, 'success', baseMessage + clientPortalService.inviteOutcome(provisionOut.invite), provisionOut.invite ? provisionOut.invite.link : null); // D-280
   } else if (provisionStatus === 'no_email_on_file') {
     flash.set(req, 'warning', `${baseMessage} WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.`);
   } else {
@@ -2831,11 +2833,12 @@ async function confirmLcUsable(req, res) {
   await auditLogRepository.log(user.id, 'LC_CONFIRMED_USABLE', 'order_lc_details', orderId, 'lc_confirmed_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */);
   await stageGateService.passAndUnlockNext(orderId, 3, user.id);
 
-  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
+  const provisionOut = {}; // D-280: the invite link, shown to copy
+  const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId, provisionOut);
 
   const baseMessage = 'LC confirmed usable. Stage 4 unlocked — you can now generate the Order Confirmation.';
   if (provisionStatus === 'provisioned') {
-    flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
+    flash.set(req, 'success', baseMessage + clientPortalService.inviteOutcome(provisionOut.invite), provisionOut.invite ? provisionOut.invite.link : null); // D-280
   } else if (provisionStatus === 'no_email_on_file') {
     flash.set(req, 'warning', `${baseMessage} WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.`);
   } else {
@@ -2923,7 +2926,7 @@ async function markOcSentToBuyer(req, res) {
   }
   const emailDispatchService = require('../services/emailDispatchService');
   if (await emailDispatchService.mailSendingEnabled()) {
-    flash.set(req, 'error', 'E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
+    flash.set(req, 'error', 'Document e-mails to the buyer are on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -3395,11 +3398,11 @@ async function generateSupplierActionLink(req, res) {
         + 'This link works for 60 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    sent = await emailService.sendPlainText(email, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'supplier_links', audience: 'supplier' });
   }
   await auditLogRepository.log(req.user.id, 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', supplierPo.id, null, null, null, 'Supplier Action link generated' + (sent ? ' and emailed to the supplier' : (email !== '' ? ' — the e-mail was not sent, hand this link over directly' : ' — no supplier email on the PO, hand this link over directly')));
   // QA batch 3 MAIL-2: "emailed" only when the e-mail really went out.
-  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Supplier Action link', email !== '' ? email : null, sent, link));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Supplier Action link', email !== '' ? email : null, sent, link, 'supplier_links', 'supplier'), link);
   res.redirect(linkReturnUrl(orderId, 'step-7c-supplier-po-attach'));
 }
 

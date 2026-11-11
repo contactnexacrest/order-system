@@ -162,9 +162,8 @@ final class PiIntakeController
         // PI-stage details must notify staff, not just sit silently in
         // the review queue behind a nav badge.
         $orderId = (int) $submission['order_id'];
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'pi_intake_submitted', $orderId, "PI-stage details submitted for order {$submission['order_reference']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('pi_intake_submitted'))['email'], 'pi_intake_submitted', $orderId, "PI-stage details submitted for order {$submission['order_reference']}.");
         \App\Repositories\AuditLogRepository::log(null, 'PI_INTAKE_SUBMITTED', 'orders', $orderId, null, null, null, 'PI-stage intake details submitted by the client.');
 
         View::render('pi_intake/thank_you', [], 'layout/bare');

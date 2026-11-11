@@ -24,11 +24,11 @@ describe('Associate agreement on file and the buyer PO received date', () => {
   let mailBefore;
 
   beforeEach(async () => {
-    mailBefore = await companySettingsRepository.get('mail_sending_enabled');
+    mailBefore = await companySettingsRepository.get('email_testing_mode');
   });
 
   afterEach(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', String(mailBefore ?? '0'), null);
+    await companySettingsRepository.set('email_testing_mode', String(mailBefore ?? '0'), null);
   });
 
   afterAll(async () => {
@@ -73,7 +73,7 @@ describe('Associate agreement on file and the buyer PO received date', () => {
       { o: orderId }
     );
     await db.execute('INSERT INTO order_buyer_po_documents (order_id, file_id) VALUES (:o, :f)', { o: orderId, f: await createTestFile(orderId, clientId) });
-    await companySettingsRepository.set('mail_sending_enabled', '0', null);
+    await companySettingsRepository.set('email_testing_mode', '1', null);
     await createTestDocument(orderId, 'BUYERPO', 'approved');
     const created = String((await orderRepository.find(orderId)).created_at).slice(0, 10);
 

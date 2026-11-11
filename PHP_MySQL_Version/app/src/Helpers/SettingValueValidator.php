@@ -21,8 +21,19 @@ namespace App\Helpers;
  */
 final class SettingValueValidator
 {
+    /**
+     * D-283 (11 Nov 2026): settings with a fixed allowed range, [min, max, unit].
+     */
+    public const RANGES = [
+        'session_timeout_staff_minutes'     => [5, 1440, 'minutes'],
+        'session_timeout_client_minutes'    => [5, 1440, 'minutes'],
+        'session_timeout_associate_minutes' => [5, 1440, 'minutes'],
+        'session_absolute_staff_hours'      => [1, 24, 'hours'],
+        'login_remember_browser_days'       => [0, 90, 'days'],
+    ];
+
     /** @return string|null an error message if invalid, null if the value passes */
-    public static function check(string $valueType, string $rawValue): ?string
+    public static function check(string $valueType, string $rawValue, string $key = ''): ?string
     {
         $value = trim($rawValue);
 
@@ -33,6 +44,12 @@ final class SettingValueValidator
                 }
                 if ((float) $value < 0) {
                     return "must not be negative (got \"{$rawValue}\")";
+                }
+                if (isset(self::RANGES[$key])) {
+                    [$min, $max, $unit] = self::RANGES[$key];
+                    if ((float) $value < $min || (float) $value > $max || (float) $value !== floor((float) $value)) {
+                        return "must be a whole number from {$min} to {$max} {$unit} (got \"{$rawValue}\")";
+                    }
                 }
                 return null;
 

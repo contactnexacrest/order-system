@@ -20,6 +20,7 @@ const roleRepository = require('../repositories/roleRepository');
 const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
+const emailPolicy = require('./emailPolicy');
 const documentDataAssembler = require('./documentDataAssembler');
 const stageGateService = require('./stageGateService');
 const fs = require('fs');
@@ -439,16 +440,19 @@ async function dispatch(emailLogRow) {
     return false;
   }
 
+  const attachments = [{ path: file.server_path, name: file.original_filename }];
   const sent = await mailSenderService.send(
     emailLogRow.recipient_email,
     emailLogRow.subject,
     emailLogRow.body_snapshot,
-    [{ path: file.server_path, name: file.original_filename }]
+    attachments,
+    { kind: 'buyer_documents', audience: 'buyer' }
   );
 
   if (sent) {
     await emailLogRepository.markSent(emailLogRow.id);
     await documentRepository.markSent(document.id);
+    await copyToAssociate(emailLogRow, attachments);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
 
     // QA batch 3 MAIL-9: a re-send does not restart the OC clock or re-pass the stage.
@@ -497,12 +501,48 @@ async function startOcAcknowledgmentClock(document) {
   }
 }
 
+/**
+ * Whether buyer document e-mails go out (D-280: testing mode off and
+ * "Documents … — Buyer" on in Admin › E-mail settings). When they do not,
+ * there is no "Send to Buyer" action and an approved document counts as sent.
+ */
 async function mailSendingEnabled() {
-  return (await companySettingsRepository.get('mail_sending_enabled')) !== '0';
+  return emailPolicy.allows('buyer_documents', 'buyer');
+}
+
+/** D-280: the text of the associate's copy of a buyer document e-mail. */
+function associateCopyBody(associate, client, order, buyerBody) {
+  return `Hello ${associate.name},\n\nFor your information, this is a copy of the e-mail NexaCrest sent to your client `
+    + `${client.company_legal_name} (order ${order.order_reference}).\n\n---\n\n${buyerBody}`;
 }
 
 /**
- * Owner decision (2026-10-25): with mail_sending_enabled off there is no
+ * D-280: when Admin › E-mail settings has "Documents … — Associate" on (OPTIONAL,
+ * off when installed), the associate who introduced the buyer gets a copy of a
+ * document e-mail that really went to the buyer — only when their access level
+ * shows order documents.
+ */
+async function copyToAssociate(emailLogRow, attachments) {
+  if (!emailLogRow.order_id || !(await emailPolicy.allows('buyer_documents', 'associate'))) return;
+  try {
+    const order = await orderRepository.find(emailLogRow.order_id);
+    const client = order && order.client_id ? await clientRepository.find(order.client_id) : null;
+    const associate = client && client.associate_id ? await require('../repositories/associateRepository').find(client.associate_id) : null;
+    if (!associate || !associate.email || ['ended', 'inactive'].includes(associate.status)
+      || !(await require('./associateAccess').allows(associate, 'order_documents'))) {
+      return;
+    }
+    await mailSenderService.send(String(associate.email), `Copy: ${emailLogRow.subject}`,
+      associateCopyBody(associate, client, order, String(emailLogRow.body_snapshot)), attachments,
+      { kind: 'buyer_documents', audience: 'associate' });
+  } catch (e) {
+    console.error('[ASSOCIATE COPY NOT SENT]', e.message);
+  }
+}
+
+/**
+ * Owner decision (2026-10-25): with buyer document e-mails held (D-280:
+ * testing mode, or the switch off) there is no
  * "Send to Buyer" action at all — staff send the PDF themselves outside the
  * app — so a buyer-sendable document counts as sent the moment it is
  * approved. Does exactly what a real send does to the document (status
@@ -523,7 +563,7 @@ async function markSentIfMailDisabled(documentId) {
   // mark the Order Confirmation as sent to the buyer (ordersController.markOcSentToBuyer), not now.
   await auditLogRepository.log(
     null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', documentId, 'status', 'approved', 'sent',
-    'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'
+    'Buyer document e-mails are held (testing mode or Admin › E-mail settings) — counted as sent on approval; staff send the PDF outside the app.'
   );
 }
 
@@ -552,7 +592,8 @@ async function dispatchGeneric(emailLogRow) {
     attachments.push({ path: file.server_path, name: file.original_filename });
   }
 
-  const sent = await mailSenderService.send(emailLogRow.recipient_email, emailLogRow.subject, emailLogRow.body_snapshot, attachments);
+  const sent = await mailSenderService.send(emailLogRow.recipient_email, emailLogRow.subject, emailLogRow.body_snapshot, attachments,
+    { kind: emailPolicy.TEMPLATE_KINDS[String(emailLogRow.template_key)] || 'buyer_followups', audience: 'buyer' });
 
   if (sent) {
     await emailLogRepository.markSent(emailLogRow.id);
@@ -576,11 +617,16 @@ async function clientEmailFor(order) {
   return email !== '' ? email : null;
 }
 
-/** QA batch 3 MAIL-2 (port of PHP linkMailOutcome): "emailed to x" only when the e-mail really went out. */
-async function linkMailOutcome(what, email, sent, link) {
-  if (email === null) return `${what} generated (no client e-mail on file — hand this link over directly): ${link}`;
-  if (!sent) return `${what} generated, but the e-mail to ${email} was not sent (${(await mailSendingEnabled()) ? 'sending failed' : 'e-mail sending is off'}) — send this link yourself: ${link}`;
-  return `${what} emailed to ${email}: ${link}`;
+/**
+ * QA batch 3 MAIL-2 / D-280 (port of PHP linkMailOutcome): "e-mailed to x" only when
+ * the e-mail really went out; otherwise the true reason. The link itself is shown
+ * under the message with a Copy button (flash.set(req, type, message, link)).
+ */
+async function linkMailOutcome(what, email, sent, link, kind = 'buyer_links', audience = 'buyer') {
+  const party = audience === 'supplier' ? 'supplier' : 'client';
+  if (email === null) return `${what} generated — not e-mailed: no ${party} e-mail on file. Copy the link and send it yourself.`;
+  if (!sent) return `${what} generated — not e-mailed to ${email}: ${await emailPolicy.notSentReason(kind, audience)}. Copy the link and send it yourself.`;
+  return `${what} e-mailed to ${email}. If they did not get it, copy the link and send it yourself.`;
 }
 
-module.exports = { senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };
+module.exports = { associateCopyBody, senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };

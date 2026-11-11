@@ -35,6 +35,8 @@ async function index(req, res) {
   // Owner points 5/8/9 (2 Nov 2026): edited on its own page with its own rules (/settings/document-cleanup).
   delete grouped.document_cleanup;
   delete grouped.sop_access; // D-266: switched on Admin › SOP access
+  // D-280: testing mode is set on Admin › E-mail settings (one place only).
+  if (grouped.mail) grouped.mail = grouped.mail.filter((r) => r.setting_key !== 'email_testing_mode');
   const isSuperAdmin = await superAdminService.isEffective(req.user.id);
   // 90-item backlog #31: rbi_purpose_code_advance/balance/freight were
   // plain free-text settings with no standard list — same dropdown
@@ -122,7 +124,7 @@ async function update(req, res) {
   // protected-field check below: one bad value fails the whole submission.
   const valueErrors = Object.entries(toApply)
     .map(([key, change]) => {
-      const error = settingValueValidator.check(byKey[key].value_type, change.new);
+      const error = settingValueValidator.check(byKey[key].value_type, change.new, key); // D-283: key ranges
       return error ? `${key} ${error}` : null;
     })
     .filter(Boolean);

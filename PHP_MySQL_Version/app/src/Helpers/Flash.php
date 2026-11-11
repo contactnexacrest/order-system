@@ -6,12 +6,21 @@ namespace App\Helpers;
 
 final class Flash
 {
-    public static function set(string $type, string $message): void
+    /**
+     * D-280: $copyLink — a link (set-password, PI form, payment details …) shown
+     * under the message in a box with a Copy button, so staff can send it
+     * themselves when the e-mail was not sent (and always for invites).
+     */
+    public static function set(string $type, string $message, ?string $copyLink = null): void
     {
-        $_SESSION['_flash'][] = ['type' => $type, 'message' => $message];
+        $entry = ['type' => $type, 'message' => $message];
+        if ($copyLink !== null && $copyLink !== '') {
+            $entry['copy_link'] = $copyLink;
+        }
+        $_SESSION['_flash'][] = $entry;
     }
 
-    /** @return array<int, array{type:string, message:string}> */
+    /** @return array<int, array{type:string, message:string, copy_link?:string}> */
     public static function pull(): array
     {
         $messages = $_SESSION['_flash'] ?? [];

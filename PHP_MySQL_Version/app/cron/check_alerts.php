@@ -113,16 +113,26 @@ final class AlertRunCache
     }
 }
 
-function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null): int
+/**
+ * D-281 (11 Nov 2026): $emailIds — who also gets the e-mail (null = everyone, as before).
+ * Everyone in $userIds and $emailIds gets the in-app notice; only $emailIds the e-mail:
+ * the department's people on the order (StaffRouting::forOrder) or, for a company-level
+ * item, its responsible person and backup (StaffRouting::companyItem).
+ *
+ * @param list<int>|null $emailIds
+ */
+function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null, ?array $emailIds = null): int
 {
     $count = 0;
     $seen = AlertRunCache::today();
+    $emailIds = $emailIds === null ? null : array_values(array_unique(array_map('intval', $emailIds)));
+    $userIds = array_values(array_unique(array_map('intval', array_merge($userIds, $emailIds ?? []))));
     foreach ($userIds as $userId) {
         $key = AlertRunCache::todayKey((int) $userId, $type, $relatedOrderId);
         if (isset($seen[$key])) {
             continue; // already alerted this same condition today — don't spam the bell (or the inbox)
         }
-        NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
+        NotificationRepository::create($userId, null, $type, $relatedOrderId, $message, $emailIds === null || in_array((int) $userId, $emailIds, true));
         AlertRunCache::$today[$key] = true;
         $seen[$key] = true;
         $count++;
@@ -135,16 +145,17 @@ function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $r
  * person, order and date (not once a day) — sent again only if the date
  * itself changes (e.g. after an LC amendment).
  */
-function notifyOnce(array $userIds, string $type, string $message, int $relatedOrderId): int
+function notifyOnce(array $userIds, string $type, string $message, int $relatedOrderId, ?array $emailIds = null): int
 {
     $count = 0;
     $sent = AlertRunCache::once();
-    foreach (array_unique($userIds) as $userId) {
+    $emailIds = $emailIds === null ? null : array_values(array_unique(array_map('intval', $emailIds)));
+    foreach (array_values(array_unique(array_map('intval', array_merge($userIds, $emailIds ?? [])))) as $userId) {
         $key = $userId . '|' . $type . '|' . $relatedOrderId . '|' . AlertRunCache::onceMessageKey($message);
         if (isset($sent[$key])) {
             continue;
         }
-        NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
+        NotificationRepository::create($userId, null, $type, $relatedOrderId, $message, $emailIds === null || in_array((int) $userId, $emailIds, true));
         AlertRunCache::$once[$key] = true;
         $sent[$key] = true;
         $count++;
@@ -156,6 +167,12 @@ function notifyOnce(array $userIds, string $type, string $message, int $relatedO
 function orderAssignees(int $orderId): array
 {
     return AlertRunCache::assignees($orderId);
+}
+
+/** D-281: who is e-mailed about an order alert — the type's department on the order (StaffRouting). */
+function routedEmail(int $orderId, string $type): array
+{
+    return \App\Services\StaffRouting::forOrder($orderId, \App\Services\StaffRouting::departmentFor($type))['email'];
 }
 
 function run(): int
@@ -177,9 +194,9 @@ function run(): int
         $alertDays = (int) (CompanySettingsRepository::get('lut_alert_days_x') ?? '30');
         $escalationDays = (int) (CompanySettingsRepository::get('lut_escalation_days_y') ?? '15');
         if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_escalation', "ESCALATION: LUT expires in {$daysLeft} day(s) ({$lutExpiry}). Renew before 1 April or document generation will be blocked.", null, \App\Services\StaffRouting::companyItem('lut'));
         } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'lut_expiry', "LUT expires in {$daysLeft} day(s) ({$lutExpiry}).", null, \App\Services\StaffRouting::companyItem('lut'));
         }
     }
 
@@ -191,7 +208,7 @@ function run(): int
     // --- TDS on associate commission (owner decision 2 Nov 2026, D-235): deposit by the 7th, Form 26Q after each quarter ---
     $payIncentiveIds = PermissionRepository::usersWithPermission('pay_incentives');
     foreach (\App\Services\AssociateTds::reminders($today->format('Y-m-d')) as $reminder) {
-        $created += notifyMdAndAdmin($payIncentiveIds, $reminder['type'], $reminder['message'], null);
+        $created += notifyMdAndAdmin($payIncentiveIds, $reminder['type'], $reminder['message'], null, \App\Services\StaffRouting::companyItem('tds'));
     }
     // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
     $created += \App\Services\ComplianceTrackingService::runReminders($today->format('Y-m-d'));
@@ -203,9 +220,9 @@ function run(): int
         $alertDays = (int) (CompanySettingsRepository::get('rcmc_alert_days_a') ?? '60');
         $escalationDays = (int) (CompanySettingsRepository::get('rcmc_escalation_days_b') ?? '30');
         if ($daysLeft <= $escalationDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_escalation', "ESCALATION: RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}). Renew with CAPEXIL.", null, \App\Services\StaffRouting::companyItem('rcmc'));
         } elseif ($daysLeft <= $alertDays && $daysLeft >= 0) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'rcmc_expiry', "RCMC certificate expires in {$daysLeft} day(s) ({$rcmcExpiry}).", null, \App\Services\StaffRouting::companyItem('rcmc'));
         }
     }
 
@@ -242,7 +259,7 @@ function run(): int
         $dueDate = (new DateTimeImmutable((string) $row['fdn_date']))->modify("+{$fdnOverdueDays} days")->format('Y-m-d');
         if ($dueDate < $today->format('Y-m-d')) {
             $issued = (new DateTimeImmutable((string) $row['fdn_date']))->format('d F Y');
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN dated {$issued}, still not cleared.", (int) $row['order_id']);
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN dated {$issued}, still not cleared.", (int) $row['order_id'], routedEmail((int) $row['order_id'], 'fdn_overdue'));
         }
     }
 
@@ -261,7 +278,7 @@ function run(): int
     );
     foreach ($stmt->fetchAll() as $row) {
         $created += notifyMdAndAdmin(array_values(array_unique(array_merge($mdAndAdminIds, orderAssignees((int) $row['order_id'])))), 'balance_overdue',
-            "Balance payment overdue on order {$row['order_reference']} — was due {$row['balance_due_date']}, still not cleared.", (int) $row['order_id']);
+            "Balance payment overdue on order {$row['order_reference']} — was due {$row['balance_due_date']}, still not cleared.", (int) $row['order_id'], routedEmail((int) $row['order_id'], 'balance_overdue'));
     }
 
     // --- Letter of Credit dates (gap list G-4, owner 1 Nov 2026) ---
@@ -289,7 +306,7 @@ function run(): int
             }
             $lc = !empty($row['lc_number']) ? "LC {$row['lc_number']}" : 'the LC';
             $created += notifyOnce(array_merge($mdAndAdminIds, orderAssignees((int) $row['order_id'])), $type,
-                "Order {$row['order_reference']}: {$lc} — {$label} is {$row[$col]} ({$daysLeft} day(s) away).", (int) $row['order_id']);
+                "Order {$row['order_reference']}: {$lc} — {$label} is {$row[$col]} ({$daysLeft} day(s) away).", (int) $row['order_id'], routedEmail((int) $row['order_id'], $type));
         }
     }
 
@@ -303,10 +320,12 @@ function run(): int
     );
     foreach ($stmt->fetchAll() as $row) {
         $targets = $mdAndAdminIds;
+        $emailTo = routedEmail((int) $row['order_id'], 'dispute_overdue');
         if ($row['assigned_to']) {
             $targets[] = (int) $row['assigned_to'];
+            $emailTo[] = (int) $row['assigned_to']; // the person handling the dispute is always told
         }
-        $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id']);
+        $created += notifyMdAndAdmin(array_unique($targets), 'dispute_overdue', "Dispute response overdue on order {$row['order_reference']} — was due {$row['response_due_date']}.", (int) $row['order_id'], $emailTo);
     }
 
     // --- Quotation/PI validity expired, order still stuck at that stage ---
@@ -333,7 +352,7 @@ function run(): int
            AND o.pi_date IS NULL"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'quotation_expired', "Quotation validity expired on order {$row['order_reference']} — was valid until {$row['quotation_valid_until']}, still no PI issued.", (int) $row['order_id']);
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'quotation_expired', "Quotation validity expired on order {$row['order_reference']} — was valid until {$row['quotation_valid_until']}, still no PI issued.", (int) $row['order_id'], routedEmail((int) $row['order_id'], 'quotation_expired'));
     }
 
     $stmt = $pdo->query(
@@ -347,7 +366,7 @@ function run(): int
            AND (sm.stage_number IS NULL OR sm.stage_number < 4)"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id']);
+        $created += notifyMdAndAdmin($mdAndAdminIds, 'pi_expired', "Proforma Invoice validity expired on order {$row['order_reference']} — was valid until {$row['pi_valid_until']}, Order Confirmation not yet reached.", (int) $row['order_id'], routedEmail((int) $row['order_id'], 'pi_expired'));
     }
 
     // --- Export process step 8a: 7-day pre-shipment inspection reminder ---
@@ -376,7 +395,7 @@ function run(): int
     );
     foreach ($stmt->fetchAll() as $row) {
         $daysLeft = $today->diff(new DateTimeImmutable($row['est_shipment_date']))->days;
-        $created += notifyMdAndAdmin($orderManagerIds, 'pre_shipment_inspection_reminder', "Pre-shipment inspection due soon on order {$row['order_reference']} — estimated shipment {$row['est_shipment_date']} ({$daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.", (int) $row['order_id']);
+        $created += notifyMdAndAdmin($orderManagerIds, 'pre_shipment_inspection_reminder', "Pre-shipment inspection due soon on order {$row['order_reference']} — estimated shipment {$row['est_shipment_date']} ({$daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.", (int) $row['order_id'], routedEmail((int) $row['order_id'], 'pre_shipment_inspection_reminder'));
     }
 
     return $created;

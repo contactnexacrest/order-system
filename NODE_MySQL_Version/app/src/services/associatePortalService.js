@@ -59,6 +59,37 @@ async function issueToken(associateId, purpose, minutes) {
 }
 
 /** The associate a valid set-password token belongs to (not used, not expired). */
+/**
+ * D-282 (11 Nov 2026): the associate's own "Forgot password?". A link to set a
+ * new password (72 hours, once) goes to the address when it belongs to an
+ * associate whose portal is on. The answer on screen is the same either way.
+ * At most 5 links an hour per associate. Returns the link, or null.
+ */
+async function sendResetLink(req, email) {
+  const e = String(email || '').trim().toLowerCase();
+  const a = e !== '' ? await associateRepository.findByEmail(e) : null;
+  if (!a || Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status)) return null;
+  const recent = await db.queryOne("SELECT COUNT(*) AS n FROM associate_tokens WHERE associate_id = :a AND purpose = 'set_password' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)", { a: a.id });
+  if (Number(recent.n) >= 5) return null;
+  const raw = await issueToken(Number(a.id), 'set_password', 72 * 60);
+  const link = `${String(env.get('APP_URL', '')).replace(/\/+$/, '')}/associate/set-password/${raw}`;
+  try {
+    await emailService.sendPlainText(String(a.email), 'Reset your NexaCrest associate portal password', resetBody(a, link), { isSecurityEmail: true, kind: 'forgot_password', audience: 'associate' });
+  } catch (err) {
+    // the screen gives the same answer either way
+  }
+  await auditLogRepository.log(null, 'ASSOCIATE_PASSWORD_RESET_REQUESTED', 'associates', Number(a.id), null, null, null, `Requested from IP ${(req && req.ip) || 'unknown'}`);
+  return link;
+}
+
+/** D-282: the associate's forgot-password e-mail. */
+function resetBody(a, link) {
+  return `Hello ${a.name},\n\nA new password was requested for your NexaCrest associate portal (${a.email}).\n\n`
+    + `To set a new password, open this link within 72 hours (it works once):\n${link}\n\n`
+    + 'If you did not ask for this, you can ignore this e-mail — your password stays as it is.\n\n'
+    + `Log in any time at:\n${require('./associateService').loginUrl()}\n\nNexaCrest International Private Limited`;
+}
+
 async function associateForSetPassword(raw) {
   const row = await db.queryOne("SELECT associate_id FROM associate_tokens WHERE purpose = 'set_password' AND token_hash = :h AND used_at IS NULL AND expires_at > NOW()", { h: sha256(raw) });
   return row ? associateRepository.find(Number(row.associate_id)) : null;
@@ -100,7 +131,7 @@ async function attemptLogin(req, email, password) {
   }
   const code = await issueToken(Number(a.id), 'login_code', 10);
   try {
-    await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`, { isSecurityEmail: true }); // QA batch 3 MAIL-13: a one-time login code is security mail
+    await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`, { isSecurityEmail: true, kind: 'login_code', audience: 'associate' }); // QA batch 3 MAIL-13: a one-time login code is security mail
   } catch (e) {
     // shown on screen in development; otherwise the associate asks again
   }
@@ -131,6 +162,7 @@ async function verifyCode(req, code) {
   await regenerate(req, () => {
     delete req.session[SESSION_PENDING];
     req.session[SESSION_ID] = Number(id);
+    req.session._associate_last_activity_ts = Date.now(); // D-283: the idle clock starts now
     req.session[SESSION_PASSWORD_FP] = sha256(String((loggedIn && loggedIn.password_hash) || ''));
   });
   await associateRepository.setFields(Number(id), { failed_login_count: 0, locked_until: null, last_login_at: formatForDb(new Date()) });
@@ -168,6 +200,7 @@ async function startViewAs(req, staffId, associateId) {
   await regenerate(req, () => {
     req.session[SESSION_ID] = associateId;
     req.session[SESSION_VIEW_AS] = staffId;
+    req.session._associate_last_activity_ts = Date.now(); // D-283
   });
   await auditLogRepository.log(staffId, 'ASSOCIATE_VIEW_AS_STARTED', 'associates', associateId);
 }
@@ -208,6 +241,6 @@ function isSuspended(a) {
 module.exports = {
   sessionPasswordStillCurrent,
   SUSPENDED_BANNER, SUSPENDED_REFUSED, isSuspended,
-  SESSION_ID, SESSION_PENDING, SESSION_VIEW_AS, issueToken, associateForSetPassword, setPassword, attemptLogin, verifyCode,
+  SESSION_ID, SESSION_PENDING, SESSION_VIEW_AS, issueToken, associateForSetPassword, setPassword, attemptLogin, verifyCode, sendResetLink, resetBody,
   pendingId, currentId, current, logout, startViewAs, viewAsStaffId, endViewAs, showCodeOnScreen,
 };

@@ -91,9 +91,19 @@ final class RememberBrowserService
         return true;
     }
 
-    /** Forgets every remembered browser of the user (password change or reset). */
-    public static function forgetAll(int $userId): void
+    /** Forgets every remembered browser of the user (password change or reset; D-283: "Forget all remembered computers"). Returns how many. */
+    public static function forgetAll(int $userId): int
     {
-        Database::connection()->prepare('DELETE FROM login_remembered_browsers WHERE user_id = :u')->execute(['u' => $userId]);
+        $stmt = Database::connection()->prepare('DELETE FROM login_remembered_browsers WHERE user_id = :u');
+        $stmt->execute(['u' => $userId]);
+        return $stmt->rowCount();
+    }
+
+    /** D-283: how many computers are remembered for the user today (not expired). */
+    public static function countFor(int $userId): int
+    {
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM login_remembered_browsers WHERE user_id = :u AND expires_at > NOW()');
+        $stmt->execute(['u' => $userId]);
+        return (int) $stmt->fetchColumn();
     }
 }

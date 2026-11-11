@@ -9,6 +9,7 @@
 <link rel="icon" href="/img/favicon.ico?v=2" sizes="any">
 <link rel="stylesheet" href="{{ asset('/css/app.css') }}">
 <script src="{{ asset('/js/app.js') }}" defer></script>
+{% if idleMeta %}<meta name="session-idle" content="{{ idleMeta.idle }}" data-warn="{{ idleMeta.warn }}"{% if idleMeta.absoluteLeft is number %} data-absolute-left="{{ idleMeta.absoluteLeft }}"{% endif %} data-keepalive="{{ idleMeta.keepalive }}" data-login="{{ idleMeta.login }}" data-csrf="{{ csrfToken }}">{% endif %}{# D-283: idle warning popup (app.js) #}
 </head>
 <body>
 {% if devServerEnabled %}
@@ -47,7 +48,7 @@
       <a class="btn-sm" href="/associate/bank/confirm">Review now</a></div>
   {% endif %}
   {% for f in flashes %}
-    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+    <div class="alert alert-{{ f.type }}">{{ f.message }}{% if f.copy_link %}{% set copyLink = f.copy_link %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}{% endif %}{# D-280 #}</div>
   {% endfor %}
   {{ content | safe }}
 </main>

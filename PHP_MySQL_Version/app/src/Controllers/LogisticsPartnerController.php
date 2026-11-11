@@ -147,7 +147,7 @@ final class LogisticsPartnerController
             return;
         }
         $sent = VendorDetailsService::sendDetailsLink('logistics_partner', $id, (int) AuthService::currentUserId());
-        Flash::set('success', 'Vendor Details Link ' . ($sent['emailed_to'] ? "emailed to {$sent['emailed_to']}" : 'generated') . ": {$sent['link']}");
+        Flash::set('success', $sent['message'], $sent['link']); // D-280
         header("Location: /logistics-partners/{$id}/edit#vendor-details-link");
     }
 

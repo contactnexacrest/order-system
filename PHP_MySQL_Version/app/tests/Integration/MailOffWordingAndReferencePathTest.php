@@ -40,7 +40,7 @@ final class MailOffWordingAndReferencePathTest extends DbTestCase
 
     private function setMail(string $value): void
     {
-        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'")->execute(['v' => $value]);
+        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'")->execute(['v' => $value]);
         if (method_exists(CompanySettingsRepository::class, 'resetCache')) {
             CompanySettingsRepository::resetCache();
         }
@@ -49,13 +49,13 @@ final class MailOffWordingAndReferencePathTest extends DbTestCase
     public function testPostingWithEmailSendingOffSaysTheClientWasNotEmailed(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
-        $original = (string) (CompanySettingsRepository::get('mail_sending_enabled') ?? '0');
-        $this->setMail('0');
+        $original = (string) (CompanySettingsRepository::get('email_testing_mode') ?? '0');
+        $this->setMail('1') /* D-280: testing mode on */;
         try {
             $_POST = ['body' => 'Your goods are being packed.'];
             (new OrderCommentController())->post(['id' => (string) $orderId]);
             $message = Flash::pull()[0]['message'];
-            self::assertStringContainsString('NOT emailed', $message);
+            self::assertStringContainsString('not e-mailed — testing mode holds e-mails to buyers and suppliers', $message);
             self::assertStringNotContainsString('has been emailed', $message);
         } finally {
             $this->setMail($original);

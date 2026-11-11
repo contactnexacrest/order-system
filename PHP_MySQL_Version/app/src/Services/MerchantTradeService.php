@@ -841,10 +841,8 @@ final class MerchantTradeService
                 }
                 $recipients ??= MerchantTradeRepository::alertRecipients((int) $d['division_id']);
                 $message = mb_substr("Merchant trade {$d['reference']} ({$d['buyer_name']}): {$c['label']} — {$c['text']}", 0, 500);
-                foreach ($recipients as $userId) {
-                    NotificationRepository::create($userId, null, 'merchant_trade_rbi', null, $message);
-                    $created++;
-                }
+                // D-281: e-mailed to the responsible person and backup for merchant-trade RBI limits.
+                $created += count(NotificationRepository::notifyRouted($recipients, StaffRouting::companyItem('merchant_trade_rbi'), 'merchant_trade_rbi', null, $message));
             }
         }
         return $created;

@@ -662,9 +662,12 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('fdn_overdue_days_c',    '3',  'number', 'alerts', 'WORKING days after FDN issue before a freight payment is flagged overdue — must match the "payable within 3 working days of issue" figure in the CFR/CIF Indicative Freight Validity clause (QT/PI) verbatim, since that clause is the written promise to the buyer. (Corrected from an earlier placeholder of 7, which did not match the clause text and used calendar-day arithmetic instead of working days — see check_alerts.php.)', 0),
   ('max_bank_charges_pct', '3', 'number', 'tolerances', 'The most bank charges one buyer remittance may carry, as a % of the amount due. Above it the difference must be recorded as a short payment instead.', 0),
   ('fema_realization_alert_days', '270', 'number', 'alerts', 'Days after a settlement leg is marked cleared before the CA / Accounting module flags its FIRC/eBRC reference as still missing — 270 days (9 months) mirrors the RBI/FEMA export-proceeds realization period as a practical proof-of-realization deadline, not a legal shipment-date calculation (this system does not track the shipment date this rule technically runs from).', 0),
-  ('session_timeout_minutes', '30', 'number', 'security', 'Idle session timeout, in minutes.', 0),
+  ('session_timeout_staff_minutes', '240', 'number', 'security', 'D-283: staff are signed out after this many minutes without activity (5 to 1440; default 240 = 4 hours). A warning with "Stay logged in" shows 2 minutes before.', 0),
+  ('session_timeout_client_minutes', '120', 'number', 'security', 'D-283: buyers (client portal) are signed out after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
+  ('session_timeout_associate_minutes', '120', 'number', 'security', 'D-283: associates (associate portal) are signed out after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
+  ('session_absolute_staff_hours', '12', 'number', 'security', 'D-283: staff log in again at least this often, however active they are (1 to 24 hours; default 12).', 0),
   ('failed_login_lockout_count', '5', 'number', 'security', 'Failed login attempts before account lockout.', 0),
-  ('login_remember_browser_days', '0', 'number', 'security', 'D-265: staff may tick "Remember this browser" on the login-code screen and skip the e-mailed code on that browser for this many days (most 90). 0 = off: the code is asked at every login (recommended). A password change or reset forgets every remembered browser.', 0),
+  ('login_remember_browser_days', '30', 'number', 'security', 'D-265 / D-283: staff may tick "This is my own office computer" on the login-code screen and skip the e-mailed code on that computer for this many days (0 to 90; default 30). 0 = off: the code is asked at every login. A password change or reset, or "Forget all remembered computers" (My Account, or Admin in Users › Edit), forgets them.', 0),
   ('lockout_duration_minutes', '15', 'number', 'security', 'How long an account stays locked after too many failed attempts. (Addition beyond the spec''s named key list — needed to make failed_login_lockout_count actually enforceable; flagging per architecture doc practice.)', 0),
   ('password_min_length',   '10', 'number', 'security', 'Minimum password length.', 0),
   ('password_complexity_json', '{"require_upper":true,"require_number":true,"require_symbol":false}', 'json', 'security', 'Password complexity rules enforced on password change.', 0),
@@ -881,7 +884,10 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.',
    NULL),
   ('client_portal_invite', 'Your NexaCrest order portal access',
-   'Hello,\n\nYour advance payment has been received and cleared — thank you.\n\nYou can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\nTo set up your login, open this link within 72 hours:\n{set_password_link}\n\nYour login email will be: {email}\n\nNexaCrest International Private Limited',
+   'Hello,\n\nYour advance payment has been received and cleared — thank you.\n\nYou can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\nTo set up your login, open this link within 72 hours (it works once):\n{set_password_link}\n\nYour login email will be: {email}\n\nAfter that, log in any time at:\n{login_link}\n\nNexaCrest International Private Limited',
+   NULL),
+  ('client_login_code', 'Your NexaCrest order portal login code',
+   'Hello,\n\nYour code to log in to your NexaCrest order portal is: {code}\n\nIt is valid for 10 minutes.\n\nIf you did not try to log in, you can ignore this e-mail — nobody can log in without this code. If it keeps happening, change your password with "Forgot your password?" on the login page.\n\nNexaCrest International Private Limited',
    NULL),
   ('staff_password_reset', 'Reset your NexaCrest password',
    'Hello {name},\n\nA password reset was requested for your NexaCrest Export Operations account ({email}).\n\nTo set a new password, open this link within 45 minutes:\n{reset_link}\n\nIf you didn''t request this, you can ignore this email — your password will not be changed.',
@@ -1534,7 +1540,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- manage_orders, and the auto-confirm window stays 48 hours.
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('mail_sending_enabled', '0', 'boolean', 'mail', 'Master kill switch for every non-security outbound email (order updates, document sends, etc.). Staff 2FA codes and password-reset links are never affected. Off = nothing sends, logged instead, useful while diagnosing a hosting SMTP problem without risking a stray send.', 0, 0),
+  ('email_testing_mode', '0', 'boolean', 'mail', 'D-280: Testing mode — hold e-mails to buyers and suppliers. On = e-mails to buyers and suppliers are not sent (the screen says so and shows the link to copy); staff and associate e-mails and every MUST e-mail (login codes, set-password and forgot-password links, security alerts) still go out. Set in Admin › E-mail settings, with the per-e-mail switches.', 0, 0),
   ('reply_to_email', '', 'email', 'mail', 'External QA report L-43: customer emails (QT/PI/OC/etc.) went out from a no-reply address with no Reply-To, so a buyer reply was lost. Set a monitored sales/support address here so replies reach someone; leave blank to fall back to company_settings.email.', 0, 0),
   ('mail_approval_queue_enabled', '1', 'boolean', 'mail', 'On (default) = every buyer-facing document send still needs a second person''s Level-2 approval before it goes out (Section 10). Off = a single staff member with generate_documents can send directly — useful for a small team or while testing.', 0, 0),
   ('oc_ack_override_restricted', '0', 'boolean', 'orders', 'Off (default) = any user with manage_orders can record a buyer''s Order Confirmation acknowledgment manually, as before. On = that action also requires the override_buyer_acknowledgment permission, so it can be restricted to specific roles.', 0, 0),
@@ -2720,3 +2726,35 @@ INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT 'bank_details', r.id FROM roles r
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'bank_details');
+
+-- ================================================================
+-- Owner decisions D-280 / D-281 (11 Nov 2026, point 3): Admin › E-mail settings.
+-- One row per e-mail kind × audience that can be switched (MUST e-mails are
+-- always on and have no row). SHOULD = on, OPTIONAL = off when installed.
+-- The kinds are listed in EmailPolicy::KINDS (PHP) / emailPolicy.KINDS (Node).
+-- ================================================================
+INSERT INTO email_settings (email_kind, audience, is_enabled) VALUES
+  ('buyer_documents', 'buyer', 1),
+  ('buyer_documents', 'associate', 0),
+  ('buyer_links', 'buyer', 1),
+  ('buyer_messages', 'buyer', 1),
+  ('buyer_followups', 'buyer', 1),
+  ('supplier_links', 'supplier', 1),
+  ('associate_clients', 'associate', 1),
+  ('associate_commission', 'associate', 1),
+  ('associate_kyc_price_message', 'associate', 1),
+  ('associate_registration_declined', 'associate', 1),
+  ('associate_code_status', 'associate', 1),
+  ('staff_approvals', 'staff', 1),
+  ('staff_counterparty', 'staff', 1),
+  ('staff_compliance', 'staff', 1),
+  ('staff_zoho', 'staff', 1),
+  ('staff_daily_summary', 'staff', 1),
+  ('staff_assigned', 'staff', 1),
+  ('staff_other', 'staff', 1);
+
+-- D-281: company-level compliance alerts — the responsible person and the backup
+-- are chosen at installation in Admin › E-mail settings (empty = the department's
+-- manager, then the Managing Director).
+INSERT INTO compliance_alert_owners (item_key) VALUES
+  ('lut'), ('rcmc'), ('agreements'), ('tds'), ('merchant_trade_rbi'), ('ecgc_policy'), ('ebrc_monthly');

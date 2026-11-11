@@ -57,7 +57,11 @@ const DUMMY_PASSWORD_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd
  *   no email can never receive their login otherwise, and that must not
  *   fail silently.
  */
-async function provisionIfNeeded(clientId, orderId) {
+/**
+ * D-280: `out.invite` = {link, sent} — the set-password link of the invite and
+ * whether its e-mail went out; staff see the link with a Copy button either way.
+ */
+async function provisionIfNeeded(clientId, orderId, out = {}) {
   if (await clientLoginRepository.findByClientId(clientId)) {
     return 'already_provisioned';
   }
@@ -78,9 +82,54 @@ async function provisionIfNeeded(clientId, orderId) {
   // order's own assignees) can actually find it.
   await auditLogRepository.log(null, 'CLIENT_PORTAL_PROVISIONED', 'orders', orderId, null, null, null, 'Client portal provisioned — advance cleared');
 
-  await sendSetPasswordEmail(clientId, client.email, client.company_legal_name);
+  out.invite = await sendSetPasswordEmail(clientId, client.email, client.company_legal_name);
 
   return 'provisioned';
+}
+
+/** D-280: the staff message after a portal was opened — "e-mailed" only when it was. */
+function inviteOutcome(invite) {
+  if (!invite) return '';
+  return invite.sent
+    ? ' The client was e-mailed a link to set their portal password (valid 72 hours, works once). If they did not get it, copy the link below and send it yourself.'
+    : ' The portal invite e-mail could NOT be sent — copy the set-password link below and send it to the client yourself (valid 72 hours, works once).';
+}
+
+/** D-282: the permanent client login page address (shown on the client page and in the invite). */
+function loginUrl() {
+  return `${String(env.get('APP_URL', '')).replace(/\/+$/, '')}/client/login`;
+}
+
+/**
+ * D-282: staff "Send set-password link" on the client page — a new 72-hour,
+ * one-use link to the client's login e-mail.
+ * @returns {Promise<{link: string, sent: boolean, email: string}>}
+ */
+async function sendSetPasswordLink(clientId, staffUserId) {
+  const login = await clientLoginRepository.findByClientId(clientId);
+  const client = await clientRepository.find(clientId);
+  if (!login || !client) {
+    throw new Error('This client has no portal account yet — it is created automatically when the first advance payment clears.');
+  }
+  const email = String(client.email || '').trim();
+  if (email === '') {
+    throw new Error('This client has no e-mail on file — add one to the client record first.');
+  }
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await clientPasswordResetTokenRepository.create(clientId, crypto.createHash('sha256').update(rawToken).digest('hex'), formatForDb(new Date(Date.now() + 72 * 3600000)), null);
+  const link = `${String(env.get('APP_URL', '')).replace(/\/+$/, '')}/client/set-password/${rawToken}`;
+  const rendered = await emailTemplateRepository.renderOrDefault(
+    'client_portal_password_reset',
+    { '{email}': email, '{reset_link}': link, '{login_link}': loginUrl() },
+    'Reset your NexaCrest order portal password',
+    'Hello,\n\n'
+      + 'A password reset was requested for your NexaCrest order portal account ({email}).\n\n'
+      + 'To set a new password, open this link within 72 hours:\n{reset_link}\n\n'
+      + "If you didn't request this, you can ignore this email — your password will not be changed."
+  );
+  const sent = await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'forgot_password', audience: 'buyer' });
+  await auditLogRepository.log(staffUserId, 'CLIENT_SET_PASSWORD_LINK_SENT', 'clients', clientId, null, null, email, sent ? 'E-mailed' : 'Not e-mailed — link shown to staff');
+  return { link, sent, email };
 }
 
 async function sendSetPasswordEmail(clientId, email) {
@@ -97,17 +146,20 @@ async function sendSetPasswordEmail(clientId, email) {
   // Templates) — this exact original wording is the fallback.
   const rendered = await emailTemplateRepository.renderOrDefault(
     'client_portal_invite',
-    { '{set_password_link}': setUrl, '{email}': email },
+    { '{set_password_link}': setUrl, '{email}': email, '{login_link}': loginUrl() }, // D-282: {login_link}
     'Your NexaCrest order portal access',
     'Hello,\n\n'
       + 'Your advance payment has been received and cleared — thank you.\n\n'
       + 'You can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\n'
-      + 'To set up your login, open this link within 72 hours:\n{set_password_link}\n\n'
+      + 'To set up your login, open this link within 72 hours (it works once):\n{set_password_link}\n\n'
       + 'Your login email will be: {email}\n\n'
+      + 'After that, log in any time at:\n{login_link}\n\n'
       + 'NexaCrest International Private Limited'
   );
 
-  await emailService.sendPlainText(email, rendered.subject, rendered.body);
+  // D-280: a set-password invite is a MUST e-mail (access-critical) — never held.
+  const sent = await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'set_password_invite', audience: 'buyer' });
+  return { link: setUrl, sent };
 }
 
 async function attemptLogin(req, email, password) {
@@ -160,6 +212,7 @@ async function completeLogin(req, code) {
   if (!login || !login.is_active) return { status: 'no_pending' };
   await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
     req.session[SESSION_CLIENT_ID] = Number(login.client_id);
+    req.session._client_last_activity_ts = Date.now(); // D-283: the idle clock starts now
     req.session[SESSION_PASSWORD_FP] = passwordFingerprint(login.password_hash);
   });
   await clientLoginRepository.updateLastLogin(login.client_id);
@@ -202,6 +255,7 @@ async function startImpersonation(req, staffUserId, clientId) {
   await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
     req.session[SESSION_CLIENT_ID] = clientId;
     req.session[SESSION_IMPERSONATED_BY] = staffUserId;
+    req.session._client_last_activity_ts = Date.now(); // D-283
   });
   await auditLogRepository.log(staffUserId, 'CLIENT_IMPERSONATION_STARTED', 'clients', clientId);
 }
@@ -285,6 +339,9 @@ module.exports = {
   paymentReportRefusal,
   SESSION_CLIENT_ID,
   provisionIfNeeded,
+  inviteOutcome,
+  loginUrl,
+  sendSetPasswordLink,
   attemptLogin,
   completeLogin,
   currentClientId,

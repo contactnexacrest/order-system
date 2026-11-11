@@ -250,7 +250,7 @@ async function create(associate, product, selection, other, note) {
     const id = await insert(row);
     const number = (await find(id)).number;
     for (const userId of await permissionRepository.usersWithPermission('manage_pricing')) {
-      await notificationRepository.createInAppOnly(userId, 'price_request', null,
+      await notificationRepository.create(userId, null, 'price_request', null, // D-280: one e-mail per approval
         `Price request ${number} from ${associate.name} needs a manual price: ${product.name} — ${row.selection_text}.`);
     }
     await auditLogRepository.log(null, 'PRICE_REQUEST_MANUAL', 'price_requests', id, null, null, `${number}: ${product.name} — ${row.selection_text}`);

@@ -751,6 +751,32 @@ final class ClientController
         header("Location: /clients/{$clientId}");
     }
 
+    /**
+     * Owner decision D-282 (11 Nov 2026, point 22): "Send set-password link" in the
+     * Client portal login block — a new 72-hour, one-use link to the client's login
+     * e-mail. The screen says "e-mailed" only when it was, and always shows the link
+     * with a Copy button.
+     */
+    public function sendPortalLink(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        try {
+            $r = \App\Services\ClientPortalService::sendSetPasswordLink($clientId, (int) AuthService::currentUserId());
+            Flash::set('success', $r['sent']
+                ? "A link to set a new portal password was e-mailed to {$r['email']}. If they did not get it, copy this link and send it yourself — valid 72 hours, works once."
+                : "The set-password e-mail could NOT be sent to {$r['email']} — copy this link and send it yourself (valid 72 hours, works once).", $r['link']);
+        } catch (\RuntimeException $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        header("Location: /clients/{$clientId}");
+    }
+
     private static function generateTempPassword(): string
     {
         // Same shape as UserController::generateTempPassword() — 12

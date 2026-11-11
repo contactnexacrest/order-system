@@ -41,10 +41,8 @@ final class AgreementAlertService
                 continue;
             }
             $message = self::message($row, $days);
-            foreach (array_unique(array_map('intval', $recipients)) as $userId) {
-                NotificationRepository::create($userId, null, 'agreement_expiry', null, $message);
-                $created++;
-            }
+            // D-281: e-mailed to the responsible person and backup for agreements (Admin › E-mail settings).
+            $created += count(NotificationRepository::notifyRouted($recipients, StaffRouting::companyItem('agreements'), 'agreement_expiry', null, $message));
             AgreementRepository::markAlertSent((string) $row['key'], (string) $row['expires_on'], $threshold);
         }
         return $created;

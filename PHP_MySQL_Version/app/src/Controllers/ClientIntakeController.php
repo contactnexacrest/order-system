@@ -107,9 +107,8 @@ final class ClientIntakeController
         // NON NEGOTIABLE" — export process step 0: a prospect filling in
         // the public Quotation-stage intake form must notify staff, not
         // just sit silently in the review queue behind a nav badge.
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$data['company_legal_name']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::managers('SALES') ?: \App\Services\StaffRouting::managingDirectors(), 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$data['company_legal_name']}.");
         \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, null, null, null, "Submitted by {$data['company_legal_name']} via the public quotation-details form.");
 
         View::render('client_intake/thank_you', ['correctionLink' => $link], 'layout/bare');
@@ -159,9 +158,8 @@ final class ClientIntakeController
             return;
         }
         unset($_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY]);
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$s['company_legal_name']} (introduced by associate {$s['associate_name']}).");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::managers('SALES') ?: \App\Services\StaffRouting::managingDirectors(), 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$s['company_legal_name']} (introduced by associate {$s['associate_name']}).");
         View::render('client_intake/thank_you', ['correctionLink' => null], 'layout/bare');
     }
 
@@ -201,9 +199,8 @@ final class ClientIntakeController
         ClientIntakeRepository::updateFromClient((int) $submission['id'], $data);
         // External QA report N-08: this action never reached the audit
         // log or anyone's notifications.
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_updated', null, "Quotation-stage intake corrected by the client: {$data['company_legal_name']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::managers('SALES') ?: \App\Services\StaffRouting::managingDirectors(), 'client_intake_updated', null, "Quotation-stage intake corrected by the client: {$data['company_legal_name']}.");
         AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMISSION_UPDATED_BY_CLIENT', 'client_intake_submissions', (int) $submission['id'], null, null, null, 'Corrected by the client via the no-login edit link.');
         View::render('client_intake/thank_you', ['correctionLink' => null, 'updated' => true], 'layout/bare');
     }
@@ -335,7 +332,7 @@ final class ClientIntakeController
                 . "This link works for 7 days.\n\n"
                 . "NexaCrest International Private Limited"
         );
-        EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+        EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], false, 'buyer_links', 'buyer');
 
         return $link;
     }

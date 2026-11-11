@@ -290,8 +290,8 @@ describe('Zoho Books Stage 3', () => {
     const notifier = require('../../src/services/zohoSyncFailureNotifier');
     const sent = [];
     notifier.state.sender = async (to, subject, body) => { sent.push({ to, subject, body }); return true; };
-    const mailBefore = String(await companySettingsRepository.get('mail_sending_enabled'));
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    const mailBefore = String(await companySettingsRepository.get('email_testing_mode'));
+    await companySettingsRepository.set('email_testing_mode', '0');
     try {
       const finance = await financeUser();
       const o = await createOrder();
@@ -314,7 +314,7 @@ describe('Zoho Books Stage 3', () => {
       expect(sent).toEqual([]); // no e-mail when the run has no failures
     } finally {
       notifier.state.sender = null;
-      await companySettingsRepository.set('mail_sending_enabled', mailBefore);
+      await companySettingsRepository.set('email_testing_mode', mailBefore);
     }
   });
 
@@ -322,8 +322,8 @@ describe('Zoho Books Stage 3', () => {
     const notifier = require('../../src/services/zohoSyncFailureNotifier');
     const sent = [];
     notifier.state.sender = async (to) => { sent.push(to); return true; };
-    const mailBefore = String(await companySettingsRepository.get('mail_sending_enabled'));
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    const mailBefore = String(await companySettingsRepository.get('email_testing_mode'));
+    await require('../../src/services/emailPolicy').setSwitchForTest('staff_zoho', 'staff', false); // D-280: this e-mail switched off in Admin › E-mail settings
     try {
       const finance = await financeUser();
       const o = await createOrder();
@@ -337,7 +337,8 @@ describe('Zoho Books Stage 3', () => {
       expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u AND type = 'zoho_sync_failed'", { u: finance.id })).n)).toBe(1);
     } finally {
       notifier.state.sender = null;
-      await companySettingsRepository.set('mail_sending_enabled', mailBefore);
+      await companySettingsRepository.set('email_testing_mode', mailBefore);
+      await require('../../src/services/emailPolicy').setSwitchForTest('staff_zoho', 'staff', true);
     }
   });
 

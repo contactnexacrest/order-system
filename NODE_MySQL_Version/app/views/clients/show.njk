@@ -160,6 +160,44 @@
 
   {% if permissions.manage_company_settings or permissions.impersonate_client %}
   <div class="section">
+    {# Owner decision D-282 (11 Nov 2026, point 22, mockup access.png): the "Client portal login" block. #}
+    <div class="portal-block" data-testid="client-portal-login">
+      <h3>Client portal login</h3>
+      {% if clientLogin %}
+        <p>Portal account: <span class="badge {{ 'badge-active' if clientLogin.is_active == 1 else 'badge-optional' }}">{{ 'Active' if clientLogin.is_active == 1 else 'Switched off' }}</span>
+          <span class="muted small">created {{ clientLogin.created_at | shortDate }}{{ ' (first advance cleared)' if clientLogin.created_by_order_id else '' }} · {{ ('last login ' + (clientLogin.last_login_at | humanDate)) if clientLogin.last_login_at else 'never logged in' }}</span></p>
+      {% else %}
+        <p class="muted small">There is no portal account yet — it is created automatically when the first advance payment clears (as today). The login page below works from then on.</p>
+      {% endif %}
+      <p class="small"><b>Login page — send this to the buyer any time</b></p>
+      {% set copyLink = clientLoginUrl %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}
+      <p class="muted small">They can use "Forgot your password?" on that page themselves.</p>
+      <div class="btn-row">
+        {% if clientLogin and permissions.manage_company_settings %}
+          <form method="post" action="/clients/{{ client.id }}/portal/send-link" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Send set-password link</button></form>
+        {% endif %}
+        {% if permissions.impersonate_client and impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}
+          <form method="post" action="/clients/{{ client.id }}/impersonate" target="_blank" style="display:inline" data-confirm="Log in as {{ client.company_legal_name }}? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
+          </form>
+        {% endif %}
+      </div>
+      {% if clientLogin and permissions.manage_company_settings %}
+        <details style="margin-top:10px">
+          <summary>Reset with a temporary password</summary>
+          <p class="muted small">For a client who's locked out and can't use their own "Forgot password" email link — generates a one-time temporary password for you to hand over directly. They'll be asked to change it the next time they log in.</p>
+          <form method="post" action="/clients/{{ client.id }}/reset-password" data-confirm="Reset the client-portal password for {{ client.company_legal_name }}? Their current password stops working immediately. This is logged.">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Reason for this reset
+              <input type="text" name="reason" placeholder="e.g., Client called, forgot password, can't access email" required minlength="10">
+            </label>
+            <button type="submit" class="btn-sm">Reset password</button>
+          </form>
+        </details>
+      {% endif %}
+    </div>
+
     <h2>Client Portal Access</h2>
     {% if permissions.manage_company_settings %}
       <form method="post" action="/clients/{{ client.id }}/impersonation-allowed">
@@ -195,29 +233,9 @@
     {% endif %}
     {% if permissions.impersonate_client %}
       {% if impersonationGloballyEnabled and client.allow_staff_impersonation and client.is_active %}
-        <form method="post" action="/clients/{{ client.id }}/impersonate" target="_blank" data-confirm="Log in as {{ client.company_legal_name }}? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
-        </form>
+        <p class="muted small">"Log in as this client" is available in the Client portal login block above.</p>
       {% else %}
         <p class="muted small">"Log in as this client" isn't available right now — {{ impersonationUnavailableReason }}.</p>
-      {% endif %}
-    {% endif %}
-    {% if permissions.manage_company_settings %}
-      {% if clientLogin %}
-        <details style="margin-top:14px">
-          <summary>Reset client-portal password</summary>
-          <p class="muted small">For a client who's locked out and can't use their own "Forgot password" email link — generates a one-time temporary password for you to hand over directly. They'll be asked to change it the next time they log in.</p>
-          <form method="post" action="/clients/{{ client.id }}/reset-password" data-confirm="Reset the client-portal password for {{ client.company_legal_name }}? Their current password stops working immediately. This is logged.">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Reason for this reset
-              <input type="text" name="reason" placeholder="e.g., Client called, forgot password, can't access email" required minlength="10">
-            </label>
-            <button type="submit" class="btn-sm">Reset password</button>
-          </form>
-        </details>
-      {% else %}
-        <p class="muted small" style="margin-top:14px">This client has no portal account yet — one is provisioned automatically once their first order's advance payment clears.</p>
       {% endif %}
     {% endif %}
   </div>

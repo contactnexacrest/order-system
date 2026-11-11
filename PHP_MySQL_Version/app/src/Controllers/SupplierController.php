@@ -216,7 +216,7 @@ final class SupplierController
             return;
         }
         $sent = VendorDetailsService::sendDetailsLink('supplier', $id, (int) AuthService::currentUserId());
-        Flash::set('success', 'Vendor Details Link ' . ($sent['emailed_to'] ? "emailed to {$sent['emailed_to']}" : 'generated') . ": {$sent['link']}");
+        Flash::set('success', $sent['message'], $sent['link']); // D-280
         header("Location: /suppliers/{$id}/edit#vendor-details-link");
     }
 

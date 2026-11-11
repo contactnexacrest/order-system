@@ -32,7 +32,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
   });
 
   const SETTING_KEYS = [
-    'mail_sending_enabled', 'mail_approval_queue_enabled',
+    'email_testing_mode', 'mail_approval_queue_enabled',
     'oc_ack_override_restricted', 'oc_ack_auto_confirm_hours',
   ];
   const originalValues = {};
@@ -234,24 +234,26 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
     expect(ack.acknowledged_at).not.toBeNull();
   });
 
-  // --- mail_sending_enabled: global kill switch ---
+  // --- D-280: testing mode holds buyer and supplier e-mails (replaced the global kill switch) ---
 
-  it('mail_sending_enabled=0 blocks a non-security email', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+  it('email_testing_mode=1 holds a buyer e-mail', async () => {
+    await companySettingsRepository.set('email_testing_mode', '1');
 
-    const sent = await mailSenderService.send('buyer@real-company.example', 'Subject', 'Body', [], { isSecurityEmail: false });
+    const sent = await mailSenderService.send('buyer@real-company.example', 'Subject', 'Body', [], { isSecurityEmail: false, kind: 'buyer_links', audience: 'buyer' });
+    expect(mailSenderService.state.lastOutcome).toBe('held');
 
     expect(sent).toBe(false);
   });
 
-  it('mail_sending_enabled=0 does not change a security email outcome', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+  it('email_testing_mode=1 does not change a security email outcome', async () => {
+    await companySettingsRepository.set('email_testing_mode', '1');
 
     // No SMTP configured in the test environment either way, so this still
     // returns false — the point is it must reach that same no-SMTP
     // fallback rather than being blocked earlier by the kill switch, which
     // only ever checks when isSecurityEmail is false.
-    const sent = await mailSenderService.send('staff@nexacrest.test', 'Your 2FA code', 'Body', [], { isSecurityEmail: true });
+    const sent = await mailSenderService.send('staff@nexacrest.test', 'Your 2FA code', 'Body', [], { isSecurityEmail: true, kind: 'login_code', audience: 'staff' });
+    expect(mailSenderService.state.lastOutcome).not.toBe('held'); // a MUST e-mail is never held
 
     expect(sent).toBe(false);
   });

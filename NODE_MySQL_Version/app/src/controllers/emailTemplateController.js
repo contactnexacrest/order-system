@@ -26,7 +26,8 @@ const AVAILABLE_TOKENS = [
  */
 const SYSTEM_TEMPLATE_TOKENS = {
   two_factor_code: ['{code}'],
-  client_portal_invite: ['{set_password_link}', '{email}'],
+  client_login_code: ['{code}'], // D-280: the buyer's own login-code wording
+  client_portal_invite: ['{set_password_link}', '{email}', '{login_link}'], // D-282: {login_link}
   staff_password_reset: ['{name}', '{email}', '{reset_link}'],
   client_portal_password_reset: ['{email}', '{reset_link}'],
   quotation_correction_link: ['{correction_link}'],

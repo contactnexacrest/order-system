@@ -62,15 +62,15 @@ final class EmailService
     /**
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function sendPlainText(string $toEmail, string $subject, string $body, bool $isSecurityEmail = false): bool
+    public static function sendPlainText(string $toEmail, string $subject, string $body, bool $isSecurityEmail = false, ?string $kind = null, ?string $audience = null): bool
     {
         // QA batch 3 MAIL-2: every business e-mail (link e-mails, notifications,
-        // alerts) goes through MailSenderService — the one place with the
-        // "e-mail sending off" switch, Test Mode, Mail Redirect and the Zoho
+        // alerts) goes through MailSenderService — the one place with Admin ›
+        // E-mail settings (D-280), Test Mode, Mail Redirect and the Zoho
         // transport. Only security mail (2FA, password reset, one-time codes)
-        // keeps this direct path.
+        // keeps this direct path — those kinds are MUST, never held.
         if (!$isSecurityEmail) {
-            return MailSenderService::send($toEmail, $subject, $body);
+            return MailSenderService::send($toEmail, $subject, $body, [], false, $kind, $audience);
         }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {
@@ -190,11 +190,11 @@ final class EmailService
      * @param array<int, array{path:string, name:string}> $attachments
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function sendWithAttachments(string $toEmail, string $subject, string $body, array $attachments, bool $isSecurityEmail = false): bool
+    public static function sendWithAttachments(string $toEmail, string $subject, string $body, array $attachments, bool $isSecurityEmail = false, ?string $kind = null, ?string $audience = null): bool
     {
         // QA batch 3 MAIL-2: business mail goes through MailSenderService (see sendPlainText()).
         if (!$isSecurityEmail) {
-            return MailSenderService::send($toEmail, $subject, $body, $attachments);
+            return MailSenderService::send($toEmail, $subject, $body, $attachments, false, $kind, $audience);
         }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {

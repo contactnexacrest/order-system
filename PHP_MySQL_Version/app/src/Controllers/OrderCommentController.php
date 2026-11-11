@@ -37,10 +37,11 @@ final class OrderCommentController
                 'Order Update Attachment'
             );
             OrderCommentService::postAsStaff($orderId, (int) $user['id'], $body !== '' ? $body : null, $fileIds);
-            // QA Round 5, R5-16: with email sending off, nothing was emailed — say so.
-            Flash::set('success', \App\Services\EmailDispatchService::mailSendingEnabled()
+            // QA Round 5, R5-16 / D-280: say "emailed" only when the e-mail really went out.
+            $note = OrderCommentService::$lastEmailNote;
+            Flash::set('success', $note === 'e-mailed'
                 ? 'Posted — the client has been emailed.'
-                : 'Posted to the client portal. Email sending is turned off, so the client was NOT emailed — tell them yourself if it is urgent.');
+                : 'Posted to the client portal — ' . $note . '. Tell the client yourself if it is urgent.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
         }

@@ -149,6 +149,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png?v=2">
 <link rel="stylesheet" href="<?= \App\Helpers\View::asset('/assets/css/app.css') ?>">
 <script src="<?= \App\Helpers\View::asset('/assets/js/app.js') ?>" defer></script>
+<?= \App\Services\SessionTimeouts::metaTag() // D-283: idle warning popup (app.js) ?>
 </head>
 <body>
 <?php if (\App\Config\Env::isDevServer()): ?>
@@ -225,6 +226,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>Admin</summary>
         <div class="nav-dropdown">
           <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings<?= $settingsExpiryWarningCount > 0 ? ' <span class="nav-badge">' . (int) $settingsExpiryWarningCount . '</span>' : '' ?></a><?php endif; ?>
+          <?php if ($canSettings): // D-280 ?><a href="/admin/email-settings" class="<?= $isActive('/admin/email-settings') ? 'active' : '' ?>">E-mail Settings</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
           <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
           <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
@@ -326,7 +328,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
   <?php endif; ?>
   <main class="page">
     <?php foreach (Flash::pull() as $f): ?>
-      <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
+      <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?><?php if (!empty($f['copy_link'])) { $__copyLink = $f['copy_link']; $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; } // D-280 ?></div>
     <?php endforeach; ?>
     <?php if (str_starts_with($currentPath, '/reports') && \App\Services\DivisionService::showSwitcher()): // D-257: one shared Division filter for every report (two or more active divisions only) ?>
       <form method="get" class="report-division-filter" data-testid="report-division-filter">

@@ -58,7 +58,7 @@ function compose(name, items, date) {
  * off, and about digests that could not be sent.
  */
 function summary(result) {
-  if (result.mailOff) return 'Daily digest: e-mail sending is off — nothing sent.';
+  if (result.mailOff) return 'Daily digest: the daily summary e-mail is switched off in Admin › E-mail settings — nothing sent.';
   return `Daily digest: ${result.sent} sent, ${result.skipped} with nothing waiting or already sent`
     + (result.failed > 0 ? `, ${result.failed} not sent (will be retried on the next run)` : '') + '.';
 }
@@ -77,7 +77,7 @@ function setSender(fn) {
  */
 async function run(date = null) {
   const day = date || todayIst();
-  if (!sender && (await require('../repositories/companySettingsRepository').get('mail_sending_enabled')) === '0') {
+  if (!sender && !(await require('./emailPolicy').allows('staff_daily_summary', 'staff'))) { // D-280: Admin › E-mail settings
     return { sent: 0, skipped: 0, failed: 0, mailOff: true };
   }
   const users = await db.query("SELECT id, name, email FROM users WHERE is_active = 1 AND email IS NOT NULL AND email <> '' ORDER BY id");
@@ -91,7 +91,7 @@ async function run(date = null) {
     const claim = await db.execute('INSERT IGNORE INTO daily_digest_log (user_id, digest_date, items) VALUES (:u, :d, :n)', { u: u.id, d: day, n: items.length });
     if (claim.affectedRows !== 1) { skipped++; continue; }
     const mail = compose(String(u.name), items, day);
-    const ok = sender ? await sender(String(u.email), mail.subject, mail.body) : await mailSenderService.send(String(u.email), mail.subject, mail.body);
+    const ok = sender ? await sender(String(u.email), mail.subject, mail.body) : await mailSenderService.send(String(u.email), mail.subject, mail.body, [], { kind: 'staff_daily_summary', audience: 'staff' });
     if (ok) {
       sent++;
     } else {

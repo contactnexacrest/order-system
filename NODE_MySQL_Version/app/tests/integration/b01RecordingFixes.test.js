@@ -32,15 +32,15 @@ describe('D-268 fixes found while recording B01', () => {
   let mailSetting;
 
   beforeAll(async () => {
-    mailSetting = (await db.queryOne("SELECT setting_value FROM company_settings WHERE setting_key = 'mail_sending_enabled'")).setting_value;
+    mailSetting = (await db.queryOne("SELECT setting_value FROM company_settings WHERE setting_key = 'email_testing_mode'")).setting_value;
   });
 
   afterAll(async () => {
-    await db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'", { v: mailSetting });
+    await db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'", { v: mailSetting });
     await db.pool.end();
   });
 
-  const setMailSending = (v) => db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'", { v });
+  const setMailSending = (v) => db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'", { v });
 
   async function createUser(roleName) {
     const role = await db.queryOne('SELECT id FROM roles WHERE name = :n', { n: roleName });
@@ -104,17 +104,17 @@ describe('D-268 fixes found while recording B01', () => {
   }
 
   it('gives "sending switched off" as the reason, not a missing e-mail', async () => {
-    await setMailSending('0');
+    await setMailSending('1') /* D-280: testing mode on */;
     const { orderId, staff } = await orderFor(`b01-${crypto.randomBytes(4).toString('hex')}@buyer.test`);
     const id = await orderCommentService.postAsStaff(orderId, staff.id, 'Your goods are packed.', []);
     const row = await db.queryOne('SELECT email_sent, email_status FROM order_comments WHERE id = :id', { id });
     expect(Number(row.email_sent)).toBe(0);
-    expect(row.email_status).toBe('sending_off');
-    expect(await noteFor(id, orderId)).toBe('not e-mailed — e-mail sending is switched off in Admin');
+    expect(row.email_status).toBe('testing_mode');
+    expect(await noteFor(id, orderId)).toBe('not e-mailed — testing mode holds e-mails to buyers and suppliers');
   });
 
   it('gives "no client e-mail on file" as the reason', async () => {
-    await setMailSending('1');
+    await setMailSending('0') /* testing mode off */;
     const { orderId, staff } = await orderFor(null);
     const id = await orderCommentService.postAsStaff(orderId, staff.id, 'Your goods are packed.', []);
     expect((await db.queryOne('SELECT email_status FROM order_comments WHERE id = :id', { id })).email_status).toBe('no_email');

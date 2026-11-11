@@ -170,7 +170,7 @@ async function sendDetailsLink(req, res) {
     return;
   }
   const sent = await vendorDetailsService.sendDetailsLink('logistics_partner', id, req.user.id);
-  flash.set(req, 'success', `Vendor Details Link ${sent.emailedTo ? `emailed to ${sent.emailedTo}` : 'generated'}: ${sent.link}`);
+  flash.set(req, 'success', sent.message, sent.link); // D-280
   res.redirect(`/logistics-partners/${id}/edit#vendor-details-link`);
 }
 

@@ -94,7 +94,7 @@ describe('Vendor bank details and the Vendor Details Link (owner request 2026-10
   it('lets the vendor fill their details once through the link', async () => {
     const { id } = await createSupplier({});
     const sent = await call(supplierController.sendDetailsLink, { id: String(id) }, {});
-    expect(sent.flash.message).toContain('emailed to accounts@heera.test');
+    expect(sent.flash.message).toContain('accounts@heera.test');
     const token = vendorDetailsRepository.liveDetailsToken(await supplierRepository.find(id));
     expect(token).toBeTruthy();
 

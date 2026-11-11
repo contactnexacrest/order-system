@@ -219,9 +219,12 @@ never gets buried below older rows still waiting out their own schedule.
 
 Two independent switches in Company Settings:
 
-- **`mail_sending_enabled`** — a master switch for every non-security
-  email (2FA codes and password resets are never affected). It is **off**
-  in a fresh installation. While it is off there is **no Send to Buyer**
+- **Testing mode / the "Documents" switch** (Admin → E-mail settings,
+  D-280; replaced `mail_sending_enabled`) — testing mode holds every
+  buyer and supplier e-mail (login codes and password links are never
+  affected); the "Documents … — Buyer" switch holds document e-mails only.
+  Testing mode is **off** in a fresh installation. While buyer document
+  e-mails are held there is **no Send to Buyer**
   at all: a buyer-facing document counts as **sent the moment it is
   approved** (its panel says "Counted as sent on approval (email sending is
   off) — send the PDF to the buyer yourself"), the OC acknowledgement clock

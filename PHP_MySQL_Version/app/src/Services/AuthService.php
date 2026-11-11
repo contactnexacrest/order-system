@@ -140,6 +140,10 @@ final class AuthService
     {
         session_regenerate_id(true);
         $_SESSION[self::SESSION_USER_ID] = $userId;
+        // D-283: the idle clock and the 12-hour limit start now (an old
+        // activity time left from an earlier, timed-out login must not count).
+        $_SESSION['_last_activity_ts'] = time();
+        $_SESSION[SessionTimeouts::STAFF_LOGIN_AT_KEY] = time();
         // External QA report L-26: snapshot the row's current
         // session_version at login time — SessionAuth::required()
         // compares this against the live DB value on every request.

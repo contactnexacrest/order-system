@@ -335,9 +335,19 @@ final class ComplianceTrackingService
         return $stmt->rowCount() > 0;
     }
 
-    /** @param list<int> $userIds */
-    private static function notify(array $userIds, string $type, ?int $orderId, string $message): int
+    /**
+     * D-281: everyone in $userIds gets the in-app notice; the e-mail goes to $emailIds
+     * (an order alert: the department on the order; a company item: its responsible
+     * person and backup). Null = everyone, as before.
+     *
+     * @param list<int> $userIds
+     * @param list<int>|null $emailIds
+     */
+    private static function notify(array $userIds, string $type, ?int $orderId, string $message, ?array $emailIds = null): int
     {
+        if ($emailIds !== null) {
+            return count(NotificationRepository::notifyRouted($userIds, $emailIds, $type, $orderId, $message));
+        }
         $n = 0;
         foreach (array_values(array_unique($userIds)) as $u) {
             NotificationRepository::create($u, null, $type, $orderId, $message);
@@ -360,7 +370,7 @@ final class ComplianceTrackingService
         if ($missing !== [] && self::once('ebrc_monthly', $month, 'monthly', $today)) {
             $orders = count(array_unique(array_column($missing, 'order_id')));
             $created += self::notify(array_merge($finance, $managers), 'ebrc_missing_monthly', null,
-                'Missing eBRC / FIRC: ' . count($missing) . ' received payment(s) on ' . $orders . ' order(s) still have no FIRC / eBRC reference — see Reports → Missing eBRC / FIRC.');
+                'Missing eBRC / FIRC: ' . count($missing) . ' received payment(s) on ' . $orders . ' order(s) still have no FIRC / eBRC reference — see Reports → Missing eBRC / FIRC.', StaffRouting::companyItem('ebrc_monthly'));
         }
 
         // (b) ECGC shipment declarations
@@ -382,7 +392,8 @@ final class ComplianceTrackingService
                     $created += self::notify($managers !== [] ? $managers : $finance, 'ecgc_declaration_' . $threshold, (int) $r['id'],
                         $threshold === 'overdue'
                             ? 'Order ' . $r['order_reference'] . ': the shipment was not declared to ECGC by ' . $due . ' — declare it now (a late declaration may not be covered).'
-                            : 'Order ' . $r['order_reference'] . ': declare the shipment to ECGC by ' . $due . '.');
+                            : 'Order ' . $r['order_reference'] . ': declare the shipment to ECGC by ' . $due . '.',
+                        StaffRouting::forOrder((int) $r['id'], 'EXPORT_COMPLIANCE')['email']);
                 }
             }
             // ECGC policy expiry, 30 days ahead
@@ -390,7 +401,7 @@ final class ComplianceTrackingService
             if ($policyTo !== '' && $policyTo >= $today && $policyTo <= date('Y-m-d', strtotime($today . ' +30 days'))
                 && self::once('ecgc_policy', $policyTo, '30', $today)) {
                 $created += self::notify(array_merge(PermissionRepository::usersWithPermission('manage_company_settings'), $managers), 'ecgc_policy_expiring', null,
-                    'The ECGC policy ' . $policyNo . ' ends on ' . $policyTo . ' — renew it so new shipments stay covered.');
+                    'The ECGC policy ' . $policyNo . ' ends on ' . $policyTo . ' — renew it so new shipments stay covered.', StaffRouting::companyItem('ecgc_policy'));
             }
         }
 
@@ -408,7 +419,7 @@ final class ComplianceTrackingService
                 if ($v['days_left'] <= $t) {
                     if (self::once('benefit_deadline', (string) $claim['id'] . '@' . $v['effective_deadline'], (string) $t, $today)) {
                         $created += self::notify(array_merge($managers, $finance), 'benefit_claim_deadline', (int) $claim['order_id'],
-                            'Order ' . $claim['order_reference'] . ': the ' . $claim['scheme_name'] . ' claim must be completed by ' . $v['effective_deadline'] . ' (' . $v['days_left'] . ' day(s) left).');
+                            'Order ' . $claim['order_reference'] . ': the ' . $claim['scheme_name'] . ' claim must be completed by ' . $v['effective_deadline'] . ' (' . $v['days_left'] . ' day(s) left).', StaffRouting::forOrder((int) $claim['order_id'], 'EXPORT_COMPLIANCE')['email']);
                     }
                     break;
                 }

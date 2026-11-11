@@ -60,7 +60,7 @@ async function afterRun(sinceLogId, triggeredBy, orderId = null) {
   const notice = `${subject} — see Zoho Sync (Sync Log).`;
 
   const recipients = [...new Set((await permissionRepository.usersWithPermission('ca_module_manage')).map(Number))];
-  const mailOn = String(await companySettingsRepository.get('mail_sending_enabled')) !== '0';
+  const mailOn = await require('./emailPolicy').allows('staff_zoho', 'staff'); // D-280: Admin › E-mail settings
   out.mail_off = !mailOn;
   const users = recipients.length
     ? await db.query(`SELECT id, email FROM users WHERE is_active = 1 AND id IN (${recipients.join(',')})`)
@@ -69,7 +69,7 @@ async function afterRun(sinceLogId, triggeredBy, orderId = null) {
     await notificationRepository.createInAppOnly(Number(u.id), 'zoho_sync_failed', orderId, notice);
     out.notified += 1;
     if (mailOn && String(u.email || '').trim() !== '') {
-      const ok = state.sender ? await state.sender(String(u.email), subject, body) : await mailSenderService.send(String(u.email), subject, body);
+      const ok = state.sender ? await state.sender(String(u.email), subject, body) : await mailSenderService.send(String(u.email), subject, body, [], { kind: 'staff_zoho', audience: 'staff' });
       out.emailed += ok ? 1 : 0;
     }
   }

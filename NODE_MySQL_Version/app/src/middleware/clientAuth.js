@@ -25,14 +25,18 @@ function required() {
     // unattended browser (a shared office computer, a public kiosk) stayed
     // logged in to a buyer's own order/document history forever. Reuses
     // the same DB-driven setting sessionAuth enforces for staff.
-    const timeoutMinutes = parseInt((await companySettingsRepository.get('session_timeout_minutes')) ?? '30', 10);
+    // D-283: the buyers' own idle timeout (Admin › Settings › Security, default 2 hours).
+    const sessionTimeouts = require('../services/sessionTimeouts');
     const lastActivity = req.session[LAST_ACTIVITY_KEY] ?? null;
-    if (lastActivity !== null && (Date.now() - lastActivity) > timeoutMinutes * 60000) {
+    if (await sessionTimeouts.idleExpired('client', lastActivity)) {
       await clientPortalService.logout(req);
+      delete req.session[LAST_ACTIVITY_KEY];
+      require('../helpers/flash').set(req, 'info', `You were signed out after ${sessionTimeouts.describeMinutes(await sessionTimeouts.idleMinutes('client'))} without activity. Please log in again.`);
       res.redirect('/client/login');
       return;
     }
     req.session[LAST_ACTIVITY_KEY] = Date.now();
+    await sessionTimeouts.markPage(req, 'client');
 
     // docs/schema.sql Section AV: a staff-impersonated session has no
     // client_logins row to check at all — it's a separate channel, not a
@@ -57,7 +61,7 @@ function required() {
       // acknowledge, upload, report payments, raise disputes or reorder as the buyer.
       if (req.method === 'POST') {
         const postPath = String(req.path || '').replace(/\/+$/, '');
-        if (!['/client/end-impersonation', '/client/logout'].includes(postPath)) {
+        if (!['/client/end-impersonation', '/client/logout', '/client/keep-alive'].includes(postPath)) {
           require('../helpers/flash').set(req, 'error', 'You are logged in as this client to look only: nothing can be saved for the buyer. Use "End impersonation" first.');
           let back = '/client';
           try {

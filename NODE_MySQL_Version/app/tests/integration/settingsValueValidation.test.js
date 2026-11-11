@@ -22,7 +22,7 @@ function extractCsrf(html) {
 describe('Admin settings reject values that violate their value_type (QA-5 SET-02)', () => {
   let agent;
   let originalValue;
-  const settingKey = 'session_timeout_minutes'; // value_type = 'number'
+  const settingKey = 'session_timeout_staff_minutes'; // value_type = 'number'
 
   beforeAll(async () => {
     agent = request.agent(app);

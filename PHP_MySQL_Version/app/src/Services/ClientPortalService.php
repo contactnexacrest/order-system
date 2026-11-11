@@ -107,12 +107,38 @@ final class ClientPortalService
         // (that order's own assignees) can actually find it.
         AuditLogRepository::log(null, 'CLIENT_PORTAL_PROVISIONED', 'orders', $orderId, null, null, null, "Client portal provisioned — advance cleared");
 
-        self::sendSetPasswordEmail($clientId, $client['email'], $client['company_legal_name']);
+        self::$lastInvite = self::sendSetPasswordEmail($clientId, $client['email'], $client['company_legal_name']);
 
         return 'provisioned';
     }
 
-    private static function sendSetPasswordEmail(int $clientId, string $email, string $companyName): void
+    /**
+     * D-280: the set-password link of the last invite and whether its e-mail went
+     * out — staff see the link with a Copy button either way.
+     *
+     * @var array{link:string, sent:bool}|null
+     */
+    public static ?array $lastInvite = null;
+
+    /** D-280: the staff message after a portal was opened — "e-mailed" only when it was. */
+    public static function inviteOutcome(): string
+    {
+        if (self::$lastInvite === null) {
+            return '';
+        }
+        return self::$lastInvite['sent']
+            ? ' The client was e-mailed a link to set their portal password (valid 72 hours, works once). If they did not get it, copy the link below and send it yourself.'
+            : ' The portal invite e-mail could NOT be sent — copy the set-password link below and send it to the client yourself (valid 72 hours, works once).';
+    }
+
+    /** D-282: the permanent client login page address (shown on the client page and in the invite). */
+    public static function loginUrl(): string
+    {
+        return rtrim((string) Env::get('APP_URL', ''), '/') . '/client/login';
+    }
+
+    /** @return array{link:string, sent:bool} */
+    private static function sendSetPasswordEmail(int $clientId, string $email, string $companyName): array
     {
         $rawToken = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $rawToken);
@@ -123,19 +149,58 @@ final class ClientPortalService
 
         // 90-item backlog #37: admin-editable (Admin > Settings > Email
         // Templates) — this exact original wording is the fallback.
+        // D-282: {login_link} — the permanent login page, for every later visit.
         $rendered = EmailTemplateRepository::renderOrDefault(
             'client_portal_invite',
-            ['{set_password_link}' => $setUrl, '{email}' => $email],
+            ['{set_password_link}' => $setUrl, '{email}' => $email, '{login_link}' => self::loginUrl()],
             'Your NexaCrest order portal access',
             "Hello,\n\n"
                 . "Your advance payment has been received and cleared — thank you.\n\n"
                 . "You can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\n"
-                . "To set up your login, open this link within 72 hours:\n{set_password_link}\n\n"
+                . "To set up your login, open this link within 72 hours (it works once):\n{set_password_link}\n\n"
                 . "Your login email will be: {email}\n\n"
+                . "After that, log in any time at:\n{login_link}\n\n"
                 . "NexaCrest International Private Limited"
         );
 
-        EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+        // D-280: a set-password invite is a MUST e-mail (access-critical) — never held.
+        $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], false, 'set_password_invite', 'buyer');
+        return ['link' => $setUrl, 'sent' => $sent];
+    }
+
+    /**
+     * D-282: staff "Send set-password link" on the client page — a new 72-hour,
+     * one-use link to the client's login e-mail (the forgot-password wording).
+     * Returns the link (shown to staff with a Copy button) and whether it was e-mailed.
+     *
+     * @return array{link:string, sent:bool, email:string}
+     */
+    public static function sendSetPasswordLink(int $clientId, int $staffUserId): array
+    {
+        $login = ClientLoginRepository::findByClientId($clientId);
+        $client = ClientRepository::find($clientId);
+        if ($login === null || $client === null) {
+            throw new \RuntimeException('This client has no portal account yet — it is created automatically when the first advance payment clears.');
+        }
+        $email = trim((string) ($client['email'] ?? ''));
+        if ($email === '') {
+            throw new \RuntimeException('This client has no e-mail on file — add one to the client record first.');
+        }
+        $rawToken = bin2hex(random_bytes(32));
+        ClientPasswordResetTokenRepository::create($clientId, hash('sha256', $rawToken), date('Y-m-d H:i:s', time() + 72 * 3600), null);
+        $link = rtrim((string) Env::get('APP_URL', ''), '/') . '/client/set-password/' . $rawToken;
+        $rendered = EmailTemplateRepository::renderOrDefault(
+            'client_portal_password_reset',
+            ['{email}' => $email, '{reset_link}' => $link, '{login_link}' => self::loginUrl()],
+            'Reset your NexaCrest order portal password',
+            "Hello,\n\n"
+                . "A password reset was requested for your NexaCrest order portal account ({email}).\n\n"
+                . "To set a new password, open this link within 72 hours:\n{reset_link}\n\n"
+                . "If you didn't request this, you can ignore this email — your password will not be changed."
+        );
+        $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], false, 'forgot_password', 'buyer');
+        AuditLogRepository::log($staffUserId, 'CLIENT_SET_PASSWORD_LINK_SENT', 'clients', $clientId, null, null, $email, $sent ? 'E-mailed' : 'Not e-mailed — link shown to staff');
+        return ['link' => $link, 'sent' => $sent, 'email' => $email];
     }
 
     public static function attemptLogin(string $email, string $password): array
@@ -207,6 +272,7 @@ final class ClientPortalService
         // always start a clean, non-impersonated identity.
         unset($_SESSION[self::SESSION_IMPERSONATED_BY]);
         $_SESSION[self::SESSION_CLIENT_ID] = $clientId;
+        $_SESSION['_client_last_activity_ts'] = time(); // D-283: the idle clock starts now
         $_SESSION[self::SESSION_PASSWORD_FP] = self::passwordFingerprint((string) $login['password_hash']);
         ClientLoginRepository::updateLastLogin($clientId);
         AuditLogRepository::log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', $clientId);
@@ -254,6 +320,7 @@ final class ClientPortalService
         session_regenerate_id(true);
         $_SESSION[self::SESSION_CLIENT_ID] = $clientId;
         $_SESSION[self::SESSION_IMPERSONATED_BY] = $staffUserId;
+        $_SESSION['_client_last_activity_ts'] = time(); // D-283
         AuditLogRepository::log($staffUserId, 'CLIENT_IMPERSONATION_STARTED', 'clients', $clientId);
     }
 

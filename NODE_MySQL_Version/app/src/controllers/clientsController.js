@@ -248,6 +248,7 @@ async function show(req, res) {
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,
     duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
     clientLogin: await clientLoginRepository.findByClientId(client.id),
+    clientLoginUrl: require('../services/clientPortalService').loginUrl(), // D-282
   }, 'layout/base');
 }
 
@@ -774,6 +775,29 @@ async function impersonate(req, res) {
  * never here) — this resets an existing portal account, it does not
  * provision one.
  */
+/**
+ * Owner decision D-282 (11 Nov 2026, point 22): "Send set-password link" in the
+ * Client portal login block — a new 72-hour, one-use link to the client's login
+ * e-mail. "E-mailed" only when it was; the link is always shown with Copy.
+ */
+async function sendPortalLink(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+  try {
+    const r = await require('../services/clientPortalService').sendSetPasswordLink(clientId, req.user.id);
+    flash.set(req, 'success', r.sent
+      ? `A link to set a new portal password was e-mailed to ${r.email}. If they did not get it, copy this link and send it yourself — valid 72 hours, works once.`
+      : `The set-password e-mail could NOT be sent to ${r.email} — copy this link and send it yourself (valid 72 hours, works once).`, r.link);
+  } catch (e) {
+    flash.set(req, 'error', e.message);
+  }
+  res.redirect(`/clients/${clientId}`);
+}
+
 async function resetPortalPassword(req, res) {
   const clientId = parseInt(req.params.id, 10);
   const client = await clientRepository.find(clientId);
@@ -909,7 +933,7 @@ async function showRemovedAdditionalDocuments(req, res) {
 
 module.exports = {
   index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
-  setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, resetPortalPassword, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
+  setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, resetPortalPassword, sendPortalLink, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,
 };

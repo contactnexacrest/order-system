@@ -50,27 +50,48 @@
   </div>
 
   <div class="section" id="portal">
-    <h2>Portal login link and personal code</h2>
-    <p>Portal: <b>{{ 'on' if a.portal_enabled == 1 else 'off' }}</b>{% if a.last_login_at %} · last login {{ a.last_login_at | shortDate }}{% endif %}
-      {% if codeLink %}<br>Quotation link (with their code): <code>{{ codeLink }}</code>{% endif %}</p>
-    <div class="btn-row">
-      <form method="post" action="/associates/{{ id }}/portal/invite" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">{{ 'Resend portal login link' if a.portal_enabled == 1 else 'Send portal login link' }}</button></form>
-      {% if a.portal_enabled == 1 %}<form method="post" action="/associates/{{ id }}/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form>{% endif %}
+    {# Owner decision D-282 (11 Nov 2026, points 2 + 5, mockup access.png): three blocks — Portal login · Quotation link · Personal code. #}
+    <div class="portal-block" data-testid="associate-portal-login">
+      <h3>Portal login</h3>
+      <p>Portal: <span class="badge {{ 'badge-active' if a.portal_enabled == 1 else 'badge-optional' }}">{{ 'On' if a.portal_enabled == 1 else 'Off' }}</span>
+        <span class="muted small">{{ 'Password set' if a.password_hash else 'Password not set yet' }} · {{ ('last login ' + (a.last_login_at | humanDate)) if a.last_login_at else 'never logged in' }}</span></p>
+      <p class="small"><b>Login page — send this to the associate any time</b></p>
+      {% set copyLink = associateLoginUrl %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}
+      <p class="muted small">On this page they log in, or click "Forgot password?" to get a new link by e-mail themselves.</p>
+      <div class="btn-row">
+        <form method="post" action="/associates/{{ id }}/portal/invite" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Send set-password link</button></form>
+        {% if a.portal_enabled == 1 %}<form method="post" action="/associates/{{ id }}/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form>{% endif %}
+      </div>
     </div>
-    {# Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). #}
-    <form method="post" action="/associates/{{ id }}/code" class="inline-form" data-confirm="Set a new personal code for this associate?">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. DEMO"></label>
-      <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
-      <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
-      <button type="submit" class="btn-sm btn-secondary">Set code</button>
-    </form>
+
+    {% if codeLink %}
+    <div class="portal-block" data-testid="associate-quotation-link">
+      <h3>Quotation link (with Associate code)</h3>
+      {% set copyLink = codeLink %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}
+      <p class="muted small">Buyers who ask for a quotation through this link are registered as this associate's clients.</p>
+    </div>
+    {% endif %}
+
+    <div class="portal-block" data-testid="associate-personal-code">
+      <h3>Personal code</h3>
+      <p>Current code: <b>{{ a.personal_code if a.personal_code else '— none yet' }}</b></p>
+      {# Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). #}
+      <form method="post" action="/associates/{{ id }}/code" data-confirm="Set a new personal code for this associate?">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="portal-block-code-form">
+          <label>New code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. DEMO"></label>
+          <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
+          <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
+        </div>
+        <p style="margin-top:14px"><button type="submit" class="btn-sm">Set code</button></p>
+      </form>
     {% if codes and codes.length %}
       <table class="list"><tr><th>Code</th><th>From</th><th>To</th><th>Status</th></tr>
         {% for c in codes %}<tr><td style="font-family:monospace">{{ c.code }}</td><td>{{ (c.issued_at | shortDate) if c.issued_at else '—' }}</td><td>{{ (c.retired_at | shortDate) if c.retired_at else '—' }}</td>
           <td>{% if c.blocked_at %}Blocked — {{ c.blocked_reason }}{% elif c.code == a.personal_code %}Current{% else %}Still accepted (old links){% endif %}</td></tr>{% endfor %}
       </table>
     {% endif %}
+    </div>
   </div>
   {% if portalAccess %}{% include "associates/_portal_access.njk" %}{% endif %}{# D-261 #}
   {% endif %}

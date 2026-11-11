@@ -1,5 +1,6 @@
 <?php
 use App\Helpers\Csrf;
+use App\Helpers\Dates;
 use App\Helpers\Mask;
 use App\Repositories\CompanySettingsRepository;
 use App\Services\AuthService;
@@ -189,6 +190,44 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
 
   <?php if ($__canManageSettings || $__canImpersonate): ?>
   <div class="section">
+    <?php // Owner decision D-282 (11 Nov 2026, point 22, mockup access.png): the "Client portal login" block. ?>
+    <div class="portal-block" data-testid="client-portal-login">
+      <h3>Client portal login</h3>
+      <?php if ($clientLogin): ?>
+        <p>Portal account: <span class="badge <?= (int) $clientLogin['is_active'] === 1 ? 'badge-active' : 'badge-optional' ?>"><?= (int) $clientLogin['is_active'] === 1 ? 'Active' : 'Switched off' ?></span>
+          <span class="muted small">created <?= htmlspecialchars(Dates::short(substr((string) $clientLogin['created_at'], 0, 10))) ?><?= !empty($clientLogin['created_by_order_id']) ? ' (first advance cleared)' : '' ?> · <?= !empty($clientLogin['last_login_at']) ? 'last login ' . htmlspecialchars(Dates::human((string) $clientLogin['last_login_at'])) : 'never logged in' ?></span></p>
+      <?php else: ?>
+        <p class="muted small">There is no portal account yet — it is created automatically when the first advance payment clears (as today). The login page below works from then on.</p>
+      <?php endif; ?>
+      <p class="small"><b>Login page — send this to the buyer any time</b></p>
+      <?php $__copyLink = \App\Services\ClientPortalService::loginUrl(); $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; ?>
+      <p class="muted small">They can use "Forgot your password?" on that page themselves.</p>
+      <div class="btn-row">
+        <?php if ($clientLogin && $__canManageSettings): ?>
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/portal/send-link" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Send set-password link</button></form>
+        <?php endif; ?>
+        <?php if ($__canImpersonate && $__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonate" target="_blank" style="display:inline" data-confirm="Log in as <?= htmlspecialchars((string) $client['company_legal_name']) ?>? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
+          </form>
+        <?php endif; ?>
+      </div>
+      <?php if ($clientLogin && $__canManageSettings): ?>
+        <details style="margin-top:10px">
+          <summary>Reset with a temporary password</summary>
+          <p class="muted small">For a client who's locked out and can't use their own "Forgot password" email link — generates a one-time temporary password for you to hand over directly. They'll be asked to change it the next time they log in.</p>
+          <form method="post" action="/clients/<?= (int) $client['id'] ?>/reset-password" data-confirm="Reset the client-portal password for <?= htmlspecialchars((string) $client['company_legal_name']) ?>? Their current password stops working immediately. This is logged.">
+            <?= Csrf::field() ?>
+            <label>Reason for this reset
+              <input type="text" name="reason" placeholder="e.g., Client called, forgot password, can't access email" required minlength="10">
+            </label>
+            <button type="submit" class="btn-sm">Reset password</button>
+          </form>
+        </details>
+      <?php endif; ?>
+    </div>
+
     <h2>Client Portal Access</h2>
     <?php if ($__canManageSettings): ?>
       <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonation-allowed">
@@ -224,10 +263,7 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <?php endif; ?>
     <?php if ($__canImpersonate): ?>
       <?php if ($__impersonationGloballyEnabled && !empty($client['allow_staff_impersonation']) && (int) $client['is_active'] === 1): ?>
-        <form method="post" action="/clients/<?= (int) $client['id'] ?>/impersonate" target="_blank" onsubmit="return confirm('Log in as <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? This opens their client-portal view in a new tab, alongside your own session here. This is logged.');">
-          <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm btn-secondary">Log in as this client &#8599;</button>
-        </form>
+        <p class="muted small">"Log in as this client" is available in the Client portal login block above.</p>
       <?php else: ?>
         <?php
           $__reasons = [];
@@ -236,23 +272,6 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
           if ((int) $client['is_active'] !== 1) { $__reasons[] = 'this client is deactivated'; }
         ?>
         <p class="muted small">"Log in as this client" isn't available right now — <?= htmlspecialchars(implode(', ', $__reasons)) ?>.</p>
-      <?php endif; ?>
-    <?php endif; ?>
-    <?php if ($__canManageSettings): ?>
-      <?php if ($clientLogin): ?>
-        <details style="margin-top:14px">
-          <summary>Reset client-portal password</summary>
-          <p class="muted small">For a client who's locked out and can't use their own "Forgot password" email link — generates a one-time temporary password for you to hand over directly. They'll be asked to change it the next time they log in.</p>
-          <form method="post" action="/clients/<?= (int) $client['id'] ?>/reset-password" onsubmit="return confirm('Reset the client-portal password for <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>? Their current password stops working immediately. This is logged.');">
-            <?= Csrf::field() ?>
-            <label>Reason for this reset
-              <input type="text" name="reason" placeholder="e.g., Client called, forgot password, can't access email" required minlength="10">
-            </label>
-            <button type="submit" class="btn-sm">Reset password</button>
-          </form>
-        </details>
-      <?php else: ?>
-        <p class="muted small" style="margin-top:14px">This client has no portal account yet — one is provisioned automatically once their first order's advance payment clears.</p>
       <?php endif; ?>
     <?php endif; ?>
   </div>

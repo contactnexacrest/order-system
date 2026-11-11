@@ -22,7 +22,7 @@
     NexaCrest <span>International</span>
   </div>
   <?php foreach (Flash::pull() as $f): ?>
-    <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
+    <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?><?php if (!empty($f['copy_link'])) { $__copyLink = $f['copy_link']; $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; } // D-280 ?></div>
   <?php endforeach; ?>
   <?= $content ?>
 </div>

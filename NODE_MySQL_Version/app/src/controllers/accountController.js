@@ -20,7 +20,18 @@ async function edit(req, res) {
     backupEligible: await backupCodeService.eligible(req.user.id),
     backupRemaining: await backupCodeService.remaining(req.user.id),
     backupCount: backupCodeService.COUNT,
+    // D-283: "Forget all remembered computers"
+    rememberDays: await require('../services/rememberBrowserService').days(),
+    rememberedCount: await require('../services/rememberBrowserService').countFor(req.user.id),
   }, 'layout/base');
+}
+
+/** D-283: forget every computer remembered for my login code. */
+async function forgetComputers(req, res) {
+  const n = await require('../services/rememberBrowserService').forgetAll(req.user.id);
+  await require('../repositories/auditLogRepository').log(req.user.id, 'LOGIN_BROWSERS_FORGOTTEN', 'users', req.user.id, null, String(n), '0', 'By the user (My Account)');
+  require('../helpers/flash').set(req, 'success', n === 1 ? '1 remembered computer forgotten.' : `${n} remembered computers forgotten.`);
+  res.redirect('/account#remembered-computers');
 }
 
 /** D-265: a new set of 10 backup codes (the old set stops working), shown once. Needs the current password. */
@@ -126,4 +137,4 @@ async function updatePassword(req, res) {
   res.redirect('/account');
 }
 
-module.exports = { edit, updateSignature, updateNotificationPreference, updateUiTemplate, updatePassword, generateBackupCodes };
+module.exports = { edit, updateSignature, updateNotificationPreference, updateUiTemplate, updatePassword, generateBackupCodes, forgetComputers };

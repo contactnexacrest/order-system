@@ -77,7 +77,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   beforeAll(async () => {
-    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
+    originalMailSendingEnabled = await companySettingsRepository.get('email_testing_mode');
     agent = request.agent(app);
     const loginPage = await agent.get('/login');
     const csrf = loginPage.text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
@@ -86,12 +86,12 @@ describe('Stage gates wait for their document', () => {
   });
 
   afterAll(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
+    await companySettingsRepository.set('email_testing_mode', originalMailSendingEnabled);
     await db.pool.end();
   });
 
   it('blocks a stage on a draft document and unblocks it on approval while email is off', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await orderAtStage2();
 
     const notGenerated = await documentGenerationService.stageDocumentBlockedBy(orderId, 2);
@@ -106,7 +106,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('needs a buyer document sent, not just approved, while email is on', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await orderAtStage2();
     const documentId = await createTestDocument(orderId, 'BUYERPO', 'approved');
 
@@ -117,7 +117,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('only needs an internal document approved, even while email is on', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await orderAtStage2();
     await createTestDocument(orderId, 'SUPPO', 'approved');
 
@@ -125,7 +125,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('refuses Confirm Buyer PO Received until the Buyer PO is approved', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await orderAtStage2();
     await createTestDocument(orderId, 'BUYERPO', 'draft');
     await orderBuyerPoDocumentRepository.attach(orderId, await createTestFile(orderId, null));
@@ -140,7 +140,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('does not pass Stage 1 on Quotation approval while email is on', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await createTestOrder(await createTestClient());
 
     await approveQuotationThroughReview(orderId);
@@ -149,7 +149,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('passes Stage 1 on Quotation approval while email is off', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await createTestOrder(await createTestClient());
 
     await approveQuotationThroughReview(orderId);
@@ -158,7 +158,7 @@ describe('Stage gates wait for their document', () => {
   });
 
   it('does not let the buyer acknowledge an approved but unsent OC while email is on', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await createTestOrder(await createTestClient());
     for (let stage = 1; stage <= 3; stage++) {
       await stageGateService.passAndUnlockNext(orderId, stage, null);

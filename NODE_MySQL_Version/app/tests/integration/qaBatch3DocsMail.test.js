@@ -67,11 +67,11 @@ async function docxText(fileId) {
 describe('QA batch 3 — documents and e-mail', () => {
   let mailBefore;
   beforeAll(async () => {
-    mailBefore = await companySettingsRepository.get('mail_sending_enabled');
+    mailBefore = await companySettingsRepository.get('email_testing_mode');
     await allowHandTypedGoodsLines();
   });
   afterEach(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', mailBefore);
+    await companySettingsRepository.set('email_testing_mode', mailBefore);
   });
   afterAll(async () => {
     await db.pool.end();
@@ -137,7 +137,7 @@ describe('QA batch 3 — documents and e-mail', () => {
   });
 
   it('DOC-6: the valid PI stays visible while a correction is drafted', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await twoLineOrder();
     const file = await createTestFile(orderId, null);
     const sent = await createTestDocument(orderId, 'PI', 'sent');
@@ -161,7 +161,7 @@ describe('QA batch 3 — documents and e-mail', () => {
   });
 
   it('MAIL-1: the overdue-freight alert sees the Debit Note that was issued', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await twoLineOrder();
     const fdn = await createTestDocument(orderId, 'FDN', 'sent');
     await db.execute('UPDATE documents SET document_date = DATE_SUB(CURDATE(), INTERVAL 12 DAY) WHERE id = :id', { id: fdn });
@@ -171,14 +171,14 @@ describe('QA batch 3 — documents and e-mail', () => {
   });
 
   it('MAIL-2: business mail goes through the sending-off switch; honest flash wording', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const spy = jest.spyOn(mailSenderService, 'send');
-    expect(await emailService.sendPlainText('buyer@example.test', 'Link', 'Body')).toBe(false);
-    expect(spy).toHaveBeenCalledWith('buyer@example.test', 'Link', 'Body');
+    expect(await emailService.sendPlainText('buyer@example.test', 'Link', 'Body', { kind: 'buyer_links', audience: 'buyer' })).toBe(false);
+    expect(spy).toHaveBeenCalledWith('buyer@example.test', 'Link', 'Body', [], { kind: 'buyer_links', audience: 'buyer' });
     spy.mockRestore();
     expect(await emailDispatchService.linkMailOutcome('PI-stage form link', 'b@x.test', false, 'L'))
-      .toBe('PI-stage form link generated, but the e-mail to b@x.test was not sent (e-mail sending is off) — send this link yourself: L');
-    expect(await emailDispatchService.linkMailOutcome('PI-stage form link', 'b@x.test', true, 'L')).toBe('PI-stage form link emailed to b@x.test: L');
+      .toBe('PI-stage form link generated — not e-mailed to b@x.test: testing mode holds e-mails to buyers and suppliers. Copy the link and send it yourself.');
+    expect(await emailDispatchService.linkMailOutcome('PI-stage form link', 'b@x.test', true, 'L')).toBe('PI-stage form link e-mailed to b@x.test. If they did not get it, copy the link and send it yourself.');
   });
 
   it('MAIL-3: LC reminders go out once per date', async () => {

@@ -17,6 +17,8 @@ const emailTemplateRepository = require('../repositories/emailTemplateRepository
 // once a minute; always by e-mail (SMS stays off), sent as security mail.
 
 const CODE_TTL_SECONDS = 600; // 10 minutes
+/** D-280: the buyer's own login-code wording (template client_login_code; this is its fallback). */
+const CLIENT_CODE_BODY = 'Hello,\n\nYour code to log in to your NexaCrest order portal is: {code}\n\nIt is valid for 10 minutes.\n\nIf you did not try to log in, you can ignore this e-mail — nobody can log in without this code. If it keeps happening, change your password with "Forgot your password?" on the login page.\n\nNexaCrest International Private Limited';
 const MAX_VERIFY_ATTEMPTS = 5;
 const RESEND_AFTER_SECONDS = 60;
 const SESSION_KEYS = { staff: '_2fa_pending', client: '_client_2fa_pending' };
@@ -40,13 +42,21 @@ async function issueCodeFor(req, subjectId, method, destination, scope = 'staff'
   };
   // 90-item backlog #37: admin-editable (Admin > Settings > Email Templates), with this
   // wording as the fallback, since a login code must never silently fail to go out.
-  const rendered = await emailTemplateRepository.renderOrDefault(
-    'two_factor_code',
-    { '{code}': code },
-    'Your NexaCrest login verification code',
-    'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.'
-  );
-  await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true });
+  // D-280: each audience gets its own plain wording — a buyer has no "administrator".
+  const rendered = scope === 'client'
+    ? await emailTemplateRepository.renderOrDefault(
+      'client_login_code',
+      { '{code}': code },
+      'Your NexaCrest order portal login code',
+      CLIENT_CODE_BODY
+    )
+    : await emailTemplateRepository.renderOrDefault(
+      'two_factor_code',
+      { '{code}': code },
+      'Your NexaCrest login verification code',
+      'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.'
+    );
+  await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true, kind: 'login_code', audience: scope === 'client' ? 'buyer' : 'staff' });
 
   // Local dev only: the code is shown on screen so the flow can be tried without a mail server.
   return env.isLocal() ? code : '';
@@ -102,5 +112,5 @@ function clear(req, scope = 'staff') {
 
 module.exports = {
   issueCodeFor, pendingUserId, resend, verify, countBackupTry, clear,
-  CODE_TTL_SECONDS, MAX_VERIFY_ATTEMPTS, RESEND_AFTER_SECONDS,
+  CODE_TTL_SECONDS, MAX_VERIFY_ATTEMPTS, RESEND_AFTER_SECONDS, CLIENT_CODE_BODY,
 };

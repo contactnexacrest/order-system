@@ -33,9 +33,9 @@ async function raiseAsStaff(orderId, clientId, authorUserId, description) {
   return complaintId;
 }
 
-async function replyAsStaff(complaintId, authorUserId, body) {
+async function replyAsStaff(complaintId, authorUserId, body, out = {}) {
   const replyId = await orderComplaintReplyRepository.createAsStaff(complaintId, authorUserId, body);
-  await emailClient(complaintId, authorUserId, body);
+  out.emailNote = await emailClient(complaintId, authorUserId, body); // D-280: for the flash message
   await auditLogRepository.log(authorUserId, 'COMPLAINT_REPLY_POSTED', 'order_complaints', complaintId, null, null, body);
   return replyId;
 }
@@ -71,12 +71,13 @@ async function notifyStaff(orderId, type, messageTemplate) {
 }
 
 async function emailClient(complaintId, authorUserId, body) {
+  const noEmail = 'not e-mailed — no client e-mail on file';
   const complaint = await orderComplaintRepository.find(complaintId);
-  if (!complaint) return;
+  if (!complaint) return noEmail;
   const order = await orderRepository.find(complaint.order_id);
   // QA batch 3 MAIL-4: the client record's e-mail when the order has none of its own.
   const clientEmail = order ? await require('./emailDispatchService').clientEmailFor(order) : null;
-  if (!order || clientEmail === null) return;
+  if (!order || clientEmail === null) return noEmail;
 
   const sender = await userRepository.findById(authorUserId);
   const subject = `Update on your complaint for order ${order.order_reference} — ${await companySettingsRepository.get('legal_name')}`;
@@ -86,7 +87,9 @@ async function emailClient(complaintId, authorUserId, body) {
     ? signature
     : `Regards,\n${(sender && sender.name) || ''}\n${await require('./emailDispatchService').senderTitleFor(sender || null)}`); // QA batch 3 MAIL-5
 
-  await mailSenderService.send(clientEmail, subject, message, []);
+  const sent = await mailSenderService.send(clientEmail, subject, message, [], { kind: 'buyer_messages', audience: 'buyer' });
+  if (sent) return 'e-mailed';
+  return `not e-mailed — ${await require('./emailPolicy').notSentReason('buyer_messages', 'buyer')}`;
 }
 
 module.exports = { raiseAsClient, raiseAsStaff, replyAsStaff, replyAsClient, updateStatus };

@@ -477,7 +477,8 @@ final class AssociateAdminController
         }
         try {
             $link = AssociateService::invitePortal((int) $a['id'], (int) self::user()['id']);
-            Flash::set('success', 'Portal login link e-mailed to ' . $a['email'] . '.' . (AssociatePortalService::showCodeOnScreen() ? " Development only — link: {$link}" : ''));
+            // D-280: "e-mailed" only when it was; the link is always shown to copy.
+            Flash::set('success', AssociateService::inviteOutcome((string) $a['email']), $link);
         } catch (\RuntimeException $e) {
             Flash::set('error', $e->getMessage());
         }
@@ -781,9 +782,10 @@ final class AssociateAdminController
             AuditLogRepository::log($uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', (int) $bank['id'], 'status', 'pending', 'verified',
                 trim(($checks !== null ? 'Checked: ' . \App\Services\BankDetailsCheck::checksText($checks) . '. ' : '') . ($selfReason !== null ? 'Own entry — reason: ' . $selfReason : '')) ?: null);
             // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
-            AssociateService::notify($a, 'bank_changed', 'Your bank account ' . AssociateBankRepository::masked($b) . ' was verified by NexaCrest. Payments go to it from '
+            $mailed = AssociateService::notify($a, 'bank_changed', 'Your bank account ' . AssociateBankRepository::masked($b) . ' was verified by NexaCrest. Payments go to it from '
                 . \App\Helpers\Dates::short((string) $b['usable_from']) . '. If you did not ask for this change, contact NexaCrest at once.', null, null, null, $uid);
-            Flash::set('success', 'Verified. Usable from ' . \App\Helpers\Dates::short((string) $b['usable_from']) . '; the associate was e-mailed.');
+            // D-280: "e-mailed" only when it was.
+            Flash::set('success', 'Verified. Usable from ' . \App\Helpers\Dates::short((string) $b['usable_from']) . ($mailed ? '; the associate was e-mailed.' : '; the associate sees it in their portal (the e-mail could not be sent).'));
         }
         self::back((int) $a['id'], 'bank');
     }

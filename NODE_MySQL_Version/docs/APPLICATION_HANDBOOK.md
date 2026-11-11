@@ -646,7 +646,7 @@ $router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'],
 | # | Check | Result if it fails |
 |---|---|---|
 | 1 | Signed in | Redirect `/login` |
-| 2 | Idle timeout (`company_settings.session_timeout_minutes`, default 30) | Logout, `/login` |
+| 2 | Idle timeout (`company_settings.session_timeout_staff_minutes`, default 240 = 4 h) and the 12-hour limit since sign-in (`session_absolute_staff_hours`, D-283) | Logout with "You were signed out after … without activity" / "… log in again at least every 12 hours", `/login` |
 | 3 | User still active (AUTH-10) | Logout |
 | 4 | `users.session_version` equals the value saved at login (L-26) | Logout (a password change ends every other session) |
 | 5 | Forced password change / password expiry (`password_expiry_days`) | Redirect `/force-password-change` |
@@ -698,7 +698,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 
 | Area | Tables |
 |---|---|
-| **Configuration** | `company_settings` (key-value; every configurable business value), `dropdown_options` (many small lists), `ports`, `port_routes`, `incoterms`, `currencies`, `payment_presets`, `document_types`, `document_sections`, `tc_clauses`, `tc_clause_documents`, `email_templates`, `watermark_settings`, `docx_generation_settings`, `file_upload_contexts`, `company_holidays`, `hs_codes`, `hs_code_product_examples`, `reference_sequences`, `ui_templates`, `test_mode_settings`, `remittance_difference_reasons`, `stages_master` |
+| **Configuration** | `company_settings` (key-value; every configurable business value), `email_settings` + `compliance_alert_owners` (Admin › E-mail settings, D-280 / D-281), `dropdown_options` (many small lists), `ports`, `port_routes`, `incoterms`, `currencies`, `payment_presets`, `document_types`, `document_sections`, `tc_clauses`, `tc_clause_documents`, `email_templates`, `watermark_settings`, `docx_generation_settings`, `file_upload_contexts`, `company_holidays`, `hs_codes`, `hs_code_product_examples`, `reference_sequences`, `ui_templates`, `test_mode_settings`, `remittance_difference_reasons`, `stages_master` |
 | **Auth / RBAC / security** | `users`, `roles`, `permissions`, `role_permissions`, `user_permissions`, `password_reset_tokens`, `login_attempts`, `rate_limit_hits`, `two_fa_backup_codes`, `super_admin_delegations`, `field_protection_requests`, `self_approval_rules` |
 | **Departments & divisions** | `departments`, `department_designations`, `user_department_memberships`, `designations`, `divisions`, `division_modules`, `division_settings`, `client_divisions` |
 | **Signatures & assets** | `assets` (logos, seals, watermarks), `user_signature_assets`, `company_default_signatory`, `document_type_signatories` |
@@ -815,7 +815,7 @@ Order of checks inside `send()`:
 
 | # | Check | Effect | Applies to security e-mails (2FA codes, password reset)? |
 |---|---|---|---|
-| 1 | **Sending-off switch** `company_settings.mail_sending_enabled = 0` | Nothing is sent; the full message is written to the error log so staff can send it by hand. Documents are then marked sent when staff confirm (`markSentIfMailDisabled`). | No (always sent) |
+| 1 | **Admin › E-mail settings (D-280)** — the e-mail's kind and audience (`EmailPolicy::holdReason`, Node `emailPolicy.js`): a MUST e-mail always goes; a buyer or supplier e-mail is held while **Testing mode** (`company_settings.email_testing_mode = 1`) is on; any other e-mail is held when its switch (`email_settings`) is off | Nothing is sent; the full message is written to the error log so staff can send it by hand; `MailSenderService::$lastOutcome` = `held`. With buyer document e-mails held, approved documents count as sent (`markSentIfMailDisabled`). | MUST kinds are never held |
 | 2 | **Test Mode** (`TestModeService::resolveEmailRecipient`) | Redirects to the Test Mode address; if none is set, the mail is **not** sent at all | No |
 | 3 | **Mail redirect** (`MailRedirectService`: `mail_redirect_enabled`, `mail_redirect_address`) | Rehearse real mail without Test Mode: all business mail goes to one address | No |
 | 4 | **CC list** (`mail_cc_emails`, `mail_default_cc_email`) | Added to every business mail | No |
@@ -829,6 +829,23 @@ Order of checks inside `send()`:
 4. If `mail_approval_queue_enabled = 0`, the request is auto-approved and sent at once (audit-logged `EMAIL_SEND_AUTO_APPROVED`).
 
 Payment-request e-mails include the Payment Action Link paragraph. Sending the OC starts the 48-hour acknowledgment clock.
+
+**Admin › E-mail settings (D-280, 11 Nov 2026; `/admin/email-settings`, permission `manage_company_settings`).** One row per e-mail kind, one switch per audience (Staff, Associate, Buyer, Supplier); stored in `email_settings` (kind, audience, is_enabled). Every save needs a reason and is audit-logged (`EMAIL_SETTING_CHANGED`, `EMAIL_TESTING_MODE_CHANGED`). The kinds are listed once in `EmailPolicy::KINDS` / `emailPolicy.KINDS`:
+
+| Group | Kind (tier per audience) |
+|---|---|
+| A. Log-in and account access — **MUST** (locked on) | `login_code` (staff, associate, buyer), `set_password_invite` (associate, buyer; access-critical), `forgot_password` (staff, associate, buyer — the associate one is new, D-282), `bank_details_changed` (associate), `backup_code_alert` (staff), `quote_verification_code` (buyer) |
+| B. Orders and documents — SHOULD | `buyer_documents` (buyer; the **associate copy** is the only OPTIONAL, off), `buyer_links` (correction, PI form, Buyer Action, Payment Action), `buyer_messages` (order messages, complaint replies), `buyer_followups` (payment follow-up, shipment readiness, BL copy, balance received), `supplier_links` (Supplier Action link, Vendor Details link) |
+| C. Associate programme — SHOULD | `associate_clients`, `associate_commission`, `associate_kyc_price_message`, `associate_registration_declined`, `associate_code_status` (event → kind in `ASSOCIATE_EVENT_KINDS`) |
+| D. Staff — SHOULD | `staff_approvals` (one e-mail per approval, incl. line price approvals and price requests), `staff_counterparty`, `staff_compliance`, `staff_zoho`, `staff_daily_summary`, `staff_assigned`, `staff_other` (notification type → kind in `NOTIFICATION_KINDS`) |
+
+**Testing mode** (`email_testing_mode`, replaced `mail_sending_enabled`; off in a fresh install) holds only buyer and supplier e-mails that are not MUST. Staff and associate e-mails and every MUST e-mail still go out. It is set on the E-mail settings page only (hidden from Company Settings). Each staff member's own "e-mail me my notifications" switch still applies to non-MUST e-mails.
+
+**Never a false "e-mailed".** A screen or audit line says "e-mailed" only when the send returned true; otherwise it gives the reason ("testing mode holds e-mails to buyers and suppliers", "this e-mail is switched off in Admin › E-mail settings", "no client e-mail on file", "the e-mail could not be sent"). Links (set-password invites always; PI form, Buyer Action, Payment Action, Supplier Action, Vendor Details links) are shown under the message with a **Copy** button (`Flash::set($type, $message, $copyLink)`, partial `views/partials/copy_link.*`, app.js `[data-copy]`). Order Communication posts store the reason (`order_comments.email_status`: sent / testing_mode / switched_off / no_email / failed; `sending_off` on posts from before D-280).
+
+**Who on the staff side is e-mailed (D-281, `StaffRouting` / `staffRouting.js`).** Each order event type has a department (`DEPARTMENT_FOR_TYPE`: buyer → Sales & Export; supplier → Procurement; payments, FDN, balance, LC dates → Accounts & Finance; inspection → Logistics; ECGC declarations, benefit claims → Export Compliance). The e-mail goes to that department's **owner on the order and the order's assignees who are members of it**. With nobody from the department on the order: the department's manager (director if no manager), with "Nobody from <department> is assigned to this order — please assign someone."; with no manager: the Managing Director. The MD, ED and Order Coordinator are not e-mailed for these routine events; the in-app notices go to the same people as before (the order's assignees, or everyone with `manage_orders`). Associate events go to the associate's relationship manager (none: the associate team; bank changes also to the `manage_associate_bank` verifiers). **Company-level compliance alerts** (LUT, RCMC, agreements, TDS, merchant-trade RBI limits, ECGC policy, monthly eBRC) are e-mailed to the **responsible person and backup** set in section E of the E-mail settings page (`compliance_alert_owners`); not set: the department's manager, then the MD.
+
+**Login-code wording per audience (D-280).** Staff get template `two_factor_code`; buyers get `client_login_code` (no "contact your administrator"); associates their own fixed wording.
 
 ### 3.11 File storage
 
@@ -868,8 +885,8 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 |---|---|---|
 | **Passwords** | `AuthService`, `bcrypt` (Node) / `password_hash` (PHP) | Password checked *before* revealing account state (AUTH-04/05); dummy hash for unknown e-mails. Expiry (`password_expiry_days`) and forced change on first login / reset. |
 | **Lockout** | `login_attempts`, `failed_login_lockout_count` (5), `lockout_duration_minutes` (15) | Failed attempt recorded before counting (L-03). |
-| **Login code (D-265, 7 Nov 2026)** | `TwoFactorService`, `BackupCodeService`, `RememberBrowserService` (Node `twoFactorService.js`, `backupCodeService.js`, `rememberBrowserService.js`); tables `two_fa_backup_codes`, `login_remembered_browsers`; setting `login_remember_browser_days` | **Every staff member (every role) and every buyer** enters a 6-digit code e-mailed after the password, at every login. Mandatory: it cannot be switched off per person (`users.two_fa_enabled` / `two_fa_method` are no longer read; the Users list shows "Required"). Valid 10 minutes, 5 tries (then sign in again), "Send me a new code" at most once a minute; always e-mail (SMS stays off); sent as security mail, so it goes out even when business e-mail is switched off and is never redirected. Each portal has its own pending slot (`_2fa_pending` staff, `_client_2fa_pending` buyer). Staff: `/2fa`, `/2fa/resend`, `/2fa/backup`; buyers: `/client/login/code`, `/client/login/code/resend`. Staff "Log in as this client" is unaffected. **Emergency backup codes:** an effective Super Admin or anyone holding `manage_company_settings` (MD, ED, Admin) can make 10 one-time codes on My Account (current password needed; shown once; stored hashed; a new set replaces the old) and use one on the code screen ("Use a backup code instead", shown only to them; counts against the same 5 tries). Each use is audited (`LOGIN_BACKUP_CODE_USED`) and every `manage_company_settings` holder gets an in-app notice and e-mail. **Remember this browser:** Admin › Settings › Security › `login_remember_browser_days` (default 0 = off, most 90). When above 0, staff (never buyers or associates) may tick "Remember this browser" on the code screen: an HttpOnly, SameSite=Lax, Secure-except-local cookie `nexacrest_trusted_browser` (`selector.validator.HMAC` signed with `APP_ENCRYPTION_KEY`) skips the code on that browser for that person only; the server keeps a SHA-256 of the validator and the person's `session_version`. A password change or reset deletes the rows and bumps `session_version`; setting the days to 0 ends every remembered browser. In `APP_ENV=local` the code is shown on screen. Associates keep their own e-mailed code (unchanged). |
-| **Sessions** | `bootstrap.php` / `server.js` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax, ends with the browser; idle timeout in app; `session_regenerate_id` at login. |
+| **Login code (D-265, 7 Nov 2026)** | `TwoFactorService`, `BackupCodeService`, `RememberBrowserService` (Node `twoFactorService.js`, `backupCodeService.js`, `rememberBrowserService.js`); tables `two_fa_backup_codes`, `login_remembered_browsers`; setting `login_remember_browser_days` | **Every staff member (every role) and every buyer** enters a 6-digit code e-mailed after the password, at every login. Mandatory: it cannot be switched off per person (`users.two_fa_enabled` / `two_fa_method` are no longer read; the Users list shows "Required"). Valid 10 minutes, 5 tries (then sign in again), "Send me a new code" at most once a minute; always e-mail (SMS stays off); sent as security mail, so it goes out even when business e-mail is switched off and is never redirected. Each portal has its own pending slot (`_2fa_pending` staff, `_client_2fa_pending` buyer). Staff: `/2fa`, `/2fa/resend`, `/2fa/backup`; buyers: `/client/login/code`, `/client/login/code/resend`. Staff "Log in as this client" is unaffected. **Emergency backup codes:** an effective Super Admin or anyone holding `manage_company_settings` (MD, ED, Admin) can make 10 one-time codes on My Account (current password needed; shown once; stored hashed; a new set replaces the old) and use one on the code screen ("Use a backup code instead", shown only to them; counts against the same 5 tries). Each use is audited (`LOGIN_BACKUP_CODE_USED`) and every `manage_company_settings` holder gets an in-app notice and e-mail. **"This is my own office computer" (D-283, was "Remember this browser"):** Admin › Settings › Security › `login_remember_browser_days` (default 30, 0–90; 0 = off). When above 0, staff (never buyers or associates) may tick "This is my own office computer" on the code screen: an HttpOnly, SameSite=Lax, Secure-except-local cookie `nexacrest_trusted_browser` (`selector.validator.HMAC` signed with `APP_ENCRYPTION_KEY`) skips the code on that browser for that person only; the server keeps a SHA-256 of the validator and the person's `session_version`. A password change or reset deletes the rows and bumps `session_version`; setting the days to 0 ends every remembered browser; "Forget all remembered computers" on My Account (own) and in Users › Edit (Admin, `manage_users`) deletes them too (`LOGIN_BROWSERS_FORGOTTEN`). In `APP_ENV=local` the code is shown on screen. Associates keep their own e-mailed code (unchanged). |
+| **Sessions (D-283, 11 Nov 2026)** | `SessionTimeouts` (Node `sessionTimeouts.js`), `bootstrap.php` / `server.js`, the three auth middlewares, app.js `initIdleWarning` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax. Idle timeouts per area from Admin › Settings › Security: staff `session_timeout_staff_minutes` 240, buyers `session_timeout_client_minutes` 120, associates `session_timeout_associate_minutes` 120 (5–1440); staff also signed out `session_absolute_staff_hours` (12, 1–24) after sign-in however active. PHP: `session.gc_maxlifetime` and the cookie lifetime follow the longest timeout (+5 min), session files live in `storage/sessions` (no host clean-up at ~24 min), the cookie is re-sent on every request. Node: `cookie.maxAge` = longest timeout, `rolling: true`, so the MySQL session store keeps the session as long. Every signed-in page carries `<meta name="session-idle">`; 2 minutes before the end app.js shows "You will be signed out soon" with **Stay logged in** (POST `/keep-alive`, `/client/keep-alive`, `/associate/keep-alive`); the 12-hour limit can only be warned about. `session_regenerate_id` at login; the idle clock starts at login. |
 | **Session versioning** | `users.session_version` | Saved at login; compared on every request; a password change bumps it so every other session (a stolen one too) is logged out (L-26). Deactivation also logs out at once (AUTH-10). |
 | **CSRF** | `Helpers/Csrf` + `Middleware/CsrfCheck` (Node `helpers/csrf.js`, `middleware/csrfCheck.js`) | One random 64-hex token per session, hidden field `_csrf`, `hash_equals` check on every POST route. A failed check redirects to the right login page; an over-size upload gives a clear 413 instead (UP-03). |
 | **RBAC** | `permissions`, `role_permissions`, `user_permissions`; `PermissionCheck` per route; `PermissionService::can()` in views | Plus `OrderAccessService` (one guard on every `/orders/{id}/*` route), `MoneyVisibility`, `GrantGuard`, `MakerCheckerGuard` / `SelfApprovalRules`. Route coverage is tested (`RouteMatrixTest`, `UngatedRoutesTest`). |
@@ -1452,6 +1469,20 @@ PL, CI, BLE, ESI.
 shows on every portal page; every use is logged. Staff can also reset a
 client's portal password (one-time temporary password, D-122).
 
+**Client portal login block (D-282, 11 Nov 2026).** The client page shows
+"Client portal login": account status (Active / Switched off), created
+date, last login; the permanent login page `/client/login` with a Copy
+button; **Send set-password link** (`POST /clients/{id}/portal/send-link`,
+`manage_company_settings`; a new 72-hour one-use link e-mailed to the
+client, MUST, always also shown with Copy); **Reset with a temporary
+password**; **Log in as this client**. Without a portal account yet the
+block says it is created when the first advance clears. The portal invite
+e-mail (template `client_portal_invite`, token `{login_link}`) gives the
+permanent login page, and staff see whether it was really e-mailed, with
+the set-password link to copy. Buyers get their own login-code wording
+(template `client_login_code`). Buyers are signed out after 2 hours idle
+(`session_timeout_client_minutes`, D-283).
+
 ### 4.11 The associate portal and access levels
 
 Associates are outside agents (India or abroad) who introduce buyers under
@@ -1460,6 +1491,23 @@ login, no department. They use `/associate` with password + an e-mailed
 code (`/associate/login`, `/associate/login/code`, middleware
 `AssociateAuth`). A buyer login never opens it, and an associate never sees
 a buyer's portal.
+
+**Getting in (D-282, 11 Nov 2026).** Accepting a registration (or "Send
+set-password link" on the associate page) makes a set-password link
+(`/associate/set-password/{token}`, valid 72 hours, works once) and e-mails
+it (MUST e-mail `set_password_invite`, never held by a switch). The e-mail
+also gives the permanent login page `/associate/login`. Staff always see
+the link with a **Copy** button, and the message says truthfully whether
+the e-mail went out. The login page has **Forgot password?**
+(`/associate/forgot-password`): a new 72-hour, one-use link to the
+address if it belongs to an associate whose portal is on (same answer
+either way; at most 5 an hour; `ASSOCIATE_PASSWORD_RESET_REQUESTED`).
+The associate page shows three blocks: **Portal login** (status, password
+set or not, last login, the login page with Copy, "Send set-password
+link", "Switch portal off"), **Quotation link (with Associate code)** with
+Copy, and **Personal code** (current code, new code, "Block the old
+code", "Set code" spaced apart). Associates are signed out after 2 hours
+idle (`session_timeout_associate_minutes`, D-283).
 
 Never shown at any level: cost, margin, supplier prices, profit, CAFIN,
 buyer payment amounts, other associates.
@@ -1632,8 +1680,8 @@ Products, Payment Overview and Document Review & Approval (D-029).
 **Page rules every step follows.**
 
 - **D-001 — a stage passes only once its own document is finished:**
-  approved while e-mail sending is off (`mail_sending_enabled = 0`, the
-  seed default), sent while it is on. Internal documents (Supplier PO, BLI)
+  approved while buyer document e-mails are held (testing mode, or the
+  switch off in Admin › E-mail settings, D-280), sent while they go out. Internal documents (Supplier PO, BLI)
   need approval only. The gate button stays disabled and a note above it
   lists what is missing (D-023). Code:
   `DocumentGenerationService::isDocumentComplete()`.
@@ -2790,8 +2838,10 @@ the same filters, counts, fields, actions and money rules on both templates
     (`email_log.body_snapshot`).
   - A document is sent with its own template (D-142).
   - Security templates fall back to built-in wording if missing or off.
-  - `mail_sending_enabled` (off in seed, D-155) covers every business
-    e-mail; only security mail bypasses it (D-258). `mail_approval_queue_enabled`
+  - Admin › E-mail settings (D-280) switches each e-mail per audience; MUST
+    e-mails (login and account access) always go; testing mode
+    (`email_testing_mode`, off in seed; replaced `mail_sending_enabled`)
+    holds only buyer and supplier e-mails. `mail_approval_queue_enabled`
     (on) gives the two-level send.
   - E-mail only when someone must act or a client acts (D-135); recipients
     are assignees + oversight (D-136); no hidden copies (D-137); Reply-To,
@@ -3522,7 +3572,7 @@ The client portal lists only customer-facing documents that are approved or sent
 - **Two revision numbers.** `revision_number` counts every generation (Rev.00, Rev.01 …, internal). `client_revision_number` counts how many of this type were actually **sent** to the buyer, so internal re-generation never shows the buyer a jump from Rev.00 to Rev.09.
 - **Approval.** When every assigned reviewer approves (none rejects), the document is finalized automatically: the same revision is re-rendered with the final watermark. Only the latest revision can be approved. An inactive user cannot review; the same reviewer cannot be added twice (D-070).
 - **Superseded.** Approving a revision supersedes every other revision of that type on that order. An approved or sent one is re-rendered with the red **"INVALID DOCUMENT — SUPERSEDED"** watermark and saved as `… (SUPERSEDED).pdf`; a draft or in-review one only changes status. Superseded copies are never deleted.
-- **Sending** (e-mail on): two levels — Level 1 submit, Level 2 approval by someone with `approve_email_send` (never the requester), then the deferred dispatch job. With `mail_sending_enabled = 0` (seed), approval **counts as sent** and staff send the PDF themselves. `mail_approval_queue_enabled = 0` removes Level 2.
+- **Sending** (e-mail on): two levels — Level 1 submit, Level 2 approval by someone with `approve_email_send` (never the requester), then the deferred dispatch job. With buyer document e-mails held (testing mode or the switch off in Admin › E-mail settings, D-280), approval **counts as sent** and staff send the PDF themselves. `mail_approval_queue_enabled = 0` removes Level 2.
 - **Drift.** Regenerating an earlier-stage document flags later documents "may be out of step".
 
 **`render_context_json` (QA batch 3, DOC-2; D-258).** `documents.render_context_json` stores the exact context a revision was rendered from. Approval re-renders and superseded copies are drawn from this stored context, with only the watermark changed — never from today's order data. So the superseded and final copies show what was really issued. Revisions made before 6 Nov 2026 have no stored context and use the older live-data path.
@@ -3608,7 +3658,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 | Defaults | `default_currency` USD, `default_estimated_total_cbm` 8.2, `default_estimated_gross_weight_kg` 27000, `default_estimated_net_weight_kg` 26000, `default_ui_template` standard |
 | Tolerances | `quantity_shortfall_tolerance_pct` 5.00, `max_bank_charges_pct` 3, `non_usd_price_buffer_pct` 1.75 (advisory) |
 | Alerts | `lut_alert_days_x` 30, `lut_escalation_days_y` 15, `rcmc_alert_days_a` 30, `rcmc_escalation_days_b` 15, `fdn_overdue_days_c` 3 (calendar days since D-051, counted by `check_alerts`; the seed's description still says working days, §14.5), `fema_realization_alert_days` 270 |
-| Security | `session_timeout_minutes` 30, `failed_login_lockout_count` 5, `lockout_duration_minutes` 15, `password_min_length` 10, `password_complexity_json` (upper + number), `password_expiry_days` 90 |
+| Security | `session_timeout_staff_minutes` 240, `session_timeout_client_minutes` 120, `session_timeout_associate_minutes` 120, `session_absolute_staff_hours` 12, `login_remember_browser_days` 30 (D-283), `failed_login_lockout_count` 5, `lockout_duration_minutes` 15, `password_min_length` 10, `password_complexity_json` (upper + number), `password_expiry_days` 90 |
 | Documents | `quotation_validity_days` 30, `pi_validity_days` 15, `revision_start_number` 1, `annexure_product_note`, `show_generated_document_disclaimer` 0, `generated_document_disclaimer_text`, `always_show_consignee_section` 1, `always_show_notify_party_section` 1 |
 | Shipping | `bl_type_instruction`, `bl_consignee_instruction` ("TO ORDER OF {company}") — protected |
 | Formats (protected) | `master_tracking_ref_format` NC/SC/{YY}/{DDMM}{NNN}, `order_ref_format` NC/SC/ORD/{YY}/{DDMM}{NNN} |
@@ -3622,7 +3672,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 
 | Key | Default | Meaning |
 |---|---|---|
-| `mail_sending_enabled` | 0 | Master switch for every non-security e-mail. Off in a fresh install; approval then counts as sent. 2FA and password resets always go. |
+| `email_testing_mode` | 0 | D-280: Testing mode — hold e-mails to buyers and suppliers (not MUST ones). Set on Admin › E-mail settings with the per-e-mail switches (`email_settings`). With buyer document e-mails held, approval counts as sent. Replaced `mail_sending_enabled`. |
 | `mail_approval_queue_enabled` | 1 | Level-2 approval for buyer e-mails. |
 | `reply_to_email` | empty | Monitored reply address (falls back to `email`). |
 | `mail_redirect_enabled`, `mail_redirect_address` | 0, empty | Redirect all non-security mail to one address (Super Admin). |

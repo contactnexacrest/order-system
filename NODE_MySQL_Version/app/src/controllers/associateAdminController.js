@@ -370,6 +370,7 @@ async function show(req, res) {
       })(),
       rm: a.relationship_manager_id ? await userRepository.findById(Number(a.relationship_manager_id)) : null,
       codeLink: a.personal_code ? `${associateService.appUrl()}/quotation-details?code=${encodeURIComponent(a.personal_code)}` : null,
+      associateLoginUrl: associateService.loginUrl(), // D-282: the permanent login page, with Copy
       tdsPct: await associateService.tdsPct(),
       tdsPctText: trimPct(await associateService.tdsPct()),
       // D-261: portal access level, track record and the "Ready for Quoting?" suggestion.
@@ -425,8 +426,10 @@ async function invitePortal(req, res) {
   const a = await found(req, res);
   if (!a) return;
   try {
-    const link = await associateService.invitePortal(Number(a.id), req.user.id);
-    flash.set(req, 'success', `Portal login link e-mailed to ${a.email}.${associatePortalService.showCodeOnScreen() ? ` Development only — link: ${link}` : ''}`);
+    const out = {};
+    const link = await associateService.invitePortal(Number(a.id), req.user.id, out);
+    // D-280: "e-mailed" only when it was; the link is always shown to copy.
+    flash.set(req, 'success', associateService.inviteOutcome(String(a.email), out.sent), link);
   } catch (e) {
     flash.set(req, 'error', e.message);
   }
@@ -694,9 +697,10 @@ async function verifyBank(req, res) {
     await auditLogRepository.log(uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', Number(bank.id), 'status', 'pending', 'verified',
       `${checks ? `Checked: ${bankDetailsCheck.checksText(checks)}. ` : ''}${selfReason !== null ? `Own entry — reason: ${selfReason}` : ''}`.trim() || null);
     // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
-    await associateService.notify(a, 'bank_changed', `Your bank account ${associateBankRepository.masked(b)} was verified by NexaCrest. Payments go to it from `
+    const mailed = await associateService.notify(a, 'bank_changed', `Your bank account ${associateBankRepository.masked(b)} was verified by NexaCrest. Payments go to it from `
       + `${dates.short(String(b.usable_from))}. If you did not ask for this change, contact NexaCrest at once.`, null, null, null, uid);
-    flash.set(req, 'success', `Verified. Usable from ${dates.short(String(b.usable_from))}; the associate was e-mailed.`);
+    // D-280: "e-mailed" only when it was.
+    flash.set(req, 'success', `Verified. Usable from ${dates.short(String(b.usable_from))}${mailed ? '; the associate was e-mailed.' : '; the associate sees it in their portal (the e-mail could not be sent).'}`);
   }
   back(res, a.id, 'bank');
 }

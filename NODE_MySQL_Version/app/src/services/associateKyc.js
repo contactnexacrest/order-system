@@ -184,9 +184,10 @@ async function review(a, docId, decision, reason, userId) {
 async function notifyStaffOfUpload(a, kind) {
   const label = associateDocumentRepository.KINDS[kind] || kind;
   const notificationRepository = require('../repositories/notificationRepository');
-  for (const userId of await require('../repositories/permissionRepository').usersWithPermission('manage_associates')) {
-    await notificationRepository.createInAppOnly(Number(userId), 'associate_document_uploaded', null, [...`Associate ${a.name} uploaded a ${label} — check it on their page (KYC).`].slice(0, 500).join(''));
-  }
+  // D-281: in-app for everyone who manages associates; e-mailed to the associate's relationship manager.
+  await notificationRepository.notifyRouted(await require('../repositories/permissionRepository').usersWithPermission('manage_associates'),
+    await require('./staffRouting').forAssociate(a),
+    'associate_document_uploaded', null, [...`Associate ${a.name} uploaded a ${label} — check it on their page (KYC).`].slice(0, 500).join(''));
 }
 
 module.exports = {

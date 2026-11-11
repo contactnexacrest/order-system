@@ -28,7 +28,7 @@ use App\Tests\Support\DbTestCase;
 final class OcAckAndMailTogglesTest extends DbTestCase
 {
     private const SETTING_KEYS = [
-        'mail_sending_enabled', 'mail_approval_queue_enabled',
+        'email_testing_mode', 'mail_approval_queue_enabled',
         'oc_ack_override_restricted', 'oc_ack_auto_confirm_hours',
     ];
     private array $originalValues = [];
@@ -204,26 +204,28 @@ final class OcAckAndMailTogglesTest extends DbTestCase
         self::assertNotNull($ack['acknowledged_at']);
     }
 
-    // --- mail_sending_enabled: global kill switch ---
+    // --- D-280: testing mode holds buyer and supplier e-mails (replaced the global kill switch) ---
 
     public function testMailSendingDisabledBlocksANonSecurityEmail(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        CompanySettingsRepository::set('email_testing_mode', '1');
 
-        $sent = MailSenderService::send('buyer@real-company.example', 'Subject', 'Body', [], false);
+        $sent = MailSenderService::send('buyer@real-company.example', 'Subject', 'Body', [], false, 'buyer_links', 'buyer');
+        self::assertSame('held', MailSenderService::$lastOutcome);
 
         self::assertFalse($sent);
     }
 
     public function testMailSendingDisabledDoesNotAffectASecurityEmail(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        CompanySettingsRepository::set('email_testing_mode', '1');
 
         // No SMTP configured in the test environment either way, so this
         // still returns false — the point is it must reach that same
         // no-SMTP fallback rather than being blocked earlier by the kill
         // switch, which only ever checks when isSecurityEmail is false.
-        $sent = MailSenderService::send('staff@nexacrest.test', 'Your 2FA code', 'Body', [], true);
+        $sent = MailSenderService::send('staff@nexacrest.test', 'Your 2FA code', 'Body', [], true, 'login_code', 'staff');
+        self::assertNotSame('held', MailSenderService::$lastOutcome, 'a MUST e-mail is never held');
 
         self::assertFalse($sent);
     }

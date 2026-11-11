@@ -45,7 +45,7 @@ describe('Q3 mail matrix: every template and send condition', () => {
   afterAll(async () => { await db.pool.end(); runSql('', `DROP DATABASE IF EXISTS \`${QA_DB}\`;`); });
 
   it('renders, queues and refuses exactly as it should', async () => {
-    const before = await db.query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('mail_sending_enabled','mail_approval_queue_enabled')");
+    const before = await db.query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('email_testing_mode','mail_approval_queue_enabled')");
     const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Admin'");
     const u = await db.execute(
       `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
@@ -62,7 +62,7 @@ describe('Q3 mail matrix: every template and send condition', () => {
     const approverId = a.insertId;
     const problems = [];
     try {
-      await setting('mail_sending_enabled', '0');
+      await setting('email_testing_mode', '1');
       await setting('mail_approval_queue_enabled', '1');
       for (const [incoterm, preset] of [['CIF', 'Standard — New Buyer'], ['FOB', 'Irrevocable Letter of Credit at Sight']]) {
         const orderId = await createTestOrder(await createTestClient(), incoterm, preset, 'USD');

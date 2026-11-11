@@ -179,6 +179,26 @@ async function logout(req, res) {
   res.redirect('/associate/login');
 }
 
+/** D-282: "Forgot password?" for associates. */
+async function showForgotPassword(req, res) {
+  res.renderView('associate_portal/forgot_password', { ...(await layoutData(req, null)) }, LAYOUT);
+}
+
+async function forgotPassword(req, res) {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  if (email === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    flash.set(req, 'error', email === '' ? 'Enter your e-mail address.' : 'Enter a valid e-mail address.');
+    res.redirect('/associate/forgot-password');
+    return;
+  }
+  const link = await associatePortalService.sendResetLink(req, email);
+  flash.set(req, 'success', `If ${email} belongs to an associate account, we have sent a link to set a new password. The link is valid for 72 hours and works once.`);
+  if (link && associatePortalService.showCodeOnScreen()) {
+    flash.set(req, 'info', `Development only — link: ${link}`);
+  }
+  res.redirect('/associate/login');
+}
+
 async function showSetPassword(req, res) {
   const a = await associatePortalService.associateForSetPassword(String(req.params.token));
   res.renderView('associate_portal/set_password', { ...(await layoutData(req, null)), valid: !!a, token: String(req.params.token), email: a ? a.email : '' }, LAYOUT);
@@ -197,7 +217,7 @@ async function setPassword(req, res) {
     return;
   }
   if (!(await associatePortalService.setPassword(token, p))) {
-    flash.set(req, 'error', 'This link has expired or was already used. Ask NexaCrest for a new one.');
+    flash.set(req, 'error', 'This link has expired or was already used. Use "Forgot password?" on the login page to get a new one.');
     res.redirect(`/associate/set-password/${token}`);
     return;
   }
@@ -571,9 +591,9 @@ async function requestBank(req, res) {
   const id = await associateBankRepository.request(Number(a.id), result, true, null);
   // D-293: the associate confirms it first (code to their registered e-mail), then NexaCrest verifies it.
   await require('../services/associateBankConfirmation').start(id, a, true, null);
-  for (const uid of await permissionRepository.usersWithPermission('manage_associate_bank')) {
-    await notificationRepository.create(uid, null, 'associate_bank_change', null, `Associate ${a.name} asked to change their bank details — they confirm them first, then one person verifies them.`);
-  }
+  // D-281: the relationship manager and Accounts & Finance's verifiers.
+  await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_associate_bank'), await require('../services/staffRouting').forAssociate(a, true),
+    'associate_bank_change', null, `Associate ${a.name} asked to change their bank details — they confirm them first, then one person verifies them.`);
   flash.set(req, 'success', `New bank details received. Please confirm them now with the code we e-mail you. ${await associateService.bankPaymentsSentence(Number(a.id))}`);
   res.redirect('/associate/bank/confirm');
 }
@@ -685,7 +705,8 @@ async function sendMessage(req, res) {
     flash.set(req, 'error', 'Write your message (up to 4,000 characters).');
   } else {
     await associateEventRepository.addMessage(Number(a.id), true, null, body);
-    const to = a.relationship_manager_id ? [Number(a.relationship_manager_id)] : await permissionRepository.usersWithPermission('manage_associates');
+    // D-281: the relationship manager (without one: the associate team, else the MD).
+    const to = await require('../services/staffRouting').forAssociate(a);
     for (const uid of to) {
       await notificationRepository.create(uid, null, 'associate_message', null, `Message from associate ${a.name}.`);
     }
@@ -780,7 +801,7 @@ async function priceRequest(req, res) {
 
 module.exports = {
   proposeCode,
-  codeLink, showLogin, login, showCode, verifyCode, logout, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
+  codeLink, showLogin, login, showCode, verifyCode, logout, showForgotPassword, forgotPassword, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
   showBankConfirm, sendBankCode, confirmBank, bankNotMe, commissionHeadline,
   messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,

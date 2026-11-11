@@ -121,6 +121,28 @@ final class AssociatePortalController
         header('Location: /associate/login');
     }
 
+    /** D-282: "Forgot password?" for associates. */
+    public function showForgotPassword(array $params): void
+    {
+        View::render('associate_portal/forgot_password', [], self::LAYOUT);
+    }
+
+    public function forgotPassword(array $params): void
+    {
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Flash::set('error', $email === '' ? 'Enter your e-mail address.' : 'Enter a valid e-mail address.');
+            header('Location: /associate/forgot-password');
+            return;
+        }
+        $link = AssociatePortalService::sendResetLink($email);
+        Flash::set('success', "If {$email} belongs to an associate account, we have sent a link to set a new password. The link is valid for 72 hours and works once.");
+        if ($link !== null && AssociatePortalService::showCodeOnScreen()) {
+            Flash::set('info', 'Development only — link: ' . $link);
+        }
+        header('Location: /associate/login');
+    }
+
     public function showSetPassword(array $params): void
     {
         $a = AssociatePortalService::associateForSetPassword((string) $params['token']);
@@ -143,7 +165,7 @@ final class AssociatePortalController
             return;
         }
         if (!AssociatePortalService::setPassword($token, $p)) {
-            Flash::set('error', 'This link has expired or was already used. Ask NexaCrest for a new one.');
+            Flash::set('error', 'This link has expired or was already used. Use "Forgot password?" on the login page to get a new one.');
             header("Location: /associate/set-password/{$token}");
             return;
         }
@@ -580,9 +602,9 @@ final class AssociatePortalController
         $id = AssociateBankRepository::request((int) $a['id'], $result, true, null);
         // D-293: the associate confirms it first (code to their registered e-mail), then NexaCrest verifies it.
         \App\Services\AssociateBankConfirmation::start($id, $a, true, null);
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_associate_bank') as $uid) {
-            \App\Repositories\NotificationRepository::create($uid, null, 'associate_bank_change', null, "Associate {$a['name']} asked to change their bank details — they confirm them first, then one person verifies them.");
-        }
+        // D-281: the relationship manager and Accounts & Finance's verifiers.
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_associate_bank'), \App\Services\StaffRouting::forAssociate($a, true),
+            'associate_bank_change', null, "Associate {$a['name']} asked to change their bank details — they confirm them first, then one person verifies them.");
         Flash::set('success', 'New bank details received. Please confirm them now with the code we e-mail you. ' . AssociateService::bankPaymentsSentence((int) $a['id']));
         header('Location: /associate/bank/confirm');
     }
@@ -694,7 +716,8 @@ final class AssociatePortalController
             Flash::set('error', 'Write your message (up to 4,000 characters).');
         } else {
             AssociateEventRepository::addMessage((int) $a['id'], true, null, $body);
-            $to = !empty($a['relationship_manager_id']) ? [(int) $a['relationship_manager_id']] : \App\Repositories\PermissionRepository::usersWithPermission('manage_associates');
+            // D-281: the relationship manager (without one: the associate team, else the MD).
+            $to = \App\Services\StaffRouting::forAssociate($a);
             foreach ($to as $uid) {
                 \App\Repositories\NotificationRepository::create($uid, null, 'associate_message', null, "Message from associate {$a['name']}.");
             }

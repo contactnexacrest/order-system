@@ -79,7 +79,7 @@ final class DailyDigestService
     public static function summary(array $result): string
     {
         if ($result['mail_off']) {
-            return 'Daily digest: e-mail sending is off — nothing sent.';
+            return 'Daily digest: the daily summary e-mail is switched off in Admin › E-mail settings — nothing sent.';
         }
         return "Daily digest: {$result['sent']} sent, {$result['skipped']} with nothing waiting or already sent"
             . ($result['failed'] > 0 ? ", {$result['failed']} not sent (will be retried on the next run)" : '') . '.';
@@ -105,7 +105,7 @@ final class DailyDigestService
     public static function run(?string $date = null): array
     {
         $date ??= date('Y-m-d');
-        if (self::$sender === null && \App\Repositories\CompanySettingsRepository::get('mail_sending_enabled') === '0') {
+        if (self::$sender === null && !EmailPolicy::allows('staff_daily_summary', 'staff')) { // D-280: Admin › E-mail settings
             return ['sent' => 0, 'skipped' => 0, 'failed' => 0, 'mail_off' => true];
         }
         $pdo = Database::connection();
@@ -129,7 +129,7 @@ final class DailyDigestService
             $mail = self::compose((string) $u['name'], $items, $date);
             $ok = self::$sender !== null
                 ? (bool) (self::$sender)((string) $u['email'], $mail['subject'], $mail['body'])
-                : MailSenderService::send((string) $u['email'], $mail['subject'], $mail['body']);
+                : MailSenderService::send((string) $u['email'], $mail['subject'], $mail['body'], [], false, 'staff_daily_summary', 'staff');
             if ($ok) {
                 $sent++;
             } else {

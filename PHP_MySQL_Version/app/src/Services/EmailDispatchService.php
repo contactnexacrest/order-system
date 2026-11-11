@@ -353,16 +353,21 @@ final class EmailDispatchService
             return false;
         }
 
+        $attachments = [['path' => $file['server_path'], 'name' => $file['original_filename']]];
         $sent = MailSenderService::send(
             $emailLogRow['recipient_email'],
             $emailLogRow['subject'],
             $emailLogRow['body_snapshot'],
-            [['path' => $file['server_path'], 'name' => $file['original_filename']]]
+            $attachments,
+            false,
+            'buyer_documents',
+            'buyer'
         );
 
         if ($sent) {
             EmailLogRepository::markSent((int) $emailLogRow['id']);
             DocumentRepository::markSent((int) $document['id']);
+            self::copyToAssociate($emailLogRow, $attachments);
             AuditLogRepository::log(null, 'EMAIL_SENT', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email']);
 
             // docs/schema.sql Section AE — the Order Confirmation just went
@@ -439,27 +444,80 @@ final class EmailDispatchService
     }
 
     /**
-     * QA batch 3 MAIL-2: the honest flash wording after a link e-mail —
-     * "emailed to x" only when the e-mail really went out.
+     * D-280: when Admin › E-mail settings has "Documents … — Associate" on (OPTIONAL,
+     * off when installed), the associate who introduced the buyer gets a copy of a
+     * document e-mail that really went to the buyer — only when their access level
+     * shows order documents. Never an internal document (those are never sent).
+     *
+     * @param array<string,mixed> $emailLogRow
+     * @param array<int, array{path:string, name:string}> $attachments
      */
-    public static function linkMailOutcome(string $what, ?string $email, bool $sent, string $link): string
+    private static function copyToAssociate(array $emailLogRow, array $attachments): void
     {
-        if ($email === null) {
-            return "{$what} generated (no client e-mail on file — hand this link over directly): {$link}";
+        if (empty($emailLogRow['order_id']) || !EmailPolicy::allows('buyer_documents', 'associate')) {
+            return;
         }
-        if (!$sent) {
-            return "{$what} generated, but the e-mail to {$email} was not sent (" . (self::mailSendingEnabled() ? 'sending failed' : 'e-mail sending is off') . ") — send this link yourself: {$link}";
+        try {
+            $order = OrderRepository::find((int) $emailLogRow['order_id']);
+            $client = $order && !empty($order['client_id']) ? \App\Repositories\ClientRepository::find((int) $order['client_id']) : null;
+            $associate = $client && !empty($client['associate_id']) ? \App\Repositories\AssociateRepository::find((int) $client['associate_id']) : null;
+            if ($associate === null || empty($associate['email']) || in_array($associate['status'] ?? '', ['ended', 'inactive'], true)
+                || !AssociateAccess::allows($associate, 'order_documents')) {
+                return;
+            }
+            MailSenderService::send(
+                (string) $associate['email'],
+                'Copy: ' . $emailLogRow['subject'],
+                self::associateCopyBody($associate, $client, $order, (string) $emailLogRow['body_snapshot']),
+                $attachments,
+                false,
+                'buyer_documents',
+                'associate'
+            );
+        } catch (\Throwable $e) {
+            error_log('[ASSOCIATE COPY NOT SENT] ' . $e->getMessage());
         }
-        return "{$what} emailed to {$email}: {$link}";
     }
 
-    public static function mailSendingEnabled(): bool
+    /** D-280: the text of the associate's copy of a buyer document e-mail. */
+    public static function associateCopyBody(array $associate, array $client, array $order, string $buyerBody): string
     {
-        return CompanySettingsRepository::get('mail_sending_enabled') !== '0';
+        return 'Hello ' . $associate['name'] . ",\n\n"
+            . 'For your information, this is a copy of the e-mail NexaCrest sent to your client '
+            . $client['company_legal_name'] . ' (order ' . $order['order_reference'] . ").\n\n---\n\n" . $buyerBody;
     }
 
     /**
-     * Owner decision (2026-10-25): with mail_sending_enabled off there is
+     * QA batch 3 MAIL-2 / D-280: the honest flash wording after a link e-mail —
+     * "e-mailed to x" only when the e-mail really went out; otherwise the true
+     * reason. The link itself is shown under the message with a Copy button
+     * (Flash::set(..., $link)), so it is not repeated in the text.
+     */
+    public static function linkMailOutcome(string $what, ?string $email, bool $sent, string $link, string $kind = 'buyer_links', string $audience = 'buyer'): string
+    {
+        $party = $audience === 'supplier' ? 'supplier' : 'client';
+        if ($email === null) {
+            return "{$what} generated — not e-mailed: no {$party} e-mail on file. Copy the link and send it yourself.";
+        }
+        if (!$sent) {
+            return "{$what} generated — not e-mailed to {$email}: " . EmailPolicy::notSentReason($kind, $audience) . '. Copy the link and send it yourself.';
+        }
+        return "{$what} e-mailed to {$email}. If they did not get it, copy the link and send it yourself.";
+    }
+
+    /**
+     * Whether buyer document e-mails go out (D-280: testing mode off and
+     * "Documents … — Buyer" on in Admin › E-mail settings). When they do not,
+     * there is no "Send to Buyer" action and an approved document counts as sent.
+     */
+    public static function mailSendingEnabled(): bool
+    {
+        return EmailPolicy::allows('buyer_documents', 'buyer');
+    }
+
+    /**
+     * Owner decision (2026-10-25): with buyer document e-mails held (D-280:
+     * testing mode, or the switch off) there is
      * no "Send to Buyer" action at all — staff send the PDF themselves
      * outside the app — so a buyer-sendable document counts as sent the
      * moment it is approved. Does exactly what a real send does to the
@@ -481,7 +539,7 @@ final class EmailDispatchService
         // mark the Order Confirmation as sent to the buyer (OrderController::markOcSentToBuyer), not now.
         AuditLogRepository::log(
             null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', $documentId, 'status', 'approved', 'sent',
-            'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'
+            'Buyer document e-mails are held (testing mode or Admin › E-mail settings) — counted as sent on approval; staff send the PDF outside the app.'
         );
     }
 
@@ -515,7 +573,10 @@ final class EmailDispatchService
             $emailLogRow['recipient_email'],
             $emailLogRow['subject'],
             $emailLogRow['body_snapshot'],
-            $attachments
+            $attachments,
+            false,
+            EmailPolicy::TEMPLATE_KINDS[(string) $emailLogRow['template_key']] ?? 'buyer_followups',
+            'buyer'
         );
 
         if ($sent) {
