@@ -52,6 +52,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-11e-approvals-setup-defaults.sql` | D-310, D-312, D-313 | `short_payment_requests`, `setup_checklist_ticks`, document clean-up and password-expiry defaults (first run only), Test Mode e-mail, national holidays |
 | `2026-11-11f-plain-language-email-templates.sql` | D-330 | Plain-language buyer e-mail texts (only templates still at the seeded text) |
 | `2026-11-11g-order-comment-email-status.sql` | D-268 | `order_comments.email_status` |
+| `2026-11-11h-tt-clause-bank-name.sql` | D-331 | T/T definition clause: fixed "State Bank of India" → `{bank_name}`, filled from Settings › Company › Bank name (owner confirmed twice; prints as before with today's bank) |
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all

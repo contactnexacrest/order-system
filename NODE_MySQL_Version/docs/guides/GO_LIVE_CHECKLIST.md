@@ -148,7 +148,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
 
 1. [ ] **Back up** the database and the `storage/` folder (Settings › Backups, or run the two backup scripts by hand) and keep the copy until the upgrade is checked.
 2. [ ] Put the new code in place (both stacks are built the same; PHP: upload the files; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
-3. [ ] Run the seven database files, **in this order** (each is safe to run twice; MySQL-compatible):
+3. [ ] Run the eight database files, **in this order** (each is safe to run twice; MySQL-compatible):
    1. [ ] `docs/migrations/2026-11-11a-quote-any-unit-piece-size.sql` (D-270–D-273)
    2. [ ] `docs/migrations/2026-11-11b-email-settings-sessions.sql` (D-280–D-283)
    3. [ ] `docs/migrations/2026-11-11c-associates-kyc-commission-bank.sql` (D-290–D-294)
@@ -156,6 +156,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    5. [ ] `docs/migrations/2026-11-11e-approvals-setup-defaults.sql` (D-310–D-313)
    6. [ ] `docs/migrations/2026-11-11f-plain-language-email-templates.sql` (D-330)
    7. [ ] `docs/migrations/2026-11-11g-order-comment-email-status.sql` (D-268)
+   8. [ ] `docs/migrations/2026-11-11h-tt-clause-bank-name.sql` (D-331: the T/T definition names the bank from Settings › Company › Bank name; documents print as before)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

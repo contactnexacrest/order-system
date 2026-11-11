@@ -1597,6 +1597,9 @@ async function clauseTextReplacements(data, documentTypeCode = '') {
     '{balance_pct}': data.financial.balance_pct,
     '{quotation_validity_days}': quotationValidityDays,
     '{pi_validity_days}': piValidityDays,
+    // Owner decision D-331 (11 Nov 2026, confirmed twice): the T/T definition names the bank
+    // from Settings › Company › Bank name (the document's own company snapshot), not fixed text.
+    '{bank_name}': String((data.company && data.company.bank_name) || ''),
   };
 }
 

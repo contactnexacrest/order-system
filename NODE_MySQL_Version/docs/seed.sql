@@ -1601,7 +1601,7 @@ WHERE c.clause_group = 'legal_terms' AND dt.code IN ('QT','PI','OC','PL','CI','F
 -- --- DEFINITIONS box (blue) — 12 entries, clause_order 1-12 within the group ---
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, clause_group, visibility_rule, status, is_protected) VALUES
   (1, 'NexaCrest', 'In this document, "NexaCrest International Private Limited" is referred to as "NexaCrest". Both names refer to the same legal entity.', 'definitions', 'always', 'active', 1),
-  (2, 'T/T (Telegraphic Transfer)', 'an electronic bank wire transfer sent directly from the Buyer''s bank to NexaCrest''s designated bank account at State Bank of India as stated in this document.', 'definitions', 'always', 'active', 1),
+  (2, 'T/T (Telegraphic Transfer)', 'an electronic bank wire transfer sent directly from the Buyer''s bank to NexaCrest''s designated bank account at {bank_name} as stated in this document.', 'definitions', 'always', 'active', 1),
   (3, 'Payment Cleared', 'the relevant payment confirmed as actually credited to NexaCrest''s bank account by NexaCrest''s accounts team. A Remittance Copy alone does not constitute Payment Cleared.', 'definitions', 'always', 'active', 1),
   (4, 'Remittance Copy', 'the bank transfer receipt or SWIFT confirmation sent by the Buyer as evidence of transfer. Receipt of a Remittance Copy by NexaCrest does not constitute Payment Cleared.', 'definitions', 'always', 'active', 1),
   (5, 'Advance Payment', 'the advance percentage of the FOB Order value paid by T/T before production commences, as stated in this document.', 'definitions', 'always', 'active', 1),
