@@ -51,7 +51,7 @@ describe('Payment terms approval before the Quotation (QA Round 5, R5-03)', () =
     await documentController.generate(req, fakeRes());
 
     expect(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT')).toBeNull();
-    expect(flash.pull(req)[0].message).toContain('need MD/ED approval');
+    expect(flash.pull(req)[0].message).toContain('need approval before the Quotation');
   });
 
   it('approving records who and when and lifts the block', async () => {
@@ -70,7 +70,7 @@ describe('Payment terms approval before the Quotation (QA Round 5, R5-03)', () =
   it('refuses to send an unapproved Quotation', async () => {
     const orderId = await order('Established Buyer — Post-BL');
     const documentId = await createTestDocument(orderId, 'QT', 'approved');
-    await expect(emailDispatchService.buildPreview(orderId, documentId, 'send_qt', await createTestUser('Admin'))).rejects.toThrow('need MD/ED approval');
+    await expect(emailDispatchService.buildPreview(orderId, documentId, 'send_qt', await createTestUser('Admin'))).rejects.toThrow('need approval before the Quotation');
   });
 
   it('the order page offers the approval only to approvers', async () => {

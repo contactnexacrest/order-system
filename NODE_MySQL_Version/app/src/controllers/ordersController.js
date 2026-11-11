@@ -1762,6 +1762,8 @@ async function show(req, res) {
       canViewCafin,
       paymentTermsApproval: await paymentTermsApprovalService.state(orderId),
       canApprovePaymentTerms: !!req.permissions.approve_payment_terms,
+      // D-269: who can approve, named from the permission, not "MD/ED".
+      paymentTermsApprovers: await paymentTermsApprovalService.whoCanApprove(),
       caInternalDoc: canViewCafin ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
       // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
       // Section AP) — gated on the new, deliberately stricter

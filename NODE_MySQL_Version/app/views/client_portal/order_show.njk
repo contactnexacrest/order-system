@@ -46,7 +46,9 @@
 
   <div class="section">
     <h2>Buyer PO</h2>
-    <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    {% if order.status != 'cancelled' and order.status != 'lost' %}{# D-269: no "upload any time" once upload is closed for good #}
+      <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    {% endif %}
     {% if buyerPoDocuments.length > 0 %}
       <table class="list">
         <tr><th>File</th><th>Uploaded</th></tr>

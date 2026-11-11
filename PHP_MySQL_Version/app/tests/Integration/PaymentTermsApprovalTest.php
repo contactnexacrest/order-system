@@ -62,7 +62,7 @@ final class PaymentTermsApprovalTest extends DbTestCase
         (new DocumentController())->generate(['id' => (string) $orderId]);
 
         self::assertNull(DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'QT'));
-        self::assertStringContainsString('need MD/ED approval', Flash::pull()[0]['message']);
+        self::assertStringContainsString('need approval before the Quotation', Flash::pull()[0]['message']);
     }
 
     public function testApprovingRecordsWhoAndWhenAndLiftsTheBlock(): void
@@ -88,7 +88,7 @@ final class PaymentTermsApprovalTest extends DbTestCase
         $documentId = $this->createTestDocument($orderId, 'QT', 'approved');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('need MD/ED approval');
+        $this->expectExceptionMessage('need approval before the Quotation');
         EmailDispatchService::buildPreview($orderId, $documentId, 'send_qt', $this->createTestUser('Admin'));
     }
 
@@ -101,8 +101,8 @@ final class PaymentTermsApprovalTest extends DbTestCase
         ob_start();
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = (string) ob_get_clean();
-        self::assertStringContainsString('Payment terms need MD/ED approval first', $html);
-        self::assertStringContainsString('Waiting for MD/ED approval.', $html);
+        self::assertStringContainsString('Payment terms need approval first', $html);
+        self::assertStringContainsString('Waiting for approval by someone who can approve payment terms (', $html);
         self::assertStringNotContainsString('Approve payment terms</button>', $html);
         self::assertStringNotContainsString('<input type="hidden" name="document_type" value="QT">', $html);
 

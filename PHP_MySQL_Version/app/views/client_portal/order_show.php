@@ -52,7 +52,9 @@
 
   <div class="section">
     <h2>Buyer PO</h2>
-    <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    <?php if (!in_array($order['status'] ?? '', ['cancelled', 'lost'], true)): /* D-269: no "upload any time" once upload is closed for good */ ?>
+      <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    <?php endif; ?>
     <?php if (!empty($buyerPoDocuments)): ?>
       <table class="list">
         <tr><th>File</th><th>Uploaded</th></tr>

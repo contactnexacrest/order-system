@@ -1664,7 +1664,7 @@
     {% if paymentTermsApproval.required %}
       <div id="payment-terms-approval">
       {% if termsPending %}
-        <p class="review-banner warn">&#9888; <span><strong>Payment terms need MD/ED approval first</strong> — this order uses &ldquo;{{ paymentTermsApproval.preset_name }}&rdquo; (advance {{ order.advance_pct | float }}% &middot; balance {{ order.balance_pct | float }}%). The Quotation can't be generated or sent until they are approved.{{ '' if canApprovePaymentTerms else ' Waiting for MD/ED approval.' }}</span></p>
+        <p class="review-banner warn">&#9888; <span><strong>Payment terms need approval first</strong> — this order uses &ldquo;{{ paymentTermsApproval.preset_name }}&rdquo; (advance {{ order.advance_pct | float }}% &middot; balance {{ order.balance_pct | float }}%). The Quotation can't be generated or sent until they are approved.{% if not canApprovePaymentTerms %} Waiting for approval by {{ paymentTermsApprovers }}.{% endif %}</span></p>
         {% if canApprovePaymentTerms %}
           <form method="post" action="/orders/{{ order.id }}/payment-terms/approve" style="margin-bottom:10px;">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">

@@ -1497,6 +1497,8 @@ final class OrderController
             'canViewCafin' => $canViewCafin,
             'paymentTermsApproval' => \App\Services\PaymentTermsApprovalService::state($orderId),
             'canApprovePaymentTerms' => PermissionService::can((int) $actor['id'], $actorRoleId, 'approve_payment_terms'),
+            // D-269: who can approve, named from the permission, not "MD/ED".
+            'paymentTermsApprovers' => \App\Services\PaymentTermsApprovalService::whoCanApprove(),
             'caInternalDoc' => $canViewCafin ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
             'canManageOrderFinancials' => $canManageOrderFinancials,
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],

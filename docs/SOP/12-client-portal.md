@@ -211,7 +211,8 @@ to choose one, never switching silently to PCS):
    you need to submit an updated copy"), and it is never offered on a
    cancelled or lost order ("This order is cancelled, so a Buyer PO can no
    longer be uploaded" — the server refuses such an upload too, also through
-   the Buyer Action Link), so in practice only a returning
+   the Buyer Action Link; the "upload a scanned copy here any time" line is
+   not shown on such an order, D-269), so in practice only a returning
    client who already has a login uses it — see
    [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the same record
    the internal staff-side upload writes to.

@@ -41,7 +41,7 @@
       </form>
       <form method="post" action="/email-log/<?= (int) $row['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this send?');">
         <?= Csrf::field() ?>
-        <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:160px" aria-label="Reason">
+        <input type="text" name="reason" placeholder="Reason (mandatory)" required minlength="10" data-reason-hint="on-error" style="width:160px" aria-label="Reason">
         <button type="submit" class="btn-sm btn-danger">Reject</button>
       </form>
       <?php endif; ?>
@@ -53,7 +53,7 @@
       <?php endif; ?>
       <form method="post" action="/email-log/<?= (int) $row['id'] ?>/cancel" style="display:inline" onsubmit="return confirm('Cancel this send? It will never go out.');">
         <?= Csrf::field() ?>
-        <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:160px" aria-label="Cancel reason">
+        <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required minlength="10" data-reason-hint="on-error" style="width:160px" aria-label="Cancel reason">
         <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
       </form>
     </div>

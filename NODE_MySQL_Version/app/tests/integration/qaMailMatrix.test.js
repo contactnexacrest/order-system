@@ -79,7 +79,7 @@ describe('Q3 mail matrix: every template and send condition', () => {
           let p;
           try { p = await emailDispatchService.buildPreview(orderId, doc.document_id, template, userId); } catch (e) {
             // An LC quotation waits for the MD/ED to approve the payment terms (expected).
-            if (!(code === 'QT' && e.message.includes('need MD/ED approval'))) problems.push(`${label} ${template}: preview refused: ${e.message}`);
+            if (!(code === 'QT' && e.message.includes('need approval before the Quotation'))) problems.push(`${label} ${template}: preview refused: ${e.message}`);
             continue;
           }
           if (!String(p.subject).trim()) problems.push(`${label} ${template}: empty subject`);

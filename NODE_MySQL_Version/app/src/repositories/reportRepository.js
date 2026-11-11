@@ -932,7 +932,8 @@ async function monthlyTrends(months = 12) {
 async function staffProductivity(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
 
-  const docWhere = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
+  // D-269: deactivated users (archived ones too — always inactive) are not listed; unattributed rows stay.
+  const docWhere = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'), '(d.generated_by IS NULL OR u.is_active = 1)'];
   const docParams = { is_test_data: isTestMode };
   if (dateFrom) {
     docWhere.push('DATE(d.generated_at) >= :date_from');
@@ -969,7 +970,7 @@ async function staffProductivity(dateFrom, dateTo) {
   // deliberately never writes audit_log rows for test records at all
   // (see docs/schema.sql Section V / README), so no is_test_data filter
   // is needed or even possible here.
-  const auditWhere = [];
+  const auditWhere = ['(al.user_id IS NULL OR u.is_active = 1)'];
   const auditParams = {};
   if (dateFrom) {
     auditWhere.push('DATE(al.created_at) >= :date_from');

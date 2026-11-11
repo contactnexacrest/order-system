@@ -119,7 +119,7 @@ final class QaMailMatrixTest extends DbTestCase
                         $p = EmailDispatchService::buildPreview($orderId, (int) $doc['document_id'], $template, $userId);
                     } catch (\RuntimeException $e) {
                         // An LC quotation waits for the MD/ED to approve the payment terms (expected).
-                        if (!($code === 'QT' && str_contains($e->getMessage(), 'need MD/ED approval'))) {
+                        if (!($code === 'QT' && str_contains($e->getMessage(), 'need approval before the Quotation'))) {
                             $problems[] = "{$label} {$template}: preview refused: {$e->getMessage()}";
                         }
                         continue;

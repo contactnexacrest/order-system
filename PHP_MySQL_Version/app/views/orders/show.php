@@ -2345,7 +2345,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($paymentTermsApproval['required']): ?>
       <div id="payment-terms-approval">
       <?php if ($__termsPending): ?>
-        <p class="review-banner warn">&#9888; <span><strong>Payment terms need MD/ED approval first</strong> — this order uses &ldquo;<?= htmlspecialchars((string) $paymentTermsApproval['preset_name']) ?>&rdquo; (advance <?= $__pct($order['advance_pct']) ?>% &middot; balance <?= $__pct($order['balance_pct']) ?>%). The Quotation can't be generated or sent until they are approved.<?= $canApprovePaymentTerms ? '' : ' Waiting for MD/ED approval.' ?></span></p>
+        <p class="review-banner warn">&#9888; <span><strong>Payment terms need approval first</strong> — this order uses &ldquo;<?= htmlspecialchars((string) $paymentTermsApproval['preset_name']) ?>&rdquo; (advance <?= $__pct($order['advance_pct']) ?>% &middot; balance <?= $__pct($order['balance_pct']) ?>%). The Quotation can't be generated or sent until they are approved.<?= $canApprovePaymentTerms ? '' : ' Waiting for approval by ' . htmlspecialchars((string) $paymentTermsApprovers) . '.' ?></span></p>
         <?php if ($canApprovePaymentTerms): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-terms/approve" style="margin-bottom:10px;">
             <?= Csrf::field() ?>

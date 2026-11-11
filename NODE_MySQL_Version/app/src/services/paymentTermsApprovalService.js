@@ -6,8 +6,8 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 /**
  * QA Round 5, R5-03 (owner decision 2026-10-28, Option A): an order on a
  * payment preset marked "Requires MD approval" needs its payment terms
- * approved — by someone holding "Approve payment terms" (default Admin,
- * MD, ED) — before its Quotation can be generated or sent. The preset's
+ * approved — by someone holding "Approve payment terms" (see
+ * approverRoleNames()) — before its Quotation can be generated or sent. The preset's
  * flag is read live, so unticking it in Admin → Payment Presets lifts the
  * requirement for orders not yet quoted. Port of PaymentTermsApprovalService.php.
  */
@@ -39,7 +39,30 @@ async function isPending(orderId) {
 
 async function pendingMessage(orderId) {
   const preset = (await state(orderId)).preset_name || 'this payment preset';
-  return `The payment terms on this order ("${preset}") need MD/ED approval before the Quotation can be generated or sent — approve them in Step 1, or ask someone who can.`;
+  return `The payment terms on this order ("${preset}") need approval before the Quotation can be generated or sent — approve them in Step 1, or ask ${await whoCanApprove()}.`;
+}
+
+/**
+ * D-269: the roles that hold "Approve payment terms" (enabled), in role
+ * order — read live, so the wording stays true when Roles & Permissions
+ * changes. Personal grants and Super Admins are not roles; the wording
+ * ("someone who can approve payment terms") covers them.
+ * @returns {Promise<string[]>}
+ */
+async function approverRoleNames() {
+  const rows = await db.query(
+    `SELECT r.id, r.name FROM roles r
+     WHERE EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+                   WHERE rp.role_id = r.id AND rp.is_enabled = 1 AND p.permission_key = 'approve_payment_terms')
+     ORDER BY r.id`
+  );
+  return rows.map((r) => String(r.name));
+}
+
+/** D-269: "someone who can approve payment terms (Admin, Managing Director, …)". */
+async function whoCanApprove() {
+  const names = await approverRoleNames();
+  return `someone who can approve payment terms${names.length ? ` (${names.join(', ')})` : ''}`;
 }
 
 /**
@@ -62,4 +85,4 @@ async function approve(orderId, userId) {
   return true;
 }
 
-module.exports = { state, isPending, pendingMessage, approve };
+module.exports = { state, isPending, pendingMessage, approve, approverRoleNames, whoCanApprove };

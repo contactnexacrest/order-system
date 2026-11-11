@@ -134,7 +134,8 @@ Everything starts from the **Reports** hub:
   [Chapter 25](./25-export-compliance.md).
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
-  isn't available to every role by default, unlike the others).
+  isn't available to every role by default, unlike the others). Date From /
+  Date To apply to both counts. Deactivated users are not listed (D-269).
 - **Find an Order** — search by order reference or client name to jump
   straight to that order's own Full Report.
 - **Per-Client Report** — every client listed, one click into their own

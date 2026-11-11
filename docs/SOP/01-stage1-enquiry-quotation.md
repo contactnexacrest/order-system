@@ -320,15 +320,19 @@ screen) — never a public link.
 
 ### Both paths converge here — generating the Quotation
 
-**Payment terms that need MD/ED approval** (owner decision 2026-10-28).
+**Payment terms that need approval** (owner decision 2026-10-28; wording D-269).
 If the order's payment preset is marked **Requires MD approval** (by
 default: Established Buyer — Post-BL, Extended Terms — Post-BL, and
 Irrevocable Letter of Credit at Sight), Step 1 shows a yellow box *Payment
-terms need MD/ED approval first*, and the Generate Quotation button is
+terms need approval first*, and the Generate Quotation button is
 hidden until the terms are approved. Anyone holding **Approve payment
-terms** (Admin, MD and ED by default — editable under Roles & Permissions)
-sees an **Approve payment terms** button there; everyone else sees
-*Waiting for MD/ED approval*. The approvers get a notification when such
+terms** (by default Admin, Managing Director, Executive Director,
+Sales/Export Manager, Sales Director and Finance Director — editable under
+Roles & Permissions) sees an **Approve payment terms** button there;
+everyone else sees *Waiting for approval by someone who can approve
+payment terms (…)*, with the roles that hold the permission named in the
+brackets. The names are read from Roles & Permissions each time, so they
+stay right when a role is given or loses the permission. The approvers get a notification when such
 an order is created. Once approved, the box turns green and says who
 approved and when, and the Quotation can be generated and sent as usual.
 Sending a Quotation is refused too while the terms wait for approval.

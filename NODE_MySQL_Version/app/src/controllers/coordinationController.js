@@ -77,7 +77,11 @@ async function myTasks(req, res) {
 
 async function cockpit(req, res) {
   const tasks = await visible(req, await departmentTaskRepository.open());
+  // D-269: every active department has a row, with zeros when it has no open work.
   const byDepartment = {};
+  for (const d of await departmentRepository.departments(true)) {
+    byDepartment[String(d.name)] = { color: d.color, open: 0, overdue: 0, escalated: 0, unowned: 0 };
+  }
   for (const t of tasks) {
     const key = String(t.department_name);
     byDepartment[key] = byDepartment[key] || { color: t.department_color, open: 0, overdue: 0, escalated: 0, unowned: 0 };

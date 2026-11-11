@@ -94,7 +94,11 @@ final class CoordinationController
     public function cockpit(array $params): void
     {
         $tasks = self::visible(DepartmentTaskRepository::open());
+        // D-269: every active department has a row, with zeros when it has no open work.
         $byDepartment = [];
+        foreach (\App\Repositories\DepartmentRepository::departments(true) as $d) {
+            $byDepartment[(string) $d['name']] = ['color' => $d['color'], 'open' => 0, 'overdue' => 0, 'escalated' => 0, 'unowned' => 0];
+        }
         foreach ($tasks as $t) {
             $key = (string) $t['department_name'];
             $byDepartment[$key] ??= ['color' => $t['department_color'], 'open' => 0, 'overdue' => 0, 'escalated' => 0, 'unowned' => 0];

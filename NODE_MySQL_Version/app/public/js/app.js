@@ -65,8 +65,11 @@
     document.querySelectorAll('input[name*="reason" i]:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), textarea[name*="reason" i]').forEach(function (field) {
       var container = field.closest('label') || field.parentElement;
       var alreadyHinted = container && /\b\d+\s*characters?\b/i.test(container.textContent);
+      // D-269: data-reason-hint="on-error" (compact inline boxes, e.g. Email
+      // Send Approvals) shows no hint up front — only the error below.
+      var hintUpFront = field.dataset.reasonHint !== 'on-error';
       var hint = null;
-      if (!alreadyHinted) {
+      if (!alreadyHinted && hintUpFront) {
         hint = document.createElement('small');
         hint.className = 'reason-hint muted';
         hint.textContent = 'Must be at least ' + MIN_LENGTH + ' characters.';

@@ -71,7 +71,9 @@ Insights → **Management Cockpit** (MD/ED, Admin, the department
 Directors, the Order Coordinator): open, overdue and escalated tasks per
 department, orders without an owner, orders by status, everything
 escalated, and suppliers that are late. Counts and status only — no
-amounts.
+amounts. Every active department has its own row, with 0s when nothing
+is open there (D-269), so a quiet department is visible as quiet rather
+than missing.
 
 ## Task due days (Admin)
 

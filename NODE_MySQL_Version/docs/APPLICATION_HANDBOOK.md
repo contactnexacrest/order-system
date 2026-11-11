@@ -682,7 +682,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
 | `fieldError(el)` | The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
 | `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
-| `initReasonFieldValidation()` | Reason fields need meaningful text. |
+| `initReasonFieldValidation()` | Reason fields need meaningful text (10 characters, or the field's own `minlength`). By default a grey "Must be at least 10 characters." hint shows under the field from the start; a field with `data-reason-hint="on-error"` (compact inline boxes, e.g. Reject / Cancel Send on Email Send Approvals, D-269) shows no hint and only the red error ("Reason must be at least 10 characters (n so far).") on blur or submit. |
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
 | `initRemittanceDifference()`, `initRemittanceInr()`, `initRemittanceStatements()` | Live remittance-difference reasons, bank charges and INR credited. |
 | `initFormDraftRestore()` | Keeps typed input after a refused submit. |
@@ -1432,7 +1432,7 @@ quotation details form (`/quotation-details`), PI details form
 | Screen | Content |
 |---|---|
 | My Orders | Every order grouped Active / Complete / Disputed / Lost / Cancelled. "Documents Sent" shows as **Complete**. Order history can be limited by `client_portal_show_order_history` (global) and a per-client override. |
-| Inside an order | OC acknowledgement (when pending); Documents (final approved/sent customer-facing PDFs only; can be hidden by `client_portal_show_document_downloads` + per-client override); Buyer PO upload (closes once the advance clears, D-127, and never offered or accepted on a cancelled/lost order, client portal and Buyer Action Link alike); Order Updates chat; Report a Payment (only after the PI is issued, never on cancelled/lost, D-206); Raise a Dispute (only if staff switched it on for that order); Report a Process Issue (always); Order Feedback (after documents are sent, D-133); Reorder This (each line's unit matched to the unit list ignoring case/spaces; an unknown unit is shown and the buyer must choose, never a silent PCS). The OC acknowledgement table's Port of Discharge falls back to the typed port, as the documents do. |
+| Inside an order | OC acknowledgement (when pending); Documents (final approved/sent customer-facing PDFs only; can be hidden by `client_portal_show_document_downloads` + per-client override); Buyer PO upload (closes once the advance clears, D-127, and never offered or accepted on a cancelled/lost order, client portal and Buyer Action Link alike; on a cancelled/lost order the "upload a scanned copy here any time" intro is not shown either, only the closed line, D-269); Order Updates chat; Report a Payment (only after the PI is issued, never on cancelled/lost, D-206); Raise a Dispute (only if staff switched it on for that order); Report a Process Issue (always); Order Feedback (after documents are sent, D-133); Reorder This (each line's unit matched to the unit list ignoring case/spaces; an unknown unit is shown and the buyer must choose, never a silent PCS). The OC acknowledgement table's Port of Discharge falls back to the typed port, as the documents do. |
 | My Account | Change password only. Forgot-password link valid 72 h, max 5 per client per hour, generic answer. |
 
 **CAFIN never reaches the client (standing rule, D-068, D-106).** The
@@ -1727,7 +1727,16 @@ Step 1 shows a yellow box and the QT cannot be generated or sent until a
 holder of `approve_payment_terms` approves (`…/payment-terms/approve`). The
 creator cannot approve their own order's terms unless the `payment_terms`
 self-approval rule allows it (D-216/D-221). Never on a cancelled or lost
-order (D-205).
+order (D-205). Wording (D-269): the box reads "Payment terms need approval
+first"; someone who cannot approve sees "Waiting for approval by someone
+who can approve payment terms (Admin, Managing Director, …)", and a refused
+Generate/Send says the same. The role names are read live from the roles
+that hold `approve_payment_terms` (enabled, in role order;
+`PaymentTermsApprovalService::approverRoleNames()` /
+`paymentTermsApprovalService.approverRoleNames()`), so a role given or
+denied the permission in Roles & Permissions is named, or not, at once.
+Seed: Admin, Managing Director, Executive Director, Sales/Export Manager,
+Sales Director, Finance Director.
 
 ### 5.4 Step-by-step reference
 
@@ -2537,7 +2546,7 @@ the same filters, counts, fields, actions and money rules on both templates
 | Freight Cost | `/reports/freight-cost` | `view_logistics_costs` |
 | Supplier Performance | `/reports/suppliers` | `view_purchase_prices` |
 | Order Profitability (Profit by division when ≥ 2 active) | `/reports/order-profitability` | `manage_order_financials` |
-| Staff Productivity | `/reports/staff` | `view_staff_reports` |
+| Staff Productivity (active users only; the dates apply to documents and audit actions alike, D-269) | `/reports/staff` | `view_staff_reports` |
 | Incentive & Commission Register, To pay, Owed, Statement | `/reports/incentives…` | incentive gate |
 | Associates | `/reports/associates` | `manage_associates` |
 | Missing eBRC / FIRC | `/reports/missing-ebrc` | `ca_module_view`, `manage_export_benefit_claims` or `manage_order_financials` |
@@ -2583,6 +2592,9 @@ the same filters, counts, fields, actions and money rules on both templates
     Admin and the Order Coordinator choose for any department.
   - Cockpit: open/overdue/escalated per department, orders without an
     owner, orders by status, escalations, late suppliers — counts only.
+    Every active department has a row, in Admin › Departments order, with
+    0s when it has no open work (D-269); work of an inactive department
+    still shows, after the active ones.
   - **Daily digest** 08:15 IST, one e-mail per person; counts as sent only
     if mail really left.
 - **Tables.** `department_task_types`, `order_department_owners`,
@@ -4011,7 +4023,7 @@ The full register is `docs/decisions/owner-decisions-register.md` (about 260 dec
 
 **Documents (D-046–D-071, D-223, D-224, D-230, D-257 (1)).** No checkboxes on documents; fixed wording and layout; reference and watermark on every page; PI "ADVANCE PAYABLE NOW" box; LC orders never show "0%"; CI balance clause follows the order's own terms (D-054); PHP and Node documents have the same page counts (D-057); internal documents never go to the buyer (D-068). Documents follow the product category, but Natural Stone prints exactly as before (D-257 (1)).
 
-**Payments and terms (D-072–D-084, D-205, D-227, D-243, D-244).** Five protected presets (D-073); risky terms need MD/ED approval before the Quotation (D-075); recording and clearing by different people (D-076); amount and rate recorded together; buyer money arrives in INR in one current account (D-084); remittances record the INR the bank credited and the rate is worked out (D-244).
+**Payments and terms (D-072–D-084, D-205, D-227, D-243, D-244).** Five protected presets (D-073); risky terms need approval by a holder of `approve_payment_terms` before the Quotation (D-075; wording names the holding roles, D-269); recording and clearing by different people (D-076); amount and rate recorded together; buyer money arrives in INR in one current account (D-084); remittances record the INR the bank credited and the rate is worked out (D-244).
 
 **Suppliers, logistics, bills (D-085–D-094, D-232).** Bill first, then pay (D-089); proforma vs tax invoice "Option B" (D-091); GST always a % from a drop-down (D-092); Logistics enters logistics bills, Accounts pays (D-232).
 

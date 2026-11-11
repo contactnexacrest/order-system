@@ -988,7 +988,8 @@ final class ReportRepository
         $isTestMode = self::isTestModeFlag();
         $pdo = Database::connection();
 
-        $docWhere = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
+        // D-269: deactivated users (archived ones too — always inactive) are not listed; unattributed rows stay.
+        $docWhere = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id'), '(d.generated_by IS NULL OR u.is_active = 1)'];
         $docParams = ['is_test_data' => $isTestMode];
         if ($dateFrom) {
             $docWhere[] = 'DATE(d.generated_at) >= :date_from';
@@ -1031,7 +1032,7 @@ final class ReportRepository
         // deliberately never writes audit_log rows for test records at all
         // (see docs/schema.sql Section V / README), so no is_test_data
         // filter is needed or even possible here.
-        $auditWhere = [];
+        $auditWhere = ['(al.user_id IS NULL OR u.is_active = 1)'];
         $auditParams = [];
         if ($dateFrom) {
             $auditWhere[] = 'DATE(al.created_at) >= :date_from';
