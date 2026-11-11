@@ -789,6 +789,7 @@ There is no permanent worker on shared hosting, so background work runs as sched
 | Zoho sync | `zoho_sync.php` | `zohoSync.js` | hourly | Pushes pending records to Zoho Books; one run at a time (`ZohoSyncLock`) |
 | Daily digest | `daily_digest.php` | `dailyDigest.js` | daily 08:15 | Per-person e-mail of waiting work, associate reminders, backup warnings |
 | Document copy clean-up | `document_copy_cleanup.php` | `documentCopyCleanup.js` | daily 02:15 | Removes old draft/superseded copies per Admin rules; does nothing while every rule is off (default) |
+| Exchange rate (D-301) | `fetch_fx_rate.php` | `fetchFxRate.js` | daily 07:05 | Fetches USD→INR (Frankfurter, backup open.er-api.com) into `fx_rates`; failure keeps the last rate; a move over 2 % waits for the MD. Needs HTTPS to api.frankfurter.app and open.er-api.com |
 | Zoho TEST clean-up | `zoho_cleanup_test_records.php` | `zohoCleanupTestRecords.js` | **by hand** | Removes `TEST-` records from Books (dry run unless `--apply`; `--log` writes change-log rows) |
 | Reorganise order files | `reorganize_order_files.php` | `reorganizeOrderFiles.js` | **by hand** | Moves files into the per-step folders (dry run unless `--apply`) |
 | Backups | `scripts/backup_db.sh`, `backup_storage.sh`, `backup_test_restore.sh` | same | 02:00, 02:30, 04:00 on the 1st | See 3.15 |
@@ -803,6 +804,7 @@ CRON_TZ=Asia/Kolkata
 0 * * * *     php …/app/cron/zoho_sync.php
 15 8 * * *    php …/app/cron/daily_digest.php
 15 2 * * *    php …/app/cron/document_copy_cleanup.php
+5 7 * * *     php …/app/cron/fetch_fx_rate.php
 ```
 
 Node offers two options (never both, or jobs double-fire): external cron calling `node src/jobs/<name>.js` (recommended), or `RUN_JOBS_IN_PROCESS=true` in `.env` so `src/jobs/scheduler.js` runs them with `node-cron` inside the web process (Zoho sync with `noOverlap`).
@@ -2998,6 +3000,70 @@ A supplier price is **expired** after its `valid_until` date, and **stale** when
 #### Pricing ready? and Try a price (D-256)
 
 `PricingService::readiness()` lists what a product still needs: supplier price per unit used for pricing; per-CBM price if it is sold at the CBM threshold or above; specifications; prices current; exact prices current; open to associates. The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only).
+
+#### Products and pricing, 11 Nov 2026 (D-300 to D-306)
+
+**Thickness prices (D-300).** A supplier-price row with `price_basis = 'grid'` holds every thickness: the
+category's Thickness options below `cbm_from_mm` (20 mm base, 15/18/30/40 mm with their %) per m², and
+"50 mm and above" per CBM. Only TYPED prices are stored, in `catalog_supplier_thickness_prices`
+(`thickness_mm` 0 = 50 mm+ per CBM); CALCULATED prices are worked out each time by `ThicknessPrices` /
+`thicknessPrices.js`: other thickness = base × (1 + % / 100); 50 mm+ per CBM = base per m² × K
+(`product_categories.thick_k_factor`, product override `catalog_products.thick_k_factor`). The base is the
+typed 20 mm price, else worked back from the first typed thickness, else from the per-CBM price ÷ K.
+Saving a box at 0 / empty calculates it again; nothing typed → "Enter at least one price". A box posted as
+"calculated" whose value differs from the calculation counts as typed (works without the browser script).
+Every change of a price, CHA or the packing tick is a row in `catalog_supplier_price_history` (who, when,
+old → new), shown on Products › a product › Market prices › Edit (`/products/suppliers/{id}/price`).
+
+**FOB cost.** `PricingService::fobParts()` = supplier price for the chosen thickness, converted to the
+product's unit (per CBM = per m² ÷ thickness; then `LineUnits::cbmPerUnit`), + CHA + transport per unit,
++ the product's packing + loading costs when "Price includes packing and loading" is unticked. CHA +
+transport per container (`catalog_product_suppliers.cha_transport_per_container`, default
+`catalog_products.cha_transport_per_container`) ÷ what one container carries: `container_cbm` (8) unless
+`container_cbm × weight_t_per_cbm > container_max_t` (27 t), then `container_max_t ÷ weight_t_per_cbm`.
+Category values, product overrides. A grid price used for pricing is also the per-CBM price for 50 mm+;
+the Thickness option's % is not applied again on top of a grid price. Old one-price rows ('unit', 'cbm',
+'combo') work as before, plus CHA from the product default when set.
+
+**Price rules (D-300).** Products › Categories › <category> › Price rules (`/products/categories/{id}?tab=rules`,
+menu link `/products/price-rules`): thickness %s (the category's Thickness options), × K, + Add a thickness
+(below 50 mm), container CBM / maximum t, stone t per CBM, live example column (app.js `initRulesExample`).
+Saving needs `manage_pricing` (MD) and a reason; every change is `PRICE_RULE_CHANGED` / `PRICE_RULE_ADDED`
+in the Audit Log with that reason (`PriceRules` / `priceRules.js`). A product's own K or container shows
+an "own rule" badge (set on Edit product, MD only).
+
+**Exchange rate (D-301).** `FxRateService` / `fxRateService.js`; settings `fx_mode` ('auto' | 'manual'),
+`fx_cushion_pct` (0–5, one decimal), `pricing_fx_rate` (manual, and the fallback until a rate is fetched).
+`PricingService::settings()['pricing_fx_rate']` is the rate in use: latest `fx_rates` row with status
+`in_use` × (1 − cushion %). Daily job `fetch_fx_rate.php` / `fetchFxRate.js` (07:05 IST): Frankfurter, then
+open.er-api.com; failure → a `failed` row, the last rate stays (warning); a move > 2 % against the rate in use
+→ `waiting_md`, in-app notice to `manage_pricing` holders, MD decides on Pricing settings with a reason
+(`/pricing/fx-rates/{id}/decide`). The MD can also "Fetch today's rate now". Issued QT / PI keep their prices
+(price snapshot on the line). The rate line with [Why?] (`pricing/_fx_rate_line`) appears only on the
+catalogue header and Pricing settings, for build-up viewers.
+
+**One master for HS code and supplier (D-302, D-303).** Product HS code must be an active `hs_codes` code
+(form datalist + `data-in-list`, server check); "+ Add a new HS code" posts to `/hs-codes` with `return_to`.
+Order-line HS fields carry `data-in-list` too. `/products/fix-hs-codes` lists products whose code is not on the
+list. A product price's supplier is `catalog_product_suppliers.supplier_id` → `suppliers`
+(`supplier_name` keeps the directory name); search-pick with the location list from
+`supplier_factory_addresses` (else city/state); `/suppliers/quick-add` creates a supplier with
+`details_pending = 1`; `/products/link-suppliers` links typed names ("Match by name" or one by one). The
+supplier form shows "Prices given for products" (purchase-price viewers) and the "Details pending" tick.
+
+**app.js (`fieldError`).** `data-in-list="<datalist id>"`: the value must be one of the list's options.
+`data-at-least-one="<name prefix>"`: at least one enabled field with that name prefix holds a number above 0
+(message on the first). `initThicknessGrid`, `initSupplierPick`, `initRulesExample`.
+
+**Labels and visibility (D-304, D-305).** Catalogue headers carry currency and unit; "Supplier price ₹ / unit"
+with "≈ USD" (product editors), "Staff lowest", "Associate lowest", staff "Quote price" / "Your lowest". On an
+order from an associate's client, staff see "for this order" figures and the note; "sold by <associate>
+(level)" only for `view_price_buildup`.
+
+**Category page (D-306).** `/products/categories/{id}` with tabs General | Options and their price effect |
+Price rules | Products in this category (`ProductCategoryController::show`). `/pricing/specifications` (GET)
+redirects to the Options tab; the specification actions redirect there too. A product's options page links
+"edit for all products in <category>".
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 

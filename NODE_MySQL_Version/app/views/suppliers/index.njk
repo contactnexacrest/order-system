@@ -28,7 +28,7 @@
       {% for s in suppliers %}
       {% set location = [s.city, s.state] | select | join(', ') %}
       <tr>
-        <td>{{ s.supplier_legal_name }}{% if s.email %}<br><small class="muted">{{ s.email }}</small>{% endif %}</td>
+        <td>{{ s.supplier_legal_name }}{% if s.details_pending == 1 %} <span class="badge badge-warning">Details pending</span>{% endif %}{% if s.email %}<br><small class="muted">{{ s.email }}</small>{% endif %}</td>
         <td>{{ s.types | join(', ') if s.types.length else '—' }}</td>
         <td>{{ location or '—' }}</td>
         <td>

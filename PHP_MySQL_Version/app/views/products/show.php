@@ -20,7 +20,10 @@
     <?php /* Owner decision D-255 (5 Nov 2026): the options that change the price. */
     $__su = \App\Services\AuthService::currentUser(); $__sr = $__su !== null && $__su['role_id'] !== null ? (int) $__su['role_id'] : null;
     $__canSpecs = $__su !== null && (\App\Services\PermissionService::can((int) $__su['id'], $__sr, 'view_price_buildup') || \App\Services\PermissionService::can((int) $__su['id'], $__sr, 'manage_product_specifications') || \App\Services\PermissionService::can((int) $__su['id'], $__sr, 'manage_pricing'));
-    if ($__canSpecs): ?><p><a class="btn-sm btn-secondary" href="/products/<?= (int) $product['id'] ?>/specifications">Price options (specifications)</a></p><?php endif; ?>
+    if ($__canSpecs): ?><p><a class="btn-sm btn-secondary" href="/products/<?= (int) $product['id'] ?>/specifications">Price options (specifications)</a>
+      <?php // D-300 (point 12): the category's price rules; a product with its own values shows "own rule". ?>
+      <?php $__catId = \App\Services\ProductSpecs::categoryIdFor($product); if ($__catId !== null && (\App\Services\PermissionService::can((int) $__su['id'], $__sr, 'view_price_buildup') || \App\Services\PermissionService::can((int) $__su['id'], $__sr, 'manage_pricing'))): ?><a class="btn-sm btn-secondary" href="/products/categories/<?= (int) $__catId ?>?tab=rules">Price rules</a><?php endif; ?>
+      <?php if (($product['thick_k_factor'] ?? null) !== null || ($product['container_cbm'] ?? null) !== null || ($product['container_max_t'] ?? null) !== null): ?> <span class="badge badge-warning" title="This product has its own price rule (× K or container) — set on Edit">own rule</span><?php endif; ?></p><?php endif; ?>
   </div>
 
 

@@ -23,20 +23,24 @@ $__usd = static fn (float $v): string => 'USD ' . number_format($v, 2);
     <table class="list" style="max-width:720px">
       <tr><td>Supplier price (<?= View::e($__p['supplier']['supplier_name']) ?>, used for pricing<?= $__p['price_date'] !== null ? ', quoted ' . View::e($__p['price_date']) : '' ?>)
         <?php if ($__p['staleness'] !== null): ?> <span class="badge <?= $__p['staleness'] === 'expired' ? 'badge-danger' : 'badge-warning' ?>"><?= $__p['staleness'] ?></span><?php endif; ?></td>
-        <td class="num">&#8377;<?= number_format((float) $__p['supplier_inr'], 2) ?></td></tr>
+        <td class="num">&#8377;<?= number_format((float) ($__p['inr_parts']['supplier'] ?? $__p['supplier_inr']), 2) ?></td></tr>
+      <?php // D-300 (point 12): FOB cost = supplier price + CHA and transport per unit (+ packing and loading when not included). ?>
+      <?php if ((float) ($__p['inr_parts']['cha'] ?? 0) > 0): ?><tr><td>+ CHA + transport per <?= View::e($__unit) ?> <span class="muted small">(per container ÷ what one container holds)</span></td><td class="num">&#8377;<?= number_format((float) $__p['inr_parts']['cha'], 2) ?></td></tr><?php endif; ?>
+      <?php if ((float) ($__p['inr_parts']['packing'] ?? 0) > 0): ?><tr><td>+ packing and loading <span class="muted small">(not in the supplier's price)</span></td><td class="num">&#8377;<?= number_format((float) $__p['inr_parts']['packing'], 2) ?></td></tr><?php endif; ?>
+      <?php if ((float) ($__p['inr_parts']['cha'] ?? 0) > 0 || (float) ($__p['inr_parts']['packing'] ?? 0) > 0): ?><tr><td>= FOB cost in ₹</td><td class="num">&#8377;<?= number_format((float) $__p['supplier_inr'], 2) ?></td></tr><?php endif; ?>
       <tr><td>÷ pricing exchange rate (&#8377;<?= number_format($__p['settings']['pricing_fx_rate'], 4) ?>)</td><td class="num"><?= $__usd($__b['supplier_usd']) ?></td></tr>
       <tr><td>+ other costs to FOB <span class="muted small">(<?= View::e(PricingService::modeLabel($__e['other_mode'], $__e['other_value'])) ?><?= $product['pricing_other_cost_mode'] === null ? ', global' : ', this product' ?>)</span></td><td class="num"><?= $__usd($__b['other_costs']) ?></td></tr>
       <tr><td><strong>Cost (FOB)</strong></td><td class="num"><strong><?= $__usd($__b['cost']) ?></strong></td></tr>
       <tr><td>Minimum price = cost ÷ (1 − <?= View::e(PricingService::pct($__e['margin_pct'])) ?> margin) <span class="muted small">— nobody goes below this</span></td><td class="num"><strong><?= $__usd($__b['minimum']) ?></strong></td></tr>
       <tr><td>+ team incentive reserve <span class="muted small">(<?= View::e(PricingService::modeLabel($__e['incentive_mode'], $__e['incentive_value'])) ?><?= $__e['incentive_mode'] === 'pct' ? ' of profit' : '' ?>)</span>
         <span class="badge <?= $__p['program_on'] ? 'badge-success' : 'badge-inactive' ?>">program <?= $__p['program_on'] ? 'on' : 'off' ?></span></td><td class="num"><?= $__usd($__b['reserve']) ?></td></tr>
-      <tr><td><strong>Staff floor</strong> (lowest price your sales staff may agree)</td><td class="num"><strong><?= $__usd($__b['staff_floor']) ?></strong></td></tr>
+      <tr><td><strong>Staff floor</strong> — staff lowest (lowest price your sales staff may agree)</td><td class="num"><strong><?= $__usd($__b['staff_floor']) ?></strong></td></tr>
       <tr><td>Staff quote price (+ <?= View::e(PricingService::pct($__e['buffer_pct'])) ?> buffer)</td><td class="num"><strong><?= $__usd($__b['staff_quote']) ?></strong></td></tr>
     </table>
     <?php if ($__p['levels'] !== []): ?>
       <h3>Associates <small class="muted">(floor = staff floor ÷ (1 − commission %), or + a fixed amount)</small></h3>
       <table class="list" style="max-width:720px">
-        <tr><th>Commission level</th><th>Commission</th><th class="num">Floor</th><th class="num">Quote price</th></tr>
+        <tr><th>Commission level</th><th>Commission</th><th class="num">Associate lowest (USD)</th><th class="num">Quote price (USD)</th></tr>
         <?php foreach ($__p['levels'] as $l): ?>
           <tr><td><?= View::e($l['name']) ?></td><td><?= View::e($l['label']) ?></td><td class="num"><?= number_format($l['floor'], 2) ?></td><td class="num"><?= number_format($l['quote'], 2) ?></td></tr>
         <?php endforeach; ?>
@@ -73,7 +77,7 @@ $__usd = static fn (float $v): string => 'USD ' . number_format($v, 2);
     <p class="muted">No price yet — ask Procurement to record the supplier price.</p>
   <?php else: ?>
     <table class="list" style="max-width:480px">
-      <tr><th class="num">Quote price</th><th class="num">Your lowest price</th></tr>
+      <tr><th class="num">Quote price (USD / <?= View::e($__unit) ?>)</th><th class="num">Your lowest (USD / <?= View::e($__unit) ?>)</th></tr>
       <tr><td class="num"><?= $__usd($pricingStaff['build']['staff_quote']) ?></td><td class="num"><?= $__usd($pricingStaff['build']['staff_floor']) ?></td></tr>
     </table>
     <p class="muted small">Quote at the first price; you may agree any price down to the second. Below it, the order line needs the MD's approval.</p>

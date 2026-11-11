@@ -150,7 +150,46 @@ const EDIT_FIELDS = [
   'bank_branch', 'bank_account_number', 'bank_ifsc', 'bank_account_type', 'bank_upi_id',
 ];
 
+/**
+ * D-303 (point 15): "+ Add a new supplier (quick)" from a price screen — name, location, phone and
+ * type; marked "Details pending" until GSTIN, bank and contacts are completed.
+ */
+async function quickAdd(name, location, phone, type, createdBy) {
+  const id = await create({ supplier_legal_name: name, address: location, city: location, phone,
+    notes: 'Added quickly from a product price — details pending.', types: type !== '' ? [type] : [] }, createdBy);
+  await setDetailsPending(id, true);
+  return id;
+}
+
+async function setDetailsPending(id, pending) {
+  await db.execute('UPDATE suppliers SET details_pending = :p WHERE id = :id', { p: pending ? 1 : 0, id });
+}
+
+/** D-303: the one active supplier with exactly this name (spaces and capitals ignored), or null when none or several. */
+async function findByExactName(name) {
+  const rows = await db.query('SELECT * FROM suppliers WHERE is_active = 1 AND LOWER(TRIM(supplier_legal_name)) = LOWER(TRIM(:n)) ORDER BY id LIMIT 2', { n: String(name) });
+  return rows.length === 1 ? find(rows[0].id) : null;
+}
+
+/** D-303: the supplier pick list — active suppliers with their locations (factory / quarry addresses, else the city). */
+async function pickList() {
+  const rows = await db.query('SELECT id, supplier_legal_name, city, state, details_pending, bank_verified_at FROM suppliers WHERE is_active = 1 ORDER BY supplier_legal_name');
+  const addresses = await require('./supplierFactoryAddressRepository').allGroupedBySupplier();
+  return rows.map((r) => {
+    const locs = (addresses[Number(r.id)] || []).map((a) => `${a.label ? `${a.label} — ` : ''}${a.address}`.trim());
+    const city = [r.city || '', r.state || ''].filter((x) => String(x) !== '').join(', ').trim();
+    if (!locs.length && city !== '') locs.push(city);
+    const pending = Number(r.details_pending || 0) === 1;
+    const verified = !!r.bank_verified_at;
+    // The text beside the name in the pick list (the PHP views build the same).
+    const hint = [locs[0] || '', pending ? 'Details pending' : '', verified ? 'Verified bank' : ''].filter((x) => x !== '').join(' · ');
+    const shortHint = [locs[0] || '', pending ? 'Details pending' : ''].filter((x) => x !== '').join(' · ');
+    return { id: Number(r.id), name: String(r.supplier_legal_name), locations: locs, pending, verified, hint, shortHint };
+  });
+}
+
 module.exports = {
   EDIT_FIELDS,
   all, find, create, update, setTypes, toggleActive, isUsedOnAnOrder, idsUsedOnOrders, remove, markSample, markTest,
+  quickAdd, setDetailsPending, findByExactName, pickList,
 };

@@ -1,0 +1,86 @@
+{#
+  Owner decision D-306 (point 20, 11 Nov 2026): Products › Categories › <category> is one page with tabs —
+  General (name, units, HS code, packing, documents) | Options and their price effect (was Admin › Pricing ›
+  Specifications) | Price rules (D-300) | Products in this category. Port of views/products/category.php.
+#}
+{% set c = category %}
+{% set returnTo = '/products/categories/' + c.id + '?tab=general' %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products/categories">&larr; Categories</a></p>
+  <h1>Category: {{ c.name }}{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</h1>
+  <nav class="tab-pills" aria-label="Category sections">
+    {% for t in tabs %}
+      <a class="btn-sm{{ ' btn-accent' if tab == t[0] else ' btn-secondary' }}" href="/products/categories/{{ c.id }}?tab={{ t[0] }}"{% if tab == t[0] %} aria-current="page"{% endif %}>{{ t[1] }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if tab == 'general' %}
+    {% set ro = '' if canManageCatalog else ' disabled' %}
+    {% if c.is_system != 1 %}
+      <h2>Name and attributes</h2>
+      <p class="muted small">The attributes an order line of this category carries — they print on the Quotation, Proforma Invoice and Commercial Invoice in the line's detail row, in this order, followed by the HS code.</p>
+      <form method="post" action="/products/categories/{{ c.id }}">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ returnTo }}">
+        <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ c.name }}" placeholder="e.g. Granite slabs"{{ ro }}></label>
+        {% for i in range(0, maxAttributes) %}
+        <label>Attribute {{ i + 1 }}{% if i == 0 %} *{% endif %}<input type="text" name="attributes[]" maxlength="60" {% if i == 0 %}required{% endif %} value="{{ c.attributes[i] or '' }}" placeholder="e.g. Finish"{{ ro }}></label>
+        {% endfor %}
+        <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" {% if c.is_active == 1 %}checked{% endif %}{{ ro }}> Active (offered on new order lines)</label>
+        {% if canManageCatalog %}<div class="btn-row"><button type="submit" class="btn-sm btn-success">Save {{ c.name }}</button></div>{% endif %}
+      </form>
+    {% else %}
+      <p class="muted">Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
+    {% endif %}
+
+    <h2>Settings</h2>
+    <p class="muted small">What an order line of the category starts with: its unit (and the only units it may use), its HS code for goods, its packing type, the quality documents its orders must collect, and the T&amp;C clause set.</p>
+    <form method="post" action="/products/categories/{{ c.id }}/settings">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="return_to" value="{{ returnTo }}">
+      <label>Default unit
+        <select name="default_unit"{{ ro }}>
+          <option value="">No default (as today)</option>
+          {% for u in units %}<option value="{{ u }}" {% if u | upper == (c.default_unit or '') | upper %}selected{% endif %}>{{ u }}</option>{% endfor %}
+        </select>
+      </label>
+      <fieldset><legend>Allowed units <small class="muted">(none ticked = any unit)</small></legend>
+        {% for u in units %}<label class="checkbox-row"><input type="checkbox" name="allowed_units[]" value="{{ u }}" {% if (u | upper) in c.allowedUnits %}checked{% endif %}{{ ro }}> {{ u }}</label>{% endfor %}
+      </fieldset>
+      <label>Default HS code <small class="muted">(goods; from the HS Code master list)</small><input type="text" name="default_hs_code" list="category_hs_codes" pattern="\d{6,8}" maxlength="8" data-in-list="category_hs_codes" data-in-list-message="Pick a code from the HS Code Master List." value="{{ c.default_hs_code or '' }}" placeholder="e.g. 680293"{{ ro }}></label>
+      <label>Packing type
+        <select name="packing_type"{{ ro }}>
+          <option value="">Not set</option>
+          {% for p in packageTypes %}<option value="{{ p }}" {% if p == (c.packing_type or '') %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Quality documents its orders need <small class="muted">(one per line, at most {{ maxQualityDocuments }})</small><textarea name="quality_documents" rows="3" maxlength="1300" placeholder="e.g. Mill test certificate 3.1&#10;Drawing approval"{{ ro }}>{{ c.quality_documents or '' }}</textarea></label>
+      <label>Weight per CBM (tonnes) <small class="muted">(for Ton prices and the container weight limit; also on Price rules)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="{{ pricingFmt.trim3(c.weight_t_per_cbm) }}" placeholder="e.g. 2.7"{{ ro }}></label>
+      <label>T&amp;C clause set
+        <select name="tc_clause_set"{{ ro }}>
+          <option value="">Not set</option>
+          {% for k, label in tcClauseSets %}<option value="{{ k }}" {% if k == (c.tc_clause_set or '') %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      {% if canManageCatalog %}<div class="btn-row"><button type="submit" class="btn-sm btn-success">Save settings</button></div>{% endif %}
+    </form>
+    <datalist id="category_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description or '' }}</option>{% endfor %}</datalist>
+
+  {% elif tab == 'options' %}
+    {% include "pricing/_spec_table.njk" %}
+
+  {% elif tab == 'rules' %}
+    {% include "products/_price_rules.njk" %}
+
+  {% else %}
+    <table class="list">
+      <tr><th>Product</th><th>HS code</th><th>Unit</th><th>Status</th><th></th></tr>
+      {% for p in products %}
+        <tr><td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if p.thick_k_factor != null or p.container_cbm != null or p.container_max_t != null %} <span class="badge badge-warning">own rule</span>{% endif %}</td>
+          <td>{{ p.hs_code }}</td><td>{{ p.reference_unit or '—' }}</td>
+          <td>{{ 'Active' if p.is_active == 1 else 'Inactive' }}</td><td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td></tr>
+      {% endfor %}
+      {% if not products.length %}<tr><td colspan="5" class="muted">No products in this category yet.</td></tr>{% endif %}
+    </table>
+  {% endif %}
+</div>

@@ -2691,3 +2691,16 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
 SELECT 'unit', u.v, u.s, 0, 1 FROM (SELECT 'TON' AS v, 14 AS s UNION ALL SELECT 'RMT', 15) u
 WHERE NOT EXISTS (SELECT 1 FROM dropdown_options d WHERE d.list_key = 'unit' AND d.option_value = u.v);
 UPDATE product_categories SET allowed_units = 'CBM,SQM,SQFT,PCS,TON,RMT', weight_t_per_cbm = 2.700 WHERE is_system = 1 AND allowed_units IS NULL;
+
+-- D-300 (owner decision 11 Nov 2026, point 12): Natural Stone's price rules —
+-- 50 mm+ per CBM = 20 mm price per m² × 40; one container holds 8 CBM, at most 27 t.
+-- (30 mm +35 % and 40 mm +70 % are the Thickness options above.)
+UPDATE product_categories SET thick_k_factor = 40.000, container_cbm = 8.00, container_max_t = 27.00
+WHERE is_system = 1 AND thick_k_factor IS NULL;
+
+-- D-301 (owner decision 11 Nov 2026, point 4): the exchange rate is fetched every day
+-- (Automatic); pricing rate = market rate × (1 − 2 % cushion). "Manual" uses
+-- pricing_fx_rate as before — it is also the fallback until the first rate is fetched.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('fx_mode', 'auto'),
+  ('fx_cushion_pct', '2.0');

@@ -29,7 +29,7 @@
       <?php foreach ($suppliers as $s): ?>
       <?php $used = isset($usedIds[(int) $s['id']]); ?>
       <tr>
-        <td><?= htmlspecialchars($s['supplier_legal_name']) ?><?php if (!empty($s['email'])): ?><br><small class="muted"><?= htmlspecialchars($s['email']) ?></small><?php endif; ?></td>
+        <td><?= htmlspecialchars($s['supplier_legal_name']) ?><?= !empty($s['details_pending']) ? ' <span class="badge badge-warning">Details pending</span>' : '' ?><?php if (!empty($s['email'])): ?><br><small class="muted"><?= htmlspecialchars($s['email']) ?></small><?php endif; ?></td>
         <td><?= $s['types'] ? htmlspecialchars(implode(', ', $s['types'])) : '—' ?></td>
         <td><?= htmlspecialchars(trim(($s['city'] ?? '') . (!empty($s['city']) && !empty($s['state']) ? ', ' : '') . ($s['state'] ?? ''))) ?: '—' ?></td>
         <td>

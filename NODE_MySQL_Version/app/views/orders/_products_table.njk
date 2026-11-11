@@ -13,6 +13,10 @@
   <h3>Products ({{ goodsLines.length }} line{{ '' if goodsLines.length == 1 else 's' }})</h3>
   {% if canEditProducts %}<button type="button" class="btn-primary" data-open-panel="line-panel-new">+ Add product</button>{% endif %}
 </div>
+{# D-305 (point 19): on an order from an associate's client, staff see this order's figures — never the associate's name, level or %. #}
+{% if sees.selling and linePricing.ctx.associate %}
+  <p class="muted small for-this-order">ⓘ This client came through an associate, so this order's prices are higher.{% if seesPriceBuildup %} Sold by {{ linePricing.ctx.label }}.{% endif %}</p>
+{% endif %}
 {% if sees.selling and lineSummary %}
   <p class="line-summary {{ 'notice notice-warning' if lineSummary.blocking else 'notice notice-success' }}">{{ lineSummary.text }}{% if lineSummary.blocking %} <a href="#price-check">Show</a>{% endif %}</p>
 {% endif %}
@@ -97,7 +101,7 @@
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>
           <div class="size-grid">
-            <label>Unit price {{ order.currency_code or '' }}<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ lp.unit_price if (lp.unit_price != null) else '' }}" placeholder="e.g. 495.00" data-floor-message="Below your lowest price"{% if lcFloor %} data-floor="{{ lcFloor }}"{% endif %}></label>
+            <label>Unit price {{ order.currency_code or '' }}<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ lp.unit_price if (lp.unit_price != null) else '' }}" placeholder="e.g. 495.00" data-floor-message="{{ 'Below the lowest for this order' if linePricing.ctx.associate else 'Below your lowest price' }}"{% if lcFloor %} data-floor="{{ lcFloor }}"{% endif %}></label>
             <div class="line-total-box"><span class="muted small">Line total</span><output class="line-total">{{ (lp.fob_value | money) if (not isNew and lp.fob_value != null) else '—' }}</output></div>
           </div>
           <div class="price-ref-box" aria-live="polite">{% if lc and sees.selling %}{% include "orders/_line_price.njk" %}{% endif %}</div>
@@ -120,7 +124,7 @@
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (lp.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ lp.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
             <label>Category

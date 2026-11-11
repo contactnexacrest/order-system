@@ -1,0 +1,22 @@
+{#
+  Owner decision D-303 (point 15, 11 Nov 2026): the supplier of a product price is picked from the
+  Suppliers directory (search as you type); the location is filled from the supplier's factory / quarry
+  addresses (app.js initSupplierPick). A name that is not in the directory is refused beside the field.
+  In: pickList, pickName, pickId, pickLocation. Port of views/products/_supplier_pick.php.
+#}
+<label>Supplier * <small class="muted">(from the Suppliers directory)</small>
+  <input type="text" name="supplier_name" list="supplier-pick-list" required autocomplete="off" maxlength="255"
+    data-pick-id="supplier_id" data-pick-locations="location" data-in-list="supplier-pick-list"
+    data-in-list-message="Pick the supplier from the Suppliers directory — or add it with &quot;+ Add a new supplier (quick)&quot;."
+    value="{{ pickName or '' }}" placeholder="Type the name, e.g. Sri Balaji Granites">
+  <input type="hidden" name="supplier_id" value="{{ pickId if pickId else '' }}">
+</label>
+<label>Location <small class="muted">(from the supplier's factory / quarry addresses — choose if several)</small>
+  <input type="text" name="location" list="supplier-location-list" maxlength="150" value="{{ pickLocation or '' }}" placeholder="e.g. Ongole, Andhra Pradesh">
+</label>
+<datalist id="supplier-pick-list">
+  {% for sp in pickList %}
+    <option value="{{ sp.name }}" data-id="{{ sp.id }}" data-locations="{{ sp.locations | join('|') }}">{{ sp.hint }}</option>
+  {% endfor %}
+</datalist>
+<datalist id="supplier-location-list"></datalist>

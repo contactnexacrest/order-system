@@ -104,4 +104,38 @@ function bindParams(data) {
   };
 }
 
-module.exports = { forProduct, find, create, update, remove, clearPrimaryForProduct, setPrimary };
+/**
+ * D-300 / D-303 (points 12 and 15): the directory supplier a price comes from, whether the price
+ * includes packing and loading, and CHA + transport per container (₹, null = the product's default).
+ */
+async function setPriceDetails(id, supplierId, includesPackingLoading, chaPerContainer) {
+  await db.execute('UPDATE catalog_product_suppliers SET supplier_id = :s, includes_packing_loading = :i, cha_transport_per_container = :c WHERE id = :id', {
+    s: supplierId, i: includesPackingLoading ? 1 : 0, c: chaPerContainer !== null && chaPerContainer !== undefined ? Number(chaPerContainer).toFixed(2) : null, id,
+  });
+}
+
+/** D-303: links a price to a directory supplier (and takes its name). */
+async function linkSupplier(id, supplierId, name) {
+  await db.execute('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n WHERE id = :id', { s: supplierId, n: name, id });
+}
+
+/** D-303: the prices a directory supplier has given for products (newest first). */
+async function forDirectorySupplier(supplierId) {
+  return db.query(`SELECT s.*, p.name AS product_name, p.reference_unit FROM catalog_product_suppliers s JOIN catalog_products p ON p.id = s.product_id
+     WHERE s.supplier_id = :id ORDER BY COALESCE(s.quoted_on, DATE(s.updated_at)) DESC, s.id DESC`, { id: supplierId });
+}
+
+/** D-303: typed supplier names not yet linked to the directory, with how many prices use each. */
+async function unlinkedNames() {
+  return db.query(`SELECT supplier_name, COUNT(*) AS prices, COUNT(DISTINCT product_id) AS products FROM catalog_product_suppliers
+     WHERE supplier_id IS NULL GROUP BY supplier_name ORDER BY supplier_name`);
+}
+
+/** D-303: links every unlinked price with this typed name. Returns how many were linked. */
+async function linkName(typedName, supplierId, directoryName) {
+  const r = await db.execute('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n WHERE supplier_id IS NULL AND supplier_name = :t',
+    { s: supplierId, n: directoryName, t: typedName });
+  return r.affectedRows;
+}
+
+module.exports = { forProduct, find, create, update, remove, clearPrimaryForProduct, setPrimary, setPriceDetails, linkSupplier, forDirectorySupplier, unlinkedNames, linkName };

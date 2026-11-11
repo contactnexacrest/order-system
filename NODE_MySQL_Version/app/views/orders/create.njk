@@ -172,7 +172,7 @@
             </select>
           </label>
           <label>Unit Price<input type="text" name="product_unit_price[]" data-max-decimals="2" data-max-value="999999999999.99" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}" placeholder="e.g. 45.00"></label>
-          <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
+          <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" data-in-list="hs_code_list" data-in-list-message="Pick an HS code from the HS Code Master List." placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>

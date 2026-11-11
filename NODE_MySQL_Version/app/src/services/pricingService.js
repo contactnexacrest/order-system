@@ -28,6 +28,9 @@ const DEFAULTS = {
   cbm_from_mm: '50',
   price_request_daily_limit: '10',
   price_request_valid_days: '7',
+  // D-301 (11 Nov 2026): the exchange rate is fetched daily; pricing rate = market × (1 − cushion %).
+  fx_mode: 'auto',
+  fx_cushion_pct: '2.0',
 };
 
 const LABELS = {
@@ -42,6 +45,8 @@ const LABELS = {
   cbm_from_mm: 'Price per CBM from (mm, this thickness and above)',
   price_request_daily_limit: 'Associate price requests per day',
   price_request_valid_days: "An associate's price stays valid for (days)",
+  fx_mode: 'Exchange rate: Automatic (fetched daily) or Manual',
+  fx_cushion_pct: 'Cushion below the market rate (%)',
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -71,7 +76,9 @@ async function settings() {
   return {
     margin_pct: Number(raw.margin_pct),
     other_cost_pct: Number(raw.other_cost_pct),
-    pricing_fx_rate: Number(raw.pricing_fx_rate),
+    // D-301: the rate in use — the fetched market rate less the cushion (Automatic), or the typed one (Manual).
+    pricing_fx_rate: await require('./fxRateService').rate(raw),
+    pricing_fx_rate_manual: Number(raw.pricing_fx_rate),
     buffer_pct: Number(raw.buffer_pct),
     incentive_mode: raw.incentive_mode === 'usd' ? 'usd' : 'pct',
     incentive_value: Number(raw.incentive_value),
@@ -139,7 +146,9 @@ function readSettingsForm(post) {
       values[key] = String(n);
     }
   }
-  return [values, errors];
+  // D-301: the exchange-rate mode and cushion (only when the form carries them).
+  const [fx, fxErrors] = require('./fxRateService').readForm(post);
+  return [{ ...values, ...fx }, [...errors, ...fxErrors]];
 }
 
 /** Validates a product's overrides form (empty = use the global value). */
@@ -177,12 +186,18 @@ function readOverridesForm(post) {
   return [fields, errors];
 }
 
+/** The supplier row used for pricing: a base price, or D-300 a price for every thickness. */
 async function pricingSupplier(productId) {
-  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1 && (s.price_basis || 'unit') === 'unit') || null;
+  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1 && ['unit', 'grid'].includes(s.price_basis || 'unit')) || null;
 }
 
-/** D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above). */
+/**
+ * D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above).
+ * D-300: a price for every thickness used for pricing also holds the per-CBM price.
+ */
 async function cbmSupplier(productId) {
+  const primary = await pricingSupplier(productId);
+  if (primary !== null && (primary.price_basis || '') === 'grid') return primary;
   return (await productSupplierRepository.forProduct(productId)).find((s) => (s.price_basis || 'unit') === 'cbm' && Number(s.is_cbm_primary) === 1) || null;
 }
 
@@ -231,6 +246,20 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   }
   const supplier = exact !== null ? exact.supplier
     : (spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id) : await pricingSupplier(product.id));
+  // D-300 (point 12): a price for every thickness already holds the Thickness option's % —
+  // the chosen thickness is priced from the grid, so the % is not applied again.
+  let gridRules = null;
+  if (supplier !== null && (supplier.price_basis || '') === 'grid') {
+    gridRules = await require('./thicknessPrices').rules(product, s);
+    if (spec !== null && !spec.errors.length && spec.adj.manual === null && spec.adj.basis === 'unit') {
+      let thicknessSpec = null;
+      for (const sp of spec.offered) if (sp.kind === 'thickness' && spec.map[sp.id] !== undefined) thicknessSpec = Number(sp.id);
+      if (thicknessSpec !== null) {
+        spec.adj = productSpecs.adjustments(product, spec.offered, spec.map, s.cbm_from_mm, [thicknessSpec], lineThicknessMm);
+        for (const l of spec.adj.lines) if (l.kind === 'exact') l.kind = 'included';
+      }
+    }
+  }
   const has = (k) => product[k] !== null && product[k] !== undefined;
   const effective = {
     margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
@@ -269,12 +298,17 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     out.missing = 'No supplier price is marked "used for pricing" yet.';
     return out;
   }
-  const inr = productService.effectiveFobForSupplier(supplier, product);
+  // D-300: FOB cost (₹) = supplier price + CHA and transport per unit (+ packing and loading
+  // when the supplier's price does not include them).
+  const parts = await fobParts(product, supplier, spec !== null ? String(spec.adj.basis) : 'unit',
+    spec !== null && spec.adj.thickness_mm !== null && spec.adj.thickness_mm !== undefined ? Number(spec.adj.thickness_mm) : null, s, gridRules);
+  const inr = parts ? parts.total : null;
   if (inr === null || !(inr > 0)) {
     out.missing = 'The supplier price used for pricing has no value yet.';
     return out;
   }
   out.supplier_inr = inr;
+  out.inr_parts = parts;
   out.staleness = staleness(supplier, s.stale_days);
   out.price_date = priceDate(supplier);
   const build = pricingEngine.build({
@@ -293,6 +327,36 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     if (out.lowest === null || a.floor < out.lowest.floor) out.lowest = row;
   }
   return out;
+}
+
+/**
+ * D-300 (point 12): the FOB cost in ₹ per the product's unit (per CBM for 50 mm and above) from one
+ * supplier-price row — supplier price + CHA and transport per unit, + packing and loading when the
+ * price does not include them. Null when the row has no usable price.
+ */
+async function fobParts(product, supplier, basis, mm, s = null, gridRules = null) {
+  const thicknessPrices = require('./thicknessPrices');
+  s = s || (await settings());
+  if ((supplier.price_basis || '') === 'grid') {
+    const r = gridRules || (await thicknessPrices.rules(product, s));
+    return thicknessPrices.cost(r, await thicknessPrices.typedFor(Number(supplier.id)), supplier, product, basis, mm);
+  }
+  const base = productService.effectiveFobForSupplier(supplier, product);
+  if (base === null || base === undefined) return null;
+  const parts = { supplier: base, cha: 0, packing: 0, total: base, unit: basis === 'cbm' ? 'CBM' : String(product.reference_unit || ''), mm, how: 'typed', note: null };
+  const perContainer = thicknessPrices.chaPerContainer(supplier, product);
+  if (perContainer !== null) {
+    const r = gridRules || (await thicknessPrices.rules(product, s));
+    const cha = thicknessPrices.chaPerCbm(perContainer, Number(r.container_cbm), r.container_max_t, r.t_per_cbm);
+    const cbmPerUnit = basis === 'cbm' ? 1 : thicknessPrices.cbmPerUnit(String(product.reference_unit || ''), mm ?? Number(r.base_mm), r.t_per_cbm);
+    if (cha.per_cbm !== null && cbmPerUnit !== null) parts.cha = cha.per_cbm * cbmPerUnit;
+    else if (cha.per_cbm !== null) parts.note = "CHA + transport is not added: the product's unit cannot be turned into CBM.";
+  }
+  if (supplier.includes_packing_loading !== undefined && Number(supplier.includes_packing_loading) === 0) {
+    parts.packing = Number(product.default_packing_cost || 0) + Number(product.default_loading_cost || 0);
+  }
+  parts.total = parts.supplier + parts.cha + parts.packing;
+  return parts;
 }
 
 /**
@@ -363,7 +427,7 @@ async function readiness(product, s = null) {
   const market = `/products/${id}/market-prices`;
   const items = [];
   const unit = await pricingSupplier(id);
-  const unitInr = unit !== null ? productService.effectiveFobForSupplier(unit, product) : null;
+  const unitInr = unit !== null ? ((await fobParts(product, unit, 'unit', null, s)) || {}).total ?? null : null; // D-300: grid prices too
   items.push({
     key: 'unit', ok: unit !== null && unitInr !== null && unitInr > 0, supplier: true,
     label: `Supplier price per ${String(product.reference_unit || '') || 'unit'} entered and "used for pricing"`,
@@ -384,7 +448,7 @@ async function readiness(product, s = null) {
     items.push({
       key: 'cbm', ok: cbm !== null, supplier: true,
       label: `Supplier price per CBM (needed: sold at ${cbmFrom} mm and above)`,
-      detail: cbm !== null ? `₹${numberFormat(productService.effectiveFobForSupplier(cbm, product))} per CBM` : 'none yet',
+      detail: cbm !== null ? `₹${numberFormat(((await fobParts(product, cbm, 'cbm', null, s)) || {}).total || 0)} per CBM` : 'none yet',
       link: market, link_text: cbm === null ? 'Add in Market prices' : 'Market prices',
     });
   }
@@ -505,5 +569,5 @@ function readLadderForm(post, levelsById) {
 module.exports = {
   exactPrice, comboText, readiness,
   DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, cbmSupplier, staleness, priceDate,
-  forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm,
+  forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm, fobParts,
 };

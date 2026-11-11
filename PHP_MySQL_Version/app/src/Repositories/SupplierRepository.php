@@ -154,6 +154,61 @@ final class SupplierRepository
         Database::connection()->prepare('UPDATE suppliers SET is_test_data = 1 WHERE id = :id')->execute(['id' => $id]);
     }
 
+    /**
+     * D-303 (point 15): "+ Add a new supplier (quick)" from a price screen — name, location,
+     * phone and type; marked "Details pending" until GSTIN, bank and contacts are completed
+     * (by the supplier's details link or by Procurement).
+     */
+    public static function quickAdd(string $name, string $location, string $phone, string $type, ?int $createdBy): int
+    {
+        $id = self::create(['supplier_legal_name' => $name, 'address' => $location, 'city' => $location, 'phone' => $phone,
+            'notes' => 'Added quickly from a product price — details pending.', 'types' => $type !== '' ? [$type] : []], $createdBy);
+        self::setDetailsPending($id, true);
+        return $id;
+    }
+
+    public static function setDetailsPending(int $id, bool $pending): void
+    {
+        Database::connection()->prepare('UPDATE suppliers SET details_pending = :p WHERE id = :id')->execute(['p' => $pending ? 1 : 0, 'id' => $id]);
+    }
+
+    /** D-303: the one active supplier with exactly this name (spaces and capitals ignored), or null when none or several. */
+    public static function findByExactName(string $name): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM suppliers WHERE is_active = 1 AND LOWER(TRIM(supplier_legal_name)) = LOWER(TRIM(:n)) ORDER BY id LIMIT 2'
+        );
+        $stmt->execute(['n' => $name]);
+        $rows = $stmt->fetchAll();
+        return count($rows) === 1 ? self::withTypes($rows)[0] : null;
+    }
+
+    /**
+     * D-303: the supplier pick list — active suppliers with their locations (factory / quarry
+     * addresses, else the city) for the search-pick on a price screen.
+     *
+     * @return list<array{id:int, name:string, locations: list<string>, pending: bool, verified: bool}>
+     */
+    public static function pickList(): array
+    {
+        $rows = Database::connection()->query('SELECT id, supplier_legal_name, city, state, details_pending, bank_verified_at FROM suppliers WHERE is_active = 1 ORDER BY supplier_legal_name')->fetchAll();
+        $addresses = SupplierFactoryAddressRepository::allGroupedBySupplier();
+        $out = [];
+        foreach ($rows as $r) {
+            $locs = [];
+            foreach ($addresses[(int) $r['id']] ?? [] as $a) {
+                $locs[] = trim((string) (($a['label'] ?? '') !== '' && $a['label'] !== null ? $a['label'] . ' — ' : '') . $a['address']);
+            }
+            $city = trim(implode(', ', array_filter([(string) ($r['city'] ?? ''), (string) ($r['state'] ?? '')])));
+            if ($locs === [] && $city !== '') {
+                $locs[] = $city;
+            }
+            $out[] = ['id' => (int) $r['id'], 'name' => (string) $r['supplier_legal_name'], 'locations' => $locs,
+                'pending' => (int) ($r['details_pending'] ?? 0) === 1, 'verified' => !empty($r['bank_verified_at'])];
+        }
+        return $out;
+    }
+
     /** @return array<string,mixed> */
     private static function bindData(array $data): array
     {

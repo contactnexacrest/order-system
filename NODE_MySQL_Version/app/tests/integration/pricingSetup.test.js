@@ -89,7 +89,7 @@ describe('Pricing setup (D-245, P1)', () => {
       expect([s, page.includes(s)]).toEqual([s, true]);
     }
     let list = (await md.get('/products')).text;
-    expect(list).toContain('Staff floor');
+    expect(list).toContain('Staff lowest'); // D-304: plain names
     expect(list).toContain('1,313.78');
 
     const ed = await login(await user('Executive Director'));
@@ -106,7 +106,7 @@ describe('Pricing setup (D-245, P1)', () => {
     }
     list = (await sales.get('/products')).text;
     expect(list).toContain('1,326.13');
-    expect(list).not.toContain('Staff floor');
+    expect(list).not.toContain('Staff lowest');
     expect(list).not.toContain('1,250.00');
 
     const procurement = await login(await user('Procurement Executive'));
@@ -169,18 +169,22 @@ describe('Pricing setup (D-245, P1)', () => {
     d.setDate(d.getDate() - 70);
     const p = (n) => String(n).padStart(2, '0');
     const old = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    // D-303 (point 15): the supplier is a record of the Suppliers directory.
+    const dirName = `Raghavendra Stones ${crypto.randomBytes(3).toString('hex')}`;
+    const dir = await require('../../src/repositories/supplierRepository').create({ supplier_legal_name: dirName, types: [] }, null);
     let msg = await post(agent, `/products/${productId}/market-prices`, `/products/${productId}/market-prices`, {
-      supplier_name: 'Raghavendra Stones', price_inr: '82000', quoted_on: old, valid_until: '', notes: 'Ex-works', used_for_pricing: '1',
+      supplier_id: String(dir), supplier_name: dirName, price_inr: '82000', quoted_on: old, valid_until: '', notes: 'Ex-works', used_for_pricing: '1',
     });
     expect(msg).toBe('Supplier price recorded and used for pricing.');
     const pr = await pricingService.forProduct(await productRepository.find(productId));
-    expect([pr.supplier.supplier_name, pr.supplier_inr, pr.staleness]).toEqual(['Raghavendra Stones', 82000, 'stale']);
+    expect([pr.supplier.supplier_name, pr.supplier_inr, pr.staleness]).toEqual([dirName, 82000, 'stale']);
+    expect(Number(pr.supplier.supplier_id)).toBe(Number(dir)); // linked to the directory supplier
     expect((await productSupplierRepository.forProduct(productId)).length).toBe(2);
 
     const t = new Date();
     t.setDate(t.getDate() + 1);
     msg = await post(agent, `/products/${productId}/market-prices`, `/products/${productId}/market-prices`, {
-      supplier_name: 'X', price_inr: '100', quoted_on: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
+      supplier_id: String(dir), supplier_name: dirName, price_inr: '100', quoted_on: `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}`,
     });
     expect(msg).toBe('The quoted date cannot be in the future.');
 

@@ -32,6 +32,9 @@ final class PricingService
         'cbm_from_mm' => '50',
         'price_request_daily_limit' => '10',
         'price_request_valid_days' => '7',
+        // D-301 (11 Nov 2026): the exchange rate is fetched daily; pricing rate = market × (1 − cushion %).
+        'fx_mode' => 'auto',
+        'fx_cushion_pct' => '2.0',
     ];
 
     /** Labels for the settings page and the audit log. */
@@ -47,6 +50,8 @@ final class PricingService
         'cbm_from_mm' => 'Price per CBM from (mm, this thickness and above)',
         'price_request_daily_limit' => 'Associate price requests per day',
         'price_request_valid_days' => 'An associate\'s price stays valid for (days)',
+        'fx_mode' => 'Exchange rate: Automatic (fetched daily) or Manual',
+        'fx_cushion_pct' => 'Cushion below the market rate (%)',
     ];
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -56,7 +61,9 @@ final class PricingService
         return [
             'margin_pct' => (float) $raw['margin_pct'],
             'other_cost_pct' => (float) $raw['other_cost_pct'],
-            'pricing_fx_rate' => (float) $raw['pricing_fx_rate'],
+            // D-301: the rate in use — the fetched market rate less the cushion (Automatic), or the typed one (Manual).
+            'pricing_fx_rate' => FxRateService::rate($raw),
+            'pricing_fx_rate_manual' => (float) $raw['pricing_fx_rate'],
             'buffer_pct' => (float) $raw['buffer_pct'],
             'incentive_mode' => $raw['incentive_mode'] === 'usd' ? 'usd' : 'pct',
             'incentive_value' => (float) $raw['incentive_value'],
@@ -131,7 +138,9 @@ final class PricingService
                 $values[$key] = (string) $n;
             }
         }
-        return [$values, $errors];
+        // D-301: the exchange-rate mode and cushion (only when the form carries them).
+        [$fx, $fxErrors] = FxRateService::readForm($post);
+        return [$values + $fx, array_merge($errors, $fxErrors)];
     }
 
     /**
@@ -179,20 +188,27 @@ final class PricingService
         return [$fields, $errors];
     }
 
-    /** The supplier row used for pricing: the one marked so; otherwise none. */
+    /** The supplier row used for pricing: the one marked so (a base price, or D-300 a price for every thickness); otherwise none. */
     public static function pricingSupplier(int $productId): ?array
     {
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
-            if (!empty($s['is_primary']) && ($s['price_basis'] ?? 'unit') === 'unit') {
+            if (!empty($s['is_primary']) && in_array($s['price_basis'] ?? 'unit', ['unit', 'grid'], true)) {
                 return $s;
             }
         }
         return null;
     }
 
-    /** D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above). */
+    /**
+     * D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above).
+     * D-300: a price for every thickness used for pricing also holds the per-CBM price.
+     */
     public static function cbmSupplier(int $productId): ?array
     {
+        $primary = self::pricingSupplier($productId);
+        if ($primary !== null && ($primary['price_basis'] ?? '') === 'grid') {
+            return $primary;
+        }
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
             if (($s['price_basis'] ?? 'unit') === 'cbm' && !empty($s['is_cbm_primary'])) {
                 return $s;
@@ -254,6 +270,29 @@ final class PricingService
         }
         $supplier = $exact !== null ? $exact['supplier']
             : ($spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id']) : self::pricingSupplier((int) $product['id']));
+        // D-300 (point 12): a price for every thickness already holds the Thickness option's % —
+        // the chosen thickness is priced from the grid, so the % is not applied again.
+        $gridRules = null;
+        if ($supplier !== null && ($supplier['price_basis'] ?? '') === 'grid') {
+            $gridRules = ThicknessPrices::rules($product, $settings);
+            if ($spec !== null && $spec['errors'] === [] && $spec['adj']['manual'] === null && $spec['adj']['basis'] === 'unit') {
+                $thicknessSpec = null;
+                foreach ($spec['offered'] as $sp) {
+                    if ($sp['kind'] === 'thickness' && isset($spec['map'][$sp['id']])) {
+                        $thicknessSpec = (int) $sp['id'];
+                    }
+                }
+                if ($thicknessSpec !== null) {
+                    $spec['adj'] = ProductSpecs::adjustments($product, $spec['offered'], $spec['map'], $settings['cbm_from_mm'], [$thicknessSpec], $lineThicknessMm);
+                    foreach ($spec['adj']['lines'] as &$__l) {
+                        if ($__l['kind'] === 'exact') {
+                            $__l['kind'] = 'included';
+                        }
+                    }
+                    unset($__l);
+                }
+            }
+        }
         $effective = [
             'margin_pct' => $product['pricing_margin_pct'] !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
             'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
@@ -297,12 +336,17 @@ final class PricingService
             $out['missing'] = 'No supplier price is marked "used for pricing" yet.';
             return $out;
         }
-        $inr = (new ProductService())->effectiveFobForSupplier($supplier, $product);
+        // D-300: FOB cost (₹) = supplier price + CHA and transport per unit (+ packing and loading
+        // when the supplier's price does not include them).
+        $parts = self::fobParts($product, $supplier, $spec !== null ? (string) $spec['adj']['basis'] : 'unit',
+            $spec !== null && $spec['adj']['thickness_mm'] !== null ? (float) $spec['adj']['thickness_mm'] : null, $settings, $gridRules);
+        $inr = $parts['total'] ?? null;
         if ($inr === null || $inr <= 0) {
             $out['missing'] = 'The supplier price used for pricing has no value yet.';
             return $out;
         }
         $out['supplier_inr'] = $inr;
+        $out['inr_parts'] = $parts;
         $out['staleness'] = self::staleness($supplier, $settings['stale_days']);
         $out['price_date'] = self::priceDate($supplier);
         $build = PricingEngine::build([
@@ -322,6 +366,43 @@ final class PricingService
             }
         }
         return $out;
+    }
+
+    /**
+     * D-300 (point 12): the FOB cost in ₹ per the product's unit (per CBM for 50 mm and above)
+     * from one supplier-price row — supplier price + CHA and transport per unit, + packing and
+     * loading when the price does not include them.
+     *
+     * @return array{supplier: float, cha: float, packing: float, total: float, unit: string, mm: ?float, how: string, note: ?string}|null
+     */
+    public static function fobParts(array $product, array $supplier, string $basis, ?float $mm, ?array $settings = null, ?array $gridRules = null): ?array
+    {
+        $settings ??= self::settings();
+        if (($supplier['price_basis'] ?? '') === 'grid') {
+            $gridRules ??= ThicknessPrices::rules($product, $settings);
+            return ThicknessPrices::cost($gridRules, ThicknessPrices::typedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
+        }
+        $base = (new ProductService())->effectiveFobForSupplier($supplier, $product);
+        if ($base === null) {
+            return null;
+        }
+        $parts = ['supplier' => $base, 'cha' => 0.0, 'packing' => 0.0, 'total' => $base, 'unit' => $basis === 'cbm' ? 'CBM' : (string) ($product['reference_unit'] ?? ''), 'mm' => $mm, 'how' => 'typed', 'note' => null];
+        $perContainer = ThicknessPrices::chaPerContainer($supplier, $product);
+        if ($perContainer !== null) {
+            $rules = $gridRules ?? ThicknessPrices::rules($product, $settings);
+            $cha = ThicknessPrices::chaPerCbm($perContainer, (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
+            $cbmPerUnit = $basis === 'cbm' ? 1.0 : ThicknessPrices::cbmPerUnit((string) ($product['reference_unit'] ?? ''), $mm ?? (float) $rules['base_mm'], $rules['t_per_cbm']);
+            if ($cha['per_cbm'] !== null && $cbmPerUnit !== null) {
+                $parts['cha'] = $cha['per_cbm'] * $cbmPerUnit;
+            } elseif ($cha['per_cbm'] !== null) {
+                $parts['note'] = 'CHA + transport is not added: the product\'s unit cannot be turned into CBM.';
+            }
+        }
+        if (array_key_exists('includes_packing_loading', $supplier) && empty($supplier['includes_packing_loading'])) {
+            $parts['packing'] = (float) ($product['default_packing_cost'] ?? 0) + (float) ($product['default_loading_cost'] ?? 0);
+        }
+        $parts['total'] = $parts['supplier'] + $parts['cha'] + $parts['packing'];
+        return $parts;
     }
 
     /**
@@ -398,9 +479,8 @@ final class PricingService
         $id = (int) $product['id'];
         $market = "/products/{$id}/market-prices";
         $items = [];
-        $service = new ProductService();
         $unit = self::pricingSupplier($id);
-        $unitInr = $unit !== null ? $service->effectiveFobForSupplier($unit, $product) : null;
+        $unitInr = $unit !== null ? (self::fobParts($product, $unit, 'unit', null, $settings)['total'] ?? null) : null; // D-300: grid prices too
         $items[] = ['key' => 'unit', 'ok' => $unit !== null && $unitInr !== null && $unitInr > 0, 'supplier' => true,
             'label' => 'Supplier price per ' . ((string) ($product['reference_unit'] ?? '') ?: 'unit') . ' entered and "used for pricing"',
             'detail' => $unit !== null && $unitInr !== null ? '₹' . number_format($unitInr, 2) . (self::priceDate($unit) !== null ? ' · ' . date('d M', (int) strtotime((string) self::priceDate($unit))) : '') : 'none yet',
@@ -422,7 +502,7 @@ final class PricingService
         if ($needsCbm) {
             $items[] = ['key' => 'cbm', 'ok' => $cbm !== null, 'supplier' => true,
                 'label' => "Supplier price per CBM (needed: sold at {$cbmFrom} mm and above)",
-                'detail' => $cbm !== null ? '₹' . number_format((float) $service->effectiveFobForSupplier($cbm, $product), 2) . ' per CBM' : 'none yet',
+                'detail' => $cbm !== null ? '₹' . number_format((float) (self::fobParts($product, $cbm, 'cbm', null, $settings)['total'] ?? 0), 2) . ' per CBM' : 'none yet',
                 'link' => $market, 'link_text' => $cbm === null ? 'Add in Market prices' : 'Market prices'];
         }
         $pdo = \App\Config\Database::connection();

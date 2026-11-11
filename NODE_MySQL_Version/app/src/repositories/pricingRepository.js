@@ -114,7 +114,7 @@ async function setAssociateCommission(associateId, mode, levelId) {
 /** D-255: a supplier price per unit (the selling unit) or per CBM (thick stone). */
 async function setSupplierBasis(supplierId, basis) {
   await db.execute("UPDATE catalog_product_suppliers SET price_basis = :b, is_primary = IF(:b2 = 'cbm', 0, is_primary) WHERE id = :id",
-    { b: basis === 'cbm' ? 'cbm' : 'unit', b2: basis, id: supplierId });
+    { b: ['cbm', 'grid'].includes(basis) ? basis : 'unit', b2: basis, id: supplierId }); // D-300: 'grid' = every thickness
 }
 
 /** D-255: marks one per-CBM supplier price "used for pricing" thick stone. */
@@ -133,7 +133,7 @@ async function setSupplierDates(supplierId, quotedOn, validUntil, quoteId = null
 /** Supplier quotes recorded in Procurement for order lines picked from this product. */
 async function purchaseQuotesForProduct(productId) {
   return db.query(
-    `SELECT q.id, q.unit_price_inr, q.valid_until, q.quote_reference, q.recorded_at, s.supplier_legal_name, r.unit
+    `SELECT q.id, q.unit_price_inr, q.valid_until, q.quote_reference, q.recorded_at, q.supplier_id, s.supplier_legal_name, r.unit
        FROM purchase_quotes q
        JOIN purchase_requirements r ON r.id = q.requirement_id
        JOIN order_products op ON op.id = r.order_product_id

@@ -16,6 +16,43 @@ $__ro = $canManage ? '' : ' disabled';
     Team incentive program is <strong><?= $programOn ? 'on' : 'off' ?></strong><?= $programOn ? '' : ' — no reserve is added to prices' ?>.
   </div>
 
+  <?php // D-301 / D-304: the rate in use, explained; source, date, warnings, the MD's OK for a big move, and the history. ?>
+  <div class="section" id="exchange-rate">
+    <h2>Exchange rate</h2>
+    <?php include __DIR__ . '/_fx_rate_line.php'; ?>
+    <p class="small muted"><?= $fx['mode'] === 'auto' ? 'Automatic' : 'Manual' ?><?= $fx['source'] !== null ? ' · source ' . View::e((string) $fx['source']) . ' · rate of ' . View::e((string) $fx['date']) : '' ?>. Prices on Quotations and Proforma Invoices already issued never change.</p>
+    <?php if ($fx['waiting'] !== null): $__w = $fx['waiting']; ?>
+      <div class="alert alert-warning">
+        <p><b>Waiting for the MD:</b> today's market rate ₹<?= number_format((float) $__w['market_rate'], 4) ?> (<?= View::e((string) $__w['source']) ?>, <?= View::e((string) $__w['rate_date']) ?>) moved <?= View::e(\App\Services\FxRateService::signed((float) $__w['change_pct'])) ?> — more than <?= View::e(rtrim(rtrim(number_format(\App\Services\FxRateService::JUMP_PCT, 1), '0'), '.')) ?>% in a day. It is not used for prices until approved.</p>
+        <?php if ($canManage): ?>
+          <form method="post" action="/pricing/fx-rates/<?= (int) $__w['id'] ?>/decide" class="field-grid">
+            <?= Csrf::field() ?>
+            <label>Reason *<input type="text" name="reason" required minlength="10" maxlength="255" placeholder="e.g. Checked with the bank — the move is real"></label>
+            <div><button type="submit" name="decision" value="approve" class="btn-sm btn-success">Use this rate</button>
+              <button type="submit" name="decision" value="reject" class="btn-sm btn-secondary">Keep the rate in use</button></div>
+          </form>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+    <?php if ($canManage): ?>
+      <form method="post" action="/pricing/fx-rates/fetch" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Fetch today's rate now</button></form>
+    <?php endif; ?>
+    <details><summary>History (last 30 fetches)</summary>
+      <table class="list">
+        <tr><th>Date</th><th class="num">Market rate (₹ per USD)</th><th>Source</th><th class="num">Change</th><th>Status</th><th>Note</th></tr>
+        <?php foreach ($fxHistory as $__h): ?>
+          <tr><td><?= View::e((string) $__h['rate_date']) ?></td>
+            <td class="num"><?= $__h['market_rate'] !== null ? number_format((float) $__h['market_rate'], 4) : '—' ?></td>
+            <td><?= View::e((string) ($__h['source'] ?? '—')) ?></td>
+            <td class="num"><?= $__h['change_pct'] !== null ? View::e(\App\Services\FxRateService::signed((float) $__h['change_pct'])) : '—' ?></td>
+            <td><?= ['in_use' => 'In use', 'waiting_md' => 'Waiting for the MD', 'rejected' => 'Not used (MD)', 'failed' => 'Fetch failed — last rate kept'][$__h['status']] ?? View::e((string) $__h['status']) ?></td>
+            <td><?= View::e(trim((string) ($__h['note'] ?? '') . ($__h['decision_reason'] !== null ? ' ' . ($__h['decided_by_name'] ?? '') . ': ' . $__h['decision_reason'] : ''))) ?></td></tr>
+        <?php endforeach; ?>
+        <?php if ($fxHistory === []): ?><tr><td colspan="6" class="muted">No rate fetched yet — the daily job fetches one every morning (see the README).</td></tr><?php endif; ?>
+      </table>
+    </details>
+  </div>
+
   <form method="post" action="/pricing/settings">
     <?= Csrf::field() ?>
     <fieldset><legend>Margin and costs</legend>
@@ -23,10 +60,21 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="margin_pct" min="0" max="90" step="0.01" required value="<?= View::e($settings['margin_pct']) ?>" placeholder="e.g. 20.00"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['other_cost_pct']) ?> *<small class="muted">Packing, inland transport to port, CHA, inspection, documents and bank charges not already in the supplier price. A product can set its own % or USD amount.</small><span class="help-line">Example: supplier price USD 975.61 + 2.5% = cost USD 1,000.00.</span></span>
         <input type="number" name="other_cost_pct" min="0" max="100" step="0.01" required value="<?= View::e($settings['other_cost_pct']) ?>" placeholder="e.g. 2.50"<?= $__ro ?>></label>
-      <label class="setting-row"><span class="setting-label"><?= View::e($labels['pricing_fx_rate']) ?> *<small class="muted">Turns supplier prices in ₹ into USD. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
-        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="<?= View::e($settings['pricing_fx_rate']) ?>" placeholder="e.g. 82.0000"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['buffer_pct']) ?> *<small class="muted">Room to negotiate: the quote price is the floor plus this %.</small><span class="help-line">Example: lowest price USD 1,287.50 + 3% → quote price USD 1,326.13; the team may agree anywhere between the two.</span></span>
         <input type="number" name="buffer_pct" min="0" max="100" step="0.01" required value="<?= View::e($settings['buffer_pct']) ?>" placeholder="e.g. 3.00"<?= $__ro ?>></label>
+    </fieldset>
+
+    <?php // D-301 (point 4, 11 Nov 2026): Automatic (fetched daily) or Manual; pricing rate = market × (1 − cushion %). ?>
+    <fieldset id="exchange-rate-settings"><legend>Exchange rate (USD → INR)</legend>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['fx_mode']) ?> *<small class="muted">Automatic: the market rate is fetched every day (Frankfurter — European Central Bank; backup open.er-api.com) and the cushion below is taken off. Manual: the rate typed below is used.</small><span class="help-line">Example: Automatic, market ₹88.40, cushion 2% → pricing rate ₹86.63.</span></span>
+        <select name="fx_mode" required<?= $__ro ?>>
+          <option value="auto"<?= ($settings['fx_mode'] ?? 'auto') !== 'manual' ? ' selected' : '' ?>>Automatic — fetched every day</option>
+          <option value="manual"<?= ($settings['fx_mode'] ?? 'auto') === 'manual' ? ' selected' : '' ?>>Manual — the rate typed below</option>
+        </select></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['fx_cushion_pct']) ?> *<small class="muted">0 to 5 %, one decimal. Pricing rate = market rate × (1 − cushion %).</small><span class="help-line">Example: 2 → ₹88.40 × 0.98 = ₹86.63; 2.5 → ₹86.19.</span></span>
+        <input type="number" name="fx_cushion_pct" min="0" max="5" step="0.1" required value="<?= View::e((string) ($settings['fx_cushion_pct'] ?? '2.0')) ?>" placeholder="e.g. 2.0"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label">Manual exchange rate (₹ per USD) *<small class="muted">Used in Manual mode, and in Automatic mode until the first rate has been fetched. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
+        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="<?= View::e($settings['pricing_fx_rate']) ?>" placeholder="e.g. 82.0000"<?= $__ro ?>></label>
     </fieldset>
 
     <fieldset><legend>Team incentive reserve</legend>
@@ -72,5 +120,5 @@ $__ro = $canManage ? '' : ' disabled';
     <tr><td>Change these settings, product overrides, commission levels and ladder, category specifications</td><td>MD only</td></tr>
     <tr><td>Change one product's specifications (hide, change, add for that product)</td><td>Roles with "Manage a product's specifications" — Admin and MD to start</td></tr>
   </table>
-  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/pricing/specifications">Specifications</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
+  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
 </div>

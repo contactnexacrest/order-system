@@ -88,7 +88,13 @@ final class ProductController
                     }
                 }
                 $primary = $primary ?? ($suppliers[0] ?? null);
-                $product['headline_fob'] = $primary ? $this->service->effectiveFobForSupplier($primary, $product) : null;
+                // D-304 (point 14): "Supplier price ₹ / unit" — the used-for-pricing price in the product's unit
+                // (D-300: a price for every thickness shows its base thickness).
+                $parts = $primary ? \App\Services\PricingService::fobParts($product, $primary, ($primary['price_basis'] ?? '') === 'cbm' ? 'cbm' : 'unit', null) : null;
+                $product['headline_fob'] = $parts['supplier'] ?? null;
+                $product['headline_basis'] = $primary === null ? null : (($primary['price_basis'] ?? '') === 'grid'
+                    ? ($parts !== null && $parts['mm'] !== null ? \App\Services\ThicknessPrices::fmt((float) $parts['mm']) . ' mm base' : 'base')
+                    : (($primary['price_basis'] ?? '') === 'cbm' ? 'per CBM' : (!empty($primary['is_primary']) ? 'used for pricing' : 'latest price')));
             }
             unset($product);
         } else {
@@ -115,6 +121,12 @@ final class ProductController
             'canManage'      => $canManage,
             'canBuildup'     => $canBuildup,
             'canStaffPrice'  => $canStaffPrice,
+            // D-304 (point 14): the rate line (build-up viewers) and "≈ USD" under the supplier price (product editors).
+            'fx'             => $canBuildup || ($canSeeHeadlineFob && $canManage) ? \App\Services\FxRateService::current() : null,
+            'canFixHs'       => $canManage,
+            'canLinkSuppliers' => $this->can('record_market_prices') || $this->can('manage_suppliers'),
+            'canPriceRules'  => $canBuildup || $this->can('manage_pricing'),
+            'canPricingSettings' => $canBuildup || $this->can('manage_pricing'),
         ], 'layout/base');
     }
 
@@ -123,21 +135,77 @@ final class ProductController
         View::render('products/create', [
             'product' => null,
             'referenceUnits' => \App\Repositories\LookupRepository::dropdownOptions('unit'),
-        ], 'layout/base');
+        ] + $this->formExtras(null), 'layout/base');
+    }
+
+    /**
+     * D-302 (point 11): the HS code is picked from the HS Code Master List, pre-filled with the
+     * category's default; people with manage_hs_codes may add a code there. D-300: the product's
+     * CHA + transport default and its own price rules.
+     *
+     * @return array<string,mixed>
+     */
+    private function formExtras(?array $product): array
+    {
+        $categoryId = $product !== null ? \App\Services\ProductSpecs::categoryIdFor($product) : \App\Repositories\SpecRepository::systemCategoryId();
+        $category = $categoryId !== null ? \App\Repositories\ProductCategoryRepository::find($categoryId) : null;
+        return [
+            'hsCodes' => \App\Repositories\HsCodeRepository::active(),
+            'categoryDefaultHs' => (string) ($category['default_hs_code'] ?? ''),
+            'categoryName' => (string) ($category['name'] ?? ''),
+            'categoryId' => $categoryId,
+            'canManageHs' => $this->can('manage_hs_codes'),
+            'canManagePricing' => $this->can('manage_pricing'),
+            'categoryRules' => $category,
+        ];
+    }
+
+    /**
+     * D-300: reads the CHA + transport default (anyone who edits products) and the product's own
+     * price rules (MD only — manage_pricing). Returns [fields, error].
+     *
+     * @return array{0: array<string,?string>, 1: ?string}
+     */
+    private function readPriceRuleFields(): array
+    {
+        $out = [];
+        $spec = ['cha_transport_per_container' => ['CHA + transport per container (₹)', 0, 9999999999, 2]];
+        if ($this->can('manage_pricing')) {
+            $spec += ['thick_k_factor' => ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], 'container_cbm' => ['Container holds (CBM)', 0.5, 100, 2],
+                'container_max_t' => ['Container maximum (tonnes)', 1, 100, 2]];
+        }
+        foreach ($spec as $key => [$label, $min, $max, $dec]) {
+            if (!array_key_exists($key, $_POST)) {
+                continue;
+            }
+            $v = trim((string) $_POST[$key]);
+            if ($v === '') {
+                $out[$key] = null;
+                continue;
+            }
+            if (!preg_match('/^\d{1,10}(\.\d{1,' . $dec . '})?$/', $v) || (float) $v < $min || (float) $v > $max) {
+                return [[], "{$label}: enter a number from {$min} to {$max} with at most {$dec} decimals, or leave it empty for the category's value."];
+            }
+            $out[$key] = number_format((float) $v, $dec, '.', '');
+        }
+        return [$out, null];
     }
 
     public function store(array $params): void
     {
         $data = $this->readProductForm();
-        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data);
+        [$ruleFields, $ruleError] = $this->readPriceRuleFields();
+        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data) ?? $ruleError;
         if ($error !== null) {
             Flash::set('error', $error);
+            Flash::setOld($_POST);
             header('Location: /products/create');
             return;
         }
 
         $user = AuthService::currentUser();
         $id = ProductRepository::create($data, (int) $user['id']);
+        ProductRepository::setPriceRuleFields($id, $ruleFields);
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_CREATED', 'products', $id, null, null, $data['name']);
         Flash::set('success', 'Product added to the catalog.');
         header("Location: /products/{$id}");
@@ -234,7 +302,7 @@ final class ProductController
         View::render('products/edit', [
             'product' => $product,
             'referenceUnits' => \App\Repositories\LookupRepository::dropdownOptions('unit'),
-        ], 'layout/base');
+        ] + $this->formExtras($product), 'layout/base');
     }
 
     public function update(array $params): void
@@ -248,7 +316,8 @@ final class ProductController
         }
 
         $data = $this->readProductForm();
-        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data);
+        [$ruleFields, $ruleError] = $this->readPriceRuleFields();
+        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data) ?? $ruleError;
         if ($error !== null) {
             Flash::set('error', $error);
             header("Location: /products/{$id}/edit");
@@ -257,6 +326,13 @@ final class ProductController
 
         $user = AuthService::currentUser();
         ProductRepository::update($id, $data, (int) $user['id']);
+        foreach ($ruleFields as $k => $v) {
+            $old = $product[$k] ?? null;
+            if (($old === null) !== ($v === null) || ($old !== null && (float) $old !== (float) $v)) {
+                AuditLogRepository::log((int) $user['id'], 'PRODUCT_PRICE_RULE_CHANGED', 'products', $id, $k, $old === null ? 'category' : (string) $old, $v ?? 'category');
+            }
+        }
+        ProductRepository::setPriceRuleFields($id, $ruleFields);
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_UPDATED', 'products', $id, null, null, $data['name']);
         Flash::set('success', 'Product updated.');
         header("Location: /products/{$id}");
@@ -569,6 +645,10 @@ final class ProductController
         }
         if ($data['hs_code'] === '') {
             return 'HS Code is required.';
+        }
+        // D-302 (point 11): only a code from the HS Code Master List — so an order line can always use it.
+        if (!\App\Repositories\HsCodeRepository::isActiveCode($data['hs_code'])) {
+            return "HS code \"{$data['hs_code']}\" is not on the HS Code Master List — pick one from the list" . ($this->can('manage_hs_codes') ? ', or add it with "+ Add a new HS code".' : ' (ask someone who manages HS codes to add it).');
         }
         return null;
     }

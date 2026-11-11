@@ -68,6 +68,11 @@ $selectedTypes = $supplier['types'] ?? [];
     </fieldset>
     <?php include __DIR__ . '/../partials/_vendor_bank_fields.php'; ?>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc."><?= $v('notes') ?></textarea></label>
+    <?php // D-303 (point 15): a supplier added quickly from a product price is "Details pending" until completed here or by its details link. ?>
+    <?php if ($isEdit): ?>
+      <input type="hidden" name="details_pending" value="0">
+      <label class="checkbox-row"><input type="checkbox" name="details_pending" value="1"<?= !empty($supplier['details_pending']) ? ' checked' : '' ?>> Details pending <small class="muted">(GSTIN, bank or contacts still to be completed — untick once they are)</small></label>
+    <?php endif; ?>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success"><?= $isEdit ? 'Save Changes' : 'Add Supplier' ?></button>
       <a href="/suppliers" class="btn-sm btn-secondary">Cancel</a>
@@ -105,6 +110,23 @@ $selectedTypes = $supplier['types'] ?? [];
       <button type="submit" class="btn-sm">Add Factory Address</button>
     </form>
   </div>
+  <?php endif; ?>
+
+  <?php // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only). ?>
+  <?php if ($isEdit && isset($productPrices) && $productPrices !== null): ?>
+    <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
+    <table class="list">
+      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th></tr>
+      <?php foreach ($productPrices as $__pp): ?>
+        <tr><td><?= htmlspecialchars((string) $__pp['product_name']) ?></td>
+          <td><?php if (($__pp['price_basis'] ?? '') === 'grid'): $__g = \App\Services\ThicknessPrices::typedFor((int) $__pp['id']); ?>
+              <?= htmlspecialchars(implode(' · ', array_map(static fn ($mm, $v) => ($mm === 0 ? '50 mm+' : $mm . ' mm') . ' ₹' . number_format((float) $v, 2) . ($mm === 0 ? ' / CBM' : ' / m²'), array_keys($__g), $__g))) ?> <small class="muted">(typed; others calculated)</small>
+            <?php else: ?>₹<?= $__pp['fob_value'] !== null ? number_format((float) $__pp['fob_value'], 2) : '—' ?> <small class="muted">/ <?= htmlspecialchars(($__pp['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($__pp['reference_unit'] ?? '') ?: 'unit')) ?></small><?php endif; ?></td>
+          <td><?= htmlspecialchars((string) ($__pp['quoted_on'] ?? '—')) ?></td><td><?= htmlspecialchars((string) ($__pp['valid_until'] ?? '—')) ?></td>
+          <td><?= !empty($__pp['is_primary']) || !empty($__pp['is_cbm_primary']) || !empty($__pp['combo_in_use']) ? 'Yes' : '—' ?></td></tr>
+      <?php endforeach; ?>
+      <?php if ($productPrices === []): ?><tr><td colspan="5" class="muted">No product prices from this supplier yet.</td></tr><?php endif; ?>
+    </table>
   <?php endif; ?>
 </div>
 

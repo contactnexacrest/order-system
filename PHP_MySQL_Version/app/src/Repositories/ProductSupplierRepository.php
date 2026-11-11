@@ -100,6 +100,61 @@ final class ProductSupplierRepository
             ->execute(['id' => $id]);
     }
 
+    /**
+     * D-300 / D-303 (points 12 and 15): the directory supplier a price comes from, whether the
+     * price includes packing and loading, and CHA + transport per container (₹, null = the
+     * product's default).
+     */
+    public static function setPriceDetails(int $id, ?int $supplierId, bool $includesPackingLoading, ?float $chaPerContainer): void
+    {
+        Database::connection()->prepare(
+            'UPDATE catalog_product_suppliers SET supplier_id = :s, includes_packing_loading = :i, cha_transport_per_container = :c WHERE id = :id'
+        )->execute(['s' => $supplierId, 'i' => $includesPackingLoading ? 1 : 0, 'c' => $chaPerContainer !== null ? number_format($chaPerContainer, 2, '.', '') : null, 'id' => $id]);
+    }
+
+    /** D-303: links a price to a directory supplier (and takes its name). */
+    public static function linkSupplier(int $id, int $supplierId, string $name): void
+    {
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n WHERE id = :id')
+            ->execute(['s' => $supplierId, 'n' => $name, 'id' => $id]);
+    }
+
+    /**
+     * D-303: the prices a directory supplier has given for products (newest first).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function forDirectorySupplier(int $supplierId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT s.*, p.name AS product_name, p.reference_unit FROM catalog_product_suppliers s JOIN catalog_products p ON p.id = s.product_id
+             WHERE s.supplier_id = :id ORDER BY COALESCE(s.quoted_on, DATE(s.updated_at)) DESC, s.id DESC'
+        );
+        $stmt->execute(['id' => $supplierId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * D-303: typed supplier names not yet linked to the directory, with how many prices use each.
+     *
+     * @return list<array{supplier_name: string, prices: int, products: int}>
+     */
+    public static function unlinkedNames(): array
+    {
+        return Database::connection()->query(
+            'SELECT supplier_name, COUNT(*) AS prices, COUNT(DISTINCT product_id) AS products FROM catalog_product_suppliers
+             WHERE supplier_id IS NULL GROUP BY supplier_name ORDER BY supplier_name'
+        )->fetchAll();
+    }
+
+    /** D-303: links every unlinked price with this typed name. Returns how many were linked. */
+    public static function linkName(string $typedName, int $supplierId, string $directoryName): int
+    {
+        $stmt = Database::connection()->prepare('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n WHERE supplier_id IS NULL AND supplier_name = :t');
+        $stmt->execute(['s' => $supplierId, 'n' => $directoryName, 't' => $typedName]);
+        return $stmt->rowCount();
+    }
+
     /** @return array<string,mixed> */
     private static function bindParams(array $data): array
     {

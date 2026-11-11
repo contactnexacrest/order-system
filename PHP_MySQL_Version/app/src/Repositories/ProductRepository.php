@@ -57,6 +57,26 @@ final class ProductRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * D-300 (point 12): the product's CHA + transport default (₹ per container) and its own
+     * price rules — × K, container CBM and maximum tonnes (null = the category's).
+     *
+     * @param array<string,?string> $f
+     */
+    public static function setPriceRuleFields(int $id, array $f): void
+    {
+        $cols = array_values(array_intersect(array_keys($f), ['cha_transport_per_container', 'thick_k_factor', 'container_cbm', 'container_max_t']));
+        if ($cols === []) {
+            return;
+        }
+        $sets = implode(', ', array_map(static fn (string $c): string => "{$c} = :{$c}", $cols));
+        $params = ['id' => $id];
+        foreach ($cols as $c) {
+            $params[$c] = $f[$c];
+        }
+        Database::connection()->prepare("UPDATE catalog_products SET {$sets} WHERE id = :id")->execute($params);
+    }
+
     public static function create(array $data, int $userId): int
     {
         $pdo = Database::connection();

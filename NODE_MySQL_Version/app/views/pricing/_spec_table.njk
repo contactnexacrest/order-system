@@ -1,18 +1,11 @@
-{# Owner decision D-255 (5 Nov 2026): Pricing → Specifications — a category's specifications and their options
-   (what changes the price). Every option changes the cost; margin, team incentive, associate commission and buffer
-   are added on top, so every option keeps the margin. PHP twin: specifications.php. #}
+{# Owner decision D-255 (5 Nov 2026): a category's specifications and their options (what changes the price).
+   Every option changes the cost; margin, team incentive, associate commission and buffer are added on top.
+   D-306 (point 20, 11 Nov 2026): shown as the "Options and their price effect" tab of the category page
+   (was Admin › Pricing › Specifications). In: categoryId, specs, edit, canManage, forms, kinds, changeTypes.
+   PHP twin: pricing/_spec_table.php. #}
 {% set ro = '' if canManage else ' disabled' %}
 {% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrfToken }}">{% endmacro %}
-<div class="card page-wide">
-  <p class="muted small"><a href="/pricing/settings">&larr; Pricing settings</a></p>
-  <h1>Specifications</h1>
-  <p class="muted">What changes the price, by category. Every option is applied to the <b>cost</b>; the margin, team incentive, associate commission and buffer are then added as usual — so every option keeps your margin. The first (base) option of each changes nothing. % options multiply the cost, USD amounts are added, the quantity discount comes last. A product can hide or change any option, or add its own (Products → a product → Specifications).</p>
-  <form method="get" action="/pricing/specifications" class="field-grid">
-    <label>Category
-      <select name="category" onchange="this.form.submit()">
-        {% for c in categories %}<option value="{{ c.id }}"{% if c.id == categoryId %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
-      </select></label>
-  </form>
+  <p class="muted">What changes the price in this category. Every option is applied to the <b>cost</b>; the margin, team incentive, associate commission and buffer are then added as usual — so every option keeps your margin. The first (base) option of each changes nothing. % options multiply the cost, USD amounts are added, the quantity discount comes last. Changes apply to every product in the category except where a product has its own value (shown on that product with a yellow badge); quotes already sent keep their prices. A product can hide or change any option, or add its own (Products → a product → Specifications).</p>
   <table class="list">
     <tr><th>Order</th><th>Specification</th><th>Applies to forms</th><th>Options (first = base)</th><th>Status</th><th>Actions</th></tr>
     {% for s in specs %}
@@ -23,7 +16,7 @@
         <td>{% set first = true %}{% for o in s.options %}{% if o.is_active == 1 %}{% if not first %} · {% endif %}{{ o.name }} <small class="muted">{{ o.change_label }}</small>{% set first = false %}{% endif %}{% endfor %}</td>
         <td>{% if s.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
         <td>
-          <a class="btn-sm" href="/pricing/specifications?category={{ categoryId }}&edit={{ s.id }}#spec-{{ s.id }}">Edit</a>
+          <a class="btn-sm" href="/products/categories/{{ categoryId }}?tab=options&edit={{ s.id }}#spec-{{ s.id }}">Edit</a>
           {% if canManage %}
             <form method="post" action="/pricing/specifications/{{ s.id }}/active" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">{{ 'Deactivate' if s.is_active == 1 else 'Activate' }}</button></form>
             {% if not s.used %}<form method="post" action="/pricing/specifications/{{ s.id }}/delete" style="display:inline" data-confirm="Delete this specification and its options?">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Delete</button></form>{% else %}<small class="muted">used — can only be deactivated</small>{% endif %}
@@ -108,4 +101,3 @@
       <div><button type="submit" class="btn-sm btn-accent">+ Add specification</button></div>
     </form>
   {% endif %}
-</div>

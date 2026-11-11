@@ -1470,9 +1470,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::NEEDS_SIZE, \App\Services\OrderLinePricing::APPROVED], true))); ?>
   <?php if ($sees['selling'] && $__pcLines !== []): ?>
   <div class="price-check" id="price-check">
-    <h3>Price check <small class="muted">(sold by <?= htmlspecialchars((string) $linePricing['ctx']['label']) ?>)</small></h3>
+    <?php // D-305 (point 19): staff see "for this order" figures on an associate's client order; only price build-up viewers see who sells it and at what level. ?>
+    <?php $__forOrder = !empty($linePricing['ctx']['associate']); $__seesBuild = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_price_buildup'); ?>
+    <h3>Price check <small class="muted"><?= $__seesBuild ? '(sold by ' . htmlspecialchars((string) $linePricing['ctx']['label']) . ')' : ($__forOrder ? '— quote and lowest for this order' : '') ?></small></h3>
+    <?php if ($__forOrder): ?><p class="muted small">ⓘ This client came through an associate, so this order's prices are higher.</p><?php endif; ?>
     <table class="list">
-      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th><?= $__forOrder ? 'Quote · lowest for this order' : 'Quote · your lowest' ?></th><th>Check</th><th></th></tr>
       <?php foreach ($__pcLines as $__pc): $__pl = $__pc['line']; $__pf = $__pc['figures']; $__pconv = $__pc['conversion'] ?? null; $__pconverted = $__pconv !== null && $__pconv['factor'] !== null && abs((float) $__pconv['factor'] - 1.0) > 1e-9; ?>
         <tr>
           <td><?= (int) $__pl['line_no'] ?></td>
@@ -1492,7 +1495,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::NO_PRICE): ?>
               <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
             <?php else: ?>
-              <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+              <span class="price-badge price-badge-bad">✗ <?= $__forOrder ? 'Below the lowest for this order' : 'Below your lowest price' ?></span>
             <?php endif; ?>
             <?php if ($__pc['requested'] && $__pc['status'] !== \App\Services\OrderLinePricing::APPROVED): ?><div class="muted small">Sent to the MD for approval.</div><?php endif; ?>
           </td>

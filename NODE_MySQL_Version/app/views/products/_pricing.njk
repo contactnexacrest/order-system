@@ -17,20 +17,25 @@
     <table class="list" style="max-width:720px">
       <tr><td>Supplier price ({{ P.supplier.supplier_name }}, used for pricing{% if P.price_date %}, quoted {{ P.price_date }}{% endif %})
         {% if P.staleness %} <span class="badge {{ 'badge-danger' if P.staleness == 'expired' else 'badge-warning' }}">{{ P.staleness }}</span>{% endif %}</td>
-        <td class="num">&#8377;{{ P.supplier_inr | money }}</td></tr>
+        <td class="num">&#8377;{{ (P.inr_parts.supplier if P.inr_parts else P.supplier_inr) | money }}</td></tr>
+      {# D-300 (point 12): FOB cost = supplier price + CHA and transport per unit (+ packing and loading when not included). #}
+      {% set IP = P.inr_parts or {} %}
+      {% if IP.cha > 0 %}<tr><td>+ CHA + transport per {{ unitLabel }} <span class="muted small">(per container ÷ what one container holds)</span></td><td class="num">&#8377;{{ IP.cha | money }}</td></tr>{% endif %}
+      {% if IP.packing > 0 %}<tr><td>+ packing and loading <span class="muted small">(not in the supplier's price)</span></td><td class="num">&#8377;{{ IP.packing | money }}</td></tr>{% endif %}
+      {% if IP.cha > 0 or IP.packing > 0 %}<tr><td>= FOB cost in ₹</td><td class="num">&#8377;{{ P.supplier_inr | money }}</td></tr>{% endif %}
       <tr><td>÷ pricing exchange rate (&#8377;{{ P.settings.pricing_fx_rate | rate4 }})</td><td class="num">USD {{ B.supplier_usd | money }}</td></tr>
       <tr><td>+ other costs to FOB <span class="muted small">({{ pricingFmt.modeLabel(E.other_mode, E.other_value) }}{{ ', global' if product.pricing_other_cost_mode == null else ', this product' }})</span></td><td class="num">USD {{ B.other_costs | money }}</td></tr>
       <tr><td><strong>Cost (FOB)</strong></td><td class="num"><strong>USD {{ B.cost | money }}</strong></td></tr>
       <tr><td>Minimum price = cost ÷ (1 − {{ pricingFmt.pct(E.margin_pct) }} margin) <span class="muted small">— nobody goes below this</span></td><td class="num"><strong>USD {{ B.minimum | money }}</strong></td></tr>
       <tr><td>+ team incentive reserve <span class="muted small">({{ pricingFmt.modeLabel(E.incentive_mode, E.incentive_value) }}{{ ' of profit' if E.incentive_mode == 'pct' }})</span>
         <span class="badge {{ 'badge-success' if P.program_on else 'badge-inactive' }}">program {{ 'on' if P.program_on else 'off' }}</span></td><td class="num">USD {{ B.reserve | money }}</td></tr>
-      <tr><td><strong>Staff floor</strong> (lowest price your sales staff may agree)</td><td class="num"><strong>USD {{ B.staff_floor | money }}</strong></td></tr>
+      <tr><td><strong>Staff floor</strong> — staff lowest (lowest price your sales staff may agree)</td><td class="num"><strong>USD {{ B.staff_floor | money }}</strong></td></tr>
       <tr><td>Staff quote price (+ {{ pricingFmt.pct(E.buffer_pct) }} buffer)</td><td class="num"><strong>USD {{ B.staff_quote | money }}</strong></td></tr>
     </table>
     {% if P.levels.length %}
       <h3>Associates <small class="muted">(floor = staff floor ÷ (1 − commission %), or + a fixed amount)</small></h3>
       <table class="list" style="max-width:720px">
-        <tr><th>Commission level</th><th>Commission</th><th class="num">Floor</th><th class="num">Quote price</th></tr>
+        <tr><th>Commission level</th><th>Commission</th><th class="num">Associate lowest (USD)</th><th class="num">Quote price (USD)</th></tr>
         {% for l in P.levels %}
           <tr><td>{{ l.name }}</td><td>{{ l.label }}</td><td class="num">{{ l.floor | money }}</td><td class="num">{{ l.quote | money }}</td></tr>
         {% endfor %}
@@ -67,7 +72,7 @@
     <p class="muted">No price yet — ask Procurement to record the supplier price.</p>
   {% else %}
     <table class="list" style="max-width:480px">
-      <tr><th class="num">Quote price</th><th class="num">Your lowest price</th></tr>
+      <tr><th class="num">Quote price (USD / {{ unitLabel }})</th><th class="num">Your lowest (USD / {{ unitLabel }})</th></tr>
       <tr><td class="num">USD {{ pricingStaff.build.staff_quote | money }}</td><td class="num">USD {{ pricingStaff.build.staff_floor | money }}</td></tr>
     </table>
     <p class="muted small">Quote at the first price; you may agree any price down to the second. Below it, the order line needs the MD's approval.</p>

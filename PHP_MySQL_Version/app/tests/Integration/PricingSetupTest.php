@@ -87,7 +87,7 @@ final class PricingSetupTest extends DbTestCase
             self::assertStringContainsString($s, $page, "MD sees {$s}");
         }
         $list = $this->render(fn () => (new ProductController())->index([]));
-        self::assertStringContainsString('Staff floor', $list);
+        self::assertStringContainsString('Staff lowest', $list); // D-304: plain names
         self::assertStringContainsString('1,313.78', $list, 'the lowest active level (2%) floor');
 
         $this->actAs($this->createTestUser('Executive Director'));
@@ -104,7 +104,7 @@ final class PricingSetupTest extends DbTestCase
         }
         $list = $this->render(fn () => (new ProductController())->index([]));
         self::assertStringContainsString('1,326.13', $list);
-        self::assertStringNotContainsString('Staff floor', $list);
+        self::assertStringNotContainsString('Staff lowest', $list);
         self::assertStringNotContainsString('1,250.00', $list);
 
         $procurement = $this->createTestUser('Procurement Executive');
@@ -167,16 +167,20 @@ final class PricingSetupTest extends DbTestCase
         $productId = $this->product();
         $procurement = $this->createTestUser('Procurement Executive');
         $this->actAs($procurement);
-        $_POST = ['supplier_name' => 'Raghavendra Stones', 'price_inr' => '82000', 'quoted_on' => date('Y-m-d', strtotime('-70 days')), 'valid_until' => '', 'notes' => 'Ex-works', 'used_for_pricing' => '1'];
+        // D-303 (point 15): the supplier is a record of the Suppliers directory.
+        $dir = \App\Repositories\SupplierRepository::create(['supplier_legal_name' => 'Raghavendra Stones ' . bin2hex(random_bytes(3)), 'types' => []], $procurement);
+        $dirName = (string) \App\Repositories\SupplierRepository::find($dir)['supplier_legal_name'];
+        $_POST = ['supplier_id' => (string) $dir, 'supplier_name' => $dirName, 'price_inr' => '82000', 'quoted_on' => date('Y-m-d', strtotime('-70 days')), 'valid_until' => '', 'notes' => 'Ex-works', 'used_for_pricing' => '1'];
         $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $productId]));
         self::assertSame('Supplier price recorded and used for pricing.', $this->flash());
         $p = PricingService::forProduct(ProductRepository::find($productId));
-        self::assertSame('Raghavendra Stones', $p['supplier']['supplier_name']);
+        self::assertSame($dirName, $p['supplier']['supplier_name']);
+        self::assertSame($dir, (int) $p['supplier']['supplier_id'], 'linked to the directory supplier');
         self::assertSame(82000.0, $p['supplier_inr']);
         self::assertSame('stale', $p['staleness'], 'older than 60 days');
         self::assertCount(2, ProductSupplierRepository::forProduct($productId), 'the old price stays as history');
 
-        $_POST = ['supplier_name' => 'X', 'price_inr' => '100', 'quoted_on' => date('Y-m-d', strtotime('+1 day'))];
+        $_POST = ['supplier_id' => (string) $dir, 'supplier_name' => $dirName, 'price_inr' => '100', 'quoted_on' => date('Y-m-d', strtotime('+1 day'))];
         $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $productId]));
         self::assertSame('The quoted date cannot be in the future.', $this->flash());
 

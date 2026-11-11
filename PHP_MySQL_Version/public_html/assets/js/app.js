@@ -770,6 +770,140 @@
     return 'Enter the ' + size + ' — needed to compare a price per ' + UNIT_LABELS[lineKind] + '.';
   }
 
+  // D-300 (owner point 12, 11 Nov 2026): a supplier price for every thickness. Typing a
+  // box makes it TYPED; every CALCULATED box follows at once from the category's rules
+  // (30 mm = 20 mm + 35 %, 50 mm+ per CBM = 20 mm per m² × K — in every direction);
+  // "↺ use calculated" goes back. The same maths as ThicknessPrices / thicknessPrices.js.
+  function initThicknessGrid() {
+    document.querySelectorAll('[data-thickness-grid]').forEach(function (table) {
+      var k = parseFloat(table.dataset.k) || 0;
+      var baseMm = parseInt(table.dataset.baseMm, 10);
+      var rows = Array.prototype.slice.call(table.querySelectorAll('tr[data-mm]'));
+      function parts(row) {
+        return {
+          mm: parseInt(row.dataset.mm, 10), cbm: row.dataset.cbm === '1', pct: parseFloat(row.dataset.pct || '0'),
+          input: row.querySelector('input.grid-price'), how: row.querySelector('input[type="hidden"]'),
+          badge: row.querySelector('[data-grid-badge]'), hint: row.querySelector('[data-grid-hint]'),
+          use: row.querySelector('[data-grid-use-calc]'), perCbm: row.querySelector('[data-grid-percbm]')
+        };
+      }
+      function round2(v) { return Math.round((v + 1e-9) * 100) / 100; }
+      function money(v) { return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      function typedValue(p) { var v = parseFloat(p.input.value); return p.how.value === 'typed' && v > 0 ? v : null; }
+      function base() {
+        var list = rows.map(parts);
+        var i;
+        for (i = 0; i < list.length; i++) if (!list[i].cbm && list[i].mm === baseMm && typedValue(list[i]) !== null) return typedValue(list[i]);
+        for (i = 0; i < list.length; i++) if (!list[i].cbm && typedValue(list[i]) !== null) return typedValue(list[i]) / (1 + list[i].pct / 100);
+        for (i = 0; i < list.length; i++) if (list[i].cbm && k > 0 && typedValue(list[i]) !== null) return typedValue(list[i]) / k;
+        return null;
+      }
+      function recalc() {
+        var b = base();
+        rows.forEach(function (row) {
+          var p = parts(row);
+          if (!p.input || !p.how) return;
+          var calc = b === null ? null : round2(p.cbm ? b * k : b * (1 + p.pct / 100));
+          var typed = typedValue(p) !== null;
+          if (!typed) {
+            p.how.value = 'calculated';
+            p.input.value = calc === null ? '' : calc.toFixed(2);
+          }
+          if (calc !== null) p.input.placeholder = calc.toFixed(2);
+          row.classList.toggle('grid-typed', typed);
+          row.classList.toggle('grid-calculated', !typed);
+          if (p.badge) {
+            p.badge.textContent = typed ? 'TYPED' : 'CALCULATED';
+            p.badge.className = 'badge ' + (typed ? 'badge-typed' : 'badge-calculated');
+          }
+          var v = parseFloat(p.input.value);
+          if (p.hint) p.hint.textContent = typed && calc !== null && Math.abs(calc - v) > 0.005 ? 'calculated would be ' + money(calc) : '';
+          if (p.use) p.use.hidden = !typed;
+          if (p.perCbm) p.perCbm.textContent = v > 0 ? '₹' + money(p.cbm ? v : v / (p.mm / 1000)) : '';
+        });
+      }
+      rows.forEach(function (row) {
+        var p = parts(row);
+        if (!p.input || !p.how) return;
+        p.input.addEventListener('input', function () {
+          p.how.value = parseFloat(p.input.value) > 0 ? 'typed' : 'calculated';
+          recalc();
+        });
+        if (p.use) {
+          p.use.addEventListener('click', function () {
+            p.how.value = 'calculated';
+            recalc();
+          });
+        }
+      });
+      recalc();
+    });
+  }
+
+  // D-303 (owner point 15): the supplier of a product price is picked from the Suppliers
+  // directory — the hidden id follows the name typed or picked, and the location list is
+  // the supplier's factory / quarry addresses (the first is filled in while empty).
+  function initSupplierPick() {
+    document.querySelectorAll('input[data-pick-id]').forEach(function (input) {
+      var form = input.form;
+      if (!form) return;
+      var list = document.getElementById(input.getAttribute('list'));
+      var idField = form.elements.namedItem(input.dataset.pickId);
+      var locField = input.dataset.pickLocations ? form.elements.namedItem(input.dataset.pickLocations) : null;
+      var locList = locField && locField.getAttribute ? document.getElementById(locField.getAttribute('list')) : null;
+      function sync() {
+        var match = null;
+        var v = input.value.trim().toLowerCase();
+        if (list) {
+          for (var i = 0; i < list.options.length; i++) {
+            if (list.options[i].value.trim().toLowerCase() === v) { match = list.options[i]; break; }
+          }
+        }
+        if (idField && 'value' in idField) idField.value = match ? match.dataset.id : '';
+        if (locList) {
+          locList.innerHTML = '';
+          var locs = match && match.dataset.locations ? match.dataset.locations.split('|') : [];
+          locs.forEach(function (l) {
+            var o = document.createElement('option');
+            o.value = l;
+            locList.appendChild(o);
+          });
+          if (locField && locField.value.trim() === '' && locs.length > 0) locField.value = locs[0];
+        }
+      }
+      input.addEventListener('input', sync);
+      input.addEventListener('change', sync);
+      sync();
+    });
+  }
+
+  // D-300 (owner point 12): the category's Price rules page — the example column follows
+  // the thickness %s and × K as they are typed.
+  function initRulesExample() {
+    document.querySelectorAll('[data-rules-example]').forEach(function (form) {
+      var ex = parseFloat(form.dataset.example) || 0;
+      function fmt(v) { return '₹' + Math.round(v).toLocaleString('en-US'); }
+      function update() {
+        form.querySelectorAll('[data-rule-row]').forEach(function (row) {
+          var input = row.querySelector('[data-rule-pct]');
+          var cell = row.querySelector('[data-rule-example]');
+          var pct = input ? parseFloat(input.value) : 0;
+          if (isNaN(pct)) pct = 0;
+          if (cell) cell.textContent = fmt(ex * (1 + pct / 100)) + ' / m²';
+        });
+        var kRow = form.querySelector('[data-rule-cbm]');
+        if (kRow) {
+          var kInput = kRow.querySelector('[data-rule-k]');
+          var kv = kInput ? parseFloat(kInput.value) : NaN;
+          var kCell = kRow.querySelector('[data-rule-example]');
+          if (kCell) kCell.textContent = isNaN(kv) ? '—' : fmt(ex * kv) + ' / CBM';
+        }
+      }
+      form.addEventListener('input', update);
+      update();
+    });
+  }
+
   function fieldError(el) {
     var value = el.value.trim();
     var name = (el.name || '').replace(/\[.*$/, '');
@@ -802,6 +936,30 @@
       if (allowed.length > 0 && allowed.indexOf(value.toUpperCase()) === -1) {
         return 'Choose one of the units for ' + opt.textContent.trim() + ': ' + allowed.join(', ') + '.';
       }
+    }
+    // data-in-list="<datalist id>" (D-302 / D-303, owner points 11 and 15): the value
+    // must be one of that list's options — an HS code from the HS Code Master List, a
+    // supplier from the Suppliers directory. Empty passes (required decides that).
+    if (el.dataset.inList && value !== '') {
+      var inList = document.getElementById(el.dataset.inList);
+      if (inList && inList.options) {
+        var listed = false;
+        for (var li = 0; li < inList.options.length; li++) {
+          if (inList.options[li].value.trim().toLowerCase() === value.toLowerCase()) { listed = true; break; }
+        }
+        if (!listed) return el.dataset.inListMessage || 'Choose one of the listed values.';
+      }
+    }
+    // data-at-least-one="<name prefix>" (D-300, owner point 12): at least one enabled
+    // field of the form whose name starts with that prefix holds a number above 0 (e.g.
+    // the thickness prices — "Enter at least one price"); the message goes on the first.
+    if (el.dataset.atLeastOne && el.form) {
+      var group = el.form.querySelectorAll('[name^="' + el.dataset.atLeastOne + '"]:not([type="hidden"])');
+      var anyFilled = false;
+      for (var gi = 0; gi < group.length; gi++) {
+        if (!group[gi].disabled && parseFloat(group[gi].value) > 0) { anyFilled = true; break; }
+      }
+      if (!anyFilled && group[0] === el) return el.dataset.atLeastOneMessage || 'Enter at least one value.';
     }
     // data-piece-size="length|width|thickness" (D-270, owner point 25): an order
     // line's piece size, needed when its unit must be converted to the product's
@@ -1526,6 +1684,9 @@
     initFocusLink();
     initFloorNotes();
     initPatternFromSelect();
+    initThicknessGrid();
+    initSupplierPick();
+    initRulesExample();
   }
 
   if (document.readyState === 'loading') {

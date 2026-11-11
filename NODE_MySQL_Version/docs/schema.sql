@@ -6297,3 +6297,77 @@ ALTER TABLE order_products ADD COLUMN copied_from_id BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_copied_from FOREIGN KEY (copied_from_id) REFERENCES order_products(id) ON DELETE SET NULL;
 ALTER TABLE product_categories ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
 ALTER TABLE catalog_products ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
+
+-- ---------------------------------------------------------------------------
+-- D-300 to D-306 (owner decisions 11 Nov 2026, points 12, 4 (exchange rate), 11,
+-- 15, 14, 19 and 20 — double-confirmed): products and pricing.
+-- D-300 (point 12): one supplier-price row holds every thickness — 20/30/40 mm
+-- per m² and 50 mm+ per CBM (price_basis 'grid'). Only the prices staff TYPED are
+-- stored (catalog_supplier_thickness_prices; thickness_mm 0 = 50 mm and above,
+-- per CBM); the others are CALCULATED from the category's price rules each time
+-- (30 mm = 20 mm + 35 %, 40 mm = 20 mm + 70 %, 50 mm+ per CBM = 20 mm per m² × K).
+-- "Price includes packing and loading" (ticked by default) and CHA + transport per
+-- container (₹, per supplier price; the product has a default) — turned into a
+-- per-unit cost from what one container holds (category: 8 CBM, max 27 t; a
+-- product may override), with the weight limit from weight_t_per_cbm.
+-- Every change to a supplier price is kept in catalog_supplier_price_history.
+-- D-301 (point 4): the USD→INR market rate is fetched daily (fx_rates); the
+-- pricing rate = market × (1 − cushion %). A daily change over 2 % waits for the MD.
+-- D-302/D-303 (points 11 and 15): the supplier of a product price is a record of
+-- the Suppliers directory (supplier_id); a supplier added quickly from a price
+-- screen is marked "Details pending".
+-- ---------------------------------------------------------------------------
+ALTER TABLE product_categories ADD COLUMN thick_k_factor DECIMAL(8,3) NULL;
+ALTER TABLE product_categories ADD COLUMN container_cbm DECIMAL(6,2) NULL;
+ALTER TABLE product_categories ADD COLUMN container_max_t DECIMAL(6,2) NULL;
+ALTER TABLE catalog_products ADD COLUMN thick_k_factor DECIMAL(8,3) NULL;
+ALTER TABLE catalog_products ADD COLUMN container_cbm DECIMAL(6,2) NULL;
+ALTER TABLE catalog_products ADD COLUMN container_max_t DECIMAL(6,2) NULL;
+ALTER TABLE catalog_products ADD COLUMN cha_transport_per_container DECIMAL(12,2) NULL;
+ALTER TABLE catalog_product_suppliers MODIFY COLUMN price_basis ENUM('unit','cbm','combo','grid') NOT NULL DEFAULT 'unit';
+ALTER TABLE catalog_product_suppliers ADD COLUMN supplier_id BIGINT UNSIGNED NULL;
+ALTER TABLE catalog_product_suppliers ADD CONSTRAINT fk_catalog_product_suppliers_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+ALTER TABLE catalog_product_suppliers ADD COLUMN includes_packing_loading TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE catalog_product_suppliers ADD COLUMN cha_transport_per_container DECIMAL(12,2) NULL;
+ALTER TABLE suppliers ADD COLUMN details_pending TINYINT(1) NOT NULL DEFAULT 0;
+
+CREATE TABLE catalog_supplier_thickness_prices (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_supplier_id BIGINT UNSIGNED NOT NULL,
+  thickness_mm        INT NOT NULL,              -- 0 = 50 mm and above (per CBM); otherwise per m²
+  price_inr           DECIMAL(14,2) NOT NULL,    -- a TYPED price; CALCULATED ones are never stored
+  updated_by          BIGINT UNSIGNED NULL,
+  updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_supplier_thickness (product_supplier_id, thickness_mm),
+  CONSTRAINT fk_supplier_thickness_row FOREIGN KEY (product_supplier_id) REFERENCES catalog_product_suppliers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_supplier_thickness_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE catalog_supplier_price_history (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  product_supplier_id BIGINT UNSIGNED NOT NULL,
+  what                VARCHAR(80) NOT NULL,      -- e.g. "30 mm per m²", "CHA + transport per container"
+  old_value           VARCHAR(80) NULL,
+  new_value           VARCHAR(80) NULL,
+  changed_by          BIGINT UNSIGNED NULL,
+  changed_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_supplier_price_history (product_supplier_id, changed_at),
+  CONSTRAINT fk_supplier_price_history_row FOREIGN KEY (product_supplier_id) REFERENCES catalog_product_suppliers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_supplier_price_history_user FOREIGN KEY (changed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE fx_rates (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  rate_date       DATE NOT NULL,
+  market_rate     DECIMAL(12,4) NULL,            -- ₹ per USD; NULL when the fetch failed
+  source          VARCHAR(60) NULL,              -- "Frankfurter (European Central Bank)" / "open.er-api.com"
+  status          ENUM('in_use','waiting_md','rejected','failed') NOT NULL,
+  change_pct      DECIMAL(7,3) NULL,             -- against the rate in use before
+  note            VARCHAR(255) NULL,
+  fetched_at      DATETIME NOT NULL,
+  decided_by      BIGINT UNSIGNED NULL,
+  decided_at      DATETIME NULL,
+  decision_reason VARCHAR(255) NULL,
+  UNIQUE KEY uq_fx_rates_date (rate_date),
+  CONSTRAINT fk_fx_rates_decided_by FOREIGN KEY (decided_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
