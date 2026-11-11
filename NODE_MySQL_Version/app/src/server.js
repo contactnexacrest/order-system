@@ -18,6 +18,7 @@ const dates = require('./helpers/dates');
 const logger = require('./helpers/logger');
 const permittedLinks = require('./helpers/permittedLinks');
 const orderAccessService = require('./services/orderAccessService');
+const navigation = require('./services/navigation'); // D-320
 
 // Process-level safety net — without these, an error thrown outside any
 // Express request handler (a stray async callback, a timer) used to just
@@ -518,6 +519,8 @@ app.use((req, res, next) => {
       query: req.query || {},
       // Owner decision D-257: the switcher, the report Division filter and module menus (all hidden with one active division).
       division: req.divisionUi || { showSwitcher: false, multi: false, modules: {}, active: [], all: [], currentId: null },
+      // Owner decision D-320 (point 26): the short left menu and this section's menu bar, from src/config/navigation.json.
+      nav: req.user && layout === 'layout/base' ? navigation.forRequest(req) : null,
     };
     const context = Object.assign({}, common, data);
     let content = njkEnv.render(`${viewPath}.njk`, context);

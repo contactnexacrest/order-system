@@ -28,15 +28,21 @@ final class SettingsExpiryWarningSidebarBadgeTest extends DbTestCase
         return ob_get_clean();
     }
 
+    /** Owner decision D-320 (point 26): the count now sits on the left menu's "Settings" entry (and on Settings › Company). */
+    private function settingsEntry(string $output): string
+    {
+        $pos = strpos($output, 'data-nav="settings"');
+        self::assertNotFalse($pos);
+        return substr($output, $pos, (int) strpos($output, '</a>', $pos) - $pos);
+    }
+
     public function testSidebarShowsNoBadgeWhenNothingIsNearExpiry(): void
     {
         CompanySettingsRepository::set('lut_expiry_date', (new \DateTimeImmutable('+2 years'))->format('Y-m-d'));
         CompanySettingsRepository::set('rcmc_valid_until', (new \DateTimeImmutable('+2 years'))->format('Y-m-d'));
 
         $output = $this->render();
-        $settingsLinkPos = strpos($output, 'Company Settings');
-        self::assertNotFalse($settingsLinkPos);
-        $nearbyMarkup = substr($output, $settingsLinkPos, 120);
+        $nearbyMarkup = $this->settingsEntry($output);
 
         self::assertStringNotContainsString('nav-badge', $nearbyMarkup);
     }
@@ -48,9 +54,7 @@ final class SettingsExpiryWarningSidebarBadgeTest extends DbTestCase
         CompanySettingsRepository::set('rcmc_valid_until', (new \DateTimeImmutable('+2 years'))->format('Y-m-d'));
 
         $output = $this->render();
-        $settingsLinkPos = strpos($output, 'Company Settings');
-        self::assertNotFalse($settingsLinkPos);
-        $nearbyMarkup = substr($output, $settingsLinkPos, 120);
+        $nearbyMarkup = $this->settingsEntry($output);
 
         self::assertStringContainsString('nav-badge">1<', $nearbyMarkup);
     }
@@ -63,9 +67,7 @@ final class SettingsExpiryWarningSidebarBadgeTest extends DbTestCase
         CompanySettingsRepository::set('rcmc_alert_days_a', '60');
 
         $output = $this->render();
-        $settingsLinkPos = strpos($output, 'Company Settings');
-        self::assertNotFalse($settingsLinkPos);
-        $nearbyMarkup = substr($output, $settingsLinkPos, 120);
+        $nearbyMarkup = $this->settingsEntry($output);
 
         self::assertStringContainsString('nav-badge">2<', $nearbyMarkup);
     }

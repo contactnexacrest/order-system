@@ -112,7 +112,9 @@ final class ApprovalsAndSetupD310Test extends DbTestCase
         self::assertStringContainsString('Line 1 — sent to the MD for approval on ', $page);
 
         // The Approvals page, the menu and the dashboard.
+        $_SERVER['REQUEST_URI'] = '/approvals'; // D-320: the menu marks the page shown by its path
         $page = $this->render($md, new ApprovalsController(), 'index');
+        unset($_SERVER['REQUEST_URI']);
         self::assertStringContainsString('Approvals waiting for you (', $page);
         self::assertStringContainsString('id="approval-price-' . $lineId . '"', $page);
         self::assertMatchesRegularExpression('#href="/approvals\?tab=prices">Prices [1-9]#', $page);

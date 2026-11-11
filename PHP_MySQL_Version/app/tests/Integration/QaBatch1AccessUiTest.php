@@ -390,8 +390,9 @@ final class QaBatch1AccessUiTest extends DbTestCase
             self::assertMatchesRegularExpression('/' . preg_quote($open, '/') . '\s*<option value="">Choose…<\/option>/', (string) file_get_contents(self::NODE_VIEWS . '/' . $view), $view);
         }
         self::assertStringContainsString('(maximum {{ maxLabel }})', (string) file_get_contents(self::NODE_VIEWS . '/errors/413.njk'));
-        self::assertStringContainsString('href="/admin/gst-rates"', (string) file_get_contents(self::VIEWS . '/layout/base.php'));
-        self::assertStringContainsString('href="/admin/gst-rates"', (string) file_get_contents(self::NODE_VIEWS . '/layout/base.njk'));
+        // D-320 (point 26): the menu entries live in one config per stack (Settings › Lists › GST rates).
+        self::assertStringContainsString('"href": "/admin/gst-rates"', (string) file_get_contents(self::VIEWS . '/../src/Config/navigation.json'));
+        self::assertStringContainsString('"href": "/admin/gst-rates"', (string) file_get_contents(self::NODE_VIEWS . '/../src/config/navigation.json'));
         self::assertSame(['manage_divisions'], \App\Helpers\PermittedLinks::requiredFor('/admin/gst-rates'));
         self::assertSame(['view_purchase_prices'], \App\Helpers\PermittedLinks::requiredFor('/import'));
     }

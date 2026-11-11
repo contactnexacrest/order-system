@@ -109,7 +109,8 @@ describe('order page — owner points of 2 Nov 2026', () => {
     const html = (await admin.agent.get(`/orders/${orderId}`)).text;
     expect(html).toContain(`action="/orders/${orderId}/zoho-sync"`);
     expect(html).toContain('Sync this order to Zoho now');
-    expect(html).toContain('href="/ca/zoho-sync"');
+    // D-320 (point 26): Zoho sync is in the Finance & accounts menu bar.
+    expect((await admin.agent.get('/ca')).text).toContain('href="/ca/zoho-sync"');
 
     const r = await postForm(admin.agent, `/orders/${orderId}/zoho-sync`);
     expect(r.status).toBe(302);

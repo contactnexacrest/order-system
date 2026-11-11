@@ -68,7 +68,7 @@
     </table>
   </div>
 
-  <div class="section">
+  <div class="section" id="create-user"><?php // D-320: Users & roles › + Add user ?>
     <h2>Create User</h2>
     <form method="post" action="/users/create">
       <?= Csrf::field() ?>

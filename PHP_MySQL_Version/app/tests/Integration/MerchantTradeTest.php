@@ -308,7 +308,9 @@ final class MerchantTradeTest extends DbTestCase
         self::assertNull(DivisionService::disabledModuleForPath('/merchant'));
         self::assertStringContainsString('TEST-Gulf Stone Trading', $this->render(fn () => (new MerchantTradeController())->show(['id' => (string) $id])));
         $this->actAs($this->md);
+        $_SERVER['REQUEST_URI'] = '/merchant/' . $id; // D-320: the Procurement & suppliers menu bar is drawn for the page's path
         $page = $this->render(fn () => (new MerchantTradeController())->show(['id' => (string) $id]));
+        unset($_SERVER['REQUEST_URI']);
         self::assertStringContainsString('TEST-Gulf Stone Trading', $page);
         self::assertStringContainsString('href="/merchant"', $page, 'the menu entry shows where the module is on');
     }

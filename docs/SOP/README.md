@@ -33,6 +33,9 @@ implementation detail.
 
 ## Modules alongside the pipeline
 
+> **Menu paths (11 Nov 2026).** The app's left menu now has 13 entries and every section has a menu bar at the top of its pages ([Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)). Where a chapter says *Operations → X*, *Insights → X* or *Admin → X*, open the section that holds X: Orders, Clients, Associates, Products, Procurement & suppliers, Finance & accounts, Reports, Users & roles or Settings.
+
+
 - [Amendments](./10-amendments.md) — changing payment terms after the PI is issued.
 - [Disputes](./11-disputes.md) — a buyer wanting to cancel this order and not proceed, admin-gated per client.
 - [Client Portal](./12-client-portal.md) — everything the buyer can see and do, in one place.

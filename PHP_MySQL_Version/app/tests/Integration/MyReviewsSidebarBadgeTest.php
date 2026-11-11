@@ -4,23 +4,29 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Controllers\DashboardController;
+use App\Controllers\ReviewController;
 use App\Repositories\DocumentReviewRepository;
 use App\Tests\Support\DbTestCase;
 
 /**
  * Owner request (2026-10-26): "My Reviews" shows how many documents are
  * waiting on the signed-in user's review, the same live badge the
- * Quotation/PI Intake Review links carry.
+ * Quotation/PI Intake Review links carry. Owner decision D-320 (point 26):
+ * My Reviews is now "Documents" in the Approvals menu bar, with the same count.
  */
 final class MyReviewsSidebarBadgeTest extends DbTestCase
 {
     private function myReviewsLink(int $userId): string
     {
         $_SESSION['_auth_user_id'] = $userId;
+        $_SERVER['REQUEST_URI'] = '/reviews';
         ob_start();
-        (new DashboardController())->index([]);
-        $output = (string) ob_get_clean();
+        try {
+            (new ReviewController())->queue([]);
+        } finally {
+            $output = (string) ob_get_clean();
+            unset($_SERVER['REQUEST_URI']);
+        }
         $start = strpos($output, '<a href="/reviews"');
         self::assertNotFalse($start);
         return substr($output, $start, (int) strpos($output, '</a>', $start) - $start);

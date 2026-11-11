@@ -103,6 +103,6 @@ describe('Admin nav group visibility (90-item backlog #34)', () => {
     const html = await loginAndGetDashboardHtml(email);
 
     expect(html).not.toContain('href="/compliance-task-types"');
-    expect(html).not.toContain('>Admin</summary>');
+    expect(html).not.toContain('data-nav="settings"'); // D-320: no Settings entry in the left menu
   });
 });

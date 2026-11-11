@@ -96,29 +96,48 @@ A few things that catch people out the first time:
 ## Finding your way around
 
 Once you're in, everything lives behind the dark blue strip on the left —
-the **sidebar**. This is the same on every single page, so it's worth
-spending thirty seconds here before anything else:
+the **left menu**. It is short on purpose (since 11 Nov 2026) and the same
+on every page:
 
-![The dashboard — your home screen, with the full sidebar on the left](./images/staff_dashboard.png)
+| Left menu | What is behind it |
+|---|---|
+| **Dashboard** | Your home screen (below). |
+| **Approvals (n)** | Everything waiting for *your* OK, with tabs: All · Prices · Payment terms · Documents (your document reviews) · E-mails · Bank details · Other. |
+| **My tasks (n)** | Your department's open tasks on your orders. |
+| *Work* — **Orders** | Active · Archived · Quotation requests · PI-stage details · Reorder requests · Disputes · Complaints |
+| **Clients** | All clients · + Add client · Agreements |
+| **Associates** | All · + Add · Registrations · Price requests · Commission · Payouts · TDS register · Access levels · Report |
+| **Products** | All · + Add · Categories · Price rules · Pricing · Price requests · HS codes · Link suppliers |
+| **Procurement & suppliers** | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
+| **Finance & accounts** | CA / Accounting · Zoho sync · Incentive payouts · My incentives · Team incentive settings |
+| *Overview* — **Reports** | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
+| *Help* — **Help & SOP** | Getting started · SOP · Reference library · Gallery |
+| *Admin* — **Users & roles** | Users · + Add user · Roles and permissions · Departments · Task due days · Self-approval rules · SOP access · Field protection |
+| **Settings** | Setup checklist · Company · E-mail · Security · Holidays · Document clean-up · Backups · Zoho · Documents ▾ · Lists ▾ · Divisions · Admin overrides · Data export · Sample data · Test mode · Super Admin |
 
-A few things worth knowing about this sidebar before you start clicking
-around it:
+A few things worth knowing before you start clicking around:
 
-- **You will not see everything in the screenshot above.** What's listed
-  depends entirely on your role — an Export Executive's sidebar looks
-  different from an Accounts Executive's, which looks different again
-  from an Admin's. If a chapter later in this manual mentions a screen
-  you can't find, that's very likely just a permission you don't hold,
-  not something broken — ask whoever manages Roles & Permissions.
-- **Operations, Insights, and Admin are collapsible groups** — click the
-  group name to open it and see what's inside. The system remembers which
-  ones you had open.
-- **Added 2 Nov 2026:** **Operations → Agreements** (the register of signed
-  agreements with expiry reminders, [Chapter 26](./26-agreements.md)) and,
-  for Finance and management, **Zoho Sync** (send everything waiting to Zoho
-  Books now; it shows a "Waiting for Zoho" count and today's Zoho call
-  usage, [CA Zoho Sync](./ca-03-zoho-sync.md)).
-- **"SOP / Operations Guide"** is this exact manual, reachable from inside
+- **Every section has its own menu bar.** Click a left-menu entry and the
+  section opens on its first page; the bar across the top of the page lists
+  every other page of that section. An item with **▾** opens a small list
+  of sub-pages. A number beside an item (Registrations **1**, Quotation
+  requests **3**) means something is waiting there. The page you are on is
+  underlined.
+- **You will not see everything listed above.** What's listed depends
+  entirely on your role — an Export Executive's menu looks different from
+  an Accounts Executive's, which looks different again from an Admin's. A
+  left-menu entry appears only if you can open at least one page in it, and
+  a menu-bar item only if you can open that page. If a chapter later in
+  this manual mentions a screen you can't find, that's very likely just a
+  permission you don't hold, not something broken — ask whoever manages
+  Users & roles.
+- **Main actions are buttons.** On an order, the bar at the top — **Edit
+  order · Documents · Full report · Duplicate order · More ▾** (request
+  cancellation, log in as client, audit trail) — stays visible while you
+  scroll. Client and associate pages keep their main buttons at the top in
+  the same way. A button that takes you to another section says so, e.g.
+  "Open in Orders ›".
+- **"SOP"** (under Help & SOP) is this exact manual, reachable from inside
   the app itself at any time — you're looking at it right now, just
   outside the app. Bookmark it; you'll be back.
   Inside the app it lists the chapters for your role (and any your Admin
@@ -242,7 +261,7 @@ manual goes deep on exactly one topic, screen by screen:
 
 You'll reach for this manual constantly in your first few weeks, less and
 less after that — that's the idea. It's reachable from inside the app any
-time, from the sidebar, so you never have to go hunting for it.
+time, from **Help & SOP** in the left menu, so you never have to go hunting for it.
 
 ## Quick reference — "I need to…"
 
@@ -251,26 +270,26 @@ time, from the sidebar, so you never have to go hunting for it.
 | Set up a new buyer/order | **Clients** → create client → create order | [Chapter 1](./01-stage1-enquiry-quotation.md) |
 | Check where an order currently stands | Open the order — the 9-dot tracker is at the top | [Chapter 00 above](#the-big-picture-one-order-nine-stages) |
 | Generate or re-send a document | Inside the order: generate it in its own step, review and send it in **Document Review & Approval** | [Document Review & Approval](./13-document-review-approval.md) |
-| See what's overdue or needs approval | **Dashboard** | *(this chapter)* |
+| See what's overdue or needs approval | **Dashboard**, **Approvals** | *(this chapter)* |
 | Handle a buyer wanting to cancel | **Disputes** | [Chapter 11](./11-disputes.md) |
 | Handle a buyer flagging a process issue (no cancel intent) | **Complaints** | [Chapter 19](./19-complaints.md) |
 | Change payment terms after the PI is out | **Amendments**, from the order page | [Chapter 10](./10-amendments.md) |
-| Run a report | **Insights → Reports** | [Chapter 14](./14-reports.md) |
-| Check who did what and when | **Insights → Audit Log** | — |
-| Manage roles, users, or company settings | **Admin** | [Chapter 15](./15-admin-settings.md) |
+| Run a report | **Reports** | [Chapter 14](./14-reports.md) |
+| Check who did what and when | **Reports → Audit log** | — |
+| Manage roles, users, or company settings | **Users & roles**, **Settings** | [Chapter 15](./15-admin-settings.md) |
 | Rehearse something without touching real data | **Test Mode** (if you have access) | [Chapter 16](./16-test-mode.md) |
-| CA / Accounting work | **CA / Accounting** | [CA Overview](./ca-01-overview.md) |
-| Check an agreement or when it expires | **Operations → Agreements** | [Chapter 26](./26-agreements.md) |
+| CA / Accounting work | **Finance & accounts → CA / Accounting** | [CA Overview](./ca-01-overview.md) |
+| Check an agreement or when it expires | **Clients → Agreements** | [Chapter 26](./26-agreements.md) |
 | Fill in a supplier or CHA / logistics payment | Order page Steps 7e / 10a / Logistics Partner Bills — "How to fill this" link | [Payments guide](./guides/Supplier_and_Logistics_Payments_Guide.pdf) |
 
 ## Your first week
 
 - [ ] Log in, set your real password, confirm you're receiving the 6-digit login codes by e-mail (MD / ED / Admin: also make your backup codes on My Account).
-- [ ] Spend ten minutes just clicking through the sidebar — nothing will
+- [ ] Spend ten minutes just clicking through the left menu and each section's menu bar — nothing will
       break, every screen here is safe to just look at.
 - [ ] Open one real, active order and follow its 9-stage tracker top to
       bottom.
-- [ ] Find the **SOP / Operations Guide** link and bookmark it.
+- [ ] Find **Help & SOP → SOP** and bookmark it.
 - [ ] Set your preferred view (Standard or Kanban) on **My Account**.
 - [ ] Read the chapter for whatever you'll actually be doing first —
       not every chapter, just that one.

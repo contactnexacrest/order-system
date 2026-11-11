@@ -1,0 +1,29 @@
+{# Owner decision D-320 (point 26): the menu bar at the top of every page of a
+   section — one shared partial, drawn by layout/base.njk for both the
+   Standard and the Kanban template (PHP twin: partials/section_nav.php).
+   Expects bar from services/navigation.js. Items with sub-pages open a small
+   drop-down; a count shows where something waits. #}
+<nav class="section-nav" aria-label="{{ bar.label }} menu" data-section="{{ bar.key }}">
+  <span class="section-nav-title">{{ bar.label }}</span>
+  <ul class="section-nav-items">
+    {% for item in bar.items %}
+      {% if item.children %}
+        <li class="section-nav-drop{{ ' active' if item.active else '' }}">
+          <details>
+            <summary>{{ item.label }}{% if item.count > 0 %} <span class="nav-badge">{{ item.count }}</span>{% endif %} <span aria-hidden="true">&#9662;</span></summary>
+            <ul class="section-nav-menu">
+              {% for child in item.children %}
+                <li><a href="{{ child.href }}"{% if child.active %} class="active" aria-current="page"{% endif %}{% if child.target %} target="{{ child.target }}" rel="noopener"{% endif %}>{{ child.label }}{% if child.count > 0 %} <span class="nav-badge">{{ child.count }}</span>{% endif %}</a></li>
+              {% endfor %}
+            </ul>
+          </details>
+        </li>
+      {% else %}
+        <li><a href="{{ item.href }}"{% if item.active %} class="active" aria-current="page"{% endif %}{% if item.target %} target="{{ item.target }}" rel="noopener"{% endif %}>{{ item.label }}{% if item.count > 0 %} <span class="nav-badge">{{ item.count }}</span>{% endif %}</a></li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+  {% for cross in bar.crossLinks %}
+    <a class="btn-sm btn-secondary section-nav-cross" href="{{ cross.href }}">{{ cross.label }}</a>
+  {% endfor %}
+</nav>

@@ -285,7 +285,8 @@ describe('QA batch 1 — access and UI fixes', () => {
     for (const [view, open] of [['orders/show.njk', '<select name="decision" required>'], ['amendments/index.njk', '<select name="requested_by" required>']]) {
       expect(fs.readFileSync(path.join(NODE_VIEWS, view), 'utf8')).toMatch(new RegExp(`${open.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*<option value="">Choose…</option>`));
     }
-    expect(fs.readFileSync(path.join(NODE_VIEWS, 'layout/base.njk'), 'utf8')).toContain('href="/admin/gst-rates"');
+    // D-320 (point 26): the menu entries live in one config per stack (Settings › Lists › GST rates).
+    expect(fs.readFileSync(path.join(NODE_VIEWS, '../src/config/navigation.json'), 'utf8')).toContain('"href": "/admin/gst-rates"');
     expect(permittedLinks.requiredFor('/admin/gst-rates')).toEqual(['manage_divisions']);
     expect(permittedLinks.requiredFor('/import')).toEqual(['view_purchase_prices']);
   });

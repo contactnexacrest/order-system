@@ -87,7 +87,8 @@ final class OpsNavGroupVisibilityTest extends DbTestCase
 
         self::assertStringNotContainsString('href="/clients"', $output);
         self::assertStringNotContainsString('href="/orders"', $output);
-        self::assertStringNotContainsString('>Operations</summary>', $output);
+        self::assertStringNotContainsString('data-nav="orders"', $output); // D-320: no Orders entry in the left menu
+        self::assertStringNotContainsString('data-nav="clients"', $output);
     }
 
     /**

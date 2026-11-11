@@ -181,7 +181,7 @@ final class OrderPageOwnerPointsNov2Test extends DbTestCase
         $missing = $this->call('POST', '/orders/99999999/zoho-sync');
         self::assertSame(404, $missing['code']);
 
-        $menu = $this->call('GET', '/');
+        $menu = $this->call('GET', '/ca'); // D-320: Zoho sync is in the Finance & accounts menu bar
         self::assertStringContainsString('href="/ca/zoho-sync"', $menu['body'], 'Zoho Sync in the menu for ca_module_manage');
 
         $this->signIn('Export Executive');

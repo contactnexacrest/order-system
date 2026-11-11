@@ -37,6 +37,25 @@ async function visible(req, tasks) {
   return tasks.filter((t) => mayOpen(t.order_id));
 }
 
+/**
+ * Owner decision D-320 (point 26): "My tasks (n)" in the left menu — the
+ * number of tasks the My tasks page opens on for this person (the same
+ * department scope, own-orders-only rule and order visibility). A failing
+ * query never breaks the page around the menu.
+ */
+async function myTaskCount(req) {
+  try {
+    let tasks = await visible(req, await departmentTaskRepository.open(await departmentsFor(req, req.user.id)));
+    if (await ownTasksOnly(req, req.user.id)) {
+      tasks = tasks.filter((t) => Number(t.owner_id || 0) === Number(req.user.id));
+    }
+    return tasks.length;
+  } catch (e) {
+    require('../helpers/logger').error('MY_TASKS_COUNT', e);
+    return 0;
+  }
+}
+
 async function myTasks(req, res) {
   const ownOnly = await ownTasksOnly(req, req.user.id);
   const mine = ownOnly || req.query.show === 'mine';
@@ -158,4 +177,4 @@ async function setOwner(req, res) {
   res.redirect(back);
 }
 
-module.exports = { myTasks, cockpit, taskTypes, updateTaskTypes, setOwner };
+module.exports = { myTasks, myTaskCount, cockpit, taskTypes, updateTaskTypes, setOwner };

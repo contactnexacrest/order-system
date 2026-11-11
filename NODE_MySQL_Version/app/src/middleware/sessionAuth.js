@@ -236,6 +236,21 @@ function required() {
         const approvalsInbox = require('../services/approvalsInbox');
         req.approvalsCount = await approvalsInbox.countFor(req);
         req.showApprovals = req.approvalsCount > 0 || approvalsInbox.isApprover(req);
+        // D-320 (point 26): the counts on the Approvals menu bar, "My tasks (n)" and Associates › Registrations (n).
+        req.approvalTabCounts = {};
+        if (req.approvalsCount > 0) {
+          try {
+            req.approvalTabCounts = approvalsInbox.counts(await approvalsInbox.items(req));
+          } catch (e) {
+            req.approvalTabCounts = {};
+          }
+        }
+        req.myTasksCount = (req.permissions.manage_orders || req.permissions.view_orders)
+          ? await require('../controllers/coordinationController').myTaskCount(req)
+          : 0;
+        req.associateRegistrationsCount = req.permissions.manage_associates
+          ? await require('../repositories/associateRegistrationRepository').pendingCount()
+          : 0;
         // D-312: the Setup checklist's Needed count beside its menu entry.
         req.setupNeededCount = req.permissions.manage_company_settings ? await require('../services/setupChecklist').neededCount(req) : 0;
       }

@@ -1261,6 +1261,48 @@ $__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRol
   <?php endforeach; ?>
 </div>
 <?php endif; ?>
+<?php
+// Owner decision D-320 (point 26): a bar of real buttons at the top of the
+// order page that stays visible while scrolling — each shown only to those
+// allowed to use it (the same checks as before). "More" holds the rare ones.
+$__barRequestCancel = $canCloseOrders && !in_array($order['status'], ['complete', 'lost', 'cancelled'], true)
+    && OrderCancellationRepository::findPendingForOrder((int) $order['id']) === null;
+$__barLoginAsClient = false;
+if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'impersonate_client')) {
+    $__barClient = \App\Repositories\ClientRepository::find((int) $order['client_id']);
+    $__barLoginAsClient = $__barClient !== null && (int) ($__barClient['allow_staff_impersonation'] ?? 0) === 1 && (int) $__barClient['is_active'] === 1
+        && \App\Repositories\CompanySettingsRepository::get('client_impersonation_enabled') === '1';
+}
+?>
+<div class="order-action-bar" id="order-action-bar" data-testid="order-action-bar">
+  <div class="order-action-bar-title"><strong><?= htmlspecialchars($order['order_reference']) ?></strong><?php if ($sees['client']): ?> &middot; <?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></div>
+  <div class="order-action-bar-buttons">
+    <?php if ($canManageOrders): ?><a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/edit">Edit order</a><?php endif; ?>
+    <a class="btn-sm btn-secondary" href="#document-review-approval">Documents</a>
+    <?php if ($canViewReports): ?><a class="btn-sm btn-secondary" href="/reports/order/<?= (int) $order['id'] ?>">Full report</a><?php endif; ?>
+    <?php if ($canManageOrders): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/duplicate" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate order</button>
+    </form>
+    <?php endif; ?>
+    <?php if ($__barRequestCancel || $__barLoginAsClient || $canViewAuditLog): ?>
+    <details class="order-action-more">
+      <summary class="btn-sm btn-secondary">More &#9662;</summary>
+      <div class="order-action-more-menu">
+        <?php if ($__barRequestCancel): ?><button type="button" onclick="promptRequestCancellation(document.getElementById('request-cancellation-btn'))">Request cancellation</button><?php endif; ?>
+        <?php if ($__barLoginAsClient): ?>
+        <form method="post" action="/clients/<?= (int) $order['client_id'] ?>/impersonate" target="_blank" data-confirm="Log in as <?= htmlspecialchars((string) $order['company_legal_name']) ?>? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
+          <?= Csrf::field() ?>
+          <button type="submit">Log in as client &#8599;</button>
+        </form>
+        <?php endif; ?>
+        <?php if ($canViewAuditLog): ?><a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit trail</a><?php endif; ?>
+      </div>
+    </details>
+    <?php endif; ?>
+  </div>
+</div>
 <div class="card page-wide">
   <?php if (($_GET['from'] ?? '') === 'kanban'): ?>
   <?php if ($canListOrders): ?><p class="muted small"><a href="/orders">&larr; Back to Board</a></p><?php endif; ?>
@@ -1274,8 +1316,6 @@ $__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRol
     <?php if ($sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><?= htmlspecialchars($order['company_legal_name']) ?> &nbsp;·&nbsp;<?php endif; ?>
     Buyer Inquiry Ref: <?= htmlspecialchars($order['buyer_inquiry_ref']) ?> &nbsp;·&nbsp;
     <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? '') ?>
-    <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
-    <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/orders/<?= (int) $order['id'] ?>/edit">Edit Order Details</a><?php endif; ?>
     <?php if (!empty($seesAllOrders)): ?>&nbsp;·&nbsp; Assigned to:
       <strong><?= $assignees ? htmlspecialchars(implode(', ', array_column($assignees, 'name'))) : 'Unassigned' ?></strong>
     <?php endif; ?>
@@ -1310,12 +1350,6 @@ $__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRol
     <p class="notice notice-info">Repeat order<?= count($duplicatedIntoOrders) === 1 ? '' : 's' ?> placed from this order:
       <?php foreach ($duplicatedIntoOrders as $i => $d): ?><?= $i > 0 ? ', ' : '' ?><a href="/orders/<?= (int) $d['id'] ?>"><?= htmlspecialchars($d['order_reference']) ?></a><?php endforeach; ?>.
     </p>
-  <?php endif; ?>
-  <?php if ($canManageOrders): ?>
-    <form method="post" action="/orders/<?= (int) $order['id'] ?>/duplicate" style="display:inline" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
-      <?= Csrf::field() ?>
-      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate Order</button>
-    </form>
   <?php endif; ?>
   <?php if ($order['status'] === 'lost'): ?>
     <p class="muted small">Marked lost<?php if ($order['lost_at']): ?> on <?= htmlspecialchars($order['lost_at']) ?><?php endif; ?><?php if ($order['lost_reason']): ?> — reason: <?= htmlspecialchars($order['lost_reason']) ?><?php endif; ?></p>
@@ -1420,7 +1454,7 @@ $__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRol
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/request" style="display:inline" onsubmit="return confirmRequestCancellation(this);">
       <?= Csrf::field() ?>
       <input type="hidden" name="reason" class="request-cancellation-reason">
-      <button type="button" class="btn-sm btn-danger" onclick="promptRequestCancellation(this)">Request Cancellation</button>
+      <button type="button" class="btn-sm btn-danger" id="request-cancellation-btn" onclick="promptRequestCancellation(this)">Request Cancellation</button>
     </form>
     <script>
       function promptRequestCancellation(btn) {

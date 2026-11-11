@@ -629,6 +629,39 @@
   {% endfor %}
 </div>
 {% endif %}
+{# Owner decision D-320 (point 26): a bar of real buttons at the top of the
+   order page that stays visible while scrolling — each shown only to those
+   allowed to use it (the same checks as before). "More" holds the rare ones. #}
+{% set barRequestCancel = permissions.close_orders and order.status not in ['complete', 'lost', 'cancelled'] and not pendingCancellation %}
+<div class="order-action-bar" id="order-action-bar" data-testid="order-action-bar">
+  <div class="order-action-bar-title"><strong>{{ order.order_reference }}</strong>{% if sees.client %} &middot; {{ order.company_legal_name }}{% endif %}</div>
+  <div class="order-action-bar-buttons">
+    {% if permissions.manage_orders %}<a class="btn-sm" href="/orders/{{ order.id }}/edit">Edit order</a>{% endif %}
+    <a class="btn-sm btn-secondary" href="#document-review-approval">Documents</a>
+    {% if permissions.view_reports %}<a class="btn-sm btn-secondary" href="/reports/order/{{ order.id }}">Full report</a>{% endif %}
+    {% if permissions.manage_orders %}
+    <form method="post" action="/orders/{{ order.id }}/duplicate" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate order</button>
+    </form>
+    {% endif %}
+    {% if barRequestCancel or canLogInAsClient or permissions.view_audit_log %}
+    <details class="order-action-more">
+      <summary class="btn-sm btn-secondary">More &#9662;</summary>
+      <div class="order-action-more-menu">
+        {% if barRequestCancel %}<button type="button" onclick="promptRequestCancellation(document.getElementById('request-cancellation-btn'))">Request cancellation</button>{% endif %}
+        {% if canLogInAsClient %}
+        <form method="post" action="/clients/{{ order.client_id }}/impersonate" target="_blank" data-confirm="Log in as {{ order.company_legal_name }}? This opens their client-portal view in a new tab, alongside your own session here. This is logged.">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit">Log in as client &#8599;</button>
+        </form>
+        {% endif %}
+        {% if permissions.view_audit_log %}<a href="/orders/{{ order.id }}/audit-log">Audit trail</a>{% endif %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
 <div class="card page-wide">
   {% if query.from == 'kanban' %}
   {% if permissions.manage_orders or permissions.view_orders %}<p class="muted small"><a href="/orders">&larr; Back to Board</a></p>{% endif %}
@@ -642,8 +675,6 @@
     {% if sees.client %}{{ order.company_legal_name }} &nbsp;&middot;&nbsp;{% endif %}{# D-214: Procurement sees the order number only (QA R7-N02) #}
     Buyer Inquiry Ref: {{ order.buyer_inquiry_ref }} &nbsp;&middot;&nbsp;
     {{ order.incoterm_code }} {{ order.port_of_loading_city or order.port_of_loading_name or '' }}
-    {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
-    {% if permissions.manage_orders %}&nbsp;&middot;&nbsp; <a href="/orders/{{ order.id }}/edit">Edit Order Details</a>{% endif %}
     {% if seesAllOrders %}&nbsp;&middot;&nbsp; Assigned to: <strong>{{ order.assignee_names or 'Unassigned' }}</strong>{% endif %}
   </p>
   {% if canAssignOwner %}
@@ -676,12 +707,6 @@
     <p class="notice notice-info">Repeat order{{ 's' if duplicatedIntoOrders.length != 1 else '' }} placed from this order:
       {% for d in duplicatedIntoOrders %}{{ ', ' if not loop.first }}<a href="/orders/{{ d.id }}">{{ d.order_reference }}</a>{% endfor %}.
     </p>
-  {% endif %}
-  {% if permissions.manage_orders %}
-    <form method="post" action="/orders/{{ order.id }}/duplicate" style="display:inline" onsubmit="return confirm('Create a new order copying this one\'s client, commercial terms, and product lines? Nothing about this order changes.');">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-sm btn-secondary" title="Repeat order — copies client, commercial terms, and product lines into a brand-new order">Duplicate Order</button>
-    </form>
   {% endif %}
   {% if order.status == 'lost' %}
     <p class="muted small">Marked lost{% if order.lost_at %} on {{ order.lost_at }}{% endif %}{% if order.lost_reason %} — reason: {{ order.lost_reason }}{% endif %}</p>
@@ -782,7 +807,7 @@
     <form method="post" action="/orders/{{ order.id }}/cancellation/request" style="display:inline" onsubmit="return confirmRequestCancellation(this);">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="hidden" name="reason" class="request-cancellation-reason">
-      <button type="button" class="btn-sm btn-danger" onclick="promptRequestCancellation(this)">Request Cancellation</button>
+      <button type="button" class="btn-sm btn-danger" id="request-cancellation-btn" onclick="promptRequestCancellation(this)">Request Cancellation</button>
     </form>
     <script>
       function promptRequestCancellation(btn) {

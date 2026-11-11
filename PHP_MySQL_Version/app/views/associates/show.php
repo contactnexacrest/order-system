@@ -13,7 +13,7 @@ $__d = static fn ($v): string => $v ? Dates::short(substr((string) $v, 0, 10)) :
 $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code', 'staff' => 'linked by NexaCrest', 'md_change' => 'changed by the MD'];
 ?>
 <div class="card page-wide">
-  <div class="page-header-row">
+  <div class="page-header-row sticky-actions" data-testid="associate-actions"><?php // D-320 (point 26): name and main buttons stay at the top while scrolling ?>
     <div>
       <h1><?= htmlspecialchars((string) $a['name']) ?> <?php $__st = (string) $a['status']; require __DIR__ . '/_status_badge.php'; ?></h1>
       <p class="muted" style="margin:0"><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?>

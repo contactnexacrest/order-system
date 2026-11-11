@@ -55,6 +55,26 @@ final class CoordinationController
         }));
     }
 
+    /**
+     * Owner decision D-320 (point 26): "My tasks (n)" in the left menu — the
+     * number of tasks the My tasks page opens on for this person (the same
+     * department scope, own-orders-only rule and order visibility). A failing
+     * query never breaks the page around the menu.
+     */
+    public static function myTaskCount(int $userId): int
+    {
+        try {
+            $tasks = self::visible(DepartmentTaskRepository::open(self::departmentsFor($userId)));
+            if (self::ownTasksOnly($userId)) {
+                $tasks = array_filter($tasks, static fn (array $t): bool => (int) ($t['owner_id'] ?? 0) === $userId);
+            }
+            return count($tasks);
+        } catch (\Throwable $e) {
+            error_log('[MyTasksCount] ' . $e->getMessage());
+            return 0;
+        }
+    }
+
     public function myTasks(array $params): void
     {
         $userId = (int) AuthService::currentUserId();

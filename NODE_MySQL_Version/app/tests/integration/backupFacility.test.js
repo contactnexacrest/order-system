@@ -133,7 +133,7 @@ describe('D-260 backups — scripts, status, digest warning, Admin › Backups',
     expect(res.text).toContain('On (key file set');
     expect(res.text).toContain('Not chosen yet — copies stay on this server only');
     expect(res.text).not.toContain('/home/x/.backup_key');
-    expect(res.text).toContain('href="/admin/backups"');
+    expect(res.text).toContain('href="/admin/backups" class="active"');
 
     const exec = await createUser('Export Executive');
     const a2 = request.agent(app);

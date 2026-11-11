@@ -81,7 +81,7 @@ final class ViewOnlyTierTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = ob_get_clean();
 
-        self::assertStringNotContainsString('Edit Order Details', $html);
+        self::assertStringNotContainsString('/edit">Edit order</a>', $html); // D-320: the action bar's Edit order button
         self::assertStringNotContainsString('+ Add product', $html, 'the editable product form must not render for a view-only user (D-273: "+ Add product" opens the side panel)');
     }
 
@@ -95,7 +95,8 @@ final class ViewOnlyTierTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = ob_get_clean();
 
-        self::assertStringContainsString('Edit Order Details', $html);
+        self::assertStringContainsString('href="/orders/' . $orderId . '/edit">Edit order</a>', $html); // D-320: the action bar's Edit order button
+        self::assertStringNotContainsString('Edit Order Details', $html, 'D-320: the old grey text link is gone');
         self::assertStringContainsString('+ Add product', $html);
     }
 

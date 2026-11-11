@@ -6,139 +6,69 @@ $isEffectiveSuperAdmin = $current && SuperAdminService::isEffective((int) $curre
 $roleId = $current && $current['role_id'] !== null ? (int) $current['role_id'] : null;
 $can = static fn(string $perm): bool => $current && PermissionService::can((int) $current['id'], $roleId, $perm);
 
-// Task #18 — the flat nav below used to list every one of these ~20 links
-// side by side; grouped into "Operations" / "Insights" / "Admin" dropdowns
-// (see .nav-group in app.css) so it's readable at all, on desktop or
-// mobile. A group's <details> only renders once at least one of its links
-// is actually visible to this user's permissions.
 // Owner decision D-214: the department this person is working as, the others
 // they can switch to, and Admin's "Preview as" banner.
 $actingMembership = $current ? \App\Services\ActiveDepartmentService::current((int) $current['id']) : null;
 $myMemberships = $actingMembership ? \App\Repositories\DepartmentRepository::activeMembershipsForUser((int) $current['id']) : [];
 $previewDesignation = $current ? \App\Services\ActiveDepartmentService::preview() : null;
-$canOrders = $can('manage_orders');
-// Standing-request badges — a live COUNT on every page load (not cached),
-// so the sidebar always reflects reality: a submission appearing the
-// moment it's filed, the number dropping the moment it's accepted or
-// rejected. Both review screens are gated on manage_orders (index.php),
-// so the badge query only runs for staff who could actually act on it.
-$clientIntakePendingCount = $canOrders ? ClientIntakeRepository::pendingCount() : 0;
-$piIntakePendingCount = $canOrders ? PiIntakeRepository::pendingReviewCount() : 0;
-// Same live-count badge on My Reviews: documents waiting on this user's own review.
-$myReviewsPendingCount = $current ? \App\Repositories\DocumentReviewRepository::pendingCountForReviewer((int) $current['id']) : 0;
-// Owner decision D-310 (point 27): "Approvals (n)" — everything this person may approve, on one page.
-$approvalsCount = $current ? \App\Services\ApprovalsInbox::countFor((int) $current['id'], $roleId) : 0;
-$showApprovals = $current && ($approvalsCount > 0 || \App\Services\ApprovalsInbox::isApprover((int) $current['id'], $roleId));
-$canSettings = $can('manage_company_settings');
-// 90-item backlog item #11: a per-field lock badge + save-time warning
-// already existed on the Settings page itself (DashboardRepository::
-// complianceExpiryWarnings() already computed this, shown only on the
-// Dashboard body) — but nothing surfaced it from every other page the
-// way the other standing-request badges above do. Reuses the exact
-// same computation, just counted and attached to the Settings link
-// instead of rendered inline.
-$settingsExpiryWarnings = $canSettings ? \App\Repositories\DashboardRepository::complianceExpiryWarnings() : ['lut' => null, 'rcmc' => null];
-$settingsExpiryWarningCount = ($settingsExpiryWarnings['lut'] ? 1 : 0) + ($settingsExpiryWarnings['rcmc'] ? 1 : 0);
-$canManageHsCodes = $can('manage_hs_codes');
-$canManageLogisticsPartners = $can('manage_logistics_partners');
-$canManageSuppliers = $can('manage_suppliers');
-$canManagePorts = $can('manage_ports');
-$canManagePaymentPresets = $can('manage_payment_presets');
-$canManageComplianceTaskTypes = $can('manage_compliance_task_types');
-$canManageDropdownOptions = $can('manage_dropdown_options');
-$canManageEmailTemplates = $can('manage_email_templates');
-$canAssets = $can('manage_assets');
-$canSignatories = $can('manage_signatories');
-$canPermissions = $can('manage_permissions');
-$canApproveEmail = $can('approve_email_send');
-// User-reported batch item 16: same live-COUNT badge pattern as the
-// Quotation/PI Intake Review links above — only queried for staff who
-// could actually act on it.
-$emailApprovalsPendingCount = $canApproveEmail ? EmailLogRepository::awaitingDispatchCount() : 0;
-$canAudit = $can('view_audit_log');
-$canReports = $can('view_reports');
-$canOverrides = $can('edit_locked_data');
-$canFieldProtection = $can('manage_field_protection');
-// Owner decision 2026-10-30: team incentives and associates.
-$canManageIncentives = $can('manage_incentives');
-$canPricing = $can('view_price_buildup') || $can('manage_pricing'); // D-245
-$canPayIncentives = $can('pay_incentives');
-$canOwnIncentives = $can('view_own_incentives');
-$canUsers = $can('manage_users');
-$canSampleData = $can('manage_sample_data');
-$canViewProducts = $can('view_product_catalog');
-$canViewArchivedOrders = $can('view_archived_orders');
-$canCaModule = $can('ca_module_view');
-$canZohoSync = $can('ca_module_manage'); // Owner 2 Nov 2026 (point 16): app-wide Zoho Sync in the menu
-$canDataExport = $can('data_export_run');
-// docs/schema.sql Section AO — no longer folded into manage_orders.
-$canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
-// External QA report U-01: the main /disputes LIST route requires
-// manage_disputes only (see public_html/index.php) — respond_to_disputes
-// alone (e.g. Export Executive) lets you respond on an order you're
-// already looking at, but never grants the cross-order list page. The
-// broader $canDisputes above stays as the Ops group's own
-// visibility check — that's just "is there a disputes-shaped doorway
-// into this group's worth of nav," not a doorway of its own.
-$canViewDisputesList = $can('manage_disputes') || $can('respond_to_disputes');
-// External QA report U-18: /clients and /orders each also accept their
-// own narrower view_clients/view_orders permission (see
-// PermissionCheck::requiresAny() on both routes) — a Viewer/Auditor holds
-// exactly these two and nothing else in this group, so without them here
-// the whole Operations dropdown never rendered at all, even though both
-// routes worked fine by direct URL.
-$canViewClients = $can('view_clients');
-$canViewOrders = $can('view_orders');
-// docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility
-// split as $canDisputes/$canViewDisputesList above.
-$canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
-$canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaints');
-
-// Owner decision D-214, phase 3: Procurement's queue.
-$canProcurement = ($can('manage_purchasing') || $can('approve_purchases')) && \App\Services\DivisionService::moduleEnabled('supplier_purchase');
-// D-257 Phase 3: Import & Distribution's imports and stock — only where its module is on (IMP only).
-$canImports = $can('view_purchase_prices') && \App\Services\DivisionService::moduleEnabled('import_stock');
-// D-257 Phase 4: Merchant Trade's deals — only where its module is on (MTT only).
-$canMerchant = $can('view_purchase_prices') && \App\Services\DivisionService::moduleEnabled('merchant_trade');
-// D-257: a module switched off for the request's division(s) hides its menu entries.
-$moduleAssociates = \App\Services\DivisionService::moduleEnabled('associates');
-$moduleIncentive = \App\Services\DivisionService::moduleEnabled('team_incentive');
-$canManageIncentives = $canManageIncentives && $moduleIncentive;
-$canPayIncentives = $canPayIncentives && $moduleIncentive;
-$canOwnIncentives = $canOwnIncentives && $moduleIncentive;
-$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement || $canImports || $canMerchant;
-// Owner decision D-214, phase 4: the management cockpit.
-$canCockpit = $can('view_cockpit');
-// Owner decision 1 Nov 2026 (A-7 / A-9): Logistics and Procurement open their own report without the Reports page.
-$canFreightReport = !$canReports && $can('view_logistics_costs');
-$canSupplierReport = !$canReports && $can('view_purchase_prices');
-$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives || $canCockpit || $canFreightReport || $canSupplierReport;
-// 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
-// $canManageDropdownOptions/$canManageEmailTemplates each gate their own
-// link inside this dropdown but were never added to the group's own
-// visibility check — a role whose ONLY Admin-section permission was one
-// of these four saw no "Admin" dropdown at all (it never rendered, so
-// there was nothing to open), even though the route itself worked fine
-// if they knew the direct URL.
-$adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
-    || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManageSuppliers || $canManagePaymentPresets
-    || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates
-    || $canManagePorts || $canManageIncentives || $canPricing || $can('manage_divisions'); // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
-
-// Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
-// current section so a fresher can see at a glance where they are, and
-// keeps a group's disclosure open automatically when they're inside it
-// rather than making them re-discover which dropdown their own page lives
-// under every time they navigate.
 $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/associates') || $isActive('/agreements') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
-$insightsGroupActive = $isActive('/cockpit') || ($isActive('/reports') && !$isActive('/reports/associates')) || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
-$adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
-    || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
-    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports') || $isActive('/incentives/settings') || $isActive('/pricing');
+
+// Owner decision D-320 (point 26): the short left menu (13 entries) and the
+// menu bar of the section this page belongs to, both from one config
+// (src/Config/navigation.json, the same file in the Node stack) — see
+// App\Services\Navigation. Each entry shows only when this person can open
+// at least one page behind it, exactly as the old long menu did per link.
+$nav = null;
+if ($current) {
+    $__uid = (int) $current['id'];
+    // The facts the config asks about besides permissions.
+    $__activeCodes = $can('manage_divisions') ? array_column(\App\Services\DivisionService::active(), 'code') : [];
+    $navFlags = [
+        'superAdmin' => $isEffectiveSuperAdmin,
+        'sopOpen' => \App\Services\SopAccessService::libraryVisibleTo($__uid, $roleId), // D-266
+        'mod_supplier_purchase' => \App\Services\DivisionService::moduleEnabled('supplier_purchase'), // D-257: a module switched off hides its pages
+        'mod_import_stock' => \App\Services\DivisionService::moduleEnabled('import_stock'),
+        'mod_merchant_trade' => \App\Services\DivisionService::moduleEnabled('merchant_trade'),
+        'mod_associates' => \App\Services\DivisionService::moduleEnabled('associates'),
+        'mod_team_incentive' => \App\Services\DivisionService::moduleEnabled('team_incentive'),
+        'div_gst' => array_intersect(['DOM', 'IMP'], $__activeCodes) !== [], // QA UI-12
+        'div_import_duty' => in_array('IMP', $__activeCodes, true),
+    ];
+    // Live counts on every page load (not cached), each queried only for
+    // people who could act on it — the same counts the old menu showed.
+    $__approvalsCount = \App\Services\ApprovalsInbox::countFor($__uid, $roleId); // D-310
+    $navFlags['approver'] = $__approvalsCount > 0 || \App\Services\ApprovalsInbox::isApprover($__uid, $roleId);
+    $__tabCounts = [];
+    if ($__approvalsCount > 0) {
+        try {
+            $__tabCounts = \App\Services\ApprovalsInbox::counts(\App\Services\ApprovalsInbox::items($__uid, $roleId));
+        } catch (\Throwable $e) {
+            $__tabCounts = [];
+        }
+    }
+    $__settingsWarnings = $can('manage_company_settings') ? \App\Repositories\DashboardRepository::complianceExpiryWarnings() : ['lut' => null, 'rcmc' => null];
+    $__zoho = $can('ca_module_manage') ? \App\Services\ZohoPendingService::menuCount() : null; // D-233 / D-239
+    $navCounts = [
+        'approvals' => $__approvalsCount,
+        'approvals_prices' => (int) ($__tabCounts['prices'] ?? 0),
+        'approvals_payment_terms' => (int) ($__tabCounts['payment_terms'] ?? 0),
+        'approvals_bank' => (int) ($__tabCounts['bank'] ?? 0),
+        'approvals_other' => (int) ($__tabCounts['other'] ?? 0),
+        'myReviews' => \App\Repositories\DocumentReviewRepository::pendingCountForReviewer($__uid),
+        'emailApprovals' => $can('approve_email_send') ? EmailLogRepository::awaitingDispatchCount() : 0,
+        'myTasks' => ($can('manage_orders') || $can('view_orders')) ? \App\Controllers\CoordinationController::myTaskCount($__uid) : 0,
+        'clientIntake' => $can('manage_orders') ? ClientIntakeRepository::pendingCount() : 0,
+        'piIntake' => $can('manage_orders') ? PiIntakeRepository::pendingReviewCount() : 0,
+        'associateRegistrations' => $can('manage_associates') ? \App\Repositories\AssociateRegistrationRepository::pendingCount() : 0,
+        'zohoWaiting' => (int) ($__zoho ?? 0),
+        'setupNeeded' => $can('manage_company_settings') ? \App\Services\SetupChecklist::neededCount() : 0, // D-312
+        'settingsExpiry' => ($__settingsWarnings['lut'] ? 1 : 0) + ($__settingsWarnings['rcmc'] ? 1 : 0),
+    ];
+    $nav = \App\Services\Navigation::build($can, $navFlags, $navCounts, $currentPath, $_GET);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -170,107 +100,13 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
     <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox">
     <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation">&#9776;</label>
   <?php endif; ?>
-  <nav class="sidebar-nav">
-    <a href="/" class="<?= $isActive('/') && $currentPath === '/' ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg></span>Dashboard</a>
-    <?php if ($showApprovals): ?>
-      <a href="/approvals" class="<?= $isActive('/approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Approvals<?= $approvalsCount > 0 ? ' <span class="nav-badge">' . (int) $approvalsCount . '</span>' : '' ?></a>
-    <?php endif; ?>
-    <?php if ($current): ?>
-      <a href="/getting-started" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg></span>Getting Started</a>
-      <a href="/reference-docs" class="<?= $isActive('/reference-docs') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
-      <?php $__sopOpen = \App\Services\SopAccessService::libraryVisibleTo((int) $current['id'], isset($current['role_id']) && $current['role_id'] !== null ? (int) $current['role_id'] : null); // D-266 ?>
-      <?php if ($__sopOpen): ?>
-      <a href="/sop" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>SOP / Operations Guide</a>
-      <a href="/gallery" class="<?= $isActive('/gallery') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg></span>Gallery</a>
-      <?php endif; ?>
-      <a href="/reviews" class="<?= $isActive('/reviews') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews<?= $myReviewsPendingCount > 0 ? ' <span class="nav-badge">' . (int) $myReviewsPendingCount . '</span>' : '' ?></a>
-      <?php if ($can('manage_orders') || $can('view_orders')): ?><a href="/my-tasks" class="<?= $isActive('/my-tasks') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>My Tasks</a><?php endif; ?>
-      <?php if ($canApproveEmail): ?><a href="/email-approvals" class="<?= $isActive('/email-approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 6L2 7"></path></svg></span>Email Approvals<?= $emailApprovalsPendingCount > 0 ? ' <span class="nav-badge">' . (int) $emailApprovalsPendingCount . '</span>' : '' ?></a><?php endif; ?>
-      <?php if ($canCaModule): ?><a href="/ca" class="<?= $isActive('/ca') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a><?php endif; ?>
-      <?php if ($canZohoSync): ?><a href="/ca/zoho-sync" class="<?= $isActive('/ca/zoho-sync') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></span>Zoho Sync<?php $__zwMenu = \App\Services\ZohoPendingService::menuCount(); if ($__zwMenu !== null && $__zwMenu > 0): // D-233 / D-239 ?> <span class="badge badge-warning nav-badge zoho-waiting-menu" title="Waiting for Zoho: <?= (int) $__zwMenu ?> — <?= htmlspecialchars(\App\Services\ZohoPendingService::pausedText() ?? 'sent at the next sync (hourly, or Sync now)') ?>"><?= (int) $__zwMenu ?></span><?php endif; ?></a><?php endif; ?>
-      <?php if ($canViewProducts): ?><a href="/products" class="<?= $isActive('/products') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a><?php endif; ?>
-    <?php endif; ?>
-    <?php if ($opsGroupVisible): ?>
-      <details class="nav-group"<?= $opsGroupActive ? ' open' : '' ?>>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
-        <div class="nav-dropdown">
-          <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
-          <?php if ($moduleAssociates && ($can('view_associates') || $can('manage_associates') || $can('manage_associate_bank'))): ?><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
-          <?php if ($can('view_agreements') || $can('manage_agreements')): ?><a href="/agreements" class="<?= $isActive('/agreements') ? 'active' : '' ?>">Agreements</a><?php endif; ?>
-          <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
-          <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
-          <?php // QA Round 5, R5-22: these three routes need manage_orders. ?>
-          <?php if ($canOrders): ?>
-          <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review<?= $clientIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $clientIntakePendingCount . '</span>' : '' ?></a>
-          <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
-          <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
-          <?php endif; ?>
-          <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
-          <?php if ($canViewComplaintsList): ?><a href="/complaints" class="<?= $isActive('/complaints') ? 'active' : '' ?>">Complaints</a><?php endif; ?>
-          <?php if ($canProcurement): ?><a href="/procurement" class="<?= $isActive('/procurement') ? 'active' : '' ?>">Procurement</a><?php endif; ?>
-          <?php if ($canImports): ?><a href="/import" class="<?= $isActive('/import') ? 'active' : '' ?>">Imports &amp; stock</a><?php endif; ?>
-          <?php if ($canMerchant): ?><a href="/merchant" class="<?= $isActive('/merchant') ? 'active' : '' ?>">Merchant trade</a><?php endif; ?>
-        </div>
-      </details>
-    <?php endif; ?>
-    <?php if ($insightsGroupVisible): ?>
-      <details class="nav-group"<?= $insightsGroupActive ? ' open' : '' ?>>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
-        <div class="nav-dropdown">
-          <?php if ($canReports): ?><a href="/reports" class="<?= $isActive('/reports') ? 'active' : '' ?>">Reports</a><?php endif; ?>
-          <?php if ($canFreightReport): ?><a href="/reports/freight-cost" class="<?= $isActive('/reports/freight-cost') ? 'active' : '' ?>">Freight Cost Report</a><?php endif; ?>
-          <?php if ($canSupplierReport): ?><a href="/reports/suppliers" class="<?= $isActive('/reports/suppliers') ? 'active' : '' ?>">Supplier Report</a><?php endif; ?>
-          <?php if ($canPayIncentives): ?><a href="/incentives/payouts" class="<?= $isActive('/incentives/payouts') ? 'active' : '' ?>">Incentive Payouts</a><?php endif; ?>
-          <?php if ($canOwnIncentives): ?><a href="/my-incentives" class="<?= $isActive('/my-incentives') ? 'active' : '' ?>">My Incentives</a><?php endif; ?>
-          <?php if ($canCockpit): ?><a href="/cockpit" class="<?= $isActive('/cockpit') ? 'active' : '' ?>">Management Cockpit</a><?php endif; ?>
-          <?php if ($canAudit): ?><a href="/audit-log" class="<?= $isActive('/audit-log') ? 'active' : '' ?>">Audit Log</a><?php endif; ?>
-        </div>
-      </details>
-    <?php endif; ?>
-    <?php if ($adminGroupVisible): ?>
-      <details class="nav-group"<?= $adminGroupActive ? ' open' : '' ?>>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>Admin</summary>
-        <div class="nav-dropdown">
-          <?php if ($canSettings): // D-312 ?><a href="/admin/setup-checklist" class="<?= $isActive('/admin/setup-checklist') ? 'active' : '' ?>">Setup Checklist<?php $__setupNeeded = \App\Services\SetupChecklist::neededCount(); if ($__setupNeeded > 0): ?> <span class="nav-badge"><?= (int) $__setupNeeded ?></span><?php endif; ?></a><?php endif; ?>
-          <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings<?= $settingsExpiryWarningCount > 0 ? ' <span class="nav-badge">' . (int) $settingsExpiryWarningCount . '</span>' : '' ?></a><?php endif; ?>
-          <?php if ($canSettings): // D-280 ?><a href="/admin/email-settings" class="<?= $isActive('/admin/email-settings') ? 'active' : '' ?>">E-mail Settings</a><?php endif; ?>
-          <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>
-          <?php if ($canManageHsCodes): ?><a href="/hs-codes" class="<?= $isActive('/hs-codes') ? 'active' : '' ?>">HS Codes</a><?php endif; ?>
-          <?php if ($canManageLogisticsPartners): ?><a href="/logistics-partners" class="<?= $isActive('/logistics-partners') ? 'active' : '' ?>">Logistics Partners</a><?php endif; ?>
-          <?php if ($canManageSuppliers): ?><a href="/suppliers" class="<?= $isActive('/suppliers') ? 'active' : '' ?>">Suppliers</a><?php endif; ?>
-          <?php if ($canManagePorts): ?><a href="/ports" class="<?= $isActive('/ports') ? 'active' : '' ?>">Ports</a><?php endif; ?>
-          <?php if ($canManagePaymentPresets): ?><a href="/payment-presets" class="<?= $isActive('/payment-presets') ? 'active' : '' ?>">Payment Presets</a><?php endif; ?>
-          <?php if ($canManageComplianceTaskTypes): ?><a href="/compliance-task-types" class="<?= $isActive('/compliance-task-types') ? 'active' : '' ?>">Compliance Task Types</a><?php endif; ?>
-          <?php if ($canManageDropdownOptions): ?><a href="/admin/dropdown-options" class="<?= $isActive('/admin/dropdown-options') ? 'active' : '' ?>">Dropdown Option Lists</a><?php endif; ?>
-          <?php if ($canManageEmailTemplates): ?><a href="/email-templates" class="<?= $isActive('/email-templates') ? 'active' : '' ?>">Email Templates</a><?php endif; ?>
-          <?php if ($canSettings): ?><a href="/ui-templates" class="<?= $isActive('/ui-templates') ? 'active' : '' ?>">UI Templates</a><?php endif; ?>
-          <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
-          <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
-          <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
-          <?php if ($can('manage_divisions')): // D-257 ?><a href="/admin/divisions" class="<?= $isActive('/admin/divisions') ? 'active' : '' ?>">Divisions</a><?php endif; ?>
-          <?php // QA UI-12: the GST and import duty rate lists, once a division that uses them is active (until then: Admin › Divisions).
-          $__activeCodes = $can('manage_divisions') ? array_column(\App\Services\DivisionService::active(), 'code') : []; ?>
-          <?php if (array_intersect(['DOM', 'IMP'], $__activeCodes) !== []): ?><a href="/admin/gst-rates" class="<?= $isActive('/admin/gst-rates') ? 'active' : '' ?>">GST Rates</a><?php endif; ?>
-          <?php if (in_array('IMP', $__activeCodes, true)): ?><a href="/admin/import-duty-rates" class="<?= $isActive('/admin/import-duty-rates') ? 'active' : '' ?>">Import Duty Rates</a><?php endif; ?>
-          <?php if ($canPermissions): ?><a href="/admin/departments" class="<?= $isActive('/admin/departments') ? 'active' : '' ?>">Departments</a><?php endif; ?>
-          <?php if ($can('manage_task_types')): ?><a href="/admin/task-types" class="<?= $isActive('/admin/task-types') ? 'active' : '' ?>">Task Due Days</a><?php endif; ?>
-          <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
-          <?php if ($canUsers): ?><a href="/users" class="<?= $isActive('/users') ? 'active' : '' ?>">Users</a><?php endif; ?>
-          <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>
-          <?php if ($canManageIncentives): ?><a href="/incentives/settings" class="<?= $isActive('/incentives/settings') ? 'active' : '' ?>">Team Incentives</a><?php endif; ?>
-          <?php if ($canPricing): ?><a href="/pricing/settings" class="<?= $isActive('/pricing') ? 'active' : '' ?>">Pricing</a><?php endif; ?>
-          <?php if ($canOverrides): ?><a href="/admin/overrides" class="<?= $isActive('/admin/overrides') ? 'active' : '' ?>">Admin Overrides</a><?php endif; ?>
-          <?php if ($canSampleData): ?><a href="/sample-data" class="<?= $isActive('/sample-data') ? 'active' : '' ?>">Sample Data</a><?php endif; ?>
-          <?php if ($canDataExport): ?><a href="/admin/data-export" class="<?= $isActive('/admin/data-export') ? 'active' : '' ?>">Data Export / Migration</a><?php endif; ?>
-          <?php if ($canSettings): ?><a href="/admin/backups" class="<?= $isActive('/admin/backups') ? 'active' : '' ?>">Backups</a><?php endif; ?>
-        </div>
-      </details>
-    <?php endif; ?>
-    <?php if ($isEffectiveSuperAdmin): ?>
-      <a href="/super-admin" class="<?= $isActive('/super-admin') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg></span>Super Admin</a>
-      <a href="/admin/self-approval" class="<?= $isActive('/admin/self-approval') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Self-approval rules</a>
-      <a href="/test-mode" class="<?= $isActive('/test-mode') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"></path><path d="M8.5 14h7"></path></svg></span>Test Mode<?= $testModeEnabled ? ' <span class="nav-live-dot" aria-hidden="true"></span>' : '' ?></a>
-    <?php endif; ?>
+  <nav class="sidebar-nav" data-testid="main-menu">
+    <?php if ($nav === null): ?>
+      <a href="/" class="<?= $currentPath === '/' ? 'active' : '' ?>">Dashboard</a>
+    <?php else: foreach ($nav['sidebar'] as $__entry): ?>
+      <?php if ($__entry['heading'] !== null): ?><div class="nav-heading"><?= htmlspecialchars($__entry['heading']) ?></div><?php endif; ?>
+      <a href="<?= htmlspecialchars($__entry['href']) ?>" class="<?= $__entry['active'] ? 'active' : '' ?>" data-nav="<?= htmlspecialchars($__entry['key']) ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><?= $__entry['icon'] // trusted markup from src/Config/navigation.json ?></svg></span><?= htmlspecialchars($__entry['label']) ?><?= $__entry['count'] > 0 ? ' <span class="nav-badge">' . (int) $__entry['count'] . '</span>' : '' ?></a>
+    <?php endforeach; endif; ?>
   </nav>
   <div class="sidebar-user">
     <?php if ($current): ?>
@@ -334,6 +170,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
     <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
   <?php endif; ?>
   <main class="page">
+    <?php if ($nav !== null && $nav['bar'] !== null) { $__bar = $nav['bar']; require dirname(__DIR__) . '/partials/section_nav.php'; } // D-320: this section's menu bar ?>
     <?php foreach (Flash::pull() as $f): ?>
       <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?><?php if (!empty($f['copy_link'])) { $__copyLink = $f['copy_link']; $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; } // D-280 ?></div>
     <?php endforeach; ?>
