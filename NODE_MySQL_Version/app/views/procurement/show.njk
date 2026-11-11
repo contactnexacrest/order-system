@@ -45,7 +45,7 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Supplier *
       <select name="supplier_id" required>
-        <option value="">— choose —</option>
+        <option value="">Choose…</option>
         {% for s in suppliers %}<option value="{{ s.id }}">{{ s.supplier_legal_name }}</option>{% endfor %}
       </select>
     </label>
@@ -80,7 +80,7 @@
     <label>Quantity received *<input type="number" name="received_quantity" step="0.001" min="0.001" value="{{ qty }}" required placeholder="e.g. 100"></label>
     <label>Received on *<input type="date" name="received_on" max="{{ today }}" value="{{ today }}" required></label>
     <label>Quality check *
-      <select name="qc_result" required><option value="">— choose —</option>{% for k, l in qcResults %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+      <select name="qc_result" required><option value="">Choose…</option>{% for k, l in qcResults %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
     </label>
     <label>What the check found <small class="muted">(needed unless passed)</small><input type="text" name="qc_note" maxlength="500" placeholder="e.g. 2 slabs chipped, replaced"></label>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Record receipt</button></div>

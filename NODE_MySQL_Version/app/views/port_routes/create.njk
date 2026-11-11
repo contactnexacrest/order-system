@@ -6,7 +6,7 @@
     <div class="field-grid">
       <label>Port of Loading *
         <select name="port_of_loading_id" required>
-          <option value="">— Select —</option>
+          <option value="">Choose…</option>
           {% for p in loadingPorts %}
             <option value="{{ p.id }}">{{ p.name }}</option>
           {% endfor %}
@@ -14,7 +14,7 @@
       </label>
       <label>Port of Discharge *
         <select name="port_of_discharge_id" required>
-          <option value="">— Select —</option>
+          <option value="">Choose…</option>
           {% for p in dischargePorts %}
             <option value="{{ p.id }}">{{ p.name }}</option>
           {% endfor %}

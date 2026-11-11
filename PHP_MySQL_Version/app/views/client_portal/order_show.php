@@ -140,7 +140,7 @@
       <div class="field-grid">
         <label>Which Payment? *
           <select name="payment_type" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             <option value="advance">Advance Payment</option>
             <option value="balance">Balance Payment</option>
             <option value="freight">Freight Payment</option>
@@ -233,7 +233,7 @@
         <?= Csrf::field() ?>
         <label>Rating *
           <select name="rating" required>
-            <option value="">Choose a rating</option>
+            <option value="">Choose a rating…</option>
             <?php for ($i = 5; $i >= 1; $i--): ?>
               <option value="<?= $i ?>" <?= (!empty($orderFeedback) && (int) $orderFeedback['rating'] === $i) ? 'selected' : '' ?>><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
             <?php endfor; ?>

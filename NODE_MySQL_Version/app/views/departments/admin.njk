@@ -35,7 +35,7 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Department *
         <select name="department_id" required>
-          <option value="">— choose —</option>
+          <option value="">Choose…</option>
           {% for dept in departments %}<option value="{{ dept.id }}">{{ dept.name }}</option>{% endfor %}
         </select>
       </label>

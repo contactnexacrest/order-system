@@ -134,7 +134,7 @@
         </label>
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             {% for i in incoterms %}
               <option value="{{ i.code }}" {% if submission.incoterm_confirmed == i.code %}selected{% endif %}>{{ i.code }}</option>
             {% endfor %}

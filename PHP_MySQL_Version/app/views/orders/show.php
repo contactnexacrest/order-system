@@ -2911,7 +2911,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div class="field-grid">
         <label>Supplier *
           <select name="supplier_id" id="spo-supplier-select" required>
-            <option value="">Select supplier…</option>
+            <option value="">Choose a supplier…</option>
             <?php foreach ($suppliers as $sup): ?>
               <?php $supAddressesForOption = $supplierFactoryAddressesBySupplier[(int) $sup['id']] ?? []; ?>
               <option value="<?= (int) $sup['id'] ?>" data-addresses="<?= htmlspecialchars(json_encode(array_map(static fn(array $a): string => $a['address'], $supAddressesForOption)) ?: '[]') ?>" data-types="<?= htmlspecialchars(json_encode($sup['types']) ?: '[]') ?>"><?= htmlspecialchars($sup['supplier_legal_name']) ?><?= $sup['types'] ? ' — ' . htmlspecialchars(implode(', ', $sup['types'])) : '' ?></option>
@@ -2968,7 +2968,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr" placeholder="e.g. 250000.00"></label>
         <label>Delivery Location
           <select id="spo-delivery-location-select">
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             <option value="__other__">Other (not listed) — specify</option>
           </select>
           <input type="text" id="spo-delivery-location-input" name="delivery_location" placeholder="Select a supplier first, or specify" style="display:none">
@@ -3035,7 +3035,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             if (types.length > 1) {
               var blank = document.createElement('option');
               blank.value = '';
-              blank.textContent = '— Select —';
+              blank.textContent = 'Choose…';
               typeSelect.appendChild(blank);
             }
             types.forEach(function (t) {
@@ -3068,7 +3068,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             deliverySelect.innerHTML = '';
             var blank = document.createElement('option');
             blank.value = '';
-            blank.textContent = '— Select —';
+            blank.textContent = 'Choose…';
             deliverySelect.appendChild(blank);
             addresses.forEach(function (addr) {
               var o = document.createElement('option');
@@ -3324,7 +3324,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= Csrf::field() ?>
         <label>Logistics partner *
           <select name="logistics_partner_id" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             <?php foreach ($__activePartners as $lp): ?>
               <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars((string) $lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? (string) $lp['service_type']) ?>)</option>
             <?php endforeach; ?>
@@ -3389,7 +3389,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Freight Forwarder (Logistics Partner) *
           <?php $__suggestedForwarder = \App\Repositories\LogisticsPartnerRepository::suggestedForwarderId($freight ?: null, $vendorBills, $logisticsPartners); // owner request (2 Nov 2026) ?>
           <select name="freight_forwarder_partner_id" required>
-            <option value="">Select logistics partner…</option>
+            <option value="">Choose a logistics partner…</option>
             <?php foreach ($logisticsPartners as $lp): ?>
               <option value="<?= (int) $lp['id'] ?>"<?= (int) $lp['id'] === $__suggestedForwarder ? ' selected' : '' ?>><?= htmlspecialchars($lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? $lp['service_type']) ?>)</option>
             <?php endforeach; ?>
@@ -3536,7 +3536,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label>Actual Quantity Unit
             <?php $__packingUnit = $packing['actual_quantity_unit'] ?? ($orderedSummary['comparable'] ? $orderedSummary['unit'] : ''); ?>
             <select name="actual_quantity_unit">
-              <option value="">— Select —</option>
+              <option value="">Choose…</option>
               <?php foreach ($units as $__u): ?>
                 <option value="<?= htmlspecialchars($__u['option_value']) ?>" <?= ($__packingUnit === $__u['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($__u['option_value']) ?></option>
               <?php endforeach; ?>
@@ -3560,7 +3560,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;" placeholder="e.g. NX/01-12" aria-label="Crate marks numbers"></td>
             <td><?php $__crateProduct = (string) ($c['product_description'] ?? ''); $__crateKnown = in_array($__crateProduct, array_map(static fn(array $p): string => (string) $p['description'], $products), true); ?>
               <select name="crate_product_description[]" data-crate-product style="width:160px;" aria-label="Crate product description">
-                <option value="" data-hs="">— Product —</option>
+                <option value="" data-hs="">Choose a product…</option>
                 <?php foreach ($products as $__p): ?>
                 <option value="<?= htmlspecialchars((string) $__p['description']) ?>" data-hs="<?= htmlspecialchars((string) $__p['hs_code']) ?>" <?= $__crateProduct === (string) $__p['description'] ? 'selected' : '' ?>><?= htmlspecialchars(mb_strimwidth((string) $__p['description'], 0, 60, '…')) ?></option>
                 <?php endforeach; ?>
@@ -4888,7 +4888,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?= Csrf::field() ?>
           <label>Rating
             <select name="rating" required>
-              <option value="">Choose a rating</option>
+              <option value="">Choose a rating…</option>
               <?php for ($i = 5; $i >= 1; $i--): ?>
                 <option value="<?= $i ?>"><?= str_repeat('★', $i) ?><?= str_repeat('☆', 5 - $i) ?> (<?= $i ?>/5)</option>
               <?php endfor; ?>
@@ -5021,7 +5021,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?= Csrf::field() ?>
                 <input type="hidden" name="department_id" value="<?= (int) $__o['department_id'] ?>">
                 <select name="user_id" required aria-label="Owner for <?= htmlspecialchars((string) $__o['name']) ?>">
-                  <option value="">— choose —</option>
+                  <option value="">Choose…</option>
                   <?php foreach ($__cands as $__c): ?><option value="<?= (int) $__c['id'] ?>" <?= (int) $__c['id'] === (int) ($__o['user_id'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars($__c['name'] . ' (' . $__c['designation_title'] . ')') ?></option><?php endforeach; ?>
                 </select>
                 <button type="submit" class="btn-sm">Set</button>

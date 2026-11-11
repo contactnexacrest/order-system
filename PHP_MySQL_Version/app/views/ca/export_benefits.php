@@ -16,7 +16,7 @@
       <div class="field-grid">
         <label>Scheme
           <select name="scheme_name" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             <?php foreach ($schemeOptions as $opt): ?>
               <option value="<?= htmlspecialchars($opt['option_value']) ?>" <?= $opt['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($opt['option_value']) ?></option>
             <?php endforeach; ?>

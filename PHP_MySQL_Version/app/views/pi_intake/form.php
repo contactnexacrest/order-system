@@ -140,7 +140,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
         </label>
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             <?php foreach ($incoterms as $i): ?>
               <option value="<?= htmlspecialchars($i['code']) ?>" <?= $incotermValue === $i['code'] ? 'selected' : '' ?>><?= htmlspecialchars($i['code']) ?></option>
             <?php endforeach; ?>

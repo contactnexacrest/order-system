@@ -48,7 +48,7 @@ $inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
     <?= Csrf::field() ?>
     <label>Supplier *
       <select name="supplier_id" required>
-        <option value="">— choose —</option>
+        <option value="">Choose…</option>
         <?php foreach ($suppliers as $s): ?><option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars((string) $s['supplier_legal_name']) ?></option><?php endforeach; ?>
       </select>
     </label>
@@ -83,7 +83,7 @@ $inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
     <label>Quantity received *<input type="number" name="received_quantity" step="0.001" min="0.001" value="<?= htmlspecialchars($qty) ?>" required placeholder="e.g. 100"></label>
     <label>Received on *<input type="date" name="received_on" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" required></label>
     <label>Quality check *
-      <select name="qc_result" required><option value="">— choose —</option><?php foreach ($qcResults as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select>
+      <select name="qc_result" required><option value="">Choose…</option><?php foreach ($qcResults as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select>
     </label>
     <label>What the check found <small class="muted">(needed unless passed)</small><input type="text" name="qc_note" maxlength="500" placeholder="e.g. 2 slabs chipped, replaced"></label>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Record receipt</button></div>
