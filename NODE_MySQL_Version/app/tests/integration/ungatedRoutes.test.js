@@ -341,7 +341,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(44); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers
+    expect(checked).toBe(45); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers; D-310: + GET /approvals
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -395,7 +395,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(25); // D-283: + /associate/keep-alive
+    expect(checked).toBe(29); // D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -429,7 +429,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(74); // D-265: + 5 login-code POSTs; D-282/D-283: + 5
+    expect(checked).toBe(79); // D-265: + 5 login-code POSTs; D-282/D-283: + 5; D-293: + 3 associate bank-confirm POSTs; D-294: + 2 vendor-bank-confirm POSTs
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -442,7 +442,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(59);
+    expect(checked).toBe(62); // D-294: + GET/POST /vendor-bank-confirm/:token, POST /vendor-bank-confirm/:token/not-us
     expect(failed).toEqual([]);
   }, 120000);
 
@@ -452,13 +452,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     for (const route of routes().filter((r) => r.method === 'GET' && !r.pattern.includes(':'))) {
       const agent = await agentFor(route.guard);
       const res = await agent.get(route.pattern);
-      const redirectsOnPurpose = ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */, '/associate/prices' /* D-255: to the catalogue */, '/pricing/line-quote' /* D-255: 404 JSON without a product */].includes(route.pattern);
+      const redirectsOnPurpose = ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */, '/associate/prices' /* D-255: to the catalogue */, '/pricing/line-quote' /* D-255: 404 JSON without a product */, '/associate/bank/confirm' /* D-293: to the profile when nothing waits for confirmation */].includes(route.pattern);
       if (res.status >= 500 || (res.status !== 200 && !redirectsOnPurpose) || (res.status === 200 && (res.text || res.body || '').length === 0)) {
         failed.push(`${label(route)} → ${res.status}`);
       }
       checked++;
     }
-    expect(checked).toBe(40); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password
+    expect(checked).toBe(42); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password; D-310: + GET /approvals; D-293: + GET /associate/bank/confirm
     expect(failed).toEqual([]);
   }, 120000);
 

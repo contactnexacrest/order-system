@@ -151,7 +151,7 @@ describe('CA order linking (Point 2 follow-up)', () => {
     await caExpenseRepository.linkToOrder(expenseId, orderId);
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 
@@ -165,7 +165,7 @@ describe('CA order linking (Point 2 follow-up)', () => {
   it('order show page returns no linked data when the permission is absent', async () => {
     const orderId = await createTestOrder(await createTestClient());
 
-    const req = { params: { id: String(orderId) }, permissions: { view_all_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions: { view_all_orders: true }, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

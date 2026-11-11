@@ -212,7 +212,7 @@ describe('QA batch 3 — documents and e-mail', () => {
       expect(await tpl(`send_${String(r.code).toLowerCase()}`)).toBeTruthy();
     }
     expect((await tpl('shipment_readiness')).body).not.toContain('attached');
-    expect((await tpl('buyer_action_link')).body).toContain('download your Purchase Order');
+    expect((await tpl('buyer_action_link')).body).toContain('download your purchase order'); // D-330: plain-language wording
   });
 
   it('MAIL-9: a failed send is reported to the requester; a row being sent is in flight', async () => {

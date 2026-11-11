@@ -126,6 +126,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
 
     const pan = await doc(a.id, 'pan', 'ABCDE1234F');
     const aad = await doc(a.id, 'aadhaar', 'XXXX XXXX 1234');
+    const addr = await doc(a.id, 'address', 'Electricity bill 0042'); // D-290: the address proof is its own item
     const bank = await doc(a.id, 'bank_proof');
     const agr = await doc(a.id, 'agreement');
     const gst = await doc(a.id, 'gst', '29ABCDE1234F1Z5');
@@ -147,7 +148,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     expect(block).toContain('KYC is not complete');
     expect(block).toContain('Bank proof');
 
-    for (const d of [pan, aad, agr, gst]) {
+    for (const d of [pan, aad, addr, agr, gst]) {
       await call(associateAdminController.reviewDocument, { as: admin, params: { id: String(a.id), docId: String(d) }, body: { decision: 'accept', reason: '' } });
       expect(flash().type).toBe('success');
     }

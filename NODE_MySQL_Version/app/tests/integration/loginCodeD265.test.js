@@ -238,7 +238,8 @@ describe('D-265 e-mailed login code for staff and buyers', () => {
     const t = await db.queryOne("SELECT body FROM email_templates WHERE template_key = 'two_factor_code'");
     expect(t.body).toContain('This code expires in 10 minutes.');
     const src = fs.readFileSync(path.join(__dirname, '../../src/services/twoFactorService.js'), 'utf8');
-    expect(src).toContain('await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true });');
+    // D-280: still security mail (never held), now also tagged with its MUST kind and audience for Admin › E-mail settings.
+    expect(src).toContain("await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true, kind: 'login_code', audience: scope === 'client' ? 'buyer' : 'staff' });");
   });
 
   it('through the real routes: password, then the code page, then the dashboard (staff) and the portal (buyer)', async () => {

@@ -184,7 +184,8 @@ async function deliverWithAttachments(to, subject, body, attachments, cc = []) {
   const t = transport();
   if (!t) {
     const names = attachments.map((a) => a.name).join(', ');
-    console.error(`[EMAIL NOT SENT — no SMTP configured] To: ${to} | Subject: ${subject} | Attachments: ${names}`);
+    // D-280: the log keeps the full text (as sendPlainText's own fallback does), so a link can be sent by hand.
+    console.error(`[EMAIL NOT SENT — no SMTP configured] To: ${to} | Subject: ${subject} | Attachments: ${names} | Body: ${body}`);
     return false;
   }
   try {

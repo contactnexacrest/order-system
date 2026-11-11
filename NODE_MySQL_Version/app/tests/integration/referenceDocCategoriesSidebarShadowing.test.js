@@ -49,14 +49,17 @@ describe('reference-docs/categories sidebar context shadowing (External QA repor
     return agent;
   }
 
-  test('an Admin still sees the Email Approvals and CA/Accounting sidebar links on this page', async () => {
+  test('an Admin still sees the Approvals, Finance & accounts, Products and Reports sidebar links on this page', async () => {
     const agent = await loginAs('Admin');
 
     const res = await agent.get('/reference-docs/categories');
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Email Approvals');
-    expect(res.text).toContain('CA / Accounting');
+    // D-320: the short left menu — Approvals (with E-mails), Finance & accounts (CA / Accounting),
+    // Products and Reports (Insights) are permission-gated entries.
+    for (const nav of ['approvals', 'finance', 'products', 'reports']) {
+      expect([nav, res.text.includes(`data-nav="${nav}"`)]).toEqual([nav, true]);
+    }
   });
 
   test('the same Admin sees those same sidebar links on an unrelated page, for comparison', async () => {
@@ -65,7 +68,10 @@ describe('reference-docs/categories sidebar context shadowing (External QA repor
     const res = await agent.get('/orders');
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Email Approvals');
-    expect(res.text).toContain('CA / Accounting');
+    // D-320: the short left menu — Approvals (with E-mails), Finance & accounts (CA / Accounting),
+    // Products and Reports (Insights) are permission-gated entries.
+    for (const nav of ['approvals', 'finance', 'products', 'reports']) {
+      expect([nav, res.text.includes(`data-nav="${nav}"`)]).toEqual([nav, true]);
+    }
   });
 });

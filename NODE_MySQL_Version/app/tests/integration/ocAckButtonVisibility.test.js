@@ -53,7 +53,7 @@ describe('OC acknowledgment override button visibility (P0 #23/#77)', () => {
     expect(await orderOcAcknowledgmentRepository.find(orderId)).toBeNull();
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 
@@ -66,7 +66,7 @@ describe('OC acknowledgment override button visibility (P0 #23/#77)', () => {
     await unlockStage4(orderId);
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 
@@ -83,7 +83,7 @@ describe('OC acknowledgment override button visibility (P0 #23/#77)', () => {
     );
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

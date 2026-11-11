@@ -63,6 +63,14 @@ describe('Audit log sends no email (owner decision 2026-10-26)', () => {
   it('notifies only the order\'s own team when the client acts on it', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const assigneeId = await createTestUser('Export Executive');
+    // D-281: the e-mail goes to the event's department people on the order (here Sales); without
+    // one, to the department's manager or the MD with "please assign someone".
+    await db.execute(
+      `INSERT INTO user_department_memberships (user_id, designation_id, starts_on, is_default)
+       SELECT :u, dd.id, CURDATE(), 1 FROM department_designations dd JOIN roles r ON r.id = dd.role_id
+         JOIN departments d ON d.id = dd.department_id WHERE r.name = 'Export Executive' AND d.code = 'SALES' LIMIT 1`,
+      { u: assigneeId }
+    );
     await orderAssigneeRepository.add(orderId, assigneeId, null);
 
     const notified = await notificationRepository.notifyOrderTeam(orderId, 'buyer_oc_acknowledged', 'The buyer acknowledged the Order Confirmation.');

@@ -137,7 +137,7 @@ describe('QA Round 6 — smaller fixes', () => {
     const report = async () => flashAfter(client, await post(client, `${page}/report-payment`, { payment_type: 'advance', transaction_ref: 'UTR-JEST', amount: '100', payment_date: todayIst() }, page));
     const count = async () => Number((await db.queryOne('SELECT COUNT(*) AS n FROM client_payment_reports WHERE order_id = :o', { o: orderId })).n);
 
-    expect((await report()).message).toContain('once we have sent you the Proforma Invoice');
+    expect((await report()).message).toContain('after we send you the proforma invoice'); // D-330 plain wording
     await createTestDocument(orderId, 'PI', 'sent');
     expect((await report()).type).toBe('success');
     expect(await count()).toBe(1);
@@ -163,7 +163,7 @@ describe('QA Round 6 — smaller fixes', () => {
       .attach('unexpected_field', Buffer.from('%PDF-1.4 x'), 'x.pdf');
     expect(res.status).toBe(302);
     const html = (await client.get(res.headers.location)).text;
-    expect(html).toContain('could not be accepted');
+    expect(html).toContain('We could not accept that file, so nothing was saved'); // D-330 plain wording
     expect(html).toContain('Please confirm the crate count.</textarea>');
     expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM order_comments WHERE order_id = :o', { o: orderId })).n)).toBe(0);
   });

@@ -434,8 +434,9 @@ describe('Order Complaint / Process Issue (Section BX)', () => {
       const loginRes = await staffAgent.post('/login').type('form').send({ _csrf: csrf, email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
       expect(loginRes.status).toBe(302);
 
-      const dashboardRes = await staffAgent.get('/');
-      expect(dashboardRes.text).toContain('>Complaints<');
+      // D-320: Complaints is in the Orders section's menu bar (shown on the order pages), not the short left menu.
+      const ordersRes = await staffAgent.get('/orders');
+      expect(ordersRes.text).toContain('<a href="/complaints">Complaints</a>');
 
       const complaintsRes = await staffAgent.get('/complaints');
       expect(complaintsRes.status).toBe(200);

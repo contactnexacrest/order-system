@@ -95,7 +95,7 @@ describe('Document drift flag (External QA report M-08)', () => {
     await documentGenerationService.generate(orderId, 'QT', userId); // regenerate QT — flags CI
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

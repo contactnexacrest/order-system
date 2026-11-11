@@ -111,7 +111,9 @@ describe('D-257 divisions — isolation', () => {
     const page = (await mdAgent.get('/')).text;
     expect(page).not.toContain('division-switcher');
     expect(page).not.toContain('All divisions');
-    expect(page).toContain('/admin/divisions');
+    // D-320: the left menu is short; Divisions sits in the Settings section's menu bar, shown on the Settings pages.
+    expect(page).not.toContain('href="/admin/divisions"');
+    expect((await mdAgent.get('/settings')).text).toContain('href="/admin/divisions"');
     const staffAgent = await loginAs(expStaff);
     const staffPage = (await staffAgent.get('/')).text;
     expect(staffPage).not.toContain('division-switcher');

@@ -79,7 +79,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
 
     const flashMessages = flash.pull(req);
     expect(flashMessages[0].type).toBe('error');
-    expect(flashMessages[0].message).toContain('already cleared');
+    expect(flashMessages[0].message).toContain('We have received your advance payment, so you can no longer upload here'); // D-330 plain wording
     expect(await orderBuyerPoDocumentRepository.forOrder(orderId)).toEqual([]);
   });
 
@@ -94,7 +94,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
 
     const flashMessages = flash.pull(req);
     expect(flashMessages[0].type).toBe('error');
-    expect(flashMessages[0].message).toContain('already cleared');
+    expect(flashMessages[0].message).toContain('We have received your advance payment, so you can no longer upload here'); // D-330 plain wording
   });
 
   // ---------------------------------------------------------------
@@ -181,7 +181,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
 
     const flashMessages = flash.pull(req);
     expect(flashMessages[0].type).toBe('error');
-    expect(flashMessages[0].message).toContain('already been marked cleared');
+    expect(flashMessages[0].message).toContain('We have already received your advance payment for this order'); // D-330 plain wording
     expect(await clientPaymentReportRepository.forOrder(orderId)).toEqual([]);
   });
 

@@ -47,7 +47,7 @@ describe('Send to Buyer generalized across document types (90-item backlog #12)'
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, typeCode, 'approved');
 
-    const req = { params: { id: String(orderId) }, permissions: new Proxy({}, { get: () => true }), session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions: new Proxy({}, { get: () => true }), session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

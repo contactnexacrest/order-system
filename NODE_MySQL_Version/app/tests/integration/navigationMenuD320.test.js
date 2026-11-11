@@ -34,8 +34,11 @@ describe('D-320: the short left menu, the section menu bars and the order action
     '/associates/new', '/reports/associates', '/products/categories', '/products/price-rules', '/pricing/commission-levels',
     '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
     '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
-    '/products/create', '/suppliers/create',
+    '/products/create',
   ];
+  // Decided bar (D-320 register): Procurement & suppliers has no "+ Add" entry; + Add supplier stays a button on the
+  // Suppliers page, which shows the section's bar.
+  const PAGE_BUTTON_ONLY = ['/suppliers/create'];
   const ALL_FLAGS = {
     superAdmin: true, sopOpen: true, approver: true, mod_supplier_purchase: true, mod_import_stock: true,
     mod_merchant_trade: true, mod_associates: true, mod_team_incentive: true, div_gst: true, div_import_duty: true,
@@ -86,10 +89,15 @@ describe('D-320: the short left menu, the section menu bars and the order action
   });
 
   it('every old menu page is still reachable from a menu and shows its section bar', () => {
-    const linked = new Set(leaves().map((l) => pathOf(l.href)));
+    // A section without a menu bar of its own (Dashboard, My tasks) is reached from its left-menu entry.
+    const linked = new Set([...leaves().map((l) => pathOf(l.href)), ...navigation.config().sections.filter((s) => s.href).map((s) => pathOf(s.href))]);
     for (const page of OLD_MENU_PAGES) {
       expect([page, linked.has(page)]).toEqual([page, true]);
       expect([page, navigation.sectionKeyFor(page) !== null]).toEqual([page, true]);
+    }
+    for (const page of PAGE_BUTTON_ONLY) {
+      expect([page, linked.has(page)]).toEqual([page, false]);
+      expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'procurement']);
     }
     expect(navigation.build(all, ALL_FLAGS, {}, '/', {}).currentKey).toBe('dashboard');
   });

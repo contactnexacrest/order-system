@@ -129,7 +129,9 @@ describe('Order page t4 (owner requests 2026-10-26)', () => {
     await ordersController.generateSupplierActionLink(req, fakeRes());
     const message = lastFlash(req);
     expect(message.type).toBe('success');
-    expect(message.message).toContain('/supplier-action/');
+    // D-280: the link is no longer pasted into the message text; it comes with the message as a link to copy.
+    expect(message.message).toContain('Copy the link and send it yourself');
+    expect(message.copy_link).toContain('/supplier-action/');
     expect((await orderSupplierPoRepository.findLatestForOrder(orderId)).supplier_action_token_hash).not.toBeNull();
   });
 });

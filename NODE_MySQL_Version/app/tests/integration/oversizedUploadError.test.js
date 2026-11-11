@@ -63,6 +63,6 @@ describe('Oversized file upload gets a clear error, not a generic 500 (QA-5 UP-0
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/company-assets');
-    expect((await agent.get('/company-assets')).text).toContain('could not be accepted by this form');
+    expect((await agent.get('/company-assets')).text).toContain('We could not accept that file, so nothing was saved.'); // D-330 plain wording
   });
 });

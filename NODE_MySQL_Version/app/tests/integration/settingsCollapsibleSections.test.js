@@ -66,7 +66,8 @@ describe('Settings collapsible sections (90-item backlog #27)', () => {
   it('details sections default to collapsed', async () => {
     const res = await agent.get('/settings');
     expect(res.status).toBe(200);
-    expect(res.text).toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+">/);
-    expect(res.text).not.toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/);
+    // D-320: each section also carries an id (#settings-security, #settings-zoho) for the Settings menu bar.
+    expect(res.text).toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+" id="settings-[^"]+">/);
+    expect(res.text).not.toMatch(/<details class="collapsible-section settings-section" data-category="[^"]+"[^>]*\sopen[\s>]/);
   });
 });

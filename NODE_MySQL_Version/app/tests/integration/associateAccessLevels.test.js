@@ -132,7 +132,7 @@ describe('Associate portal access levels (D-261)', () => {
     const agent = await portal(a);
     const list = (await agent.get('/associate/orders')).text;
     expect(list).not.toContain('12,345.67');
-    expect(list).toContain('The order value (FOB) is not shown');
+    expect(list).toContain('Order values are not shown for your account.'); // D-330 plain wording
     expect((await agent.get(`/associate/orders/${o}`)).text).not.toContain('12,345.67');
     const filtered = associateAccess.filterOrder(await associateAccess.features(a), { fob_value: 12345.67, commission: { level: 'Level 2 — 5%', rate: 5, detail: null } });
     expect(filtered.fob_value).toBeNull();

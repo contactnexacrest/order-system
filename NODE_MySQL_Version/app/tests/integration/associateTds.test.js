@@ -164,7 +164,7 @@ describe('TDS on associate commission (D-235)', () => {
     expect([c.tds, c.net]).toEqual([0, 40000]);
     expect(c.missing_foreign).toEqual(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration (no fixed place of business in India)']);
     expect(c.missing_payout).toEqual(['Form 15CA', 'Form 15CB']);
-    expect((await pay(p)).message).toBe("Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration, Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate's Documents tab; Form 15CA and 15CB are attached to this payment.");
+    expect((await pay(p)).message).toBe("Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration (no fixed place of business in India), Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate's Documents tab; Form 15CA and 15CB are attached to this payment.");
     for (const kind of ['tax_residency', 'form_10f', 'no_pe']) await doc(Number(a.id), kind, null);
     await doc(Number(a.id), 'form_15ca', Number(p.id), 'received');
     expect((await pay(p)).message).toMatch(/^Before paying an associate based abroad, these must be on file: Form 15CB\./);

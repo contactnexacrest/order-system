@@ -221,7 +221,7 @@ describe('BL Endorsement (Section BC)', () => {
     await orderBlEndorsementRepository.upsert(orderId, { bl_number: 'MSCU5555555' }, userId);
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 

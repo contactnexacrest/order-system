@@ -100,7 +100,7 @@ describe('Maker-checker guard (QA-5)', () => {
 
   // QA Round 8, R8-N09: one choke point, seven rules, default MD and ED, no blanket exemption.
   it('every rule defaults to MD and ED with no blanket exemption', async () => {
-    const rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment', 'price_discount'];
+    const rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment', 'price_discount', 'bank_details' /* D-293 */];
     expect(Object.keys(require('../../src/services/selfApprovalRules').RULES)).toEqual(rules);
     const md = await createTestUser('Managing Director');
     const ed = await createTestUser('Executive Director');

@@ -22,9 +22,16 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
  */
 describe('Gap list G-1 / G-3 / G-6: shipment gates and the OC clock', () => {
   let admin;
+  let testingModeBefore;
+
+  beforeAll(async () => {
+    testingModeBefore = await companySettingsRepository.get('email_testing_mode');
+  });
 
   afterAll(async () => {
-    await companySettingsRepository.set('email_testing_mode', '1');
+    // Put back what was there (D-280: Testing mode is off when installed) — forcing '1' here
+    // leaked into later files such as emailOffAutoSent's seed-default check.
+    await companySettingsRepository.set('email_testing_mode', String(testingModeBefore ?? '0'));
     await db.pool.end();
   });
 

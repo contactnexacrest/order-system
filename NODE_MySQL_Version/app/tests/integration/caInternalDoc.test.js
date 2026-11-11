@@ -291,7 +291,7 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     const orderId = await createTestOrder(await createTestClient());
 
     const permissions = new Proxy({}, { get: () => true });
-    const req = { params: { id: String(orderId) }, permissions, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 
@@ -301,7 +301,7 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
   it('order show page hides the toggle from a non-privileged CA viewer', async () => {
     const orderId = await createTestOrder(await createTestClient());
 
-    const req = { params: { id: String(orderId) }, permissions: { ca_module_view: true, view_all_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions: { ca_module_view: true, view_all_orders: true }, session: {} };
     const res = fakeRes();
     await ordersController.show(req, res);
 
@@ -317,13 +317,13 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
 
     const hidden = fakeRes();
-    await ordersController.show({ params: { id: String(orderId) }, permissions: { ca_module_view: true, manage_order_financials: true, view_all_orders: true }, session: {} }, hidden);
+    await ordersController.show({ params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions: { ca_module_view: true, manage_order_financials: true, view_all_orders: true }, session: {} }, hidden);
     expect(hidden.renderedData.canViewCafin).toBe(false);
     expect(hidden.renderedData.caInternalDoc).toBeNull();
     expect(hidden.renderedData.documents.map((d) => d.document_type_code)).not.toContain('CAFIN');
 
     const shown = fakeRes();
-    await ordersController.show({ params: { id: String(orderId) }, permissions: { view_cafin: true, view_all_orders: true }, session: {} }, shown);
+    await ordersController.show({ params: { id: String(orderId) }, user: { id: 1 } /* D-311: the order page asks who is looking (approvals bar) */, permissions: { view_cafin: true, view_all_orders: true }, session: {} }, shown);
     expect(shown.renderedData.canViewCafin).toBe(true);
     expect(shown.renderedData.caInternalDoc.document_reference).toBe(result.document_reference);
     expect(shown.renderedData.documents.map((d) => d.document_type_code)).toContain('CAFIN');

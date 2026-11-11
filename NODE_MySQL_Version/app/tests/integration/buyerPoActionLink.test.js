@@ -70,7 +70,7 @@ describe('Buyer PO Action Link (Step 4b)', () => {
     expect((await orderRepository.find(orderId)).buyers_po_ref).toBe('PO-BUYER-42');
     expect(await orderBuyerPoDocumentRepository.forOrder(orderId)).toHaveLength(1);
     page = await agent.get(`/buyer-action/${token}`);
-    expect(page.text).toContain('We have your signed Purchase Order');
+    expect(page.text).toContain('We have your signed purchase order'); // D-330 plain wording
     expect(page.text).not.toContain('name="buyers_po_ref"');
   });
 
@@ -92,7 +92,7 @@ describe('Buyer PO Action Link (Step 4b)', () => {
 
     const page = await request(app).get(`/buyer-action/${token}`);
     expect(page.text).toContain(`/buyer-action/${token}/order-confirmation`);
-    expect(page.text).toContain(`I have read Order Confirmation ${reference}`);
+    expect(page.text).toContain(`I have read order confirmation ${reference}. It is correct`); // D-330 plain wording
     const download = await request(app).get(`/buyer-action/${token}/order-confirmation`);
     expect(download.status).toBe(200);
     expect(download.headers['content-disposition']).toContain('attachment');
@@ -107,7 +107,7 @@ describe('Buyer PO Action Link (Step 4b)', () => {
     const token = await orderRepository.generateBuyerActionToken(orderId);
 
     let page = await request(app).get(`/buyer-action/${token}`);
-    expect(page.text).toContain("We're preparing your Proforma Invoice");
+    expect(page.text).toContain('We are now preparing your proforma invoice'); // D-330 plain wording
     expect(page.text).not.toContain('Submit Payment Details');
     expect(page.text).not.toContain('name="buyers_po_ref"');
 

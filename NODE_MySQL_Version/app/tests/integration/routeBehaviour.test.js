@@ -500,7 +500,9 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', `/associates/${id}/commission-rule`, { rule: 'ladder', reason: 'Route test: keep the standard ladder.' }), 'POST /associates/:id/commission-rule', 'Nothing changed.');
     expectDone(await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' }), 'POST /associates/:id/status');
 
-    expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite', `Portal login link e-mailed to ${email}.`);
+    expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite',
+      // D-280/D-282: the set-password link; the flash says honestly that no e-mail went (no SMTP in tests) and shows the link to copy.
+      `The "set your password" e-mail could NOT be sent to ${email} — copy this link and send it yourself`);
     expectDone(await holder.call('POST', `/associates/${id}/code`, { readable: 'ROUTE' }), 'POST /associates/:id/code', 'Personal code set to NXA-ROUTE-');
     expectDone(await holder.call('POST', `/associates/${id}/portal/disable`), 'POST /associates/:id/portal/disable');
     expectDone(await holder.call('POST', `/associates/${id}/messages`, { body: 'Route test message.' }), 'POST /associates/:id/messages');

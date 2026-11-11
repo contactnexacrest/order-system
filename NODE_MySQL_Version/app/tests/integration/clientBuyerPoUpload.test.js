@@ -72,7 +72,7 @@ describe('Client Buyer PO self-upload', () => {
 
   it('shows the uploaded copy on the order page afterwards', async () => {
     const page = await agent.get(`/client/orders/${orderId}`);
-    expect(page.text).toContain('Buyer PO');
+    expect(page.text).toContain('<h2>Your purchase order</h2>'); // D-330 plain wording
     expect(page.text).toContain('signed-buyer-po.pdf');
   });
 

@@ -82,7 +82,7 @@ describe('Payment Action Link (owner request 2026-10-27)', () => {
     expect(await clientPaymentReportRepository.forOrder(orderId)).toHaveLength(0);
 
     page = await agent.get(`/payment-action/${token}`);
-    expect(page.text).toContain('Attach the payment screenshot');
+    expect(page.text).toContain('Add a screenshot or the bank receipt of your payment.'); // D-330 plain wording
     await agent.post(`/payment-action/${token}/report`)
       .field('_csrf', csrfOf(page.text)).field('transaction_ref', 'UTR-1').field('amount', '3000').field('payment_date', '2026-10-27')
       .attach('screenshot', Buffer.from('%PDF-1.4 remittance'), 'remittance.pdf');
@@ -101,7 +101,7 @@ describe('Payment Action Link (owner request 2026-10-27)', () => {
     const documentId = await issuePi(orderId, clientId);
     const admin = await db.queryOne('SELECT id FROM users WHERE email = :email', { email: TEST_ADMIN_EMAIL });
     const preview = await emailDispatchService.buildPreview(orderId, documentId, 'send_pi', admin.id);
-    expect(preview.body).toContain('upload the payment screenshot');
+    expect(preview.body).toContain('please send us a screenshot of the payment and its details'); // D-330 plain wording
     expect(preview.body).toContain(`/payment-action/${token}`);
   });
 

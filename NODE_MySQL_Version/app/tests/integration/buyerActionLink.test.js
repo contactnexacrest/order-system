@@ -48,6 +48,23 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     return result.insertId;
   }
 
+  /**
+   * "Approved but never e-mailed" counts as issued only while buyer document
+   * e-mails are held. Before D-280 that was the seed default (mail sending
+   * off); now Testing mode is off when installed, so these tests switch it on
+   * themselves and restore it afterwards.
+   */
+  async function withDocumentMailsHeld(fn) {
+    const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
+    const before = await companySettingsRepository.get('email_testing_mode');
+    await companySettingsRepository.set('email_testing_mode', '1');
+    try {
+      await fn();
+    } finally {
+      await companySettingsRepository.set('email_testing_mode', before ?? '0');
+    }
+  }
+
   async function unlockThroughStage3(orderId) {
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
@@ -174,7 +191,7 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
    * same way the staff-side "Record Buyer's Acknowledgement" fallback
    * already does.
    */
-  it('show() renders the OC-ack banner data when OC is approved but never emailed', async () => {
+  it('show() renders the OC-ack banner data when OC is approved but never emailed', async () => withDocumentMailsHeld(async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThroughStage3(orderId);
     await createTestDocument(orderId, 'OC', 'approved');
@@ -187,9 +204,9 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     expect(res.renderedData.ocAcknowledgment.acknowledged_at).toBeNull();
     const ack = await orderOcAcknowledgmentRepository.find(orderId);
     expect(ack).not.toBeNull();
-  });
+  }));
 
-  it('acknowledgeOc() succeeds when OC was approved but never emailed', async () => {
+  it('acknowledgeOc() succeeds when OC was approved but never emailed', async () => withDocumentMailsHeld(async () => {
     const orderId = await createTestOrder(await createTestClient());
     await unlockThroughStage3(orderId);
     await createTestDocument(orderId, 'OC', 'approved');
@@ -204,7 +221,7 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     const ack = await orderOcAcknowledgmentRepository.find(orderId);
     expect(ack.acknowledged_at).not.toBeNull();
     expect(await stageGateService.isUnlocked(orderId, 5)).toBe(true);
-  });
+  }));
 
   // ---------------------------------------------------------------
   // buyerActionController.acknowledgeOc
@@ -296,7 +313,7 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
    * Action Link: a client who logs in before the OC email went out must
    * also see something real to acknowledge.
    */
-  it('clientPortalController.showOrder renders the OC-ack banner data when OC is approved but never emailed', async () => {
+  it('clientPortalController.showOrder renders the OC-ack banner data when OC is approved but never emailed', async () => withDocumentMailsHeld(async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await unlockThroughStage3(orderId);
@@ -310,7 +327,7 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
     expect(res.renderedData.ocAcknowledgment.acknowledged_at).toBeNull();
     const ack = await orderOcAcknowledgmentRepository.find(orderId);
     expect(ack).not.toBeNull();
-  });
+  }));
 
   it('clientPortalController.acknowledgeOc still works after the refactor', async () => {
     const clientId = await createTestClient();
@@ -344,7 +361,8 @@ describe('Buyer Action Link — public no-login OC-ack + Buyer-PO-upload (90-ite
 
     const flashMessages = flash.pull(req);
     expect(flashMessages[0].type).toBe('success');
-    expect(flashMessages[0].message).toContain('/buyer-action/');
+    // D-280: the link comes with the message as a link to copy ("e-mailed" only when it was).
+    expect(flashMessages[0].copy_link).toContain('/buyer-action/');
 
     const order = await orderRepository.find(orderId);
     expect(order.buyer_action_token_plain).toBeTruthy();

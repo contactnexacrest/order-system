@@ -117,7 +117,7 @@ describe('Money separation (D-214 phase 2)', () => {
       await orderPaymentStatusRepository.initializeForOrder(orderId);
       await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 6100.0, '2026-06-01');
       const html = (await agent.get(`/orders/${orderId}`)).text;
-      expect([roleName, 'selling', html.includes('<th>Unit Price</th>')]).toEqual([roleName, 'selling', sees]);
+      expect([roleName, 'selling', html.includes('<th class="num">Price USD</th>') /* D-273 compact products table: price column headed with its currency */]).toEqual([roleName, 'selling', sees]);
       expect([roleName, 'fob', html.includes('>FOB Value<')]).toEqual([roleName, 'fob', sees]);
       expect([roleName, 'payment', /6,100\.00/.test(html)]).toEqual([roleName, 'payment', sees]);
     }

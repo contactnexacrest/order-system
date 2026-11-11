@@ -121,7 +121,7 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
 
       expect(res.status).toBe(200);
       expect(res.text).not.toContain('/edit">Edit order</a>'); // D-320: the action bar's Edit order button
-      expect(res.text).not.toContain('+ Add product');
+      expect(res.text).not.toContain('data-open-panel="line-panel-new">+ Add product'); // D-273: the button (the side-panel script's comment also names it)
     });
 
     test('order show page shows mutating buttons for a manage_orders user', async () => {
@@ -139,7 +139,7 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
       expect(res.status).toBe(200);
       expect(res.text).toContain(`href="/orders/${orderId}/edit">Edit order</a>`); // D-320: the action bar's Edit order button
       expect(res.text).not.toContain('Edit Order Details'); // D-320: the old grey text link is gone
-      expect(res.text).toContain('+ Add product');
+      expect(res.text).toContain('data-open-panel="line-panel-new">+ Add product');
     });
 
     test('client show page hides Edit and New Order buttons for a view-only user', async () => {

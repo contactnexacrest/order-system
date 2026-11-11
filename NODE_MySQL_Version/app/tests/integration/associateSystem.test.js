@@ -83,7 +83,8 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     tag = crypto.randomBytes(3).toString('hex');
     session = {};
     const values = {
-      associate_bank_wait_days: '7', associate_protection_months: '12', associate_tds_pct: '2.00', cutoff_day: '20',
+      // D-293: the old single wait setting became first-account / change-of-account waits; one checker by default.
+      associate_bank_wait_first_days: '0', associate_bank_wait_change_days: '7', bank_details_check_people: 'one', associate_protection_months: '12', associate_tds_pct: '2.00', cutoff_day: '20',
       associate_commission_due_days: '30', associate_claim_hold: '1', associate_payout_run: 'monthly', associate_payout_day: '5',
     };
     for (const [k, v] of Object.entries(values)) {
@@ -286,7 +287,12 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(await associateBankRepository.fullNumber(id)).toBe('999988887777');
 
     const params = { id: String(a.id), bankId: String(id) };
-    await call(associateAdminController.firstCheck, { as: finance1, params, body: { check_method: 'Called back on the known number; ₹1 test credit confirmed.' } });
+    const checked = { check_bank_proof: '1', check_phone: '1' };
+    // D-293: one person verifies by default; "two people" stays available as a setting and still needs two different people.
+    await call(associateAdminController.firstCheck, { as: finance1, params, body: checked });
+    expect(flash().message).toBe('One person verifies bank details — use Verify.');
+    await incentiveRepository.setSetting('bank_details_check_people', 'two', admin);
+    await call(associateAdminController.firstCheck, { as: finance1, params, body: checked });
     expect(flash().type).toBe('success');
     await call(associateAdminController.verifyBank, { as: finance1, params });
     expect(flash().message).toBe('A different person must verify — you already acted on this request.');
@@ -604,7 +610,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(flash().message).toBe('You can invite clients once your account is active.');
     expect(await associateInvitationRepository.forAssociate(Number(a.id))).toEqual([]);
     await call(associateAdminController.changeStatus, { as: md, params: { id: String(a.id) }, body: { status: 'active', reason: 'KYC and agreement done.' } });
-    expect(flash().message).toBe('An associate becomes Active once Accounts have verified their bank details (two people).');
+    expect(flash().message).toBe('An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.'); // D-293
   });
 
   // ---------------------------------------------------------------- staff pages, permissions, Zoho wording
@@ -625,7 +631,9 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
       expect([never, show.includes(never)]).toEqual([never, false]); // Sales never sees it
     }
     show = (await (await staffAgent(ed)).get(`/associates/${a.id}`)).text;
-    expect(show).toContain('Fixed level: <b>Level 3</b>');
+    // D-291 / D-292: the commission rule section (rule "Fixed %", the level of the next order) for those who may see commission rules.
+    expect(show).toContain('<th>Rule</th><td><b>Fixed %</b>');
+    expect(show).toMatch(/<th>Next order earns<\/th><td><b class="stat-value">[^<]+<\/b> — Level 3<\/td>/);
     expect(show).not.toContain('Show full number'); // the full bank number is Finance / MD only
     const role = async (name) => Number(await value('SELECT id FROM roles WHERE name = :n', { n: name }));
     expect(!!(await permissionService.load(sales, await role('Export Executive'))).manage_associates).toBe(false);

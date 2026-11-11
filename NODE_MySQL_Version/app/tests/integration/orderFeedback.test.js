@@ -332,7 +332,7 @@ describe('Order Feedback (Section BV)', () => {
 
       expect(res.status).toBe(200);
       expect(res.text).not.toContain(`action="/client/orders/${activeOrderId}/feedback"`);
-      expect(res.text).toContain('Feedback will be available once');
+      expect(res.text).toContain('You can leave a review after we send you the shipping documents'); // D-330 plain wording
     });
 
     it('staff order page shows the Order Feedback section', async () => {

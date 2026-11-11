@@ -306,7 +306,8 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     expect((await post(admin, `/associates/${a.id}`, verify, { check_bank_proof: '1' })).message).toBe('Tick at least two of the ways you checked the bank details.');
     expect((await post(admin, `/associates/${a.id}`, verify, { check_bank_proof: '1', check_test_payment: '1' })).message).toBe('Enter the bank reference (UTR / SWIFT) of the test payment.');
     const ok = await post(admin, `/associates/${a.id}`, verify, { check_bank_proof: '1', check_test_payment: '1', test_payment_ref: 'UTR 412345678901', verify_note: 'Spoke to them at 3 pm' });
-    expect(ok.message).toBe(`Verified. Usable from ${short(await dbDay('CURDATE()'))}; the associate was e-mailed.`);
+    // D-280: "e-mailed" only when it was — the test run has no mail server, so the screen says so honestly.
+    expect(ok.message).toBe(`Verified. Usable from ${short(await dbDay('CURDATE()'))}; the associate sees it in their portal (the e-mail could not be sent).`);
     const row = await associateBankRepository.find(id);
     expect([Number(row.check_bank_proof), Number(row.check_phone), Number(row.check_test_payment), row.test_payment_ref, row.verify_note]).toEqual([1, 0, 1, 'UTR 412345678901', 'Spoke to them at 3 pm']);
     expect(bankDetailsCheck.checksText(row)).toBe('bank proof, test payment (ref UTR 412345678901)');
@@ -325,7 +326,7 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     const verify3 = `/associates/${a.id}/bank/${third}/verify`;
     expect((await post(md, `/associates/${a.id}`, verify3, { check_bank_proof: '1', check_phone: '1' })).message).toBe('You entered these details yourself — give the reason you verify them (at least 10 characters).');
     const own = await post(md, `/associates/${a.id}`, verify3, { check_bank_proof: '1', check_phone: '1', self_reason: 'Only finance person is on leave until 20 Nov' });
-    expect(own.message).toBe(`Verified. Usable from ${short(await dbDay('DATE_ADD(CURDATE(), INTERVAL 15 DAY)'))}; the associate was e-mailed.`);
+    expect(own.message).toBe(`Verified. Usable from ${short(await dbDay('DATE_ADD(CURDATE(), INTERVAL 15 DAY)'))}; the associate sees it in their portal (the e-mail could not be sent).`);
     expect((await associateBankRepository.find(third)).self_verify_reason).toBe('Only finance person is on leave until 20 Nov');
     expect(Number((await associateBankRepository.usable(Number(a.id))).id)).toBe(id);
 

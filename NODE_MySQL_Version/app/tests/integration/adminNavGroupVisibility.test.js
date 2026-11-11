@@ -48,7 +48,7 @@ describe('Admin nav group visibility (90-item backlog #34)', () => {
     await permissionRepository.grantOverride(userId, permission.id, null, 'jest test');
   }
 
-  async function loginAndGetDashboardHtml(email) {
+  async function loginAndGetDashboardHtml(email, then = null) {
     const agent = request.agent(app);
     const loginPage = await agent.get('/login');
     const csrfToken = extractCsrf(loginPage.text);
@@ -58,6 +58,11 @@ describe('Admin nav group visibility (90-item backlog #34)', () => {
 
     const dashboard = await agent.get('/');
     expect(dashboard.status).toBe(200);
+    if (then) {
+      const page = await agent.get(then);
+      expect(page.status).toBe(200);
+      return page.text;
+    }
     return dashboard.text;
   }
 
@@ -74,7 +79,10 @@ describe('Admin nav group visibility (90-item backlog #34)', () => {
     const { userId, email } = await createTestStaffUserWithRealPassword();
     await grantOnlyPermission(userId, 'manage_hs_codes');
 
-    const html = await loginAndGetDashboardHtml(email);
+    // D-320: HS codes moved to the Products section; the role already opens Products, so the
+    // left-menu entry goes to /products and the HS codes link is in that section's menu bar.
+    expect(await loginAndGetDashboardHtml(email)).toContain('href="/products" class="" data-nav="products"');
+    const html = await loginAndGetDashboardHtml(email, '/products');
 
     expect(html).toContain('href="/hs-codes"');
   });
