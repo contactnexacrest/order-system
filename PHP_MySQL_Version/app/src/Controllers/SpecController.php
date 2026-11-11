@@ -359,15 +359,20 @@ final class SpecController
                 $cbmVal = $n;
             }
         }
+        // D-270 (point 25): the product's own weight per CBM (empty = its category's).
+        [$weight, $weightError] = ProductCategoryRepository::weightInput($_POST['weight_t_per_cbm'] ?? '');
+        if ($weightError !== null) {
+            $errors[] = $weightError;
+        }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             self::back("/products/{$id}/specifications");
             return;
         }
-        $before = ($product['category_id'] ?? '—') . ' / ' . ($product['forms'] ?? 'all') . ' / ' . ($product['cbm_from_mm'] ?? 'global');
-        SpecRepository::setProductFields($id, $categoryId, $forms === [] ? null : implode(',', $forms), $cbmVal);
-        AuditLogRepository::log((int) self::user()['id'], 'PRODUCT_SPEC_FIELDS_CHANGED', 'catalog_products', $id, 'category / forms / cbm_from_mm', $before,
-            $categoryId . ' / ' . ($forms === [] ? 'all' : implode(',', $forms)) . ' / ' . ($cbmVal ?? 'global'));
+        $before = ($product['category_id'] ?? '—') . ' / ' . ($product['forms'] ?? 'all') . ' / ' . ($product['cbm_from_mm'] ?? 'global') . ' / ' . ($product['weight_t_per_cbm'] ?? 'category');
+        SpecRepository::setProductFields($id, $categoryId, $forms === [] ? null : implode(',', $forms), $cbmVal, $weight);
+        AuditLogRepository::log((int) self::user()['id'], 'PRODUCT_SPEC_FIELDS_CHANGED', 'catalog_products', $id, 'category / forms / cbm_from_mm / weight_t_per_cbm', $before,
+            $categoryId . ' / ' . ($forms === [] ? 'all' : implode(',', $forms)) . ' / ' . ($cbmVal ?? 'global') . ' / ' . ($weight ?? 'category'));
         Flash::set('success', 'Saved.');
         self::back("/products/{$id}/specifications");
     }

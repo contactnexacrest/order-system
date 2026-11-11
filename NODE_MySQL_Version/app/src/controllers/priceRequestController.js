@@ -127,7 +127,14 @@ async function lineQuote(req, res) {
     }
   }
   const ctx = await orderLinePricing.context(order);
-  res.json(await orderLinePricing.lineQuote(product, ctx, orderLinePricing.selectionInput(String(req.query.spec || '')) || {}));
+  // D-270 (point 25): the line's unit and piece size — the quote and lowest come back per the line's unit.
+  const [size, sizeError] = require('../services/lineUnits').readSize(req.query);
+  if (sizeError !== null) {
+    res.json({ ok: false, reason: sizeError });
+    return;
+  }
+  const unit = String(req.query.unit || '').trim().slice(0, 20);
+  res.json(await orderLinePricing.lineQuote(product, ctx, orderLinePricing.selectionInput(String(req.query.spec || '')) || {}, unit !== '' ? unit : null, size));
 }
 
 module.exports = { index, price, access, saveAccess, lineQuote };

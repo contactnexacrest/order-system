@@ -191,7 +191,7 @@ function describe(offeredSpecs, map, includeBase = false) {
 }
 
 /** What the chosen options do to the cost (same shape as PHP). */
-function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = []) {
+function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = [], lineThicknessMm = null) {
   const out = {
     basis: 'unit', unit: String(product.reference_unit ?? '') || 'unit', thickness_mm: null,
     pct: [], usd: 0, qty_pct: 0, lines: [], charges: [], manual: null,
@@ -209,7 +209,10 @@ function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = []) {
     if (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= cbmFrom)) {
       out.basis = 'cbm';
       out.unit = 'CBM';
-      if (o.thickness_mm === null) out.manual = `A thickness of ${cbmFrom} mm or more that is not listed needs a manual price.`;
+      // D-270 (point 25): the line's own thickness (e.g. 13 cm) on a "50 mm and above" option
+      // is thick stone priced per CBM — no manual price needed.
+      if (o.thickness_mm === null && lineThicknessMm !== null && lineThicknessMm !== undefined && lineThicknessMm >= cbmFrom) out.thickness_mm = lineThicknessMm;
+      if (out.thickness_mm === null) out.manual = `A thickness of ${cbmFrom} mm or more that is not listed needs a manual price.`;
     }
   }
   const isRm = RM_UNITS.includes(String(product.reference_unit ?? '').trim().toUpperCase());

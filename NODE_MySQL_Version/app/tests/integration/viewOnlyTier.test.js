@@ -121,7 +121,7 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
 
       expect(res.status).toBe(200);
       expect(res.text).not.toContain('Edit Order Details');
-      expect(res.text).not.toContain('Add Product Line');
+      expect(res.text).not.toContain('+ Add product');
     });
 
     test('order show page shows mutating buttons for a manage_orders user', async () => {
@@ -138,7 +138,7 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
 
       expect(res.status).toBe(200);
       expect(res.text).toContain('Edit Order Details');
-      expect(res.text).toContain('Add Product Line');
+      expect(res.text).toContain('+ Add product');
     });
 
     test('client show page hides Edit and New Order buttons for a view-only user', async () => {

@@ -103,10 +103,13 @@ way. Saving order details is recorded in the audit log.
 ## Product lines: edit, add, remove, duplicate
 
 The order page's Products section is fully editable (again, subject to
-the same pre/post-confirmation rule): each line is its own small form —
-description, dimensions, finish, quantity, unit, unit price, HS code —
-with Save, Duplicate, and Remove actions, plus an "Add Product Line" form
-at the bottom.
+the same pre/post-confirmation rule). Since owner decision D-273 (11 Nov
+2026) it is one compact table with **Edit**, **Duplicate** and **Delete**
+on every line and **+ Add product** at the top; Edit and Add open a side
+panel in four steps (Product · Options · Size and quantity · Price) with
+"More" for the description, Dimensions text, finish, line type, HS / SAC
+code and category. See
+[Stage 1 — The Products section](./01-stage1-enquiry-quotation.md#the-products-section-on-the-order-page-owner-decisions-d-271--d-273-11-nov-2026).
 
 Quantity and unit price are checked wherever a line is saved — creating
 the order, adding a line, editing a line (QA Round 6, R6-N14/N15): the
@@ -118,9 +121,13 @@ and a net weight above the gross weight, are refused with a message
 beside the field (R6-N28).
 
 **Duplicate** is the one built specifically for the common case: a second
-size or a renamed variant of a product already on the order. It clones
-every field on that line into a new one — nothing needs re-typing except
-whatever's actually different. From Stage 4 on, duplicating (like editing
+size or a renamed variant of a product already on the order. Since owner
+decision D-272 (11 Nov 2026) it is an **exact copy placed right below** the
+original, marked "copy of line N": every option, the piece size, unit,
+quantity, price, HS code, line type, SAC, category, product, material and
+price-request link. The MD's price approval is **not** copied — the copy is
+checked at once and, if it is below your lowest price, goes to the MD.
+Change only what differs (usually the size and the price). From Stage 4 on, duplicating (like editing
 or removing a line, or adding a new one) needs the override permission
 and a reason, exactly like the Edit Order Details form above.
 
@@ -135,7 +142,8 @@ variant) and Add for a genuinely new product.
 
 ## Duplicating a whole order
 
-**Duplicate Order**, on the order page, is for a genuine repeat order —
+**Duplicate Order**, on the order page, is for a genuine repeat order (its
+lines are the same full copies as a line's Duplicate, each checked again) —
 available on any order regardless of its status, including one that's
 long since closed. It creates a brand-new order carrying over:
 

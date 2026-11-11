@@ -526,15 +526,22 @@ final class OrderController
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
             }
-            $__refusal = \App\Services\OrderLinePricing::saveRefusal(
+            // D-270 (point 25): the row's piece size; a typed thickness chooses the Thickness option.
+            [$__size, $__sizeError] = self::lineSizeInput($_POST, $i);
+            [$__rowSel, $__syncError] = $__sizeError === null
+                ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), $__size['piece_thickness_cm'])
+                : [null, null];
+            $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::saveRefusal(
                 ['client_id' => $clientId, 'currency_code' => $__currencyCode],
                 self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
                 'goods',
                 trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
                 self::seesPriceBuildup(),
                 // D-255: the row's chosen specification options and unit.
-                \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''),
-                trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null
+                $__rowSel,
+                trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null,
+                null,
+                $__size
             );
             if ($__refusal !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$__refusal}");
@@ -646,11 +653,14 @@ final class OrderController
                     continue; // blank row — skip rather than insert an empty product
                 }
                 $quantityIsTbc = !empty($_POST['product_quantity_tbc'][$i]);
+                // D-270: the piece size (checked above); the Dimensions text is filled from it when left empty.
+                [$__size] = self::lineSizeInput($_POST, $i);
+                [$__rowSel] = \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), $__size['piece_thickness_cm']);
                 $__lineId = OrderProductRepository::add(
                     $orderId,
                     $lineNo++,
                     $description,
-                    trim((string) ($_POST['product_dimensions'][$i] ?? '')) ?: null,
+                    trim((string) ($_POST['product_dimensions'][$i] ?? '')) ?: self::dimensionsFromSize($__size),
                     trim((string) ($_POST['product_finish'][$i] ?? '')) ?: null,
                     trim((string) ($_POST['product_quantity'][$i] ?? '')) ?: null,
                     $quantityIsTbc,
@@ -663,7 +673,8 @@ final class OrderController
                 if (trim((string) ($_POST['product_unit_price'][$i] ?? '')) !== '') {
                     OrderProductRepository::setPriceSetBy($__lineId, (int) $user['id']);
                 }
-                \App\Services\OrderLinePricing::saveSelection($__lineId, \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), null);
+                \App\Services\OrderLinePricing::saveSelection($__lineId, $__rowSel, null);
+                OrderProductRepository::setPieceSize($__lineId, $__size);
                 // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
                 \App\Services\OrderLinePricing::afterSave($__lineId, null, (int) $user['id']);
             }
@@ -981,6 +992,33 @@ final class OrderController
     }
 
     /** The flash after saving a line, saying when it now waits for the MD. */
+    /**
+     * Owner decision D-270 (point 25): a line's piece size from the form — the order page's
+     * piece_*_cm fields, or row $row of the New Order form's product_piece_*_cm[].
+     *
+     * @return array{0: array{piece_length_cm: ?string, piece_width_cm: ?string, piece_thickness_cm: ?string}, 1: ?string}
+     */
+    private static function lineSizeInput(array $post, ?int $row = null): array
+    {
+        $values = [];
+        foreach (array_keys(\App\Services\LineUnits::SIZE_FIELDS) as $f) {
+            $values[$f] = $row === null ? ($post[$f] ?? '') : ($post['product_' . $f][$row] ?? '');
+        }
+        [$size, $error] = \App\Services\LineUnits::readSize($values);
+        if ($error !== null) {
+            return [['piece_length_cm' => null, 'piece_width_cm' => null, 'piece_thickness_cm' => null], $error];
+        }
+        return [$size, null];
+    }
+
+    /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
+    private static function dimensionsFromSize(array $size): ?string
+    {
+        $text = \App\Services\LineUnits::dimensionsText(\App\Services\LineUnits::size($size['piece_length_cm'] ?? null),
+            \App\Services\LineUnits::size($size['piece_width_cm'] ?? null), \App\Services\LineUnits::size($size['piece_thickness_cm'] ?? null));
+        return $text !== '' ? $text : null;
+    }
+
     private static function lineSavedMessage(int $lineId, string $saved): string
     {
         $line = OrderProductRepository::find($lineId);
@@ -1054,11 +1092,14 @@ final class OrderController
         }
 
         // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
-        // D-255: with the chosen specification options (and their unit: 50 mm and above is per CBM).
-        $__specSel = \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'] ?? '');
-        $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
+        // D-255: with the chosen specification options. D-270 (point 25): in any unit, converted with the piece size.
+        [$__size, $__sizeError] = self::lineSizeInput($_POST);
+        [$__specSel, $__syncError] = $__sizeError === null
+            ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['catalog_product_id'] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'] ?? ''), $__size['piece_thickness_cm'])
+            : [null, null];
+        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
             ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
-                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest);
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size);
         if ($__refusal !== null) {
             Flash::set('error', 'Product line: ' . $__refusal);
             header("Location: /orders/{$orderId}#step-products");
@@ -1078,7 +1119,7 @@ final class OrderController
             $orderId,
             OrderProductRepository::nextLineNo($orderId),
             $description,
-            trim((string) ($_POST['dimensions'] ?? '')) ?: null,
+            trim((string) ($_POST['dimensions'] ?? '')) ?: self::dimensionsFromSize($__size),
             trim((string) ($_POST['finish'] ?? '')) ?: null,
             trim((string) ($_POST['quantity'] ?? '')) ?: null,
             !empty($_POST['quantity_is_tbc']),
@@ -1095,6 +1136,7 @@ final class OrderController
         }
         // D-255: the options chosen, and the price request the line came from (now "became an order").
         \App\Services\OrderLinePricing::saveSelection($newLineId, $__specSel, $__priceRequest !== null ? (int) $__priceRequest['id'] : null);
+        OrderProductRepository::setPieceSize($newLineId, $__size);
         if ($__priceRequest !== null) {
             \App\Services\PriceRequestService::markOrdered((int) $__priceRequest['id'], $orderId);
         }
@@ -1149,10 +1191,22 @@ final class OrderController
             && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0);
         // D-255: the chosen options (a form without the field keeps the line's options).
         $__specSel = array_key_exists('spec_json', $_POST) ? \App\Services\OrderLinePricing::selectionInput($_POST['spec_json']) : \App\Services\OrderLinePricing::selectionInput((string) ($product['spec_selection'] ?? ''));
+        // D-270 (point 25): the piece size (a form without the fields keeps the line's size); a typed thickness chooses the option.
+        if (array_key_exists('piece_length_cm', $_POST) || array_key_exists('piece_width_cm', $_POST) || array_key_exists('piece_thickness_cm', $_POST)) {
+            [$__size, $__sizeError] = self::lineSizeInput($_POST);
+        } else {
+            [$__size, $__sizeError] = [['piece_length_cm' => $product['piece_length_cm'] ?? null, 'piece_width_cm' => $product['piece_width_cm'] ?? null, 'piece_thickness_cm' => $product['piece_thickness_cm'] ?? null], null];
+        }
+        $__syncError = null;
+        if ($__sizeError === null) {
+            [$__specSel, $__syncError] = \App\Services\OrderLinePricing::syncThickness($__catalogId, $__specSel, $__size['piece_thickness_cm']);
+        }
         $__specUnchanged = json_encode($__specSel) === json_encode(\App\Services\OrderLinePricing::selectionInput((string) ($product['spec_selection'] ?? '')));
-        $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
-            ?? ($__priceUnchanged && $__specUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
-                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null));
+        $__sizeUnchanged = \App\Services\OrderLinePricing::lineSize($__size) === \App\Services\OrderLinePricing::lineSize($product)
+            && strtoupper(trim((string) ($_POST['unit'] ?? ''))) === strtoupper(trim((string) ($product['unit'] ?? '')));
+        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
+            ?? ($__priceUnchanged && $__specUnchanged && $__sizeUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null, $__size));
         if ($__refusal !== null) {
             Flash::set('error', 'Product line: ' . $__refusal);
             header("Location: /orders/{$orderId}#step-products");
@@ -1171,7 +1225,7 @@ final class OrderController
         OrderProductRepository::update(
             $productId,
             $description,
-            trim((string) ($_POST['dimensions'] ?? '')) ?: null,
+            trim((string) ($_POST['dimensions'] ?? '')) ?: self::dimensionsFromSize($__size),
             trim((string) ($_POST['finish'] ?? '')) ?: null,
             trim((string) ($_POST['quantity'] ?? '')) ?: null,
             !empty($_POST['quantity_is_tbc']),
@@ -1189,6 +1243,7 @@ final class OrderController
             // A changed product or options: the line no longer follows its price request.
             \App\Services\OrderLinePricing::saveSelection($productId, $__specSel, null);
         }
+        OrderProductRepository::setPieceSize($productId, $__size);
         $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
             OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);
@@ -1247,9 +1302,13 @@ final class OrderController
             return;
         }
 
-        OrderProductRepository::duplicate($productId);
-        Flash::set('success', 'Product line duplicated — edit the copy below to adjust its name or dimensions.');
-        header("Location: /orders/{$orderId}");
+        // Owner decision D-271/D-272 (points 13 and 24): an exact copy right below; its price is checked at once.
+        $__copyId = OrderProductRepository::duplicate($productId);
+        \App\Services\OrderLinePricing::afterSave($__copyId, null, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_LINE_DUPLICATED', 'order_products', $__copyId, 'copied_from_id', null, (string) $productId);
+        $__copyNo = (int) $product['line_no'] + 1;
+        Flash::set('success', self::lineSavedMessage($__copyId, "Line {$__copyNo} is an exact copy of line {$product['line_no']} — change what differs (e.g. the size). The MD's price approval is not copied: the copy's price was checked again."));
+        header("Location: /orders/{$orderId}?copied={$__copyId}#line-{$__copyId}");
     }
 
     public function show(array $params): void

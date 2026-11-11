@@ -74,15 +74,29 @@ async function softDelete(id) {
  * changed") or, with targetOrderId, onto a different order entirely
  * (reused by whole-order duplication).
  */
+/*
+ * Owner decision D-271/D-272 (points 13 and 24, 11 Nov 2026): an exact copy — every option, the
+ * piece size, material, product, price-request link and Zoho item — placed right below the
+ * original on the same order and marked "copy of line N". The MD's price approval, the
+ * figures fixed at PI and an open approval request are NOT copied: the caller runs
+ * orderLinePricing.afterSave() so the copy is checked at once.
+ */
 async function duplicate(id, targetOrderId = null) {
   const source = await find(id);
   if (!source) {
     throw new Error(`Cannot duplicate order_products row ${id} — not found.`);
   }
+  const sameOrder = targetOrderId === null || Number(targetOrderId) === Number(source.order_id);
   const orderId = targetOrderId ?? source.order_id;
+  let lineNo = await nextLineNo(orderId);
+  if (sameOrder) {
+    // Right below the original: the lines after it move down by one.
+    lineNo = Number(source.line_no) + 1;
+    await db.execute('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC', { o: orderId, n: lineNo });
+  }
   const newId = await add(
     orderId,
-    await nextLineNo(orderId),
+    lineNo,
     source.description,
     source.dimensions,
     source.finish,
@@ -97,7 +111,32 @@ async function duplicate(id, targetOrderId = null) {
   await db.execute('UPDATE order_products SET category_id = :c, attribute_values = :v, catalog_product_id = :cp, price_set_by = :pb WHERE id = :id', {
     c: source.category_id || null, v: source.attribute_values || null, cp: source.catalog_product_id || null, pb: source.price_set_by || null, id: newId,
   });
+  // D-272: and everything else that describes the line.
+  await db.execute(
+    `UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
+            piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf WHERE id = :id`, {
+      p: source.product_id ?? null, m: source.material ?? null, s: source.spec_selection ?? null, pr: source.price_request_id ?? null, z: source.zoho_item_id ?? null,
+      l: source.piece_length_cm ?? null, w: source.piece_width_cm ?? null, t: source.piece_thickness_cm ?? null, cf: sameOrder ? id : null, id: newId,
+    }
+  );
   return newId;
+}
+
+/**
+ * Owner decision D-270 (point 25): the piece size Length × Width × Thickness (cm) a line's price
+ * is converted with. Used for the price check only — the Dimensions text prints.
+ */
+async function setPieceSize(id, size) {
+  await db.execute('UPDATE order_products SET piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t WHERE id = :id', {
+    l: (size || {}).piece_length_cm ?? null, w: (size || {}).piece_width_cm ?? null, t: (size || {}).piece_thickness_cm ?? null, id,
+  });
+}
+
+/** D-272: the line number of the line a copy was made from (null when it is gone or not a copy). */
+function copiedFromLineNo(line, lines) {
+  if (!line.copied_from_id) return null;
+  const src = lines.find((l) => Number(l.id) === Number(line.copied_from_id));
+  return src ? Number(src.line_no) : null;
 }
 
 // Owner decision 2 Nov 2026 (D-240): the Products-menu product a line was picked from (null = typed by
@@ -161,4 +200,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setPieceSize, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };

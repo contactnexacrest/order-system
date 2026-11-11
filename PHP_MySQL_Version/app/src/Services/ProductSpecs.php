@@ -234,7 +234,7 @@ final class ProductSpecs
      * @return array{basis: string, unit: string, thickness_mm: ?int, pct: list<float>, usd: float, qty_pct: float,
      *               lines: list<array{spec:string, option:string, kind:string, value:float, usd_effect: ?float}>, charges: list<string>, manual: ?string}
      */
-    public static function adjustments(array $product, array $offered, array $map, int $cbmFrom, array $exactSpecIds = []): array
+    public static function adjustments(array $product, array $offered, array $map, int $cbmFrom, array $exactSpecIds = [], ?float $lineThicknessMm = null): array
     {
         $out = ['basis' => 'unit', 'unit' => (string) ($product['reference_unit'] ?? '') ?: 'unit', 'thickness_mm' => null,
             'pct' => [], 'usd' => 0.0, 'qty_pct' => 0.0, 'lines' => [], 'charges' => [], 'manual' => null];
@@ -255,7 +255,12 @@ final class ProductSpecs
             if ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $cbmFrom)) {
                 $out['basis'] = 'cbm';
                 $out['unit'] = 'CBM';
-                if ($o['thickness_mm'] === null) {
+                // D-270 (point 25): the line's own thickness (e.g. 13 cm) on a "50 mm and above" option
+                // is thick stone priced per CBM — no manual price needed.
+                if ($o['thickness_mm'] === null && $lineThicknessMm !== null && $lineThicknessMm >= $cbmFrom) {
+                    $out['thickness_mm'] = $lineThicknessMm;
+                }
+                if ($out['thickness_mm'] === null) {
                     $out['manual'] = 'A thickness of ' . $cbmFrom . ' mm or more that is not listed needs a manual price.';
                 }
             }

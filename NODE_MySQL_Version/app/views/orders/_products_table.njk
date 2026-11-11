@@ -1,0 +1,154 @@
+{#
+  Owner decision D-273 (point 17, 11 Nov 2026): the order page's products as one compact table —
+  the options as labels under each description (D-271, point 13), size, qty, unit, price, total,
+  a price-check badge per line and Edit / Duplicate / Delete buttons — with a summary bar above
+  it, a totals row with CBM and containers (8 CBM each), "+ Add product" always visible, and
+  charges and services in the same table style. Edit / "+ Add product" open a side panel in four
+  steps: Product | Options | Size and quantity | Price (with the reference box), and "More"
+  (description, Dimensions text, finish, line type, HS / SAC code, category) closed until needed.
+  Included by orders/show.njk inside the Products card. Port of views/orders/_products_table.php.
+#}
+{% set productReasonRequired = isLockedOrder or isPostConfirmationOrder %}
+<div class="products-head">
+  <h3>Products ({{ goodsLines.length }} line{{ '' if goodsLines.length == 1 else 's' }})</h3>
+  {% if canEditProducts %}<button type="button" class="btn-primary" data-open-panel="line-panel-new">+ Add product</button>{% endif %}
+</div>
+{% if sees.selling and lineSummary %}
+  <p class="line-summary {{ 'notice notice-warning' if lineSummary.blocking else 'notice notice-success' }}">{{ lineSummary.text }}{% if lineSummary.blocking %} <a href="#price-check">Show</a>{% endif %}</p>
+{% endif %}
+{% if isLockedOrder and canEditProducts %}
+  <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required.</p>
+{% elif isPostConfirmationOrder and canEditProducts %}
+  <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required.</p>
+{% elif isLockedOrder and permissions.manage_orders %}
+  <p class="notice notice-error">This order is LOCKED (closed or marked lost) — editing or duplicating a product line now needs the "Override locked data" permission.</p>
+{% elif isPostConfirmationOrder and permissions.manage_orders %}
+  <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
+{% endif %}
+<div class="table-scroll">
+<table class="list products-table">
+  <thead><tr><th>#</th><th>Product and options</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for p in goodsLines %}{% include "orders/_product_row.njk" %}{% endfor %}
+  {% if not goodsLines.length %}<tr><td colspan="9" class="muted">No product lines yet.</td></tr>{% endif %}
+  </tbody>
+  {% if goodsLines.length %}
+  <tfoot><tr class="totals-row">
+    <td></td>
+    <td colspan="4"><strong>Total{% if lineTotals.cbm > 0 %} · about {{ lineTotals.cbm | round(1) }} CBM · {{ lineTotals.containers }} container{{ '' if lineTotals.containers == 1 else 's' }} ({{ containerCbm | sizeNum }} CBM each){% endif %}</strong>
+      {% if lineTotals.uncounted > 0 %}<span class="muted small"> — {{ lineTotals.uncounted }} line{{ '' if lineTotals.uncounted == 1 else 's' }} without a size or quantity not counted in CBM</span>{% endif %}</td>
+    {% if sees.selling %}<td></td><td class="num"><strong>{{ lineTotals.amount | money }}</strong></td><td></td>{% endif %}
+    {% if canEditProducts %}<td></td>{% endif %}
+  </tr></tfoot>
+  {% endif %}
+</table>
+</div>
+{% if otherLines.length %}
+<h3>Charges and services</h3>
+<div class="table-scroll">
+<table class="list products-table">
+  <thead><tr><th>#</th><th>Charge or service</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th></th>{% endif %}</tr></thead>
+  <tbody>{% for p in otherLines %}{% include "orders/_product_row.njk" %}{% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+
+{% if canEditProducts %}
+  {% for pl in products.concat([null]) %}
+    {% set isNew = (pl === null) %}
+    {% set lp = pl if pl else {} %}
+    {% set panelId = 'line-panel-new' if isNew else ('line-panel-' + lp.id) %}
+    {% set lc = null if isNew else linePricing.lines[lp.id] %}
+    {% set lcFloor = (lc.figures.floor | fixed2) if (not isNew and sees.selling and lc and lc.figures and lc.status != 'approved') else null %}
+    <aside class="line-panel" id="{{ panelId }}" hidden aria-label="{{ 'Add product' if isNew else ('Line ' + lp.line_no + ' — edit') }}">
+      <form method="post" action="/orders/{{ order.id }}/products{{ '' if isNew else ('/' + lp.id) }}" class="line-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="line-panel-head">
+          <h3>{{ 'Add product' if isNew else ('Line ' + lp.line_no + ' — edit') }}</h3>
+          <button type="button" class="btn-sm btn-secondary" data-close-panel aria-label="Close">Close</button>
+        </div>
+        <section class="line-step"><h4><span class="step-no">1</span> Product</h4>
+          {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = lp.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = lp.spec_selection or '' %}{% set pickerOrderId = order.id %}{% set pickerNoSpecBox = true %}{% include "orders/_product_picker.njk" %}{% set pickerNoSpecBox = false %}
+          {% if isNew and sees.selling and linePricing.ctx.associate %}{# Owner decision D-255: a line from the associate's price request #}
+            <label>From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
+              <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
+          {% endif %}
+        </section>
+        <section class="line-step"><h4><span class="step-no">2</span> Options</h4>
+          <div class="spec-options spec-grid" aria-live="polite"></div>
+          <p class="muted small spec-empty-hint">Pick a product to choose its options.</p>
+        </section>
+        <section class="line-step"><h4><span class="step-no">3</span> Size and quantity</h4>
+          <div class="size-grid">
+            <label>Length (cm)<input type="text" inputmode="decimal" name="piece_length_cm" data-piece-size="length" data-max-decimals="2" data-max-value="10000" value="{{ lp.piece_length_cm | sizeNum }}" placeholder="e.g. 180"></label>
+            <label>Width (cm)<input type="text" inputmode="decimal" name="piece_width_cm" data-piece-size="width" data-max-decimals="2" data-max-value="10000" value="{{ lp.piece_width_cm | sizeNum }}" placeholder="e.g. 80"></label>
+            <label>Thickness (cm)<input type="text" inputmode="decimal" name="piece_thickness_cm" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="{{ lp.piece_thickness_cm | sizeNum }}" placeholder="e.g. 13"></label>
+            <label>Unit
+              <select name="unit" data-allowed-from="category_id">
+                {% for o in units %}
+                  <option value="{{ o.option_value }}" {{ 'selected' if ((o.is_default) if isNew else (lp.unit == o.option_value)) else '' }}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ lp.quantity if (lp.quantity != null) else '' }}" placeholder="e.g. 40"></label>
+            <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" {{ 'checked' if lp.quantity_is_tbc else '' }}> Qty To Be Confirmed</label>
+          </div>
+          <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
+        </section>
+        <section class="line-step"><h4><span class="step-no">4</span> Price</h4>
+          <div class="size-grid">
+            <label>Unit price {{ order.currency_code or '' }}<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ lp.unit_price if (lp.unit_price != null) else '' }}" placeholder="e.g. 495.00" data-floor-message="Below your lowest price"{% if lcFloor %} data-floor="{{ lcFloor }}"{% endif %}></label>
+            <div class="line-total-box"><span class="muted small">Line total</span><output class="line-total">{{ (lp.fob_value | money) if (not isNew and lp.fob_value != null) else '—' }}</output></div>
+          </div>
+          <div class="price-ref-box" aria-live="polite">{% if lc and sees.selling %}{% include "orders/_line_price.njk" %}{% endif %}</div>
+        </section>
+        <details class="line-more">
+          <summary>More <small class="muted">(description text, Dimensions, finish, line type, HS / SAC code, category)</small></summary>
+          <div class="kv-grid">
+            <label>Description *<input type="text" name="description" value="{{ lp.description or '' }}" required placeholder="e.g. Absolute black granite — Premium, Polished"></label>
+            <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="{{ '0' if (not isNew and lp.dimensions) else '1' }}" value="{{ lp.dimensions or '' }}" placeholder="e.g. 180 × 80 × 13 cm"></label>
+            <label>Finish
+              <select name="finish">
+                <option value="">—</option>
+                {% for o in surfaceFinishes %}
+                  <option value="{{ o.option_value }}" {{ 'selected' if ((o.is_default) if isNew else (lp.finish == o.option_value)) else '' }}>{{ o.option_value }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Line type
+              <select name="line_type">
+                {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (lp.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
+            <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ lp.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
+            {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
+            <label>Category
+              <select name="category_id">
+                {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and lp.category_id == c.id) else '' }}{{ c | categoryLineAttrs }}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </label>
+            {% for c in productCategories %}{% if c.is_system != 1 %}
+            {% set vals = (lp.attribute_values | fromJson) if lp.category_id == c.id else {} %}
+            <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
+              {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}" placeholder="e.g. Black Galaxy"></label>{% endfor %}
+            </fieldset>
+            {% endif %}{% endfor %}
+          </div>
+        </details>
+        {% if productReasonRequired %}
+          <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="{{ 'Why is a new line being added?' if isNew else 'Why is this line changing?' }}"></textarea></label>
+        {% endif %}
+        <div class="btn-row">
+          <button type="submit">{{ ('Override & Add' if isNew else 'Override & Save') if productReasonRequired else ('Add product' if isNew else 'Save line') }}</button>
+          <button type="button" class="btn-secondary" data-close-panel>Cancel</button>
+        </div>
+      </form>
+    </aside>
+  {% endfor %}
+  <datalist id="hs_code_list_edit">
+    {% for hc in hsCodes %}
+      <option value="{{ hc.code }}">{{ hc.description or '' }}</option>
+    {% endfor %}
+  </datalist>
+{% endif %}

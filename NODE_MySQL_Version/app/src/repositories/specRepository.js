@@ -138,8 +138,8 @@ async function resetSpecForProduct(productId, specId) {
   await db.execute('DELETE ov FROM product_option_overrides ov JOIN spec_options o ON o.id = ov.option_id WHERE ov.product_id = :p AND o.spec_id = :s', { p: productId, s: specId });
 }
 
-async function setProductFields(productId, categoryId, forms, cbmFrom) {
-  await db.execute('UPDATE catalog_products SET category_id = :c, forms = :f, cbm_from_mm = :m WHERE id = :id', { c: categoryId, f: forms, m: cbmFrom, id: productId });
+async function setProductFields(productId, categoryId, forms, cbmFrom, weightPerCbm = null) {
+  await db.execute('UPDATE catalog_products SET category_id = :c, forms = :f, cbm_from_mm = :m, weight_t_per_cbm = :w WHERE id = :id', { c: categoryId, f: forms, m: cbmFrom, w: weightPerCbm, id: productId });
 }
 
 /** Whether an option has been used on an order line or a price request. */

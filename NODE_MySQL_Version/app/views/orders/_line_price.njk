@@ -2,21 +2,29 @@
   Owner decision D-245 P2: one order line's price check — "Quote · lowest" and a badge; MD/ED
   (view_price_buildup) also see the minimum price. Selling-visible people only; never on a
   document or in the client portal. In: lc (orderLinePricing.checkLine result), seesPriceBuildup.
+  Owner decision D-270 (point 25): a line in another unit than the product's reference unit shows
+  both — the figures per the line's unit, and the product's figures per its reference unit with
+  the line price converted ("= USD 2,644.23 / CBM").
   Port of views/orders/_line_price.php.
 #}
-{% if lc %}{% set lcf = lc.figures %}
+{% if lc %}{% set lcf = lc.figures %}{% set lconv = lc.conversion %}{% set lconverted = lconv and lconv.factor !== null and ((lconv.factor - 1) | abs) > 0.000000001 %}{% set lref = lc.reference %}
 <span class="price-check-line small">
   {% if lcf %}
-    <span class="price-range muted">Quote {{ lcf.quote | money }} · lowest {{ lcf.floor | money }}{% if seesPriceBuildup %} · minimum {{ lcf.minimum | money }}{% endif %}{% if lc.fixed %} <span title="Fixed when the Proforma Invoice was issued">(fixed at PI)</span>{% endif %}</span>
+    <span class="price-range muted">Quote {{ lcf.quote | money }} · lowest {{ lcf.floor | money }}{% if seesPriceBuildup %} · minimum {{ lcf.minimum | money }}{% endif %}{% if lconverted %} per {{ lconv.line_unit | unitLabel }}{% endif %}{% if lc.fixed %} <span title="Fixed when the Proforma Invoice was issued">(fixed at PI)</span>{% endif %}</span>
+    {% if lconverted and lref %}
+      <span class="price-ref muted">Product reference per {{ lconv.ref_unit | unitLabel }}: quote {{ lref.quote | money }} · lowest {{ lref.floor | money }} · your price = USD {{ (lconv.price_ref or 0) | money }} / {{ lconv.ref_unit | unitLabel }} (1 {{ lconv.line_unit | unitLabel }} = {{ lconv.factor | factor4 }} {{ lconv.ref_unit | unitLabel }})</span>
+    {% endif %}
   {% endif %}
   {% if lc.status == 'ok' %}
     <span class="price-badge price-badge-ok">✓ OK</span>
   {% elif lc.status == 'below' %}
-    <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+    <span class="price-badge price-badge-bad">✗ Below your lowest price{{ ' — sent to the MD' if lc.requested else '' }}</span>
   {% elif lc.status == 'below_minimum' %}
     <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept</span>
   {% elif lc.status == 'no_price' %}
-    <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+    <span class="price-badge price-badge-bad">No price set — needs MD approval</span>{% if lc.note and lconv and lconv.unconvertible %} <span class="muted">{{ lc.note }}</span>{% endif %}
+  {% elif lc.status == 'needs_size' %}
+    <span class="price-badge price-badge-size">Size needed</span> <span class="muted">{{ lc.note }}</span>
   {% elif lc.status == 'approved' %}
     <span class="price-badge price-badge-approved">Approved by the MD</span>
   {% elif lc.note %}

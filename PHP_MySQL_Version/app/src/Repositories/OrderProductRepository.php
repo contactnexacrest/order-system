@@ -92,6 +92,13 @@ final class OrderProductRepository
      * same order (the common case: "same product, just the name or
      * dimension changed") or, with $targetOrderId, onto a different order
      * entirely (reused by whole-order duplication).
+     *
+     * Owner decision D-271/D-272 (points 13 and 24, 11 Nov 2026): an exact copy —
+     * every option, the piece size, material, product, price-request link and
+     * Zoho item — placed right below the original on the same order and marked
+     * "copy of line N". The MD's price approval, the figures fixed at PI and an
+     * open approval request are NOT copied: the caller runs
+     * OrderLinePricing::afterSave() so the copy is checked at once.
      */
     public static function duplicate(int $id, ?int $targetOrderId = null): int
     {
@@ -99,10 +106,18 @@ final class OrderProductRepository
         if ($source === null) {
             throw new \RuntimeException("Cannot duplicate order_products row {$id} — not found.");
         }
+        $sameOrder = $targetOrderId === null || $targetOrderId === (int) $source['order_id'];
         $orderId = $targetOrderId ?? (int) $source['order_id'];
+        $lineNo = self::nextLineNo($orderId);
+        if ($sameOrder) {
+            // Right below the original: the lines after it move down by one.
+            $lineNo = (int) $source['line_no'] + 1;
+            Database::connection()->prepare('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC')
+                ->execute(['o' => $orderId, 'n' => $lineNo]);
+        }
         $newId = self::add(
             $orderId,
-            self::nextLineNo($orderId),
+            $lineNo,
             (string) $source['description'],
             $source['dimensions'],
             $source['finish'],
@@ -116,7 +131,43 @@ final class OrderProductRepository
         // D-215 (5a): the copy keeps the line's product category and attribute values.
         Database::connection()->prepare('UPDATE order_products SET category_id = :c, attribute_values = :v, catalog_product_id = :cp, price_set_by = :pb WHERE id = :id')
             ->execute(['c' => $source['category_id'] ?? null, 'v' => $source['attribute_values'] ?? null, 'cp' => $source['catalog_product_id'] ?? null, 'pb' => $source['price_set_by'] ?? null, 'id' => $newId]);
+        // D-272: and everything else that describes the line.
+        Database::connection()->prepare(
+            'UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
+                    piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf WHERE id = :id'
+        )->execute([
+            'p' => $source['product_id'] ?? null, 'm' => $source['material'] ?? null, 's' => $source['spec_selection'] ?? null,
+            'pr' => $source['price_request_id'] ?? null, 'z' => $source['zoho_item_id'] ?? null,
+            'l' => $source['piece_length_cm'] ?? null, 'w' => $source['piece_width_cm'] ?? null, 't' => $source['piece_thickness_cm'] ?? null,
+            'cf' => $sameOrder ? $id : null, 'id' => $newId,
+        ]);
         return $newId;
+    }
+
+    /**
+     * Owner decision D-270 (point 25): the piece size Length × Width × Thickness (cm) a line's
+     * price is converted with. Used for the price check only — the Dimensions text prints.
+     *
+     * @param array{piece_length_cm?: ?string, piece_width_cm?: ?string, piece_thickness_cm?: ?string} $size
+     */
+    public static function setPieceSize(int $id, array $size): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t WHERE id = :id')
+            ->execute(['l' => $size['piece_length_cm'] ?? null, 'w' => $size['piece_width_cm'] ?? null, 't' => $size['piece_thickness_cm'] ?? null, 'id' => $id]);
+    }
+
+    /** D-272: the line number of the line a copy was made from (null when it is gone or not a copy). */
+    public static function copiedFromLineNo(array $line, array $lines): ?int
+    {
+        if (empty($line['copied_from_id'])) {
+            return null;
+        }
+        foreach ($lines as $l) {
+            if ((int) $l['id'] === (int) $line['copied_from_id']) {
+                return (int) $l['line_no'];
+            }
+        }
+        return null;
     }
 
     public static function add(

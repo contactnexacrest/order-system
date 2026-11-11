@@ -181,8 +181,14 @@ product can set its own) the price is per CBM and starts from the product's
 stone", with its own "Used for pricing"). Thickness % options no longer apply;
 per-m² amounts are converted ×1000 ÷ thickness. Example at 80 mm with ₹53,300 per CBM:
 quote **USD 904.56**, lowest **USD 878.21** per CBM (≈ USD 72.36 per m²). No per-CBM
-supplier price, or "Other, 50 mm or more", goes to a manual price. On an order line
-of 50 mm or more the unit must be **CBM**; the floor check uses the CBM price.
+supplier price goes to a manual price; "Other, 50 mm or more" on an order line uses
+the line's own thickness (e.g. 13 cm), so it needs no manual price. Since owner
+decision D-270 (11 Nov 2026) an order line may be in **any unit** of its category —
+PCS, m², sq ft, RMT, Ton or CBM: the line price is converted to the product's
+reference unit with the piece size (one piece = L × W × T; 1 m² = 10.7639 sq ft;
+Ton by the weight per CBM, stone 2.7 t) for every check — the save, the badge, Price
+check, the MD's approval and the Quotation / PI hold. See
+[Stage 1 — Quoting in any unit](./01-stage1-enquiry-quotation.md#quoting-in-any-unit--piece-size-owner-decision-d-270-11-nov-2026).
 
 **A product's own specifications** — Products › a product › **Price options
 (specifications)**. Needs the role permission **Manage a product's
@@ -196,8 +202,8 @@ option or specification already used on an order line or price request can only 
 deactivated. Every change is in the audit log; prices already issued do not change.
 
 **Order lines.** Picking a product on an order line shows its options; the quote and
-the floor follow them (fetched from the server — cost never reaches the browser), and
-the unit switches to CBM for 50 mm and above. The options go into the line's
+the floor follow them (fetched from the server — cost never reaches the browser),
+per the line's own unit and piece size (D-270). The options go into the line's
 existing fields (description, dimensions, finish, unit); documents are unchanged.
 
 | Setting | Default | Where |

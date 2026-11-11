@@ -35,5 +35,7 @@ $__pickerSpecName = str_ends_with((string) $__pickerName, '[]') ? 'product_spec_
   </select>
   <span class="muted small product-picker-hint" aria-live="polite"></span>
 </label>
+<?php if (empty($__pickerNoSpecBox)): // D-273: the side panel shows the options in its own step 2 ?>
 <div class="full spec-options" aria-live="polite"></div>
+<?php endif; ?>
 <input type="hidden" name="<?= $__pickerSpecName ?>" class="spec-json" value="<?= htmlspecialchars((string) ($__pickerSpecSel ?? '')) ?>">

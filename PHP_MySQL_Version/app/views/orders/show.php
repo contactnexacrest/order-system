@@ -1449,170 +1449,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <?php $__qualityDocs = \App\Repositories\OrderQualityDocumentRepository::forOrder((int) $order['id']); $__qualityOpen = array_filter($__qualityDocs, static fn ($qd) => $qd['status'] !== 'approved') !== []; ?>
   <details class="step-card" id="step-products"<?= (($sees['selling'] && $linePricing['blocking'] !== []) || $__qualityOpen) ? ' open' : '' ?>>
     <summary><h2>Products</h2></summary>
-    <?php if (!$canEditProducts): ?>
-      <table class="list">
-        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><?php if ($sees['selling']): ?><th>Unit Price</th><th>Amount</th><?php endif; ?></tr>
-        <?php foreach ($products as $i => $p): ?>
-        <tr>
-          <td><?= $i + 1 ?></td>
-          <td><?= htmlspecialchars($p['description']) ?><?php if ($p['dimensions'] || $p['finish']): ?><br><span class="muted small"><?= htmlspecialchars($p['dimensions'] ?? '') ?> <?= htmlspecialchars($p['finish'] ?? '') ?></span><?php endif; ?></td>
-          <td><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) $p['quantity']) ?></td>
-          <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
-          <?php if ($sees['selling']): ?>
-          <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'To Be Confirmed' ?>
-            <?php // Owner decision D-245 P2: the line's price check. ?>
-            <?php $__lc = $linePricing['lines'][(int) $p['id']] ?? null; include __DIR__ . '/_line_price.php'; ?>
-          </td>
-          <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'To Be Confirmed' ?></td>
-          <?php endif; ?>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-      <?php if ($isLockedOrder && $canManageOrders): ?>
-        <p class="notice notice-error">This order is LOCKED (closed or marked lost) — editing or duplicating a product line now needs the "Override locked data" permission.</p>
-      <?php elseif ($isPostConfirmationOrder && $canManageOrders): ?>
-        <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
-      <?php endif; ?>
-    <?php else: ?>
-      <?php if ($isLockedOrder): ?>
-        <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required below.</p>
-      <?php elseif ($isPostConfirmationOrder): ?>
-        <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
-      <?php endif; ?>
-      <?php $__productReasonRequired = $isLockedOrder || $isPostConfirmationOrder; ?>
-      <?php foreach ($products as $i => $p): ?>
-        <div class="card-nested">
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
-            <?= Csrf::field() ?>
-            <div class="kv-grid">
-              <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); $__pickerSpecSel = (string) ($p['spec_selection'] ?? ''); $__pickerOrderId = (int) $order['id']; include __DIR__ . '/_product_picker.php'; ?>
-              <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required placeholder="e.g. Granite slabs, polished"></label>
-              <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 240 x 120 x 2 cm"></label>
-              <label>Finish
-                <select name="finish">
-                  <?php $__finishVal = (string) ($p['finish'] ?? ''); ?>
-                  <option value="">—</option>
-                  <?php foreach ($surfaceFinishes as $o): ?>
-                    <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__finishVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </label>
-              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
-              <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
-              <label>Unit
-                <select name="unit" data-allowed-from="category_id">
-                  <?php $__unitVal = (string) ($p['unit'] ?? ''); ?>
-                  <?php foreach ($units as $o): ?>
-                    <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </label>
-              <?php $__lc = $linePricing['lines'][(int) $p['id']] ?? null; $__lcFloor = ($sees['selling'] && $__lc !== null && $__lc['figures'] !== null && $__lc['status'] !== \App\Services\OrderLinePricing::APPROVED) ? number_format((float) $__lc['figures']['floor'], 2, '.', '') : null; ?>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '" data-floor-message="Below your lowest price"' : '' ?>>
-                <?php // Owner decision D-245 P2: the line's price check — selling-visible people only, never on a document. ?>
-                <?php if ($sees['selling']): include __DIR__ . '/_line_price.php'; endif; ?>
-              </label>
-              <label>Line type
-                <select name="line_type">
-                  <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
-                </select>
-              </label>
-              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
-              <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
-              <?php $__catLine = $p; ?>
-              <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
-              <label>Category
-                <select name="category_id">
-                  <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?><?= \App\Repositories\ProductCategoryRepository::lineOptionAttributes($__c) ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
-                </select>
-              </label>
-              <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
-              <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
-                <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>" placeholder="e.g. Black Galaxy"></label><?php endforeach; ?>
-              </fieldset>
-              <?php endforeach; ?>
-            </div>
-            <?php if ($__productReasonRequired): ?>
-              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
-            <?php endif; ?>
-            <button type="submit" class="btn-sm"><?= $__productReasonRequired ? 'Override & Save' : 'Save' ?></button>
-          </form>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/duplicate" style="display:inline">
-            <?= Csrf::field() ?>
-            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason"><?php endif; ?>
-            <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
-          </form>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
-            <?= Csrf::field() ?>
-            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason"><?php endif; ?>
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
-          </form>
-        </div>
-      <?php endforeach; ?>
-      <?php if (empty($products)): ?><p class="muted">No product lines yet.</p><?php endif; ?>
-
-      <div class="card-nested">
-        <strong>Add Product Line</strong>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
-          <?= Csrf::field() ?>
-          <div class="kv-grid">
-            <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = 0; $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); $__pickerSpecSel = ''; $__pickerOrderId = (int) $order['id']; include __DIR__ . '/_product_picker.php'; ?>
-            <?php if (!empty($sees['selling']) && !empty($linePricing['ctx']['associate'])): // Owner decision D-255: a line from the associate's price request ?>
-              <label class="full">From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
-                <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
-            <?php endif; ?>
-            <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
-            <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
-            <label>Finish
-              <select name="finish">
-                <option value="">—</option>
-                <?php foreach ($surfaceFinishes as $o): ?>
-                  <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
-            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-            <label>Unit
-              <select name="unit" data-allowed-from="category_id">
-                <?php foreach ($units as $o): ?>
-                  <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00" data-floor-message="Below your lowest price"></label>
-            <label>Line type
-              <select name="line_type">
-                <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>"><?= $__ltLabel ?></option><?php endforeach; ?>
-              </select>
-            </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
-            <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
-            <?php $__catLine = []; ?>
-            <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
-            <label>Category
-              <select name="category_id">
-                <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?><?= \App\Repositories\ProductCategoryRepository::lineOptionAttributes($__c) ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
-              </select>
-            </label>
-            <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
-            <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
-              <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>" placeholder="e.g. Black Galaxy"></label><?php endforeach; ?>
-            </fieldset>
-            <?php endforeach; ?>
-          </div>
-          <?php if ($__productReasonRequired): ?>
-            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
-          <?php endif; ?>
-          <button type="submit"><?= $__productReasonRequired ? 'Override & Add' : 'Add Product Line' ?></button>
-        </form>
-      </div>
-      <datalist id="hs_code_list_edit">
-        <?php foreach ($hsCodes ?? [] as $hc): ?>
-          <option value="<?= htmlspecialchars($hc['code']) ?>"><?= htmlspecialchars($hc['description'] ?? '') ?></option>
-        <?php endforeach; ?>
-      </datalist>
-    <?php endif; ?>
+    <?php // Owner decision D-273 (point 17): one compact products table, summary bar, totals and side-panel editing. ?>
+    <?php include __DIR__ . '/_products_table.php'; ?>
     <?php // Owner decision D-215 (5a-2): service lines are invoiced on their own Export Service Invoice. ?>
     <?php $__serviceLines = array_filter($products, static fn (array $p): bool => ($p['line_type'] ?? 'goods') === 'service'); ?>
     <?php if ($__serviceLines && $canGenerateDocuments && $sees['selling']): ?>
@@ -1629,20 +1467,24 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php endif; ?>
 
   <?php // Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). ?>
-  <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::APPROVED], true))); ?>
+  <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::NEEDS_SIZE, \App\Services\OrderLinePricing::APPROVED], true))); ?>
   <?php if ($sees['selling'] && $__pcLines !== []): ?>
   <div class="price-check" id="price-check">
     <h3>Price check <small class="muted">(sold by <?= htmlspecialchars((string) $linePricing['ctx']['label']) ?>)</small></h3>
     <table class="list">
-      <tr><th>Line</th><th>Description</th><th>Price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
-      <?php foreach ($__pcLines as $__pc): $__pl = $__pc['line']; $__pf = $__pc['figures']; ?>
+      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      <?php foreach ($__pcLines as $__pc): $__pl = $__pc['line']; $__pf = $__pc['figures']; $__pconv = $__pc['conversion'] ?? null; $__pconverted = $__pconv !== null && $__pconv['factor'] !== null && abs((float) $__pconv['factor'] - 1.0) > 1e-9; ?>
         <tr>
           <td><?= (int) $__pl['line_no'] ?></td>
-          <td><?= htmlspecialchars((string) $__pl['description']) ?></td>
-          <td><?= number_format((float) $__pl['unit_price'], 2) ?></td>
-          <td><?= $__pf !== null ? number_format((float) $__pf['quote'], 2) . ' · ' . number_format((float) $__pf['floor'], 2) : '—' ?></td>
+          <td><?= htmlspecialchars((string) $__pl['description']) ?><?php if (($__pl['dimensions'] ?? '') !== ''): ?><br><span class="muted small"><?= htmlspecialchars((string) $__pl['dimensions']) ?><?= $__pconverted ? ' → ' . rtrim(rtrim(number_format((float) $__pconv['factor'], 4, '.', ''), '0'), '.') . ' ' . htmlspecialchars(\App\Services\LineUnits::label((string) $__pconv['ref_unit'])) . ' per ' . htmlspecialchars(\App\Services\LineUnits::label((string) $__pconv['line_unit'])) : '' ?></span><?php endif; ?></td>
+          <td><?= number_format((float) $__pl['unit_price'], 2) ?><?= ($__pl['unit'] ?? '') !== '' ? ' / ' . htmlspecialchars((string) $__pl['unit']) : '' ?>
+            <?php if ($__pconverted && isset($__pconv['price_ref'])): ?><br><span class="muted small">= USD <?= number_format((float) $__pconv['price_ref'], 2) ?> / <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__pconv['ref_unit'])) ?></span><?php endif; ?></td>
+          <td><?= $__pf !== null ? number_format((float) $__pf['quote'], 2) . ' · ' . number_format((float) $__pf['floor'], 2) . ($__pconverted ? ' <span class="muted small">per ' . htmlspecialchars(\App\Services\LineUnits::label((string) $__pconv['line_unit'])) . '</span>' : '') : '—' ?></td>
           <td>
-            <?php if ($__pc['status'] === \App\Services\OrderLinePricing::APPROVED): ?>
+            <?php if ($__pc['status'] === \App\Services\OrderLinePricing::NEEDS_SIZE): ?>
+              <span class="price-badge price-badge-size">Size needed</span>
+              <div class="muted small"><?= htmlspecialchars((string) $__pc['note']) ?></div>
+            <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::APPROVED): ?>
               <span class="price-badge price-badge-approved">Approved by <?= htmlspecialchars((string) (\App\Repositories\UserRepository::findById((int) $__pc['approval']['by'])['name'] ?? '—')) ?></span>
               <div class="muted small"><?= htmlspecialchars((string) $__pc['approval']['at']) ?> — <?= htmlspecialchars((string) $__pc['approval']['reason']) ?></div>
             <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::BELOW_MINIMUM): ?>
@@ -1670,7 +1512,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php endforeach; ?>
     </table>
     <?php if ($linePricing['blocking'] !== []): ?>
-      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it.</p>
+      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it. A line that needs its piece size is checked once the size is entered.</p>
     <?php endif; ?>
   </div>
   <?php endif; ?>

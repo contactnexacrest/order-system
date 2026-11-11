@@ -146,7 +146,11 @@ async function parseSettings(body, knownUnits, packageTypes) {
   if (docs.length > MAX_QUALITY_DOCUMENTS) return [{}, `A category can ask for at most ${MAX_QUALITY_DOCUMENTS} quality documents.`];
   const tc = String(body.tc_clause_set ?? '').trim();
   if (tc !== '' && !Object.prototype.hasOwnProperty.call(TC_CLAUSE_SETS, tc)) return [{}, 'Choose the T&C clause set from the list.'];
+  // D-270 (point 25): tonnes per CBM, for lines priced per Ton (stone 2.7).
+  const [weight, weightError] = weightInput(body.weight_t_per_cbm);
+  if (weightError !== null) return [{}, weightError];
   return [{
+    weight_t_per_cbm: weight,
     default_unit: def !== '' ? def : null,
     allowed_units: allowed.length > 0 ? allowed.join(',') : null,
     default_hs_code: hs !== '' ? hs : null,
@@ -158,8 +162,8 @@ async function parseSettings(body, knownUnits, packageTypes) {
 
 async function updateSettings(id, s) {
   await db.execute(
-    'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc WHERE id = :id',
-    { du: s.default_unit, au: s.allowed_units, hs: s.default_hs_code, pt: s.packing_type, qd: s.quality_documents, tc: s.tc_clause_set, id },
+    'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt WHERE id = :id',
+    { du: s.default_unit, au: s.allowed_units, hs: s.default_hs_code, pt: s.packing_type, qd: s.quality_documents, tc: s.tc_clause_set, wt: s.weight_t_per_cbm ?? null, id },
   );
 }
 
@@ -169,7 +173,18 @@ function settingsSummary(c) {
   return `unit ${c.default_unit || 'as today'} (allowed: ${c.allowed_units || 'any'})`
     + `; HS ${c.default_hs_code || '-'}; packing ${c.packing_type || '-'}`
     + `; quality documents: ${docs.length > 0 ? docs.join(', ') : 'none'}`
-    + `; T&C ${c.tc_clause_set || '-'}`;
+    + `; T&C ${c.tc_clause_set || '-'}`
+    + `; weight per CBM ${c.weight_t_per_cbm !== null && c.weight_t_per_cbm !== undefined ? `${String(Number(c.weight_t_per_cbm))} t` : '-'}`;
+}
+
+/** D-270 (point 25): a weight per CBM in tonnes (0.1 to 20, up to 3 decimals), or null when left empty. Returns [value, error]. */
+function weightInput(raw) {
+  const v = String(raw ?? '').trim();
+  if (v === '') return [null, null];
+  if (!/^\d{1,2}(\.\d{1,3})?$/.test(v) || Number(v) < 0.1 || Number(v) > 20) {
+    return [null, 'Weight per CBM: tonnes from 0.1 to 20, up to 3 decimals (e.g. 2.7), or leave it empty.'];
+  }
+  return [Number(v).toFixed(3), null];
 }
 
 /**
@@ -178,8 +193,13 @@ function settingsSummary(c) {
  * (checked by app.js). '' for Natural Stone, which stays as today.
  */
 function lineOptionAttributes(category) {
-  if (Number(category.is_system ?? 0) === 1) return '';
   const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  if (Number(category.is_system ?? 0) === 1) {
+    // D-270 (point 25): Natural Stone's goods lines use its unit list (CBM, m², sq ft, PCS, Ton, RMT);
+    // its HS code and unit defaults stay as today, and charge lines keep any unit.
+    const stoneAllowed = allowedUnits(category);
+    return stoneAllowed.length > 0 ? ` data-allowed-units="${esc(stoneAllowed.join(','))}" data-allowed-goods-only="1"` : '';
+  }
   const fills = {};
   if (String(category.default_hs_code ?? '') !== '') fills.hs_code = String(category.default_hs_code);
   if (String(category.default_unit ?? '') !== '') fills.unit = String(category.default_unit);
@@ -199,7 +219,18 @@ function lineOptionAttributes(category) {
 async function applyLineDefaults(body) {
   const categoryId = parseInt(body.category_id, 10) || 0;
   const lineType = String(body.line_type ?? 'goods');
-  if (categoryId === 0 || lineType === 'service') return null;
+  if (lineType === 'service') return null;
+  if (categoryId === 0) {
+    // D-270 (point 25): a Natural Stone goods line uses one of the category's units.
+    const sid = await require('./specRepository').systemCategoryId();
+    const stone = sid ? await find(sid) : null;
+    const stoneAllowed = stone ? allowedUnits(stone) : [];
+    const stoneUnit = String(body.unit ?? '').trim().toUpperCase();
+    if (lineType === 'goods' && stoneAllowed.length > 0 && stoneUnit !== '' && !stoneAllowed.includes(stoneUnit)) {
+      return `Unit ${stoneUnit} is not one of the units for ${stone.name} (${stoneAllowed.join(', ')}) — the MD can add it in Products › Categories.`;
+    }
+    return null;
+  }
   const category = await find(categoryId);
   if (!category || Number(category.is_system) === 1) return null;
   if (lineType === 'goods' && String(body.hs_code ?? '').trim() === '' && category.default_hs_code) body.hs_code = String(category.default_hs_code);
@@ -212,5 +243,5 @@ async function applyLineDefaults(body) {
 
 module.exports = {
   MAX_ATTRIBUTES, all, find, attributeLabels, nameTaken, create, update, parseLabels, setLineCategory, documentAttributes,
-  TC_CLAUSE_SETS, MAX_QUALITY_DOCUMENTS, allowedUnits, qualityDocuments, parseSettings, updateSettings, settingsSummary, lineOptionAttributes, applyLineDefaults,
+  TC_CLAUSE_SETS, MAX_QUALITY_DOCUMENTS, allowedUnits, qualityDocuments, parseSettings, updateSettings, settingsSummary, lineOptionAttributes, applyLineDefaults, weightInput,
 };

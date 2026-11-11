@@ -90,13 +90,14 @@ final class D257ProductNeutralTest extends DbTestCase
     public function testNaturalStoneIsSeededWithTodaysBehaviour(): void
     {
         $stone = $this->stone();
-        self::assertSame([null, null, '680293', 'Wooden Crates', null, 'natural_stone'],
+        // D-270 (owner point 25, 11 Nov 2026): Natural Stone's goods lines use CBM, m², sq ft, PCS, Ton and RMT.
+        self::assertSame([null, 'CBM,SQM,SQFT,PCS,TON,RMT', '680293', 'Wooden Crates', null, 'natural_stone'],
             [$stone['default_unit'], $stone['allowed_units'], $stone['default_hs_code'], $stone['packing_type'], $stone['quality_documents'], $stone['tc_clause_set']]);
-        self::assertSame([], ProductCategoryRepository::allowedUnits($stone), 'any unit, as today');
+        self::assertSame(['CBM', 'SQM', 'SQFT', 'PCS', 'TON', 'RMT'], ProductCategoryRepository::allowedUnits($stone));
         self::assertSame([], ProductCategoryRepository::qualityDocuments($stone), 'no extra quality documents');
-        self::assertSame('', ProductCategoryRepository::lineOptionAttributes($stone), 'the order-line form fills nothing for Natural Stone');
+        self::assertSame(' data-allowed-units="CBM,SQM,SQFT,PCS,TON,RMT" data-allowed-goods-only="1"', ProductCategoryRepository::lineOptionAttributes($stone), 'no HS / unit fills for Natural Stone, only its unit list for goods lines');
         $units = array_column(\App\Repositories\LookupRepository::dropdownOptions('unit'), 'option_value');
-        foreach (['PCS', 'SET', 'KG', 'MT', 'MTR', 'LTR', 'HOUR', 'DAY', 'SQM', 'CBM'] as $u) {
+        foreach (['PCS', 'SET', 'KG', 'MT', 'MTR', 'LTR', 'HOUR', 'DAY', 'SQM', 'CBM', 'TON', 'RMT'] as $u) {
             self::assertContains($u, $units);
         }
         $types = array_column(\App\Repositories\LookupRepository::dropdownOptions('supplier_type'), 'option_value');

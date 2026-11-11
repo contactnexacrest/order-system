@@ -877,3 +877,39 @@ input.below-floor{border-color:#b42318}
 .help-line { display: block; font-size: .85em; color: #555; background: #f7f4ec; border-left: 3px solid #c9b98a; padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-weight: normal; }
 .pricing-two { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .pricing-two > .section { flex: 1 1 380px; min-width: 0; }
+
+/* Owner decisions of 11 Nov 2026 — D-273 (point 17): compact products table, summary bar,
+   totals, side panel in four steps; D-271 (point 13): option labels, "copy of line N";
+   D-270 (point 25): piece size and the reference box. */
+.products-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 8px}
+.products-head h3{margin:0}
+.line-summary{margin:6px 0 10px}
+.products-table td{vertical-align:top}
+.products-table .num{text-align:right;white-space:nowrap}
+.products-table .line-actions{white-space:nowrap}
+.products-table .line-actions .inline-form{display:inline-flex;gap:4px;align-items:center;margin:2px 0}
+.products-table .line-actions input[type="text"]{width:130px}
+.products-table tr.line-copied td{background:#fff6dc}
+.products-table .totals-row td{background:#faf7f0;border-top:2px solid #e3dccb}
+.option-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:12px;background:#efebe2;color:#3d3a33}
+.chip-gone{background:#fde8e8;color:#a32020;font-weight:600}
+.price-badge-size{background:#fff1d6;color:#7a5200}
+.price-ref{display:block;font-size:11.5px;margin-top:2px}
+.table-scroll{overflow-x:auto;max-width:100%}
+.line-panel{position:fixed;top:0;right:0;bottom:0;width:min(760px,100%);overflow-y:auto;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.18);z-index:1000;padding:16px}
+.line-panel[hidden]{display:none}
+.line-panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.line-step{border:1px solid #e6e1d6;border-radius:8px;padding:10px 12px;margin:10px 0}
+.line-step h4{margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.step-no{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#1a3a8a;color:#fff;font-size:12px}
+.spec-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.spec-grid .spec-option{display:flex;flex-direction:column;font-size:13px}
+.spec-option-gone select{border-color:#a32020;color:#a32020}
+.size-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.line-total-box{display:flex;flex-direction:column;justify-content:flex-end}
+.line-total-box output{font-weight:700;padding:6px 0}
+.price-ref-box{background:#eef2fb;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:13px;min-height:1.2em}
+.line-more{margin:10px 0}
+body.line-panel-open{overflow:hidden}
+@media (max-width:700px){.spec-grid,.size-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-panel{padding:12px}}

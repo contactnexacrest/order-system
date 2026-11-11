@@ -525,6 +525,53 @@ refused. **Every document (QT, PI, OC, CI …) prints the line's own price.** Th
 whole flow — who sees what, the MD's approval, the PI waiting, the figures fixed
 at the PI — is in [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 
+### Quoting in any unit — piece size (owner decision D-270, 11 Nov 2026)
+
+You can quote a line in any unit of its category. Natural Stone: **CBM, SQM (m²),
+SQFT (sq ft), PCS, TON and RMT** (Set or Lot only if the MD adds them in Products ›
+Categories). The product's prices are per its own unit (per CBM from 50 mm), so the
+app converts your price before checking it — you never have to switch to CBM.
+
+1. Pick the product and its options.
+2. Enter the **piece size in cm** — Length, Width, Thickness (decimals allowed):
+   - **PCS** needs all three (e.g. 180 × 80 × 13);
+   - **RMT** needs width and thickness;
+   - **SQM / SQFT** need the thickness (or a Thickness option that has one);
+   - **CBM** and **TON** need nothing extra (Ton uses the weight per CBM of the
+     category — stone 2.7 t — or the product's own figure).
+3. The **Thickness** box and the **Thickness option** follow each other: type 3 and
+   "30 mm" is chosen; type 13 and the per-CBM thick-stone option is chosen (no manual
+   price needed).
+4. The **Dimensions** text fills itself ("180 × 80 × 13 cm"); you may still change it.
+   It prints on the documents as before.
+5. Enter the price per your unit. The box under the price shows the quote and your
+   lowest **per your unit** and the product's figures **per CBM** (e.g. "1 piece =
+   0.1872 CBM; your price = USD 2,644.23 / CBM").
+
+If a size is missing the field asks for it ("Enter the length — needed to compare a
+price per piece."); the line is **not** called too low and is **not** sent to the MD.
+A saved line without its size shows **Size needed** and holds the Quotation until you
+enter it. A Set or Lot line cannot be converted, so it goes to the MD for approval.
+For a second size, use **Duplicate** on the line and change the sizes and price.
+
+### The Products section on the order page (owner decisions D-271 – D-273, 11 Nov 2026)
+
+- One table: each line shows its **options as labels** under the description, then
+  size, qty, unit, price, total, a **price-check badge** and **Edit / Duplicate /
+  Delete**. An option that has since been switched off shows in red "“…” is no
+  longer offered — choose again": open **Edit** and choose a new one.
+- The bar above the table sums up the price check, e.g. "2 lines OK · 1 line needs
+  MD approval (line 3) — the Quotation waits for it." — **Show** jumps to Price check.
+- The **Total** row shows the goods value, about how many CBM and how many containers
+  (8 CBM each). Lines without a size or quantity are left out of the CBM and named.
+- **+ Add product** (top right) and **Edit** open a panel on the right in four steps:
+  1 Product · 2 Options · 3 Size and quantity · 4 Price (with the reference box). The
+  description, Dimensions text, finish, line type, HS / SAC code and category are under
+  **More**. Charges and services are listed below the products in the same style.
+- **Duplicate** makes an exact copy right below, marked "copy of line N" — every
+  option, the size, product, material and price-request link. The MD's approval is not
+  copied: the copy is checked at once and, if below your lowest price, goes to the MD.
+
 ### Export Service Invoice (D-215)
 
 When an order has at least one service line, the **Products** card on the

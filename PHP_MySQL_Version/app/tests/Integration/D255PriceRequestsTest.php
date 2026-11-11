@@ -262,11 +262,14 @@ final class D255PriceRequestsTest extends DbTestCase
         Flash::pull();
     }
 
-    public function testOrderLineUnitMustBeCbmFromFiftyMmAndTheFloorUsesCbm(): void
+    public function testFromFiftyMmTheFloorUsesCbmAndAnyUnitIsConverted(): void
     {
         $order = Database::connection()->query('SELECT * FROM orders WHERE id = ' . $this->createTestOrder($this->client, 'FOB', 'Standard — New Buyer', 'USD'))->fetch();
         $sel = $this->sel(self::CBM);
-        self::assertStringContainsString('set the unit to CBM', (string) OrderLinePricing::saveRefusal($order, $this->product, 'goods', '904.56', true, $sel, 'SQM'));
+        // D-270 (point 25): the old "set the unit to CBM" refusal is gone — a per-m² line at 80 mm is
+        // converted (1 m² = 0.08 CBM): USD 500 per CBM is USD 40 per m².
+        self::assertNull(OrderLinePricing::saveRefusal($order, $this->product, 'goods', '904.56', true, $sel, 'SQM'));
+        self::assertStringContainsString('below what NexaCrest can accept', (string) OrderLinePricing::saveRefusal($order, $this->product, 'goods', '40.00', true, $sel, 'SQM'));
         self::assertNull(OrderLinePricing::saveRefusal($order, $this->product, 'goods', '904.56', true, $sel, 'CBM'));
         self::assertNotNull(OrderLinePricing::saveRefusal($order, $this->product, 'goods', '500.00', true, $sel, 'CBM'), 'below the CBM minimum');
         self::assertNull(OrderLinePricing::saveRefusal($order, $this->product, 'goods', '73.43', true, $this->sel(self::SQM), 'SQM'));

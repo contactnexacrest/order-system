@@ -27,6 +27,8 @@ $__forms = ProductSpecs::productForms($product);
     <?= Csrf::field() ?>
     <label>Category *<select name="category_id" required<?= $__ro ?>><?php foreach ($categories as $c): ?><option value="<?= (int) $c['id'] ?>"<?= (int) $c['id'] === (int) $categoryId ? ' selected' : '' ?>><?= View::e($c['name']) ?></option><?php endforeach; ?></select></label>
     <label>Priced per CBM from (mm)<input type="number" name="cbm_from_mm" min="1" max="2000" step="1" value="<?= $product['cbm_from_mm'] !== null ? (int) $product['cbm_from_mm'] : '' ?>" placeholder="global <?= (int) $cbmFrom ?>"<?= $__ro ?>></label>
+    <?php // D-270 (point 25): this product's own weight per CBM, for order lines priced per Ton. ?>
+    <label>Weight per CBM (tonnes) <small class="muted">(empty = the category's)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="<?= ($product['weight_t_per_cbm'] ?? null) !== null ? View::e(rtrim(rtrim((string) $product['weight_t_per_cbm'], '0'), '.')) : '' ?>" placeholder="e.g. 3.0"<?= $__ro ?>></label>
     <fieldset class="full"><legend>Forms this product comes in (none ticked = all)</legend>
       <?php foreach (ProductSpecs::FORMS as $k => $l): ?><label class="inline"><input type="checkbox" name="forms[]" value="<?= $k ?>"<?= in_array($k, $__forms, true) ? ' checked' : '' ?><?= $__ro ?>> <?= View::e($l) ?></label> <?php endforeach; ?>
     </fieldset>

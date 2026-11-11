@@ -196,10 +196,13 @@ describe('D-255 specifications and associate price requests', () => {
     spy.mockRestore();
   });
 
-  it('order line unit must be CBM from 50 mm and the floor uses CBM', async () => {
+  it('from 50 mm the floor uses CBM and any unit is converted', async () => {
     const order = await orderRow(client);
     const cbm = await sel(CBM);
-    expect(await orderLinePricing.saveRefusal(order, product, 'goods', '904.56', true, cbm, 'SQM')).toContain('set the unit to CBM');
+    // D-270 (point 25): the old "set the unit to CBM" refusal is gone — a per-m² line at 80 mm is
+    // converted (1 m² = 0.08 CBM): USD 500 per CBM is USD 40 per m².
+    expect(await orderLinePricing.saveRefusal(order, product, 'goods', '904.56', true, cbm, 'SQM')).toBeNull();
+    expect(await orderLinePricing.saveRefusal(order, product, 'goods', '40.00', true, cbm, 'SQM')).toContain('below what NexaCrest can accept');
     expect(await orderLinePricing.saveRefusal(order, product, 'goods', '904.56', true, cbm, 'CBM')).toBeNull();
     expect(await orderLinePricing.saveRefusal(order, product, 'goods', '500.00', true, cbm, 'CBM')).not.toBeNull();
     expect(await orderLinePricing.saveRefusal(order, product, 'goods', '73.43', true, await sel(SQM), 'SQM')).toBeNull();

@@ -538,6 +538,9 @@ async function store(req, res) {
     }
   }
 
+  // D-270 (point 25): each row's piece size and its options with the typed thickness applied.
+  const rowSizes = {};
+  const rowSels = {};
   // QA-5 ORD-05/ORD-06: quantity/unit price used to be passed straight
   // through as raw strings all the way to a DECIMAL column bind — a
   // non-numeric value crashed with an unhandled
@@ -575,13 +578,24 @@ async function store(req, res) {
         res.redirect(`/orders/create?client_id=${clientId}`);
         return;
       }
-      const refusal = await require('../services/orderLinePricing').saveRefusal(
+      // D-270 (point 25): the row's piece size; a typed thickness chooses the Thickness option.
+      const [rowSize, sizeError] = lineSizeInput(body, i);
+      const rowCatalogId = await catalogProductInput([].concat(body.product_catalog_id || [])[i]);
+      const olpRow = require('../services/orderLinePricing');
+      const [rowSel, syncError] = sizeError === null
+        ? await olpRow.syncThickness(rowCatalogId, olpRow.selectionInput([].concat(body.product_spec_json || [])[i] ?? ''), rowSize.piece_thickness_cm)
+        : [null, null];
+      rowSizes[i] = rowSize;
+      rowSels[i] = rowSel;
+      const refusal = sizeError ?? syncError ?? await olpRow.saveRefusal(
         { client_id: clientId, currency_code: currency ? currency.code : '' },
-        await catalogProductInput([].concat(body.product_catalog_id || [])[i]),
+        rowCatalogId,
         'goods', str(unitPricesInput[i]) || null, seesPriceBuildup(req),
         // D-255: the row's chosen specification options and unit.
-        require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''),
-        str([].concat(body.product_unit || [])[i]) || null
+        rowSel,
+        str([].concat(body.product_unit || [])[i]) || null,
+        null,
+        rowSize
       );
       if (refusal !== null) {
         flash.set(req, 'error', `Product line ${i + 1}: ${refusal}`);
@@ -615,6 +629,7 @@ async function store(req, res) {
   // order row itself along with everything else.
   const createdLineIds = [];
   const createdSpecs = [];
+  const createdSizes = [];
   const { orderId, orderReference } = await divisionService.withDivision(newOrderDivision, () => db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
@@ -685,7 +700,7 @@ async function store(req, res) {
         orderId,
         lineNo++,
         description,
-        str(dimensions[i]) || null,
+        str(dimensions[i]) || dimensionsFromSize(rowSizes[i] || {}),
         str(finishes[i]) || null,
         str(quantities[i]) || null,
         quantityIsTbc,
@@ -698,7 +713,8 @@ async function store(req, res) {
       await orderProductRepository.setCatalogProduct(lineId, pickedIds[i] || null, trx);
       if (str(unitPrices[i]) !== '') await orderProductRepository.setPriceSetBy(lineId, user.id, trx);
       createdLineIds.push(lineId);
-      createdSpecs.push(require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
+      createdSpecs.push(rowSels[i] !== undefined ? rowSels[i] : require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
+      createdSizes.push(rowSizes[i] || {});
     }
 
     return result;
@@ -707,7 +723,10 @@ async function store(req, res) {
   // External QA report L-23: order creation was never audit-logged.
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
-  for (let k = 0; k < createdLineIds.length; k++) await require('../services/orderLinePricing').saveSelection(createdLineIds[k], createdSpecs[k] ?? null, null);
+  for (let k = 0; k < createdLineIds.length; k++) {
+    await require('../services/orderLinePricing').saveSelection(createdLineIds[k], createdSpecs[k] ?? null, null);
+    await orderProductRepository.setPieceSize(createdLineIds[k], createdSizes[k] || {});
+  }
   for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
 
   // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
@@ -954,11 +973,29 @@ async function linePricingViewData(req, orderId) {
       check.approval.approver_name = approver ? approver.name : '—';
     }
   }
-  const pcLines = Object.values(linePricing.lines).filter((c) => ['below', 'below_minimum', 'no_price', 'approved'].includes(c.status));
+  const pcLines = Object.values(linePricing.lines).filter((c) => ['below', 'below_minimum', 'no_price', 'needs_size', 'approved'].includes(c.status));
+  // Owner decisions of 11 Nov 2026 — D-271 (point 13): each line's options as labels and the line it
+  // was copied from; D-273 (point 17): the summary bar and the totals row with CBM and containers.
+  const olp = require('../services/orderLinePricing');
+  const lines = await orderProductRepository.forOrder(orderId);
+  const lineChips = {};
+  const copyOf = {};
+  for (const l of lines) {
+    lineChips[Number(l.id)] = await olp.optionChips(l);
+    copyOf[Number(l.id)] = orderProductRepository.copiedFromLineNo(l, lines);
+  }
   return {
     ...(await pickerViewData(req)),
     linePricing,
     pcLines,
+    lineChips,
+    copyOf,
+    goodsLines: lines.filter((l) => (l.line_type || 'goods') === 'goods'),
+    otherLines: lines.filter((l) => (l.line_type || 'goods') !== 'goods'),
+    lineSummary: olp.summary(linePricing.lines),
+    lineTotals: olp.totals(lines, linePricing.lines),
+    copiedLineId: parseInt((req.query || {}).copied, 10) || 0,
+    containerCbm: require('../services/lineUnits').CONTAINER_CBM,
     piBlockReason: linePricing.blocking.length ? await require('../services/orderLinePricing').documentBlockReason(orderId, 'PI') : null,
     qtBlockReason: linePricing.blocking.length ? await require('../services/orderLinePricing').documentBlockReason(orderId, 'QT') : null,
     pickRequiredWhen: (await require('../services/orderLinePricing').productPickRequired((await orderRepository.find(orderId) || {}).currency_code)) ? 'line_type=goods' : '',
@@ -1022,6 +1059,29 @@ async function lineSavedMessage(lineId, saved) {
   return `${saved} Line ${Number(line.line_no)} is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.`;
 }
 
+/**
+ * Owner decision D-270 (point 25): a line's piece size from the form — the order page's
+ * piece_*_cm fields, or row `row` of the New Order form's product_piece_*_cm[].
+ * Returns [{ piece_length_cm, piece_width_cm, piece_thickness_cm }, error].
+ */
+function lineSizeInput(body, row = null) {
+  const lineUnits = require('../services/lineUnits');
+  const values = {};
+  for (const f of Object.keys(lineUnits.SIZE_FIELDS)) {
+    values[f] = row === null ? (body[f] ?? '') : ([].concat(body[`product_${f}`] ?? [])[row] ?? '');
+  }
+  const [size, error] = lineUnits.readSize(values);
+  if (error !== null) return [{ piece_length_cm: null, piece_width_cm: null, piece_thickness_cm: null }, error];
+  return [size, null];
+}
+
+/** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
+function dimensionsFromSize(size) {
+  const lineUnits = require('../services/lineUnits');
+  const text = lineUnits.dimensionsText(lineUnits.size(size.piece_length_cm), lineUnits.size(size.piece_width_cm), lineUnits.size(size.piece_thickness_cm));
+  return text !== '' ? text : null;
+}
+
 async function addProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1083,9 +1143,14 @@ async function addProduct(req, res) {
   // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
   const orderLinePricing = require('../services/orderLinePricing');
   const pickedId = await catalogProductInput(body.catalog_product_id);
-  const refusal = (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
+  // D-255: with the chosen specification options. D-270 (point 25): in any unit, converted with the piece size.
+  const [lineSize, sizeError] = lineSizeInput(body);
+  const [specSel, syncError] = sizeError === null
+    ? await orderLinePricing.syncThickness(pickedId, orderLinePricing.selectionInput(body.spec_json ?? ''), lineSize.piece_thickness_cm)
+    : [null, null];
+  const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
     ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
-      orderLinePricing.selectionInput(body.spec_json ?? ''), str(body.unit) || null, priceRequest));
+      specSel, str(body.unit) || null, priceRequest, lineSize));
   if (refusal !== null) {
     flash.set(req, 'error', `Product line: ${refusal}`);
     res.redirect(`/orders/${orderId}#step-products`);
@@ -1102,7 +1167,7 @@ async function addProduct(req, res) {
     orderId,
     await orderProductRepository.nextLineNo(orderId),
     description,
-    str(body.dimensions) || null,
+    str(body.dimensions) || dimensionsFromSize(lineSize),
     str(body.finish) || null,
     str(body.quantity) || null,
     !!body.quantity_is_tbc,
@@ -1116,7 +1181,8 @@ async function addProduct(req, res) {
   await orderProductRepository.setCatalogProduct(newLineId, await catalogProductInput(body.catalog_product_id));
   if (str(body.unit_price) !== '') await orderProductRepository.setPriceSetBy(newLineId, req.user.id);
   // D-255: the options chosen, and the price request the line came from (now "became an order").
-  await require('../services/orderLinePricing').saveSelection(newLineId, require('../services/orderLinePricing').selectionInput(body.spec_json ?? ''), priceRequest ? Number(priceRequest.id) : null);
+  await require('../services/orderLinePricing').saveSelection(newLineId, specSel, priceRequest ? Number(priceRequest.id) : null);
+  await orderProductRepository.setPieceSize(newLineId, lineSize);
   if (priceRequest) await require('../services/priceRequestService').markOrdered(Number(priceRequest.id), orderId);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
@@ -1170,13 +1236,22 @@ async function updateProduct(req, res) {
     && Number(product.catalog_product_id || 0) === Number(catalogId || 0);
   // D-255: the chosen options (a form without the field keeps the line's options).
   const olp = require('../services/orderLinePricing');
-  const specSel = Object.prototype.hasOwnProperty.call(body, 'spec_json') ? olp.selectionInput(body.spec_json) : olp.selectionInput(String(product.spec_selection ?? ''));
+  let specSel = Object.prototype.hasOwnProperty.call(body, 'spec_json') ? olp.selectionInput(body.spec_json) : olp.selectionInput(String(product.spec_selection ?? ''));
+  // D-270 (point 25): the piece size (a form without the fields keeps the line's size); a typed thickness chooses the option.
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+  const [lineSize, sizeError] = has('piece_length_cm') || has('piece_width_cm') || has('piece_thickness_cm')
+    ? lineSizeInput(body)
+    : [{ piece_length_cm: product.piece_length_cm ?? null, piece_width_cm: product.piece_width_cm ?? null, piece_thickness_cm: product.piece_thickness_cm ?? null }, null];
+  let syncError = null;
+  if (sizeError === null) [specSel, syncError] = await olp.syncThickness(catalogId, specSel, lineSize.piece_thickness_cm);
   const specUnchanged = JSON.stringify(specSel) === JSON.stringify(olp.selectionInput(String(product.spec_selection ?? '')));
+  const sizeUnchanged = JSON.stringify(olp.lineSize(lineSize)) === JSON.stringify(olp.lineSize(product))
+    && str(body.unit).toUpperCase() === String(product.unit ?? '').trim().toUpperCase();
   {
     const orderLinePricing = require('../services/orderLinePricing');
-    const refusal = (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
-      ?? (priceUnchanged && specUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
-        specSel, str(body.unit) || null, null));
+    const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
+      ?? (priceUnchanged && specUnchanged && sizeUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
+        specSel, str(body.unit) || null, null, lineSize));
     if (refusal !== null) {
       flash.set(req, 'error', `Product line: ${refusal}`);
       res.redirect(`/orders/${orderId}#step-products`);
@@ -1193,7 +1268,7 @@ async function updateProduct(req, res) {
   await orderProductRepository.update(
     productId,
     description,
-    str(body.dimensions) || null,
+    str(body.dimensions) || dimensionsFromSize(lineSize),
     str(body.finish) || null,
     str(body.quantity) || null,
     !!body.quantity_is_tbc,
@@ -1211,6 +1286,7 @@ async function updateProduct(req, res) {
     // A changed product or options: the line no longer follows its price request.
     await olp.saveSelection(productId, specSel, null);
   }
+  await orderProductRepository.setPieceSize(productId, lineSize);
   const newPrice = str(body.unit_price);
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
     await orderProductRepository.setPriceSetBy(productId, req.user.id);
@@ -1259,9 +1335,13 @@ async function duplicateProduct(req, res) {
     return;
   }
 
-  await orderProductRepository.duplicate(productId);
-  flash.set(req, 'success', 'Product line duplicated — edit the copy below to adjust its name or dimensions.');
-  res.redirect(`/orders/${orderId}`);
+  // Owner decision D-271/D-272 (points 13 and 24): an exact copy right below; its price is checked at once.
+  const copyId = await orderProductRepository.duplicate(productId);
+  await require('../services/orderLinePricing').afterSave(copyId, null, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_LINE_DUPLICATED', 'order_products', copyId, 'copied_from_id', null, String(productId));
+  const copyNo = Number(product.line_no) + 1;
+  flash.set(req, 'success', await lineSavedMessage(copyId, `Line ${copyNo} is an exact copy of line ${product.line_no} — change what differs (e.g. the size). The MD's price approval is not copied: the copy's price was checked again.`));
+  res.redirect(`/orders/${orderId}?copied=${copyId}#line-${copyId}`);
 }
 
 /** The order's owner per department, with whom this person may choose from (a manager for their own department; MD/ED, Admin for all). */

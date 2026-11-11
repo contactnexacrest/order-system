@@ -156,6 +156,10 @@ njkEnv.addFilter('humanDate', dates.human);
 // D-257 0B: a product category's option attributes on the order-line form (default HS code and unit, allowed units).
 njkEnv.addFilter('categoryLineAttrs', (c) => new nunjucks.runtime.SafeString(require('./repositories/productCategoryRepository').lineOptionAttributes(c)));
 njkEnv.addFilter('fromJson', (v) => { try { return v ? JSON.parse(v) : {}; } catch (e) { return {}; } });
+// D-270 (point 25): a unit as words ("piece", "CBM", "m²") and a size without trailing zeros (180, 2.5).
+njkEnv.addFilter('unitLabel', (u) => require('./services/lineUnits').label(u));
+njkEnv.addFilter('sizeNum', (v) => (v === null || v === undefined || v === '' ? '' : require('./services/lineUnits').num(v)));
+njkEnv.addFilter('factor4', (v) => String(Math.round(Number(v) * 10000) / 10000));
 njkEnv.addFilter('shortDate', dates.short);
 // D-245 P4: the time (HH:MM) of a 'YYYY-MM-DD HH:MM:SS' value, for the incentive history.
 njkEnv.addFilter('timeHm', (v) => String(v || '').slice(11, 16));

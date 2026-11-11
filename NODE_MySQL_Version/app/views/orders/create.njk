@@ -148,7 +148,11 @@
         <div class="product-row">
           {% set pickerName = 'product_catalog_id[]' %}{% set pickerSelected = (old.product_catalog_id[loop.index0] if old.product_catalog_id else 0) %}{% set pickerCurrency = '' %}{% set pickerSpecSel = (old.product_spec_json[loop.index0] if old.product_spec_json else '') %}{% set pickerOrderId = null %}{% include "orders/_product_picker.njk" %}
           <label>Description *<input type="text" name="product_description[]" required value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
+          {# Owner decision D-270 (point 25): the piece size the line's price is converted with; it fills the Dimensions text. #}
+          <label>Length (cm)<input type="text" inputmode="decimal" name="product_piece_length_cm[]" data-piece-size="length" data-max-decimals="2" data-max-value="10000" value="{{ ([].concat(old.product_piece_length_cm)[loop.index0] or '') if old.product_piece_length_cm else '' }}" placeholder="e.g. 180"></label>
+          <label>Width (cm)<input type="text" inputmode="decimal" name="product_piece_width_cm[]" data-piece-size="width" data-max-decimals="2" data-max-value="10000" value="{{ ([].concat(old.product_piece_width_cm)[loop.index0] or '') if old.product_piece_width_cm else '' }}" placeholder="e.g. 80"></label>
+          <label>Thickness (cm)<input type="text" inputmode="decimal" name="product_piece_thickness_cm[]" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="{{ ([].concat(old.product_piece_thickness_cm)[loop.index0] or '') if old.product_piece_thickness_cm else '' }}" placeholder="e.g. 13"></label>
+          <label>Dimensions <small class="muted">(prints on the documents)</small><input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 180 × 80 × 13 cm"></label>
           <label>Finish
             {% set finishVal = (old.product_finish[loop.index0] or '') if old.product_finish else '' %}
             <select name="product_finish[]">
@@ -291,6 +295,9 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
+  // D-271 (point 13): a new row starts without the first row's options.
+  clone.querySelectorAll('.spec-options').forEach(function (el) { el.innerHTML = ''; });
+  clone.querySelectorAll('[data-dims-auto]').forEach(function (el) { el.removeAttribute('data-dims-auto'); });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

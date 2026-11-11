@@ -170,6 +170,13 @@ final class PriceRequestController
             }
         }
         $ctx = OrderLinePricing::context($order);
-        echo json_encode(OrderLinePricing::lineQuote($product, $ctx, OrderLinePricing::selectionInput((string) ($_GET['spec'] ?? '')) ?? []));
+        // D-270 (point 25): the line's unit and piece size — the quote and lowest come back per the line's unit.
+        [$size, $sizeError] = \App\Services\LineUnits::readSize($_GET);
+        if ($sizeError !== null) {
+            echo json_encode(['ok' => false, 'reason' => $sizeError]);
+            return;
+        }
+        $unit = trim((string) ($_GET['unit'] ?? ''));
+        echo json_encode(OrderLinePricing::lineQuote($product, $ctx, OrderLinePricing::selectionInput((string) ($_GET['spec'] ?? '')) ?? [], $unit !== '' ? mb_substr($unit, 0, 20) : null, $size));
     }
 }

@@ -6275,3 +6275,25 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- ---------------------------------------------------------------------------
+-- D-270 (owner decision 11 Nov 2026, point 25 — double-confirmed): an order line
+-- may be priced in any unit of its category (Natural Stone: CBM, SQM, SQFT, PCS,
+-- TON, RMT). For the price check its price is converted to the product's
+-- reference unit (per CBM from 50 mm) with the piece size Length × Width ×
+-- Thickness in cm: PCS needs all three, RMT width and thickness, m² / sq ft the
+-- thickness (or the Thickness option); m² ↔ sq ft = 10.7639. Used only for the
+-- check and the totals row — the Dimensions text still prints on the documents.
+-- Ton uses the weight per CBM (tonnes): set on the category (Natural Stone 2.7),
+-- a product may override it. Units that cannot be converted (Set, Lot …) go to
+-- the MD as "no price".
+-- D-271/D-272 (points 13 and 24): a duplicated line is placed right below the line it
+-- was copied from and remembers it ("copy of line N").
+-- ---------------------------------------------------------------------------
+ALTER TABLE order_products ADD COLUMN piece_length_cm DECIMAL(7,2) NULL;
+ALTER TABLE order_products ADD COLUMN piece_width_cm DECIMAL(7,2) NULL;
+ALTER TABLE order_products ADD COLUMN piece_thickness_cm DECIMAL(7,2) NULL;
+ALTER TABLE order_products ADD COLUMN copied_from_id BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD CONSTRAINT fk_order_products_copied_from FOREIGN KEY (copied_from_id) REFERENCES order_products(id) ON DELETE SET NULL;
+ALTER TABLE product_categories ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
+ALTER TABLE catalog_products ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;

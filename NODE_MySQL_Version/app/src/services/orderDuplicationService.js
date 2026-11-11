@@ -110,7 +110,10 @@ async function duplicateInDivision(source, sourceOrderId, createdBy, productLine
 
   if (productLines === null) {
     for (const line of await orderProductRepository.forOrder(sourceOrderId)) {
-      await orderProductRepository.duplicate(line.id, newOrderId);
+      // D-272: the same full copy as a line's Duplicate; the copy's price is checked at once
+      // (no MD approval is carried over) and a line below its lowest goes to the MD.
+      const copyId = await orderProductRepository.duplicate(line.id, newOrderId);
+      await require('./orderLinePricing').afterSave(copyId, null, createdBy);
     }
   } else {
     let lineNo = 1;

@@ -26,5 +26,7 @@
   <span class="muted small product-picker-hint" aria-live="polite"></span>
 </label>
 {# Owner decision D-255: the product's specification options (names only — never values or cost) and the chosen ones. #}
+{% if not pickerNoSpecBox %}{# D-273: the side panel shows the options in its own step 2 #}
 <div class="full spec-options" aria-live="polite"></div>
+{% endif %}
 <input type="hidden" name="{{ 'product_spec_json[]' if (pickerName | string).endsWith('[]') else 'spec_json' }}" class="spec-json" value="{{ pickerSpecSel or '' }}">

@@ -60,6 +60,7 @@
         </select>
       </label>
       <label>Quality documents its orders need <small class="muted">(one per line, at most <?= \App\Repositories\ProductCategoryRepository::MAX_QUALITY_DOCUMENTS ?>)</small><textarea name="quality_documents" rows="3" maxlength="1300" placeholder="e.g. Mill test certificate 3.1&#10;Drawing approval"><?= htmlspecialchars((string) ($c['quality_documents'] ?? '')) ?></textarea></label>
+      <label>Weight per CBM (tonnes) <small class="muted">(for lines priced per Ton; Natural Stone 2.7 — a product can set its own)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="<?= ($c['weight_t_per_cbm'] ?? null) !== null ? htmlspecialchars(rtrim(rtrim((string) $c['weight_t_per_cbm'], '0'), '.')) : '' ?>" placeholder="e.g. 2.7"></label>
       <label>T&amp;C clause set
         <select name="tc_clause_set">
           <option value="">Not set</option>

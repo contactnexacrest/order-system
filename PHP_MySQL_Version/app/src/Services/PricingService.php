@@ -230,7 +230,7 @@ final class PricingService
      * @param list<array<string,mixed>>|null $levels active commission levels (loaded when null)
      * @return array<string,mixed>
      */
-    public static function forProduct(array $product, ?array $levels = null, ?array $settings = null, ?bool $programOn = null, ?array $selection = null): array
+    public static function forProduct(array $product, ?array $levels = null, ?array $settings = null, ?bool $programOn = null, ?array $selection = null, ?float $lineThicknessMm = null): array
     {
         $settings ??= self::settings();
         $programOn ??= self::programOn();
@@ -239,7 +239,7 @@ final class PricingService
         if ($selection !== null) {
             $offered = ProductSpecs::offered($product);
             [$map, $specErrors] = ProductSpecs::normalize($offered, $selection);
-            $adj = ProductSpecs::adjustments($product, $offered, $map, $settings['cbm_from_mm']);
+            $adj = ProductSpecs::adjustments($product, $offered, $map, $settings['cbm_from_mm'], [], $lineThicknessMm);
             $spec = ['map' => $map, 'offered' => $offered, 'adj' => $adj, 'text' => ProductSpecs::describe($offered, $map),
                 'errors' => $specErrors];
         }
@@ -248,7 +248,7 @@ final class PricingService
         if ($spec !== null && $spec['errors'] === [] && $spec['adj']['manual'] === null) {
             $exact = self::exactPrice($product, $spec['map'], $spec['adj']['basis'], $settings, $spec['offered']);
             if ($exact !== null) {
-                $spec['adj'] = ProductSpecs::adjustments($product, $spec['offered'], $spec['map'], $settings['cbm_from_mm'], array_keys($exact['named']));
+                $spec['adj'] = ProductSpecs::adjustments($product, $spec['offered'], $spec['map'], $settings['cbm_from_mm'], array_keys($exact['named']), $lineThicknessMm);
                 $spec['exact'] = $exact['text'];
             }
         }

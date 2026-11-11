@@ -155,7 +155,11 @@
         <div class="product-row">
           <?php $__pickerName = 'product_catalog_id[]'; $__pickerSelected = (int) ($old['product_catalog_id'][$__i] ?? 0); $__pickerSpecSel = (string) ($old['product_spec_json'][$__i] ?? ''); $__pickerOrderId = null; include __DIR__ . '/_product_picker.php'; ?>
           <label>Description *<input type="text" name="product_description[]" required value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
+          <?php // Owner decision D-270 (point 25): the piece size the line's price is converted with; it fills the Dimensions text. ?>
+          <label>Length (cm)<input type="text" inputmode="decimal" name="product_piece_length_cm[]" data-piece-size="length" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_length_cm'][$__i] ?? '')) ?>" placeholder="e.g. 180"></label>
+          <label>Width (cm)<input type="text" inputmode="decimal" name="product_piece_width_cm[]" data-piece-size="width" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_width_cm'][$__i] ?? '')) ?>" placeholder="e.g. 80"></label>
+          <label>Thickness (cm)<input type="text" inputmode="decimal" name="product_piece_thickness_cm[]" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_thickness_cm'][$__i] ?? '')) ?>" placeholder="e.g. 13"></label>
+          <label>Dimensions <small class="muted">(prints on the documents)</small><input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
           <label>Finish
             <select name="product_finish[]">
               <?php $__finishVal = (string) ($old['product_finish'][$__i] ?? ''); ?>
@@ -298,6 +302,9 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
+  // D-271 (point 13): a new row starts without the first row's options.
+  clone.querySelectorAll('.spec-options').forEach(function (el) { el.innerHTML = ''; });
+  clone.querySelectorAll('[data-dims-auto]').forEach(function (el) { el.removeAttribute('data-dims-auto'); });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

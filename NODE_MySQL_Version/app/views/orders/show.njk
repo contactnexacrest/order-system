@@ -817,171 +817,8 @@
   <details class="step-card" id="step-products"{{ ' open' if ((sees.selling and linePricing.blocking.length) or qualityOpen) else '' }}>
     <summary><h2>Products</h2></summary>
     {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
-    {% if not canEditProducts %}
-      <table class="list">
-        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th>{% if sees.selling %}<th>Unit Price</th><th>Amount</th>{% endif %}</tr>
-        {% for p in products %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ p.description }}{% if p.dimensions or p.finish %}<br><span class="muted small">{{ p.dimensions or '' }} {{ p.finish or '' }}</span>{% endif %}</td>
-          <td>{{ 'To Be Confirmed' if p.quantity_is_tbc else p.quantity }}</td>
-          <td>{{ p.unit or '' }}</td>
-          {% if sees.selling %}
-          <td>{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}
-            {# Owner decision D-245 P2: the line's price check. #}
-            {% set lc = linePricing.lines[p.id] %}{% include "orders/_line_price.njk" %}
-          </td>
-          <td>{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </table>
-      {% if isLockedOrder and permissions.manage_orders %}
-        <p class="notice notice-error">This order is LOCKED (closed or marked lost) — editing or duplicating a product line now needs the "Override locked data" permission.</p>
-      {% elif isPostConfirmationOrder and permissions.manage_orders %}
-        <p class="notice notice-error">This order has already reached Order Confirmation — editing or duplicating a product line now needs the "Edit an order after confirmation" permission.</p>
-      {% endif %}
-    {% else %}
-      {% if isLockedOrder %}
-        <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required below.</p>
-      {% elif isPostConfirmationOrder %}
-        <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required below.</p>
-      {% endif %}
-      {% set productReasonRequired = isLockedOrder or isPostConfirmationOrder %}
-      {% for p in products %}
-        <div class="card-nested">
-          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <div class="kv-grid">
-              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = p.spec_selection or '' %}{% set pickerOrderId = order.id %}{% include "orders/_product_picker.njk" %}
-              <label>Description *<input type="text" name="description" value="{{ p.description }}" required placeholder="e.g. Granite slabs, polished"></label>
-              <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}" placeholder="e.g. 240 x 120 x 2 cm"></label>
-              <label>Finish
-                <select name="finish">
-                  <option value="">—</option>
-                  {% for o in surfaceFinishes %}
-                    <option value="{{ o.option_value }}" {% if p.finish == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
-              <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
-              <label>Unit
-                <select name="unit" data-allowed-from="category_id">
-                  {% for o in units %}
-                    <option value="{{ o.option_value }}" {% if p.unit == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              {% set lc = linePricing.lines[p.id] %}
-              {% set lcFloor = (lc.figures.floor | fixed2) if (sees.selling and lc and lc.figures and lc.status != 'approved') else null %}
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00"{% if lcFloor %} data-floor="{{ lcFloor }}" data-floor-message="Below your lowest price"{% endif %}>
-                {# Owner decision D-245 P2: the line's price check — selling-visible people only, never on a document. #}
-                {% if sees.selling %}{% include "orders/_line_price.njk" %}{% endif %}
-              </label>
-              <label>Line type
-                <select name="line_type">
-                  {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (p.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
-                </select>
-              </label>
-              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
-              <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ p.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
-              {% set catLine = p %}
-              {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
-              <label>Category
-                <select name="category_id">
-                  {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}{{ c | categoryLineAttrs }}>{{ c.name }}</option>{% endfor %}
-                </select>
-              </label>
-              {% for c in productCategories %}{% if c.is_system != 1 %}
-              {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
-              <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
-                {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}" placeholder="e.g. Black Galaxy"></label>{% endfor %}
-              </fieldset>
-              {% endif %}{% endfor %}
-            </div>
-            {% if productReasonRequired %}
-              <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
-            {% endif %}
-            <button type="submit" class="btn-sm">{{ 'Override & Save' if productReasonRequired else 'Save' }}</button>
-          </form>
-          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/duplicate" style="display:inline">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason">{% endif %}
-            <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
-          </form>
-          <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason">{% endif %}
-            <button type="submit" class="btn-sm btn-danger">Remove</button>
-          </form>
-        </div>
-      {% endfor %}
-      {% if not products or products.length == 0 %}<p class="muted">No product lines yet.</p>{% endif %}
-
-      <div class="card-nested">
-        <strong>Add Product Line</strong>
-        <form method="post" action="/orders/{{ order.id }}/products">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <div class="kv-grid">
-            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = '' %}{% set pickerOrderId = order.id %}{% include "orders/_product_picker.njk" %}
-            {% if sees.selling and linePricing.ctx.associate %}{# Owner decision D-255: a line from the associate's price request #}
-              <label class="full">From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
-                <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
-            {% endif %}
-            <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
-            <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
-            <label>Finish
-              <select name="finish">
-                <option value="">—</option>
-                {% for o in surfaceFinishes %}
-                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
-            <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
-            <label>Unit
-              <select name="unit" data-allowed-from="category_id">
-                {% for o in units %}
-                  <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00" data-floor-message="Below your lowest price"></label>
-            <label>Line type
-              <select name="line_type">
-                {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}">{{ ltLabel }}</option>{% endfor %}
-              </select>
-            </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
-            <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
-            {% set catLine = {} %}
-            {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
-            <label>Category
-              <select name="category_id">
-                {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}{{ c | categoryLineAttrs }}>{{ c.name }}</option>{% endfor %}
-              </select>
-            </label>
-            {% for c in productCategories %}{% if c.is_system != 1 %}
-            {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
-            <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
-              {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}" placeholder="e.g. Black Galaxy"></label>{% endfor %}
-            </fieldset>
-            {% endif %}{% endfor %}
-          </div>
-          {% if productReasonRequired %}
-            <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
-          {% endif %}
-          <button type="submit">{{ 'Override & Add' if productReasonRequired else 'Add Product Line' }}</button>
-        </form>
-      </div>
-      <datalist id="hs_code_list_edit">
-        {% for hc in hsCodes %}
-          <option value="{{ hc.code }}">{{ hc.description or '' }}</option>
-        {% endfor %}
-      </datalist>
-    {% endif %}
+    {# Owner decision D-273 (point 17): one compact products table, summary bar, totals and side-panel editing. #}
+    {% include "orders/_products_table.njk" %}
     {# Owner decision D-215 (5a-2): service lines are invoiced on their own Export Service Invoice. #}
     {% if serviceLineCount and permissions.generate_documents and sees.selling %}
       <div class="esi-generate">
@@ -1001,15 +838,19 @@
   <div class="price-check" id="price-check">
     <h3>Price check <small class="muted">(sold by {{ linePricing.ctx.label }})</small></h3>
     <table class="list">
-      <tr><th>Line</th><th>Description</th><th>Price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
-      {% for pc in pcLines %}{% set pl = pc.line %}{% set pf = pc.figures %}
+      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      {% for pc in pcLines %}{% set pl = pc.line %}{% set pf = pc.figures %}{% set pconv = pc.conversion %}{% set pconverted = pconv and pconv.factor !== null and ((pconv.factor - 1) | abs) > 0.000000001 %}
         <tr>
           <td>{{ pl.line_no }}</td>
-          <td>{{ pl.description }}</td>
-          <td>{{ pl.unit_price | money }}</td>
-          <td>{{ ((pf.quote | money) + ' · ' + (pf.floor | money)) if pf else '—' }}</td>
+          <td>{{ pl.description }}{% if pl.dimensions %}<br><span class="muted small">{{ pl.dimensions }}{% if pconverted %} → {{ pconv.factor | factor4 }} {{ pconv.ref_unit | unitLabel }} per {{ pconv.line_unit | unitLabel }}{% endif %}</span>{% endif %}</td>
+          <td>{{ pl.unit_price | money }}{% if pl.unit %} / {{ pl.unit }}{% endif %}
+            {% if pconverted and pconv.price_ref != null %}<br><span class="muted small">= USD {{ pconv.price_ref | money }} / {{ pconv.ref_unit | unitLabel }}</span>{% endif %}</td>
+          <td>{% if pf %}{{ pf.quote | money }} · {{ pf.floor | money }}{% if pconverted %} <span class="muted small">per {{ pconv.line_unit | unitLabel }}</span>{% endif %}{% else %}—{% endif %}</td>
           <td>
-            {% if pc.status == 'approved' %}
+            {% if pc.status == 'needs_size' %}
+              <span class="price-badge price-badge-size">Size needed</span>
+              <div class="muted small">{{ pc.note }}</div>
+            {% elif pc.status == 'approved' %}
               <span class="price-badge price-badge-approved">Approved by {{ pc.approval.approver_name }}</span>
               <div class="muted small">{{ pc.approval.at | string }} — {{ pc.approval.reason }}</div>
             {% elif pc.status == 'below_minimum' %}
@@ -1037,7 +878,7 @@
       {% endfor %}
     </table>
     {% if linePricing.blocking.length %}
-      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it.</p>
+      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it. A line that needs its piece size is checked once the size is entered.</p>
     {% endif %}
   </div>
   {% endif %}

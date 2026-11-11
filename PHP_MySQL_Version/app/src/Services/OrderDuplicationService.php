@@ -106,7 +106,10 @@ final class OrderDuplicationService
 
         if ($productLines === null) {
             foreach (OrderProductRepository::forOrder($sourceOrderId) as $line) {
-                OrderProductRepository::duplicate((int) $line['id'], $newOrderId);
+                // D-272: the same full copy as a line's Duplicate; the copy's price is checked at once
+                // (no MD approval is carried over) and a line below its lowest goes to the MD.
+                $copyId = OrderProductRepository::duplicate((int) $line['id'], $newOrderId);
+                \App\Services\OrderLinePricing::afterSave($copyId, null, $createdBy);
             }
         } else {
             $lineNo = 1;

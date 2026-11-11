@@ -680,7 +680,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | Function | What it does |
 |---|---|
 | `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
-| `fieldError(el)` | The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
+| `fieldError(el)` | D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; m² / sq ft thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
 | `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
 | `initReasonFieldValidation()` | Reason fields need meaningful text (10 characters, or the field's own `minlength`). By default a grey "Must be at least 10 characters." hint shows under the field from the start; a field with `data-reason-hint="on-error"` (compact inline boxes, e.g. Reject / Cancel Send on Email Send Approvals, D-269) shows no hint and only the red error ("Reason must be at least 10 characters (n so far).") on blur or submit. |
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
@@ -1721,6 +1721,61 @@ whoever sells (staff or the associate's level) fills in (D-245 P2). Below
 the seller's floor the line needs MD approval; below the product's minimum
 price it is refused (6.3).
 
+**Any unit, piece size and conversion (D-270, owner point 25, 11 Nov 2026).**
+A line may use any unit of its category's list (`product_categories.allowed_units`;
+Natural Stone seeded `CBM,SQM,SQFT,PCS,TON,RMT`; the stone list applies to goods
+lines only, charges keep any unit; Set / Lot can be added by the MD). A goods line
+carries a piece size in cm, `order_products.piece_length_cm / piece_width_cm /
+piece_thickness_cm` (DECIMAL(7,2), up to 10000, 2 decimals). For every price check —
+saving (`OrderLinePricing::saveRefusal`), the line badge and Price check
+(`checkLine`), the MD's approval screen and the QT/PI block reason — the line price is
+converted into the product's reference unit (`LineUnits` / `lineUnits.js`):
+
+| Line unit | Needs | Converted to the reference (per CBM) |
+|---|---|---|
+| CBM | — | same unit |
+| m² (SQM) / sq ft (SQFT) | thickness | 1 m² × thickness; 1 m² = 10.7639 sq ft (no thickness needed between the two) |
+| PCS (also NOS) | length, width, thickness | one piece = L × W × T |
+| RMT | width, thickness | 1 m × W × T |
+| Ton (TON, MT) / kg | — | weight per CBM: `product_categories.weight_t_per_cbm` (Natural Stone 2.7), product override `catalog_products.weight_t_per_cbm` |
+| Set, Lot, other | — | cannot be converted → status "no price", the line goes to the MD |
+
+A line in the reference unit itself needs nothing (as before). The thickness may come
+from the Thickness option (its mm). The Thickness (cm) box and the Thickness option
+follow each other, in the browser and on save (`OrderLinePricing::syncThickness`): 3 cm
+chooses "30 mm"; from the product's per-CBM thickness (50 mm) up, the "priced per CBM"
+option ("Other, 50 mm or more"), whose thickness is then the line's own — so 13 cm needs
+no manual price; a thickness with no option below 50 mm is refused beside the field.
+The old "50 mm and above: set the unit to CBM" refusal is gone. A missing size is
+refused beside the field on save ("Enter the length (cm) — needed to compare a price
+per piece with the product's price per CBM."); a saved line without it gets the status
+`needs_size` — badge "Size needed", it holds the QT/PI ("Line N needs its piece size to
+check its price — …") and is **not** sent to the MD. The line shows its figures per its
+own unit and the product's reference figures ("Product reference per CBM: quote … ·
+lowest … · your price = USD 2,644.23 / CBM (1 piece = 0.1872 CBM)"). The MD's approval
+also holds only for the size it was given for (the size joins
+`price_approved_selection`). The Dimensions text is filled "180 × 80 × 13 cm" from the
+sizes (browser; on save when left empty) and stays editable; it prints on the documents
+as before — no document change. `/pricing/line-quote` takes `unit` and the three sizes
+and returns the quote and lowest per the line's unit plus the reference figures.
+
+**Products section (D-273, owner point 17).** The order page's Products card is one
+compact table (`orders/_products_table.php` / `.njk`): # · product and its options as
+labels (D-271) · size (Dimensions text) · qty · unit · price · total · price-check badge ·
+Edit / Duplicate / Delete. Above it a summary bar
+(`OrderLinePricing::summary()`, e.g. "2 lines OK · 1 line needs MD approval (line 3) —
+the Quotation waits for it." with a **Show** link to Price check); below the goods a
+totals row with the goods value, about … CBM and containers of 8 CBM
+(`OrderLinePricing::totals()`, `LineUnits::CONTAINER_CBM`; lines without a size or
+quantity are named as not counted); charges and services follow in a second table of
+the same style. **+ Add product** is always visible to whoever may edit lines. Edit /
+Add open a side panel (`aside.line-panel`) in four steps — 1 Product, 2 Options (grid of
+3 columns), 3 Size and quantity (L, W, T, unit, qty), 4 Price with the reference box and
+line total — and a closed **More** with description, Dimensions text, finish, line
+type, HS / SAC code and category. The order page is one view for both templates; the
+Kanban board has no products section. People without edit rights see the same table
+without buttons. The New Order form has the same three size fields per row.
+
 **Payment terms needing approval (D-075).** If the preset has "Requires MD
 approval" (seed: Established Buyer — Post-BL, Extended Terms — Post-BL, LC),
 Step 1 shows a yellow box and the QT cannot be generated or sent until a
@@ -2066,7 +2121,22 @@ reported as lost.
 - **Locked** (complete / lost / cancelled): `edit_locked_data` + reason
   (`ORDER_EDITED_WHILE_LOCKED`), checked first.
 - **Duplicate Order**: copies client, terms, ports and active lines into a
-  new order at Stage 1; nothing from the source's history.
+  new order at Stage 1; nothing from the source's history. Each line is the
+  same full copy as a line's Duplicate (D-272) and is price-checked at once
+  (`OrderLinePricing::afterSave`), so a line below its lowest goes to the MD.
+- **Duplicate a line (D-272, owner point 24)**: an exact copy placed right
+  below the original (later lines move down one `line_no`), marked "copy of
+  line N" (`order_products.copied_from_id`): description, every option
+  (`spec_selection`), piece size, unit, quantity, price, HS, line type, SAC,
+  category and attributes, product, material, `price_request_id`,
+  `zoho_item_id`. Not copied: the MD's approval, `price_snapshot`, an open
+  approval request. The copy is checked at once; below the lowest it goes to
+  the MD. Audit `ORDER_LINE_DUPLICATED`.
+- **Options on a line (D-271, owner point 13)**: shown as labels under the
+  description (`OrderLinePricing::optionChips()`). An option switched off
+  since shows "“X” is no longer offered — choose again" in red and is never
+  replaced silently (the edit form keeps it selected with that text; its
+  price check is "no price" until a new option is chosen).
 - **Client reorder request**: the buyer's "Reorder This" lands in
   **Operations › Reorder Requests** (`order_reorder_requests`).
 - **Archive** (`POST /orders/{id}/archive`, `manage_orders`): sets

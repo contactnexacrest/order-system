@@ -88,13 +88,14 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
 
   it('seeds Natural Stone with today\'s behaviour, and the new units and supplier types', async () => {
     const s = await stone();
+    // D-270 (owner point 25, 11 Nov 2026): Natural Stone's goods lines use CBM, m², sq ft, PCS, Ton and RMT.
     expect([s.default_unit, s.allowed_units, s.default_hs_code, s.packing_type, s.quality_documents, s.tc_clause_set])
-      .toEqual([null, null, '680293', 'Wooden Crates', null, 'natural_stone']);
-    expect(productCategoryRepository.allowedUnits(s)).toEqual([]);
+      .toEqual([null, 'CBM,SQM,SQFT,PCS,TON,RMT', '680293', 'Wooden Crates', null, 'natural_stone']);
+    expect(productCategoryRepository.allowedUnits(s)).toEqual(['CBM', 'SQM', 'SQFT', 'PCS', 'TON', 'RMT']);
     expect(productCategoryRepository.qualityDocuments(s)).toEqual([]);
-    expect(productCategoryRepository.lineOptionAttributes(s)).toBe('');
+    expect(productCategoryRepository.lineOptionAttributes(s)).toBe(' data-allowed-units="CBM,SQM,SQFT,PCS,TON,RMT" data-allowed-goods-only="1"');
     const units = (await lookupRepository.dropdownOptions('unit')).map((o) => o.option_value);
-    for (const u of ['PCS', 'SET', 'KG', 'MT', 'MTR', 'LTR', 'HOUR', 'DAY', 'SQM', 'CBM']) expect(units).toContain(u);
+    for (const u of ['PCS', 'SET', 'KG', 'MT', 'MTR', 'LTR', 'HOUR', 'DAY', 'SQM', 'CBM', 'TON', 'RMT']) expect(units).toContain(u);
     const types = (await lookupRepository.dropdownOptions('supplier_type')).map((o) => o.option_value);
     for (const t of ['Quarry Owner', 'Trader', 'Manufacturer', 'Machine Shop', 'Forging / Casting Unit']) expect(types).toContain(t);
     expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM file_upload_contexts WHERE context_key = 'quality_document'")).n)).toBe(1);

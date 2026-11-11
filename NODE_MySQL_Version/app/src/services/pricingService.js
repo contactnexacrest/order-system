@@ -208,7 +208,7 @@ function staleness(supplier, staleDays, today = null) {
 }
 
 /** The full build-up for a product, or a reason it cannot be worked out. */
-async function forProduct(product, levels = null, s = null, program = null, selection = null) {
+async function forProduct(product, levels = null, s = null, program = null, selection = null, lineThicknessMm = null) {
   s = s || (await settings());
   program = program === null ? await programOn() : program;
   // D-255: the chosen specification options (spec id => option id); null = the base product.
@@ -217,7 +217,7 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   if (selection !== null && selection !== undefined) {
     const offered = await productSpecs.offered(product);
     const [map, specErrors] = productSpecs.normalize(offered, selection);
-    const adj = productSpecs.adjustments(product, offered, map, s.cbm_from_mm);
+    const adj = productSpecs.adjustments(product, offered, map, s.cbm_from_mm, [], lineThicknessMm);
     spec = { map, offered, adj, text: productSpecs.describe(offered, map), errors: specErrors };
   }
   // D-256: an exact supplier price for the chosen combination is the cost for the options it names.
@@ -225,7 +225,7 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   if (spec !== null && !spec.errors.length && spec.adj.manual === null) {
     exact = await exactPrice(product, spec.map, spec.adj.basis, s, spec.offered);
     if (exact !== null) {
-      spec.adj = productSpecs.adjustments(product, spec.offered, spec.map, s.cbm_from_mm, Object.keys(exact.named).map(Number));
+      spec.adj = productSpecs.adjustments(product, spec.offered, spec.map, s.cbm_from_mm, Object.keys(exact.named).map(Number), lineThicknessMm);
       spec.exact = exact.text;
     }
   }

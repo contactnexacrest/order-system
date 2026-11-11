@@ -2681,3 +2681,12 @@ INSERT INTO sop_role_chapters (role_id, slug)
   WHERE r.name IN ('Export Executive', 'Sales/Export Manager', 'Sales Director')
     AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
                 WHERE rp.role_id = r.id AND rp.is_enabled = 1 AND p.permission_key = 'view_product_pricing');
+
+-- D-270 (owner decision 11 Nov 2026, point 25): Natural Stone's order-line units —
+-- CBM, m² (SQM), sq ft (SQFT), PCS, Ton (TON) and running metre (RMT) — and its
+-- weight per CBM (2.7 t) for lines priced per Ton. Set and Lot can be added in
+-- Products › Categories; such lines cannot be converted and go to the MD.
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT 'unit', u.v, u.s, 0, 1 FROM (SELECT 'TON' AS v, 14 AS s UNION ALL SELECT 'RMT', 15) u
+WHERE NOT EXISTS (SELECT 1 FROM dropdown_options d WHERE d.list_key = 'unit' AND d.option_value = u.v);
+UPDATE product_categories SET allowed_units = 'CBM,SQM,SQFT,PCS,TON,RMT', weight_t_per_cbm = 2.700 WHERE is_system = 1 AND allowed_units IS NULL;

@@ -43,9 +43,11 @@ final class OrderLinePricing
     public const NO_PRICE = 'no_price';
     public const APPROVED = 'approved';
     public const UNCHECKED = 'unchecked';
+    /** D-270 (point 25): the line's unit needs a piece size to be compared — asked for, never "too low". */
+    public const NEEDS_SIZE = 'needs_size';
 
     /** Statuses that keep the Proforma Invoice back. */
-    public const BLOCKING = [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE];
+    public const BLOCKING = [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE, self::NEEDS_SIZE];
 
     /**
      * Who sells this order: the client's associate (when the order is one the
@@ -119,10 +121,11 @@ final class OrderLinePricing
      *
      * @return array<string,mixed>
      */
-    public static function liveFigures(array $product, array $ctx, ?array $selection = null): array
+    public static function liveFigures(array $product, array $ctx, ?array $selection = null, ?float $lineThicknessMm = null): array
     {
         // D-255: with the line's chosen specification options (null = the base product).
-        $p = PricingService::forProduct($product, [], null, null, $selection);
+        // D-270: and the line's own thickness (a "50 mm and above" option priced per CBM).
+        $p = PricingService::forProduct($product, [], null, null, $selection, $lineThicknessMm);
         if ($p['build'] === null) {
             return ['missing' => (string) $p['missing'], 'manual' => (bool) $p['manual']];
         }
@@ -151,7 +154,195 @@ final class OrderLinePricing
             'supplier_inr' => $p['supplier_inr'] ?? null,
             'supplier_id' => isset($p['supplier']['id']) ? (int) $p['supplier']['id'] : null,
             'unit' => $p['unit'], 'spec_text' => $p['spec']['text'] ?? null, 'spec_map' => $p['spec']['map'] ?? null,
+            // D-270: what the conversion of a line in another unit needs.
+            'thickness_mm' => $p['spec']['adj']['thickness_mm'] ?? null, 'weight_t_per_cbm' => self::weightPerCbm($product),
         ];
+    }
+
+    /** D-270 (point 25): tonnes per CBM — the product's own figure, else its category's (stone 2.7); null when neither is set. */
+    public static function weightPerCbm(array $product): ?float
+    {
+        if (isset($product['weight_t_per_cbm']) && $product['weight_t_per_cbm'] !== null && (float) $product['weight_t_per_cbm'] > 0) {
+            return (float) $product['weight_t_per_cbm'];
+        }
+        $categoryId = ProductSpecs::categoryIdFor($product);
+        if ($categoryId === null) {
+            return null;
+        }
+        $stmt = Database::connection()->prepare('SELECT weight_t_per_cbm FROM product_categories WHERE id = :id');
+        $stmt->execute(['id' => $categoryId]);
+        $v = $stmt->fetchColumn();
+        return $v !== false && $v !== null && (float) $v > 0 ? (float) $v : null;
+    }
+
+    /** D-270: the line's piece size in cm, [length, width, thickness] (null = not given). */
+    public static function lineSize(array $line): array
+    {
+        return [LineUnits::size($line['piece_length_cm'] ?? null), LineUnits::size($line['piece_width_cm'] ?? null), LineUnits::size($line['piece_thickness_cm'] ?? null)];
+    }
+
+    /** D-270: the thickness option chosen on a line, in mm (null = none, or one without a thickness). */
+    public static function optionThicknessMm(array $product, ?array $selection): ?float
+    {
+        if ($selection === null) {
+            return null;
+        }
+        $offered = ProductSpecs::offered($product);
+        [$map] = ProductSpecs::normalize($offered, $selection);
+        foreach ($offered as $s) {
+            if ($s['kind'] !== 'thickness') {
+                continue;
+            }
+            foreach ($s['options'] as $o) {
+                if (($map[$s['id']] ?? null) === $o['id'] && $o['thickness_mm'] !== null) {
+                    return (float) $o['thickness_mm'];
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * D-270 (point 25): the Thickness (cm) box and the Thickness option stay in sync —
+     * a thickness typed in cm chooses the option of that thickness, or, from the
+     * product's per-CBM thickness (50 mm) up, its "priced per CBM" option.
+     *
+     * @return array{0: ?array, 1: ?string} [the selection, or the refusal beside the field]
+     */
+    public static function syncThickness(?int $catalogProductId, ?array $selection, ?string $thicknessCm): array
+    {
+        if ($catalogProductId === null || $thicknessCm === null || $thicknessCm === '') {
+            return [$selection, null];
+        }
+        $product = ProductRepository::find($catalogProductId);
+        if ($product === null) {
+            return [$selection, null];
+        }
+        $mm = round((float) $thicknessCm * 10, 1);
+        $cbmFrom = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : PricingService::settings()['cbm_from_mm'];
+        foreach (ProductSpecs::offered($product) as $s) {
+            if ($s['kind'] !== 'thickness') {
+                continue;
+            }
+            $exact = null;
+            $perCbm = null;
+            foreach ($s['options'] as $o) {
+                if ($o['thickness_mm'] !== null && abs((float) $o['thickness_mm'] - $mm) < 0.05) {
+                    $exact = $o['id'];
+                }
+                $isCbm = $o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $cbmFrom);
+                if ($isCbm && ($perCbm === null || $o['thickness_mm'] === null)) {
+                    $perCbm = $o['id'];
+                }
+            }
+            $pick = $exact ?? ($mm >= $cbmFrom ? $perCbm : null);
+            if ($pick === null) {
+                $listed = [];
+                foreach ($s['options'] as $o) {
+                    if ($o['thickness_mm'] !== null && $o['thickness_mm'] < $cbmFrom) {
+                        $listed[] = LineUnits::num($o['thickness_mm'] / 10);
+                    }
+                }
+                return [$selection, 'There is no ' . LineUnits::num($mm) . ' mm ' . $s['name'] . ' option for this product — enter '
+                    . ($listed !== [] ? implode(', ', $listed) . ' cm, or ' : '') . LineUnits::num($cbmFrom / 10) . ' cm or more (priced per CBM).'];
+            }
+            $selection ??= [];
+            $selection[(int) $s['id']] = (int) $pick;
+            ksort($selection);
+            return [$selection, null];
+        }
+        return [$selection, null];
+    }
+
+    /**
+     * D-270 (point 25): how the line's unit compares with the unit of its figures.
+     *
+     * @return array{factor: ?float, missing: list<string>, unconvertible: bool, line_unit: string, ref_unit: string, message: ?string}
+     */
+    public static function conversionFor(array $line, array $figures, ?array $product = null): array
+    {
+        [$l, $w, $t] = self::lineSize($line);
+        $refUnit = (string) ($figures['unit'] ?? '');
+        $lineUnit = (string) ($line['unit'] ?? '');
+        $density = isset($figures['weight_t_per_cbm']) ? LineUnits::size($figures['weight_t_per_cbm']) : null;
+        $optionMm = isset($figures['thickness_mm']) ? LineUnits::size($figures['thickness_mm']) : null;
+        $quick = LineUnits::factor($lineUnit, $refUnit, $l, $w, $t ?? ($optionMm !== null ? $optionMm / 10 : null), $density);
+        if ($quick['factor'] === null && !$quick['unconvertible'] && $product === null && !empty($line['catalog_product_id'])) {
+            $product = ProductRepository::find((int) $line['catalog_product_id']);
+        }
+        if ($quick['factor'] === null && !$quick['unconvertible'] && $product !== null) {
+            // Figures fixed before point 25 (PI, price request) do not carry these: take them from the product.
+            $density ??= self::weightPerCbm($product);
+            $optionMm ??= self::optionThicknessMm($product, self::lineSelection($line));
+            $quick = LineUnits::factor($lineUnit, $refUnit, $l, $w, $t ?? ($optionMm !== null ? $optionMm / 10 : null), $density);
+        }
+        $message = null;
+        if ($quick['unconvertible']) {
+            $message = 'A price per ' . LineUnits::label($lineUnit) . ' cannot be converted to the product\'s price per ' . LineUnits::label($refUnit) . ' — needs MD approval.';
+        } elseif ($quick['missing'] !== []) {
+            $message = LineUnits::missingMessage($quick['missing'][0], $lineUnit, $refUnit);
+        }
+        return $quick + ['line_unit' => $lineUnit, 'ref_unit' => $refUnit, 'message' => $message];
+    }
+
+    /** D-270: the figures per the line's unit (reference figures × factor). */
+    public static function scaleFigures(array $figures, float $factor, string $lineUnit): array
+    {
+        foreach (['cost', 'minimum', 'reserve', 'staff_floor', 'staff_quote', 'floor', 'quote'] as $k) {
+            if (isset($figures[$k]) && $figures[$k] !== null) {
+                $figures[$k] = (float) $figures[$k] * $factor;
+            }
+        }
+        if (abs($factor - 1.0) > 1e-9 && $lineUnit !== '') {
+            $figures['unit'] = $lineUnit;
+        }
+        return $figures;
+    }
+
+    /**
+     * D-270 (point 13): a line's chosen options as labels for the order page — every option,
+     * in the product's order; one switched off since is shown as gone, never replaced.
+     *
+     * @return list<array{name: string, gone: bool}>
+     */
+    public static function optionChips(array $line, ?array $product = null): array
+    {
+        $selection = self::lineSelection($line);
+        if ($selection === null || empty($line['catalog_product_id'])) {
+            return [];
+        }
+        $product ??= ProductRepository::find((int) $line['catalog_product_id']);
+        if ($product === null) {
+            return [];
+        }
+        $chips = [];
+        $seen = [];
+        foreach (ProductSpecs::offered($product) as $s) {
+            if (!array_key_exists($s['id'], $selection)) {
+                continue;
+            }
+            $seen[$s['id']] = true;
+            $found = null;
+            foreach ($s['options'] as $o) {
+                if ($o['id'] === $selection[$s['id']]) {
+                    $found = $o;
+                }
+            }
+            $chips[] = $found !== null ? ['name' => (string) $found['name'], 'gone' => false] : self::goneChip($selection[$s['id']]);
+        }
+        foreach ($selection as $specId => $optionId) {
+            if (!isset($seen[$specId])) {
+                $chips[] = self::goneChip($optionId);
+            }
+        }
+        return $chips;
+    }
+
+    /** @return array{name: string, gone: bool} */
+    private static function goneChip(int $optionId): array
+    {
+        $o = \App\Repositories\SpecRepository::findOption($optionId);
+        return ['name' => '"' . ($o !== null ? (string) $o['name'] : 'This option') . '" is no longer offered — choose again', 'gone' => true];
     }
 
     /** D-255: a line's chosen options from the form (JSON {spec id: option id}); null when none. */
@@ -204,6 +395,7 @@ final class OrderLinePricing
             return null;
         }
         $f['minimum'] ??= $f['floor'];
+        $f['unit'] ??= $r['unit'] ?? null;
         $f['price_request'] = $r['number'];
         return $f;
     }
@@ -214,13 +406,33 @@ final class OrderLinePricing
      *
      * @return array<string,mixed>
      */
-    public static function lineQuote(array $product, array $ctx, ?array $selection): array
+    public static function lineQuote(array $product, array $ctx, ?array $selection, ?string $unit = null, array $size = []): array
     {
-        $f = self::liveFigures($product, $ctx, $selection);
+        // D-270 (point 25): a typed thickness chooses the Thickness option, as on save.
+        [$synced, $syncError] = self::syncThickness((int) $product['id'], $selection, $size['piece_thickness_cm'] ?? null);
+        if ($syncError !== null) {
+            return ['ok' => false, 'reason' => $syncError, 'field' => 'piece_thickness_cm'];
+        }
+        $selection = $synced;
+        $t = LineUnits::size($size['piece_thickness_cm'] ?? null);
+        $f = self::liveFigures($product, $ctx, $selection, $t !== null ? $t * 10 : null);
         if (isset($f['missing'])) {
             return ['ok' => false, 'reason' => $f['missing'], 'manual' => !empty($f['manual'])];
         }
-        return ['ok' => true, 'quote' => $f['quote'], 'floor' => $f['floor'], 'unit' => $f['unit'], 'spec_text' => $f['spec_text']];
+        $out = ['ok' => true, 'quote' => $f['quote'], 'floor' => $f['floor'], 'unit' => $f['unit'], 'spec_text' => $f['spec_text'],
+            'selection' => $selection, 'ref_unit' => $f['unit'], 'ref_quote' => $f['quote'], 'ref_floor' => $f['floor'], 'factor' => 1.0];
+        if ($unit !== null && $unit !== '') {
+            $conv = self::conversionFor(['unit' => $unit] + $size + ['spec_selection' => $selection !== null ? json_encode((object) $selection) : null], $f, $product);
+            if ($conv['factor'] === null) {
+                return ['ok' => false, 'reason' => (string) $conv['message'], 'field' => $conv['missing'][0] ?? null, 'unconvertible' => $conv['unconvertible'],
+                    'ref_unit' => $f['unit'], 'ref_quote' => $f['quote'], 'ref_floor' => $f['floor'], 'selection' => $selection];
+            }
+            $out['factor'] = $conv['factor'];
+            $out['quote'] = round($f['quote'] * $conv['factor'], 2);
+            $out['floor'] = round($f['floor'] * $conv['factor'], 2);
+            $out['unit'] = abs($conv['factor'] - 1.0) > 1e-9 ? $unit : $f['unit'];
+        }
+        return $out;
     }
 
     /** Whether a line is in scope of the check at all, with the reason when not. */
@@ -252,7 +464,13 @@ final class OrderLinePricing
     /** The line's options and unit as one text, kept with the MD's approval (fresh-eyes review M4). */
     public static function approvalSelectionKey(array $line): string
     {
-        return trim((string) ($line['spec_selection'] ?? '')) . '|' . trim((string) ($line['unit'] ?? ''));
+        $key = trim((string) ($line['spec_selection'] ?? '')) . '|' . trim((string) ($line['unit'] ?? ''));
+        // D-270: and the piece size, once one is given (a new size is a new price per piece).
+        [$l, $w, $t] = self::lineSize($line);
+        if ($l !== null || $w !== null || $t !== null) {
+            $key .= '|' . implode('x', array_map(static fn (?float $v): string => $v !== null ? LineUnits::num($v) : '', [$l, $w, $t]));
+        }
+        return $key;
     }
 
     /**
@@ -263,7 +481,7 @@ final class OrderLinePricing
     public static function checkLine(array $line, array $ctx, ?array $product = null): array
     {
         $out = ['status' => self::UNCHECKED, 'figures' => null, 'fixed' => false, 'note' => null, 'approval' => null,
-            'requested' => !empty($line['price_approval_requested_at'])];
+            'requested' => !empty($line['price_approval_requested_at']), 'reference' => null, 'conversion' => null];
         if (($reason = self::scope($line, $ctx)) !== null) {
             $out['note'] = $reason;
             return $out;
@@ -278,7 +496,8 @@ final class OrderLinePricing
             $out['fixed'] = true;
         } else {
             $product ??= ProductRepository::find((int) $line['catalog_product_id']);
-            $figures = $product !== null ? self::liveFigures($product, $ctx, self::lineSelection($line)) : ['missing' => 'The product is no longer in Products.'];
+            $t = self::lineSize($line)[2];
+            $figures = $product !== null ? self::liveFigures($product, $ctx, self::lineSelection($line), $t !== null ? $t * 10 : null) : ['missing' => 'The product is no longer in Products.'];
         }
         if (self::approvalHolds($line)) {
             $out['approval'] = [
@@ -293,6 +512,18 @@ final class OrderLinePricing
             $out['status'] = $out['approval'] !== null ? self::APPROVED : self::NO_PRICE;
             return $out;
         }
+        // D-270 (point 25): the line's price is compared in the product's reference unit —
+        // the figures are shown per the line's unit, with the reference figures beside them.
+        $conv = self::conversionFor($line, $figures, $product);
+        $out['reference'] = $figures;
+        $out['conversion'] = $conv;
+        if ($conv['factor'] === null) {
+            $out['note'] = $conv['message'];
+            $out['status'] = $out['approval'] !== null ? self::APPROVED : ($conv['unconvertible'] ? self::NO_PRICE : self::NEEDS_SIZE);
+            return $out;
+        }
+        $figures = self::scaleFigures($figures, $conv['factor'], (string) ($line['unit'] ?? ''));
+        $out['conversion']['price_ref'] = $conv['factor'] > 0 ? (float) $line['unit_price'] / $conv['factor'] : null;
         $out['figures'] = $figures;
         $price = (float) $line['unit_price'];
         if ($out['approval'] !== null) {
@@ -331,6 +562,86 @@ final class OrderLinePricing
         return $out;
     }
 
+    /**
+     * Owner decision D-273 (point 17): the summary bar above the products table —
+     * "2 lines OK · 1 line needs MD approval (line 3) — the Quotation waits for it."
+     * Null when no line is price-checked.
+     *
+     * @param array<int, array> $checks forOrder()['lines']
+     * @return array{text: string, blocking: bool}|null
+     */
+    public static function summary(array $checks): ?array
+    {
+        $groups = ['ok' => [], 'md' => [], 'size' => [], 'minimum' => []];
+        foreach ($checks as $c) {
+            $no = (int) $c['line']['line_no'];
+            match ($c['status']) {
+                self::OK, self::APPROVED => $groups['ok'][] = $no,
+                self::BELOW, self::NO_PRICE => $groups['md'][] = $no,
+                self::NEEDS_SIZE => $groups['size'][] = $no,
+                self::BELOW_MINIMUM => $groups['minimum'][] = $no,
+                default => null,
+            };
+        }
+        $n = static fn (int $k): string => $k . ' line' . ($k === 1 ? '' : 's');
+        $which = static fn (array $nos): string => ' (line' . (count($nos) === 1 ? ' ' : 's ') . implode(', ', $nos) . ')';
+        $parts = [];
+        if ($groups['ok'] !== []) {
+            $parts[] = $n(count($groups['ok'])) . ' OK';
+        }
+        if ($groups['md'] !== []) {
+            $parts[] = $n(count($groups['md'])) . (count($groups['md']) === 1 ? ' needs' : ' need') . ' MD approval' . $which($groups['md']);
+        }
+        if ($groups['size'] !== []) {
+            $parts[] = $n(count($groups['size'])) . (count($groups['size']) === 1 ? ' needs its' : ' need their') . ' piece size' . $which($groups['size']);
+        }
+        if ($groups['minimum'] !== []) {
+            $parts[] = $n(count($groups['minimum'])) . ' below what NexaCrest can accept' . $which($groups['minimum']);
+        }
+        if ($parts === []) {
+            return null;
+        }
+        $blocking = count($groups['md']) + count($groups['size']) + count($groups['minimum']);
+        return ['text' => implode(' · ', $parts) . ($blocking > 0 ? ' — the Quotation waits for ' . ($blocking === 1 ? 'it.' : 'them.') : '.'), 'blocking' => $blocking > 0];
+    }
+
+    /**
+     * D-273 (point 17): the totals row — goods value, CBM (from each line's unit and piece
+     * size; lines whose size is not known are not counted) and containers of 8 CBM.
+     *
+     * @param list<array> $lines the order's lines
+     * @param array<int, array> $checks forOrder()['lines'] (for the option thickness and weight per CBM)
+     * @return array{amount: float, cbm: float, counted: int, uncounted: int, containers: int}
+     */
+    public static function totals(array $lines, array $checks): array
+    {
+        $out = ['amount' => 0.0, 'cbm' => 0.0, 'counted' => 0, 'uncounted' => 0, 'containers' => 0];
+        foreach ($lines as $line) {
+            if (($line['line_type'] ?? 'goods') !== 'goods') {
+                continue;
+            }
+            $out['amount'] += (float) ($line['fob_value'] ?? 0);
+            $qty = ($line['quantity'] ?? null) !== null && empty($line['quantity_is_tbc']) ? (float) $line['quantity'] : null;
+            $ref = $checks[(int) $line['id']]['reference'] ?? null;
+            [$l, $w, $t] = self::lineSize($line);
+            if ($t === null && isset($ref['thickness_mm']) && $ref['thickness_mm'] !== null) {
+                $t = (float) $ref['thickness_mm'] / 10;
+            }
+            $density = isset($ref['weight_t_per_cbm']) && $ref['weight_t_per_cbm'] !== null ? (float) $ref['weight_t_per_cbm'] : null;
+            $per = LineUnits::cbmPerUnit($line['unit'] ?? null, $l, $w, $t, $density);
+            if ($qty === null || $per === null) {
+                $out['uncounted']++;
+                continue;
+            }
+            $out['cbm'] += $qty * $per;
+            $out['counted']++;
+        }
+        $out['amount'] = round($out['amount'], 2);
+        $out['containers'] = LineUnits::containers($out['cbm']);
+        $out['cbm'] = round($out['cbm'], 2);
+        return $out;
+    }
+
     /** Why the PI cannot be issued yet, or null when it can. */
     public static function piBlockReason(int $orderId): ?string
     {
@@ -351,6 +662,7 @@ final class OrderLinePricing
         $doc = $typeCode === 'QT' ? 'the Quotation' : 'the Proforma Invoice';
         $no = (int) $first['line']['line_no'];
         return match ($first['status']) {
+            self::NEEDS_SIZE => "Line {$no} needs its piece size to check its price — " . lcfirst((string) $first['note']) . " Then generate {$doc} (order page → Products).",
             self::NO_PRICE => "Line {$no} has no price set for its product — the MD must approve it before {$doc} (order page → Products).",
             self::BELOW_MINIMUM => "Line {$no} is below the price NexaCrest can accept — raise it before {$doc} (order page → Products).",
             default => "Line {$no} is below the lowest price for this order — raise it, or ask the MD to approve it, before {$doc} (order page → Products).",
@@ -379,7 +691,7 @@ final class OrderLinePricing
      * (nobody, not even the MD, goes below it). Null when the price may be saved.
      */
     public static function saveRefusal(array $order, ?int $catalogProductId, string $lineType, ?string $unitPrice, bool $seesBuildup,
-        ?array $selection = null, ?string $unit = null, ?array $priceRequest = null): ?string
+        ?array $selection = null, ?string $unit = null, ?array $priceRequest = null, array $size = []): ?string
     {
         if ($catalogProductId === null || $lineType !== 'goods') {
             return null;
@@ -392,33 +704,42 @@ final class OrderLinePricing
         if ($product === null) {
             return null;
         }
-        // D-255: 50 mm and above is priced per CBM — the line's unit must say so.
         if ($selection !== null) {
-            $settings = PricingService::settings();
-            $offered = ProductSpecs::offered($product);
-            [$map, $errors] = ProductSpecs::normalize($offered, $selection);
+            [, $errors] = ProductSpecs::normalize(ProductSpecs::offered($product), $selection);
             if ($errors !== []) {
                 return implode(' ', $errors);
             }
-            $adj = ProductSpecs::adjustments($product, $offered, $map, $settings['cbm_from_mm']);
-            if ($adj['basis'] === 'cbm' && strtoupper((string) $unit) !== 'CBM') {
-                return 'A thickness of ' . ((int) ($product['cbm_from_mm'] ?? 0) ?: $settings['cbm_from_mm']) . ' mm and above is priced per CBM — set the unit to CBM and the quantity in CBM.';
-            }
         }
-        if ($unitPrice === null || $unitPrice === '') {
-            return null;
-        }
+        // D-270 (point 25): any unit of the category — the old "50 mm and above: set the unit to CBM"
+        // refusal is gone; the price is converted to the product's reference unit instead.
         if ($priceRequest !== null && !empty($priceRequest['figures'])) {
             $f = json_decode((string) $priceRequest['figures'], true);
             $f['minimum'] ??= $f['floor'] ?? 0;
+            $f['unit'] ??= $priceRequest['unit'] ?? null;
         } else {
-            $f = self::liveFigures($product, $ctx, $selection);
+            $t = LineUnits::size($size['piece_thickness_cm'] ?? null);
+            $f = self::liveFigures($product, $ctx, $selection, $t !== null ? $t * 10 : null);
         }
-        if (isset($f['missing']) || (float) $unitPrice >= (float) $f['minimum'] - 0.0001) {
+        if (isset($f['missing'])) {
             return null;
         }
+        $conv = self::conversionFor(['unit' => $unit, 'catalog_product_id' => $catalogProductId,
+            'spec_selection' => $selection !== null ? json_encode((object) $selection) : null] + $size, $f, $product);
+        // A missing size is asked for beside the field — never called "too low", never sent to the MD.
+        if ($conv['factor'] === null && !$conv['unconvertible']) {
+            return (string) $conv['message'];
+        }
+        if ($unitPrice === null || $unitPrice === '' || $conv['factor'] === null) {
+            return null; // no price yet, or a unit that cannot be converted (Set, Lot …): the MD approves it
+        }
+        $minimum = (float) $f['minimum'] * $conv['factor'];
+        if ((float) $unitPrice >= $minimum - 0.0001) {
+            return null;
+        }
+        $per = abs($conv['factor'] - 1.0) > 1e-9;
         return 'This price is below what NexaCrest can accept for ' . $product['name'] . ' — raise it.'
-            . ($seesBuildup ? ' Minimum price: USD ' . number_format((float) $f['minimum'], 2) . '; to go lower, change the product\'s margin (Products → pricing).' : '');
+            . ($seesBuildup ? ' Minimum price: USD ' . number_format($minimum, 2) . ($per ? ' per ' . LineUnits::label($unit) . ' (USD ' . number_format((float) $f['minimum'], 2) . ' per ' . LineUnits::label((string) $f['unit']) . ')' : '')
+                . '; to go lower, change the product\'s margin (Products → pricing).' : '');
     }
 
     /**
@@ -453,7 +774,8 @@ final class OrderLinePricing
         }
         $order = OrderRepository::find($orderId);
         $check = self::checkLine($line, self::context($order ?? []));
-        if (in_array($check['status'], self::BLOCKING, true)) {
+        // D-270: a line still missing its size is asked for it on the page — not sent to the MD.
+        if (in_array($check['status'], [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE], true)) {
             self::requestApproval($orderId, $lineId, $userId, true);
         } elseif (!empty($line['price_approval_requested_at'])) {
             $pdo->prepare('UPDATE order_products SET price_approval_requested_at = NULL, price_approval_requested_by = NULL WHERE id = :id')->execute(['id' => $lineId]);
@@ -552,6 +874,9 @@ final class OrderLinePricing
             return "Line {$no}: USD " . number_format((float) $line['unit_price'], 2) . ' is below the minimum price USD ' . number_format((float) $f['minimum'], 2)
                 . ' — nobody can approve it, not even the MD. To sell lower, change the product\'s margin (Products → pricing; logged).';
         }
+        if ($status === self::NEEDS_SIZE) {
+            return "Line {$no} needs its piece size first — " . lcfirst((string) $view['check']['note']);
+        }
         if (!in_array($status, [self::BELOW, self::NO_PRICE], true)) {
             return "Line {$no} does not need an approval.";
         }
@@ -624,7 +949,8 @@ final class OrderLinePricing
                 continue;
             }
             // D-255: a line from a price request fixes the request's prices; else the line's options.
-            $f = self::priceRequestFigures($line) ?? self::liveFigures($product, $ctx, self::lineSelection($line));
+            $t = self::lineSize($line)[2];
+            $f = self::priceRequestFigures($line) ?? self::liveFigures($product, $ctx, self::lineSelection($line), $t !== null ? $t * 10 : null);
             if (isset($f['missing'])) {
                 continue;
             }
@@ -680,9 +1006,10 @@ final class OrderLinePricing
             $from = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $cbmFrom;
             $specs = [];
             foreach (ProductSpecs::offered($product) as $s) {
-                $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'options' => array_map(static fn (array $o): array => [
+                $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'thickness' => $s['kind'] === 'thickness', 'cbm_from' => $from, 'options' => array_map(static fn (array $o): array => [
                     'id' => $o['id'], 'name' => $o['name'], 'base' => $o['is_base'],
                     'cbm' => $s['kind'] === 'thickness' && ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $from)),
+                    'mm' => $s['kind'] === 'thickness' ? $o['thickness_mm'] : null,
                 ], $s['options'])];
             }
             if ($specs !== []) {

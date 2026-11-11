@@ -203,10 +203,10 @@ final class SpecRepository
             ->execute(['p' => $productId, 's' => $specId]);
     }
 
-    public static function setProductFields(int $productId, ?int $categoryId, ?string $forms, ?int $cbmFrom): void
+    public static function setProductFields(int $productId, ?int $categoryId, ?string $forms, ?int $cbmFrom, ?string $weightPerCbm = null): void
     {
-        Database::connection()->prepare('UPDATE catalog_products SET category_id = :c, forms = :f, cbm_from_mm = :m WHERE id = :id')
-            ->execute(['c' => $categoryId, 'f' => $forms, 'm' => $cbmFrom, 'id' => $productId]);
+        Database::connection()->prepare('UPDATE catalog_products SET category_id = :c, forms = :f, cbm_from_mm = :m, weight_t_per_cbm = :w WHERE id = :id')
+            ->execute(['c' => $categoryId, 'f' => $forms, 'm' => $cbmFrom, 'w' => $weightPerCbm, 'id' => $productId]);
     }
 
     /** Whether an option (or any option of a specification) has been used on an order line or a price request. */

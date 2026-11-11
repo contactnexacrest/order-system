@@ -1,0 +1,40 @@
+{#
+  Owner decision D-273 (point 17): one row of the order page's compact products table (goods,
+  or a charge / service line). In: p (the line), plus the order page's context.
+  Port of the $__row closure in views/orders/_products_table.php.
+#}
+{% set lc = linePricing.lines[p.id] %}{% set rowChips = lineChips[p.id] or [] %}{% set rowCopyOf = copyOf[p.id] %}
+<tr id="line-{{ p.id }}" class="{{ 'line-copied' if p.id == copiedLineId else '' }}">
+  <td>{{ p.line_no }}</td>
+  <td class="line-desc">
+    <strong>{{ p.description }}</strong>{% if rowCopyOf %} <span class="muted">— copy of line {{ rowCopyOf }}</span>{% endif %}
+    {% if (p.line_type or 'goods') != 'goods' %} <span class="muted small">({{ lineTypes[p.line_type] }})</span>{% endif %}
+    {% if rowChips.length %}
+      <div class="option-chips">{% for chip in rowChips %}<span class="chip{{ ' chip-gone' if chip.gone else '' }}">{{ chip.name }}</span>{% endfor %}</div>
+    {% endif %}
+    {% if p.finish and not rowChips.length %}<div class="muted small">{{ p.finish }}</div>{% endif %}
+  </td>
+  <td>{{ p.dimensions or '' }}</td>
+  <td class="num">{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity if p.quantity != null else '') }}</td>
+  <td>{{ p.unit or '' }}</td>
+  {% if sees.selling %}
+    <td class="num">{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}</td>
+    <td class="num">{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
+    <td class="line-check">{% include "orders/_line_price.njk" %}</td>
+  {% endif %}
+  {% if canEditProducts %}
+    <td class="line-actions">
+      <button type="button" class="btn-sm btn-secondary" data-open-panel="line-panel-{{ p.id }}">Edit</button>
+      <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/duplicate" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" aria-label="Reason">{% endif %}
+        <button type="submit" class="btn-sm btn-secondary" title="An exact copy right below — every option, the size, the product; the MD's approval is not copied">Duplicate</button>
+      </form>
+      <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/delete" class="inline-form" data-confirm="Remove line {{ p.line_no }}?">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" aria-label="Reason">{% endif %}
+        <button type="submit" class="btn-sm btn-danger">Delete</button>
+      </form>
+    </td>
+  {% endif %}
+</tr>

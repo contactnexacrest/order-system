@@ -299,15 +299,18 @@ async function saveProductFields(req, res) {
     if (n === false || n < 1 || n > 2000) errors.push('CBM from: whole millimetres from 1 to 2000, or leave it empty for the global value.');
     else cbmVal = n;
   }
+  // D-270 (point 25): the product's own weight per CBM (empty = its category's).
+  const [weight, weightError] = productCategoryRepository.weightInput(body.weight_t_per_cbm);
+  if (weightError !== null) errors.push(weightError);
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
     res.redirect(`/products/${pid}/specifications`);
     return;
   }
-  const before = `${p.category_id ?? '—'} / ${p.forms ?? 'all'} / ${p.cbm_from_mm ?? 'global'}`;
-  await specRepository.setProductFields(pid, categoryId, forms.length ? forms.join(',') : null, cbmVal);
-  await auditLogRepository.log(uid(req), 'PRODUCT_SPEC_FIELDS_CHANGED', 'catalog_products', pid, 'category / forms / cbm_from_mm', before,
-    `${categoryId} / ${forms.length ? forms.join(',') : 'all'} / ${cbmVal ?? 'global'}`);
+  const before = `${p.category_id ?? '—'} / ${p.forms ?? 'all'} / ${p.cbm_from_mm ?? 'global'} / ${p.weight_t_per_cbm ?? 'category'}`;
+  await specRepository.setProductFields(pid, categoryId, forms.length ? forms.join(',') : null, cbmVal, weight);
+  await auditLogRepository.log(uid(req), 'PRODUCT_SPEC_FIELDS_CHANGED', 'catalog_products', pid, 'category / forms / cbm_from_mm / weight_t_per_cbm', before,
+    `${categoryId} / ${forms.length ? forms.join(',') : 'all'} / ${cbmVal ?? 'global'} / ${weight ?? 'category'}`);
   flash.set(req, 'success', 'Saved.');
   res.redirect(`/products/${pid}/specifications`);
 }

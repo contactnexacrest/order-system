@@ -202,7 +202,13 @@ final class ProductCategoryRepository
         if ($tc !== '' && !array_key_exists($tc, self::TC_CLAUSE_SETS)) {
             return [[], 'Choose the T&C clause set from the list.'];
         }
+        // D-270 (point 25): tonnes per CBM, for lines priced per Ton (stone 2.7).
+        [$weight, $weightError] = self::weightInput($post['weight_t_per_cbm'] ?? '');
+        if ($weightError !== null) {
+            return [[], $weightError];
+        }
         return [[
+            'weight_t_per_cbm' => $weight,
             'default_unit' => $default !== '' ? $default : null,
             'allowed_units' => $allowed !== [] ? implode(',', $allowed) : null,
             'default_hs_code' => $hs !== '' ? $hs : null,
@@ -216,8 +222,9 @@ final class ProductCategoryRepository
     public static function updateSettings(int $id, array $settings): void
     {
         Database::connection()->prepare(
-            'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc WHERE id = :id'
+            'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt WHERE id = :id'
         )->execute([
+            'wt' => $settings['weight_t_per_cbm'] ?? null,
             'du' => $settings['default_unit'], 'au' => $settings['allowed_units'], 'hs' => $settings['default_hs_code'],
             'pt' => $settings['packing_type'], 'qd' => $settings['quality_documents'], 'tc' => $settings['tc_clause_set'], 'id' => $id,
         ]);
@@ -229,7 +236,25 @@ final class ProductCategoryRepository
         return 'unit ' . (($c['default_unit'] ?? null) ?: 'as today') . ' (allowed: ' . (($c['allowed_units'] ?? null) ?: 'any') . ')'
             . '; HS ' . (($c['default_hs_code'] ?? null) ?: '-') . '; packing ' . (($c['packing_type'] ?? null) ?: '-')
             . '; quality documents: ' . (self::qualityDocuments($c) !== [] ? implode(', ', self::qualityDocuments($c)) : 'none')
-            . '; T&C ' . (($c['tc_clause_set'] ?? null) ?: '-');
+            . '; T&C ' . (($c['tc_clause_set'] ?? null) ?: '-')
+            . '; weight per CBM ' . (($c['weight_t_per_cbm'] ?? null) !== null ? rtrim(rtrim((string) $c['weight_t_per_cbm'], '0'), '.') . ' t' : '-');
+    }
+
+    /**
+     * D-270 (point 25): a weight per CBM in tonnes (0.1 to 20, up to 3 decimals), or null when left empty.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public static function weightInput(mixed $raw): array
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return [null, null];
+        }
+        if (!preg_match('/^\d{1,2}(\.\d{1,3})?$/', $raw) || (float) $raw < 0.1 || (float) $raw > 20) {
+            return [null, 'Weight per CBM: tonnes from 0.1 to 20, up to 3 decimals (e.g. 2.7), or leave it empty.'];
+        }
+        return [number_format((float) $raw, 3, '.', ''), null];
     }
 
     /**
@@ -240,7 +265,10 @@ final class ProductCategoryRepository
     public static function lineOptionAttributes(array $category): string
     {
         if ((int) ($category['is_system'] ?? 0) === 1) {
-            return '';
+            // D-270 (point 25): Natural Stone's goods lines use its unit list (CBM, m², sq ft, PCS, Ton, RMT);
+            // its HS code and unit defaults stay as today, and charge lines keep any unit.
+            $allowed = self::allowedUnits($category);
+            return $allowed !== [] ? ' data-allowed-units="' . htmlspecialchars(implode(',', $allowed), ENT_QUOTES) . '" data-allowed-goods-only="1"' : '';
         }
         $fills = array_filter(['hs_code' => (string) ($category['default_hs_code'] ?? ''), 'unit' => (string) ($category['default_unit'] ?? '')], static fn ($v) => $v !== '');
         $out = $fills !== [] ? ' data-fills="' . htmlspecialchars((string) json_encode($fills), ENT_QUOTES) . '"' : '';
@@ -260,7 +288,17 @@ final class ProductCategoryRepository
     public static function applyLineDefaults(array &$post): ?string
     {
         $categoryId = (int) ($post['category_id'] ?? 0);
-        if ($categoryId === 0 || (string) ($post['line_type'] ?? 'goods') === 'service') {
+        if ((string) ($post['line_type'] ?? 'goods') === 'service') {
+            return null;
+        }
+        if ($categoryId === 0) {
+            // D-270 (point 25): a Natural Stone goods line uses one of the category's units.
+            $stone = ($sid = SpecRepository::systemCategoryId()) !== null ? self::find($sid) : null;
+            $allowed = $stone !== null ? self::allowedUnits($stone) : [];
+            $unit = strtoupper(trim((string) ($post['unit'] ?? '')));
+            if ((string) ($post['line_type'] ?? 'goods') === 'goods' && $allowed !== [] && $unit !== '' && !in_array($unit, $allowed, true)) {
+                return "Unit {$unit} is not one of the units for {$stone['name']} (" . implode(', ', $allowed) . ') — the MD can add it in Products › Categories.';
+            }
             return null;
         }
         $category = self::find($categoryId);

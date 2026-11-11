@@ -737,6 +737,40 @@
     return null;
   }
 
+  // D-270 (owner point 25): the kind of a unit for converting a line price.
+  var UNIT_KINDS = {
+    CBM: ['CBM', 'M3', 'M³', 'CUM', 'CU M'], M2: ['M2', 'M²', 'SQM', 'SQ M', 'SQMT'], SQFT: ['SQFT', 'SQ FT', 'SFT', 'FT2'],
+    PCS: ['PCS', 'PC', 'PIECE', 'PIECES', 'NOS', 'NO'], RMT: ['RMT', 'RM', 'LM'], TON: ['TON', 'TONS', 'TONNE', 'MT', 'T'], KG: ['KG', 'KGS']
+  };
+  var UNIT_LABELS = { CBM: 'CBM', M2: 'm²', SQFT: 'sq ft', PCS: 'piece', RMT: 'running metre', TON: 'Ton', KG: 'kg' };
+  var SIZE_NEEDS = { M2: ['thickness'], SQFT: ['thickness'], PCS: ['length', 'width', 'thickness'], RMT: ['width', 'thickness'] };
+  function unitKind(u) {
+    u = String(u || '').trim().toUpperCase();
+    for (var k in UNIT_KINDS) { if (UNIT_KINDS[k].indexOf(u) !== -1) return k; }
+    return null;
+  }
+  function pieceSizeNeed(el) {
+    var scope = el.closest('.product-row') || el.form;
+    if (!scope) return null;
+    var picker = scope.querySelector('select.product-picker');
+    var opt = picker && picker.options[picker.selectedIndex];
+    if (!opt || !opt.value) return null;
+    var lineType = scope.querySelector('[name="line_type"]');
+    if (lineType && lineType.value !== 'goods') return null;
+    var unitField = scope.querySelector('[name="unit"]') || scope.querySelector('[name="product_unit[]"]');
+    var lineKind = unitKind(unitField ? unitField.value : '');
+    var thick = scope.querySelector('.spec-options option[data-cbm="1"]:checked');
+    var refKind = thick ? 'CBM' : unitKind(opt.dataset.unit);
+    var lineRaw = String(unitField ? unitField.value : '').trim().toUpperCase();
+    if (!lineKind || !refKind || lineKind === refKind || lineRaw === String(opt.dataset.unit || '').trim().toUpperCase()) return null;
+    if ((lineKind === 'M2' || lineKind === 'SQFT') && (refKind === 'M2' || refKind === 'SQFT')) return null;
+    var needs = (SIZE_NEEDS[lineKind] || []).concat(SIZE_NEEDS[refKind] || []);
+    var size = el.dataset.pieceSize;
+    if (needs.indexOf(size) === -1) return null;
+    if (size === 'thickness' && scope.querySelector('.spec-options option[data-mm]:checked')) return null;
+    return 'Enter the ' + size + ' — needed to compare a price per ' + UNIT_LABELS[lineKind] + '.';
+  }
+
   function fieldError(el) {
     var value = el.value.trim();
     var name = (el.name || '').replace(/\[.*$/, '');
@@ -763,9 +797,20 @@
       var from = el.form.elements.namedItem(el.dataset.allowedFrom);
       var opt = from && from.options ? from.options[from.selectedIndex] : null;
       var allowed = opt && !from.disabled && opt.dataset.allowedUnits ? opt.dataset.allowedUnits.split(',') : [];
+      // D-270: Natural Stone's unit list applies to goods lines only (charges keep any unit).
+      var lineTypeField = opt && opt.dataset.allowedGoodsOnly ? el.form.elements.namedItem('line_type') : null;
+      if (lineTypeField && 'value' in lineTypeField && lineTypeField.value !== 'goods') allowed = [];
       if (allowed.length > 0 && allowed.indexOf(value.toUpperCase()) === -1) {
         return 'Choose one of the units for ' + opt.textContent.trim() + ': ' + allowed.join(', ') + '.';
       }
+    }
+    // data-piece-size="length|width|thickness" (D-270, owner point 25): an order
+    // line's piece size, needed when its unit must be converted to the product's
+    // reference unit for the price check — PCS needs all three, RMT width and
+    // thickness, m² / sq ft the thickness (unless the Thickness option gives it).
+    if (el.dataset.pieceSize && value === '') {
+      var sizeNeed = pieceSizeNeed(el);
+      if (sizeNeed) return sizeNeed;
     }
     // data-required-if="<name>=<value>": required while that field has that value
     // (e.g. the staff member's name when an expense was paid by staff);

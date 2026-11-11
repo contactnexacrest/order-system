@@ -23,6 +23,7 @@ const db = require('../config/db');
 const pricingService = require('./pricingService');
 const pricingEngine = require('./pricingEngine');
 const pricingRepository = require('../repositories/pricingRepository');
+const lineUnits = require('./lineUnits');
 
 const OK = 'ok';
 const BELOW = 'below';
@@ -30,7 +31,9 @@ const BELOW_MINIMUM = 'below_minimum';
 const NO_PRICE = 'no_price';
 const APPROVED = 'approved';
 const UNCHECKED = 'unchecked';
-const BLOCKING = [BELOW, BELOW_MINIMUM, NO_PRICE];
+/** D-270 (point 25): the line's unit needs a piece size to be compared — asked for, never "too low". */
+const NEEDS_SIZE = 'needs_size';
+const BLOCKING = [BELOW, BELOW_MINIMUM, NO_PRICE, NEEDS_SIZE];
 
 const n2 = (v) => Number(v).toFixed(2);
 const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -87,9 +90,10 @@ async function context(order) {
 }
 
 /** Live figures for a product in this order's context, or { missing }. */
-async function liveFigures(product, ctx, selection = null) {
+async function liveFigures(product, ctx, selection = null, lineThicknessMm = null) {
   // D-255: with the line's chosen specification options (null = the base product).
-  const p = await pricingService.forProduct(product, [], null, null, selection);
+  // D-270: and the line's own thickness (a "50 mm and above" option priced per CBM).
+  const p = await pricingService.forProduct(product, [], null, null, selection, lineThicknessMm);
   if (!p.build) return { missing: String(p.missing), manual: !!p.manual };
   const b = p.build;
   let floor = b.staff_floor;
@@ -116,7 +120,135 @@ async function liveFigures(product, ctx, selection = null) {
     supplier_inr: p.supplier_inr ?? null,
     supplier_id: p.supplier && p.supplier.id ? Number(p.supplier.id) : null,
     unit: p.unit, spec_text: p.spec ? p.spec.text : null, spec_map: p.spec ? p.spec.map : null,
+    // D-270: what the conversion of a line in another unit needs.
+    thickness_mm: p.spec && p.spec.adj ? (p.spec.adj.thickness_mm ?? null) : null, weight_t_per_cbm: await weightPerCbm(product),
   };
+}
+
+/** D-270 (point 25): tonnes per CBM — the product's own figure, else its category's (stone 2.7); null when neither is set. */
+async function weightPerCbm(product) {
+  if (product.weight_t_per_cbm !== null && product.weight_t_per_cbm !== undefined && Number(product.weight_t_per_cbm) > 0) return Number(product.weight_t_per_cbm);
+  const categoryId = await require('./productSpecs').categoryIdFor(product);
+  if (categoryId === null || categoryId === undefined) return null;
+  const row = await db.queryOne('SELECT weight_t_per_cbm FROM product_categories WHERE id = :id', { id: categoryId });
+  const v = row ? row.weight_t_per_cbm : null;
+  return v !== null && v !== undefined && Number(v) > 0 ? Number(v) : null;
+}
+
+/** D-270: the line's piece size in cm, [length, width, thickness] (null = not given). */
+function lineSize(line) {
+  return [lineUnits.size(line.piece_length_cm), lineUnits.size(line.piece_width_cm), lineUnits.size(line.piece_thickness_cm)];
+}
+
+/** D-270: the thickness option chosen on a line, in mm (null = none, or one without a thickness). */
+async function optionThicknessMm(product, selection) {
+  if (!selection) return null;
+  const productSpecs = require('./productSpecs');
+  const offered = await productSpecs.offered(product);
+  const [map] = productSpecs.normalize(offered, selection);
+  for (const s of offered) {
+    if (s.kind !== 'thickness') continue;
+    for (const o of s.options) {
+      if (Number(map[s.id]) === Number(o.id) && o.thickness_mm !== null && o.thickness_mm !== undefined) return Number(o.thickness_mm);
+    }
+  }
+  return null;
+}
+
+/**
+ * D-270 (point 25): the Thickness (cm) box and the Thickness option stay in sync — a thickness
+ * typed in cm chooses the option of that thickness, or, from the product's per-CBM thickness
+ * (50 mm) up, its "priced per CBM" option. Returns [selection, refusal beside the field].
+ */
+async function syncThickness(catalogProductId, selection, thicknessCm) {
+  if (!catalogProductId || thicknessCm === null || thicknessCm === undefined || thicknessCm === '') return [selection, null];
+  const product = await require('../repositories/productRepository').find(Number(catalogProductId));
+  if (!product) return [selection, null];
+  const mm = Math.round(Number(thicknessCm) * 100) / 10;
+  const cbmFrom = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : (await pricingService.settings()).cbm_from_mm;
+  for (const s of await require('./productSpecs').offered(product)) {
+    if (s.kind !== 'thickness') continue;
+    let exact = null;
+    let perCbm = null;
+    for (const o of s.options) {
+      if (o.thickness_mm !== null && o.thickness_mm !== undefined && Math.abs(Number(o.thickness_mm) - mm) < 0.05) exact = o.id;
+      const isCbm = o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm !== undefined && o.thickness_mm >= cbmFrom);
+      if (isCbm && (perCbm === null || o.thickness_mm === null || o.thickness_mm === undefined)) perCbm = o.id;
+    }
+    const pick = exact ?? (mm >= cbmFrom ? perCbm : null);
+    if (pick === null) {
+      const listed = s.options.filter((o) => o.thickness_mm !== null && o.thickness_mm !== undefined && o.thickness_mm < cbmFrom).map((o) => lineUnits.num(o.thickness_mm / 10));
+      return [selection, `There is no ${lineUnits.num(mm)} mm ${s.name} option for this product — enter `
+        + (listed.length ? `${listed.join(', ')} cm, or ` : '') + `${lineUnits.num(cbmFrom / 10)} cm or more (priced per CBM).`];
+    }
+    const out = { ...(selection || {}) };
+    out[Number(s.id)] = Number(pick);
+    const sorted = {};
+    for (const k of Object.keys(out).map(Number).sort((a, b) => a - b)) sorted[k] = out[k];
+    return [sorted, null];
+  }
+  return [selection, null];
+}
+
+/** D-270 (point 25): how the line's unit compares with the unit of its figures. */
+async function conversionFor(line, figures, product = null) {
+  const [l, w, t] = lineSize(line);
+  const refUnit = String(figures.unit ?? '');
+  const lineUnit = String(line.unit ?? '');
+  let density = figures.weight_t_per_cbm !== undefined ? lineUnits.size(figures.weight_t_per_cbm) : null;
+  let optionMm = figures.thickness_mm !== undefined ? lineUnits.size(figures.thickness_mm) : null;
+  let quick = lineUnits.factor(lineUnit, refUnit, l, w, t ?? (optionMm !== null ? optionMm / 10 : null), density);
+  if (quick.factor === null && !quick.unconvertible && !product && line.catalog_product_id) {
+    product = await require('../repositories/productRepository').find(Number(line.catalog_product_id));
+  }
+  if (quick.factor === null && !quick.unconvertible && product) {
+    // Figures fixed before point 25 (PI, price request) do not carry these: take them from the product.
+    density = density ?? await weightPerCbm(product);
+    optionMm = optionMm ?? await optionThicknessMm(product, lineSelection(line));
+    quick = lineUnits.factor(lineUnit, refUnit, l, w, t ?? (optionMm !== null ? optionMm / 10 : null), density);
+  }
+  let message = null;
+  if (quick.unconvertible) message = `A price per ${lineUnits.label(lineUnit)} cannot be converted to the product's price per ${lineUnits.label(refUnit)} — needs MD approval.`;
+  else if (quick.missing.length) message = lineUnits.missingMessage(quick.missing[0], lineUnit, refUnit);
+  return { ...quick, line_unit: lineUnit, ref_unit: refUnit, message };
+}
+
+/** D-270: the figures per the line's unit (reference figures × factor). */
+function scaleFigures(figures, factor, lineUnit) {
+  const out = { ...figures };
+  for (const k of ['cost', 'minimum', 'reserve', 'staff_floor', 'staff_quote', 'floor', 'quote']) {
+    if (out[k] !== undefined && out[k] !== null) out[k] = Number(out[k]) * factor;
+  }
+  if (Math.abs(factor - 1) > 1e-9 && lineUnit !== '') out.unit = lineUnit;
+  return out;
+}
+
+/**
+ * D-270 (point 13): a line's chosen options as labels for the order page — every option, in the
+ * product's order; one switched off since is shown as gone, never replaced. [{ name, gone }].
+ */
+async function optionChips(line, product = null) {
+  const selection = lineSelection(line);
+  if (!selection || !line.catalog_product_id) return [];
+  product = product || await require('../repositories/productRepository').find(Number(line.catalog_product_id));
+  if (!product) return [];
+  const chips = [];
+  const seen = {};
+  for (const s of await require('./productSpecs').offered(product)) {
+    if (!(s.id in selection)) continue;
+    seen[s.id] = true;
+    const found = s.options.find((o) => Number(o.id) === Number(selection[s.id]));
+    chips.push(found ? { name: String(found.name), gone: false } : await goneChip(selection[s.id]));
+  }
+  for (const [specId, optionId] of Object.entries(selection)) {
+    if (!seen[specId]) chips.push(await goneChip(optionId));
+  }
+  return chips;
+}
+
+async function goneChip(optionId) {
+  const o = await require('../repositories/specRepository').findOption(Number(optionId));
+  return { name: `"${o ? String(o.name) : 'This option'}" is no longer offered — choose again`, gone: true };
 }
 
 const intOk = (v) => /^\s*[+-]?(0|[1-9]\d*)\s*$/.test(String(v));
@@ -158,15 +290,34 @@ async function priceRequestFigures(line) {
   if (r && r.figures) { try { f = JSON.parse(r.figures); } catch (e) { f = null; } }
   if (!f || typeof f !== 'object') return null;
   if (f.minimum === undefined || f.minimum === null) f.minimum = f.floor;
+  if (f.unit === undefined || f.unit === null) f.unit = r.unit ?? null;
   f.price_request = r.number;
   return f;
 }
 
 /** D-255: the quote and floor for a product with chosen options, for the order form (never cost). */
-async function lineQuote(product, ctx, selection) {
-  const f = await liveFigures(product, ctx, selection);
+async function lineQuote(product, ctx, selection, unit = null, size = {}) {
+  // D-270 (point 25): a typed thickness chooses the Thickness option, as on save.
+  const [synced, syncError] = await syncThickness(Number(product.id), selection, size.piece_thickness_cm ?? null);
+  if (syncError !== null) return { ok: false, reason: syncError, field: 'piece_thickness_cm' };
+  selection = synced;
+  const t = lineUnits.size(size.piece_thickness_cm);
+  const f = await liveFigures(product, ctx, selection, t !== null ? t * 10 : null);
   if (f.missing !== undefined) return { ok: false, reason: f.missing, manual: !!f.manual };
-  return { ok: true, quote: f.quote, floor: f.floor, unit: f.unit, spec_text: f.spec_text };
+  const out = { ok: true, quote: f.quote, floor: f.floor, unit: f.unit, spec_text: f.spec_text,
+    selection, ref_unit: f.unit, ref_quote: f.quote, ref_floor: f.floor, factor: 1.0 };
+  if (unit) {
+    const conv = await conversionFor({ unit, ...size, spec_selection: selection ? JSON.stringify(selection) : null }, f, product);
+    if (conv.factor === null) {
+      return { ok: false, reason: String(conv.message), field: conv.missing[0] ?? null, unconvertible: conv.unconvertible,
+        ref_unit: f.unit, ref_quote: f.quote, ref_floor: f.floor, selection };
+    }
+    out.factor = conv.factor;
+    out.quote = Math.round(f.quote * conv.factor * 100) / 100;
+    out.floor = Math.round(f.floor * conv.factor * 100) / 100;
+    out.unit = Math.abs(conv.factor - 1) > 1e-9 ? unit : f.unit;
+  }
+  return out;
 }
 
 /** Whether a line is in scope of the check at all, with the reason when not. */
@@ -187,12 +338,16 @@ function approvalHolds(line) {
 
 /** The line's options and unit as one text, kept with the MD's approval (fresh-eyes review M4). */
 function approvalSelectionKey(line) {
-  return `${String(line.spec_selection ?? '').trim()}|${String(line.unit ?? '').trim()}`;
+  let key = `${String(line.spec_selection ?? '').trim()}|${String(line.unit ?? '').trim()}`;
+  // D-270: and the piece size, once one is given (a new size is a new price per piece).
+  const sz = lineSize(line);
+  if (sz.some((v) => v !== null)) key += `|${sz.map((v) => (v !== null ? lineUnits.num(v) : '')).join('x')}`;
+  return key;
 }
 
 /** The check of one line: { status, figures, fixed, note, approval, requested }. */
 async function checkLine(line, ctx, product = null) {
-  const out = { status: UNCHECKED, figures: null, fixed: false, note: null, approval: null, requested: Boolean(line.price_approval_requested_at) };
+  const out = { status: UNCHECKED, figures: null, fixed: false, note: null, approval: null, requested: Boolean(line.price_approval_requested_at), reference: null, conversion: null };
   const reason = scope(line, ctx);
   if (reason !== null) {
     out.note = reason;
@@ -214,7 +369,8 @@ async function checkLine(line, ctx, product = null) {
       out.fixed = true;
     } else {
       product = product || await require('../repositories/productRepository').find(Number(line.catalog_product_id));
-      figures = product ? await liveFigures(product, ctx, lineSelection(line)) : { missing: 'The product is no longer in Products.' };
+      const t = lineSize(line)[2];
+      figures = product ? await liveFigures(product, ctx, lineSelection(line), t !== null ? t * 10 : null) : { missing: 'The product is no longer in Products.' };
     }
   }
   if (approvalHolds(line)) {
@@ -229,6 +385,18 @@ async function checkLine(line, ctx, product = null) {
     out.status = out.approval ? APPROVED : NO_PRICE;
     return out;
   }
+  // D-270 (point 25): the line's price is compared in the product's reference unit — the
+  // figures are shown per the line's unit, with the reference figures beside them.
+  const conv = await conversionFor(line, figures, product);
+  out.reference = figures;
+  out.conversion = conv;
+  if (conv.factor === null) {
+    out.note = conv.message;
+    out.status = out.approval ? APPROVED : (conv.unconvertible ? NO_PRICE : NEEDS_SIZE);
+    return out;
+  }
+  figures = scaleFigures(figures, conv.factor, String(line.unit ?? ''));
+  out.conversion.price_ref = conv.factor > 0 ? Number(line.unit_price) / conv.factor : null;
   out.figures = figures;
   const price = Number(line.unit_price);
   if (out.approval) out.status = APPROVED;
@@ -263,9 +431,63 @@ async function documentBlockReason(orderId, typeCode) {
   if (!first) return null;
   const doc = typeCode === 'QT' ? 'the Quotation' : 'the Proforma Invoice';
   const no = Number(first.line.line_no);
+  if (first.status === NEEDS_SIZE) {
+    const note = String(first.note || '');
+    return `Line ${no} needs its piece size to check its price — ${note.charAt(0).toLowerCase()}${note.slice(1)} Then generate ${doc} (order page → Products).`;
+  }
   if (first.status === NO_PRICE) return `Line ${no} has no price set for its product — the MD must approve it before ${doc} (order page → Products).`;
   if (first.status === BELOW_MINIMUM) return `Line ${no} is below the price NexaCrest can accept — raise it before ${doc} (order page → Products).`;
   return `Line ${no} is below the lowest price for this order — raise it, or ask the MD to approve it, before ${doc} (order page → Products).`;
+}
+
+/**
+ * Owner decision D-273 (point 17): the summary bar above the products table — "2 lines OK ·
+ * 1 line needs MD approval (line 3) — the Quotation waits for it." Null when no line is checked.
+ */
+function summary(checks) {
+  const groups = { ok: [], md: [], size: [], minimum: [] };
+  for (const c of Object.values(checks)) {
+    const no = Number(c.line.line_no);
+    if (c.status === OK || c.status === APPROVED) groups.ok.push(no);
+    else if (c.status === BELOW || c.status === NO_PRICE) groups.md.push(no);
+    else if (c.status === NEEDS_SIZE) groups.size.push(no);
+    else if (c.status === BELOW_MINIMUM) groups.minimum.push(no);
+  }
+  const n = (k) => `${k} line${k === 1 ? '' : 's'}`;
+  const which = (nos) => ` (line${nos.length === 1 ? ' ' : 's '}${nos.join(', ')})`;
+  const parts = [];
+  if (groups.ok.length) parts.push(`${n(groups.ok.length)} OK`);
+  if (groups.md.length) parts.push(`${n(groups.md.length)}${groups.md.length === 1 ? ' needs' : ' need'} MD approval${which(groups.md)}`);
+  if (groups.size.length) parts.push(`${n(groups.size.length)}${groups.size.length === 1 ? ' needs its' : ' need their'} piece size${which(groups.size)}`);
+  if (groups.minimum.length) parts.push(`${n(groups.minimum.length)} below what NexaCrest can accept${which(groups.minimum)}`);
+  if (!parts.length) return null;
+  const blocking = groups.md.length + groups.size.length + groups.minimum.length;
+  return { text: parts.join(' · ') + (blocking > 0 ? ` — the Quotation waits for ${blocking === 1 ? 'it.' : 'them.'}` : '.'), blocking: blocking > 0 };
+}
+
+/**
+ * D-273 (point 17): the totals row — goods value, CBM (from each line's unit and piece size;
+ * lines whose size is not known are not counted) and containers of 8 CBM.
+ */
+function totals(lines, checks) {
+  const out = { amount: 0, cbm: 0, counted: 0, uncounted: 0, containers: 0 };
+  for (const line of lines) {
+    if ((line.line_type || 'goods') !== 'goods') continue;
+    out.amount += Number(line.fob_value || 0);
+    const qty = line.quantity !== null && line.quantity !== undefined && !Number(line.quantity_is_tbc) ? Number(line.quantity) : null;
+    const ref = (checks[Number(line.id)] || {}).reference || null;
+    let [l, w, t] = lineSize(line);
+    if (t === null && ref && ref.thickness_mm !== null && ref.thickness_mm !== undefined) t = Number(ref.thickness_mm) / 10;
+    const density = ref && ref.weight_t_per_cbm !== null && ref.weight_t_per_cbm !== undefined ? Number(ref.weight_t_per_cbm) : null;
+    const per = lineUnits.cbmPerUnit(line.unit, l, w, t, density);
+    if (qty === null || per === null) { out.uncounted += 1; continue; }
+    out.cbm += qty * per;
+    out.counted += 1;
+  }
+  out.amount = Math.round(out.amount * 100) / 100;
+  out.containers = lineUnits.containers(out.cbm);
+  out.cbm = Math.round(out.cbm * 100) / 100;
+  return out;
 }
 
 /** Why the PI cannot be issued yet, or null when it can. */
@@ -287,35 +509,39 @@ async function pickRefusal(currencyCode, catalogProductId, lineType) {
 }
 
 /** Refuses a price below the product's minimum price before it is saved. Null when the price may be saved. */
-async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null) {
+async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null, size = {}) {
   if (!catalogProductId || lineType !== 'goods') return null;
   const ctx = await context(order);
   if (!ctx.usd) return null;
   const product = await require('../repositories/productRepository').find(Number(catalogProductId));
   if (!product) return null;
-  // D-255: 50 mm and above is priced per CBM — the line's unit must say so.
   if (selection !== null && selection !== undefined) {
     const productSpecs = require('./productSpecs');
-    const settings = await pricingService.settings();
-    const offered = await productSpecs.offered(product);
-    const [map, errors] = productSpecs.normalize(offered, selection);
+    const [, errors] = productSpecs.normalize(await productSpecs.offered(product), selection);
     if (errors.length) return errors.join(' ');
-    const adj = productSpecs.adjustments(product, offered, map, settings.cbm_from_mm);
-    if (adj.basis === 'cbm' && String(unit ?? '').toUpperCase() !== 'CBM') {
-      return `A thickness of ${(parseInt(product.cbm_from_mm, 10) || 0) || settings.cbm_from_mm} mm and above is priced per CBM — set the unit to CBM and the quantity in CBM.`;
-    }
   }
-  if (unitPrice === null || unitPrice === undefined || unitPrice === '') return null;
+  // D-270 (point 25): any unit of the category — the old "50 mm and above: set the unit to CBM"
+  // refusal is gone; the price is converted to the product's reference unit instead.
   let f;
   if (priceRequest && priceRequest.figures) {
     f = JSON.parse(priceRequest.figures);
     if (f.minimum === undefined || f.minimum === null) f.minimum = f.floor ?? 0;
+    if (f.unit === undefined || f.unit === null) f.unit = priceRequest.unit ?? null;
   } else {
-    f = await liveFigures(product, ctx, selection);
+    const t = lineUnits.size((size || {}).piece_thickness_cm);
+    f = await liveFigures(product, ctx, selection, t !== null ? t * 10 : null);
   }
-  if (f.missing !== undefined || Number(unitPrice) >= Number(f.minimum) - 0.0001) return null;
+  if (f.missing !== undefined) return null;
+  const conv = await conversionFor({ unit, catalog_product_id: catalogProductId,
+    spec_selection: selection ? JSON.stringify(selection) : null, ...(size || {}) }, f, product);
+  // A missing size is asked for beside the field — never called "too low", never sent to the MD.
+  if (conv.factor === null && !conv.unconvertible) return String(conv.message);
+  if (unitPrice === null || unitPrice === undefined || unitPrice === '' || conv.factor === null) return null;
+  const minimum = Number(f.minimum) * conv.factor;
+  if (Number(unitPrice) >= minimum - 0.0001) return null;
+  const per = Math.abs(conv.factor - 1) > 1e-9;
   return `This price is below what NexaCrest can accept for ${product.name} — raise it.`
-    + (seesBuildup ? ` Minimum price: USD ${money(f.minimum)}; to go lower, change the product's margin (Products → pricing).` : '');
+    + (seesBuildup ? ` Minimum price: USD ${money(minimum)}${per ? ` per ${lineUnits.label(unit)} (USD ${money(f.minimum)} per ${lineUnits.label(f.unit)})` : ''}; to go lower, change the product's margin (Products → pricing).` : '');
 }
 
 /**
@@ -377,7 +603,8 @@ async function afterSave(lineId, before, userId) {
   }
   const order = await require('../repositories/orderRepository').find(orderId);
   const check = await checkLine(line, await context(order || {}));
-  if (BLOCKING.includes(check.status)) {
+  // D-270: a line still missing its size is asked for it on the page — not sent to the MD.
+  if ([BELOW, BELOW_MINIMUM, NO_PRICE].includes(check.status)) {
     await requestApproval(orderId, lineId, userId, true);
   } else if (line.price_approval_requested_at) {
     await db.execute('UPDATE order_products SET price_approval_requested_at = NULL, price_approval_requested_by = NULL WHERE id = :id', { id: lineId });
@@ -430,6 +657,10 @@ async function approve(orderId, lineId, userId, reason) {
       `Order line ${no}: USD ${money(line.unit_price)} is below the minimum price USD ${money(f.minimum)} — not approvable.`);
     return `Line ${no}: USD ${money(line.unit_price)} is below the minimum price USD ${money(f.minimum)} — nobody can approve it, not even the MD. To sell lower, change the product's margin (Products → pricing; logged).`;
   }
+  if (status === NEEDS_SIZE) {
+    const note = String(view.check.note || '');
+    return `Line ${no} needs its piece size first — ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
+  }
   if (![BELOW, NO_PRICE].includes(status)) return `Line ${no} does not need an approval.`;
   if (Number(line.price_set_by || 0) === Number(userId) && !(await require('./makerCheckerGuard').selfApprovalAllowed('price_discount', userId))) {
     return 'You set this price yourself — Admin → Self-approval rules do not let your role approve its own price.';
@@ -479,7 +710,8 @@ async function snapshotForPi(orderId) {
     const product = await productRepository.find(Number(line.catalog_product_id));
     if (!product) continue;
     // D-255: a line from a price request fixes the request's prices; else the line's options.
-    const f = (await priceRequestFigures(line)) ?? await liveFigures(product, ctx, lineSelection(line));
+    const t = lineSize(line)[2];
+    const f = (await priceRequestFigures(line)) ?? await liveFigures(product, ctx, lineSelection(line), t !== null ? t * 10 : null);
     if (f.missing !== undefined) continue;
     f.fixed_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await db.execute('UPDATE order_products SET price_snapshot = :s WHERE id = :id AND price_snapshot IS NULL', { s: JSON.stringify(f), id: Number(line.id) });
@@ -517,9 +749,10 @@ async function pickerSpecs(pickerProducts) {
     if (!product) continue;
     const from = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : cbmFrom;
     const specs = (await productSpecs.offered(product)).map((s) => ({
-      id: s.id, name: s.name, options: s.options.map((o) => ({
+      id: s.id, name: s.name, thickness: s.kind === 'thickness', cbm_from: from, options: s.options.map((o) => ({
         id: o.id, name: o.name, base: o.is_base,
         cbm: s.kind === 'thickness' && (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= from)),
+        mm: s.kind === 'thickness' ? (o.thickness_mm ?? null) : null,
       })),
     }));
     if (specs.length) out[Number(pp.id)] = specs;
@@ -552,7 +785,8 @@ async function clientKeys(clients) {
 }
 
 module.exports = {
-  OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, BLOCKING,
+  OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, NEEDS_SIZE, BLOCKING,
+  weightPerCbm, lineSize, optionThicknessMm, syncThickness, conversionFor, scaleFigures, optionChips, summary, totals,
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, pickerSpecs, clientKeys,
