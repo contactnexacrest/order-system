@@ -56,6 +56,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-11g-order-comment-email-status.sql` | D-268 | `order_comments.email_status` |
 | `2026-11-11h-tt-clause-bank-name.sql` | D-331 | T/T definition clause: fixed "State Bank of India" → `{bank_name}`, filled from Settings › Company › Bank name (owner confirmed twice; prints as before with today's bank) |
 | `2026-11-12a-settings-plain-labels.sql` | D-332 | Settings › Company in plain words: 60 setting descriptions rewritten as one plain sentence (only rows still at the old seeded text; an empty protected setting is skipped — the database refuses changes to it, and the screen shows the plain sentence anyway). Keys and values unchanged |
+| `2026-11-12b-supplier-prices-base-and-calculated.sql` | D-335 | Supplier prices: `catalog_supplier_thickness_prices` gains `how` (typed / calculated), `calc_from_mm`, `quoted_on`; `catalog_product_suppliers` gains `base_thickness_mm` (the BASE for orders; 0 = 50 mm and above per CBM) and `auto_fill` (1 = older rows still work out missing thicknesses on the fly). One time: grid rows get their base (50 mm+ for a product sold per CBM with a typed per-CBM price, else 20 mm); "add up the cost parts" rows become typed prices with the same total. No price changes |
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
@@ -70,6 +71,10 @@ install gets placeholders), and `email_testing_mode` is on where
 `schema.sql` + `seed.sql` of the last commit, the file applied twice without an error;
 its descriptions then match the new `seed.sql` except the empty protected Zoho keys
 (skipped on purpose, see the file header). Applied twice to both development databases.
+
+`2026-11-12b` was checked on 12 Nov 2026: applied twice without an error to both development
+databases, and a scratch database from `schema.sql` + `seed.sql` plus every migration equals a
+fresh install (FreshInstallCompleteTest / freshInstallComplete.test.js).
 
 The live-site order of work (backup, files, cron job, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".

@@ -148,7 +148,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
 
 1. [ ] **Back up** the database and the `storage/` folder (Settings › Backups, or run the two backup scripts by hand) and keep the copy until the upgrade is checked.
 2. [ ] Put the new code in place (both stacks are built the same; PHP: upload the files; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
-3. [ ] Run the nine database files, **in this order** (each is safe to run twice; MySQL-compatible):
+3. [ ] Run the ten database files, **in this order** (each is safe to run twice; MySQL-compatible):
    1. [ ] `docs/migrations/2026-11-11a-quote-any-unit-piece-size.sql` (D-270–D-273)
    2. [ ] `docs/migrations/2026-11-11b-email-settings-sessions.sql` (D-280–D-283)
    3. [ ] `docs/migrations/2026-11-11c-associates-kyc-commission-bank.sql` (D-290–D-294)
@@ -158,6 +158,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    7. [ ] `docs/migrations/2026-11-11g-order-comment-email-status.sql` (D-268)
    8. [ ] `docs/migrations/2026-11-11h-tt-clause-bank-name.sql` (D-331: the T/T definition names the bank from Settings › Company › Bank name; documents print as before)
    9. [ ] `docs/migrations/2026-11-12a-settings-plain-labels.sql` (D-332: plain help sentences under the settings on Settings › Company; keys and values unchanged)
+   10. [ ] `docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql` (D-335: supplier prices get a BASE for orders and TYPED / CALCULATED marks; "add up the cost parts" prices become typed prices with the same total — no price changes)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.
@@ -168,6 +169,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
 9. [ ] **Settings › Security:** the new idle timeouts (4 h staff, 2 h buyers and associates, 12 h staff limit) replaced the single 30-minute setting; "This is my own office computer" is 30 days unless you had chosen another number.
 10. [ ] **Settings › Document clean-up:** the upgrade switched the clean-up on where it was off (drafts 90 days, superseded never-sent 365 days, CAFIN latest only) and password expiry off where it was 90 days. Change them back here if the company wants. The nightly clean-up job starts removing copies under these rules.
 11. [ ] **Products › Price rules** and two or three products: existing supplier prices were turned into thickness rows (the old base price became the 20 mm price per m²; a per-CBM price became the 50 mm+ price). Check that the 30 mm and 50 mm+ figures are right — a 30 mm price on a product priced per CBM is now worked out from the 20 mm price (D-300).
+    - [ ] **Products › Market prices** of two or three Natural Stone products (D-335): each supplier price shows a price card with its **BASE** (◉). A product sold per CBM whose per-CBM price was typed has "50 mm and above" as the base, others 20 mm; change it with "make base" if needed. Older prices still work out missing thicknesses each time until someone adds a price with "+ Add / update a price".
 12. [ ] **Products › HS codes › Fix HS codes on products** (once): choose a master-list code for every product listed.
 13. [ ] **Products › Link suppliers** (once): *Match by name*, then pick or quick-add the rest; complete the details of each supplier marked *Details pending*.
 14. [ ] **Open orders with Natural Stone lines in BOX, NOS, SET, KG or MT:** such a line is refused on its next edit until the MD adds the unit (Products › Categories › Natural Stone) or the line is changed to CBM, m², sq ft, PCS, Ton or RMT. A line in another unit without its piece size shows "Size needed" and holds the QT / PI until the size is given (D-270).

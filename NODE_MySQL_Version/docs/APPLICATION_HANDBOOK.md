@@ -3379,7 +3379,7 @@ A supplier price is **expired** after its `valid_until` date, and **stale** when
 
 **Thickness prices (D-300).** A supplier-price row with `price_basis = 'grid'` holds every thickness: the
 category's Thickness options below `cbm_from_mm` (20 mm base, 15/18/30/40 mm with their %) per m², and
-"50 mm and above" per CBM. Only TYPED prices are stored, in `catalog_supplier_thickness_prices`
+"50 mm and above" per CBM. Before D-335 (below) only TYPED prices were stored, in `catalog_supplier_thickness_prices`
 (`thickness_mm` 0 = 50 mm+ per CBM); CALCULATED prices are worked out each time by `ThicknessPrices` /
 `thicknessPrices.js`: other thickness = base × (1 + % / 100); 50 mm+ per CBM = base per m² × K
 (`product_categories.thick_k_factor`, product override `catalog_products.thick_k_factor`). The base is the
@@ -3405,6 +3405,49 @@ menu link `/products/price-rules`): thickness %s (the category's Thickness optio
 Saving needs `manage_pricing` (MD) and a reason; every change is `PRICE_RULE_CHANGED` / `PRICE_RULE_ADDED`
 in the Audit Log with that reason (`PriceRules` / `priceRules.js`). A product's own K or container shows
 an "own rule" badge (set on Edit product, MD only).
+
+**Typed wins, a base, the rules only a calculator (D-335, 12 Nov 2026).** This replaces the "CALCULATED
+prices are worked out each time" part of D-300 for every price added from 12 Nov 2026:
+1. A price the user TYPED always wins — no rule ever changes it.
+2. Each grid row has a BASE the user chose: `catalog_product_suppliers.base_thickness_mm` (0 = 50 mm and
+   above per CBM; NULL = the category's base thickness, as before). The product-level price (Market prices
+   summary, price build-up, catalogue / lowest price, associate catalogue, price requests) and order lines
+   with no thickness use the base (`ThicknessPrices::cost()` / `thicknessPrices.cost()`); lines of 50 mm
+   and above use the stored "50 mm and above" price; a line with a thickness below that uses that
+   thickness's stored price.
+3. The rules (thickness %, × K, container) are only a CALCULATOR. Market prices shows one **price card** per
+   grid row (Thickness · Price (₹) · Unit · How it was set — TYPED / CALCULATED from … / no price · Since ·
+   FOB cost (₹) incl. CHA in the thickness's own unit · Base for orders ◉ BASE, "○ make base"), then
+   "Product price (from the base): ₹… per <unit> · <base> → USD … at ₹… · minimum (… % margin) USD … · quote
+   (+… %) USD …" (the USD part only for `view_price_buildup`), the CHA per CBM line, **+ Add / update a
+   price** and History. The form: Thickness *, Price * (₹ per m², per CBM for 50 mm+), Quoted on *, "Also work
+   out from this <X> price" — one tick box per other thickness with the result and how ("= 4,600 − 20 %",
+   "= 20 mm price ₹4,600 per m² × 40", from a non-base price the base is worked back first: CBM ÷ K, or ÷ (1 +
+   %)) and a "change …" link to the product's price rules (`/products/{id}/edit#price-rules`); ticked by
+   default only where no TYPED price exists ("you typed ₹… on … — kept unless you tick this"); Base for
+   orders: keep / make this price the base. app.js `initThicknessCalc` previews; `ThicknessPrices::calcFrom`
+   / `thicknessPrices.calcFrom` works it out again on save (`POST /products/suppliers/{id}/thickness-price`;
+   `POST /products/suppliers/{id}/base` for "make base"; both `record_market_prices`). Save: upsert the typed
+   thickness (`how` 'typed', `quoted_on`), upsert the ticked ones (`how` 'calculated', `calc_from_mm`), leave
+   the unticked ones untouched, set the base if chosen, `auto_fill` = 0, and write history lines ("20 mm per
+   m²: — → 4,600.00 typed", "15 mm per m²: … → 3,680.00 calculated from 20 mm", "Base: … → 50 mm and above").
+   A new supplier price (Add a price from another supplier) uses the same fields; its typed thickness is the base.
+- **Older rows** (`auto_fill` 1, saved before 12 Nov 2026) keep the old on-the-fly completion, so no price
+  changed. The first "Add / update a price" stores what each untouched thickness showed as CALCULATED, then
+  switches the row to `auto_fill` 0. With `auto_fill` 0 a thickness without a stored price has **no price**
+  (the order line goes to the MD, as today). The older grid boxes (`price[mm]`) are still accepted.
+- **Owner example** (product sold per CBM, base 50 mm+ typed ₹1,80,000 / CBM, CHA ₹80,000 per container of
+  8.2 CBM, rate 95, margin 8 %, other 0 %, buffer 3 %): FOB ₹1,89,756.10 / CBM, supplier USD 1,894.74, cost
+  USD 1,997.43, minimum USD 2,171.12, quote USD 2,236.26 (the engine rounds at the end; ≈ 2,236.25). A 20 mm
+  price of ₹4,600 typed later: 4,600 + CHA 195.12 = ₹4,795.12 per m²; the base stays ₹1,89,756.10 / CBM.
+- **Product page (Edit product):** "Costs to FOB" — CHA + transport per container (₹, with "÷ X CBM per
+  container = ₹Y per CBM") and Packing + loading per unit (₹; stored in `default_packing_cost`,
+  `default_loading_cost` set empty; both still added up where read; added only when a supplier price does
+  NOT include packing and loading) — and "Price rules in effect for this product" (every rule with a
+  "category" / "own rule" tag; MD switch "Use own rules for this product" opens × K, container CBM and
+  maximum t; off clears them). Default factory / transportation / CHA cost are no longer on the form (the
+  columns stay, kept as they are). Migration 2026-11-12b turned every "add up the cost parts" row
+  (`fob_source` 'computed') into a typed price (`direct`) with the same total.
 
 **Exchange rate (D-301).** `FxRateService` / `fxRateService.js`; settings `fx_mode` ('auto' | 'manual'),
 `fx_cushion_pct` (0–5, one decimal), `pricing_fx_rate` (manual, and the fallback until a rate is fetched).

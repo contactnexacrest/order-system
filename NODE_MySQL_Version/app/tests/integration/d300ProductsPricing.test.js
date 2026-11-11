@@ -136,7 +136,7 @@ describe('D-300 to D-306 products and pricing', () => {
     expect(p.supplier_inr).toBeCloseTo(71500, 6);
 
     const page = (await agent.get(url)).text;
-    for (const s of ['every thickness', '1,600.00', '2,160.00', '64,000.00', 'typed', 'calc.', '1,750.00', 'Price includes packing and loading', 'CHA + transport per container']) expect(page).toContain(s);
+    for (const s of ['every thickness', '1,600.00', '2,160.00', '64,000.00', 'TYPED', 'CALCULATED', '1,750.00', 'Price includes packing and loading', 'CHA + transport per container']) expect(page).toContain(s);
     expect(page).not.toContain('margin');
   });
 
@@ -163,7 +163,7 @@ describe('D-300 to D-306 products and pricing', () => {
     expect(await post(agent, edit, edit, { ...base, 'price[20]': '', 'how[20]': 'typed', 'price[30]': '0', 'how[30]': 'typed' })).toBe('Enter at least one price.');
     const page = (await agent.get(edit)).text;
     expect(page).toContain('Price history');
-    expect(page).toContain('calculated would be 2,295.00');
+    expect(page).toContain('Add / update a price'); // D-335: the thickness prices are changed there
     expect(page).not.toContain('Change these rules');
   });
 

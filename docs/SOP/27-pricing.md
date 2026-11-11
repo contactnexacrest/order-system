@@ -362,10 +362,12 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
 1. **Supplier** — type a few letters and pick from the list (it is the Suppliers directory). Not there yet?
    Use **+ Add a new supplier (quick)**: name, location, phone, type. It is added as *Details pending*;
    GSTIN, bank and contacts follow later. The **Location** list shows the supplier's factory / quarry addresses.
-2. **Prices by thickness** — type what the supplier quoted, e.g. 20 mm = ₹1,600 per m². The other boxes
-   fill themselves (grey, CALCULATED): 30 mm = 20 mm + 35 % = 2,160, 40 mm = + 70 % = 2,720, 50 mm and above
-   = 20 mm × 40 = ₹64,000 per CBM. If the supplier also quoted 40 mm (say 2,650), type it over the grey box —
-   it turns TYPED. "↺ use calculated" puts the calculated figure back. Empty or 0 = calculated when you save.
+2. **Thickness, Price and the tick boxes** (D-335) — choose the thickness the supplier quoted and type its
+   price, e.g. 20 mm = ₹1,600 per m² (per CBM for 50 mm and above). Under "Also work out from this 20 mm
+   price" each other thickness shows what it would be and how: 30 mm → ₹2,160.00 (= 1,600 + 35 %),
+   50 mm and above → ₹64,000.00 per CBM (= 20 mm price ₹1,600 per m² × 40). Leave ticked the ones you want
+   worked out; untick the others (they stay "no price"). The price you type becomes the **base** of this
+   supplier's price.
 3. **Price includes packing and loading** — leave ticked unless the supplier's price is without them.
 4. **CHA + transport per container (₹)** — e.g. ₹60,000. The screen shows it per CBM (₹7,500 with 8 CBM)
    and per m² for each thickness (₹150 at 20 mm). Empty = the product's default.
@@ -373,15 +375,50 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
    "30 mm · Leather".
 6. Tick **Use this price for pricing** and **Save price**.
 
-Later changes: Market prices › **Edit** on the row. When you change a TYPED price, every CALCULATED one
-follows. The page shows the **price history** (who, when, old → new) and what goes into the FOB cost
-(supplier price + CHA and transport per unit).
+**The one rule (D-335, 12 Nov 2026).**
+1. **A price you typed always wins** — no rule ever changes it.
+2. **The base price you chose (◉)** is what the product's price, order lines with no thickness and lines
+   of 50 mm and above use.
+3. **The rules (−20 %, +35 %, × 40 …) are only a calculator** — used when you tick a thickness to work it
+   out while adding a price. The result is marked CALCULATED ("from 20 mm") and you can type over it later.
+   Nothing is ever recalculated in the background.
+
+**The price card.** Market prices shows one card per supplier: every thickness with its price, unit, how it
+was set (**TYPED**, **CALCULATED** from 20 mm …, or *no price*), since when, the FOB cost including CHA and
+transport (per m², or per CBM for 50 mm and above) and which one is the **BASE**. Below it: "Product price
+(from the base)". *Example (product sold per CBM):* 50 mm and above typed ₹1,80,000 per CBM and made the base,
+CHA + transport ₹80,000 per container of 8.2 CBM (₹9,756.10 per CBM): FOB cost ₹1,89,756.10 per CBM. At a rate of
+₹95, 8 % margin and 3 % buffer: USD 1,997.43, minimum USD 2,171.12, quote about USD 2,236.
+
+**Later prices: + Add / update a price** on the card. Example: the supplier now quotes 20 mm at ₹4,600 per m².
+Choose 20 mm, type 4,600 and the date. The tick boxes show 15 mm → ₹3,680.00 (= 4,600 − 20 %), 18 mm →
+₹4,370.00, 30 mm → ₹6,210.00, 40 mm → ₹7,820.00 — ticked, because they have no typed price — and 50 mm
+and above → ₹1,84,000.00 per CBM **not ticked**, with "you typed ₹1,80,000.00 on 11 Nov — kept unless you
+tick this". Base for orders: keep 50 mm and above, or make this 20 mm price the base. **Save price**. After
+saving: 20 mm is TYPED (₹4,600 + CHA 195.12 = ₹4,795.12 per m²), 15/18/30/40 mm are CALCULATED from 20 mm,
+the CBM price is unchanged and still the base. A thickness you leave unticked keeps its price (or stays "no
+price" — an order line for it goes to the MD, as today). "○ make base" on a row changes the base without a
+new price. Every change is in the **History** (who, when, old → new).
+
+Prices recorded before 12 Nov 2026 still work out the missing thicknesses each time (marked "worked out each
+time — older price") until someone adds a price with **+ Add / update a price**; from then on only what is on
+the card is used. Market prices › **Edit** changes the supplier, dates, packing and loading, CHA + transport and
+notes; the thickness prices are changed on the card.
 
 **Price rules (MD).** Products › Price rules (or Categories › <category> › Price rules): the thickness %s,
 the "× 40" for 50 mm and above, **+ Add a thickness** (e.g. 18 mm −5 %), what one container holds (8 CBM,
 max 27 t) and the stone weight (2.7 t per CBM). The example column changes as you type. Give a reason and
 **Save rules**; it is in the Audit Log. New prices use the rules at once; quotes already sent keep theirs.
 A product can have its own × K or container (Edit product, MD only) — it shows an **own rule** badge.
+
+**Product page (D-335).** Edit product has two sections:
+- **Costs to FOB** — CHA + transport per container (₹; the screen shows "÷ 8.2 CBM per container = ₹9,756.10
+  per CBM") and Packing + loading per unit (₹; added only when a supplier price does NOT include packing and
+  loading). The old Default factory / transportation / CHA cost fields are gone: the supplier's price is typed
+  on Market prices, and CHA + transport is only here (or on one supplier price).
+- **Price rules in effect for this product** — every rule with "category" or "own rule". The MD can switch on
+  **Use own rules for this product** to change × K and the container for this product only; switched off, the
+  category's rules apply. The rules are only a calculator: they never change a typed price or the base.
 
 ## Exchange rate (D-301, 11 Nov 2026)
 

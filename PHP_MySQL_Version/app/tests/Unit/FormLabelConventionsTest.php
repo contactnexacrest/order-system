@@ -210,8 +210,12 @@ final class FormLabelConventionsTest extends TestCase
         self::assertStringContainsString('<input type="number" min="1" step="1" name="user_id"', $audit);
         $form = (string) file_get_contents(self::VIEWS . '/products/_form.php');
         $show = (string) file_get_contents(self::VIEWS . '/products/show.php');
+        // D-335 (12 Nov 2026): the product form has "Costs to FOB" (CHA + transport per container, packing + loading
+        // per unit — typed amounts, never negative); the old default cost fields are gone from it.
+        self::assertStringContainsString('name="packing_loading_cost" data-max-decimals="2"', $form);
+        self::assertStringContainsString('name="cha_transport_per_container" data-max-decimals="2"', $form);
         foreach (['factory', 'transportation', 'packing', 'loading', 'cha'] as $cost) {
-            self::assertStringContainsString("<input type=\"number\" step=\"0.01\" min=\"0\" name=\"default_{$cost}_cost\"", $form);
+            self::assertStringNotContainsString("name=\"default_{$cost}_cost\"", $form);
             self::assertSame(2, substr_count($show, "<input type=\"number\" step=\"0.01\" min=\"0\" name=\"{$cost}_cost\""));
         }
         self::assertSame(2, substr_count($show, '<input type="number" step="0.01" min="0" name="fob_value"'));

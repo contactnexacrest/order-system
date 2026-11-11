@@ -154,7 +154,7 @@ final class D300ProductsPricingTest extends DbTestCase
         // The market prices page shows every thickness, TYPED and calculated, and the FOB cost.
         $_POST = [];
         $page = $this->render(fn () => (new PricingController())->marketPrices(['id' => (string) $productId]));
-        foreach (['every thickness', '1,600.00', '2,160.00', '64,000.00', 'typed', 'calc.', '1,750.00', 'Price includes packing and loading', 'CHA + transport per container'] as $s) {
+        foreach (['every thickness', '1,600.00', '2,160.00', '64,000.00', 'TYPED', 'CALCULATED', '1,750.00', 'Price includes packing and loading', 'CHA + transport per container'] as $s) {
             self::assertStringContainsString($s, $page);
         }
         self::assertStringNotContainsString('margin', $page, 'Procurement never sees selling-price wording');
@@ -191,7 +191,7 @@ final class D300ProductsPricingTest extends DbTestCase
         $_POST = [];
         $page = $this->render(fn () => (new PricingController())->editPrice(['supplierId' => (string) $row['id']]));
         self::assertStringContainsString('Price history', $page);
-        self::assertStringContainsString('calculated would be 2,295.00', $page);
+        self::assertStringContainsString('Add / update a price', $page); // D-335: the thickness prices are changed there
         self::assertStringNotContainsString('Change these rules', $page);
     }
 

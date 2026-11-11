@@ -154,8 +154,12 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     expect(audit).toContain('<input type="number" min="1" step="1" name="user_id"');
     const form = fs.readFileSync(path.join(VIEWS, 'products/_form.njk'), 'utf8');
     const show = fs.readFileSync(path.join(VIEWS, 'products/show.njk'), 'utf8');
+    // D-335 (12 Nov 2026): the product form has "Costs to FOB" (CHA + transport per container, packing + loading
+    // per unit — typed amounts, never negative); the old default cost fields are gone from it.
+    expect(form).toContain('name="packing_loading_cost" data-max-decimals="2"');
+    expect(form).toContain('name="cha_transport_per_container" data-max-decimals="2"');
     for (const cost of ['factory', 'transportation', 'packing', 'loading', 'cha']) {
-      expect(form).toContain(`<input type="number" step="0.01" min="0" name="default_${cost}_cost"`);
+      expect(form).not.toContain(`name="default_${cost}_cost"`);
       expect(count(show, `<input type="number" step="0.01" min="0" name="${cost}_cost"`)).toBe(2);
     }
     expect(count(show, '<input type="number" step="0.01" min="0" name="fob_value"')).toBe(2);
