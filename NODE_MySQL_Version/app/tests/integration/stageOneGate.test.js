@@ -7,7 +7,7 @@ const documentReviewRepository = require('../../src/repositories/documentReviewR
 const reviewWorkflowService = require('../../src/services/reviewWorkflowService');
 const documentGenerationService = require('../../src/services/documentGenerationService');
 const stageGateService = require('../../src/services/stageGateService');
-const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, withDocumentMailsHeld } = require('../support/fixtures');
 
 /**
  * QA-5 (GATE-01 — external QA report cross-verification, Owner Decision #1:
@@ -73,27 +73,30 @@ describe('Stage 1 gate — QT approval, not generation (QA-5 GATE-01)', () => {
   });
 
   it('passes only once the QT is fully approved', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    const documentId = await createTestDocument(orderId, 'QT', 'draft');
-    const reviewer = await createTestUser('Export Executive');
+    // Written for buyer document e-mails held (approved = issued); D-280 made Testing mode off the default.
+    await withDocumentMailsHeld(async () => {
+      const orderId = await createTestOrder(await createTestClient());
+      const documentId = await createTestDocument(orderId, 'QT', 'draft');
+      const reviewer = await createTestUser('Export Executive');
 
-    // finalizeApproval() renders a real PDF via puppeteer-core, which is
-    // deliberately stubbed out under Jest — stub just that heavy side
-    // effect so the real gate logic above it is still exercised for real.
-    const fileId = await createTestFile(orderId, null);
-    const finalizeSpy = jest.spyOn(documentGenerationService, 'finalizeApproval').mockImplementation(async (docId) => {
-      await documentRepository.markApproved(docId, fileId);
+      // finalizeApproval() renders a real PDF via puppeteer-core, which is
+      // deliberately stubbed out under Jest — stub just that heavy side
+      // effect so the real gate logic above it is still exercised for real.
+      const fileId = await createTestFile(orderId, null);
+      const finalizeSpy = jest.spyOn(documentGenerationService, 'finalizeApproval').mockImplementation(async (docId) => {
+        await documentRepository.markApproved(docId, fileId);
+      });
+
+      await reviewWorkflowService.assignReviewers(documentId, [reviewer], 1);
+      const review = (await documentReviewRepository.forDocument(documentId))[0];
+      expect(await stageStatus(orderId, 1)).toBe('in_progress');
+
+      await reviewWorkflowService.approve(review.id, reviewer, null);
+
+      expect(await stageStatus(orderId, 1)).toBe('gate_passed');
+      expect(await stageGateService.isUnlocked(orderId, 2)).toBe(true);
+      finalizeSpy.mockRestore();
     });
-
-    await reviewWorkflowService.assignReviewers(documentId, [reviewer], 1);
-    const review = (await documentReviewRepository.forDocument(documentId))[0];
-    expect(await stageStatus(orderId, 1)).toBe('in_progress');
-
-    await reviewWorkflowService.approve(review.id, reviewer, null);
-
-    expect(await stageStatus(orderId, 1)).toBe('gate_passed');
-    expect(await stageGateService.isUnlocked(orderId, 2)).toBe(true);
-    finalizeSpy.mockRestore();
   });
 
   it('remains locked when one of two required reviewers is still pending', async () => {

@@ -90,7 +90,7 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
   it('balance due is the order value minus the advance actually received', async () => {
     const { orderId, userId } = await setup();
     await recordAdvance(orderId, userId, { advance_amount: '3500', difference_reason_choice: RID.excess });
-    await createTestDocument(orderId, 'PI', 'approved');
+    await createTestDocument(orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
     await ordersController.clearAdvancePayment(
       { user: { id: userId }, params: { id: String(orderId) }, session: {}, body: { advance_cleared_at: '2026-10-27' } },
       { redirect: () => {} }
@@ -124,8 +124,9 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
     const icon = (html) => (html.match(/id="step-6b-buyer-action-link"[^>]*>\s*<summary><span class="step-card-icon (\w+)"/) || [])[1];
 
     expect(icon((await agent.get(`/orders/${orderId}`)).text)).not.toBe('done');
-    await db.execute("UPDATE documents SET status = 'approved' WHERE id = :id", { id: docId });
-    // Owner request (3 Nov 2026): approving the OC no longer makes 6b green on its own —
+    // Issued: D-280 made Testing mode off the default, so the OC counts once sent to the buyer (approved alone is not enough).
+    await db.execute("UPDATE documents SET status = 'sent' WHERE id = :id", { id: docId });
+    // Owner request (3 Nov 2026): issuing the OC no longer makes 6b green on its own —
     // the OC confirmation link must be generated with the 6b button first.
     expect(icon((await agent.get(`/orders/${orderId}`)).text)).not.toBe('done');
     await db.execute('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id', { id: orderId });

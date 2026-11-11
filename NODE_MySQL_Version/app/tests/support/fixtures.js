@@ -249,4 +249,21 @@ async function clearDivisionTradeData() {
   await db.pool.query("UPDATE divisions SET status = 'planned' WHERE id <> 1");
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData };
+/**
+ * Runs fn with buyer document e-mails held (Testing mode on), then puts back the value found.
+ * "Approved but never e-mailed" counts as issued only while those e-mails are held. Before D-280
+ * that was the seed default (mail sending off); now Testing mode is off when installed, so a test
+ * written for the held case switches it on itself (PHP twin: DbTestCase::withDocumentMailsHeld).
+ */
+async function withDocumentMailsHeld(fn) {
+  const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
+  const before = await companySettingsRepository.get('email_testing_mode');
+  await companySettingsRepository.set('email_testing_mode', '1', null);
+  try {
+    return await fn();
+  } finally {
+    await companySettingsRepository.set('email_testing_mode', String(before ?? '0'), null);
+  }
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData, withDocumentMailsHeld };

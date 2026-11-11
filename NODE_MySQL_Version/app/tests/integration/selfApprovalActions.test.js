@@ -188,7 +188,7 @@ describe('Self-approval rules on cancellation, purchase award, amendment and sho
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
     const type = await db.queryOne("SELECT id FROM document_types WHERE code = 'PI'");
-    await db.execute("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, :r, 'approved')", { o: orderId, t: type.id, r: `JEST-SA-${Math.random().toString(16).slice(2, 10)}` });
+    await db.execute("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, :r, 'sent')", { o: orderId, t: type.id, r: `JEST-SA-${Math.random().toString(16).slice(2, 10)}` }); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
     await partPaymentService.addLegReceipt(orderId, 'advance', 1500, '2026-10-20', 84, `UTR${Math.floor(10000 + Math.random() * 89999)}`, recordedBy.id);
     return orderId;

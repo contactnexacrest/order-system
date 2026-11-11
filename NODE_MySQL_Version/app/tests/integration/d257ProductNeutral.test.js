@@ -40,6 +40,22 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
   let userId;
   let agent;
 
+  /** Natural Stone's seeded settings, put back after each test (two tests here save other values). */
+  const STONE_SETTINGS = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set', 'weight_t_per_cbm'];
+  let stoneSeeded = null;
+
+  beforeAll(async () => {
+    stoneSeeded = await db.queryOne(`SELECT id, ${STONE_SETTINGS.join(', ')} FROM product_categories WHERE is_system = 1 ORDER BY id LIMIT 1`);
+  });
+
+  afterEach(async () => {
+    // Saving Natural Stone's settings here left its units and weight per CBM changed for later files
+    // (d270OrderLineUnits, orderLinePricing rely on the seed) — put the seeded values back.
+    if (stoneSeeded) {
+      await db.execute(`UPDATE product_categories SET ${STONE_SETTINGS.map((k) => `${k} = :${k}`).join(', ')} WHERE id = :id`, stoneSeeded);
+    }
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });

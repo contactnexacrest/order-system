@@ -63,7 +63,7 @@ describe('D-244: INR credited on buyer remittances', () => {
     return flashes[flashes.length - 1] || { type: '', message: '' };
   }
 
-  /** USD order, products USD 4,500, advance 40% = USD 1,800 due, PI approved, at Stage 3. */
+  /** USD order, products USD 4,500, advance 40% = USD 1,800 due, PI issued, at Stage 3. */
   async function orderAtAdvance() {
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
     await db.execute("INSERT INTO order_products (order_id, line_no, description, quantity, unit, unit_price, fob_value) VALUES (:o, 1, 'Granite slabs', 100, 'PCS', 45, 4500)", { o: orderId });
@@ -71,7 +71,7 @@ describe('D-244: INR credited on buyer remittances', () => {
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
     const type = await db.queryOne("SELECT id FROM document_types WHERE code = 'PI'");
-    await db.execute("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, :r, 'approved')", { o: orderId, t: type.id, r: `JEST-INR-${crypto.randomBytes(4).toString('hex')}` });
+    await db.execute("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, :r, 'sent')", { o: orderId, t: type.id, r: `JEST-INR-${crypto.randomBytes(4).toString('hex')}` }); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
     return orderId;
   }

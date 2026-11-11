@@ -66,9 +66,12 @@ async function audits(action, userId) {
 }
 
 describe('D-265 e-mailed login code for staff and buyers', () => {
+  let rememberDaysBefore;
+  beforeAll(async () => { rememberDaysBefore = await companySettingsRepository.get('login_remember_browser_days'); });
   beforeEach(async () => { await companySettingsRepository.set('login_remember_browser_days', '0'); });
   afterAll(async () => {
-    await companySettingsRepository.set('login_remember_browser_days', '0');
+    // Put back what was there (seed: 30 days) — forcing '0' here broke sessionTimeoutsD283's seed check later in the run.
+    await companySettingsRepository.set('login_remember_browser_days', String(rememberDaysBefore ?? '30'));
     await db.pool.end();
   });
 

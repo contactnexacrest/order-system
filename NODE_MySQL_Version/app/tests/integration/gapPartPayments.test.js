@@ -62,14 +62,14 @@ describe('Gap list G-5: part payments and short payments', () => {
     return (req.session._flash || [])[0] || { type: '', message: '' };
   }
 
-  /** A USD order at Stage 3 with its PI approved: products USD 4,500, advance 40% = USD 1,800 due. */
+  /** A USD order at Stage 3 with its PI issued: products USD 4,500, advance 40% = USD 1,800 due. */
   async function orderAtAdvance() {
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
     await db.execute("INSERT INTO order_products (order_id, line_no, description, quantity, unit, unit_price, fob_value) VALUES (:o, 1, 'Granite slabs', 100, 'PCS', 45, 4500)", { o: orderId });
     await db.execute('UPDATE orders SET advance_pct = 40 WHERE id = :o', { o: orderId });
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
-    await createTestDocument(orderId, 'PI', 'approved');
+    await createTestDocument(orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
     return orderId;
   }

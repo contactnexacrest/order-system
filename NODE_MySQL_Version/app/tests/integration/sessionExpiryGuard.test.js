@@ -110,16 +110,21 @@ describe('Session expiry / deactivation guards (QA-5 AUTH-10 / CP-06 / CP-12)', 
   });
 
   it('enforces the same idle timeout on the client portal as staff', async () => {
+    // The seeded value is put back afterwards — leaving '5' broke sessionTimeoutsD283's seed check later in the run.
+    const before = await companySettingsRepository.get('session_timeout_client_minutes');
     await companySettingsRepository.set('session_timeout_client_minutes', '5');
+    try {
+      const clientId = await createTestClient();
+      await provisionClientLogin(clientId);
+      const { req, res } = fakeReqRes();
+      req.session[clientPortalService.SESSION_CLIENT_ID] = clientId;
+      req.session['_client_last_activity_ts'] = Date.now() - (10 * 60 * 1000);
+      const mw = clientAuth.required();
 
-    const clientId = await createTestClient();
-    await provisionClientLogin(clientId);
-    const { req, res } = fakeReqRes();
-    req.session[clientPortalService.SESSION_CLIENT_ID] = clientId;
-    req.session['_client_last_activity_ts'] = Date.now() - (10 * 60 * 1000);
-    const mw = clientAuth.required();
-
-    expect(await runMiddleware(mw, req, res)).toBe(false);
-    expect(clientPortalService.currentClientId(req)).toBeNull();
+      expect(await runMiddleware(mw, req, res)).toBe(false);
+      expect(clientPortalService.currentClientId(req)).toBeNull();
+    } finally {
+      await companySettingsRepository.set('session_timeout_client_minutes', String(before ?? '120'));
+    }
   });
 });

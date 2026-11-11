@@ -188,7 +188,7 @@ describe('Payment milestones (D-215, 5a)', () => {
       await stageGateService.passAndUnlockNext(orderId, stage, null);
     }
     await orderPaymentStatusRepository.recordBalanceReceived(orderId, 900.0, todayIst());
-    await createTestDocument(orderId, 'CI', 'approved');
+    await createTestDocument(orderId, 'CI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await ordersController.clearBalancePayment(req, { redirect: () => {} });
     const msgs = flash.pull(req);
