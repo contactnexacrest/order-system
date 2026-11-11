@@ -71,15 +71,22 @@ async function onceSent() {
   return runCache.once;
 }
 
-async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
+/**
+ * D-281 (11 Nov 2026): emailIds — who also gets the e-mail (null = everyone, as before).
+ * Everyone in userIds and emailIds gets the in-app notice; only emailIds the e-mail:
+ * the department's people on the order (staffRouting.forOrder) or, for a company-level
+ * item, its responsible person and backup (staffRouting.companyItem).
+ */
+async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null, emailIds = null) {
   let count = 0;
   const seen = await todaySeen();
-  for (const userId of userIds) {
+  const mail = emailIds === null ? null : [...new Set(emailIds.map(Number))];
+  for (const userId of [...new Set(userIds.map(Number).concat(mail || []))]) {
     const key = todayKey(userId, type, relatedOrderId);
     if (seen.has(key)) {
       continue; // already alerted this same condition today — don't spam the bell (or the inbox)
     }
-    await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    await notificationRepository.create(userId, null, type, relatedOrderId, message, mail === null || mail.includes(userId));
     seen.add(key);
     count++;
   }
@@ -100,19 +107,31 @@ function onceMessageKey(message) {
   return String(message).replace(/ \(\d+ day\(s\) away\)\.$/, '');
 }
 
-async function notifyOnce(userIds, type, message, relatedOrderId) {
+async function notifyOnce(userIds, type, message, relatedOrderId, emailIds = null) {
   let count = 0;
   const sent = await onceSent();
-  for (const userId of [...new Set(userIds.map(Number))]) {
+  const mail = emailIds === null ? null : [...new Set(emailIds.map(Number))];
+  for (const userId of [...new Set(userIds.map(Number).concat(mail || []))]) {
     const key = `${userId}|${type}|${Number(relatedOrderId)}|${onceMessageKey(message)}`;
     if (sent.has(key)) {
       continue;
     }
-    await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    await notificationRepository.create(userId, null, type, relatedOrderId, message, mail === null || mail.includes(userId));
     sent.add(key);
     count++;
   }
   return count;
+}
+
+/** D-281: who is e-mailed about an order alert — the type's department on the order. */
+async function routedEmail(orderId, type) {
+  const staffRouting = require('../services/staffRouting');
+  return (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor(type))).email;
+}
+
+/** D-281: who is e-mailed about a company-level compliance item. */
+async function companyEmail(item) {
+  return require('../services/staffRouting').companyItem(item);
 }
 
 /** The order's assignees (read once per run for every order). */
@@ -151,9 +170,9 @@ async function run() {
     const alertDays = parseInt((await companySettingsRepository.get('lut_alert_days_x')) || '30', 10);
     const escalationDays = parseInt((await companySettingsRepository.get('lut_escalation_days_y')) || '15', 10);
     if (daysLeft <= escalationDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_escalation', `ESCALATION: LUT expires in ${daysLeft} day(s) (${lutExpiry}). Renew before 1 April or document generation will be blocked.`, null);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_escalation', `ESCALATION: LUT expires in ${daysLeft} day(s) (${lutExpiry}). Renew before 1 April or document generation will be blocked.`, null, await companyEmail('lut'));
     } else if (daysLeft <= alertDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_expiry', `LUT expires in ${daysLeft} day(s) (${lutExpiry}).`, null);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'lut_expiry', `LUT expires in ${daysLeft} day(s) (${lutExpiry}).`, null, await companyEmail('lut'));
     }
   }
 
@@ -165,7 +184,7 @@ async function run() {
   {
     const payIncentiveIds = await permissionRepository.usersWithPermission('pay_incentives');
     for (const reminder of await require('../services/associateTds').reminders(todayIst())) {
-      created += await notifyMdAndAdmin(payIncentiveIds, reminder.type, reminder.message, null);
+      created += await notifyMdAndAdmin(payIncentiveIds, reminder.type, reminder.message, null, await companyEmail('tds'));
     }
   }
   // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
@@ -178,9 +197,9 @@ async function run() {
     const alertDays = parseInt((await companySettingsRepository.get('rcmc_alert_days_a')) || '60', 10);
     const escalationDays = parseInt((await companySettingsRepository.get('rcmc_escalation_days_b')) || '30', 10);
     if (daysLeft <= escalationDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_escalation', `ESCALATION: RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}). Renew with CAPEXIL.`, null);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_escalation', `ESCALATION: RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}). Renew with CAPEXIL.`, null, await companyEmail('rcmc'));
     } else if (daysLeft <= alertDays && daysLeft >= 0) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_expiry', `RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}).`, null);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'rcmc_expiry', `RCMC certificate expires in ${daysLeft} day(s) (${rcmcExpiry}).`, null, await companyEmail('rcmc'));
     }
   }
 
@@ -221,7 +240,7 @@ async function run() {
     const dueDate = due.toISOString().slice(0, 10);
     if (dueDate < todayStr) {
       const issued = require('../services/documentDataAssembler').formatDate(fdnDate);
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN dated ${issued}, still not cleared.`, row.order_id);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN dated ${issued}, still not cleared.`, row.order_id, await routedEmail(row.order_id, 'fdn_overdue'));
     }
   }
 
@@ -241,7 +260,7 @@ async function run() {
   for (const row of overdueBalances) {
     const targets = [...new Set([...mdAndAdminIds.map(Number), ...(await orderAssignees(row.order_id))])];
     created += await notifyMdAndAdmin(targets, 'balance_overdue',
-      `Balance payment overdue on order ${row.order_reference} — was due ${String(row.balance_due_date).slice(0, 10)}, still not cleared.`, row.order_id);
+      `Balance payment overdue on order ${row.order_reference} — was due ${String(row.balance_due_date).slice(0, 10)}, still not cleared.`, row.order_id, await routedEmail(row.order_id, 'balance_overdue'));
   }
 
   // --- Letter of Credit dates (gap list G-4, owner 1 Nov 2026) ---
@@ -270,7 +289,7 @@ async function run() {
       }
       const lc = row.lc_number ? `LC ${row.lc_number}` : 'the LC';
       created += await notifyOnce([...mdAndAdminIds.map(Number), ...(await orderAssignees(row.order_id))], type,
-        `Order ${row.order_reference}: ${lc} — ${label} is ${date} (${daysLeft} day(s) away).`, row.order_id);
+        `Order ${row.order_reference}: ${lc} — ${label} is ${date} (${daysLeft} day(s) away).`, row.order_id, await routedEmail(row.order_id, type));
     }
   }
 
@@ -284,8 +303,12 @@ async function run() {
   );
   for (const row of overdueDisputes) {
     const targets = new Set(mdAndAdminIds);
-    if (row.assigned_to) targets.add(row.assigned_to);
-    created += await notifyMdAndAdmin([...targets], 'dispute_overdue', `Dispute response overdue on order ${row.order_reference} — was due ${row.response_due_date}.`, row.order_id);
+    const emailTo = await routedEmail(row.order_id, 'dispute_overdue');
+    if (row.assigned_to) {
+      targets.add(row.assigned_to);
+      emailTo.push(Number(row.assigned_to)); // the person handling the dispute is always told
+    }
+    created += await notifyMdAndAdmin([...targets], 'dispute_overdue', `Dispute response overdue on order ${row.order_reference} — was due ${row.response_due_date}.`, row.order_id, emailTo);
   }
 
   // --- Quotation/PI validity expired, order still stuck at that stage ---
@@ -308,7 +331,7 @@ async function run() {
        AND o.pi_date IS NULL`
   );
   for (const row of expiredQuotations) {
-    created += await notifyMdAndAdmin(mdAndAdminIds, 'quotation_expired', `Quotation validity expired on order ${row.order_reference} — was valid until ${row.quotation_valid_until}, still no PI issued.`, row.order_id);
+    created += await notifyMdAndAdmin(mdAndAdminIds, 'quotation_expired', `Quotation validity expired on order ${row.order_reference} — was valid until ${row.quotation_valid_until}, still no PI issued.`, row.order_id, await routedEmail(row.order_id, 'quotation_expired'));
   }
 
   const expiredPis = await db.query(
@@ -322,7 +345,7 @@ async function run() {
        AND (sm.stage_number IS NULL OR sm.stage_number < 4)`
   );
   for (const row of expiredPis) {
-    created += await notifyMdAndAdmin(mdAndAdminIds, 'pi_expired', `Proforma Invoice validity expired on order ${row.order_reference} — was valid until ${row.pi_valid_until}, Order Confirmation not yet reached.`, row.order_id);
+    created += await notifyMdAndAdmin(mdAndAdminIds, 'pi_expired', `Proforma Invoice validity expired on order ${row.order_reference} — was valid until ${row.pi_valid_until}, Order Confirmation not yet reached.`, row.order_id, await routedEmail(row.order_id, 'pi_expired'));
   }
 
   // --- Export process step 8a: 7-day pre-shipment inspection reminder ---
@@ -351,7 +374,7 @@ async function run() {
   );
   for (const row of dueInspections) {
     const daysLeft = daysUntil(row.est_shipment_date, today);
-    created += await notifyMdAndAdmin(orderManagerIds, 'pre_shipment_inspection_reminder', `Pre-shipment inspection due soon on order ${row.order_reference} — estimated shipment ${row.est_shipment_date} (${daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.`, row.order_id);
+    created += await notifyMdAndAdmin(orderManagerIds, 'pre_shipment_inspection_reminder', `Pre-shipment inspection due soon on order ${row.order_reference} — estimated shipment ${row.est_shipment_date} (${daysLeft} day(s) away). Confirm production completion and prepare for 3rd-party inspection.`, row.order_id, await routedEmail(row.order_id, 'pre_shipment_inspection_reminder'));
   }
 
   return created;

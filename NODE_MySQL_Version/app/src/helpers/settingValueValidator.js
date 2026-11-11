@@ -19,7 +19,16 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * @returns {string|null} an error message if invalid, null if the value passes
  */
-function check(valueType, rawValue) {
+/** D-283 (11 Nov 2026): settings with a fixed allowed range, [min, max, unit] — as PHP SettingValueValidator::RANGES. */
+const RANGES = {
+  session_timeout_staff_minutes: [5, 1440, 'minutes'],
+  session_timeout_client_minutes: [5, 1440, 'minutes'],
+  session_timeout_associate_minutes: [5, 1440, 'minutes'],
+  session_absolute_staff_hours: [1, 24, 'hours'],
+  login_remember_browser_days: [0, 90, 'days'],
+};
+
+function check(valueType, rawValue, key = '') {
   const value = String(rawValue ?? '').trim();
 
   switch (valueType) {
@@ -29,6 +38,13 @@ function check(valueType, rawValue) {
       }
       if (Number(value) < 0) {
         return `must not be negative (got "${rawValue}")`;
+      }
+      if (Object.prototype.hasOwnProperty.call(RANGES, key)) {
+        const [min, max, unit] = RANGES[key];
+        const n = Number(value);
+        if (n < min || n > max || n !== Math.floor(n)) {
+          return `must be a whole number from ${min} to ${max} ${unit} (got "${rawValue}")`;
+        }
       }
       return null;
     }
@@ -81,4 +97,4 @@ function check(valueType, rawValue) {
   }
 }
 
-module.exports = { check };
+module.exports = { check, RANGES };

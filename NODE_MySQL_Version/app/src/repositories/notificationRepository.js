@@ -40,13 +40,21 @@ function emailSubject(message) {
  *   null when the user doesn't exist, has no email, or has opted out.
  *   Exposed (and non-void) purely for testability.
  */
-async function emailNotification(userId, message) {
+async function emailNotification(userId, message, type = '') {
+  // D-280: the type's row in Admin › E-mail settings (MUST alerts always go;
+  // the person's own opt-out applies only to the others).
+  const emailPolicy = require('../services/emailPolicy');
+  const kind = emailPolicy.kindForNotification(type);
+  if (!(await emailPolicy.allows(kind, 'staff'))) {
+    return null;
+  }
   const user = await userRepository.findById(userId);
-  if (!user || Number(user.email_action_notifications_enabled ?? 1) !== 1 || !user.email) {
+  const optedOut = user && Number(user.email_action_notifications_enabled ?? 1) !== 1 && !emailPolicy.isMust(kind, 'staff');
+  if (!user || optedOut || !user.email || Number(user.is_active ?? 1) !== 1) {
     return null;
   }
   try {
-    await emailService.sendPlainText(user.email, emailSubject(message), message);
+    await emailService.sendPlainText(user.email, emailSubject(message), message, { kind, audience: 'staff' });
   } catch (e) {
     // Never let a notification-email failure break the action it's reporting on.
   }
@@ -66,38 +74,65 @@ async function createInAppOnly(userId, type, relatedOrderId, message) {
   return result.insertId;
 }
 
-async function create(userId, roleId, type, relatedOrderId, message) {
+/**
+ * D-280: email false = in-app only for this person (routing decided elsewhere,
+ * e.g. notifyOrderTeam()). The e-mail itself also follows Admin › E-mail
+ * settings (the type's kind) and the person's own notification-e-mail switch.
+ */
+async function create(userId, roleId, type, relatedOrderId, message, email = true) {
   const result = await db.execute(
     `INSERT INTO notifications (user_id, role_id, type, related_order_id, message)
      VALUES (:user_id, :role_id, :type, :related_order_id, :message)`,
     { user_id: userId, role_id: roleId, type, related_order_id: relatedOrderId, message }
   );
 
-  if (userId !== null && userId !== undefined) {
-    await emailNotification(userId, message);
+  if (userId !== null && userId !== undefined && email) {
+    await emailNotification(userId, message, type);
   }
 
   return result.insertId;
 }
 
 /**
- * Something the client did on an order that staff now need to act on
- * (acknowledged the OC, uploaded their PO, reported a payment): notifies
- * that order's own assignees — or, on an order nobody is assigned to yet,
- * everyone who manages orders, so it is never missed.
+ * Something the buyer / supplier did on an order that staff now need to act on.
  *
- * @returns {Promise<number[]>} the user ids notified
+ * In-app: the order's assignees — or, on an order nobody is assigned to yet,
+ * everyone who manages orders (as before).
+ * E-mail (owner decision D-281, 11 Nov 2026): only the people of the event's
+ * department on that order (staffRouting.forOrder); with none, the
+ * department's manager with an "assign someone" note; with no manager, the MD.
+ * The MD, ED and Order Coordinator get the in-app notice only.
+ *
+ * @returns {Promise<number[]>} the user ids notified in-app
  */
 async function notifyOrderTeam(orderId, type, message) {
+  const staffRouting = require('../services/staffRouting');
   let userIds = (await orderAssigneeRepository.forOrder(orderId)).map((a) => Number(a.user_id));
   if (!userIds.length) {
     userIds = (await permissionRepository.usersWithPermission('manage_orders')).map(Number);
   }
-  userIds = [...new Set(userIds)];
+  const route = await staffRouting.forOrder(orderId, staffRouting.departmentFor(type));
+  const emailIds = route.email.map(Number);
+  userIds = [...new Set(userIds.concat(emailIds))];
   for (const userId of userIds) {
-    await create(userId, null, type, orderId, message);
+    const routed = emailIds.includes(userId);
+    const text = routed && route.note !== null ? `${message} ${route.note}` : message;
+    await create(userId, null, type, orderId, text, routed);
   }
   return userIds;
+}
+
+/**
+ * D-281: everyone in inAppIds gets the notice; only emailIds also get the e-mail.
+ * @returns {Promise<number[]>} everyone notified
+ */
+async function notifyRouted(inAppIds, emailIds, type, relatedOrderId, message) {
+  const mail = [...new Set((emailIds || []).map(Number))];
+  const all = [...new Set((inAppIds || []).map(Number).concat(mail))];
+  for (const userId of all) {
+    await create(userId, null, type, relatedOrderId, message, mail.includes(userId));
+  }
+  return all;
 }
 
 async function forUser(userId, limit = 20) {
@@ -139,4 +174,4 @@ async function existsToday(userId, type, relatedOrderId) {
   return row ? parseInt(row.c, 10) > 0 : false;
 }
 
-module.exports = { create, createInAppOnly, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam };
+module.exports = { create, createInAppOnly, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam, notifyRouted };

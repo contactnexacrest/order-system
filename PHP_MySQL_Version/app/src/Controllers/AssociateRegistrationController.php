@@ -120,7 +120,8 @@ final class AssociateRegistrationController
         AssociateEventRepository::add($id, 'registered', 'Registered through an associate registration link; accepted by ' . (self::user()['name'] ?? 'NexaCrest') . '.', null, null, null, $userId, false);
         try {
             $link = AssociateService::invitePortal($id, $userId);
-            Flash::set('success', "{$r['name']} is now an associate (Invited). The portal login link was e-mailed to {$r['email']}." . (AssociatePortalService::showCodeOnScreen() ? " Development only — link: {$link}" : ''));
+            // D-280: "e-mailed" only when it was; the link is always shown to copy (valid 72 hours, once).
+            Flash::set('success', "{$r['name']} is now an associate (Invited). " . AssociateService::inviteOutcome((string) $r['email']), $link);
         } catch (\RuntimeException $e) {
             Flash::set('error', 'Associate created, but the portal login link could not be sent: ' . $e->getMessage());
         }
@@ -137,9 +138,13 @@ final class AssociateRegistrationController
             Flash::set('error', 'Give the reason (10 to 300 characters) — it is e-mailed to the person.');
         } elseif (AssociateRegistrationRepository::decide((int) $r['id'], 'rejected', $reason, (int) self::user()['id'], null)) {
             AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_REGISTRATION_REJECTED', 'associate_registrations', (int) $r['id'], 'reason', null, $reason);
-            EmailService::sendPlainText((string) $r['email'], 'Your NexaCrest associate registration',
-                "Hello {$r['name']},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n{$reason}\n\nNexaCrest International Private Limited");
-            Flash::set('success', 'Registration rejected — the reason was e-mailed.');
+            $sent = EmailService::sendPlainText((string) $r['email'], 'Your NexaCrest associate registration',
+                "Hello {$r['name']},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n{$reason}\n\nNexaCrest International Private Limited",
+                false, 'associate_registration_declined', 'associate');
+            // D-280: "e-mailed" only when it was.
+            Flash::set('success', $sent
+                ? 'Registration rejected — the reason was e-mailed to ' . $r['email'] . '.'
+                : 'Registration rejected — not e-mailed: ' . \App\Services\EmailPolicy::notSentReason('associate_registration_declined', 'associate') . '. Tell the person yourself.');
         }
         header('Location: /associates/registrations');
     }
@@ -216,9 +221,9 @@ final class AssociateRegistrationController
         }
         $id = AssociateRegistrationRepository::create((int) $link['id'], $d, $_SERVER['REMOTE_ADDR'] ?? null);
         AuditLogRepository::log(null, 'ASSOCIATE_REGISTRATION_SUBMITTED', 'associate_registrations', $id, 'email', null, $d['email']);
-        foreach (PermissionRepository::usersWithPermission('manage_associates') as $userId) {
-            NotificationRepository::createInAppOnly((int) $userId, 'associate_registration', null, mb_substr("New associate registration from {$d['name']} ({$d['city']}, {$d['country']}) — review it under Associates › Registrations.", 0, 500));
-        }
+        // D-281: in-app for everyone who manages associates; e-mailed to the associate team (not MD / ED / Coordinator).
+        NotificationRepository::notifyRouted(PermissionRepository::usersWithPermission('manage_associates'), \App\Services\StaffRouting::forAssociate(null),
+            'associate_registration', null, mb_substr("New associate registration from {$d['name']} ({$d['city']}, {$d['country']}) — review it under Associates › Registrations.", 0, 500));
         View::render('associate_register/done', ['name' => $d['name']], 'layout/bare');
     }
 }

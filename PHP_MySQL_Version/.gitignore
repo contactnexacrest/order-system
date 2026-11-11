@@ -12,6 +12,8 @@ storage/clients/*
 storage/associates/*
 storage/temp/*
 storage/logs/*
+# D-283: PHP session files, kept in the app own folder so no system clean-up removes them early
+storage/sessions/*
 storage/internal/reference_library/*
 !storage/clients/.gitkeep
 !storage/temp/.gitkeep

@@ -1,0 +1,8 @@
+{# D-280: a link with a Copy button (app.js [data-copy]). Expects copyLink; optional copyNote. #}
+<div class="copy-box" data-testid="copy-box">
+  {% if copyNote %}<p class="muted small copy-box-note">{{ copyNote }}</p>{% endif %}
+  <div class="copy-box-row">
+    <code class="copy-box-value">{{ copyLink }}</code>
+    <button type="button" class="btn-sm" data-copy="{{ copyLink }}">Copy</button>
+  </div>
+</div>

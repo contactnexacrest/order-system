@@ -1645,11 +1645,11 @@ final class OrderController
                     . "This link works for 30 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body'], false, 'buyer_links', 'buyer');
         }
 
         AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('PI-stage form link', $clientEmail, $sent, $link));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('PI-stage form link', $clientEmail, $sent, $link), $link);
         header('Location: ' . self::linkReturnUrl($orderId, 'step-5a-pi-form-link'));
     }
 
@@ -1723,11 +1723,11 @@ final class OrderController
                     . "This link works for 90 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body'], false, 'buyer_links', 'buyer');
         }
 
         AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Buyer Action link', $clientEmail, $sent, $link));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Buyer Action link', $clientEmail, $sent, $link), $link);
         // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
         header('Location: ' . self::linkReturnUrl($orderId, $returnAnchor));
     }
@@ -1762,11 +1762,11 @@ final class OrderController
                     . "Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body'], false, 'buyer_links', 'buyer');
         }
 
         AuditLogRepository::log((int) $user['id'], 'PAYMENT_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Payment Action link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
-        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Payment Action link', $clientEmail, $sent, $link));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Payment Action link', $clientEmail, $sent, $link), $link);
         header('Location: ' . self::linkReturnUrl($orderId, self::linkReturnAnchor('step-5d-payment-record')));
     }
 
@@ -2261,7 +2261,7 @@ final class OrderController
 
         $baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.' . $shortNote;
         if ($provisionStatus === 'provisioned') {
-            Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
+            Flash::set('success', $baseMessage . \App\Services\ClientPortalService::inviteOutcome(), \App\Services\ClientPortalService::$lastInvite['link'] ?? null); // D-280
         } elseif ($provisionStatus === 'no_email_on_file') {
             Flash::set('warning', $baseMessage . ' WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.');
         } else {
@@ -2495,7 +2495,7 @@ final class OrderController
 
         $baseMessage = 'LC confirmed usable. Stage 4 unlocked — you can now generate the Order Confirmation.';
         if ($provisionStatus === 'provisioned') {
-            Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
+            Flash::set('success', $baseMessage . \App\Services\ClientPortalService::inviteOutcome(), \App\Services\ClientPortalService::$lastInvite['link'] ?? null); // D-280
         } elseif ($provisionStatus === 'no_email_on_file') {
             Flash::set('warning', $baseMessage . ' WARNING: this client has no email on file, so portal login could NOT be provisioned — add an email to their record and provision access manually, otherwise they will never be able to log in.');
         } else {
@@ -2653,7 +2653,7 @@ final class OrderController
             return;
         }
         if (\App\Services\EmailDispatchService::mailSendingEnabled()) {
-            Flash::set('error', 'E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
+            Flash::set('error', 'Document e-mails to the buyer are on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -3100,11 +3100,11 @@ final class OrderController
                     . "This link works for 60 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], false, 'supplier_links', 'supplier');
         }
         AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', (int) $supplierPo['id'], null, null, null, 'Supplier Action link generated' . ($sent ? ' and emailed to the supplier' : ($email !== '' ? ' — the e-mail was not sent, hand this link over directly' : ' — no supplier email on the PO, hand this link over directly')));
         // QA batch 3 MAIL-2: "emailed" only when the e-mail really went out.
-        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Supplier Action link', $email !== '' ? $email : null, $sent, $link));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Supplier Action link', $email !== '' ? $email : null, $sent, $link, 'supplier_links', 'supplier'), $link);
         header('Location: ' . self::linkReturnUrl($orderId, 'step-7c-supplier-po-attach'));
     }
 

@@ -150,8 +150,8 @@ final class AssociateKyc
     public static function notifyStaffOfUpload(array $a, string $kind): void
     {
         $label = AssociateDocumentRepository::KINDS[$kind] ?? $kind;
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_associates') as $userId) {
-            \App\Repositories\NotificationRepository::createInAppOnly((int) $userId, 'associate_document_uploaded', null, mb_substr("Associate {$a['name']} uploaded a {$label} — check it on their page (KYC).", 0, 500));
-        }
+        // D-281: in-app for everyone who manages associates; e-mailed to the associate's relationship manager.
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_associates'), StaffRouting::forAssociate($a),
+            'associate_document_uploaded', null, mb_substr("Associate {$a['name']} uploaded a {$label} — check it on their page (KYC).", 0, 500));
     }
 }

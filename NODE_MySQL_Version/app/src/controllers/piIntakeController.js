@@ -154,8 +154,10 @@ async function submit(req, res) {
   // PI-stage details must notify staff, not just sit silently in the
   // review queue behind a nav badge.
   const orderId = submission.order_id;
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'pi_intake_submitted', orderId, `PI-stage details submitted for order ${submission.order_reference}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor('pi_intake_submitted'))).email, 'pi_intake_submitted', orderId, `PI-stage details submitted for order ${submission.order_reference}.`);
   }
   await auditLogRepository.log(null, 'PI_INTAKE_SUBMITTED', 'orders', orderId, null, null, null, 'PI-stage intake details submitted by the client.');
 

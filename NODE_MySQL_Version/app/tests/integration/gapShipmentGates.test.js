@@ -24,7 +24,7 @@ describe('Gap list G-1 / G-3 / G-6: shipment gates and the OC clock', () => {
   let admin;
 
   afterAll(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     await db.pool.end();
   });
 
@@ -106,7 +106,7 @@ describe('Gap list G-1 / G-3 / G-6: shipment gates and the OC clock', () => {
 
   beforeAll(async () => {
     admin = await createTestUser('Admin');
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
   });
 
   it('a before-shipment balance is cleared before the Bill of Lading, which waits for it', async () => {
@@ -243,8 +243,8 @@ describe('Gap list G-1 / G-3 / G-6: shipment gates and the OC clock', () => {
     expect(message).toMatch(/^Order Confirmation marked as sent to the buyer\. If the buyer does not respond by /);
     expect(await call('markOcSentToBuyer', orderId)).toBe('This Order Confirmation is already marked as sent to the buyer.');
 
-    await companySettingsRepository.set('mail_sending_enabled', '1');
-    expect(await call('markOcSentToBuyer', orderId)).toBe('E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '0');
+    expect(await call('markOcSentToBuyer', orderId)).toBe('Document e-mails to the buyer are on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
+    await companySettingsRepository.set('email_testing_mode', '1');
   });
 });

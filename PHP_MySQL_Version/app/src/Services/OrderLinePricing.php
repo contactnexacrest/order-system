@@ -486,7 +486,7 @@ final class OrderLinePricing
         $message = "Order {$ref}, line {$line['line_no']} ({$line['description']}) needs your price approval: "
             . ($check['status'] === self::NO_PRICE ? 'its product has no price set.' : 'it is below the lowest price for this order.');
         foreach (PermissionRepository::usersWithPermission('manage_pricing') as $mdId) {
-            NotificationRepository::createInAppOnly((int) $mdId, 'line_price_approval', $orderId, mb_substr($message, 0, 500));
+            NotificationRepository::create((int) $mdId, null, 'line_price_approval', $orderId, mb_substr($message, 0, 500)); // D-280: one e-mail per approval
         }
         AuditLogRepository::log($userId, 'LINE_PRICE_APPROVAL_REQUESTED', 'order_products', $lineId, null, null, $message);
         return null;

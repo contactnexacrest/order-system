@@ -21,6 +21,9 @@ use App\Repositories\UserRepository;
  */
 final class OrderComplaintService
 {
+    /** D-280: what happened to the e-mail of the last staff reply, for the flash message. */
+    public static string $lastEmailNote = '';
+
     private const STAFF_PERMISSIONS = ['manage_complaints', 'respond_to_complaints'];
 
     public static function raiseAsClient(int $orderId, int $clientId, string $description): int
@@ -83,6 +86,7 @@ final class OrderComplaintService
 
     private static function emailClient(int $complaintId, int $authorUserId, string $body): void
     {
+        self::$lastEmailNote = 'not e-mailed — no client e-mail on file';
         $complaint = \App\Repositories\OrderComplaintRepository::find($complaintId);
         if (!$complaint) {
             return;
@@ -101,6 +105,8 @@ final class OrderComplaintService
             ? $signature
             : "Regards,\n" . ($sender['name'] ?? '') . "\n" . \App\Services\EmailDispatchService::senderTitle($sender ?: null)); // QA batch 3 MAIL-5
 
-        \App\Services\MailSenderService::send($clientEmail, $subject, $message, []);
+        $sent = \App\Services\MailSenderService::send($clientEmail, $subject, $message, [], false, 'buyer_messages', 'buyer');
+        $hold = \App\Services\EmailPolicy::holdReason('buyer_messages', 'buyer');
+        self::$lastEmailNote = $sent ? 'e-mailed' : 'not e-mailed — ' . ($hold ?? 'the e-mail could not be sent');
     }
 }

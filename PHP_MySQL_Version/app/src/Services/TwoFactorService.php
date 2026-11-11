@@ -27,6 +27,9 @@ final class TwoFactorService
     public const MAX_VERIFY_ATTEMPTS = 5;
     public const RESEND_AFTER_SECONDS = 60;
 
+    /** D-280: the buyer's own login-code wording (template client_login_code; this is its fallback). */
+    public const CLIENT_CODE_BODY = "Hello,\n\nYour code to log in to your NexaCrest order portal is: {code}\n\nIt is valid for 10 minutes.\n\nIf you did not try to log in, you can ignore this e-mail — nobody can log in without this code. If it keeps happening, change your password with \"Forgot your password?\" on the login page.\n\nNexaCrest International Private Limited";
+
     private const SESSION_KEYS = ['staff' => '_2fa_pending', 'client' => '_client_2fa_pending'];
 
     private static function key(string $scope): string
@@ -49,13 +52,21 @@ final class TwoFactorService
         ];
         // 90-item backlog #37: admin-editable (Admin > Settings > Email Templates), with this
         // wording as the fallback, since a login code must never silently fail to go out.
-        $rendered = EmailTemplateRepository::renderOrDefault(
-            'two_factor_code',
-            ['{code}' => $code],
-            'Your NexaCrest login verification code',
-            "Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator."
-        );
-        EmailService::sendPlainText($destination, $rendered['subject'], $rendered['body'], true);
+        // D-280: each audience gets its own plain wording — a buyer has no "administrator".
+        $rendered = $scope === 'client'
+            ? EmailTemplateRepository::renderOrDefault(
+                'client_login_code',
+                ['{code}' => $code],
+                'Your NexaCrest order portal login code',
+                self::CLIENT_CODE_BODY
+            )
+            : EmailTemplateRepository::renderOrDefault(
+                'two_factor_code',
+                ['{code}' => $code],
+                'Your NexaCrest login verification code',
+                "Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator."
+            );
+        EmailService::sendPlainText($destination, $rendered['subject'], $rendered['body'], true, 'login_code', $scope === 'client' ? 'buyer' : 'staff');
 
         // Local dev only: the code is shown on screen so the flow can be tried without a mail server.
         return Env::isLocal() ? $code : '';

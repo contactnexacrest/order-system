@@ -25,6 +25,9 @@ use App\Repositories\UserRepository;
  */
 final class OrderCommentService
 {
+    /** D-280: what happened to the e-mail of the last staff post ("e-mailed" / "not e-mailed — why"), for the flash message. */
+    public static string $lastEmailNote = '';
+
     /**
      * Combined size cap for attachments sent directly on the email itself.
      * Kept comfortably under typical SMTP/Zoho Mail attachment limits
@@ -50,12 +53,16 @@ final class OrderCommentService
         if ($clientEmail !== null) {
             $order['client_email'] = $clientEmail;
             // D-268: checked before sending, so the note gives the true reason (the switch, not a missing address).
-            $sendingOff = CompanySettingsRepository::get('mail_sending_enabled') === '0';
+            // D-280: held by testing mode, or this e-mail switched off in Admin › E-mail settings.
+            $hold = EmailPolicy::holdReason('buyer_messages', 'buyer');
             $sent = self::emailClient($order, $authorUserId, $bodyTrim, $fileStoreIds);
-            OrderCommentRepository::recordEmailStatus($commentId, $sent ? 'sent' : ($sendingOff ? 'sending_off' : 'failed'));
+            $status = $sent ? 'sent' : ($hold === null ? 'failed' : (EmailPolicy::testingMode() ? 'testing_mode' : 'switched_off'));
         } else {
-            OrderCommentRepository::recordEmailStatus($commentId, 'no_email');
+            $status = 'no_email';
+            $sent = false;
         }
+        OrderCommentRepository::recordEmailStatus($commentId, $status);
+        self::$lastEmailNote = OrderCommentRepository::emailNote(['author_type' => 'staff', 'email_sent' => $sent ? 1 : 0, 'email_status' => $status]);
 
         AuditLogRepository::log($authorUserId, 'ORDER_COMMENT_POSTED', 'orders', $orderId);
         return $commentId;
@@ -71,9 +78,8 @@ final class OrderCommentService
 
         $order = OrderRepository::find($orderId);
         $orderRef = $order['order_reference'] ?? "#{$orderId}";
-        foreach (PermissionRepository::usersWithPermission('manage_orders') as $userId) {
-            NotificationRepository::create($userId, null, 'order_comment_from_client', $orderId, "New client message on order {$orderRef}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        NotificationRepository::notifyRouted(PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('order_comment_from_client'))['email'], 'order_comment_from_client', $orderId, "New client message on order {$orderRef}.");
 
         AuditLogRepository::log(null, 'ORDER_COMMENT_POSTED', 'orders', $orderId);
         return $commentId;
@@ -127,6 +133,6 @@ final class OrderCommentService
             ? $signature
             : "Regards,\n" . ($sender['name'] ?? '') . "\n" . EmailDispatchService::senderTitle($sender ?: null); // QA batch 3 MAIL-5: the sender's own title, not the MD's
 
-        return MailSenderService::send($order['client_email'], $subject, $message, $direct);
+        return MailSenderService::send($order['client_email'], $subject, $message, $direct, false, 'buyer_messages', 'buyer');
     }
 }

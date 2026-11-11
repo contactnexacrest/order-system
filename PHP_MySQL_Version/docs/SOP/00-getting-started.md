@@ -76,8 +76,14 @@ A few things that catch people out the first time:
   password (owner decision D-265). It is valid for 10 minutes; after 5 wrong
   tries, sign in again. "Send me a new code" works once a minute. It is not
   optional and cannot be switched off — see your Admin if the e-mail does not
-  arrive. If Admin has switched on "Remember this browser", you may tick it
-  on your own computer to skip the code there for that many days.
+  arrive. On your own office computer (one nobody else uses) you may tick
+  **"This is my own office computer"** to skip the code there for 30 days
+  (Admin can change the number of days, 0–90). My Account → Remembered
+  computers → **Forget all remembered computers** undoes it everywhere.
+- **Staying logged in (D-283).** You are signed out after 4 hours without
+  activity (buyers and associates after 2 hours), and staff log in again at
+  least every 12 hours. Two minutes before an idle sign-out a box says
+  "You will be signed out soon" — click **Stay logged in** to carry on.
 - **MD, ED, Admin and Super Admin: make your backup codes.** My Account →
   Emergency backup codes → Make new backup codes (current password needed).
   Keep the 10 codes offline. If e-mail ever stops working, "Use a backup code

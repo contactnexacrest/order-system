@@ -8,5 +8,6 @@
     <label>Password<input type="password" name="password" required maxlength="200" placeholder="Your password"></label>
     <button type="submit">Continue</button>
   </form>
-  <p class="muted small">Forgot your password or no access yet? Ask your NexaCrest relationship manager to send you a new link.</p>
+  <p class="small"><a href="/associate/forgot-password">Forgot password?</a></p>
+  <p class="muted small">No access yet? Ask your NexaCrest relationship manager to send you a set-password link.</p>
 </div>

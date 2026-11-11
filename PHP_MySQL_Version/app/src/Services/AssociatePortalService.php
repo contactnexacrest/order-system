@@ -62,6 +62,41 @@ final class AssociatePortalService
         return $raw;
     }
 
+    /**
+     * D-282 (11 Nov 2026): the associate's own "Forgot password?". A link to set a
+     * new password (72 hours, once) goes to the address when it belongs to an
+     * associate whose portal is on. The answer on screen is the same either way,
+     * so the page never tells whether an address is registered. At most 5 links
+     * an hour per associate. Returns the link (for tests and dev), or null.
+     */
+    public static function sendResetLink(string $email): ?string
+    {
+        $email = strtolower(trim($email));
+        $a = $email !== '' ? AssociateRepository::findByEmail($email) : null;
+        if ($a === null || (int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true)) {
+            return null;
+        }
+        $recent = Database::connection()->prepare("SELECT COUNT(*) FROM associate_tokens WHERE associate_id = :a AND purpose = 'set_password' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+        $recent->execute(['a' => (int) $a['id']]);
+        if ((int) $recent->fetchColumn() >= 5) {
+            return null;
+        }
+        $raw = self::issueToken((int) $a['id'], 'set_password', 72 * 60);
+        $link = rtrim((string) Env::get('APP_URL', ''), '/') . '/associate/set-password/' . $raw;
+        EmailService::sendPlainText((string) $a['email'], 'Reset your NexaCrest associate portal password', self::resetBody($a, $link), true, 'forgot_password', 'associate');
+        AuditLogRepository::log(null, 'ASSOCIATE_PASSWORD_RESET_REQUESTED', 'associates', (int) $a['id'], null, null, null, 'Requested from IP ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        return $link;
+    }
+
+    /** D-282: the associate's forgot-password e-mail. */
+    public static function resetBody(array $a, string $link): string
+    {
+        return "Hello {$a['name']},\n\nA new password was requested for your NexaCrest associate portal ({$a['email']}).\n\n"
+            . "To set a new password, open this link within 72 hours (it works once):\n{$link}\n\n"
+            . "If you did not ask for this, you can ignore this e-mail — your password stays as it is.\n\n"
+            . "Log in any time at:\n" . AssociateService::loginUrl() . "\n\nNexaCrest International Private Limited";
+    }
+
     /** The associate a valid set-password token belongs to (not used, not expired). */
     public static function associateForSetPassword(string $raw): ?array
     {
@@ -110,7 +145,7 @@ final class AssociatePortalService
             return ['status' => 'disabled'];
         }
         $code = self::issueToken((int) $a['id'], 'login_code', 10);
-        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.", true); // QA batch 3 MAIL-13: a one-time login code is security mail
+        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.", true, 'login_code', 'associate'); // QA batch 3 MAIL-13: a one-time login code is security mail
         self::regenerate();
         unset($_SESSION[self::SESSION_ID], $_SESSION[self::SESSION_VIEW_AS]);
         $_SESSION[self::SESSION_PENDING] = (int) $a['id'];
@@ -139,6 +174,7 @@ final class AssociatePortalService
         self::regenerate();
         unset($_SESSION[self::SESSION_PENDING]);
         $_SESSION[self::SESSION_ID] = (int) $id;
+        $_SESSION['_associate_last_activity_ts'] = time(); // D-283: the idle clock starts now
         $_SESSION[self::SESSION_PASSWORD_FP] = hash('sha256', (string) (AssociateRepository::find((int) $id)['password_hash'] ?? ''));
         AssociateRepository::setFields((int) $id, ['failed_login_count' => 0, 'locked_until' => null, 'last_login_at' => date('Y-m-d H:i:s')]);
         AuditLogRepository::log(null, 'ASSOCIATE_LOGIN', 'associates', (int) $id);
@@ -173,6 +209,7 @@ final class AssociatePortalService
         self::regenerate();
         $_SESSION[self::SESSION_ID] = $associateId;
         $_SESSION[self::SESSION_VIEW_AS] = $staffId;
+        $_SESSION['_associate_last_activity_ts'] = time(); // D-283
         AuditLogRepository::log($staffId, 'ASSOCIATE_VIEW_AS_STARTED', 'associates', $associateId);
     }
 

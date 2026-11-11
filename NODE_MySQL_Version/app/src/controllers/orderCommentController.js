@@ -32,11 +32,12 @@ async function post(req, res) {
       'Staff',
       'Order Update Attachment'
     );
-    await orderCommentService.postAsStaff(orderId, req.user.id, body !== '' ? body : null, fileIds);
-    // QA Round 5, R5-16: with email sending off, nothing was emailed — say so.
-    flash.set(req, 'success', (await emailDispatchService.mailSendingEnabled())
+    const out = {};
+    await orderCommentService.postAsStaff(orderId, req.user.id, body !== '' ? body : null, fileIds, out);
+    // QA Round 5, R5-16 / D-280: say "emailed" only when the e-mail really went out.
+    flash.set(req, 'success', out.emailNote === 'e-mailed'
       ? 'Posted — the client has been emailed.'
-      : 'Posted to the client portal. Email sending is turned off, so the client was NOT emailed — tell them yourself if it is urgent.');
+      : `Posted to the client portal — ${out.emailNote}. Tell the client yourself if it is urgent.`);
   } catch (e) {
     flash.setErrorFromException(req, e);
   }

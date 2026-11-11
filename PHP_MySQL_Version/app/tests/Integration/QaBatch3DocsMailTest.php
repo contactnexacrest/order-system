@@ -37,13 +37,13 @@ final class QaBatch3DocsMailTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mailBefore = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->mailBefore = CompanySettingsRepository::get('email_testing_mode');
         $this->allowHandTypedGoodsLines();
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', $this->mailBefore);
+        CompanySettingsRepository::set('email_testing_mode', $this->mailBefore);
         parent::tearDown();
     }
 
@@ -141,7 +141,7 @@ final class QaBatch3DocsMailTest extends DbTestCase
 
     public function testDoc6ReleaseRuleAndTheValidPiStaysVisibleDuringACorrection(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1');
+        CompanySettingsRepository::set('email_testing_mode', '0');
         $orderId = $this->twoLineOrder();
         $file = $this->createTestFile($orderId);
         $sent = $this->createTestDocument($orderId, 'PI', 'sent', $file);
@@ -176,7 +176,7 @@ final class QaBatch3DocsMailTest extends DbTestCase
 
     public function testMail1TheOverdueFreightAlertSeesTheIssuedDebitNote(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '1');
+        CompanySettingsRepository::set('email_testing_mode', '0');
         $orderId = $this->twoLineOrder();
         $fdn = $this->createTestDocument($orderId, 'FDN', 'sent', $this->createTestFile($orderId));
         Database::connection()->exec("UPDATE documents SET document_date = DATE_SUB(CURDATE(), INTERVAL 12 DAY) WHERE id = {$fdn}");
@@ -190,19 +190,19 @@ final class QaBatch3DocsMailTest extends DbTestCase
 
     public function testMail2TheSendingOffSwitchStopsLinkAndNotificationMail(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        CompanySettingsRepository::set('email_testing_mode', '1');
         $log = tempnam(sys_get_temp_dir(), 'qa3mail');
         $previous = ini_set('error_log', $log);
         try {
-            self::assertFalse(EmailService::sendPlainText('buyer@example.test', 'Link', 'Body'));
+            self::assertFalse(EmailService::sendPlainText('buyer@example.test', 'Link', 'Body', false, 'buyer_links', 'buyer'));
         } finally {
             ini_set('error_log', (string) $previous);
         }
-        self::assertStringContainsString('sending disabled by admin', (string) file_get_contents($log));
+        self::assertStringContainsString('testing mode holds e-mails to buyers and suppliers', (string) file_get_contents($log));
         @unlink($log);
-        self::assertSame('PI-stage form link generated, but the e-mail to b@x.test was not sent (e-mail sending is off) — send this link yourself: L',
+        self::assertSame('PI-stage form link generated — not e-mailed to b@x.test: testing mode holds e-mails to buyers and suppliers. Copy the link and send it yourself.',
             EmailDispatchService::linkMailOutcome('PI-stage form link', 'b@x.test', false, 'L'));
-        self::assertSame('PI-stage form link emailed to b@x.test: L', EmailDispatchService::linkMailOutcome('PI-stage form link', 'b@x.test', true, 'L'));
+        self::assertSame('PI-stage form link e-mailed to b@x.test. If they did not get it, copy the link and send it yourself.', EmailDispatchService::linkMailOutcome('PI-stage form link', 'b@x.test', true, 'L'));
     }
 
     public function testMail3LcRemindersGoOutOncePerDate(): void

@@ -104,7 +104,7 @@ final class UserController
             return;
         }
         View::render('users/edit', [
-            'target' => $target,
+            'target' => $target, // D-283: the "Remembered computers" card reads RememberBrowserService itself
             // D-259: the team incentive switch (only the MD changes it).
             'incentiveEligible' => \App\Services\IncentiveService::isEligible($userId),
             'incentiveDesignation' => \App\Services\IncentiveService::designationEligibility($userId),
@@ -202,6 +202,21 @@ final class UserController
 
         Flash::set('success', "{$name} updated.");
         header('Location: /users');
+    }
+
+    /** D-283: Admin forgets every computer remembered for this person's login code. */
+    public function forgetComputers(array $params): void
+    {
+        $userId = (int) $params['id'];
+        if (UserRepository::findById($userId) === null) {
+            http_response_code(404);
+            echo 'User not found.';
+            return;
+        }
+        $n = \App\Services\RememberBrowserService::forgetAll($userId);
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'LOGIN_BROWSERS_FORGOTTEN', 'users', $userId, null, (string) $n, '0', 'By an administrator (Users › Edit)');
+        Flash::set('success', ($n === 1 ? '1 remembered computer' : "{$n} remembered computers") . ' forgotten — the e-mailed login code is asked again at the next login.');
+        header("Location: /users/{$userId}/edit");
     }
 
     public function toggleActive(array $params): void

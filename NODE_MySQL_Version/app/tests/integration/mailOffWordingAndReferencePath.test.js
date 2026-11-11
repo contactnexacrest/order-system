@@ -28,17 +28,17 @@ describe('Mail-off wording and seeded Reference Library paths (QA Round 5)', () 
     await db.pool.end();
   });
 
-  const setMail = (value) => db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'", { v: value });
+  const setMail = (value) => db.execute("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'", { v: value });
 
   it('says the client was NOT emailed when email sending is off (R5-16)', async () => {
     const orderId = await createTestOrder(await createTestClient());
-    const original = String((await companySettingsRepository.get('mail_sending_enabled')) ?? '0');
-    await setMail('0');
+    const original = String((await companySettingsRepository.get('email_testing_mode')) ?? '0');
+    await setMail('1') /* D-280: testing mode on */;
     try {
       const req = { params: { id: String(orderId) }, body: { body: 'Your goods are being packed.' }, user: { id: userId }, files: [], session: {} };
       await orderCommentController.post(req, { redirect() {} });
       const message = flash.pull(req)[0].message;
-      expect(message).toContain('NOT emailed');
+      expect(message).toContain('not e-mailed — testing mode holds e-mails to buyers and suppliers');
       expect(message).not.toContain('has been emailed');
     } finally {
       await setMail(original);

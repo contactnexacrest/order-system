@@ -103,8 +103,10 @@ async function accept(req, res) {
   await auditLogRepository.log(userId, 'ASSOCIATE_REGISTRATION_ACCEPTED', 'associate_registrations', Number(r.id), 'associate_id', null, String(id));
   await associateEventRepository.add(id, 'registered', `Registered through an associate registration link; accepted by ${req.user.name || 'NexaCrest'}.`, null, null, null, userId, false);
   try {
-    const link = await associateService.invitePortal(id, userId);
-    flash.set(req, 'success', `${r.name} is now an associate (Invited). The portal login link was e-mailed to ${r.email}.${associatePortalService.showCodeOnScreen() ? ` Development only — link: ${link}` : ''}`);
+    const out = {};
+    const link = await associateService.invitePortal(id, userId, out);
+    // D-280: "e-mailed" only when it was; the link is always shown to copy (valid 72 hours, once).
+    flash.set(req, 'success', `${r.name} is now an associate (Invited). ${associateService.inviteOutcome(String(r.email), out.sent)}`, link);
   } catch (e) {
     flash.set(req, 'error', `Associate created, but the portal login link could not be sent: ${e.message}`);
   }
@@ -120,9 +122,13 @@ async function reject(req, res) {
     flash.set(req, 'error', 'Give the reason (10 to 300 characters) — it is e-mailed to the person.');
   } else if (await associateRegistrationRepository.decide(Number(r.id), 'rejected', reason, req.user.id, null)) {
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_REGISTRATION_REJECTED', 'associate_registrations', Number(r.id), 'reason', null, reason);
-    await emailService.sendPlainText(String(r.email), 'Your NexaCrest associate registration',
-      `Hello ${r.name},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n${reason}\n\nNexaCrest International Private Limited`);
-    flash.set(req, 'success', 'Registration rejected — the reason was e-mailed.');
+    const sent = await emailService.sendPlainText(String(r.email), 'Your NexaCrest associate registration',
+      `Hello ${r.name},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n${reason}\n\nNexaCrest International Private Limited`,
+      { kind: 'associate_registration_declined', audience: 'associate' });
+    // D-280: "e-mailed" only when it was.
+    flash.set(req, 'success', sent
+      ? `Registration rejected — the reason was e-mailed to ${r.email}.`
+      : `Registration rejected — not e-mailed: ${await require('../services/emailPolicy').notSentReason('associate_registration_declined', 'associate')}. Tell the person yourself.`);
   }
   res.redirect('/associates/registrations');
 }
@@ -180,9 +186,9 @@ async function submit(req, res) {
   }
   const id = await associateRegistrationRepository.create(Number(link.id), d, req.ip || null);
   await auditLogRepository.log(null, 'ASSOCIATE_REGISTRATION_SUBMITTED', 'associate_registrations', id, 'email', null, d.email);
-  for (const userId of await permissionRepository.usersWithPermission('manage_associates')) {
-    await notificationRepository.createInAppOnly(Number(userId), 'associate_registration', null, [...`New associate registration from ${d.name} (${d.city}, ${d.country}) — review it under Associates › Registrations.`].slice(0, 500).join(''));
-  }
+  // D-281: in-app for everyone who manages associates; e-mailed to the associate team (not MD / ED / Coordinator).
+  await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_associates'), await require('../services/staffRouting').forAssociate(null),
+    'associate_registration', null, [...`New associate registration from ${d.name} (${d.city}, ${d.country}) — review it under Associates › Registrations.`].slice(0, 500).join(''));
   res.renderView('associate_register/done', { name: d.name }, 'layout/bare');
 }
 

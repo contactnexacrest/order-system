@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png?v=2">
 <link rel="stylesheet" href="<?= \App\Helpers\View::asset('/assets/css/app.css') ?>">
 <script src="<?= \App\Helpers\View::asset('/assets/js/app.js') ?>" defer></script>
+<?= \App\Services\SessionTimeouts::metaTag() // D-283: idle warning popup (app.js) ?>
 </head>
 <body>
 <?php if (\App\Config\Env::isDevServer()): ?>
@@ -38,7 +39,7 @@
 </header>
 <main class="page">
   <?php foreach (Flash::pull() as $f): ?>
-    <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
+    <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?><?php if (!empty($f['copy_link'])) { $__copyLink = $f['copy_link']; $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; } // D-280 ?></div>
   <?php endforeach; ?>
   <?= $content ?>
 </main>

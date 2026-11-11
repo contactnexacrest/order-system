@@ -40,6 +40,16 @@
     </form>
   </div>
 
+  <?php // Owner decision D-283 (11 Nov 2026): "This is my own office computer" — forget them all. ?>
+  <div class="section" id="remembered-computers">
+    <h2>Remembered computers</h2>
+    <p class="small">Computers where you ticked "This is my own office computer" skip the e-mailed login code for <?= (int) \App\Services\RememberBrowserService::days() ?> day(s). Remembered now: <b><?= (int) \App\Services\RememberBrowserService::countFor((int) $user['id']) ?></b>.</p>
+    <form method="post" action="/account/forget-computers" data-confirm="Forget all remembered computers? Every computer asks for the login code again at the next login.">
+      <?= \App\Helpers\Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary">Forget all remembered computers</button>
+    </form>
+  </div>
+
   <?php if (!empty($backupEligible)): ?>
   <div class="section" id="backup-codes">
     <h2>Emergency backup codes</h2>

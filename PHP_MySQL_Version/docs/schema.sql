@@ -51,7 +51,7 @@ CREATE TABLE company_settings (
 -- rbi_purpose_code_advance, rbi_purpose_code_balance, rbi_purpose_code_freight,
 -- default_currency, storage_base_path, quantity_shortfall_tolerance_pct,
 -- lut_alert_days_x, lut_escalation_days_y, rcmc_alert_days_a,
--- rcmc_escalation_days_b, fdn_overdue_days_c, session_timeout_minutes,
+-- rcmc_escalation_days_b, fdn_overdue_days_c, session_timeout_staff_minutes / _client_ / _associate_ (D-283),
 -- failed_login_lockout_count, password_min_length, password_complexity_json,
 -- password_expiry_days, non_usd_price_buffer_pct, revision_start_number,
 -- master_tracking_ref_format, order_ref_format,
@@ -3000,7 +3000,7 @@ CREATE TABLE order_annexure_terms (
 -- needed for them (see Section A); only the new permission below is new
 -- schema.
 -- ================================================================
--- Seed keys (see seed.sql): mail_sending_enabled, mail_approval_queue_enabled,
+-- Seed keys (see seed.sql): email_testing_mode (D-280, replaced mail_sending_enabled), mail_approval_queue_enabled,
 -- oc_ack_override_restricted, oc_ack_auto_confirm_hours.
 -- New permission (see seed.sql): override_buyer_acknowledgment — only
 -- consulted when oc_ack_override_restricted is '1'; when '0' (default),
@@ -6277,3 +6277,36 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+
+-- ---------------------------------------------------------------------------
+-- Owner decision D-280 (11 Nov 2026, point 3): Admin › E-mail settings — one
+-- switch per e-mail kind and audience (Staff / Associate / Buyer / Supplier).
+-- MUST kinds (login codes, set-password invites, forgot-password links, the
+-- bank-details-changed alert, the backup-code alert, the quotation
+-- verification code) are always sent and have no row here.
+-- ---------------------------------------------------------------------------
+CREATE TABLE email_settings (
+  email_kind  VARCHAR(60) NOT NULL,
+  audience    ENUM('staff','associate','buyer','supplier') NOT NULL,
+  is_enabled  TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (email_kind, audience),
+  CONSTRAINT fk_email_settings_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Owner decision D-281 (11 Nov 2026): company-level compliance alerts (LUT, RCMC,
+-- agreements, TDS, merchant-trade RBI limits, ECGC policy, monthly eBRC) are
+-- e-mailed to a named responsible person plus a backup; empty = the department's
+-- manager, then the Managing Director.
+CREATE TABLE compliance_alert_owners (
+  item_key             VARCHAR(40) NOT NULL PRIMARY KEY,
+  responsible_user_id  BIGINT UNSIGNED NULL,
+  backup_user_id       BIGINT UNSIGNED NULL,
+  updated_by           BIGINT UNSIGNED NULL,
+  updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cao_responsible FOREIGN KEY (responsible_user_id) REFERENCES users(id),
+  CONSTRAINT fk_cao_backup FOREIGN KEY (backup_user_id) REFERENCES users(id),
+  CONSTRAINT fk_cao_updated_by FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;

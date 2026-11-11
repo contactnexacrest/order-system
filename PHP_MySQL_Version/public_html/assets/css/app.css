@@ -897,3 +897,23 @@ input.below-floor{border-color:#b42318}
 .help-line { display: block; font-size: .85em; color: #555; background: #f7f4ec; border-left: 3px solid #c9b98a; padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-weight: normal; }
 .pricing-two { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .pricing-two > .section { flex: 1 1 380px; min-width: 0; }
+
+/* D-280 / D-282 / D-283 (11 Nov 2026): e-mail settings badges, copy-link boxes, portal-login blocks, idle warning */
+.badge-must{background:#0b3a8a;color:#fff;margin-left:0;}
+.badge-should{background:var(--success-soft);color:var(--success);margin-left:0;}
+.badge-optional{background:#eceeed;color:#55605c;margin-left:0;}
+.email-settings-table td.text-center,.email-settings-table th.text-center{text-align:center;white-space:nowrap;}
+.copy-box{margin-top:8px;}
+.copy-box-row{display:flex;gap:8px;align-items:center;background:#f4f2ee;border-radius:8px;padding:8px 10px;}
+.copy-box-value{flex:1;min-width:0;overflow-wrap:anywhere;font-size:0.85rem;background:none;}
+.copy-box-note{margin:0 0 4px;}
+.portal-block{margin-bottom:22px;}
+.portal-block h3{border-left:4px solid #c9a227;padding-left:8px;margin:0 0 8px;}
+.portal-block .btn-row{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+.portal-block-code-form{margin-top:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
+.portal-block-code-form button{margin-top:6px;}
+.idle-warning{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:2000;}
+.idle-warning[hidden]{display:none;}
+.idle-warning-box{background:#fff;border-radius:12px;padding:20px 22px;max-width:420px;width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,0.25);}
+.idle-warning-box h2{margin:0 0 8px;font-size:1.1rem;}
+.idle-warning-box .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}

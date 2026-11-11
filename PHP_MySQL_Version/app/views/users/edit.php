@@ -81,6 +81,16 @@
   </form>
 </div>
 
+<?php // Owner decision D-283 (11 Nov 2026): Admin can forget every computer remembered for this person's login code. ?>
+<div class="card" data-testid="user-remembered-computers">
+  <h2>Remembered computers</h2>
+  <p class="muted">Computers where this person ticked "This is my own office computer" skip the e-mailed login code. Remembered now: <b><?= (int) \App\Services\RememberBrowserService::countFor((int) $target['id']) ?></b>.</p>
+  <form method="post" action="/users/<?= (int) $target['id'] ?>/forget-computers" data-confirm="Forget all computers remembered for this person? They enter the e-mailed login code again at the next login.">
+    <?= \App\Helpers\Csrf::field() ?>
+    <button type="submit" class="btn-sm btn-secondary">Forget all remembered computers</button>
+  </form>
+</div>
+
 <?php if (\App\Services\DivisionService::isMulti()): // D-257: shown only with two or more active divisions ?>
 <div class="card" data-testid="user-division">
   <h2>Division</h2>

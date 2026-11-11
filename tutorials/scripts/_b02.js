@@ -24,7 +24,8 @@ async function setup(demo) {
   cleanStage(demo);
   for (const k of ['exec', 'salesmgr', 'salesdir']) demo.demoStaff(k);
   demo.sql("UPDATE users SET is_active = 0 WHERE email NOT LIKE '%@email.com'");
-  demo.sql("UPDATE company_settings SET setting_value = '1' WHERE setting_key IN ('mail_sending_enabled', 'mail_approval_queue_enabled')");
+  demo.sql("UPDATE company_settings SET setting_value = '1' WHERE setting_key = 'mail_approval_queue_enabled'");
+  demo.sql("UPDATE company_settings SET setting_value = '0' WHERE setting_key = 'email_testing_mode'"); // D-280: buyer e-mails on (testing mode off)
   // Each works as Sales & Export, at their own level (their department membership), as on the live site.
   for (const [email, level] of [['export.executive@email.com', 'executive'], ['sales.manager@email.com', 'manager'], ['sales.director@email.com', 'director']]) {
     demo.sql(`INSERT INTO user_department_memberships (user_id, designation_id, starts_on, is_default)

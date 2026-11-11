@@ -18,11 +18,11 @@ describe('Stage document notice on the order page', () => {
   let mailBefore;
 
   beforeEach(async () => {
-    mailBefore = await companySettingsRepository.get('mail_sending_enabled');
+    mailBefore = await companySettingsRepository.get('email_testing_mode');
   });
 
   afterEach(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', String(mailBefore ?? '0'), null);
+    await companySettingsRepository.set('email_testing_mode', String(mailBefore ?? '0'), null);
   });
 
   afterAll(async () => {
@@ -31,15 +31,15 @@ describe('Stage document notice on the order page', () => {
 
   it('the gate says what each document still needs', async () => {
     const orderId = await createTestOrder(await createTestClient());
-    await companySettingsRepository.set('mail_sending_enabled', '1', null);
+    await companySettingsRepository.set('email_testing_mode', '0', null);
     expect(await documentGenerationService.stageDocumentGate(orderId, 3)).toEqual([{ name: 'Proforma Invoice', todo: 'generate', buyer_facing: true }]);
 
     await createTestDocument(orderId, 'PI', 'in_review');
     expect((await documentGenerationService.stageDocumentGate(orderId, 3))[0].todo).toBe('approve_send');
-    await companySettingsRepository.set('mail_sending_enabled', '0', null);
+    await companySettingsRepository.set('email_testing_mode', '1', null);
     expect((await documentGenerationService.stageDocumentGate(orderId, 3))[0].todo).toBe('approve'); // with email off, approval is enough
 
-    await companySettingsRepository.set('mail_sending_enabled', '1', null);
+    await companySettingsRepository.set('email_testing_mode', '0', null);
     await createTestDocument(orderId, 'PI', 'approved');
     expect((await documentGenerationService.stageDocumentGate(orderId, 3))[0].todo).toBe('send');
     await createTestDocument(orderId, 'PI', 'sent');
@@ -70,7 +70,7 @@ describe('Stage document notice on the order page', () => {
     expect(html).toContain('Before you can confirm the buyer&#039;s PO received:');
     expect(html).toMatch(/<button type="submit" disabled title="See the note above[^"]*" class="btn-sm">Confirm Buyer PO Received<\/button>/);
 
-    await companySettingsRepository.set('mail_sending_enabled', '0', null);
+    await companySettingsRepository.set('email_testing_mode', '1', null);
     await createTestDocument(orderId, 'BUYERPO', 'approved');
     html = (await agent.get(`/orders/${orderId}`)).text;
     expect(html).not.toContain('Before you can confirm the buyer&#039;s PO received:');

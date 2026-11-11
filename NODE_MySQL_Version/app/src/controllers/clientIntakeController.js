@@ -117,8 +117,10 @@ async function submit(req, res) {
   // NEGOTIABLE" — export process step 0: a prospect filling in the
   // public Quotation-stage intake form must notify staff, not just sit
   // silently in the review queue behind a nav badge.
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${data.company_legal_name}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.managers('SALES')).length ? await staffRouting.managers('SALES') : await staffRouting.managingDirectors(), 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${data.company_legal_name}.`);
   }
   await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, null, null, null, `Submitted by ${data.company_legal_name} via the public quotation-details form.`);
 
@@ -166,8 +168,10 @@ async function verify(req, res) {
     return;
   }
   delete req.session[associateIntakeService.SESSION_KEY];
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${s.company_legal_name} (introduced by associate ${s.associate_name}).`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.managers('SALES')).length ? await staffRouting.managers('SALES') : await staffRouting.managingDirectors(), 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${s.company_legal_name} (introduced by associate ${s.associate_name}).`);
   }
   res.renderView('client_intake/thank_you', { correctionLink: null }, 'layout/bare');
 }
@@ -214,8 +218,10 @@ async function updateSubmission(req, res) {
   await clientIntakeRepository.updateFromClient(submission.id, data);
   // External QA report N-08: this action never reached the audit log or
   // anyone's notifications.
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'client_intake_updated', null, `Quotation-stage intake corrected by the client: ${data.company_legal_name}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.managers('SALES')).length ? await staffRouting.managers('SALES') : await staffRouting.managingDirectors(), 'client_intake_updated', null, `Quotation-stage intake corrected by the client: ${data.company_legal_name}.`);
   }
   await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMISSION_UPDATED_BY_CLIENT', 'client_intake_submissions', submission.id, null, null, null, 'Corrected by the client via the no-login edit link.');
   res.renderView('client_intake/thank_you', { correctionLink: null, updated: true }, 'layout/bare');
@@ -346,7 +352,7 @@ async function issueCorrectionLink(submissionId, email) {
       + 'This link works for 7 days.\n\n'
       + 'NexaCrest International Private Limited'
   );
-  await emailService.sendPlainText(email, rendered.subject, rendered.body);
+  await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'buyer_links', audience: 'buyer' });
 
   return link;
 }

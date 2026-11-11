@@ -31,10 +31,8 @@ async function run(today = null) {
     }
     if (threshold === null || await agreementRepository.alertAlreadySent(row.key, row.expires_on, threshold)) continue;
     const text = message(row, days);
-    for (const userId of recipients) {
-      await notificationRepository.create(userId, null, 'agreement_expiry', null, text);
-      created++;
-    }
+    // D-281: e-mailed to the responsible person and backup for agreements (Admin › E-mail settings).
+    created += (await notificationRepository.notifyRouted(recipients, await require('./staffRouting').companyItem('agreements'), 'agreement_expiry', null, text)).length;
     await agreementRepository.markAlertSent(row.key, row.expires_on, threshold);
   }
   return created;

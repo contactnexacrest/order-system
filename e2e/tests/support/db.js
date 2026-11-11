@@ -101,12 +101,16 @@ function provisionClientLogin(email, password) {
  * specs (05, 08) exercise sending — each switches it to what it needs in
  * its own setup and puts the previous value back afterwards.
  */
+// D-280: the old switch mail_sending_enabled became "Testing mode — hold e-mails to buyers
+// and suppliers" (email_testing_mode, the opposite value). These helpers keep the old
+// meaning for the specs: '1' = buyer e-mails go out (testing mode off).
 function getMailSending() {
-  return runSql("SELECT setting_value FROM company_settings WHERE setting_key = 'mail_sending_enabled'", 'reading mail_sending_enabled') || '0';
+  const testing = runSql("SELECT setting_value FROM company_settings WHERE setting_key = 'email_testing_mode'", 'reading email_testing_mode') || '0';
+  return testing === '1' ? '0' : '1';
 }
 
 function setMailSending(value) {
-  runSql(`UPDATE company_settings SET setting_value = '${value === '1' ? '1' : '0'}' WHERE setting_key = 'mail_sending_enabled'`, 'setting mail_sending_enabled');
+  runSql(`UPDATE company_settings SET setting_value = '${value === '1' ? '0' : '1'}' WHERE setting_key = 'email_testing_mode'`, 'setting email_testing_mode');
 }
 
 /** Whether the newest email_log row to this recipient went out with a document attached. */

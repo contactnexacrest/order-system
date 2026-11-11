@@ -316,8 +316,8 @@ final class ZohoBooksStage3Test extends DbTestCase
             $sent[] = compact('to', 'subject', 'body');
             return true;
         };
-        $mailBefore = (string) CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '1');
+        $mailBefore = (string) CompanySettingsRepository::get('email_testing_mode');
+        CompanySettingsRepository::set('email_testing_mode', '0');
         try {
             $finance = $this->createTestUser('Accounts Executive');
             $o = $this->createOrder();
@@ -342,7 +342,7 @@ final class ZohoBooksStage3Test extends DbTestCase
             self::assertSame([], $sent, 'no e-mail when the run has no failures');
         } finally {
             \App\Services\ZohoSyncFailureNotifier::$sender = null;
-            CompanySettingsRepository::set('mail_sending_enabled', $mailBefore);
+            CompanySettingsRepository::set('email_testing_mode', $mailBefore);
         }
     }
 
@@ -353,8 +353,8 @@ final class ZohoBooksStage3Test extends DbTestCase
             $sent[] = $to;
             return true;
         };
-        $mailBefore = (string) CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        $mailBefore = (string) CompanySettingsRepository::get('email_testing_mode');
+        \App\Services\EmailPolicy::setSwitchForTest('staff_zoho', 'staff', false); // D-280: this e-mail switched off in Admin › E-mail settings
         try {
             $finance = $this->createTestUser('Accounts Executive');
             $o = $this->createOrder();
@@ -368,7 +368,8 @@ final class ZohoBooksStage3Test extends DbTestCase
             self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE user_id = {$finance} AND type = 'zoho_sync_failed'")->fetchColumn());
         } finally {
             \App\Services\ZohoSyncFailureNotifier::$sender = null;
-            CompanySettingsRepository::set('mail_sending_enabled', $mailBefore);
+            CompanySettingsRepository::set('email_testing_mode', $mailBefore);
+            \App\Services\EmailPolicy::setSwitchForTest('staff_zoho', 'staff', true);
         }
     }
 

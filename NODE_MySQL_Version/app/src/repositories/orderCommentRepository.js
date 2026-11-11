@@ -46,7 +46,9 @@ function emailNote(comment) {
   if (!comment || comment.author_type !== 'staff') return '';
   if (Number(comment.email_sent) === 1) return 'e-mailed';
   switch (comment.email_status) {
-    case 'sending_off': return 'not e-mailed — e-mail sending is switched off in Admin';
+    case 'sending_off': return 'not e-mailed — e-mail sending is switched off in Admin'; // posts from before D-280
+    case 'testing_mode': return 'not e-mailed — testing mode holds e-mails to buyers and suppliers'; // D-280
+    case 'switched_off': return 'not e-mailed — this e-mail is switched off in Admin › E-mail settings'; // D-280
     case 'no_email': return 'not e-mailed — no client e-mail on file';
     case 'failed': return 'not e-mailed — the e-mail could not be sent';
     default: return 'not e-mailed';

@@ -143,6 +143,9 @@ async function establishSession(req, userId) {
   await regeneratePreserving(req, [CLIENT_PORTAL_SESSION_KEY], () => {
     req.session[SESSION_USER_ID] = userId;
     req.session[SESSION_VERSION_KEY] = user ? Number(user.session_version) : 0;
+    // D-283: the idle clock and the 12-hour limit start now.
+    req.session._last_activity_ts = Date.now();
+    req.session[require('./sessionTimeouts').STAFF_LOGIN_AT_KEY] = Date.now();
   });
   await userRepository.updateLastLogin(userId);
 }

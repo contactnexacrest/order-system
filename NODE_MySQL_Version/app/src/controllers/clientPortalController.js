@@ -210,7 +210,7 @@ async function forgotPassword(req, res) {
           + "If you didn't request this, you can ignore this email — your password will not be changed."
       );
 
-      await emailService.sendPlainText(email, rendered.subject, rendered.body, { isSecurityEmail: true });
+      await emailService.sendPlainText(email, rendered.subject, rendered.body, { isSecurityEmail: true, kind: 'forgot_password', audience: 'buyer' });
       await auditLogRepository.log(null, 'CLIENT_PASSWORD_RESET_REQUESTED', 'clients', login.client_id, null, null, null, `Requested from IP ${ip}`);
     }
   }
@@ -475,8 +475,10 @@ async function submitReorder(req, res) {
     );
   }
 
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'reorder_request_submitted', orderId, `Client submitted a reorder request based on order ${order.order_reference}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor('reorder_request_submitted'))).email, 'reorder_request_submitted', orderId, `Client submitted a reorder request based on order ${order.order_reference}.`);
   }
   await auditLogRepository.log(null, 'REORDER_REQUEST_SUBMITTED', 'orders', orderId, null, null, null, 'Reorder request submitted by the client via the client portal.');
 
@@ -705,8 +707,10 @@ async function raiseDispute(req, res) {
   // for disputes — manage_disputes holders — never got a targeted
   // in-app alert, same dual-channel pattern submitFeedback() above
   // already uses for manage_orders.
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_disputes')) {
-    await notificationRepository.create(staffUserId, null, 'dispute_raised', orderId, `Client raised a dispute on order ${order.order_reference}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_disputes'), (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor('dispute_raised'))).email, 'dispute_raised', orderId, `Client raised a dispute on order ${order.order_reference}.`);
   }
   await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
 
@@ -807,8 +811,10 @@ async function submitFeedback(req, res) {
   // NEGOTIABLE" — same dual-channel pattern as
   // orderCommentService.postAsClient(): an in-app notification per
   // manage_orders holder, plus the catch-all email via the audit log.
-  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(staffUserId, null, 'order_feedback_submitted', orderId, `Client submitted feedback (${rating}/5) on order ${order.order_reference}.`);
+  // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+  {
+    const staffRouting = require('../services/staffRouting');
+    await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'), (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor('order_feedback_submitted'))).email, 'order_feedback_submitted', orderId, `Client submitted feedback (${rating}/5) on order ${order.order_reference}.`);
   }
   await auditLogRepository.log(null, 'ORDER_FEEDBACK_SUBMITTED', 'orders', orderId, null, null, String(rating), 'Order feedback submitted by the client via the client portal.');
 

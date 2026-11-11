@@ -99,7 +99,10 @@ async function sendPlainText(toEmail, subject, body, opts = {}) {
   // Only security mail (2FA, password reset, one-time codes) keeps this path.
   // Required here, not at the top: mailSenderService requires this module.
   if (!opts.isSecurityEmail) {
-    return require('./mailSenderService').send(toEmail, subject, body);
+    // D-280: the e-mail's kind and audience (Admin › E-mail settings) travel with it.
+    return opts.kind
+      ? require('./mailSenderService').send(toEmail, subject, body, [], { kind: opts.kind, audience: opts.audience })
+      : require('./mailSenderService').send(toEmail, subject, body);
   }
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
@@ -145,7 +148,9 @@ async function sendWithAttachment(toEmail, subject, body, attachmentPath, attach
 async function sendWithAttachments(toEmail, subject, body, attachments, opts = {}) {
   // QA batch 3 MAIL-2: business mail goes through mailSenderService (see sendPlainText()).
   if (!opts.isSecurityEmail) {
-    return require('./mailSenderService').send(toEmail, subject, body, attachments);
+    return opts.kind
+      ? require('./mailSenderService').send(toEmail, subject, body, attachments, { kind: opts.kind, audience: opts.audience })
+      : require('./mailSenderService').send(toEmail, subject, body, attachments);
   }
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {

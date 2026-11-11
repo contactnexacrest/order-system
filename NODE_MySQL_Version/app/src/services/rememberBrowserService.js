@@ -86,8 +86,16 @@ async function isRemembered(req, user, cookie = null) {
 }
 
 /** Forgets every remembered browser of the user (password change or reset). */
+/** Forgets every remembered browser of the user (password change or reset; D-283: "Forget all remembered computers"). Returns how many. */
 async function forgetAll(userId) {
-  await db.execute('DELETE FROM login_remembered_browsers WHERE user_id = :u', { u: userId });
+  const r = await db.execute('DELETE FROM login_remembered_browsers WHERE user_id = :u', { u: userId });
+  return Number((r && r.affectedRows) || 0);
 }
 
-module.exports = { COOKIE, MAX_DAYS, days, remember, isRemembered, forgetAll, cookieFrom };
+/** D-283: how many computers are remembered for the user today (not expired). */
+async function countFor(userId) {
+  const row = await db.queryOne('SELECT COUNT(*) AS n FROM login_remembered_browsers WHERE user_id = :u AND expires_at > NOW()', { u: userId });
+  return Number((row && row.n) || 0);
+}
+
+module.exports = { COOKIE, MAX_DAYS, days, remember, isRemembered, forgetAll, countFor, cookieFrom };

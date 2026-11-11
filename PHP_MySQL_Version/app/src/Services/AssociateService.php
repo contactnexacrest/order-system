@@ -58,7 +58,7 @@ final class AssociateService
     }
 
     /** A notice in the associate's portal and, where useful, an e-mail. */
-    public static function notify(array $associate, string $event, string $message, ?int $clientId = null, ?int $orderId = null, ?int $invitationId = null, ?int $userId = null, bool $email = true): void
+    public static function notify(array $associate, string $event, string $message, ?int $clientId = null, ?int $orderId = null, ?int $invitationId = null, ?int $userId = null, bool $email = true): bool
     {
         // D-261: amounts (and the commission %) only where the associate's access level shows them.
         if (!empty($associate['id'])) {
@@ -66,9 +66,36 @@ final class AssociateService
         }
         AssociateEventRepository::add((int) $associate['id'], $event, $message, $clientId, $orderId, $invitationId, $userId, true);
         if ($email && !empty($associate['email'])) {
-            EmailService::sendPlainText((string) $associate['email'], 'NexaCrest associate portal — ' . self::subjectFor($event),
-                "Hello {$associate['name']},\n\n{$message}\n\nSee the details in your associate portal: " . rtrim((string) Env::get('APP_URL', ''), '/') . "/associate\n\nNexaCrest International Private Limited");
+            // D-280: each event's row in Admin › E-mail settings (bank details changed is a MUST alert).
+            $kind = EmailPolicy::kindForAssociateEvent($event);
+            $extra = $kind === 'bank_details_changed' && stripos($message, 'if you did not') === false
+                ? "\n\nIf this wasn't you, tell us at once: reply to this e-mail or call your NexaCrest relationship manager."
+                : '';
+            return EmailService::sendPlainText((string) $associate['email'], 'NexaCrest associate portal — ' . self::subjectFor($event),
+                "Hello {$associate['name']},\n\n{$message}{$extra}\n\nSee the details in your associate portal: " . rtrim((string) Env::get('APP_URL', ''), '/') . "/associate\n\nNexaCrest International Private Limited",
+                false, $kind, 'associate');
         }
+        return false;
+    }
+
+    /** D-282: the permanent associate login page (shown on the associate page and in the invite e-mail). */
+    public static function loginUrl(): string
+    {
+        return rtrim((string) Env::get('APP_URL', ''), '/') . '/associate/login';
+    }
+
+    /** D-280: whether the last invitePortal() e-mail really went out. */
+    public static bool $lastInviteSent = false;
+
+    /**
+     * D-280: the staff message after a set-password link was made — "e-mailed" only
+     * when it was; the link itself is shown under it with a Copy button.
+     */
+    public static function inviteOutcome(string $email): string
+    {
+        return self::$lastInviteSent
+            ? "The \"set your password\" e-mail was sent to {$email}. If they did not get it, copy this link and send it yourself (WhatsApp etc.) — valid 72 hours, works once."
+            : "The \"set your password\" e-mail could NOT be sent to {$email} — copy this link and send it yourself (WhatsApp etc.) — valid 72 hours, works once.";
     }
 
     private static function subjectFor(string $event): string
@@ -96,12 +123,22 @@ final class AssociateService
         }
         $raw = AssociatePortalService::issueToken($associateId, 'set_password', 72 * 60);
         $link = rtrim((string) Env::get('APP_URL', ''), '/') . '/associate/set-password/' . $raw;
-        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest associate portal',
-            "Hello {$a['name']},\n\nNexaCrest has opened your associate portal. There you can see the clients you introduced, their orders and stages, your commission and payments, and invite new clients.\n\n"
-            . "Set your password within 72 hours:\n{$link}\n\nYour login e-mail: {$a['email']}\n\nNexaCrest International Private Limited");
-        AuditLogRepository::log($userId, 'ASSOCIATE_PORTAL_INVITED', 'associates', $associateId, null, null, (string) $a['email']);
-        AssociateEventRepository::add($associateId, 'portal_invite', 'Portal login link sent to ' . $a['email'] . '.', null, null, null, $userId, false);
+        // D-280: a set-password invite is a MUST e-mail (access-critical) — never held.
+        // D-282: it also gives the permanent login page, for every later visit.
+        self::$lastInviteSent = EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest associate portal',
+            self::inviteBody($a, $link), false, 'set_password_invite', 'associate');
+        AuditLogRepository::log($userId, 'ASSOCIATE_PORTAL_INVITED', 'associates', $associateId, null, null, (string) $a['email'],
+            self::$lastInviteSent ? 'Set-password link e-mailed' : 'Set-password link NOT e-mailed — shown to staff to send');
+        AssociateEventRepository::add($associateId, 'portal_invite', (self::$lastInviteSent ? 'Set-password link e-mailed to ' : 'Set-password link made for ') . $a['email'] . '.', null, null, null, $userId, false);
         return $link;
+    }
+
+    /** D-282: the invite e-mail text (set-password link, valid 72 hours, once; and the permanent login page). */
+    public static function inviteBody(array $a, string $link): string
+    {
+        return "Hello {$a['name']},\n\nNexaCrest has opened your associate portal. There you can see the clients you introduced, their orders and stages, your commission and payments, and invite new clients.\n\n"
+            . "Set your password within 72 hours (the link works once):\n{$link}\n\nYour login e-mail: {$a['email']}\n\n"
+            . "After that, log in any time at:\n" . self::loginUrl() . "\n(Forgot your password later? Use \"Forgot password?\" on that page.)\n\nNexaCrest International Private Limited";
     }
 
     /**

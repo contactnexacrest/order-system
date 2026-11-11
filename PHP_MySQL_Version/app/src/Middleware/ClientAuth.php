@@ -33,14 +33,17 @@ final class ClientAuth
             // kiosk) stayed logged in to a buyer's own order/document
             // history forever. Reuses the same DB-driven setting
             // SessionAuth enforces for staff.
-            $timeoutMinutes = (int) (CompanySettingsRepository::get('session_timeout_minutes') ?? '30');
+            // D-283: the buyers' own idle timeout (Admin › Settings › Security, default 2 hours).
             $lastActivity = $_SESSION[self::LAST_ACTIVITY_KEY] ?? null;
-            if ($lastActivity !== null && (time() - $lastActivity) > ($timeoutMinutes * 60)) {
+            if (\App\Services\SessionTimeouts::idleExpired('client', $lastActivity !== null ? (int) $lastActivity : null)) {
                 ClientPortalService::logout();
+                unset($_SESSION[self::LAST_ACTIVITY_KEY]);
+                \App\Helpers\Flash::set('info', 'You were signed out after ' . \App\Services\SessionTimeouts::describeMinutes(\App\Services\SessionTimeouts::idleMinutes('client')) . ' without activity. Please log in again.');
                 header('Location: /client/login');
                 return false;
             }
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
+            \App\Services\SessionTimeouts::markPage('client');
 
             // docs/schema.sql Section AV: a staff-impersonated session has
             // no client_logins row to check at all — it's a separate
@@ -65,7 +68,7 @@ final class ClientAuth
                 // acknowledge, upload, report payments, raise disputes or reorder as the buyer.
                 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-                    if (!in_array($postPath, ['/client/end-impersonation', '/client/logout'], true)) {
+                    if (!in_array($postPath, ['/client/end-impersonation', '/client/logout', '/client/keep-alive'], true)) {
                         \App\Helpers\Flash::set('error', 'You are logged in as this client to look only: nothing can be saved for the buyer. Use "End impersonation" first.');
                         header('Location: ' . \App\Helpers\Router::safeRedirectBack());
                         return false;

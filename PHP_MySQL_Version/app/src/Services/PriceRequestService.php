@@ -308,7 +308,7 @@ final class PriceRequestService
             $id = self::insert($row);
             $number = self::find($id)['number'];
             foreach (PermissionRepository::usersWithPermission('manage_pricing') as $userId) {
-                NotificationRepository::createInAppOnly($userId, 'price_request', null,
+                NotificationRepository::create($userId, null, 'price_request', null, // D-280: one e-mail per approval
                     "Price request {$number} from {$associate['name']} needs a manual price: {$product['name']} — {$row['selection_text']}.");
             }
             AuditLogRepository::log(null, 'PRICE_REQUEST_MANUAL', 'price_requests', $id, null, null, "{$number}: {$product['name']} — {$row['selection_text']}");

@@ -110,7 +110,7 @@ describe('Session expiry / deactivation guards (QA-5 AUTH-10 / CP-06 / CP-12)', 
   });
 
   it('enforces the same idle timeout on the client portal as staff', async () => {
-    await companySettingsRepository.set('session_timeout_minutes', '5');
+    await companySettingsRepository.set('session_timeout_client_minutes', '5');
 
     const clientId = await createTestClient();
     await provisionClientLogin(clientId);

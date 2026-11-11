@@ -30,8 +30,8 @@ describe('Self-approval rules (D-221)', () => {
   let saved;
 
   beforeEach(async () => {
-    mail = await companySettingsRepository.get('mail_sending_enabled');
-    await companySettingsRepository.set('mail_sending_enabled', '1', null);
+    mail = await companySettingsRepository.get('email_testing_mode');
+    await companySettingsRepository.set('email_testing_mode', '0', null);
     saved = {};
     for (const rule of Object.keys(selfApprovalRules.RULES)) saved[rule] = await selfApprovalRules.roleIds(rule);
     await db.execute("UPDATE document_types SET min_reviewers_default = 1 WHERE code = 'QT'");
@@ -39,7 +39,7 @@ describe('Self-approval rules (D-221)', () => {
 
   afterEach(async () => {
     for (const [rule, ids] of Object.entries(saved)) await selfApprovalRules.set(rule, ids);
-    await companySettingsRepository.set('mail_sending_enabled', mail, null);
+    await companySettingsRepository.set('email_testing_mode', mail, null);
   });
 
   afterAll(async () => {

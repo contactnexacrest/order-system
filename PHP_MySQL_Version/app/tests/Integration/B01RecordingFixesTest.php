@@ -37,13 +37,13 @@ final class B01RecordingFixesTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mailSetting = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->mailSetting = CompanySettingsRepository::get('email_testing_mode');
         OrderAccessService::resetCache();
     }
 
     protected function tearDown(): void
     {
-        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'")
+        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'")
             ->execute(['v' => $this->mailSetting]);
         $_SESSION = [];
         $_GET = [];
@@ -69,7 +69,7 @@ final class B01RecordingFixesTest extends DbTestCase
 
     private function setMailSending(string $value): void
     {
-        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'mail_sending_enabled'")
+        Database::connection()->prepare("UPDATE company_settings SET setting_value = :v WHERE setting_key = 'email_testing_mode'")
             ->execute(['v' => $value]);
     }
 
@@ -127,19 +127,19 @@ final class B01RecordingFixesTest extends DbTestCase
 
     public function testSendingSwitchedOffIsGivenAsTheReasonNotAMissingEmail(): void
     {
-        $this->setMailSending('0');
+        $this->setMailSending('1') /* D-280: testing mode on */;
         [$orderId, $staff] = $this->orderFor('b01-' . bin2hex(random_bytes(4)) . '@buyer.test');
         $id = OrderCommentService::postAsStaff($orderId, $staff, 'Your goods are packed.', []);
         $row = Database::connection()->query("SELECT email_sent, email_status FROM order_comments WHERE id = {$id}")->fetch();
         self::assertSame(0, (int) $row['email_sent']);
-        self::assertSame('sending_off', $row['email_status']);
-        self::assertSame('not e-mailed — e-mail sending is switched off in Admin', $this->noteFor($id, $orderId));
+        self::assertSame('testing_mode', $row['email_status']);
+        self::assertSame('not e-mailed — testing mode holds e-mails to buyers and suppliers', $this->noteFor($id, $orderId));
 
     }
 
     public function testNoClientEmailOnFileIsGivenAsTheReason(): void
     {
-        $this->setMailSending('1');
+        $this->setMailSending('0') /* testing mode off */;
         [$orderId, $staff] = $this->orderFor(null);
         $id = OrderCommentService::postAsStaff($orderId, $staff, 'Your goods are packed.', []);
         self::assertSame('no_email', Database::connection()->query("SELECT email_status FROM order_comments WHERE id = {$id}")->fetchColumn());

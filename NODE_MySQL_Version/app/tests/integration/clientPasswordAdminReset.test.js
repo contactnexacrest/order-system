@@ -156,7 +156,7 @@ describe('Client portal password admin-reset', () => {
       const res = await staffAgent.get(`/clients/${clientId}`);
 
       expect(res.status).toBe(200);
-      expect(res.text).toContain('Reset client-portal password');
+      expect(res.text).toContain('Reset with a temporary password');
       expect(res.text).toContain(`action="/clients/${clientId}/reset-password"`);
     });
 

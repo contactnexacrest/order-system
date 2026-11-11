@@ -91,8 +91,19 @@ date_default_timezone_set('Asia/Kolkata');
 
 if (session_status() === PHP_SESSION_NONE) {
     $secure = !Env::isLocal(); // HTTPS cookie flag off only for local http:// testing
+    // Owner decision D-283 (11 Nov 2026): PHP's own session life (garbage
+    // collection, often 24 minutes on a host) and the cookie follow the
+    // longest idle timeout set in Admin; session files live in the app's own
+    // storage folder. Each area's own idle limit is then checked by its
+    // middleware (SessionAuth / ClientAuth / AssociateAuth).
+    try {
+        $sessionLifetime = \App\Services\SessionTimeouts::configurePhpSession();
+    } catch (\Throwable $e) {
+        $sessionLifetime = 4 * 3600;
+        ini_set('session.gc_maxlifetime', (string) ($sessionLifetime + 300));
+    }
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => $sessionLifetime,
         'path'     => '/',
         'domain'   => '',
         'secure'   => $secure,
@@ -101,4 +112,5 @@ if (session_status() === PHP_SESSION_NONE) {
     ]);
     session_name('nexacrest_session');
     session_start();
+    \App\Services\SessionTimeouts::refreshCookie($sessionLifetime, $secure); // rolling: an active person keeps the cookie
 }

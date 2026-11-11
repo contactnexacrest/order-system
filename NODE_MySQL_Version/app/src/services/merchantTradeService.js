@@ -650,10 +650,8 @@ async function runAlerts(today = null) {
       if (!['warn', 'breach'].includes(c.level) || !(await repo.markAlertSent(Number(d.id), c.key, c.level))) continue;
       if (recipients === null) recipients = await repo.alertRecipients(Number(d.division_id));
       const message = [...`Merchant trade ${d.reference} (${d.buyer_name}): ${c.label} — ${c.text}`].slice(0, 500).join('');
-      for (const userId of recipients) {
-        await notificationRepository.create(userId, null, 'merchant_trade_rbi', null, message);
-        created++;
-      }
+      // D-281: e-mailed to the responsible person and backup for merchant-trade RBI limits.
+      created += (await notificationRepository.notifyRouted(recipients, await require('./staffRouting').companyItem('merchant_trade_rbi'), 'merchant_trade_rbi', null, message)).length;
     }
   }
   return created;

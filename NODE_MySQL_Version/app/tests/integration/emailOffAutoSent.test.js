@@ -68,7 +68,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   beforeAll(async () => {
-    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
+    originalMailSendingEnabled = await companySettingsRepository.get('email_testing_mode');
     agent = request.agent(app);
     const loginPage = await agent.get('/login');
     const csrf = loginPage.text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
@@ -77,7 +77,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   afterAll(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
+    await companySettingsRepository.set('email_testing_mode', originalMailSendingEnabled);
     await db.pool.end();
   });
 
@@ -86,7 +86,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   it('marks an approved Quotation sent when email is off, with an audit entry', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await createTestOrder(await createTestClient());
     const documentId = await createTestDocument(orderId, 'QT', 'draft');
 
@@ -101,7 +101,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   it('leaves an approved Quotation approved when email is on', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const orderId = await createTestOrder(await createTestClient());
     const documentId = await createTestDocument(orderId, 'QT', 'draft');
 
@@ -111,7 +111,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   it('never marks an internal never-shown-to-buyer document sent', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await createTestOrder(await createTestClient());
     const documentId = await createTestDocument(orderId, 'SUPPO', 'approved');
 
@@ -121,7 +121,7 @@ describe('Email sending off: approved documents count as sent', () => {
   });
 
   it('does not start the OC acknowledgment clock yet when an Order Confirmation is marked sent on approval', async () => {
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const orderId = await createTestOrder(await createTestClient());
     const documentId = await createTestDocument(orderId, 'OC', 'approved');
 
@@ -150,13 +150,13 @@ describe('Email sending off: approved documents count as sent', () => {
     const orderId = await createTestOrder(await createTestClient());
     await createTestDocument(orderId, 'QT', 'approved');
 
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    await companySettingsRepository.set('email_testing_mode', '0');
     const mailOn = await agent.get(`/orders/${orderId}`);
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    await companySettingsRepository.set('email_testing_mode', '1');
     const mailOff = await agent.get(`/orders/${orderId}`);
 
     expect(mailOn.text).toContain('Send to Buyer (deferred');
     expect(mailOff.text).not.toContain('Send to Buyer (deferred');
-    expect(mailOff.text).toContain('Email sending is turned off');
+    expect(mailOff.text).toContain('Document e-mails to the buyer are held');
   });
 });

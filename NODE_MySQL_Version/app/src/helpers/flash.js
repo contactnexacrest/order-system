@@ -2,9 +2,16 @@
 
 // Port of App\Helpers\Flash — one-shot session-backed messages.
 
-function set(req, type, message) {
+/**
+ * D-280: copyLink — a link (set-password, PI form, payment details …) shown under
+ * the message in a box with a Copy button, so staff can send it themselves when
+ * the e-mail was not sent (and always for invites).
+ */
+function set(req, type, message, copyLink = null) {
   if (!req.session._flash) req.session._flash = [];
-  req.session._flash.push({ type, message });
+  const entry = { type, message };
+  if (copyLink) entry.copy_link = copyLink;
+  req.session._flash.push(entry);
 }
 
 /** @returns {Array<{type:string,message:string}>} and clears the queue, same contract as the PHP pull(). */

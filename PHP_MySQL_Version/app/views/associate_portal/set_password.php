@@ -2,7 +2,7 @@
 <div class="card card-narrow">
   <h1>Set your password</h1>
   <?php if (!$valid): ?>
-    <p>This link has expired or was already used. Ask your NexaCrest relationship manager for a new one.</p>
+    <p>This link has expired or was already used. <a href="/associate/forgot-password">Get a new link</a>, or ask your NexaCrest relationship manager for one.</p>
   <?php else: ?>
     <p class="muted small">Your login e-mail: <b><?= htmlspecialchars((string) $email) ?></b></p>
     <form method="post" action="/associate/set-password/<?= htmlspecialchars($token) ?>">

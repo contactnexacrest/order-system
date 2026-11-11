@@ -17,7 +17,7 @@ use App\Tests\Support\DbTestCase;
  */
 final class SettingsValueValidationTest extends DbTestCase
 {
-    private const SETTING_KEY = 'session_timeout_minutes'; // value_type = 'number'
+    private const SETTING_KEY = 'session_timeout_staff_minutes'; // value_type = 'number'
     private string $originalValue;
     private int $userId;
 

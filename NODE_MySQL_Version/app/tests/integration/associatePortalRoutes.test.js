@@ -132,7 +132,7 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     expect([ok.type, ok.message]).toEqual(['success', 'Password set. Log in with your e-mail and the new password.']);
     expect(await bcrypt.compare('Route1234567', (await associateRepository.find(a.id)).password_hash.replace(/^\$2y\$/, '$2b$'))).toBe(true);
     expect((await post(agent, '/associate/login', pagePath, { new_password: 'Other1234567', confirm_password: 'Other1234567' })).message)
-      .toBe('This link has expired or was already used. Ask NexaCrest for a new one.'); // the link works once
+      .toBe('This link has expired or was already used. Use "Forgot password?" on the login page to get a new one.'); // the link works once
   });
 
   // ---------------------------------------------------------------- clients, code, invitations
@@ -279,8 +279,8 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
   // ---------------------------------------------------------------- staff: OC sent to buyer, inspection result
 
   it('POST /orders/:id/oc-sent-to-buyer', async () => {
-    const original = await companySettingsRepository.get('mail_sending_enabled');
-    await companySettingsRepository.set('mail_sending_enabled', '0');
+    const original = await companySettingsRepository.get('email_testing_mode');
+    await companySettingsRepository.set('email_testing_mode', '1');
     try {
       const orderId = await createTestOrder(await createTestClient());
       const agent = await staff();
@@ -300,7 +300,7 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
       expect(await count("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'OC_MARKED_SENT_TO_BUYER' AND entity_id = :id", { id: orderId })).toBe(1);
       expect((await post(agent, page, `/orders/${orderId}/oc-sent-to-buyer`)).message).toBe('This Order Confirmation is already marked as sent to the buyer.');
     } finally {
-      await companySettingsRepository.set('mail_sending_enabled', original);
+      await companySettingsRepository.set('email_testing_mode', original);
     }
   });
 

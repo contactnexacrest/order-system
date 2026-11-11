@@ -263,6 +263,21 @@ $router->post('/force-password-change', [$auth, 'forcePasswordChange'], [Session
 
 $router->get('/', [$dashboard, 'index'], [SessionAuth::required()]);
 
+// Owner decisions D-280 / D-281 (11 Nov 2026): Admin › E-mail settings.
+$emailSettings = new \App\Controllers\EmailSettingsController();
+$router->get('/admin/email-settings', [$emailSettings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/admin/email-settings', [$emailSettings, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// D-283: "Stay logged in" (the 2-minute warning in app.js) — one per signed-in area.
+$sessionKeepAlive = new \App\Controllers\SessionController();
+$router->post('/keep-alive', [$sessionKeepAlive, 'staffKeepAlive'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/client/keep-alive', [$sessionKeepAlive, 'clientKeepAlive'], [ClientAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/keep-alive', [$sessionKeepAlive, 'associateKeepAlive'], [AssociateAuth::required(), CsrfCheck::verify()]);
+// D-282: staff send a client a new set-password link (Client portal login block).
+$router->post('/clients/{id}/portal/send-link', [$clients, 'sendPortalLink'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// D-283: forget every computer remembered for the login code — one user (Admin) or yourself.
+$router->post('/users/{id}/forget-computers', [$users, 'forgetComputers'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/account/forget-computers', [$account, 'forgetComputers'], [SessionAuth::required(), CsrfCheck::verify()]);
+
 $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-zoho-email', [$settings, 'testZohoEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
@@ -1049,6 +1064,8 @@ $router->get('/associate/login', [$associatePortal, 'showLogin']);
 $router->post('/associate/login', [$associatePortal, 'login'], [CsrfCheck::verify()]);
 $router->get('/associate/login/code', [$associatePortal, 'showCode']);
 $router->post('/associate/login/code', [$associatePortal, 'verifyCode'], [CsrfCheck::verify()]);
+$router->get('/associate/forgot-password', [$associatePortal, 'showForgotPassword']);                 // D-282
+$router->post('/associate/forgot-password', [$associatePortal, 'forgotPassword'], [CsrfCheck::verify()]); // D-282
 $router->get('/associate/set-password/{token}', [$associatePortal, 'showSetPassword']);
 $router->post('/associate/set-password/{token}', [$associatePortal, 'setPassword'], [CsrfCheck::verify()]);
 $router->get('/associate/logout', [$associatePortal, 'logout']);

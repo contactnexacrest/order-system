@@ -133,7 +133,7 @@ final class ClientPasswordAdminResetTest extends DbTestCase
         (new ClientController())->show(['id' => (string) $clientId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Reset client-portal password', $output);
+        self::assertStringContainsString('Reset with a temporary password', $output);
         self::assertStringContainsString('action="/clients/' . $clientId . '/reset-password"', $output);
     }
 

@@ -22,13 +22,13 @@ final class StageDocumentGateNoticeTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mailBefore = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->mailBefore = CompanySettingsRepository::get('email_testing_mode');
         $_SESSION = ['_auth_user_id' => $this->createTestUser('Admin')];
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', (string) ($this->mailBefore ?? '0'), null);
+        CompanySettingsRepository::set('email_testing_mode', (string) ($this->mailBefore ?? '0'), null);
         $_SESSION = [];
         parent::tearDown();
     }
@@ -36,15 +36,15 @@ final class StageDocumentGateNoticeTest extends DbTestCase
     public function testTheGateSaysWhatEachDocumentStillNeeds(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         self::assertSame([['name' => 'Proforma Invoice', 'todo' => 'generate', 'buyer_facing' => true]], DocumentGenerationService::stageDocumentGate($orderId, 3));
 
         $this->createTestDocument($orderId, 'PI', 'in_review');
         self::assertSame('approve_send', DocumentGenerationService::stageDocumentGate($orderId, 3)[0]['todo']);
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         self::assertSame('approve', DocumentGenerationService::stageDocumentGate($orderId, 3)[0]['todo'], 'with email off, approval is enough');
 
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         $this->createTestDocument($orderId, 'PI', 'approved');
         self::assertSame('send', DocumentGenerationService::stageDocumentGate($orderId, 3)[0]['todo']);
         $this->createTestDocument($orderId, 'PI', 'sent');
@@ -75,7 +75,7 @@ final class StageDocumentGateNoticeTest extends DbTestCase
         self::assertStringContainsString('Before you can confirm the buyer&#039;s PO received:', $html);
         self::assertMatchesRegularExpression('#<button type="submit" disabled title="See the note above[^"]*" class="btn-sm">Confirm Buyer PO Received</button>#', $html);
 
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $this->createTestDocument($orderId, 'BUYERPO', 'approved');
         $html = $render($orderId);
         self::assertStringNotContainsString('Before you can confirm the buyer&#039;s PO received:', $html);

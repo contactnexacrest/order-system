@@ -97,12 +97,12 @@ final class QaMailMatrixTest extends DbTestCase
     private function runMatrix(): void
     {
         $pdo = Database::connection();
-        $before = $pdo->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('mail_sending_enabled','mail_approval_queue_enabled')")->fetchAll(\PDO::FETCH_KEY_PAIR);
+        $before = $pdo->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('email_testing_mode','mail_approval_queue_enabled')")->fetchAll(\PDO::FETCH_KEY_PAIR);
         $userId = $this->createTestUser('Admin');
         $approverId = $this->createTestUser('Managing Director');
         $problems = [];
         try {
-            $this->setting('mail_sending_enabled', '0');
+            $this->setting('email_testing_mode', '1');
             $this->setting('mail_approval_queue_enabled', '1');
             foreach ([['CIF', 'Standard — New Buyer'], ['FOB', 'Irrevocable Letter of Credit at Sight']] as [$incoterm, $preset]) {
                 $orderId = $this->order($incoterm, $preset);

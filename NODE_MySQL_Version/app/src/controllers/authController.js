@@ -200,7 +200,7 @@ async function forgotPassword(req, res) {
           + "If you didn't request this, you can ignore this email — your password will not be changed."
       );
 
-      await emailService.sendPlainText(email, rendered.subject, rendered.body, { isSecurityEmail: true });
+      await emailService.sendPlainText(email, rendered.subject, rendered.body, { isSecurityEmail: true, kind: 'forgot_password', audience: 'staff' });
       await auditLogRepository.log(user.id, 'PASSWORD_RESET_REQUESTED', 'users', user.id, null, null, null, `Requested from IP ${ip}`);
     }
   }

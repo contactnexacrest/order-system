@@ -8,6 +8,7 @@ use App\Repositories\AuditLogRepository;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
+use App\Services\SessionTimeouts;
 
 final class SessionAuth
 {
@@ -29,14 +30,27 @@ final class SessionAuth
                 return false;
             }
 
-            $timeoutMinutes = (int) (CompanySettingsRepository::get('session_timeout_minutes') ?? '30');
+            // Owner decision D-283 (11 Nov 2026): the staff idle timeout
+            // (Admin › Settings › Security, default 4 hours) and the 12-hour
+            // limit since sign-in, however active.
             $lastActivity = $_SESSION[self::LAST_ACTIVITY_KEY] ?? null;
-            if ($lastActivity !== null && (time() - $lastActivity) > ($timeoutMinutes * 60)) {
+            if (SessionTimeouts::idleExpired('staff', $lastActivity !== null ? (int) $lastActivity : null)) {
                 AuthService::logout();
+                \App\Helpers\Flash::set('info', 'You were signed out after ' . SessionTimeouts::describeMinutes(SessionTimeouts::idleMinutes('staff')) . ' without activity. Please log in again.');
+                header('Location: /login');
+                return false;
+            }
+            $_SESSION[SessionTimeouts::STAFF_LOGIN_AT_KEY] ??= time(); // a session from before D-283 starts its 12 hours now
+            $loginAt = (int) $_SESSION[SessionTimeouts::STAFF_LOGIN_AT_KEY];
+            if (SessionTimeouts::absoluteExpired($loginAt)) {
+                AuthService::logout();
+                unset($_SESSION[SessionTimeouts::STAFF_LOGIN_AT_KEY]);
+                \App\Helpers\Flash::set('info', 'For security, staff log in again at least every ' . SessionTimeouts::absoluteHours() . ' hours. Please log in again.');
                 header('Location: /login');
                 return false;
             }
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
+            SessionTimeouts::markPage('staff', SessionTimeouts::staffAbsoluteLeft($loginAt));
 
             $user = AuthService::currentUser();
 
@@ -115,7 +129,7 @@ final class SessionAuth
             // previewed designation's rights — only "Exit preview" and log out post.
             if (\App\Services\ActiveDepartmentService::preview() !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-                if (!in_array($postPath, ['/preview/exit', '/logout'], true)) {
+                if (!in_array($postPath, ['/preview/exit', '/logout', '/keep-alive'], true)) {
                     \App\Helpers\Flash::set('error', 'You are previewing the app: nothing can be saved during a preview. Use "Exit preview" at the top first.');
                     header('Location: ' . \App\Helpers\Router::safeRedirectBack());
                     return false;
@@ -128,7 +142,7 @@ final class SessionAuth
                 && !\App\Services\DivisionService::seesAll($user)) {
                 $ownDivision = \App\Services\DivisionService::find((int) $user['division_id']);
                 $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-                if ($ownDivision !== null && $ownDivision['status'] !== 'active' && !in_array($postPath, ['/logout', '/preview/exit', '/account/password'], true)) {
+                if ($ownDivision !== null && $ownDivision['status'] !== 'active' && !in_array($postPath, ['/logout', '/preview/exit', '/account/password', '/keep-alive'], true)) {
                     http_response_code(403);
                     echo 'Your division (' . htmlspecialchars((string) $ownDivision['name'], ENT_QUOTES, 'UTF-8') . ') is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.';
                     return false;

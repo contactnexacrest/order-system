@@ -203,7 +203,7 @@ final class ClientPortalController
                         . "If you didn't request this, you can ignore this email — your password will not be changed."
                 );
 
-                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true);
+                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true, 'forgot_password', 'buyer');
                 AuditLogRepository::log(null, 'CLIENT_PASSWORD_RESET_REQUESTED', 'clients', (int) $login['client_id'], null, null, null, "Requested from IP {$ip}");
             }
         }
@@ -478,9 +478,8 @@ final class ClientPortalController
             );
         }
 
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'reorder_request_submitted', $orderId, "Client submitted a reorder request based on order {$order['order_reference']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('reorder_request_submitted'))['email'], 'reorder_request_submitted', $orderId, "Client submitted a reorder request based on order {$order['order_reference']}.");
         AuditLogRepository::log(null, 'REORDER_REQUEST_SUBMITTED', 'orders', $orderId, null, null, null, 'Reorder request submitted by the client via the client portal.');
 
         Flash::set('success', 'Reorder request submitted — our team will review it and confirm the new order with you shortly.');
@@ -654,9 +653,8 @@ final class ClientPortalController
         // responsible for disputes — manage_disputes holders — never got
         // a targeted in-app alert, same dual-channel pattern
         // submitFeedback() above already uses for manage_orders.
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_disputes') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'dispute_raised', $orderId, "Client raised a dispute on order {$order['order_reference']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_disputes'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('dispute_raised'))['email'], 'dispute_raised', $orderId, "Client raised a dispute on order {$order['order_reference']}.");
         \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
 
         Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');
@@ -763,9 +761,8 @@ final class ClientPortalController
         // NON NEGOTIABLE" — same dual-channel pattern as
         // OrderCommentService::postAsClient(): an in-app notification per
         // manage_orders holder, plus the catch-all email via the audit log.
-        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
-            \App\Repositories\NotificationRepository::create($staffUserId, null, 'order_feedback_submitted', $orderId, "Client submitted feedback ({$rating}/5) on order {$order['order_reference']}.");
-        }
+        // D-281: in-app as before; e-mailed only to the department on the order (no order: its manager).
+        \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_orders'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('order_feedback_submitted'))['email'], 'order_feedback_submitted', $orderId, "Client submitted feedback ({$rating}/5) on order {$order['order_reference']}.");
         AuditLogRepository::log(null, 'ORDER_FEEDBACK_SUBMITTED', 'orders', $orderId, null, null, (string) $rating, 'Order feedback submitted by the client via the client portal.');
 
         Flash::set('success', 'Thank you — your feedback has been recorded.');

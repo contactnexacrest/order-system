@@ -37,7 +37,13 @@ final class NotificationRepository
         return (int) $pdo->lastInsertId();
     }
 
-    public static function create(?int $userId, ?int $roleId, string $type, ?int $relatedOrderId, string $message): int
+    /**
+     * D-280: $email false = in-app only for this person (routing decided elsewhere,
+     * e.g. notifyOrderTeam()). The e-mail itself also follows Admin › E-mail
+     * settings (the type's kind, see EmailPolicy::NOTIFICATION_KINDS) and the
+     * person's own "e-mail me my notifications" switch (not for MUST alerts).
+     */
+    public static function create(?int $userId, ?int $roleId, string $type, ?int $relatedOrderId, string $message, bool $email = true): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
@@ -53,20 +59,26 @@ final class NotificationRepository
         ]);
         $id = (int) $pdo->lastInsertId();
 
-        if ($userId !== null) {
-            self::emailNotification($userId, $message);
+        if ($userId !== null && $email) {
+            self::emailNotification($userId, $message, $type);
         }
 
         return $id;
     }
 
     /**
-     * Something the client did on an order that staff now need to act on
-     * (acknowledged the OC, uploaded their PO, reported a payment):
-     * notifies that order's own assignees — or, on an order nobody is
-     * assigned to yet, everyone who manages orders, so it is never missed.
+     * Something the buyer / supplier did on an order that staff now need to act on
+     * (acknowledged the OC, uploaded their PO, reported a payment).
      *
-     * @return int[] the user ids notified
+     * In-app: the order's assignees — or, on an order nobody is assigned to yet,
+     * everyone who manages orders — so it is never missed (as before).
+     * E-mail (owner decision D-281, 11 Nov 2026): only the people of the event's
+     * department on that order (StaffRouting::forOrder) — its department owner
+     * and the department's assignees; with none, the department's manager with an
+     * "assign someone" note; with no manager, the MD. The MD, ED and Order
+     * Coordinator get the in-app notice only.
+     *
+     * @return int[] the user ids notified in-app
      */
     public static function notifyOrderTeam(int $orderId, string $type, string $message): array
     {
@@ -74,11 +86,34 @@ final class NotificationRepository
         if ($userIds === []) {
             $userIds = PermissionRepository::usersWithPermission('manage_orders');
         }
-        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+        $route = \App\Services\StaffRouting::forOrder($orderId, \App\Services\StaffRouting::departmentFor($type));
+        $emailIds = $route['email'];
+        $userIds = array_values(array_unique(array_map('intval', array_merge($userIds, $emailIds))));
         foreach ($userIds as $userId) {
-            self::create($userId, null, $type, $orderId, $message);
+            $isRouted = in_array($userId, $emailIds, true);
+            $text = $isRouted && $route['note'] !== null ? $message . ' ' . $route['note'] : $message;
+            self::create($userId, null, $type, $orderId, $text, $isRouted);
         }
         return $userIds;
+    }
+
+    /**
+     * D-281: an alert whose in-app list and e-mail list differ (check_alerts,
+     * compliance reminders): everyone in $inAppIds gets the notice, only
+     * $emailIds (a subset or extra people) also get the e-mail.
+     *
+     * @param list<int> $inAppIds
+     * @param list<int> $emailIds
+     * @return list<int> everyone notified
+     */
+    public static function notifyRouted(array $inAppIds, array $emailIds, string $type, ?int $relatedOrderId, string $message): array
+    {
+        $emailIds = array_values(array_unique(array_map('intval', $emailIds)));
+        $all = array_values(array_unique(array_map('intval', array_merge($inAppIds, $emailIds))));
+        foreach ($all as $userId) {
+            self::create($userId, null, $type, $relatedOrderId, $message, in_array($userId, $emailIds, true));
+        }
+        return $all;
     }
 
     /**
@@ -86,14 +121,21 @@ final class NotificationRepository
      *   when the user doesn't exist, has no email, or has opted out.
      *   Exposed (and non-void) purely for testability.
      */
-    public static function emailNotification(int $userId, string $message): ?string
+    public static function emailNotification(int $userId, string $message, string $type = ''): ?string
     {
+        // D-280: the type's row in Admin › E-mail settings (MUST alerts always go;
+        // the person's own opt-out applies only to the others).
+        $kind = \App\Services\EmailPolicy::kindForNotification($type);
+        if (!\App\Services\EmailPolicy::allows($kind, 'staff')) {
+            return null;
+        }
         $user = UserRepository::findById($userId);
-        if (!$user || (int) ($user['email_action_notifications_enabled'] ?? 1) !== 1 || empty($user['email'])) {
+        $optedOut = (int) ($user['email_action_notifications_enabled'] ?? 1) !== 1 && !\App\Services\EmailPolicy::isMust($kind, 'staff');
+        if (!$user || $optedOut || empty($user['email']) || (int) ($user['is_active'] ?? 1) !== 1) {
             return null;
         }
         try {
-            \App\Services\EmailService::sendPlainText($user['email'], self::emailSubject($message), $message);
+            \App\Services\EmailService::sendPlainText($user['email'], self::emailSubject($message), $message, false, $kind, 'staff');
         } catch (\Throwable $e) {
             // Never let a notification-email failure break the action it's reporting on.
         }

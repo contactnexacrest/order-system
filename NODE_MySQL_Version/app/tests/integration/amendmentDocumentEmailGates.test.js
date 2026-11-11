@@ -37,12 +37,12 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
   // instead; that path is covered by emailOffAutoSent.test.js.
   let originalMailSendingEnabled;
   beforeAll(async () => {
-    originalMailSendingEnabled = await companySettingsRepository.get('mail_sending_enabled');
-    await companySettingsRepository.set('mail_sending_enabled', '1');
+    originalMailSendingEnabled = await companySettingsRepository.get('email_testing_mode');
+    await companySettingsRepository.set('email_testing_mode', '0');
   });
 
   afterAll(async () => {
-    await companySettingsRepository.set('mail_sending_enabled', originalMailSendingEnabled);
+    await companySettingsRepository.set('email_testing_mode', originalMailSendingEnabled);
     await db.pool.end();
   });
 

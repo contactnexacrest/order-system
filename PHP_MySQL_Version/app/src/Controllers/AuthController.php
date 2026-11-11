@@ -224,7 +224,7 @@ final class AuthController
                         . "If you didn't request this, you can ignore this email — your password will not be changed."
                 );
 
-                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true);
+                EmailService::sendPlainText($email, $rendered['subject'], $rendered['body'], true, 'forgot_password', 'staff');
                 AuditLogRepository::log((int) $user['id'], 'PASSWORD_RESET_REQUESTED', 'users', (int) $user['id'], null, null, null, "Requested from IP {$ip}");
             }
         }

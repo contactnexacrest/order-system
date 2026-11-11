@@ -34,7 +34,9 @@ function normalizeBody(body, fileStoreIds) {
   return trimmed !== '' ? trimmed : null;
 }
 
-async function postAsStaff(orderId, authorUserId, body, fileStoreIds) {
+async function postAsStaff(orderId, authorUserId, body, fileStoreIds, out = {}) {
+  let sent = false;
+  let status = 'no_email';
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
@@ -50,13 +52,15 @@ async function postAsStaff(orderId, authorUserId, body, fileStoreIds) {
   const clientEmail = await require('./emailDispatchService').clientEmailFor(order);
   if (clientEmail !== null) {
     order.client_email = clientEmail;
-    // D-268: checked before sending, so the note gives the true reason (the switch, not a missing address).
-    const sendingOff = (await companySettingsRepository.get('mail_sending_enabled')) === '0';
-    const sent = await emailClient(order, authorUserId, bodyTrim, fileStoreIds);
-    await orderCommentRepository.recordEmailStatus(commentId, sent ? 'sent' : (sendingOff ? 'sending_off' : 'failed'));
-  } else {
-    await orderCommentRepository.recordEmailStatus(commentId, 'no_email');
+    // D-280: held by testing mode, or this e-mail switched off in Admin › E-mail settings.
+    const emailPolicy = require('./emailPolicy');
+    const hold = await emailPolicy.holdReason('buyer_messages', 'buyer');
+    sent = await emailClient(order, authorUserId, bodyTrim, fileStoreIds);
+    status = sent ? 'sent' : (hold === null ? 'failed' : ((await emailPolicy.testingMode()) ? 'testing_mode' : 'switched_off'));
   }
+  await orderCommentRepository.recordEmailStatus(commentId, status);
+  // D-280: what happened to the e-mail ("e-mailed" / "not e-mailed — why"), for the flash message.
+  out.emailNote = orderCommentRepository.emailNote({ author_type: 'staff', email_sent: sent ? 1 : 0, email_status: status });
 
   await auditLogRepository.log(authorUserId, 'ORDER_COMMENT_POSTED', 'orders', orderId);
   return commentId;
@@ -71,9 +75,11 @@ async function postAsClient(orderId, clientId, body, fileStoreIds) {
 
   const order = await orderRepository.find(orderId);
   const orderRef = (order && order.order_reference) || `#${orderId}`;
-  for (const userId of await permissionRepository.usersWithPermission('manage_orders')) {
-    await notificationRepository.create(userId, null, 'order_comment_from_client', orderId, `New client message on order ${orderRef}.`);
-  }
+  // D-281: in-app as before; e-mailed only to the department on the order.
+  const staffRouting = require('./staffRouting');
+  await notificationRepository.notifyRouted(await permissionRepository.usersWithPermission('manage_orders'),
+    (await staffRouting.forOrder(Number(orderId), staffRouting.departmentFor('order_comment_from_client'))).email,
+    'order_comment_from_client', orderId, `New client message on order ${orderRef}.`);
 
   await auditLogRepository.log(null, 'ORDER_COMMENT_POSTED', 'orders', orderId);
   return commentId;
@@ -115,7 +121,7 @@ async function emailClient(order, authorUserId, body, fileStoreIds) {
     ? signature
     : `Regards,\n${(sender && sender.name) || ''}\n${await require('./emailDispatchService').senderTitleFor(sender || null)}`; // QA batch 3 MAIL-5
 
-  return mailSenderService.send(order.client_email, subject, message, direct);
+  return mailSenderService.send(order.client_email, subject, message, direct, { kind: 'buyer_messages', audience: 'buyer' });
 }
 
 module.exports = { postAsStaff, postAsClient };

@@ -1,0 +1,66 @@
+{# D-280 / D-281: Admin › E-mail settings. Expects groups, audiences, testingMode, items, staff, csrfToken. #}
+<div class="card" data-testid="email-settings">
+  <h1>E-mail settings</h1>
+  <p class="muted small">Each e-mail the app sends, and to whom.
+    <span class="badge badge-must">MUST</span> = always sent, cannot be switched off (log-in and account access).
+    <span class="badge badge-should">SHOULD</span> = on when installed.
+    <span class="badge badge-optional">OPTIONAL</span> = off when installed.
+    Every change needs a reason and is in the Audit Log. Each staff member can still turn off their own non-MUST e-mails under My Account.</p>
+
+  <form method="post" action="/admin/email-settings">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="alert alert-warning email-testing-mode">
+      <label class="checkbox-label"><input type="checkbox" name="testing_mode" value="1" {{ 'checked' if testingMode else '' }} data-testid="email-testing-mode">
+        <b>Testing mode — hold all e-mails to buyers and suppliers</b></label>
+      <p class="small" style="margin:4px 0 0">When ON, e-mails to buyers and suppliers are not sent (the screen says so and shows the link to copy). Staff and associate e-mails, and every MUST e-mail, still go out.</p>
+    </div>
+
+    {% for g in groups %}
+      <h2>{{ g.key }}. {{ g.title }}</h2>
+      <div class="table-scroll">
+      <table class="list email-settings-table">
+        <tr><th>E-mail</th><th>Tier</th>{% for a in audiences %}<th class="text-center">{{ a }}</th>{% endfor %}</tr>
+        {% for k in g.kinds %}
+          <tr data-email-kind="{{ k.kind }}">
+            <td>{{ k.label }}{% if k.accessCritical %} <span class="muted small">(access-critical)</span>{% endif %}</td>
+            <td><span class="badge badge-{{ k.tierLabel }}">{{ k.tierLabel | upper }}</span></td>
+            {% for c in k.cells %}
+              <td class="text-center">
+                {% if not c.cell %}<span class="muted">—</span>
+                {% elif c.cell.tier == 'must' %}<span class="badge badge-must" title="Always sent">&#128274; ON</span>
+                {% else %}
+                  <label class="checkbox-label" style="justify-content:center"><input type="checkbox" name="on[{{ k.kind }}|{{ c.aud }}]" value="1" {{ 'checked' if c.cell.on else '' }} aria-label="{{ k.label }} — {{ c.audLabel }}">
+                    {% if c.cell.tier == 'optional' %}<span class="muted small">optional</span>{% endif %}</label>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </table>
+      </div>
+    {% endfor %}
+    <p class="muted small">Staff e-mails about an order go only to the people of the relevant department on that order (its department owner and the department's assignees). With nobody from that department on the order, the department's manager is e-mailed with an "assign someone" note; with no manager, the Managing Director. The Managing Director, Executive Director and Order Coordinator see routine events in the app only. Associate column for documents = a copy of the buyer's document e-mail to the introducing associate (only when their access level shows order documents).</p>
+
+    <h2>E. Company compliance alerts — who is told</h2>
+    <p class="muted small">Company-level alerts (not about one order) go by e-mail to the responsible person and the backup (for leave). Not set: the department's manager, then the Managing Director. Everyone who saw these alerts before still sees them in the app.</p>
+    <div class="table-scroll">
+    <table class="list">
+      <tr><th>Alert</th><th>Responsible person</th><th>Backup person</th></tr>
+      {% for it in items %}
+        <tr>
+          <td>{{ it.label }}</td>
+          {% for f in [['responsible', it.owner.responsible_user_id], ['backup', it.owner.backup_user_id]] %}
+            <td><select name="owners[{{ it.item }}][{{ f[0] }}]" aria-label="{{ it.label }} — {{ f[0] }}">
+              <option value="">Not set (department manager, then MD)</option>
+              {% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if (u.id | int) == (f[1] | int) else '' }}>{{ u.name }}</option>{% endfor %}
+            </select></td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </table>
+    </div>
+
+    <label>Reason for this change *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Testing finished — buyer e-mails on again"></label>
+    <button type="submit" data-testid="email-settings-save">Save</button>
+  </form>
+</div>

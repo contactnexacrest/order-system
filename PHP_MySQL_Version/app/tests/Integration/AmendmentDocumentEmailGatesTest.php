@@ -32,13 +32,13 @@ final class AmendmentDocumentEmailGatesTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->originalMailSendingEnabled = CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        $this->originalMailSendingEnabled = CompanySettingsRepository::get('email_testing_mode');
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', $this->originalMailSendingEnabled, null);
+        CompanySettingsRepository::set('email_testing_mode', $this->originalMailSendingEnabled, null);
         parent::tearDown();
     }
 

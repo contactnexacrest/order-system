@@ -60,7 +60,7 @@ final class ZohoSyncFailureNotifier
         $notice = $subject . ' — see Zoho Sync (Sync Log).';
 
         $recipients = PermissionRepository::usersWithPermission('ca_module_manage');
-        $mailOn = CompanySettingsRepository::get('mail_sending_enabled') !== '0';
+        $mailOn = EmailPolicy::allows('staff_zoho', 'staff'); // D-280: Admin › E-mail settings
         $out['mail_off'] = !$mailOn;
         $emails = [];
         if ($recipients !== []) {
@@ -73,7 +73,7 @@ final class ZohoSyncFailureNotifier
             if ($mailOn && trim((string) $u['email']) !== '') {
                 $ok = self::$sender !== null
                     ? (bool) (self::$sender)((string) $u['email'], $subject, $body)
-                    : MailSenderService::send((string) $u['email'], $subject, $body);
+                    : MailSenderService::send((string) $u['email'], $subject, $body, [], false, 'staff_zoho', 'staff');
                 $out['emailed'] += $ok ? 1 : 0;
             }
         }

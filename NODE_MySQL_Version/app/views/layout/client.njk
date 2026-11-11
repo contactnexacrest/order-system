@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png?v=2">
 <link rel="stylesheet" href="{{ asset('/css/app.css') }}">
 <script src="{{ asset('/js/app.js') }}" defer></script>
+{% if idleMeta %}<meta name="session-idle" content="{{ idleMeta.idle }}" data-warn="{{ idleMeta.warn }}"{% if idleMeta.absoluteLeft is number %} data-absolute-left="{{ idleMeta.absoluteLeft }}"{% endif %} data-keepalive="{{ idleMeta.keepalive }}" data-login="{{ idleMeta.login }}" data-csrf="{{ csrfToken }}">{% endif %}{# D-283: idle warning popup (app.js) #}
 </head>
 <body>
 {% if devServerEnabled %}
@@ -34,7 +35,7 @@
 </header>
 <main class="page">
   {% for f in flashes %}
-    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+    <div class="alert alert-{{ f.type }}">{{ f.message }}{% if f.copy_link %}{% set copyLink = f.copy_link %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}{% endif %}{# D-280 #}</div>
   {% endfor %}
   {{ content | safe }}
 </main>

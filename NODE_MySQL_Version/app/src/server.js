@@ -426,7 +426,9 @@ app.use(session({
   secret: env.sessionSecret(),
   resave: false,
   saveUninitialized: false,
-  rolling: false,
+  // D-283: the cookie (and the store's expiry) roll on every request — see the
+  // maxAge middleware right below.
+  rolling: true,
   cookie: {
     path: '/',
     httpOnly: true,
@@ -434,6 +436,17 @@ app.use(session({
     sameSite: 'lax',
     maxAge: null, // session cookie — idle timeout is enforced in app logic (SessionAuth), not the cookie
   },
+}));
+// Owner decision D-283 (11 Nov 2026): the session store and the cookie follow
+// the longest idle timeout set in Admin (staff 4 h by default), so the store
+// never drops a session earlier than the app's own timeout, and an active person
+// is never cut off by the cookie. Each area's own idle limit (staff / buyers /
+// associates) is then checked by its middleware.
+app.use(wrapAsyncMiddleware(async (req, res, next) => {
+  if (req.session && req.session.cookie) {
+    req.session.cookie.maxAge = await require('./services/sessionTimeouts').maxIdleMs();
+  }
+  next();
 }));
 // QA Round 5, R5-15: a redirect waits for the session (and its flash message) to be saved.
 app.use(saveSessionBeforeRedirect);
@@ -467,6 +480,7 @@ app.use((req, res, next) => {
     const common = {
       csrfToken: csrf.token(req),
       flashes: flash.pull(req),
+      idleMeta: req.idleMeta || null, // D-283: the idle warning popup (app.js)
       currentUser: req.user || null,
       permissions: req.permissions || {},
       isSuperAdmin: req.isSuperAdmin || false,
@@ -691,6 +705,16 @@ app.post('/force-password-change', requireAuth, verifyCsrf, asyncHandler(authCon
 
 app.get('/', requireAuth, asyncHandler(dashboardController.index));
 
+// Owner decisions D-280 / D-281 (11 Nov 2026): Admin › E-mail settings.
+app.get('/admin/email-settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(require('./controllers/emailSettingsController').index));
+app.post('/admin/email-settings', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(require('./controllers/emailSettingsController').save));
+// D-283: "Stay logged in" (the 2-minute warning in app.js) — staff; the client and associate ones are with their portals.
+app.post('/keep-alive', requireAuth, verifyCsrf, asyncHandler(require('./controllers/sessionController').staffKeepAlive));
+// D-282: staff send a client a new set-password link (Client portal login block).
+app.post('/clients/:id/portal/send-link', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(clientsController.sendPortalLink));
+// D-283: forget every computer remembered for the login code — one user (Admin) or yourself.
+app.post('/users/:id/forget-computers', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.forgetComputers));
+app.post('/account/forget-computers', requireAuth, verifyCsrf, asyncHandler(accountController.forgetComputers));
 app.get('/settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(settingsController.index));
 app.post('/settings/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.update));
 app.post('/settings/test-zoho-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoEmail));
@@ -1527,6 +1551,9 @@ app.get('/associate/login', asyncHandler(associatePortalController.showLogin));
 app.post('/associate/login', verifyCsrf, asyncHandler(associatePortalController.login));
 app.get('/associate/login/code', asyncHandler(associatePortalController.showCode));
 app.post('/associate/login/code', verifyCsrf, asyncHandler(associatePortalController.verifyCode));
+app.get('/associate/forgot-password', asyncHandler(associatePortalController.showForgotPassword)); // D-282
+app.post('/associate/forgot-password', verifyCsrf, asyncHandler(associatePortalController.forgotPassword)); // D-282
+app.post('/associate/keep-alive', requireAssociateAuth, verifyCsrf, asyncHandler(require('./controllers/sessionController').associateKeepAlive)); // D-283
 app.get('/associate/set-password/:token', asyncHandler(associatePortalController.showSetPassword));
 app.post('/associate/set-password/:token', verifyCsrf, asyncHandler(associatePortalController.setPassword));
 app.get('/associate/logout', asyncHandler(associatePortalController.logout));
@@ -1560,6 +1587,7 @@ app.post('/associate/messages', requireAssociateAuth, verifyCsrf, asyncHandler(a
 // --- Client portal (authenticated, structurally separate from staff /
 // requireAuth) — gated by clientAuth.required(), a different session key. ---
 const requireClientAuth = clientAuth.required();
+app.post('/client/keep-alive', requireClientAuth, verifyCsrf, asyncHandler(require('./controllers/sessionController').clientKeepAlive)); // D-283
 app.get('/client', requireClientAuth, asyncHandler(clientPortalController.dashboard));
 app.get('/client/account', requireClientAuth, asyncHandler(clientPortalController.showAccount));
 app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.changePassword));

@@ -33,8 +33,8 @@ final class SelfApprovalRulesTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mail = CompanySettingsRepository::get('mail_sending_enabled');
-        CompanySettingsRepository::set('mail_sending_enabled', '1', null);
+        $this->mail = CompanySettingsRepository::get('email_testing_mode');
+        CompanySettingsRepository::set('email_testing_mode', '0', null);
         foreach (array_keys(SelfApprovalRules::RULES) as $rule) {
             $this->saved[$rule] = SelfApprovalRules::roleIds($rule);
         }
@@ -46,7 +46,7 @@ final class SelfApprovalRulesTest extends DbTestCase
         foreach ($this->saved as $rule => $ids) {
             SelfApprovalRules::set($rule, $ids);
         }
-        CompanySettingsRepository::set('mail_sending_enabled', $this->mail, null);
+        CompanySettingsRepository::set('email_testing_mode', $this->mail, null);
         $_POST = [];
         $_SESSION = [];
         Flash::pull();

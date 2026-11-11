@@ -4,7 +4,14 @@ const emailService = require('./emailService');
 const testModeService = require('./testModeService');
 const zohoMailService = require('./zohoMailService');
 const mailRedirectService = require('./mailRedirectService');
-const companySettingsRepository = require('../repositories/companySettingsRepository');
+const emailPolicy = require('./emailPolicy');
+
+/**
+ * Why the last send() returned false: 'held' (Admin › E-mail settings or
+ * testing mode — see emailPolicy.holdReason()) or 'failed'; '' after a
+ * successful send. Lets a caller word its message truthfully.
+ */
+const state = { lastOutcome: '' };
 
 /**
  * docs/schema.sql Section AI — the one chokepoint every outbound email in
@@ -18,19 +25,24 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
  * never something the app can be blocked by.
  *
  * @param {Array<{path: string, name: string}>} [attachments]
- * @param {{isSecurityEmail?: boolean}} [opts]
+ * @param {{isSecurityEmail?: boolean, kind?: string, audience?: string}} [opts]
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
 async function send(to, subject, body, attachments = [], opts = {}) {
-  // docs/schema.sql Section AU: a master kill switch for business email,
-  // separate from Test Mode/Mail Redirect — never applies to 2FA/password-
-  // reset, matching every other gate in this function. Checked here, the
-  // one chokepoint every non-security send passes through, so it can never
-  // be bypassed by a future transport added below Zoho/SMTP.
-  if (!opts.isSecurityEmail && (await companySettingsRepository.get('mail_sending_enabled')) === '0') {
-    // QA batch 3 MAIL-2: the body is logged too (as the no-SMTP fallback does), so staff can send it themselves.
-    console.error(`[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: ${to} | Subject: ${subject} | Body: ${body}`);
-    return false;
+  // Owner decision D-280 (11 Nov 2026): the old master kill switch
+  // (mail_sending_enabled) is replaced by Admin › E-mail settings — one switch
+  // per e-mail kind and audience, MUST e-mails always on — and by "Testing
+  // mode", which holds only buyer and supplier e-mails. Checked here, the one
+  // chokepoint every business send passes through.
+  state.lastOutcome = '';
+  if (opts.kind && opts.audience) {
+    const hold = await emailPolicy.holdReason(opts.kind, opts.audience);
+    if (hold !== null) {
+      // The body is logged too, so staff can send it themselves.
+      console.error(`[EMAIL NOT SENT — ${hold}] Kind: ${opts.kind}/${opts.audience} | To: ${to} | Subject: ${subject} | Body: ${body}`);
+      state.lastOutcome = 'held';
+      return false;
+    }
   }
 
   // QA-5 TM-08: resolved ONCE, here, before either transport is chosen.
@@ -43,6 +55,7 @@ async function send(to, subject, body, attachments = [], opts = {}) {
   if (resolved === null) {
     // QA-5 TM-07: Test Mode is on and no test_email is configured — never
     // fall back to sending this to the real address, via Zoho or SMTP.
+    state.lastOutcome = 'failed';
     return false;
   }
   // docs/schema.sql Section AS: chained immediately after Test Mode's own
@@ -62,7 +75,9 @@ async function send(to, subject, body, attachments = [], opts = {}) {
     }
   }
 
-  return emailService.deliverWithAttachments(resolved, subject, body, attachments, cc);
+  const ok = await emailService.deliverWithAttachments(resolved, subject, body, attachments, cc);
+  state.lastOutcome = ok ? '' : 'failed';
+  return ok;
 }
 
-module.exports = { send };
+module.exports = { send, state };

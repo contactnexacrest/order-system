@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repositories\CompanySettingsRepository;
-
 /**
  * docs/schema.sql Section AI — the one chokepoint every outbound email in
  * the app should go through from here on (order-comment notifications now;
@@ -23,18 +21,29 @@ final class MailSenderService
      * @param array<int, array{path:string, name:string}> $attachments
      * @return bool true if actually handed to a transport, false if only logged (dev fallback)
      */
-    public static function send(string $to, string $subject, string $body, array $attachments = [], bool $isSecurityEmail = false): bool
+    /**
+     * Why the last send() call returned false: 'held' (Admin › E-mail settings
+     * or testing mode — see EmailPolicy::holdReason()) or 'failed'; '' after a
+     * successful send. Lets a caller word its message truthfully.
+     */
+    public static string $lastOutcome = '';
+
+    public static function send(string $to, string $subject, string $body, array $attachments = [], bool $isSecurityEmail = false, ?string $kind = null, ?string $audience = null): bool
     {
-        // docs/schema.sql Section AU: a master kill switch for business
-        // email, separate from Test Mode/Mail Redirect — never applies to
-        // 2FA/password-reset, matching every other gate in this method.
-        // Checked here, the one chokepoint every non-security send passes
-        // through, so it can never be bypassed by a future transport added
-        // below Zoho/SMTP the way a per-transport check could be.
-        if (!$isSecurityEmail && CompanySettingsRepository::get('mail_sending_enabled') === '0') {
-            // QA batch 3 MAIL-2: the body is logged too (as the no-SMTP fallback does), so staff can send it themselves.
-            error_log("[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: {$to} | Subject: {$subject} | Body: {$body}");
-            return false;
+        // Owner decision D-280 (11 Nov 2026): the old master kill switch
+        // (mail_sending_enabled) is replaced by Admin › E-mail settings — one
+        // switch per e-mail kind and audience, MUST e-mails always on — and by
+        // "Testing mode", which holds only buyer and supplier e-mails. Checked
+        // here, the one chokepoint every business send passes through.
+        self::$lastOutcome = '';
+        if ($kind !== null && $audience !== null) {
+            $hold = EmailPolicy::holdReason($kind, $audience);
+            if ($hold !== null) {
+                // The body is logged too, so staff can send it themselves.
+                error_log("[EMAIL NOT SENT — {$hold}] Kind: {$kind}/{$audience} | To: {$to} | Subject: {$subject} | Body: {$body}");
+                self::$lastOutcome = 'held';
+                return false;
+            }
         }
 
         // QA-5 TM-08: resolved ONCE, here, before either transport is
@@ -48,6 +57,7 @@ final class MailSenderService
             // QA-5 TM-07: Test Mode is on and no test_email is configured —
             // never fall back to sending this to the real address, via
             // Zoho or SMTP.
+            self::$lastOutcome = 'failed';
             return false;
         }
         // docs/schema.sql Section AS: chained immediately after Test Mode's
@@ -68,6 +78,8 @@ final class MailSenderService
             }
         }
 
-        return EmailService::deliverWithAttachments($resolved, $subject, $body, $attachments, $cc);
+        $ok = EmailService::deliverWithAttachments($resolved, $subject, $body, $attachments, $cc);
+        self::$lastOutcome = $ok ? '' : 'failed';
+        return $ok;
     }
 }

@@ -31,6 +31,7 @@ const divisionService = require('../services/divisionService');
 const db = require('../config/db');
 
 const LAST_ACTIVITY_KEY = '_last_activity_ts';
+const flash = require('../helpers/flash');
 
 function required() {
   return async function sessionAuthRequired(req, res, next) {
@@ -40,14 +41,30 @@ function required() {
       return;
     }
 
-    const timeoutMinutes = parseInt((await companySettingsRepository.get('session_timeout_minutes')) ?? '30', 10);
+    // Owner decision D-283 (11 Nov 2026): the staff idle timeout (Admin ›
+    // Settings › Security, default 4 hours) and the 12-hour limit since
+    // sign-in, however active.
+    const sessionTimeouts = require('../services/sessionTimeouts');
     const lastActivity = req.session[LAST_ACTIVITY_KEY] ?? null;
-    if (lastActivity !== null && (Date.now() - lastActivity) > timeoutMinutes * 60000) {
+    if (await sessionTimeouts.idleExpired('staff', lastActivity)) {
       await authService.logout(req);
+      flash.set(req, 'info', `You were signed out after ${sessionTimeouts.describeMinutes(await sessionTimeouts.idleMinutes('staff'))} without activity. Please log in again.`);
+      res.redirect('/login');
+      return;
+    }
+    if (req.session[sessionTimeouts.STAFF_LOGIN_AT_KEY] === undefined || req.session[sessionTimeouts.STAFF_LOGIN_AT_KEY] === null) {
+      req.session[sessionTimeouts.STAFF_LOGIN_AT_KEY] = Date.now(); // a session from before D-283 starts its 12 hours now
+    }
+    const loginAt = Number(req.session[sessionTimeouts.STAFF_LOGIN_AT_KEY]);
+    if (await sessionTimeouts.absoluteExpired(loginAt)) {
+      await authService.logout(req);
+      delete req.session[sessionTimeouts.STAFF_LOGIN_AT_KEY];
+      flash.set(req, 'info', `For security, staff log in again at least every ${await sessionTimeouts.absoluteHours()} hours. Please log in again.`);
       res.redirect('/login');
       return;
     }
     req.session[LAST_ACTIVITY_KEY] = Date.now();
+    await sessionTimeouts.markPage(req, 'staff', await sessionTimeouts.staffAbsoluteLeft(loginAt));
 
     const user = await userRepository.findById(userId);
 
@@ -125,7 +142,7 @@ function required() {
     if (req.method === 'POST' && user.division_id !== null && user.division_id !== undefined && !req.permissions.see_all_divisions) {
       const ownDivision = await divisionService.find(Number(user.division_id));
       const postPath = String(req.path || '').replace(/\/+$/, '');
-      if (ownDivision && ownDivision.status !== 'active' && !['/logout', '/preview/exit', '/account/password'].includes(postPath)
+      if (ownDivision && ownDivision.status !== 'active' && !['/logout', '/preview/exit', '/account/password', '/keep-alive'].includes(postPath)
         && !(await superAdminService.isEffective(user.id))) {
         const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         res.status(403).send(`Your division (${escapeHtml(ownDivision.name)}) is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.`);
@@ -138,7 +155,7 @@ function required() {
     // previewed designation's rights — only "Exit preview" and log out post.
     if (acting.previewing && req.method === 'POST') {
       const postPath = String(req.path || '').replace(/\/+$/, '');
-      if (!['/preview/exit', '/logout'].includes(postPath)) {
+      if (!['/preview/exit', '/logout', '/keep-alive'].includes(postPath)) {
         require('../helpers/flash').set(req, 'error', 'You are previewing the app: nothing can be saved during a preview. Use "Exit preview" at the top first.');
         let back = '/';
         try {

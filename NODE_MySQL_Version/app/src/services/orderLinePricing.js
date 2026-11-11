@@ -340,7 +340,7 @@ async function requestApproval(orderId, lineId, userId, automatic = false) {
     + (check.status === NO_PRICE ? 'its product has no price set.' : 'it is below the lowest price for this order.');
   const notificationRepository = require('../repositories/notificationRepository');
   for (const mdId of await require('../repositories/permissionRepository').usersWithPermission('manage_pricing')) {
-    await notificationRepository.createInAppOnly(Number(mdId), 'line_price_approval', orderId, message.slice(0, 500));
+    await notificationRepository.create(Number(mdId), null, 'line_price_approval', orderId, message.slice(0, 500)); // D-280: one e-mail per approval
   }
   await auditLog(userId, 'LINE_PRICE_APPROVAL_REQUESTED', 'order_products', lineId, null, null, message);
   return null;

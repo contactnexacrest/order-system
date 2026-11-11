@@ -113,12 +113,13 @@ async function postReply(req, res) {
     return;
   }
 
-  await orderComplaintService.replyAsStaff(complaintId, req.user.id, body);
+  const out = {};
+  await orderComplaintService.replyAsStaff(complaintId, req.user.id, body, out);
 
-  // QA Round 5, R5-16: with email sending off, nothing was emailed — say so.
-  flash.set(req, 'success', (await emailDispatchService.mailSendingEnabled())
+  // D-280: "emailed" only when the e-mail really went out.
+  flash.set(req, 'success', out.emailNote === 'e-mailed'
     ? 'Reply posted — the client has been emailed.'
-    : 'Reply posted to the client portal. Email sending is turned off, so the client was NOT emailed — tell them yourself if it is urgent.');
+    : `Reply posted to the client portal — ${out.emailNote || 'not e-mailed'}. Tell the client yourself if it is urgent.`);
   res.redirect(`/orders/${complaint.order_id}/complaints`);
 }
 

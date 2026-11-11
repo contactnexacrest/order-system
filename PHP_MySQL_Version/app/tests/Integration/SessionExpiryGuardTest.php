@@ -85,7 +85,7 @@ final class SessionExpiryGuardTest extends DbTestCase
 
     public function testTheClientPortalEnforcesTheSameIdleTimeoutAsStaff(): void
     {
-        CompanySettingsRepository::set('session_timeout_minutes', '5');
+        CompanySettingsRepository::set('session_timeout_client_minutes', '5');
 
         $clientId = $this->createTestClient();
         $this->provisionClientLogin($clientId);

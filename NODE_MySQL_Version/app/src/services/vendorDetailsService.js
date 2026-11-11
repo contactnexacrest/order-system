@@ -46,6 +46,7 @@ async function sendDetailsLink(kind, id, userId) {
   const vendor = await vendorDetailsRepository.find(kind, id);
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/vendor-details/${await vendorDetailsRepository.generateDetailsToken(kind, id)}`;
   const email = String(vendor.email || '').trim();
+  let sent = false;
   if (email) {
     const rendered = await emailTemplateRepository.renderOrDefault(
       'vendor_details_link',
@@ -56,10 +57,18 @@ async function sendDetailsLink(kind, id, userId) {
         + 'Please keep a cancelled cheque or bank letter ready; our team may ask for it to verify the account. The link works once and for 30 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    await emailService.sendPlainText(email, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'supplier_links', audience: 'supplier' });
   }
-  await auditLogRepository.log(userId, 'VENDOR_DETAILS_LINK_GENERATED', meta.table, id, null, null, null, email ? `Emailed to ${email}` : 'No email on file — hand the link over directly');
-  return { link, emailedTo: email || null };
+  const emailPolicy = require('./emailPolicy');
+  await auditLogRepository.log(userId, 'VENDOR_DETAILS_LINK_GENERATED', meta.table, id, null, null, null,
+    sent ? `Emailed to ${email}` : (email ? `Not e-mailed (${await emailPolicy.notSentReason('supplier_links', 'supplier')}) — hand the link over directly` : 'No email on file — hand the link over directly'));
+  // D-280: emailedTo only when the e-mail really went out.
+  return {
+    link,
+    emailedTo: sent ? email : null,
+    email: email || null,
+    message: await require('./emailDispatchService').linkMailOutcome('Vendor Details Link', email || null, sent, link, 'supplier_links', 'supplier'),
+  };
 }
 
 function detailsLinkUrl(vendor) {

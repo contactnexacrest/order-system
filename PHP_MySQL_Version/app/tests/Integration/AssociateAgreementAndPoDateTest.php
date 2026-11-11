@@ -32,7 +32,7 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mailBefore = CompanySettingsRepository::get('mail_sending_enabled');
+        $this->mailBefore = CompanySettingsRepository::get('email_testing_mode');
         $this->admin = $this->createTestUser('Admin');
         $_SESSION = ['_auth_user_id' => $this->admin];
         $_POST = [];
@@ -41,7 +41,7 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('mail_sending_enabled', (string) ($this->mailBefore ?? '0'), null);
+        CompanySettingsRepository::set('email_testing_mode', (string) ($this->mailBefore ?? '0'), null);
         $_SESSION = [];
         $_POST = [];
         $_FILES = [];
@@ -67,7 +67,7 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
         $pdo->prepare("UPDATE order_stages os JOIN stages_master sm ON sm.id = os.stage_id SET os.status = 'in_progress', os.unlocked_at = NOW() WHERE os.order_id = :o AND sm.stage_number = 2")
             ->execute(['o' => $orderId]);
         $pdo->prepare('INSERT INTO order_buyer_po_documents (order_id, file_id) VALUES (:o, :f)')->execute(['o' => $orderId, 'f' => $this->createTestFile($orderId)]);
-        CompanySettingsRepository::set('mail_sending_enabled', '0', null);
+        CompanySettingsRepository::set('email_testing_mode', '1', null);
         $this->createTestDocument($orderId, 'BUYERPO', 'approved');
         $created = substr((string) OrderRepository::find($orderId)['created_at'], 0, 10);
 

@@ -27,6 +27,16 @@ final class AccountController
         ], 'layout/base');
     }
 
+    /** D-283: forget every computer remembered for my login code. */
+    public function forgetComputers(array $params): void
+    {
+        $userId = (int) AuthService::currentUser()['id'];
+        $n = \App\Services\RememberBrowserService::forgetAll($userId);
+        \App\Repositories\AuditLogRepository::log($userId, 'LOGIN_BROWSERS_FORGOTTEN', 'users', $userId, null, (string) $n, '0', 'By the user (My Account)');
+        Flash::set('success', $n === 1 ? '1 remembered computer forgotten.' : "{$n} remembered computers forgotten.");
+        header('Location: /account#remembered-computers');
+    }
+
     /** D-265: a new set of 10 backup codes (the old set stops working), shown once. Needs the current password. */
     public function generateBackupCodes(array $params): void
     {

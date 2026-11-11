@@ -308,7 +308,15 @@ async function once(kind, ref, threshold, today) {
   return (r.affectedRows || 0) > 0;
 }
 
-async function notify(userIds, type, orderId, message) {
+/**
+ * D-281: everyone in userIds gets the in-app notice; the e-mail goes to emailIds
+ * (an order alert: the department on the order; a company item: its responsible
+ * person and backup). null = everyone, as before.
+ */
+async function notify(userIds, type, orderId, message, emailIds = null) {
+  if (emailIds !== null) {
+    return (await notificationRepository.notifyRouted(userIds, emailIds, type, orderId, message)).length;
+  }
   let n = 0;
   for (const u of [...new Set(userIds.map(Number))]) {
     await notificationRepository.create(u, null, type, orderId, message);
@@ -328,7 +336,8 @@ async function runReminders(today = null) {
   if (missing.length > 0 && await once('ebrc_monthly', t.slice(0, 7), 'monthly', t)) {
     const orders = new Set(missing.map((m) => m.order_id)).size;
     created += await notify([...finance, ...managers], 'ebrc_missing_monthly', null,
-      `Missing eBRC / FIRC: ${missing.length} received payment(s) on ${orders} order(s) still have no FIRC / eBRC reference — see Reports → Missing eBRC / FIRC.`);
+      `Missing eBRC / FIRC: ${missing.length} received payment(s) on ${orders} order(s) still have no FIRC / eBRC reference — see Reports → Missing eBRC / FIRC.`,
+      await require('./staffRouting').companyItem('ebrc_monthly'));
   }
 
   // (b) ECGC shipment declarations and the policy's expiry
@@ -347,13 +356,14 @@ async function runReminders(today = null) {
         created += await notify(managers.length > 0 ? managers : finance, `ecgc_declaration_${threshold}`, Number(r.id),
           threshold === 'overdue'
             ? `Order ${r.order_reference}: the shipment was not declared to ECGC by ${due} — declare it now (a late declaration may not be covered).`
-            : `Order ${r.order_reference}: declare the shipment to ECGC by ${due}.`);
+            : `Order ${r.order_reference}: declare the shipment to ECGC by ${due}.`,
+          (await require('./staffRouting').forOrder(Number(r.id), 'EXPORT_COMPLIANCE')).email);
       }
     }
     const policyTo = (await setting('ecgc_policy_valid_to')).trim();
     if (policyTo !== '' && policyTo >= t && policyTo <= addDays(t, 30) && await once('ecgc_policy', policyTo, '30', t)) {
       created += await notify([...(await permissionRepository.usersWithPermission('manage_company_settings')).map(Number), ...managers], 'ecgc_policy_expiring', null,
-        `The ECGC policy ${policyNo} ends on ${policyTo} — renew it so new shipments stay covered.`);
+        `The ECGC policy ${policyNo} ends on ${policyTo} — renew it so new shipments stay covered.`, await require('./staffRouting').companyItem('ecgc_policy'));
     }
   }
 
@@ -369,7 +379,8 @@ async function runReminders(today = null) {
       if (v.days_left <= th) {
         if (await once('benefit_deadline', `${claim.id}@${v.effective_deadline}`, String(th), t)) {
           created += await notify([...managers, ...finance], 'benefit_claim_deadline', Number(claim.order_id),
-            `Order ${claim.order_reference}: the ${claim.scheme_name} claim must be completed by ${v.effective_deadline} (${v.days_left} day(s) left).`);
+            `Order ${claim.order_reference}: the ${claim.scheme_name} claim must be completed by ${v.effective_deadline} (${v.days_left} day(s) left).`,
+            (await require('./staffRouting').forOrder(Number(claim.order_id), 'EXPORT_COMPLIANCE')).email);
         }
         break;
       }
