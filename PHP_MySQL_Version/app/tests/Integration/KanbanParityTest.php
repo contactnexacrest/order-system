@@ -26,7 +26,7 @@ use App\Tests\Support\DbTestCase;
  * Owner hard rule (2026-11-01): the Standard and Kanban templates stay
  * parallel — any user may pick either, so every list page offers the same
  * on its board: every link to a record, every action (form), every filter,
- * and a way to switch to the other view. For each of the eight list pages
+ * and a way to switch to the other view. For each list page
  * this renders the list (?view=list) and the board for the same Kanban user
  * and the same data, and compares them. The Node suite has the same test
  * (kanbanParity.test.js).
@@ -62,6 +62,7 @@ final class KanbanParityTest extends DbTestCase
         $_SESSION = ['_auth_user_id' => $this->userId];
         $_GET = $get;
         \App\Services\PermissionService::resetCache();
+        \App\Services\ApprovalsInbox::resetCache(); // D-310: the Approvals counts are per person
         ob_start();
         $controller->{$action}([]);
         return (string) ob_get_clean();
@@ -164,6 +165,8 @@ final class KanbanParityTest extends DbTestCase
             ['Associates', new \App\Controllers\AssociateAdminController(), 'index', ['view' => 'list'], [], '/associates'],
             // Owner decision 2 Nov 2026 (point 4): the Agreements register, list and board.
             ['Agreements', new \App\Controllers\AgreementController(), 'index', ['view' => 'list'], [], '/agreements'],
+            // Owner decision D-310 (point 27): the Approvals page, list and board.
+            ['Approvals', new \App\Controllers\ApprovalsController(), 'index', ['view' => 'list'], [], '/approvals'],
         ];
     }
 
@@ -197,7 +200,7 @@ final class KanbanParityTest extends DbTestCase
     public function testTheSectionMenuBarIsTheSameOnTheListAndTheBoard(): void
     {
         $this->seed();
-        $pages = array_merge($this->pages(), [['Approvals', new \App\Controllers\ApprovalsController(), 'index', ['view' => 'list'], [], '/approvals']]);
+        $pages = $this->pages();
         try {
             foreach ($pages as [$page, $controller, $action, $listQuery, $boardQuery, $path]) {
                 $_SERVER['REQUEST_URI'] = $path;

@@ -22,7 +22,7 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
  * and Kanban templates stay parallel — any user may pick either, so every
  * list page offers the same on its board: every link to a record, every
  * action (form), every filter, and a way to switch to the other view. For
- * each of the eight list pages this renders the list (?view=list) and the
+ * each list page this renders the list (?view=list) and the
  * board for the same Kanban user and the same data, and compares them.
  */
 describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
@@ -129,6 +129,8 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     ['Associates', '/associates?view=list', '/associates', '/associates'],
     // Owner decision 2 Nov 2026 (point 4): the Agreements register, list and board.
     ['Agreements', '/agreements?view=list', '/agreements', '/agreements'],
+    // Owner decision D-310 (point 27): the Approvals page, list and board.
+    ['Approvals', '/approvals?view=list', '/approvals', '/approvals'],
   ];
 
   it('offers on every board what its list offers', async () => {
@@ -155,7 +157,7 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     await seed();
     const bar = (html) => (html.match(/<nav class="section-nav"[\s\S]*?<\/nav>/) || [''])[0];
     const side = (html) => (html.match(/<nav class="sidebar-nav"[\s\S]*?<\/nav>/) || [''])[0];
-    for (const [page, listUrl, boardUrl] of [...PAGES, ['Approvals', '/approvals?view=list', '/approvals']]) {
+    for (const [page, listUrl, boardUrl] of PAGES) {
       const list = (await agent.get(listUrl)).text;
       const board = (await agent.get(boardUrl)).text;
       if (page !== 'My tasks') expect([page, bar(list) !== '']).toEqual([page, true]);

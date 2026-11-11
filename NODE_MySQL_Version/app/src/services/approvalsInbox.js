@@ -145,6 +145,19 @@ async function prices(req) {
       details, url: `/orders/${orderId}/products/${line.id}/price-approval`, button: 'Review and approve', bar, bar_button: `Review and approve line ${no}`,
     });
   }
+  // D-301: a daily exchange-rate move over 2 % waits for the MD's OK (Products › Pricing settings › Exchange rate).
+  const fxRateService = require('./fxRateService');
+  const fx = await fxRateService.current();
+  if (fx.waiting) {
+    const w = fx.waiting;
+    out.push({
+      key: `fx:${w.id}`, tab: 'prices', what: 'Exchange rate', tone: 'red',
+      since: String(w.fetched_at), order_id: null, order_ref: '', line_no: null,
+      who: `Daily rate of ${w.rate_date}`,
+      details: `Market rate ₹${Number(w.market_rate).toFixed(4)} per USD moved ${fxRateService.signed(Number(w.change_pct))} — not used for prices until approved`,
+      url: '/pricing/settings#exchange-rate', button: 'Review the rate', bar: '', bar_button: '',
+    });
+  }
   return out;
 }
 

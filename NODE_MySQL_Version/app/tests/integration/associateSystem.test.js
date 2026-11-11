@@ -365,7 +365,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
 
   const intakePost = (company, extra = {}) => ({
     company_legal_name: company, billing_address_line1: '1 Harbour Road', billing_city: 'Rotterdam', billing_country: 'Netherlands',
-    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Purchase Head', email: `jan@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
+    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Purchase Head', email: `buyer@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
     country_of_destination: 'Netherlands', incoterm_preference: 'FOB', consignee_same_as_buyer: '1', website: '', ...extra,
   });
 

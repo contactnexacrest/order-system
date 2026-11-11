@@ -376,6 +376,13 @@ Six jobs need to run outside the request/response cycle (plus the backup scripts
   Never removes anything sent to the client, the current copy of a
   document, uploaded files, files of an order with an open dispute, or
   documents in a CA-locked financial year.
+- **`src/jobs/fetchFxRate.js`** — once a day at 07:05 IST (owner decision
+  D-301, 11 Nov 2026; in-process in `scheduler.js`, or
+  `node src/jobs/fetchFxRate.js` from cron): fetches the USD→INR market
+  rate (Frankfurter, backup open.er-api.com) into `fx_rates`. A move of more
+  than 2 % waits for the MD's OK (Products › Pricing settings › Exchange
+  rate, also listed on Approvals). Without this job, Automatic mode keeps the
+  manual rate and warns that no rate was fetched.
 - **`src/jobs/zohoSync.js`** — CA / Accounting module. **Must run hourly**
   (owner decision 2 Nov 2026, D-233): saving a receipt, bill, payment,
   expense or cost in the app never sends it to Zoho Books at that moment —
@@ -416,7 +423,7 @@ node src/jobs/dailyDigest.js
 same job double-fires:**
 
 **Option 1 — external cron (recommended: simplest, and independent of the
-web process's own uptime).** Add six crontab entries, in IST:
+web process's own uptime).** Add seven crontab entries, in IST:
 ```
 CRON_TZ=Asia/Kolkata
 */10 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dispatchDeferredEmails.js >> /var/log/nexacrest/dispatch_deferred_emails.log 2>&1
@@ -425,6 +432,7 @@ CRON_TZ=Asia/Kolkata
 0 * * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1
 15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 15 2 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/documentCopyCleanup.js >> /var/log/nexacrest/document_copy_cleanup.log 2>&1
+5 7 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/fetchFxRate.js >> /var/log/nexacrest/fetch_fx_rate.log 2>&1
 ```
 
 Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.

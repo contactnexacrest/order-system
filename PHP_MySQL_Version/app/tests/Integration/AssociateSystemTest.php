@@ -356,7 +356,7 @@ final class AssociateSystemTest extends DbTestCase
     private function intakePost(string $company, array $extra = []): array
     {
         return $extra + ['company_legal_name' => $company, 'billing_address_line1' => '1 Harbour Road', 'billing_city' => 'Rotterdam', 'billing_country' => 'Netherlands',
-            'vat_eori_tax_no' => 'NL' . strtoupper(bin2hex(random_bytes(5))), 'contact_person' => 'Purchase Head', 'email' => 'jan@' . bin2hex(random_bytes(4)) . '-buyer.example',
+            'vat_eori_tax_no' => 'NL' . strtoupper(bin2hex(random_bytes(5))), 'contact_person' => 'Purchase Head', 'email' => 'buyer@' . bin2hex(random_bytes(4)) . '-buyer.example',
             'country_of_destination' => 'Netherlands', 'incoterm_preference' => 'FOB', 'consignee_same_as_buyer' => '1', 'website' => ''];
     }
 

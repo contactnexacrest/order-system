@@ -556,7 +556,7 @@ async function markPaid(req, res) {
     // Owner decision 1 Nov 2026 (AS-7): an associate is paid only into a verified bank account past its waiting days.
     if (payout.payee_kind === 'associate' && !(await associateBankRepository.usable(Number(payout.associate_id), paidOn))) {
       if (single) {
-        flash.set(req, 'error', `This associate has no verified bank account usable on ${dates.short(paidOn)} — Accounts must verify their bank details first (two people), and a new account is usable only after its waiting days.`);
+        flash.set(req, 'error', `This associate has no verified bank account usable on ${dates.short(paidOn)} — Accounts must verify their bank details first, and a new account is usable only after its waiting days.`);
         res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
         return;
       }

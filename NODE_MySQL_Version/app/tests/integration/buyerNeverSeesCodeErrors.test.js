@@ -61,7 +61,7 @@ describe('A buyer never sees an associate-code error (A6)', () => {
 
   it('staff see the note on the intake review', async () => {
     const r = await db.execute(`INSERT INTO client_intake_submissions (company_legal_name, billing_address, contact_person, email, country_of_destination, status, associate_note)
-      VALUES ('A6 Review Buyer', '1 Harbour Road', 'Jan', 'jan@a6.example', 'Netherlands', 'pending', :n)`,
+      VALUES ('A6 Review Buyer', '1 Harbour Road', 'Purchase Head', 'buyer@a6.example', 'Netherlands', 'pending', :n)`,
     { n: 'Associate code NXA-OLD-7K given but not applied: no associate has this code.' });
     const info = await associateIntakeService.reviewInfo(await associateIntakeService.submission(r.insertId));
     expect(info.associate).toBeNull();

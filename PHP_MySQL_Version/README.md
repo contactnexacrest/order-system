@@ -403,7 +403,7 @@ Send to Buyer" section appears per generated document, plus new
 
 ### Bluehost cron setup
 
-Six scheduled jobs, all plain PHP scripts meant to be run via
+Seven scheduled jobs, all plain PHP scripts meant to be run via
 cPanel → Cron Jobs (Bluehost's equivalent of a systemd timer — there is no
 persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
@@ -416,10 +416,16 @@ CRON_TZ=Asia/Kolkata
 0 * * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/zoho_sync.php >> /home/yourcpaneluser/logs/zoho_sync.log 2>&1
 15 8 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/daily_digest.php >> /home/yourcpaneluser/logs/daily_digest.log 2>&1
 15 2 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/document_copy_cleanup.php >> /home/yourcpaneluser/logs/document_copy_cleanup.log 2>&1
+5 7 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/fetch_fx_rate.php >> /home/yourcpaneluser/logs/fetch_fx_rate.log 2>&1
 ```
 
 Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
 
+- `fetch_fx_rate.php` — once a day at 07:05 IST (owner decision D-301, 11 Nov 2026):
+  fetches the USD→INR market rate (Frankfurter, backup open.er-api.com) into
+  `fx_rates`. A move of more than 2 % waits for the MD's OK (Products ›
+  Pricing settings › Exchange rate, also listed on Approvals). Without this
+  job, Automatic mode keeps the manual rate and warns that no rate was fetched.
 - `document_copy_cleanup.php` — once a day (owner points 5/8/9, 2 Nov 2026):
   removes the document copies Admin → Settings → Document copies clean-up
   lists in its preview (drafts of approved documents, never-sent superseded

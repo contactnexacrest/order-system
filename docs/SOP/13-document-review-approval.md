@@ -101,7 +101,8 @@ opens one list of everything waiting for **you**, oldest first, with tabs:
 **All · Prices · Payment terms · Documents · E-mails · Bank details · Other**
 (amendments, cancellation requests, purchase approvals, short payments,
 associate registrations, associate price requests, field-protection and
-reorder requests). Each row shows since when it waits, what it is, the order
+reorder requests). The Prices tab also shows the day's exchange rate when it
+moved more than 2 % and waits for the MD's OK. Each row shows since when it waits, what it is, the order
 or person, the details, and a button that opens the **exact place where it
 is approved** — the approval itself is done there, as before.
 

@@ -2901,7 +2901,10 @@ the same filters, counts, fields, actions and money rules on both templates
   approvals, short payments, associate registrations, associate price
   requests, field-protection requests, reorder requests). The D-240
   "discount above warning" approval no longer exists separately — since
-  D-245 it is the line-price approval (Prices tab).
+  D-245 it is the line-price approval (Prices tab). The Prices tab also
+  holds the daily exchange rate when it moved more than 2 % and waits for
+  the MD's OK (D-301; holders of `manage_pricing`; the button opens
+  Products › Pricing settings › Exchange rate).
 - **Columns.** Waiting since ("Today 10:42", "Yesterday", "9 Nov") · What ·
   Order / who · Details · a button that opens the **exact existing approval
   screen** (line price approval page, order Step 1 for payment terms,

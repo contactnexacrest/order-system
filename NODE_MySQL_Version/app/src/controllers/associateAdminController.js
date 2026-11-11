@@ -597,7 +597,7 @@ function validateBank(associate, post) {
   return d;
 }
 
-/** Accounts enter the bank details themselves (from the associate's signed form) — still checked by two people. */
+/** Accounts enter the bank details themselves (from the associate's signed form) — the holder confirms them, then one person (or two, by the setting) verifies them. */
 /**
  * Accounts enter the bank details themselves (from the associate's signed form). D-293: the associate
  * confirms them first (portal + e-mailed code), then one person other than the enterer verifies them.

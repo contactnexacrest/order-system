@@ -17,7 +17,7 @@ final class SessionAuth
     /**
      * Returns a callable middleware. Redirects to /login if not
      * authenticated; enforces the DB-driven idle session timeout
-     * (company_settings.session_timeout_minutes); also enforces the
+     * (D-283: session_timeout_staff_minutes and session_absolute_staff_hours); also enforces the
      * forced-password-change gate so a user can't wander the app on a
      * temporary/reset password.
      */

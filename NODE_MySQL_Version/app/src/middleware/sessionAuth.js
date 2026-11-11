@@ -18,7 +18,7 @@ const dashboardRepository = require('../repositories/dashboardRepository');
 
 // Port of App\Middleware\SessionAuth. Redirects to /login if not
 // authenticated; enforces the DB-driven idle session timeout
-// (company_settings.session_timeout_minutes); enforces the forced-password-
+// (D-283: session_timeout_staff_minutes and session_absolute_staff_hours); enforces the forced-password-
 // change gate; and — new in this port, since Express has no per-request
 // global equivalent to PHP re-checking PermissionService::can() ad hoc in
 // every view — also preloads req.user and req.permissions once per request

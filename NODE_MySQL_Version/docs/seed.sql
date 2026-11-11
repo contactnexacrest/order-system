@@ -2731,7 +2731,8 @@ SELECT 'bank_details', r.id FROM roles r
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'bank_details');
 
--- =========================================================-- Owner decisions D-280 / D-281 (11 Nov 2026, point 3): Admin › E-mail settings.
+-- ================================================================
+-- Owner decisions D-280 / D-281 (11 Nov 2026, point 3): Admin › E-mail settings.
 -- One row per e-mail kind × audience that can be switched (MUST e-mails are
 -- always on and have no row). SHOULD = on, OPTIONAL = off when installed.
 -- The kinds are listed in EmailPolicy::KINDS (PHP) / emailPolicy.KINDS (Node).

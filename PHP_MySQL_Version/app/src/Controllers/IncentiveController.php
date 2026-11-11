@@ -558,7 +558,7 @@ final class IncentiveController
             // Owner decision 1 Nov 2026 (AS-7): an associate is paid only into a verified bank account past its waiting days.
             if ($payout['payee_kind'] === 'associate' && \App\Repositories\AssociateBankRepository::usable((int) $payout['associate_id'], $paidOn) === null) {
                 if (isset($params['payoutId'])) {
-                    Flash::set('error', 'This associate has no verified bank account usable on ' . \App\Helpers\Dates::short($paidOn) . ' — Accounts must verify their bank details first (two people), and a new account is usable only after its waiting days.');
+                    Flash::set('error', 'This associate has no verified bank account usable on ' . \App\Helpers\Dates::short($paidOn) . ' — Accounts must verify their bank details first, and a new account is usable only after its waiting days.');
                     header('Location: /incentives/payouts?month=' . rawurlencode($month));
                     return;
                 }

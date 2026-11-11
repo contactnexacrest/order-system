@@ -239,6 +239,18 @@ final class ApprovalsInbox
                 'bar' => $bar, 'bar_button' => "Review and approve line {$no}",
             ];
         }
+        // D-301: a daily exchange-rate move over 2 % waits for the MD's OK (Products › Pricing settings › Exchange rate).
+        $fx = FxRateService::current();
+        if ($fx['waiting'] !== null) {
+            $w = $fx['waiting'];
+            $out[] = [
+                'key' => 'fx:' . $w['id'], 'tab' => 'prices', 'what' => 'Exchange rate', 'tone' => 'red',
+                'since' => (string) $w['fetched_at'], 'order_id' => null, 'order_ref' => '', 'line_no' => null,
+                'who' => 'Daily rate of ' . $w['rate_date'],
+                'details' => 'Market rate ₹' . number_format((float) $w['market_rate'], 4) . ' per USD moved ' . FxRateService::signed((float) $w['change_pct']) . ' — not used for prices until approved',
+                'url' => '/pricing/settings#exchange-rate', 'button' => 'Review the rate', 'bar' => '', 'bar_button' => '',
+            ];
+        }
         return $out;
     }
 
