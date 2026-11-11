@@ -61,7 +61,7 @@ describe('Amendment document type signatory defaults to the MD, overridable (Q2)
 
     const financeHeadDesignationId = await signatoryRepository.createDesignation('Finance Head', superAdmin.id);
     const financeHeadUserId = await createTestUser('Export Executive');
-    await db.execute('UPDATE users SET name = :name WHERE id = :id', { name: 'Priya Deshmukh', id: financeHeadUserId });
+    await db.execute('UPDATE users SET name = :name WHERE id = :id', { name: 'Finance Director', id: financeHeadUserId });
     await signatoryRepository.setEligibility(financeHeadUserId, true, financeHeadDesignationId, superAdmin.id);
 
     try {
@@ -69,7 +69,7 @@ describe('Amendment document type signatory defaults to the MD, overridable (Q2)
 
       const block = await documentDataAssembler.signatoryBlock(amdTypeId);
 
-      expect(block.name).toBe('Priya Deshmukh');
+      expect(block.name).toBe('Finance Director');
       expect(block.designation).toBe('Finance Head');
       expect(block.designation).not.toBe('Founder & Managing Director');
     } finally {

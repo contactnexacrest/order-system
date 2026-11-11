@@ -70,7 +70,7 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     await orderReorderRequestRepository.create(clientId, orderId, 'Parity test reorder.');
     await clientIntakeRepository.create({
       company_legal_name: 'Parity Intake Ltd', billing_address: '1 Parity Street', billing_address_line1: null, billing_address_line2: null,
-      billing_city: null, billing_postcode: null, billing_country: null, vat_eori_tax_no: null, contact_person: 'Jane Buyer',
+      billing_city: null, billing_postcode: null, billing_country: null, vat_eori_tax_no: null, contact_person: 'Chief Buyer',
       email: `parity-${crypto.randomBytes(4).toString('hex')}@intake.example`, phone: null, country_of_destination: 'Netherlands',
       port_of_discharge_text: null, coo_type: null, incoterm_preference: null, container_type_text: null, buyer_own_reference: null, notes: null,
     }, '127.0.0.1');

@@ -151,7 +151,7 @@ final class TeamIncentiveTest extends DbTestCase
         // One person does Sales and Export; Marketing and Accounts are unticked: 30:15:15 over Sales, Export, Logistics.
         $flash = $this->call('saveOrderPeople', $orderId, ['gets_it' => ['sales' => '1', 'export' => '1', 'logistics' => '1'],
             'people' => ['sales' => [$this->people['sales']], 'export' => [$this->people['sales']], 'logistics' => [$this->people['logistics1'], $this->people['logistics2']]],
-            'people_note' => 'Priya did sales and documents']);
+            'people_note' => 'The Export Executive did sales and documents']);
         self::assertSame('success', $flash['type']);
         $calc = IncentiveService::calculate($orderId);
         self::assertSame([50000.0, 25000.0, 25000.0, 12500.0, false], [$calc['roles']['sales']['amount'], $calc['roles']['export']['amount'], $calc['roles']['logistics']['amount'], $calc['roles']['logistics']['each'], $calc['roles']['marketing']['gets_it']]);

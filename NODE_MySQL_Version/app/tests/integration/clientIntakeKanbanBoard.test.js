@@ -55,7 +55,7 @@ describe('Client Intake Kanban board (Task #42)', () => {
         billing_postcode: null,
         billing_country: null,
         vat_eori_tax_no: null,
-        contact_person: 'Jane Buyer',
+        contact_person: 'Chief Buyer',
         email: `jane-${crypto.randomBytes(4).toString('hex')}@intake-kanban.example`,
         phone: null,
         country_of_destination: 'Netherlands',

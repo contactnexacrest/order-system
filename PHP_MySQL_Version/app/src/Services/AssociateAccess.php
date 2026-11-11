@@ -236,7 +236,7 @@ final class AssociateAccess
     {
         // D-263: the order's FOB in a notice follows "Show FOB order value" (the commission amount itself stays).
         if (!self::allows($associate, 'fob_value')) {
-            $message = (string) preg_replace('/(invoiced FOB of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/u', '$1', $message);
+            $message = (string) preg_replace('/(invoiced FOB of the goods|invoice value of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/u', '$1', $message);
         }
         if (!self::allows($associate, 'notice_amounts')) {
             $message = (string) preg_replace('/(?:\b(?:USD|EUR|GBP|INR|AED|AUD|CAD|SGD|JPY|CNY|CHF|SAR)\s?|₹\s?|Rs\.?\s?)-?\d[\d,]*(?:\.\d+)?/u', '[amount in your portal]', $message);

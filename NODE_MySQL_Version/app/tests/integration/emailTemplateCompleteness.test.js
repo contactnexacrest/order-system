@@ -63,7 +63,7 @@ describe('Email Templates completeness — 7 system emails now admin-editable (9
       ],
       client_portal_invite: [
         'Your NexaCrest order portal access',
-        'Hello,\n\nYour advance payment has been received and cleared — thank you.\n\nYou can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\nTo set up your login, open this link within 72 hours:\n{set_password_link}\n\nYour login email will be: {email}\n\nNexaCrest International Private Limited',
+        'Hello,\n\nThank you — we have received your advance payment.\n\nYou can now sign in at any time to follow your order and download your documents: the quotation, the proforma invoice and every document we send you from now on.\n\nTo set up your login, open this link within 72 hours:\n{set_password_link}\n\nYour login email will be: {email}\n\nNexaCrest International Private Limited',
       ],
       staff_password_reset: [
         'Reset your NexaCrest password',
@@ -71,18 +71,18 @@ describe('Email Templates completeness — 7 system emails now admin-editable (9
       ],
       client_portal_password_reset: [
         'Reset your NexaCrest order portal password',
-        "Hello,\n\nA password reset was requested for your NexaCrest order portal account ({email}).\n\nTo set a new password, open this link within 72 hours:\n{reset_link}\n\nIf you didn't request this, you can ignore this email — your password will not be changed.",
+        "Hello,\n\nSomeone asked to reset the password of your NexaCrest buyer account ({email}).\n\nTo set a new password, open this link within 72 hours:\n{reset_link}\n\nIf you didn't request this, you can ignore this email — your password will not be changed.",
       ],
       quotation_correction_link: [
         'Your NexaCrest quotation request — correction link',
-        "Hello,\n\nThank you for your quotation request. We'll review it and get back to you within 24 hours.\n\nSpotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{correction_link}\n\nThis link works for 7 days.\n\nNexaCrest International Private Limited",
+        "Hello,\n\nThank you for your quotation request. We'll review it and get back to you within 24 hours.\n\nDid you make a mistake in your request? You can correct it yourself until our team starts checking it. Use this link:\n{correction_link}\n\nThis link works for 7 days.\n\nNexaCrest International Private Limited",
       ],
       pi_form_link: [
-        'NexaCrest — confirm your PI-stage details',
-        'Hello,\n\nThank you for accepting our Quotation for order {order_reference}.\n\nTo issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\nThis link works for 30 days.\n\nNexaCrest International Private Limited',
+        'NexaCrest — please confirm your details for the proforma invoice',
+        'Hello,\n\nThank you for accepting our Quotation for order {order_reference}.\n\nBefore we can send your proforma invoice, please confirm your shipping details and who receives the goods:\n{pi_form_link}\n\nThis link works for 30 days.\n\nNexaCrest International Private Limited',
       ],
       buyer_action_link: [
-        'NexaCrest — acknowledge your order / upload your Buyer PO',
+        'NexaCrest — sign your purchase order and confirm your order',
         'Hello,\n\nTo acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\nThis link works for 90 days.\n\nNexaCrest International Private Limited',
       ],
     };
@@ -260,7 +260,7 @@ describe('Email Templates completeness — 7 system emails now admin-editable (9
         billing_city: 'Testville',
         billing_country: 'Testland',
         vat_eori_tax_no: 'VAT123',
-        contact_person: 'Jane Test',
+        contact_person: 'Test Contact',
         email: 'correction-link-test@nexacrest.test',
         country_of_destination: 'Testland',
         incoterm_preference: 'FOB',

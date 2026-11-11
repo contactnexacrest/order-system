@@ -110,7 +110,7 @@ final class ZohoClientsProductsSyncTest extends DbTestCase
     private function testClient(string $name, ?string $currency = 'USD'): int
     {
         $id = $this->createTestClient();
-        Database::connection()->prepare("UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Anna Buyer', phone = '+31 10 555 0101' WHERE id = :id")
+        Database::connection()->prepare("UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Project Buyer', phone = '+31 10 555 0101' WHERE id = :id")
             ->execute(['n' => $name, 'id' => $id]);
         if ($currency !== null) {
             $this->createTestOrder($id, 'FOB', 'Standard — New Buyer', $currency);
@@ -161,7 +161,7 @@ final class ZohoClientsProductsSyncTest extends DbTestCase
         self::assertSame('customer', $p['contact_type']);
         self::assertSame('CUR-USD', $p['currency_id']);
         self::assertSame(['address' => '1 Harbour Road', 'city' => 'Rotterdam', 'zip' => '3011', 'country' => 'Netherlands'], $p['billing_address']);
-        self::assertSame('Anna Buyer', $p['contact_persons'][0]['first_name']);
+        self::assertSame('Project Buyer', $p['contact_persons'][0]['first_name']);
         self::assertStringContainsString('NL123456789B01', $p['notes']);
         self::assertSame('overseas', $p['gst_treatment']);
         $pdo = Database::connection();

@@ -23,7 +23,7 @@ abstract class DbTestCase extends TestCase
      * behind by an earlier test is cleared first, so each test can use it.
      */
     private const FIXED_TEST_CLIENT_EMAILS = [
-        'buyer@example.test', 'buyer@phpunit-test.example', 'jane@buyer.example', 'original@buyer.test',
+        'buyer@example.test', 'buyer@phpunit-test.example', 'buyer.contact@buyer.example', 'original@buyer.test',
         'renamed@buyer.test', 'confirmed@buyer.test', 'updated@buyer.test', 'intake@buyer.test',
     ];
 

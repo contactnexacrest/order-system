@@ -110,7 +110,7 @@
                     <label>Supplier Name *<input type="text" name="supplier_name" value="<?= View::e($s['supplier_name']) ?>" required placeholder="e.g. Sri Balaji Granites"></label>
                     <label>Location<input type="text" name="location" value="<?= View::e($s['location'] ?? '') ?>" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
                     <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>" placeholder="e.g., Sales Manager"></label>
-                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91 98765 43210"></label>
+                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91-0000000000"></label>
                     <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>" placeholder="e.g. name@company.com"></label>
                     <label>FOB Source
                       <select name="fob_source">
@@ -149,7 +149,7 @@
             <label>Supplier Name *<input type="text" name="supplier_name" required placeholder="e.g. Sri Balaji Granites"></label>
             <label>Location<input type="text" name="location" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
             <label>Contact Person<input type="text" name="contact_person" placeholder="e.g., Sales Manager"></label>
-            <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91 98765 43210"></label>
+            <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91-0000000000"></label>
             <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com"></label>
             <label>FOB Source
               <select name="fob_source">

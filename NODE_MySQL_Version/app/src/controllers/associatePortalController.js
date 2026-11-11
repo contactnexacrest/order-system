@@ -341,7 +341,7 @@ async function chooseCode(req, res) {
   const proposed = proposal && Number(proposal.associate_id) === Number(a.id) ? String(proposal.code) : '';
   const limit = await associateCodeService.changesPerYear();
   if (proposed === '' || String((req.body || {}).code || '') !== proposed) {
-    flash.set(req, 'error', 'Press "New ending" to get a code first, then "Use this code".');
+    flash.set(req, 'error', 'Press "Show another ending" to get a code first, then "Use this code".');
   } else if (a.personal_code && await associateCodeService.changesInLastYear(Number(a.id)) >= limit) {
     flash.set(req, 'error', `You can change your code ${limit} times a year — you have used them. Ask your relationship manager if it must change.`);
   } else {
@@ -351,7 +351,7 @@ async function chooseCode(req, res) {
     } catch (e) {
       // Someone took this code in the meantime (unique): propose again.
       delete req.session.associate_code_proposal;
-      flash.set(req, 'error', 'That code was just taken — press "New ending" for another one.');
+      flash.set(req, 'error', 'That code was just taken — press "Show another ending" for another one.');
       res.redirect('/associate/clients#code');
       return;
     }
@@ -405,7 +405,7 @@ async function commission(req, res) {
     // Owner decision 2 Nov 2026 (D-235): gross / TDS (section, rate) / net.
     p.gross_inr = Number(p.paid_inr || 0) + Number(p.tds_inr || 0);
     p.tdsRateLabel = Number(p.tds_rate || 0) > 0 ? require('../services/associateTds').pct(Number(p.tds_rate)) : '';
-    p.status_label = Number(p.amount_inr) < 0 && p.status === 'due' ? 'To be deducted' : associatePortalRepository.payoutLabel(p, false, String(p.incentive_month));
+    p.status_label = Number(p.amount_inr) < 0 && p.status === 'due' ? 'We will take this off your next payment' : associatePortalRepository.payoutLabel(p, false, String(p.incentive_month));
     p.rate_text = associatePortalRepository.orderRateText(p); // D-292: the % fixed on the order
     if (india && p.fixed_rate !== null && p.fixed_rate !== undefined && p.status !== 'paid' && Number(p.amount_inr) > 0) {
       p.fixed_line = payoutService.fixedRupeeLine(p.amount_inr, p.fixed_rate, p.currency_code, p.fixed_on);

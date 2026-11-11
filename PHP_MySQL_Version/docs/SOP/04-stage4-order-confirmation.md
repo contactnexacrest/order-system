@@ -69,8 +69,7 @@ the Order Confirmation step the buyer gets a **Download Order Confirmation
 (SC/OC/…)** button for the exact issued OC (approved, or sent while email
 is on — the same rule as every other link download, so internal documents
 such as the CA annexure can never be reached), and the button reads **"I
-have read Order Confirmation SC/OC/… — I acknowledge and confirm to
-proceed"**, so the acknowledgement names the document it accepts.
+have read order confirmation SC/OC/…. It is correct — please go ahead"** (D-330), so the acknowledgement names the document it accepts.
 
 Once the OC has actually been emailed, the order page shows exactly where
 things stand and offers the one thing staff can still do here — record an
@@ -155,7 +154,7 @@ exactly one thing:
 
 ![Client portal — Order Confirmation awaiting the buyer's acknowledgement](./images/s4_client_ack_section.png)
 
-Clicking **I acknowledge and confirm to proceed** is the buyer's entire
+Clicking **Yes, this is correct — please go ahead** (portal) is the buyer's entire
 role at this stage — a single button, deliberately with **no decline or
 dispute option** presented here. This isn't the moment to raise a
 disagreement; a genuine dispute has its own separate channel further along

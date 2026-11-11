@@ -235,8 +235,8 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
       await page.goto(`/client/orders/${orderId}`);
       const disputeForm = page.locator('form[action$="/disputes"]');
       await disputeForm.locator('textarea[name="description"]').fill('The crates arrived with visible damage to two units.');
-      await disputeForm.getByRole('button', { name: 'Raise a Dispute' }).click();
-      await expect(page.locator('body')).toContainText(/dispute has been logged/i);
+      await disputeForm.getByRole('button', { name: 'Ask to cancel this order' }).click();
+      await expect(page.locator('body')).toContainText(/We have received your request/i);
     });
 
     await test.step('Export Executive (respond_to_disputes) replies to the real dispute', async () => {

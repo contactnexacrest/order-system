@@ -20,11 +20,11 @@ const incentive = () => require('../services/incentiveService');
 function stageLabel(order) {
   const status = String(order.status);
   if (status === 'cancelled') return 'Cancelled';
-  if (status === 'lost') return 'Not proceeding';
+  if (status === 'lost') return 'Did not go ahead';
   if (['shipped_docs_sent', 'complete'].includes(status)) return 'Shipped';
   // stages_master: 1 quotation · 2 buyer PO · 3 PI · 4 OC/production · 5 supplier PO · 6 freight · 7 BL · 8 commercial invoice · 9 closure
   const n = Number(order.current_stage_number ?? 1) || 1;
-  if (n <= 1) return 'Enquiry & quotation';
+  if (n <= 1) return 'Quotation';
   if (n <= 3) return 'Order confirmed';
   if (n <= 5) return 'In production';
   if (n <= 8) return 'Shipping';
@@ -62,7 +62,7 @@ async function cameVia(client) {
   if (source === 'link' || (inv && inv.kind === 'client_link')) {
     return 'Buyer registration link';
   }
-  return ({ staff: 'Linked by NexaCrest', md_change: 'Changed by the MD' })[source] || (source !== '' ? source : '—');
+  return ({ staff: 'Linked by NexaCrest', md_change: 'Changed by NexaCrest' })[source] || (source !== '' ? source : '—');
 }
 
 /** Every order of the associate's clients, newest first. */
@@ -99,7 +99,7 @@ async function productSummary(orderId) {
   return lines.length > 1 ? `${first} + ${lines.length - 1} more` : first;
 }
 
-const NONE_REPEAT = 'No commission — repeat order (outside the 10 days from the first Buyer PO)';
+const NONE_REPEAT = 'No commission — this is a repeat order, placed more than 10 days after the first purchase order of this client';
 
 /**
  * The commission line for one order (owner decision D-245 P3: on the invoiced FOB of
@@ -146,7 +146,7 @@ async function commission(associateId, o) {
     : NOT_EARNED_LABEL;
   return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
     level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
-    rate_text: associateCommission.rateLabel(c.level) + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is sent)'), detail: c };
+    rate_text: associateCommission.rateLabel(c.level) + (c.level_fixed ? '' : ' for now — final when we send the buyer the proforma invoice'), detail: c };
 }
 
 /**

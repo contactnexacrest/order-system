@@ -353,7 +353,7 @@ async function fixLevelAtPi(orderId) {
   );
   if (Number(order.is_test_data) !== 1 && Number(order.is_sample_data) !== 1) {
     // D-292: the associate is told only their %, never a level name.
-    await require('./associateService').notify(a, 'order_created', `The Proforma Invoice for order ${order.order_reference} was issued. Your commission on it is fixed at ${rateLabel(level)}${level.kind === 'pct' ? ' of its FOB value' : ''}.`,
+    await require('./associateService').notify(a, 'order_created', `We have sent the proforma invoice for order ${order.order_reference}. Your commission rate on this order is now final: ${rateLabel(level)}.`,
       Number(order.client_id), orderId);
   }
 }
@@ -545,7 +545,7 @@ async function lapseRegistrations(today = null) {
       `Registration ended ${until} with no order from the buyer.`);
     const a = await require('../repositories/associateRepository').find(Number(c.associate_id));
     if (a) {
-      await require('./associateService').notify(a, 'registration_lapsed', `Your registration of ${c.company_legal_name} ended on ${short(until)} with no order from the buyer, so it has lapsed and the buyer is no longer linked to you.`,
+      await require('./associateService').notify(a, 'registration_lapsed', `${c.company_legal_name} did not place an order by ${short(until)}, so they are no longer your client.`,
         Number(c.id), null);
     }
     n++;

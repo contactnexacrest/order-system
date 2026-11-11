@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card card-narrow">
-  <h1>Client Login</h1>
-  <p class="muted small">For NexaCrest buyers with an active order. Your login is set up automatically once your advance payment is cleared — check your email.</p>
+  <h1>Buyer sign-in</h1>
+  <p class="muted small">This page is for NexaCrest buyers who have an order with us. When we receive your advance payment, we e-mail you a link to set up your login.</p>
   <form method="post" action="/client/login">
     <?= Csrf::field() ?>
     <label>Email

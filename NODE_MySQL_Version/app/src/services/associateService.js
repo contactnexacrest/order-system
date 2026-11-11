@@ -85,7 +85,7 @@ const SUBJECTS = {
   direct_contact: 'your client contacted us', order_created: 'new order from your client',
   commission_earned: 'commission earned', payout_paid: 'commission paid', payout_held: 'commission on hold',
   clawback: 'commission adjustment', bank_changed: 'your bank details changed', bank_rejected: 'your new bank details were not accepted', link_changed: 'a client link changed',
-  lock_ending: 'protection ending soon', registration_lapsed: 'a buyer registration lapsed', agreement_ending: 'agreement ending soon', portal_invite: 'your portal login link',
+  lock_ending: 'your client registration ends soon', registration_lapsed: 'a client is no longer linked to you', agreement_ending: 'agreement ending soon', portal_invite: 'your portal login link',
   document_accepted: 'your document was accepted', document_rejected: 'please upload a document again', code_changed: 'your personal code changed', price_ready: 'your price is ready',
 };
 
@@ -212,7 +212,7 @@ async function onOrderCreated(orderId, executor = db) {
   );
   if (Number(o.is_test_data) === 1 || Number(o.is_sample_data) === 1) return;
   await notify(a, 'order_created', `New order ${o.order_reference} from your client ${o.company_legal_name}. `
-    + (!level ? 'No commission applies to it.' : `Your commission for now: ${associateCommission.rateLabel(level)} — fixed on the order when its Proforma Invoice is issued.`), Number(o.client_id), orderId);
+    + (!level ? 'No commission applies to it.' : `Your commission rate for now is ${associateCommission.rateLabel(level)}. It becomes final when we send the buyer the proforma invoice.`), Number(o.client_id), orderId);
 }
 
 /**
@@ -233,12 +233,13 @@ async function onPayoutPaid(payoutId, userId) {
   const order = await orderRepository.find(Number(p.order_id));
   if (a) {
     const fmt = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    await notify(a, 'payout_paid', `Commission paid for order ${order ? order.order_reference : p.order_id}: INR ${fmt(p.paid_inr)}`
-      // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net.
-      + (Number(p.tds_inr || 0) > 0 ? ` (gross INR ${fmt(Number(p.paid_inr) + Number(p.tds_inr))}, TDS deducted INR ${fmt(p.tds_inr)}`
-        + (p.tds_section ? ` u/s ${p.tds_section}` : '') + (Number(p.tds_rate || 0) > 0 ? ` at ${require('./associateTds').pct(Number(p.tds_rate))}` : '') + ')' : '')
-      + (Number(p.gst_inr || 0) > 0 ? ` + GST INR ${Number(p.gst_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} on your tax invoice` : '')
-      + ` on ${dates.short(String(p.paid_on))}${p.paid_reference ? `, bank reference ${p.paid_reference}` : ''}.`, null, Number(p.order_id), null, userId);
+    // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net. D-330: in plain words —
+    // what was paid, when, the bank reference; then the tax deducted and the GST.
+    await notify(a, 'payout_paid', `We have paid your commission for order ${order ? order.order_reference : p.order_id}: INR ${fmt(p.paid_inr)}`
+      + `, on ${dates.short(String(p.paid_on))}${p.paid_reference ? `, bank reference ${p.paid_reference}` : ''}.`
+      + (Number(p.tds_inr || 0) > 0 ? ` Before tax it was INR ${fmt(Number(p.paid_inr) + Number(p.tds_inr))}; we deducted INR ${fmt(p.tds_inr)}`
+        + ' tax (TDS' + (p.tds_section ? `, Income Tax Act section ${p.tds_section}` : '') + (Number(p.tds_rate || 0) > 0 ? `, ${require('./associateTds').pct(Number(p.tds_rate))}` : '') + ').' : '')
+      + (Number(p.gst_inr || 0) > 0 ? ` We also paid GST of INR ${Number(p.gst_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} on your tax invoice.` : ''), null, Number(p.order_id), null, userId);
   }
 }
 
@@ -259,7 +260,7 @@ async function dailyReminders(today = null) {
     for (const c of clientRows) {
       const a = await associateRepository.find(Number(c.associate_id));
       if (a && !(await associateEventRepository.hasEvent(Number(a.id), `lock_ending_${days}`, Number(c.id), null))) {
-        await notify(a, 'lock_ending', `Your protection for ${c.company_legal_name} ends on ${dates.short(String(c.associate_locked_until))} (${days} days) and the client has not ordered yet. Ask your relationship manager if you need an extension.`, Number(c.id));
+        await notify(a, 'lock_ending', `${c.company_legal_name} stays your client only until ${dates.short(String(c.associate_locked_until))} (${days} days from now). They have not ordered yet. If you need more time, ask your relationship manager.`, Number(c.id));
         await associateEventRepository.add(Number(a.id), `lock_ending_${days}`, `Reminder sent (${days} days).`, Number(c.id), null, null, null, false);
         sent++;
       }

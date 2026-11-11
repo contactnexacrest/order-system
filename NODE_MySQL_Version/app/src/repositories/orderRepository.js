@@ -829,7 +829,7 @@ async function applyAmendmentOverride(orderId, advancePct, balancePct, balanceTr
 async function forClient(clientId, activeOnly = false) {
   const statusFilter = activeOnly ? " AND o.status IN ('active','disputed')" : '';
   return db.query(
-    `SELECT o.*, sm.stage_name AS current_stage_name
+    `SELECT o.*, sm.stage_name AS current_stage_name, sm.stage_number AS current_stage_number
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      WHERE o.client_id = :client_id${statusFilter}

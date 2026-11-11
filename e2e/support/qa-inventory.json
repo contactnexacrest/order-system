@@ -33511,7 +33511,7 @@
   {
    "template_key": "send_fdn",
    "seeded_in_email_templates": true,
-   "subject": "Debit Note {document_reference} — Payment Required Before Shipment",
+   "subject": "Freight bill (debit note) {document_reference} — please pay before we ship",
    "kind": "queue",
    "trigger": "Send approved Freight Debit Note (CFR/CIF only)",
    "attachments": "FDN PDF",
@@ -33601,7 +33601,7 @@
   {
    "template_key": "shipment_readiness",
    "seeded_in_email_templates": true,
-   "subject": "Shipment Readiness Confirmation — Order {order_reference}",
+   "subject": "Your order {order_reference} is ready to ship (shipment readiness confirmation)",
    "kind": "queue",
    "trigger": "Generic order email",
    "attachments": "none",
@@ -33721,7 +33721,7 @@
   {
    "template_key": "pi_form_link",
    "seeded_in_email_templates": true,
-   "subject": "NexaCrest — confirm your PI-stage details",
+   "subject": "NexaCrest — please confirm your details for the proforma invoice",
    "kind": "direct",
    "trigger": "POST /orders/{id}/pi-form-link",
    "attachments": "none",
@@ -33736,7 +33736,7 @@
   {
    "template_key": "buyer_action_link",
    "seeded_in_email_templates": true,
-   "subject": "NexaCrest — acknowledge your order / upload your Buyer PO",
+   "subject": "NexaCrest — sign your purchase order and confirm your order",
    "kind": "direct",
    "trigger": "POST /orders/{id}/buyer-action-link",
    "attachments": "none",
@@ -41313,7 +41313,7 @@
     {
      "name": "phone",
      "type": "tel",
-     "placeholder": "e.g. +91 98765 43210",
+     "placeholder": "e.g. +91-0000000000",
      "maxlength": "40"
     },
     {
@@ -41736,7 +41736,7 @@
      "name": "phone",
      "type": "tel",
      "required": true,
-     "placeholder": "e.g. +91 98765 43210",
+     "placeholder": "e.g. +91-0000000000",
      "pattern": "[0-9 +()\\-]{6,40}",
      "minlength": "6",
      "maxlength": "40"
@@ -43237,12 +43237,12 @@
     {
      "name": "phone",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "whatsapp_number",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "email",
@@ -43257,12 +43257,12 @@
     {
      "name": "contact_person_phone",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "contact_person_whatsapp",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "gstin",
@@ -44572,7 +44572,7 @@
     {
      "name": "phone",
      "type": "tel",
-     "placeholder": "e.g. +91 98765 43210",
+     "placeholder": "e.g. +91-0000000000",
      "maxlength": "40"
     },
     {
@@ -47748,7 +47748,7 @@
     {
      "name": "contact_phone",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "contact_email",
@@ -47852,7 +47852,7 @@
     {
      "name": "contact_phone",
      "type": "text",
-     "placeholder": "e.g. +91 98765 43210"
+     "placeholder": "e.g. +91-0000000000"
     },
     {
      "name": "contact_email",
@@ -50723,12 +50723,12 @@
     {
      "name": "phone",
      "type": "text",
-     "placeholder": "e.g., +91 98765 43210"
+     "placeholder": "e.g., +91-0000000000"
     },
     {
      "name": "whatsapp_number",
      "type": "text",
-     "placeholder": "e.g., +91 98765 43210"
+     "placeholder": "e.g., +91-0000000000"
     },
     {
      "name": "email",
@@ -50743,12 +50743,12 @@
     {
      "name": "contact_person_phone",
      "type": "text",
-     "placeholder": "e.g., +91 98765 43210"
+     "placeholder": "e.g., +91-0000000000"
     },
     {
      "name": "contact_person_whatsapp",
      "type": "text",
-     "placeholder": "e.g., +91 98765 43210"
+     "placeholder": "e.g., +91-0000000000"
     },
     {
      "name": "gstin",

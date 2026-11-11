@@ -248,13 +248,13 @@ final class ZohoBooksStage3Test extends DbTestCase
     public function testOrderExpensesGoToBooksAndAreNotImportedBack(): void
     {
         $o = $this->createOrder();
-        $staff = OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-22', 'category' => 'travel_ticket', 'details' => 'Train to the factory', 'amount_inr' => 2450, 'paid_by' => 'staff', 'staff_name' => 'Ravi', 'no_receipt_reason' => 'test'], $this->userId);
+        $staff = OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-22', 'category' => 'travel_ticket', 'details' => 'Train to the factory', 'amount_inr' => 2450, 'paid_by' => 'staff', 'staff_name' => 'Export Executive', 'no_receipt_reason' => 'test'], $this->userId);
         OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-23', 'category' => 'courier', 'details' => 'Samples to buyer', 'amount_inr' => 1800, 'paid_by' => 'company_account', 'no_receipt_reason' => 'test'], $this->userId);
 
         self::assertSame(2, $this->sync()['expenses']);
         $staffExpense = $this->expenses['EX-1'];
         self::assertSame(['account_id' => 'AC-TRAVEL', 'paid_through_account_id' => 'AC-EMP', 'amount' => 2450.0, 'date' => '2026-10-22', 'reference_number' => "NX-{$o['order']}-EXP-{$staff}",
-            'description' => "TEST-Stage3 Buyer / NX-{$o['order']}: Travel — train / flight / bus — Train to the factory (paid by Ravi)", 'expense_id' => 'EX-1'], $staffExpense);
+            'description' => "TEST-Stage3 Buyer / NX-{$o['order']}: Travel — train / flight / bus — Train to the factory (paid by Export Executive)", 'expense_id' => 'EX-1'], $staffExpense);
         self::assertSame(['AC-POST', 'SBI-1'], [$this->expenses['EX-2']['account_id'], $this->expenses['EX-2']['paid_through_account_id']]);
 
         $import = CaSyncService::importPendingExpenses('manual', null);

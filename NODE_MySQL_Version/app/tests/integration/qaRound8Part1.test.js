@@ -216,7 +216,7 @@ describe('QA Round 8, part 1', () => {
 
   const intakePost = (company, token) => ({
     company_legal_name: company, billing_address_line1: '1 Harbour Road', billing_city: 'Rotterdam', billing_country: 'Netherlands',
-    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Jan Buyer', email: `jan@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
+    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Purchase Head', email: `jan@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
     country_of_destination: 'Netherlands', incoterm_preference: 'FOB', consignee_same_as_buyer: '1', website: '', associate_inv: token,
   });
   const submissionsFor = (associateId) => db.query('SELECT * FROM client_intake_submissions WHERE associate_id = :a ORDER BY id', { a: associateId });

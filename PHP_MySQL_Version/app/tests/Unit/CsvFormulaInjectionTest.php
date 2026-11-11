@@ -50,7 +50,7 @@ final class CsvFormulaInjectionTest extends TestCase
             ['Ordinary Trading Co.'],
             ['Client -inline dash is fine mid-string'],
             [''],
-            ['john@example.com'],
+            ['buyer.main@example.com'],
             ['A-1 Warehouse'],
             ['-1250.50'], // a plain negative number stays a number Excel can add up
         ];

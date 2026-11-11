@@ -37,7 +37,7 @@
     {% if issuedBuyerPo %}
       <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/buyer-po-document">&#11015; Download Purchase Order ({{ issuedBuyerPo.document_reference }})</a></p>
     {% else %}
-      <p class="intake-note">Your Purchase Order is being prepared — you can already upload your own signed PO below if you have one.</p>
+      <p class="intake-note">We are still preparing your purchase order. If you already have your own signed purchase order, you can upload it below now.</p>
     {% endif %}
     {% if buyerPoDocuments.length %}
       <table class="list">
@@ -51,7 +51,7 @@
       </table>
     {% endif %}
     {% if advanceCleared %}
-      <p class="muted small">The advance payment has already cleared, so uploads here are closed. Contact your NexaCrest representative if you need to send an updated copy.</p>
+      <p class="muted small">We have received your advance payment, so you can no longer upload here. If you need to send us a new copy, please contact your NexaCrest contact person.</p>
     {% else %}
     <form method="post" action="/buyer-action/{{ token }}/buyer-po" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -69,7 +69,7 @@
     <legend><span class="intake-step-num">2</span> Advance Payment <span class="action-status todo">Action needed</span></legend>
     <ol class="action-howto">
       <li><strong>Download</strong> your Proforma Invoice and pay the advance shown on it.</li>
-      <li><strong>Tell us</strong> the transaction details below — our team checks them against our bank statement.</li>
+      <li><strong>Tell us</strong> the payment details below (with the bank reference number). Our team checks them against our bank statement.</li>
     </ol>
     {% if issuedPi %}
       <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/proforma-invoice">&#11015; Download Proforma Invoice ({{ issuedPi.document_reference }})</a></p>
@@ -77,10 +77,10 @@
     <form method="post" action="/buyer-action/{{ token }}/report-payment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="{{ today() }}"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label class="full">Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
       <button type="submit">Submit Payment Details</button>
@@ -90,18 +90,18 @@
   {% elif task == 'oc' %}
   <fieldset class="intake-step action-step">
     <legend><span class="intake-step-num">3</span> Order Confirmation <span class="action-status todo">Action needed</span></legend>
-    <p><strong>Your Acknowledgement Needed</strong> — please read the Order Confirmation, check the summary below and confirm to proceed.</p>
+    <p><strong>Please confirm your order.</strong> Read the order confirmation and check the summary below. If everything is correct, press the button.</p>
     {# Owner decision (2026-10-27): the buyer reads the exact document they acknowledge. #}
     {% if issuedOc %}
       <p><a class="btn btn-secondary" href="/buyer-action/{{ token }}/order-confirmation">&#11015; Download Order Confirmation ({{ issuedOc.document_reference }})</a></p>
     {% endif %}
     <div class="action-kv">
       <div><span class="k">Order Reference</span><span class="v">{{ order.order_reference }}</span></div>
-      <div><span class="k">Total Order Value (FOB)</span><span class="v">{{ order.currency_code or '' }} {{ totalFobValue | money }}</span></div>
+      <div><span class="k">Total value of the goods (FOB — before freight and insurance)</span><span class="v">{{ order.currency_code or '' }} {{ totalFobValue | money }}</span></div>
       <div><span class="k">Advance Paid</span><span class="v">{% if advanceReceived != null %}{{ order.currency_code or '' }} {{ advanceReceived | money }}{% else %}—{% endif %}</span></div>
       <div><span class="k">Balance Due</span><span class="v">{{ order.currency_code or '' }} {{ balanceDue | money }}</span></div>
-      <div><span class="k">Incoterm</span><span class="v">{{ order.incoterm_code or '—' }}</span></div>
-      <div><span class="k">Port of Discharge</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or '—' }}</span></div>
+      <div><span class="k">Delivery terms (Incoterm)</span><span class="v">{{ order.incoterm_code or '—' }}</span></div>
+      <div><span class="k">Port where the goods arrive</span><span class="v">{{ order.port_of_discharge_name or order.port_of_discharge_text or '—' }}</span></div>
     </div>
     <table class="list">
       <tr><th>Product</th><th>Quantity</th></tr>
@@ -111,7 +111,7 @@
     </table>
     <form method="post" action="/buyer-action/{{ token }}/acknowledge-oc">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-success">{% if issuedOc %}I have read Order Confirmation {{ issuedOc.document_reference }} — {% endif %}I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success">{% if issuedOc %}I have read order confirmation {{ issuedOc.document_reference }}. It is correct — please go ahead{% else %}Yes, this is correct — please go ahead{% endif %}</button>
     </form>
   </fieldset>
 
@@ -119,13 +119,13 @@
   <div class="action-wait">
     {% if task == 'waiting_pi' %}
       <h2>&#10003; Thank you — nothing to do right now</h2>
-      <p>We have your signed Purchase Order{% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %} <strong>{{ order.buyers_po_ref }}</strong>{% endif %}. We're preparing your Proforma Invoice and will email you when it's ready — then this same link will show you how to pay the advance.</p>
+      <p>We have your signed purchase order{% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %} <strong>{{ order.buyers_po_ref }}</strong>{% endif %}. We are now preparing your proforma invoice and will e-mail you when it is ready. This same link will then show you how to pay the advance.</p>
     {% elif task == 'advance_reported' %}
       <h2>&#10003; Thank you — we're checking your payment</h2>
       <p>We've received your advance payment details and our team is verifying them against our bank statement. We'll email you as soon as it's confirmed.</p>
     {% elif task == 'done' %}
       <h2>&#10003; All set — thank you</h2>
-      <p>There's nothing left for you to do on this link. Your order is moving ahead; we'll keep you updated by email and in your <a href="/client/login">client portal</a>.</p>
+      <p>There's nothing left for you to do on this link. Your order is moving ahead; we'll keep you updated by e-mail and in your <a href="/client/login">buyer account</a>.</p>
     {% else %}
       <h2>&#10003; Thank you — nothing to do right now</h2>
       <p>Your order is with our team. We'll email you when there's something for you to do next — this same link will show it.</p>
@@ -133,5 +133,5 @@
   </div>
   {% endif %}
 
-  <p class="muted small">Questions? Reply to the email this link came with{% if task != 'buyer_po' %}, or <a href="/client/login">log in to your client portal</a> once your advance payment has cleared{% endif %}.</p>
+  <p class="muted small">Questions? Reply to the email this link came with{% if task != 'buyer_po' %}, or <a href="/client/login">sign in to your buyer account</a> once we have received your advance payment{% endif %}.</p>
 </div>

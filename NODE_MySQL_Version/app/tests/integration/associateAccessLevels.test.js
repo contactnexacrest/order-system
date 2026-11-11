@@ -112,10 +112,10 @@ describe('Associate portal access levels (D-261)', () => {
         const r = await agent.get(p);
         if (allowed[feature]) {
           expect([level, p, r.status]).not.toEqual([level, p, 403]);
-          expect(r.text).not.toContain('Not available at your access level');
+          expect(r.text).not.toContain('This page is not open for your account');
         } else {
           expect([level, p, r.status]).toEqual([level, p, 403]);
-          expect(r.text).toContain('Not available at your access level');
+          expect(r.text).toContain('This page is not open for your account');
         }
       }
       const home = (await agent.get('/associate')).text;
@@ -176,7 +176,7 @@ describe('Associate portal access levels (D-261)', () => {
     const agent = await staff(admin);
     const name = `New Assoc ${crypto.randomBytes(3).toString('hex')}`;
     await post(agent, '/associates/new', '/associates', { name, based_in: 'india', currency_code: 'INR', email: `new-${crypto.randomBytes(3).toString('hex')}@assoc.test`,
-      phone: '+91 98765 43210', commission_mode: 'ladder' });
+      phone: '+91-0000000000', commission_mode: 'ladder' });
     expect((await db.queryOne('SELECT access_level FROM associates WHERE name = :n', { n: name })).access_level).toBe('starter');
   });
 

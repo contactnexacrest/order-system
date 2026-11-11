@@ -475,8 +475,8 @@ final class PriceRequestService
             'b' => json_encode(['lines' => [['label' => 'Priced by NexaCrest' . ($note !== '' ? ': ' . $note : ''), 'change' => '—']], 'charges' => []]), 'id' => $id]);
         AuditLogRepository::log($userId, 'PRICE_REQUEST_PRICED', 'price_requests', $id, null, null, "{$r['number']}: USD {$quote} / {$lowest} per {$unit}");
         if ($associate !== null) {
-            AssociateService::notify($associate, 'price_ready', "Your price request {$r['number']} has a price: quote USD " . number_format($q, 2) . ', lowest USD ' . number_format($l, 2)
-                . " per {$unit}, valid until " . \App\Helpers\Dates::short($validUntil) . '.');
+            AssociateService::notify($associate, 'price_ready', "Your price request {$r['number']} is ready. Price to quote: USD " . number_format($q, 2) . " per {$unit}. Lowest price you may agree: USD " . number_format($l, 2)
+                . " per {$unit}. Valid until " . \App\Helpers\Dates::short($validUntil) . '.');
         }
         return null;
     }

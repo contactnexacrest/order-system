@@ -1,10 +1,10 @@
 {# Expects: orders (each with order_reference, created_at, company_legal_name, products, currency_code, fob_value, stage, buyer_paid_in_full, commission). #}
 <div class="card page-wide">
   <h1>Orders of my clients</h1>
-  <p class="muted">Commission is earned on a client's first orders (everything ordered in the 10 days from their first purchase order), once the buyer has paid the order in full — never on the advance alone. Repeat orders after that earn no commission.</p>
+  <p class="muted">You earn commission on a client's first orders: everything they order within 10 days of their first purchase order. You earn it when the buyer has paid the order in full, not when they pay only the advance. Later repeat orders do not earn commission.</p>
   <table class="list">
     {# D-261: the FOB value and the commission only where the access level shows them #}
-    <tr><th>Order</th><th>Client</th><th>Products</th>{% if access.fob_value %}<th>FOB value</th>{% endif %}<th>Stage</th><th>Buyer paid in full</th>{% if access.commission %}<th>Commission</th>{% endif %}</tr>
+    <tr><th>Order</th><th>Client</th><th>Products</th>{% if access.fob_value %}<th>Value of the goods (FOB, without freight)</th>{% endif %}<th>Stage</th><th>Buyer paid in full</th>{% if access.commission %}<th>Commission</th>{% endif %}</tr>
     {% for o in orders %}
       <tr><td><a href="/associate/orders/{{ o.id }}">{{ o.order_reference }}</a><br><small class="muted">{{ o.created_at | shortDate }}</small></td>
         <td>{{ o.company_legal_name }}</td><td>{{ o.products }}</td>
@@ -13,5 +13,5 @@
     {% endfor %}
     {% if orders.length == 0 %}<tr><td colspan="7" class="muted">No orders yet.</td></tr>{% endif %}
   </table>
-  {% if not access.fob_value %}<p class="small muted">The order value (FOB) is not shown at your access level.</p>{% endif %}
+  {% if not access.fob_value %}<p class="small muted">Order values are not shown for your account.</p>{% endif %}
 </div>

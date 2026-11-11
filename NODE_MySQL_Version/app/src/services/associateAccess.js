@@ -198,7 +198,7 @@ async function maskNotice(associate, message) {
   let m = String(message);
   // D-263: the order's FOB in a notice follows "Show FOB order value" (the commission amount itself stays).
   if (!f.fob_value) {
-    m = m.replace(/(invoiced FOB of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/gu, '$1');
+    m = m.replace(/(invoiced FOB of the goods|invoice value of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/gu, '$1');
   }
   if (!f.notice_amounts) {
     m = m.replace(/(?:\b(?:USD|EUR|GBP|INR|AED|AUD|CAD|SGD|JPY|CNY|CHF|SAR)\s?|₹\s?|Rs\.?\s?)-?\d[\d,]*(?:\.\d+)?/gu, '[amount in your portal]');

@@ -53,9 +53,9 @@ function rateText(rate) {
   return `₹${money(rate)}`;
 }
 
-/** India only, once fixed: "You will be paid ₹104,312.50 (fixed at ₹83.45 per USD on 12 Nov 2026; will not change)". */
+/** India only, once fixed: "We will pay you ₹104,312.50 (at ₹83.45 per USD, set on 12 Nov 2026; this will not change)". */
 function fixedRupeeLine(inr, rate, currency, fixedOn) {
-  return `You will be paid ₹${money(inr)} (fixed at ${rateText(rate)} per ${currency} on ${short(ymd(fixedOn))}; will not change)`;
+  return `We will pay you ₹${money(inr)} (at ${rateText(rate)} per ${currency}, set on ${short(ymd(fixedOn))}; this will not change)`;
 }
 
 function currencyName(cur) {
@@ -64,18 +64,18 @@ function currencyName(cur) {
 
 async function chargesText() {
   return (await associateCommission().settings()).abroad_charges === 'SHA'
-    ? "NexaCrest pays its own bank's charges; your own bank may charge you on receipt."
-    : "NexaCrest pays its own and the intermediary bank's charges.";
+    ? "We pay our own bank's charges; your own bank may charge you when the money arrives."
+    : "We pay our bank's charges and the charges of any bank in between.";
 }
 
 /** The "How your commission is fixed" box, worded for India or abroad. */
 async function howFixedBox(associate) {
-  const title = 'How your commission is fixed — it never changes afterwards';
+  const title = 'How we set your commission — it does not change later';
   if (isIndia(associate)) {
-    return { title, text: "Your commission is a percentage of the goods value (FOB) in the order's currency. On the day the buyer completes payment, it is fixed in rupees at the exchange rate the buyer's payment was actually converted at. That rupee amount is what you are paid. Later changes in the exchange rate do not raise or lower it. NexaCrest pays all bank charges." };
+    return { title, text: "Your commission is a percentage of the value of the goods (FOB), in the order's currency. On the day the buyer finishes paying, we turn it into rupees at the rate the bank used for the buyer's payment. We pay you that rupee amount. If the exchange rate changes later, your amount stays the same. We pay all bank charges." };
   }
   const cur = String((associate && associate.currency_code) || 'USD');
-  return { title, text: `Your commission is a percentage of the goods value (FOB). It is fixed in ${currencyName(cur)} on the day the buyer completes payment, and you are paid exactly that amount in ${currencyName(cur)} to your verified account. ${await chargesText()} Any conversion into your local currency is done by your own bank.` };
+  return { title, text: `Your commission is a percentage of the value of the goods (FOB). On the day the buyer finishes paying, we set the amount in ${currencyName(cur)}. We pay you exactly that amount in ${currencyName(cur)} into your checked bank account. ${await chargesText()} If you need it in your local currency, your own bank changes it.` };
 }
 
 /** The message the associate gets when the commission is fixed (portal notice and e-mail, mockup 7). */
@@ -83,15 +83,15 @@ async function fixedMessage(associate, order, a, dueOn, runOn) {
   const cur = String(a.currency);
   const level = associateCommission().rateLabel(a.level || null);
   const head = `Your client ${order.company_legal_name || 'Your client'} has paid order ${order.order_reference} in full. `;
-  const when = `It is due on ${short(ymd(dueOn))} and will be paid in the ${short(ymd(runOn))} payout run to your verified bank account`;
+  const when = `It is due on ${short(ymd(dueOn))}. We will pay it on ${short(ymd(runOn))} into your checked bank account`;
   if (isIndia(associate)) {
-    return `${head}Your commission is now fixed at ₹${money(a.amount_inr)} (${cur} ${money(a.amount_fc)}, ${level} of the invoiced goods value, at ${rateText(a.rate_inr)} per ${cur} — the rate at which the buyer's payments were converted by the bank). `
-      + `This amount will not change, whatever the exchange rate does from now on. ${when}, after TDS as the law requires. `
-      + 'Please upload your invoice for this commission under My commission. NexaCrest pays all bank charges.';
+    return `${head}Your commission is ₹${money(a.amount_inr)} (${cur} ${money(a.amount_fc)}: ${level} of the invoice value of the goods, at ${rateText(a.rate_inr)} per ${cur}, the rate the bank used for the buyer's payment). `
+      + `This amount will not change, even if the exchange rate changes. ${when}, after deducting tax (TDS) as the law requires. `
+      + 'Please upload your invoice for this commission under "My commission". We pay all bank charges.';
   }
-  return `${head}Your commission is now fixed at ${cur} ${money(a.amount_fc)} (${level} of the invoiced goods value). `
-    + `This amount will not change. ${when}, paid in ${currencyName(cur)}. `
-    + `Please upload your invoice for this commission under My commission. ${await chargesText()}`;
+  return `${head}Your commission is ${cur} ${money(a.amount_fc)} (${level} of the invoice value of the goods). `
+    + `This amount will not change. ${when}, in ${currencyName(cur)}. `
+    + `Please upload your invoice for this commission under "My commission". ${await chargesText()}`;
 }
 
 /** Called after a buyer payment is cleared or its rupees recorded: fixes the commission if the order is now fully paid. Never throws. */
@@ -211,14 +211,14 @@ async function daily(t = null) {
       if (await incentiveRepository.holdPayout(Number(p.id), CLAIM_HOLD_REASON)) {
         out.held++;
         if (associate && order) {
-          await associateService().notify(associate, 'payout_held', `Your commission on order ${order.order_reference} is on hold: ${CLAIM_HOLD_REASON}`, Number(order.client_id), Number(order.id));
+          await associateService().notify(associate, 'payout_held', `Your commission on order ${order.order_reference} is on hold. The buyer has an open claim (complaint) about this order. We will pay your commission once it is settled.`, Number(order.client_id), Number(order.id));
         }
       }
     } else if (p.status === 'held' && String(p.hold_reason || '') === CLAIM_HOLD_REASON && !claim) {
       if (await incentiveRepository.releasePayout(Number(p.id))) {
         out.released++;
         if (associate && order) {
-          await associateService().notify(associate, 'commission_earned', `The buyer claim on order ${order.order_reference} is resolved — your commission is no longer on hold and is paid in the ${short(ymd(p.payout_run_on))} payout run.`, Number(order.client_id), Number(order.id));
+          await associateService().notify(associate, 'commission_earned', `The buyer's claim on order ${order.order_reference} is settled. Your commission is no longer on hold. We will pay it on ${short(ymd(p.payout_run_on))}.`, Number(order.client_id), Number(order.id));
         }
       }
     }

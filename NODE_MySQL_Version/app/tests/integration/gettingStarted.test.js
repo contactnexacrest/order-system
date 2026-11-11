@@ -25,7 +25,7 @@ describe('Getting Started controller', () => {
   }
 
   it('renders with no layout wrapper, for any logged-in user regardless of role', async () => {
-    const req = { user: { name: 'Priya Example' }, permissions: {} };
+    const req = { user: { name: 'Example Contact' }, permissions: {} };
     const res = fakeRes();
 
     await gettingStartedController.show(req, res);
@@ -43,12 +43,12 @@ describe('Getting Started controller', () => {
   });
 
   it('passes the signed-in user\'s name through to the view', async () => {
-    const req = { user: { name: 'Priya Example' }, permissions: {} };
+    const req = { user: { name: 'Example Contact' }, permissions: {} };
     const res = fakeRes();
 
     await gettingStartedController.show(req, res);
 
-    expect(res.renderedData.userName).toBe('Priya Example');
+    expect(res.renderedData.userName).toBe('Example Contact');
   });
 
   it('falls back to a null userName when req.user is missing', async () => {

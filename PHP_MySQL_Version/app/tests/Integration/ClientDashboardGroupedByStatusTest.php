@@ -103,7 +103,7 @@ final class ClientDashboardGroupedByStatusTest extends DbTestCase
         $output = $this->render($clientId);
 
         self::assertStringContainsString('Active (1)', $output);
-        self::assertStringContainsString('Lost (1)', $output);
+        self::assertStringContainsString('Did not go ahead (1)', $output);
     }
 
     public function testGroupsRenderInTheFixedMostRelevantFirstOrder(): void
@@ -129,7 +129,7 @@ final class ClientDashboardGroupedByStatusTest extends DbTestCase
 
         $output = $this->render($clientId);
 
-        self::assertStringNotContainsString('Lost (0)', $output);
+        self::assertStringNotContainsString('Did not go ahead (0)', $output);
         self::assertStringNotContainsString('Cancelled (0)', $output);
         self::assertStringNotContainsString('Disputed (0)', $output);
     }

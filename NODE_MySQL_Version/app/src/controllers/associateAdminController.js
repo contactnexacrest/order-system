@@ -528,7 +528,7 @@ async function linkClient(req, res) {
     await associateService.linkClient(clientId, Number(a.id), 'staff', null, registeredOn, req.user.id);
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_LINKED', 'clients', clientId, 'associate_id', null, String(a.id));
     const until = associateService.addMonths(associateService.todayIst(), await associateService.protectionMonths());
-    await associateService.notify(a, 'client_accepted', `${client.company_legal_name} is registered as your client (linked by NexaCrest: ${reason}). Your protection runs until ${dates.short(until)}.`, clientId, null, null, req.user.id);
+    await associateService.notify(a, 'client_accepted', `${client.company_legal_name} is now registered as your client (NexaCrest linked them to you: ${reason}). It stays your client until ${dates.short(until)}.`, clientId, null, null, req.user.id);
     flash.set(req, 'success', 'Client linked to the associate.');
   }
   back(res, a.id, 'clients');
@@ -697,7 +697,7 @@ async function verifyBank(req, res) {
     await auditLogRepository.log(uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', Number(bank.id), 'status', 'pending', 'verified',
       `${checks ? `Checked: ${bankDetailsCheck.checksText(checks)}. ` : ''}${selfReason !== null ? `Own entry — reason: ${selfReason}` : ''}`.trim() || null);
     // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
-    const mailed = await associateService.notify(a, 'bank_changed', `Your bank account ${associateBankRepository.masked(b)} was verified by NexaCrest. Payments go to it from `
+    const mailed = await associateService.notify(a, 'bank_changed', `We have checked your bank account ${associateBankRepository.masked(b)}. We will pay into it from `
       + `${dates.short(String(b.usable_from))}. If you did not ask for this change, contact NexaCrest at once.`, null, null, null, uid);
     // D-280: "e-mailed" only when it was.
     flash.set(req, 'success', `Verified. Usable from ${dates.short(String(b.usable_from))}${mailed ? '; the associate was e-mailed.' : '; the associate sees it in their portal (the e-mail could not be sent).'}`);
@@ -982,7 +982,7 @@ async function clawback(req, res) {
       await db.execute('UPDATE incentive_payouts SET takeback_kind = :k WHERE id = :id', { k: kind, id });
       await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLAWBACK', 'incentive_payouts', id, 'takeback_kind', null, String(amount), `${kind}: ${reason}`);
       const a = await associateRepository.find(Number(p.associate_id));
-      await associateService.notify(a, 'clawback', `INR ${fmt2(amount)} of the commission paid on order ${order ? order.order_reference : ''} is taken back (${kind === 'fraud' ? 'fraud' : 'breach of the agreement'}) and deducted from your ${incentiveService.monthLabel(month)} payout: ${reason}`, null, Number(p.order_id), null, req.user.id);
+      await associateService.notify(a, 'clawback', `We are taking back INR ${fmt2(amount)} of the commission we paid you on order ${order ? order.order_reference : ''}, because of ${kind === 'fraud' ? 'fraud' : 'a breach of the agreement'}. We will take it off your ${incentiveService.monthLabel(month)} payment. Reason: ${reason}`, null, Number(p.order_id), null, req.user.id);
       flash.set(req, 'success', `Take-back recorded (${kind}); it is deducted from the associate's next payout.`);
     }
   }

@@ -63,24 +63,24 @@ final class AssociatePayoutService
         return '₹' . number_format($rate, 2);
     }
 
-    /** India only, once fixed: "You will be paid ₹104,312.50 (fixed at ₹83.45 per USD on 12 Nov 2026; will not change)". */
+    /** India only, once fixed: "We will pay you ₹104,312.50 (at ₹83.45 per USD, set on 12 Nov 2026; this will not change)". */
     public static function fixedRupeeLine(float $inr, float $rate, string $currency, string $fixedOn): string
     {
-        return 'You will be paid ₹' . self::money($inr) . ' (fixed at ' . self::rateText($rate) . ' per ' . $currency . ' on ' . Dates::short(substr($fixedOn, 0, 10)) . '; will not change)';
+        return 'We will pay you ₹' . self::money($inr) . ' (at ' . self::rateText($rate) . ' per ' . $currency . ', set on ' . Dates::short(substr($fixedOn, 0, 10)) . '; this will not change)';
     }
 
     /** @return array{title:string, text:string} the "How your commission is fixed" box, worded for India or abroad. */
     public static function howFixedBox(?array $associate): array
     {
-        $title = 'How your commission is fixed — it never changes afterwards';
+        $title = 'How we set your commission — it does not change later';
         if (self::isIndia($associate)) {
-            return ['title' => $title, 'text' => 'Your commission is a percentage of the goods value (FOB) in the order\'s currency. On the day the buyer completes payment, it is fixed in rupees at the exchange rate the buyer\'s payment was actually converted at. That rupee amount is what you are paid. Later changes in the exchange rate do not raise or lower it. NexaCrest pays all bank charges.'];
+            return ['title' => $title, 'text' => 'Your commission is a percentage of the value of the goods (FOB), in the order\'s currency. On the day the buyer finishes paying, we turn it into rupees at the rate the bank used for the buyer\'s payment. We pay you that rupee amount. If the exchange rate changes later, your amount stays the same. We pay all bank charges.'];
         }
         $cur = (string) ($associate['currency_code'] ?? 'USD');
         $charges = AssociateCommission::settings()['abroad_charges'] === 'SHA'
-            ? 'NexaCrest pays its own bank\'s charges; your own bank may charge you on receipt.'
-            : 'NexaCrest pays its own and the intermediary bank\'s charges.';
-        return ['title' => $title, 'text' => 'Your commission is a percentage of the goods value (FOB). It is fixed in ' . self::currencyName($cur) . ' on the day the buyer completes payment, and you are paid exactly that amount in ' . self::currencyName($cur) . ' to your verified account. ' . $charges . ' Any conversion into your local currency is done by your own bank.'];
+            ? 'We pay our own bank\'s charges; your own bank may charge you when the money arrives.'
+            : 'We pay our bank\'s charges and the charges of any bank in between.';
+        return ['title' => $title, 'text' => 'Your commission is a percentage of the value of the goods (FOB). On the day the buyer finishes paying, we set the amount in ' . self::currencyName($cur) . '. We pay you exactly that amount in ' . self::currencyName($cur) . ' into your checked bank account. ' . $charges . ' If you need it in your local currency, your own bank changes it.'];
     }
 
     private static function currencyName(string $cur): string
@@ -95,19 +95,19 @@ final class AssociatePayoutService
         $level = AssociateCommission::rateLabel($a['level'] ?? null);
         $client = (string) ($order['company_legal_name'] ?? 'Your client');
         $head = 'Your client ' . $client . ' has paid order ' . $order['order_reference'] . ' in full. ';
-        $when = 'It is due on ' . Dates::short($dueOn) . ' and will be paid in the ' . Dates::short($runOn) . ' payout run to your verified bank account';
+        $when = 'It is due on ' . Dates::short($dueOn) . '. We will pay it on ' . Dates::short($runOn) . ' into your checked bank account';
         if (self::isIndia($associate)) {
-            return $head . 'Your commission is now fixed at ₹' . self::money((float) $a['amount_inr']) . ' (' . $cur . ' ' . self::money((float) $a['amount_fc'])
-                . ', ' . $level . ' of the invoiced goods value, at ' . self::rateText((float) $a['rate_inr']) . ' per ' . $cur . ' — the rate at which the buyer\'s payments were converted by the bank). '
-                . 'This amount will not change, whatever the exchange rate does from now on. ' . $when . ', after TDS as the law requires. '
-                . 'Please upload your invoice for this commission under My commission. NexaCrest pays all bank charges.';
+            return $head . 'Your commission is ₹' . self::money((float) $a['amount_inr']) . ' (' . $cur . ' ' . self::money((float) $a['amount_fc'])
+                . ': ' . $level . ' of the invoice value of the goods, at ' . self::rateText((float) $a['rate_inr']) . ' per ' . $cur . ', the rate the bank used for the buyer\'s payment). '
+                . 'This amount will not change, even if the exchange rate changes. ' . $when . ', after deducting tax (TDS) as the law requires. '
+                . 'Please upload your invoice for this commission under "My commission". We pay all bank charges.';
         }
         $charges = AssociateCommission::settings()['abroad_charges'] === 'SHA'
-            ? 'NexaCrest pays its own bank\'s charges; your own bank may charge you on receipt.'
-            : 'NexaCrest pays its own and the intermediary bank\'s charges.';
-        return $head . 'Your commission is now fixed at ' . $cur . ' ' . self::money((float) $a['amount_fc']) . ' (' . $level . ' of the invoiced goods value). '
-            . 'This amount will not change. ' . $when . ', paid in ' . self::currencyName($cur) . '. '
-            . 'Please upload your invoice for this commission under My commission. ' . $charges;
+            ? 'We pay our own bank\'s charges; your own bank may charge you when the money arrives.'
+            : 'We pay our bank\'s charges and the charges of any bank in between.';
+        return $head . 'Your commission is ' . $cur . ' ' . self::money((float) $a['amount_fc']) . ' (' . $level . ' of the invoice value of the goods). '
+            . 'This amount will not change. ' . $when . ', in ' . self::currencyName($cur) . '. '
+            . 'Please upload your invoice for this commission under "My commission". ' . $charges;
     }
 
     /** Called after a buyer payment is cleared or its rupees recorded: fixes the commission if the order is now fully paid. Never throws. */
@@ -240,14 +240,14 @@ final class AssociatePayoutService
                 if (IncentiveRepository::holdPayout((int) $p['id'], self::CLAIM_HOLD_REASON)) {
                     $out['held']++;
                     if ($associate !== null && $order !== null) {
-                        AssociateService::notify($associate, 'payout_held', 'Your commission on order ' . $order['order_reference'] . ' is on hold: ' . self::CLAIM_HOLD_REASON, (int) $order['client_id'], (int) $order['id']);
+                        AssociateService::notify($associate, 'payout_held', 'Your commission on order ' . $order['order_reference'] . ' is on hold. The buyer has an open claim (complaint) about this order. We will pay your commission once it is settled.', (int) $order['client_id'], (int) $order['id']);
                     }
                 }
             } elseif ($p['status'] === 'held' && (string) $p['hold_reason'] === self::CLAIM_HOLD_REASON && !$claim) {
                 if (IncentiveRepository::releasePayout((int) $p['id'])) {
                     $out['released']++;
                     if ($associate !== null && $order !== null) {
-                        AssociateService::notify($associate, 'commission_earned', 'The buyer claim on order ' . $order['order_reference'] . ' is resolved — your commission is no longer on hold and is paid in the ' . Dates::short((string) $p['payout_run_on']) . ' payout run.', (int) $order['client_id'], (int) $order['id']);
+                        AssociateService::notify($associate, 'commission_earned', 'The buyer\'s claim on order ' . $order['order_reference'] . ' is settled. Your commission is no longer on hold. We will pay it on ' . Dates::short((string) $p['payout_run_on']) . '.', (int) $order['client_id'], (int) $order['id']);
                     }
                 }
             }

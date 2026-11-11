@@ -271,7 +271,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const a = await associate();
     const post = { holder_name: 'X', account_number: '123456789012', account_number_confirm: '123456789013', ifsc: 'HDFC0001234', bank_name: 'HDFC Bank', account_currency: 'INR' };
     expect(associateAdminController.validateBank(a, post)).toBe('Enter the account holder\'s name as the bank has it (as on the PAN).');
-    post.holder_name = 'Ravi Kumar';
+    post.holder_name = 'Test Associate';
     expect(associateAdminController.validateBank(a, post)).toBe('The two account numbers do not match — type it again.');
     post.account_number_confirm = '1234 5678 9012';
     post.ifsc = 'HDFC1234';
@@ -280,7 +280,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
       .toBe('Enter the bank\'s SWIFT / BIC (8 or 11 characters).');
 
     const old = await verifiedBank(a);
-    const id = await associateBankRepository.request(Number(a.id), { holder_name: 'Ravi Kumar', account_number: '999988887777', ifsc: 'ICIC0001234', swift: '',
+    const id = await associateBankRepository.request(Number(a.id), { holder_name: 'Test Associate', account_number: '999988887777', ifsc: 'ICIC0001234', swift: '',
       bank_name: 'ICICI Bank', bank_branch_address: '', intermediary_bank: '', account_currency: 'INR' }, true, null);
     expect(await value('SELECT account_number_enc FROM associate_bank_accounts WHERE id = :id', { id })).not.toBe('999988887777'); // stored encrypted
     expect(await associateBankRepository.fullNumber(id)).toBe('999988887777');
@@ -365,7 +365,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
 
   const intakePost = (company, extra = {}) => ({
     company_legal_name: company, billing_address_line1: '1 Harbour Road', billing_city: 'Rotterdam', billing_country: 'Netherlands',
-    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Jan Buyer', email: `jan@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
+    vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Purchase Head', email: `jan@${crypto.randomBytes(4).toString('hex')}-buyer.example`,
     country_of_destination: 'Netherlands', incoterm_preference: 'FOB', consignee_same_as_buyer: '1', website: '', ...extra,
   });
 

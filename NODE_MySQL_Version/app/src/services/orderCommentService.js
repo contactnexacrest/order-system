@@ -108,7 +108,7 @@ async function emailClient(order, authorUserId, body, fileStoreIds) {
   }
 
   if (linked.length) {
-    message += 'The following file(s) are too large to attach directly to this email — view or download them securely from your order portal:\n';
+    message += 'These files are too big to attach to this e-mail. You can open or download them from your buyer account:\n';
     const baseUrl = (env.get('APP_URL', '') || '').replace(/\/+$/, '');
     for (const file of linked) {
       message += `- ${file.original_filename}: ${baseUrl}/client/orders/${order.id}/comment-attachments/${file.id}/download\n`;

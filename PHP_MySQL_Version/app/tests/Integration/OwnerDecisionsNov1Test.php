@@ -290,9 +290,9 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         self::assertCount(1, array_filter($taskTexts, static fn (string $t): bool => str_starts_with($t, $order['order_reference'] . ' — ')));
         self::assertSame([], \App\Services\DailyDigestService::itemsFor($idle));
 
-        $mail = \App\Services\DailyDigestService::compose('Asha', [['kind' => 'task', 'text' => 'A'], ['kind' => 'review', 'text' => 'B']], '2026-11-02');
+        $mail = \App\Services\DailyDigestService::compose('Managing Director', [['kind' => 'task', 'text' => 'A'], ['kind' => 'review', 'text' => 'B']], '2026-11-02');
         self::assertSame('NexaCrest — your day 2 Nov 2026: 1 task, 1 review', $mail['subject']);
-        self::assertSame("Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n", $mail['body']);
+        self::assertSame("Good morning Managing Director,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n", $mail['body']);
 
         $date = '2099-01-0' . random_int(1, 9);
         \App\Services\DailyDigestService::setSender(static fn (): bool => true);

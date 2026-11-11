@@ -27,7 +27,7 @@ final class PaymentActionService
     /** Each payment the client can make, in order, with the document it is paid against. */
     public const LEGS = [
         'advance' => ['doc' => 'PI', 'label' => 'Advance Payment', 'document' => 'Proforma Invoice'],
-        'freight' => ['doc' => 'FDN', 'label' => 'Freight & Insurance', 'document' => 'Debit Note'],
+        'freight' => ['doc' => 'FDN', 'label' => 'Freight and insurance', 'document' => 'freight bill (debit note)'],
         'balance' => ['doc' => 'CI', 'label' => 'Balance Payment', 'document' => 'Commercial Invoice'],
     ];
 
@@ -126,7 +126,7 @@ final class PaymentActionService
 
         $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
         if ($transactionRef === '') {
-            return ['ok' => false, 'message' => 'Enter the transaction ID / UTR of your payment.'];
+            return ['ok' => false, 'message' => 'Enter the bank reference number of your payment.'];
         }
         $amount = trim((string) ($_POST['amount'] ?? ''));
         if ($amount === '' || !is_numeric($amount) || (float) $amount <= 0) {
@@ -137,7 +137,7 @@ final class PaymentActionService
             return ['ok' => false, 'message' => 'Enter the date you paid.'];
         }
         if (empty($_FILES['screenshot']['name'])) {
-            return ['ok' => false, 'message' => 'Attach the payment screenshot or bank remittance advice.'];
+            return ['ok' => false, 'message' => 'Add a screenshot or the bank receipt of your payment.'];
         }
         try {
             $screenshotFileId = FileUploadService::handleUpload(

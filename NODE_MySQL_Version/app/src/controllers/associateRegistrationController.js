@@ -151,7 +151,7 @@ function validate(input) {
   const e = {};
   if (len(d.name) < 2 || len(d.name) > 150) e.name = 'Enter your full name (2 to 150 characters).';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) || len(d.email) > 190) e.email = 'Enter a valid e-mail address — it becomes your portal login.';
-  if (!/^[0-9 +()\-]{6,40}$/.test(d.phone)) e.phone = 'Enter a phone number with the country code, e.g. +91 98765 43210.';
+  if (!/^[0-9 +()\-]{6,40}$/.test(d.phone)) e.phone = 'Enter a phone number with the country code, e.g. +91-0000000000.';
   if (len(d.country) < 2 || len(d.country) > 80) e.country = 'Enter your country.';
   if (!['india', 'abroad'].includes(d.based_in)) e.based_in = 'Choose whether you are based in India or abroad.';
   if (len(d.city) < 2 || len(d.city) > 100) e.city = 'Enter your city.';

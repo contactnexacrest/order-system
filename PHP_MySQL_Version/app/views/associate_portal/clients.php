@@ -7,7 +7,7 @@ $__codeChosen = false;
 ?>
 <div class="card page-wide">
   <h1>My clients</h1>
-  <p class="muted">Your buyer registers with NexaCrest themselves, with their own details, through your buyer registration link or your quotation link (with your personal code), and confirms that you introduced them. Once NexaCrest accepts the registration, the company is your client for <?= (int) \App\Services\AssociateService::protectionMonths() ?> months — however they contact us later. The first completed registration of a company counts.</p>
+  <p class="muted">Your buyer registers with NexaCrest using your buyer registration link or your quotation link (which has your personal code). They fill in their own details and confirm that you introduced them. When we accept the registration, the company is your client for <?= (int) \App\Services\AssociateService::protectionMonths() ?> months, however they contact us later. If two people register the same company, the first one finished counts.</p>
 
   <?php if (!empty($newLink)): ?>
     <div class="alert alert-success">Your new buyer registration link — copy it and send it to your buyer (valid 30 days, for one registration):<br><code style="user-select:all"><?= htmlspecialchars($newLink) ?></code></div>
@@ -32,14 +32,14 @@ $__codeChosen = false;
         <?php if (!empty($me['personal_code'])): ?>
           <p>Code: <b style="font-size:1.2em;font-family:monospace"><?= htmlspecialchars((string) $me['personal_code']) ?></b><br>
             Quotation link (with your code): <code style="user-select:all"><?= htmlspecialchars((string) $codeLink) ?></code></p>
-          <p class="muted small">Give the code or the quotation link to a buyer. When they register with it and confirm your name, they become your client. The code always belongs to you; its last letter catches typing mistakes.</p>
+          <p class="muted small">Give the code or the quotation link to a buyer. When they register with it and confirm your name, they become your client. The code is always yours. Its last letter is a check letter that helps us spot typing mistakes.</p>
         <?php endif; ?>
         <?php // Owner decision D-254 (A5): change the code like a captcha refresh; old codes keep bringing buyers to you. ?>
         <details<?= !empty($proposal) ? ' open' : '' ?>><summary><?= empty($me['personal_code']) ? 'Choose my code' : 'Change my code' ?></summary>
           <form method="post" action="/associate/code/propose" class="inline-form">
             <?= Csrf::field() ?>
-            <label>Readable part (3–12 letters or digits) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="<?= htmlspecialchars((string) ($proposal['readable'] ?? '')) ?>" placeholder="e.g. DEMOEXIM"></label>
-            <button type="submit" class="btn-sm btn-secondary" title="Try another ending, like a captcha refresh">&#10227; New ending</button>
+            <label>Your word for the code (3 to 12 letters or numbers) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="<?= htmlspecialchars((string) ($proposal['readable'] ?? '')) ?>" placeholder="e.g. DEMOEXIM"></label>
+            <button type="submit" class="btn-sm btn-secondary" title="Shows a different ending for your code">&#10227; Show another ending</button>
           </form>
           <?php if (!empty($proposal)): ?>
             <p>Proposed code: <b style="font-size:1.2em;font-family:monospace"><?= htmlspecialchars((string) $proposal['code']) ?></b></p>
@@ -68,7 +68,7 @@ $__codeChosen = false;
   <div class="section">
     <h2>Registered clients (<?= count($clients) ?>)</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Came via</th><th>Registered</th><th>Protected until</th><?php if (!empty($access['orders'])): // D-263 ?><th>Orders</th><?php endif; ?><th>10-day window ends</th><th></th></tr>
+      <tr><th>Client</th><th>Country</th><th>How they came to us</th><th>Registered</th><th>Your client until</th><?php if (!empty($access['orders'])): // D-263 ?><th>Orders</th><?php endif; ?><th>Last day for orders that earn commission</th><th></th></tr>
       <?php foreach ($clients as $c): ?>
         <tr><td><?= htmlspecialchars((string) $c['company_legal_name']) ?></td><td><?= htmlspecialchars((string) ($c['country_of_destination'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string) ($c['came_via'] ?? '')) ?></td><td><?= $__d($c['associate_registered_on']) ?></td><td><?= $__d($c['associate_locked_until']) ?></td>
@@ -83,7 +83,7 @@ $__codeChosen = false;
   <div class="section">
     <h2>My buyer registration links and codes used</h2>
     <table class="list">
-      <tr><th>Created</th><th>Company</th><th>Kind</th><th>Status</th><th>Expires</th><th></th></tr>
+      <tr><th>Created</th><th>Company</th><th>Type</th><th>Status</th><th>Expires</th><th></th></tr>
       <?php foreach ($invitations as $i): ?>
         <tr><td><?= $__d($i['created_at']) ?></td><td><?= htmlspecialchars(trim($i['company_name'] . ($i['country'] ? ' (' . $i['country'] . ')' : ''))) ?></td>
           <td><?= $i['kind'] === 'personal_code' ? 'Personal code' . (!empty($i['code_used']) ? ' ' . htmlspecialchars((string) $i['code_used']) : '') : 'Buyer registration link' ?></td>

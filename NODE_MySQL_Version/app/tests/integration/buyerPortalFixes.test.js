@@ -56,8 +56,8 @@ describe('Buyer-portal fixes (7 Nov 2026)', () => {
     await orderOcAcknowledgmentRepository.recordSent(orderId, doc, fmt(now), fmt(new Date(now.getTime() + 2 * 86400000)));
 
     const page = await agent.get(`/client/orders/${orderId}`);
-    expect(page.text).toContain('I acknowledge and confirm to proceed');
-    expect(page.text).toMatch(/<th>Port of Discharge<\/th><td>Port of Antwerp<\/td>/);
+    expect(page.text).toContain('Yes, this is correct — please go ahead');
+    expect(page.text).toMatch(/<th>Port where the goods arrive<\/th><td>Port of Antwerp<\/td>/);
   });
 
   it('Reorder matches the unit whatever its case or spacing', async () => {
@@ -82,11 +82,12 @@ describe('Buyer-portal fixes (7 Nov 2026)', () => {
 
     const page = await agent.get(`/client/orders/${orderId}`);
     expect(page.text).not.toContain('/buyer-po" enctype="multipart/form-data"');
-    expect(page.text).toContain(`This order is ${status}, so a Buyer PO can no longer be uploaded.`);
+    const word = status === 'lost' ? 'This order did not go ahead' : 'This order was cancelled'; // D-330
+    expect(page.text).toContain(`${word}, so you can no longer upload a purchase order.`);
 
     const result = await buyerActionService.uploadBuyerPo({ body: {} }, await orderRepository.find(orderId));
     expect(result.ok).toBe(false);
-    expect(result.message).toBe(`This order is ${status}, so a Buyer PO can no longer be uploaded. Contact your NexaCrest representative if you have a question.`);
+    expect(result.message).toBe(`${word}, so you can no longer upload a purchase order. If you have a question, please contact your NexaCrest contact person.`);
     const n = await db.queryOne('SELECT COUNT(*) AS n FROM order_buyer_po_documents WHERE order_id = :o', { o: orderId });
     expect(Number(n.n)).toBe(0);
   });

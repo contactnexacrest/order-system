@@ -2,7 +2,7 @@
 <div class="card card-narrow">
   <h1>My Account</h1>
   <p><strong><?= htmlspecialchars($client['company_legal_name']) ?></strong><br><?= htmlspecialchars($client['email'] ?? '') ?></p>
-  <p class="muted small">Your company details are managed by NexaCrest. The only thing you can change here is your password.</p>
+  <p class="muted small">We keep your company details up to date for you. Here you can change only your password.</p>
 
   <h2>Change Password</h2>
   <form method="post" action="/client/account/password">

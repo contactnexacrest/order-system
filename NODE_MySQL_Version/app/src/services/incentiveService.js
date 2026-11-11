@@ -749,15 +749,15 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
     const associate = await associateRepository.find(a.id);
     if (associate && order) {
       if (!earned) {
-        await associateService.notify(associate, 'commission_earned', `Order ${order.order_reference} is closed for commission: `
-          + (a.state === 'unpaid' ? 'the buyer did not pay the order in full, so no commission is due on it.' : 'no commission is due on it.'), Number(order.client_id), orderId);
+        await associateService.notify(associate, 'commission_earned', `Order ${order.order_reference} is finished. `
+          + (a.state === 'unpaid' ? 'The buyer did not pay the order in full, so no commission is due on it.' : 'No commission is due on it.'), Number(order.client_id), orderId);
       } else {
         await associateService.notify(associate, a.status === 'suspended' ? 'payout_held' : 'commission_earned',
-          `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${fmt2(a.amount_fc)}`
-          + ` (${require('./associateCommission').rateLabel(a.level || null)} on the invoiced FOB of the goods, ${a.currency} ${fmt2(a.basis_fc)}).`
+          `Your client paid order ${order.order_reference} in full. You have earned ${a.currency} ${fmt2(a.amount_fc)}`
+          + ` commission (${require('./associateCommission').rateLabel(a.level || null)} of the invoice value of the goods, ${a.currency} ${fmt2(a.basis_fc)}).`
           + (a.status === 'suspended' ? ' It is on hold while your account is suspended.'
-            : ` It is due on ${short(due)} and paid in the ${short(runOn)} payout run, against your invoice`
-              + (String(associate.gstin || '').trim() !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') + '.'),
+            : ` It is due on ${short(due)}. We pay it on ${short(runOn)}, after you send your invoice.`
+              + (String(associate.gstin || '').trim() !== '' ? ' If you are registered for GST, we add GST when we have your tax invoice.' : '')),
           Number(order.client_id), orderId);
       }
     }

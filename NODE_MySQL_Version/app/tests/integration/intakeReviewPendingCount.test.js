@@ -34,8 +34,8 @@ describe('intake review pending-count nav badges', () => {
       {
         company_legal_name: 'Badge Test Buyer Ltd',
         billing_address: '1 Badge Street',
-        contact_person: 'Jane Buyer',
-        email: 'jane@badge-test.example',
+        contact_person: 'Chief Buyer',
+        email: 'buyer.contact@badge-test.example',
         country_of_destination: 'Netherlands',
       },
       '127.0.0.1'

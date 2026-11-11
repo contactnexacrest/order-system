@@ -774,15 +774,15 @@ final class IncentiveService
             $order = OrderRepository::find($orderId);
             if ($associate !== null && $order !== null) {
                 if (!$earned) {
-                    AssociateService::notify($associate, 'commission_earned', "Order {$order['order_reference']} is closed for commission: "
-                        . ($a['state'] === 'unpaid' ? 'the buyer did not pay the order in full, so no commission is due on it.' : 'no commission is due on it.'), (int) $order['client_id'], $orderId);
+                    AssociateService::notify($associate, 'commission_earned', "Order {$order['order_reference']} is finished. "
+                        . ($a['state'] === 'unpaid' ? 'The buyer did not pay the order in full, so no commission is due on it.' : 'No commission is due on it.'), (int) $order['client_id'], $orderId);
                 } else {
                     AssociateService::notify($associate, $a['status'] === 'suspended' ? 'payout_held' : 'commission_earned',
-                        "Your client paid order {$order['order_reference']} in full. Commission earned: {$a['currency']} " . number_format($a['amount_fc'], 2)
-                        . ' (' . AssociateCommission::rateLabel($a['level'] ?? null) . ' on the invoiced FOB of the goods, ' . $a['currency'] . ' ' . number_format($a['basis_fc'], 2) . ').'
+                        "Your client paid order {$order['order_reference']} in full. You have earned {$a['currency']} " . number_format($a['amount_fc'], 2)
+                        . ' commission (' . AssociateCommission::rateLabel($a['level'] ?? null) . ' of the invoice value of the goods, ' . $a['currency'] . ' ' . number_format($a['basis_fc'], 2) . ').'
                         . ($a['status'] === 'suspended' ? ' It is on hold while your account is suspended.'
-                            : ' It is due on ' . \App\Helpers\Dates::short((string) $dueOn) . ' and paid in the ' . \App\Helpers\Dates::short((string) $runOn) . ' payout run, against your invoice'
-                              . (trim((string) ($associate['gstin'] ?? '')) !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') . '.'),
+                            : ' It is due on ' . \App\Helpers\Dates::short((string) $dueOn) . '. We pay it on ' . \App\Helpers\Dates::short((string) $runOn) . ', after you send your invoice.'
+                              . (trim((string) ($associate['gstin'] ?? '')) !== '' ? ' If you are registered for GST, we add GST when we have your tax invoice.' : '')),
                         (int) $order['client_id'], $orderId);
                 }
             }

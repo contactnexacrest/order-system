@@ -42,7 +42,7 @@ final class CaFinancialSnapshotTest extends DbTestCase
         $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'Snapshot CHA', 'service_type' => 'cha'], $userId);
         OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'cha', 'bill_no' => 'SNAP-CHA-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 18500, 'gst_inr' => 0], $userId);
         OrderCostEntryRepository::create($orderId, 'ecgc_insurance', 'ECGC cover', 5000, date('Y-m-d'), $userId);
-        OrderExpenseRepository::create($orderId, ['expense_date' => date('Y-m-d'), 'category' => 'hotel', 'details' => 'Hotel Kota', 'amount_inr' => 3540, 'paid_by' => 'staff', 'staff_name' => 'Ramesh', 'no_receipt_reason' => 'No bill given at the hotel'], $userId);
+        OrderExpenseRepository::create($orderId, ['expense_date' => date('Y-m-d'), 'category' => 'hotel', 'details' => 'Hotel Kota', 'amount_inr' => 3540, 'paid_by' => 'staff', 'staff_name' => 'Export Executive', 'no_receipt_reason' => 'No bill given at the hotel'], $userId);
         CaExportBenefitRepository::record($orderId, 'RODTEP', 'R-1', 5000.0, date('Y-m-d'), 'INR', null, $userId);
 
         $s = CaFinancialSnapshotService::build($orderId);
@@ -55,7 +55,7 @@ final class CaFinancialSnapshotTest extends DbTestCase
         self::assertSame('Snapshot CHA', $s['logistics'][0]['partner']);
         self::assertTrue($s['logistics'][0]['unpaid']);
         self::assertSame('ECGC Insurance', $s['costs'][0]['category'], 'readable names, never raw codes like ecgc_insurance');
-        self::assertSame('Staff (to reimburse) — Ramesh', $s['expenses'][0]['paid_by']);
+        self::assertSame('Staff (to reimburse) — Export Executive', $s['expenses'][0]['paid_by']);
         self::assertSame('Claimed / Pending', $s['benefits'][0]['status']);
 
         $profit = OrderProfitabilityService::computeForOrder($orderId);

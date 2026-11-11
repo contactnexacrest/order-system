@@ -50,11 +50,11 @@ final class LogisticsPartnerFreightTest extends DbTestCase
         self::assertSame('error', $this->save(['freight_forwarder_partner_id' => (string) $inactive])['type']);
         self::assertNull(OrderFreightRepository::find($this->orderId));
 
-        $partner = LogisticsPartnerRepository::create(['partner_name' => 'Blue Wave Logistics', 'service_type' => 'freight_forwarder', 'contact_person_name' => 'Ravi', 'phone' => '+91 90000 11111', 'email' => 'ops@bluewave.test'], (int) $_SESSION['_auth_user_id']);
+        $partner = LogisticsPartnerRepository::create(['partner_name' => 'Blue Wave Logistics', 'service_type' => 'freight_forwarder', 'contact_person_name' => 'Operations Manager', 'phone' => '+91-0000000000', 'email' => 'ops@bluewave.test'], (int) $_SESSION['_auth_user_id']);
         self::assertSame('success', $this->save(['freight_forwarder_partner_id' => (string) $partner, 'freight_forwarder_name' => 'ignored free text'])['type']);
         $freight = OrderFreightRepository::find($this->orderId);
         self::assertSame('Blue Wave Logistics', $freight['freight_forwarder_name']);
-        self::assertSame('Ravi · +91 90000 11111 · ops@bluewave.test', $freight['freight_forwarder_contact']);
+        self::assertSame('Operations Manager · +91-0000000000 · ops@bluewave.test', $freight['freight_forwarder_contact']);
         self::assertSame($partner, (int) $freight['freight_forwarder_partner_id']);
     }
 

@@ -59,7 +59,7 @@ final class AmendmentSignatoryDefaultsToMdTest extends DbTestCase
         $financeHeadDesignationId = SignatoryRepository::createDesignation('Finance Head', $superAdminId);
         $financeHeadUserId = $this->createTestUser('Export Executive');
         $pdo->prepare('UPDATE users SET name = :name WHERE id = :id')
-            ->execute(['name' => 'Priya Deshmukh', 'id' => $financeHeadUserId]);
+            ->execute(['name' => 'Finance Director', 'id' => $financeHeadUserId]);
         SignatoryRepository::setEligibility($financeHeadUserId, true, $financeHeadDesignationId, $superAdminId);
 
         try {
@@ -67,7 +67,7 @@ final class AmendmentSignatoryDefaultsToMdTest extends DbTestCase
 
             $block = DocumentDataAssembler::signatoryBlock($amdTypeId);
 
-            self::assertSame('Priya Deshmukh', $block['name']);
+            self::assertSame('Finance Director', $block['name']);
             self::assertSame('Finance Head', $block['designation']);
             self::assertNotSame('Founder & Managing Director', $block['designation'], 'overriding the per-document-type signatory must actually change the printed designation, not silently keep showing the MD.');
         } finally {

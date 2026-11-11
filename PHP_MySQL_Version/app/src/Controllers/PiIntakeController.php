@@ -150,7 +150,7 @@ final class PiIntakeController
             return;
         }
         if (empty($_POST['confirm_lock'])) {
-            Flash::set('error', 'Please check the confirmation box — the details above must be confirmed as correct before this form can be submitted.');
+            Flash::set('error', 'Please tick the box to confirm the details are correct. You can send the form only after you do.');
             header("Location: /pi-details/{$token}");
             return;
         }

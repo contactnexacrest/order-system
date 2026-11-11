@@ -59,7 +59,7 @@ final class ClientIntakeController
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
         if (RateLimiter::tooManyRequests(self::RATE_LIMIT_BUCKET, $ip, self::RATE_LIMIT_MAX_REQUESTS, self::RATE_LIMIT_WINDOW_MINUTES)) {
-            Flash::set('error', 'Too many submissions from this connection. Please wait a few minutes and try again.');
+            Flash::set('error', 'We have received too many forms from your network in a short time. Please wait a few minutes and try again.');
             header('Location: /quotation-details');
             return;
         }
@@ -328,7 +328,7 @@ final class ClientIntakeController
             'Your NexaCrest quotation request — correction link',
             "Hello,\n\n"
                 . "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
-                . "Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{correction_link}\n\n"
+                . "Did you make a mistake in your request? You can correct it yourself until our team starts checking it. Use this link:\n{correction_link}\n\n"
                 . "This link works for 7 days.\n\n"
                 . "NexaCrest International Private Limited"
         );

@@ -294,15 +294,15 @@ describe('Associate commission period and no business totals (D-263)', () => {
   });
 
   it('the FOB in a notice follows "Show FOB order value"', async () => {
-    const message = 'Your client paid order NX-1 in full. Commission earned: USD 617.28 (5% on the invoiced FOB of the goods, USD 12,345.67).';
+    const message = 'Your client paid order NX-1 in full. You have earned USD 617.28 commission (5% of the invoice value of the goods, USD 12,345.67).';
     expect(await associateAccess.maskNotice(await associate('full'), message)).toBe(message);
     expect(await associateAccess.maskNotice(await associate('starter'), message))
-      .toBe('Your client paid order NX-1 in full. Commission earned: [amount in your portal] ([rate in your agreement] on the invoiced FOB of the goods).');
+      .toBe('Your client paid order NX-1 in full. You have earned [amount in your portal] commission ([rate in your agreement] of the invoice value of the goods).');
     const md = await db.queryOne('SELECT * FROM users WHERE id = :id', { id: await user('Managing Director') });
     const c = await associate('starter');
     expect(await associateAccess.setLevel(c, 'custom', ['clients', 'commission', 'commission_pct', 'notice_amounts'], 'Amounts on, FOB value off for this one', md)).toBeNull();
     expect(await associateAccess.maskNotice(await associateRepository.find(Number(c.id)), message))
-      .toBe('Your client paid order NX-1 in full. Commission earned: USD 617.28 (5% on the invoiced FOB of the goods).');
+      .toBe('Your client paid order NX-1 in full. You have earned USD 617.28 commission (5% of the invoice value of the goods).');
   });
 
   it('My clients hides order numbers when "orders" is off', async () => {

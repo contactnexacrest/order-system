@@ -86,7 +86,7 @@ final class QuotationIntakeRateLimitTest extends DbTestCase
             'billing_city'           => 'Testville',
             'billing_country'        => 'Testland',
             'vat_eori_tax_no'        => 'VAT123',
-            'contact_person'         => 'Jane Test',
+            'contact_person'         => 'Test Contact',
             'email'                  => 'jane-' . bin2hex(random_bytes(4)) . '@example.test',
             'country_of_destination' => 'Testland',
             'incoterm_preference'    => 'FOB',

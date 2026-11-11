@@ -105,7 +105,7 @@ final class AssociateService
             'direct_contact' => 'your client contacted us', 'order_created' => 'new order from your client',
             'commission_earned' => 'commission earned', 'payout_paid' => 'commission paid', 'payout_held' => 'commission on hold',
             'clawback' => 'commission adjustment', 'bank_changed' => 'your bank details changed', 'bank_rejected' => 'your new bank details were not accepted', 'link_changed' => 'a client link changed',
-            'lock_ending' => 'protection ending soon', 'registration_lapsed' => 'a buyer registration lapsed', 'agreement_ending' => 'agreement ending soon', 'portal_invite' => 'your portal login link',
+            'lock_ending' => 'your client registration ends soon', 'registration_lapsed' => 'a client is no longer linked to you', 'agreement_ending' => 'agreement ending soon', 'portal_invite' => 'your portal login link',
             'document_accepted' => 'your document was accepted', 'document_rejected' => 'please upload a document again', 'code_changed' => 'your personal code changed', 'price_ready' => 'your price is ready',
         ][$event] ?? 'update';
     }
@@ -195,7 +195,7 @@ final class AssociateService
             return;
         }
         self::notify($a, 'order_created', "New order {$o['order_reference']} from your client {$o['company_legal_name']}. "
-            . ($level === null ? 'No commission applies to it.' : 'Your commission for now: ' . AssociateCommission::rateLabel($level) . ' — fixed on the order when its Proforma Invoice is issued.'), (int) $o['client_id'], $orderId);
+            . ($level === null ? 'No commission applies to it.' : 'Your commission rate for now is ' . AssociateCommission::rateLabel($level) . '. It becomes final when we send the buyer the proforma invoice.'), (int) $o['client_id'], $orderId);
     }
 
     /**
@@ -217,11 +217,12 @@ final class AssociateService
         $order = \App\Repositories\OrderRepository::find((int) $p['order_id']);
         if ($a !== null) {
             // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net.
-            self::notify($a, 'payout_paid', 'Commission paid for order ' . ($order['order_reference'] ?? $p['order_id']) . ': INR ' . number_format((float) $p['paid_inr'], 2)
-                . ((float) ($p['tds_inr'] ?? 0) > 0 ? ' (gross INR ' . number_format((float) $p['paid_inr'] + (float) $p['tds_inr'], 2) . ', TDS deducted INR ' . number_format((float) $p['tds_inr'], 2)
-                    . (!empty($p['tds_section']) ? ' u/s ' . $p['tds_section'] : '') . (!empty($p['tds_rate']) ? ' at ' . AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '')
-                . ((float) ($p['gst_inr'] ?? 0) > 0 ? ' + GST INR ' . number_format((float) $p['gst_inr'], 2) . ' on your tax invoice' : '')
-                . ' on ' . \App\Helpers\Dates::short((string) $p['paid_on']) . (!empty($p['paid_reference']) ? ', bank reference ' . $p['paid_reference'] : '') . '.', null, (int) $p['order_id'], null, $userId);
+            // D-330: plain words — what was paid, when, the bank reference; then the tax deducted and the GST.
+            self::notify($a, 'payout_paid', 'We have paid your commission for order ' . ($order['order_reference'] ?? $p['order_id']) . ': INR ' . number_format((float) $p['paid_inr'], 2)
+                . ', on ' . \App\Helpers\Dates::short((string) $p['paid_on']) . (!empty($p['paid_reference']) ? ', bank reference ' . $p['paid_reference'] : '') . '.'
+                . ((float) ($p['tds_inr'] ?? 0) > 0 ? ' Before tax it was INR ' . number_format((float) $p['paid_inr'] + (float) $p['tds_inr'], 2) . '; we deducted INR ' . number_format((float) $p['tds_inr'], 2)
+                    . ' tax (TDS' . (!empty($p['tds_section']) ? ', Income Tax Act section ' . $p['tds_section'] : '') . (!empty($p['tds_rate']) ? ', ' . AssociateTds::pct((float) $p['tds_rate']) : '') . ').' : '')
+                . ((float) ($p['gst_inr'] ?? 0) > 0 ? ' We also paid GST of INR ' . number_format((float) $p['gst_inr'], 2) . ' on your tax invoice.' : ''), null, (int) $p['order_id'], null, $userId);
         }
     }
 
@@ -243,7 +244,7 @@ final class AssociateService
             foreach ($stmt->fetchAll() as $c) {
                 $a = AssociateRepository::find((int) $c['associate_id']);
                 if ($a !== null && !AssociateEventRepository::hasEvent((int) $a['id'], "lock_ending_{$days}", (int) $c['id'], null)) {
-                    self::notify($a, 'lock_ending', "Your protection for {$c['company_legal_name']} ends on " . \App\Helpers\Dates::short((string) $c['associate_locked_until']) . " ({$days} days) and the client has not ordered yet. Ask your relationship manager if you need an extension.", (int) $c['id']);
+                    self::notify($a, 'lock_ending', "{$c['company_legal_name']} stays your client only until " . \App\Helpers\Dates::short((string) $c['associate_locked_until']) . " ({$days} days from now). They have not ordered yet. If you need more time, ask your relationship manager.", (int) $c['id']);
                     AssociateEventRepository::add((int) $a['id'], "lock_ending_{$days}", "Reminder sent ({$days} days).", (int) $c['id'], null, null, null, false);
                     $sent++;
                 }

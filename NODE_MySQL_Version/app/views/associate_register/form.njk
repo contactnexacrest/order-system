@@ -7,7 +7,7 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Full name *<input type="text" name="name" required minlength="2" maxlength="150" value="{{ old.name or '' }}" placeholder="e.g. Full name as on PAN card" autocomplete="name">{{ err('name') }}</label>
     <label>E-mail * <small class="muted">(your portal login)</small><input type="email" name="email" required maxlength="190" value="{{ old.email or '' }}" placeholder="e.g. name@email.com" autocomplete="email">{{ err('email') }}</label>
-    <label>Phone *<input type="tel" name="phone" required minlength="6" maxlength="40" pattern="[0-9 +\(\)\-]{6,40}" value="{{ old.phone or '' }}" placeholder="e.g. +91 98765 43210" autocomplete="tel">{{ err('phone') }}</label>
+    <label>Phone *<input type="tel" name="phone" required minlength="6" maxlength="40" pattern="[0-9 +\(\)\-]{6,40}" value="{{ old.phone or '' }}" placeholder="e.g. +91-0000000000" autocomplete="tel">{{ err('phone') }}</label>
     <label>Based in *
       <select name="based_in" required>
         <option value="">Choose…</option>

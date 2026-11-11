@@ -41,9 +41,9 @@ final class ConsigneeNotifyPartySameAsRowTest extends TestCase
                 'postcode' => 'EC1A 1AA',
                 'country' => 'United Kingdom',
                 'vat_eori_tax_no' => 'GB123456789',
-                'contact_person' => 'Jane Buyer',
+                'contact_person' => 'Chief Buyer',
                 'phone' => '+44 20 7946 0000',
-                'email' => 'jane@acme.example',
+                'email' => 'buyer.contact@acme.example',
             ],
         ]);
 
@@ -65,9 +65,9 @@ final class ConsigneeNotifyPartySameAsRowTest extends TestCase
                 'postcode' => '3000AA',
                 'country' => 'Netherlands',
                 'vat_eori_tax_no' => 'NL123456789B01',
-                'contact_person' => 'Pieter Consignee',
+                'contact_person' => 'Warehouse Manager',
                 'phone' => '+31 10 000 0000',
-                'email' => 'pieter@independent.example',
+                'email' => 'consignee.warehouse@independent.example',
             ],
         ]);
 
@@ -87,9 +87,9 @@ final class ConsigneeNotifyPartySameAsRowTest extends TestCase
                 'city' => 'London',
                 'postcode' => 'EC1A 1AA',
                 'country' => 'United Kingdom',
-                'contact_person' => 'Jane Buyer',
+                'contact_person' => 'Chief Buyer',
                 'phone' => '+44 20 7946 0000',
-                'email' => 'jane@acme.example',
+                'email' => 'buyer.contact@acme.example',
             ],
         ]);
 
@@ -110,9 +110,9 @@ final class ConsigneeNotifyPartySameAsRowTest extends TestCase
                 'city' => 'Hamburg',
                 'postcode' => '20095',
                 'country' => 'Germany',
-                'contact_person' => 'Hans Forwarder',
+                'contact_person' => 'Forwarder Contact',
                 'phone' => '+49 40 000000',
-                'email' => 'hans@forwarder.example',
+                'email' => 'forwarder.contact@forwarder.example',
             ],
         ]);
 

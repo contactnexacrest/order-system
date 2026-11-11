@@ -216,13 +216,13 @@ describe('Zoho Books Stage 3', () => {
 
   it('order expenses go to Books and are not imported back', async () => {
     const o = await createOrder();
-    const staff = await orderExpenseRepository.create(o.order, { expense_date: '2026-10-22', category: 'travel_ticket', details: 'Train to the factory', amount_inr: 2450, paid_by: 'staff', staff_name: 'Ravi', no_receipt_reason: 'test' }, userId);
+    const staff = await orderExpenseRepository.create(o.order, { expense_date: '2026-10-22', category: 'travel_ticket', details: 'Train to the factory', amount_inr: 2450, paid_by: 'staff', staff_name: 'Export Executive', no_receipt_reason: 'test' }, userId);
     await orderExpenseRepository.create(o.order, { expense_date: '2026-10-23', category: 'courier', details: 'Samples to buyer', amount_inr: 1800, paid_by: 'company_account', no_receipt_reason: 'test' }, userId);
 
     expect((await sync()).expenses).toBe(2);
     expect(expenses['EX-1']).toEqual({
       account_id: 'AC-TRAVEL', paid_through_account_id: 'AC-EMP', amount: 2450, date: '2026-10-22', reference_number: `NX-${o.order}-EXP-${staff}`,
-      description: `TEST-Stage3 Buyer / NX-${o.order}: Travel — train / flight / bus — Train to the factory (paid by Ravi)`, expense_id: 'EX-1',
+      description: `TEST-Stage3 Buyer / NX-${o.order}: Travel — train / flight / bus — Train to the factory (paid by Export Executive)`, expense_id: 'EX-1',
     });
     expect([expenses['EX-2'].account_id, expenses['EX-2'].paid_through_account_id]).toEqual(['AC-POST', 'SBI-1']);
 

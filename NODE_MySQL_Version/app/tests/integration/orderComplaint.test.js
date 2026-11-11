@@ -422,9 +422,9 @@ describe('Order Complaint / Process Issue (Section BX)', () => {
     it('client order page offers the complaint form but not a dispute form', async () => {
       const res = await agent.get(`/client/orders/${orderId}`);
       expect(res.status).toBe(200);
-      expect(res.text).toContain('Report a Process Issue');
+      expect(res.text).toContain('Tell us what we could do better');
       expect(res.text).toContain(`action="/client/orders/${orderId}/complaints"`);
-      expect(res.text).not.toContain('Raise a Dispute');
+      expect(res.text).not.toContain('Ask to cancel this order');
     });
 
     it('staff Complaints nav link and list page render for Admin', async () => {

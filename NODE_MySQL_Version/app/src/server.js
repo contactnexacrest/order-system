@@ -1685,7 +1685,7 @@ app.use((err, req, res, next) => {
   if (err && err.name === 'MulterError') {
     // QA Round 6, R6-N03: back to the form with a message (and what was
     // typed so far), the same as PHP, instead of a bare error page.
-    const message = 'That file could not be accepted by this form — nothing was saved. Attach files with the form\'s own upload button and try again.';
+    const message = 'We could not accept that file, so nothing was saved. Please add the file with the "Choose file" button on this form and try again.';
     if (req.xhr || String(req.get('Accept') || '').includes('application/json')) {
       res.status(400).json({ error: message });
       return;

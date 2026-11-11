@@ -5,27 +5,27 @@
   <table class="list">
     {# D-261: the associate portal hides the FOB value unless their access level shows it #}
     {% set showFob = c.show_fob !== false %}
-    <tr><th>Line</th>{% if showFob %}<th class="r">Invoiced FOB ({{ c.currency }})</th>{% endif %}<th>Price check</th><th class="r">Commission ({{ c.currency }})</th></tr>
+    <tr><th>Line</th>{% if showFob %}<th class="r">Invoice value of the goods ({{ c.currency }})</th>{% endif %}<th>Price within range?</th><th class="r">Commission ({{ c.currency }})</th></tr>
     {% for l in c.lines %}
       <tr><td>{{ l.line_no }} · {{ l.description | truncate(60, true, '') }}</td>{% if showFob %}<td class="r">{{ l.fob | money }}</td>{% endif %}
-        <td>{% if l.in_range %}<span class="badge badge-active">In range</span>{% else %}<span class="badge badge-pending">Below floor, approved — no commission</span>{% endif %}</td><td class="r">{{ l.commission | money }}</td></tr>
+        <td>{% if l.in_range %}<span class="badge badge-active">Yes</span>{% else %}<span class="badge badge-pending">Sold below the lowest price (we agreed to it) — no commission on this line</span>{% endif %}</td><td class="r">{{ l.commission | money }}</td></tr>
     {% endfor %}
-    {% if c.lines.length == 0 %}<tr><td colspan="4" class="muted">No goods lines yet.</td></tr>{% endif %}
+    {% if c.lines.length == 0 %}<tr><td colspan="4" class="muted">No products on this order yet.</td></tr>{% endif %}
     <tr><td><b>Total</b></td>{% if showFob %}<td class="r"><b>{{ c.goods_fc | money }}</b></td>{% endif %}<td></td><td class="r"><b>{{ c.amount_fc | money }}</b></td></tr>
   </table>
   <table class="kv" style="margin-top:8px">
-    {% if c.show_pct !== false and c.level_label !== null %}<tr><th>Commission level</th><td>{{ c.level_label }}{{ ' — fixed when the Proforma Invoice was issued' if c.level_fixed else ' — for now; fixed when the Proforma Invoice is issued' }}</td></tr>{% endif %}
-    {% if showFob and (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount / settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (lowers the basis)</td></tr>{% endif %}
+    {% if c.show_pct !== false and c.level_label !== null %}<tr><th>Your commission rate</th><td>{{ c.level_label }}{{ ' — final since we sent the buyer the proforma invoice' if c.level_fixed else ' — for now; final when we send the buyer the proforma invoice' }}</td></tr>{% endif %}
+    {% if showFob and (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount or settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (this lowers the amount we work your commission out on)</td></tr>{% endif %}
     {# D-264: in the portal the order currency is the figure; rupees only for an associate in India, once fixed (c.fixed_line, set by the portal controller) #}
-    {% if showFob and not c.portal %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' fixed' if c.fixed else (' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised') }} = ₹{{ c.basis_inr | money }}</td></tr>{% elif showFob %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }}</td></tr>{% endif %}
-    <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }}{% if not c.portal %} · ₹{{ c.amount_inr | money }}{% endif %}</b>{% if c.fixed %} <span class="badge badge-active">Fixed</span>{% elif c.state != 'unpaid' %} <span class="badge badge-pending">Estimate</span>{% endif %}{{ ' — none: the buyer did not pay the order in full' if c.state == 'unpaid' }}
+    {% if showFob and not c.portal %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' fixed' if c.fixed else (' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised') }} = ₹{{ c.basis_inr | money }}</td></tr>{% elif showFob %}<tr><th>Commission worked out on</th><td>{{ c.currency }} {{ c.basis_fc | money }}</td></tr>{% endif %}
+    <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }}{% if not c.portal %} · ₹{{ c.amount_inr | money }}{% endif %}</b>{% if c.fixed %} <span class="badge badge-active">Fixed</span>{% elif c.state != 'unpaid' %} <span class="badge badge-pending">Estimate</span>{% endif %}{{ ' — no commission, because the buyer did not pay the full order' if c.state == 'unpaid' }}
       {% if c.portal and c.fixed_line %}<br><span data-fixed-rupees>{{ c.fixed_line }}</span>{% endif %}
       {% if not c.portal and c.override %}<br><small class="muted">Changed by the MD: {{ c.override_reason }}</small>{% endif %}</td></tr>
-    <tr><th>GST</th><td>{% if c.gstin %}GST {{ c.gst_pct | pct2 }}% added on top once your tax invoice is on file{% else %}none (not GST-registered){% endif %}</td></tr>
+    <tr><th>GST</th><td>{% if c.gstin %}We add GST of {{ c.gst_pct | pct2 }}% when we have your tax invoice{% else %}No GST (you are not registered for GST){% endif %}</td></tr>
     <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>
-    <tr><th>Due / payout run</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }} · paid in the {{ c.payout_run_on | shortDate }} payout run{% else %}once the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>held while a buyer claim is open</b>{% endif %}</td></tr>
+    <tr><th>When we pay</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }}, paid on {{ c.payout_run_on | shortDate }}{% else %}after the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>on hold while the buyer has an open claim</b>{% endif %}</td></tr>
     {# D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. #}
-    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}decided when the buyer has paid in full{% elif c.portal %}{{ 'yes' if c.counts else 'no' }}{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+    <tr><th>{{ 'Counts toward your next commission rate' if c.portal else 'Counts toward the ladder' }}</th><td>{% if c.state != 'paid' %}we will know when the buyer has paid in full{% elif c.portal %}{{ 'yes' if c.counts else 'no' }}{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
   </table>
-  <p class="muted small">Basis is the final invoiced FOB of the goods only — no freight, insurance or services. Bank charges never reduce it; an agreed discount or settled claim does; an order not paid in full earns nothing.</p>
+  <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
 </div>

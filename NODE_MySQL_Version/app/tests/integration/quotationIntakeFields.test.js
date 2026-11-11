@@ -35,9 +35,9 @@ describe('Quotation intake form fields (External QA report U-05/U-06)', () => {
     const res = await request(app).get('/quotation-details');
 
     expect(res.text).not.toContain('placeholder="UK: EORI No.');
-    expect(res.text).toContain('UK: EORI No. | Others: Tax Reg. No.');
+    expect(res.text).toContain('In the UK, give your EORI number. In other countries, give your company tax or VAT number.');
     expect(res.text).not.toContain('placeholder="GSP Form A (preferential)');
-    expect(res.text).toContain('GSP Form A (preferential) / Non-preferential');
+    expect(res.text).toContain('A preferential certificate (GSP Form A) can lower import duty');
   });
 
   it('billing and destination country are dropdowns with Not sure and Other options', async () => {
@@ -67,7 +67,7 @@ describe('Quotation intake form fields (External QA report U-05/U-06)', () => {
         billing_city: 'Testville',
         billing_country: 'United Kingdom',
         vat_eori_tax_no: 'GB123456789',
-        contact_person: 'Jane Test',
+        contact_person: 'Test Contact',
         email: `jane-${Math.random().toString(16).slice(2, 10)}@example.test`,
         country_of_destination: 'Not sure',
         incoterm_preference: 'FOB',

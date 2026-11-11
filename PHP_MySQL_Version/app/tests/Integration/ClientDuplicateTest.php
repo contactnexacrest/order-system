@@ -42,7 +42,7 @@ final class ClientDuplicateTest extends DbTestCase
         $this->sourceEmail = 'jane-' . bin2hex(random_bytes(4)) . '@example.test';
         $pdo->prepare(
             "INSERT INTO clients (client_unique_number, company_legal_name, billing_address, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
-             VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Jane Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)"
+             VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)"
         )->execute(['unique_number' => $uniqueNumber, 'email' => $this->sourceEmail, 'created_by' => $this->userId]);
         $id = (int) $pdo->lastInsertId();
         return ClientRepository::find($id);

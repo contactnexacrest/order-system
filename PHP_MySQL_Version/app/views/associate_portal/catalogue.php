@@ -9,9 +9,9 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
 ?>
 <div class="card page-wide">
   <h1>Catalogue</h1>
-  <p class="muted">Products you can offer. Prices on request · <b><?= (int) $left ?> of <?= (int) $limit ?></b> price requests left today.</p>
+  <p class="muted">Products you can offer to buyers. Ask us for a price. You can ask for <b><?= (int) $left ?></b> more prices today (out of <?= (int) $limit ?>).</p>
   <table class="list">
-    <tr><th>Product</th><th>Forms</th><th>Finishes</th><th></th></tr>
+    <tr><th>Product</th><th>Available as</th><th>Finishes</th><th></th></tr>
     <?php foreach ($products as $p): ?>
       <tr>
         <td><b><?= View::e($p['name']) ?></b><?php if ($p['description'] !== ''): ?><br><small class="muted"><?= View::e(mb_substr($p['description'], 0, 160)) ?></small><?php endif; ?></td>
@@ -26,14 +26,14 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
 
   <h2>Your price requests</h2>
   <table class="list">
-    <tr><th>No.</th><th>Product · specification</th><th class="r">Quote · lowest</th><th>Status</th></tr>
+    <tr><th>No.</th><th>Product · specification</th><th class="r">Price to quote · Lowest price you may agree</th><th>Status</th></tr>
     <?php foreach ($requests as $r): ?>
       <?php $__st = \App\Services\PriceRequestService::displayStatus($r); ?>
       <tr>
         <td><a href="/associate/price-requests/<?= (int) $r['id'] ?>"><?= View::e($r['number']) ?></a></td>
         <td><?= View::e($r['product_name']) ?> · <?= View::e($r['selection_text']) ?></td>
         <td class="r"><?= $r['quote'] !== null ? number_format((float) $r['quote'], 2) . ' · ' . number_format((float) $r['lowest'], 2) . ' <small class="muted">USD/' . View::e((string) $r['unit']) . '</small>' : '—' ?></td>
-        <td><?= ['valid' => 'Valid until ' . $__d($r['valid_until']), 'priced' => 'Priced — valid until ' . $__d($r['valid_until']), 'pending' => 'With our team', 'ordered' => 'Became an order', 'expired' => 'Expired', 'refused' => 'Not priced'][$__st] ?? View::e($__st) ?></td>
+        <td><?= ['valid' => 'Valid until ' . $__d($r['valid_until']), 'priced' => 'Priced — valid until ' . $__d($r['valid_until']), 'pending' => 'Our team is working on it', 'ordered' => 'Became an order', 'expired' => 'Expired', 'refused' => 'We could not give a price'][$__st] ?? View::e($__st) ?></td>
       </tr>
     <?php endforeach; ?>
     <?php if ($requests === []): ?><tr><td colspan="4" class="muted">No price requests yet.</td></tr><?php endif; ?>

@@ -41,10 +41,10 @@ $selectedTypes = $supplier['types'] ?? [];
           <input type="text" name="state" value="<?= $v('state') ?>" placeholder="e.g., Rajasthan">
         </label>
         <label>Phone
-          <input type="text" name="phone" value="<?= $v('phone') ?>" placeholder="e.g., +91 98765 43210">
+          <input type="text" name="phone" value="<?= $v('phone') ?>" placeholder="e.g., +91-0000000000">
         </label>
         <label>WhatsApp Number
-          <input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g., +91 98765 43210">
+          <input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g., +91-0000000000">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= $v('email') ?>" placeholder="e.g., name@example.com">
@@ -53,10 +53,10 @@ $selectedTypes = $supplier['types'] ?? [];
           <input type="text" name="contact_person" value="<?= $v('contact_person') ?>" placeholder="e.g., Sales Manager">
         </label>
         <label>Contact Person — Phone
-          <input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g., +91 98765 43210">
+          <input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g., +91-0000000000">
         </label>
         <label>Contact Person — WhatsApp
-          <input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g., +91 98765 43210">
+          <input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g., +91-0000000000">
         </label>
         <label>GSTIN
           <input type="text" name="gstin" value="<?= $v('gstin') ?>" placeholder="e.g., 08AAAAA0000A1Z5">

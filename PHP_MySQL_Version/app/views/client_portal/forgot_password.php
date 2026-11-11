@@ -1,7 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card card-narrow">
   <h1>Forgot your password?</h1>
-  <p>Enter the email address on your account and, if it matches one, we'll send a password reset link that's valid for 72 hours.</p>
+  <p>Enter the e-mail address you sign in with. If we find your account, we will e-mail you a link to reset your password. The link works for 72 hours.</p>
   <form method="post" action="/client/forgot-password">
     <?= Csrf::field() ?>
     <label>Email

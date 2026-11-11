@@ -138,7 +138,7 @@ final class B02RecordingFixesTest extends DbTestCase
 
     // ---- 2. Buyer portal: the Buyer PO intro -------------------------------------------------
 
-    private const BUYER_PO_INTRO = "Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.";
+    private const BUYER_PO_INTRO = "After you sign your purchase order, upload a scan of it here. You can upload a corrected copy later. We keep every copy you upload.";
 
     private function portalPage(string $status): string
     {
@@ -160,8 +160,10 @@ final class B02RecordingFixesTest extends DbTestCase
     {
         foreach (['cancelled', 'lost'] as $status) {
             $html = $this->portalPage($status);
-            self::assertStringNotContainsString('upload a scanned copy here any time', $html, $status);
-            self::assertStringContainsString("This order is {$status}, so a Buyer PO can no longer be uploaded.", $html, $status);
+            self::assertStringNotContainsString('upload a scan of it here', $html, $status);
+            // D-330: buyer words — never the raw status ("lost").
+            $word = $status === 'lost' ? 'This order did not go ahead' : 'This order was cancelled';
+            self::assertStringContainsString($word . ', so you can no longer upload a purchase order.', $html, $status);
         }
     }
 

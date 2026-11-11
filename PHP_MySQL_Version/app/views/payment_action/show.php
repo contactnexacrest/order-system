@@ -23,8 +23,8 @@ $legName = $legInfo['label'] ?? '';
     <legend><span class="intake-step-num"><?= array_search($current['leg'], array_keys($current['legs']), true) + 1 ?></span> <?= htmlspecialchars($legName) ?> <span class="action-status todo">Action needed</span></legend>
     <ol class="action-howto">
       <li><strong>Download</strong> the <?= htmlspecialchars($legInfo['document']) ?> — our bank details are on it.</li>
-      <li><strong>Pay</strong> <?= $amountDue !== null ? '<strong>' . htmlspecialchars($currency) . ' ' . number_format($amountDue, 2) . '</strong>' : 'the amount shown on it' ?> by T/T (bank transfer).</li>
-      <li><strong>Send us</strong> the transaction details and a screenshot below — our team checks them against our bank statement.</li>
+      <li><strong>Pay</strong> <?= $amountDue !== null ? '<strong>' . htmlspecialchars($currency) . ' ' . number_format($amountDue, 2) . '</strong>' : 'the amount shown on it' ?> by bank transfer (T/T).</li>
+      <li><strong>Send us</strong> the payment details (with the bank reference number) and a screenshot below. Our team checks them against our bank statement.</li>
     </ol>
     <?php if ($document): ?>
       <p><a class="btn btn-secondary" href="/payment-action/<?= htmlspecialchars($token) ?>/document">&#11015; Download <?= htmlspecialchars($legInfo['document']) ?> (<?= htmlspecialchars((string) $document['document_reference']) ?>)</a></p>
@@ -32,11 +32,11 @@ $legName = $legInfo['label'] ?? '';
     <form method="post" action="/payment-action/<?= htmlspecialchars($token) ?>/report" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid (<?= htmlspecialchars($currency) ?>) *<input type="number" step="0.01" min="0.01" name="amount" required value="<?= $amountDue !== null ? number_format($amountDue, 2, '.', '') : '' ?>" placeholder="e.g. 1500.00"></label>
         <label>Date Paid *<input type="date" name="payment_date" required value="<?= date('Y-m-d') ?>"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
-        <label class="full">Payment Screenshot / Bank Remittance Advice *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label class="full">Screenshot or bank receipt of your payment *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
       </div>
       <button type="submit">Send Payment Details</button>
     </form>
@@ -48,7 +48,7 @@ $legName = $legInfo['label'] ?? '';
       <p>We have your payment details. Our team is verifying them against our bank statement and will confirm by email. Nothing more is needed from you right now.</p>
     <?php elseif ($current['state'] === 'waiting'): ?>
       <h2>&#10003; Nothing to pay right now</h2>
-      <p>Your next payment is the <strong><?= htmlspecialchars(strtolower($legName)) ?></strong>, against our <?= htmlspecialchars($legInfo['document']) ?>. We'll email it to you when it's due — then this same link will show you what to pay.</p>
+      <p>Your next payment is the <strong><?= htmlspecialchars(strtolower($legName)) ?></strong>. It is shown on our <?= htmlspecialchars(strtolower($legInfo['document'])) ?>, which we will e-mail you when it is due. This same link will then show you what to pay.</p>
     <?php else: ?>
       <h2>&#10003; All payments received — thank you</h2>
       <p>There is nothing left to pay on this order.</p>

@@ -187,7 +187,8 @@ closure](./09-stage9-despatch-closure.md#closing-the-order--two-phases))
 and one already marked **complete** both land in the same **Complete**
 group, since the buyer was never meant to see that internal distinction as
 two separate buckets in the first place. Groups appear in a fixed,
-most-relevant-first order (Active, Complete, Disputed, Lost, Cancelled),
+most-relevant-first order (Active, Complete, Disputed, Did not go ahead, Cancelled — a lost order is
+shown to the buyer as "Did not go ahead", never "lost", D-330),
 and only a group with at least one order in it is shown — each rendered
 group carries its own short, factual one-line description (e.g.
 "Disputed — Being reviewed by our team"), so a client never has to guess
@@ -197,14 +198,19 @@ what landed an order in a given bucket:
 
 ### Inside an order
 
-Opening an order (**View documents**) shows, top to bottom (with a
+The list shows **Order number · Where it is now · Ordered on**; "Where it is now" is the stage in
+buyer words — Quotation · Order confirmed · In production · Shipping · Shipped (the associate portal's
+mapping; D-330), never our internal step names such as "Supplier Purchase Order" or "Packing & BL
+Instruction".
+
+Opening an order (**Open order**) shows, top to bottom (with a
 **Reorder This** link at the top for a repeat order — see
 [Chapter 17](./17-order-edit-duplication.md); the reorder form keeps each
 line's unit, matching it to the unit list whatever its capitals or spaces,
 and if the earlier unit is not on the list it shows it and asks the buyer
 to choose one, never switching silently to PCS):
 
-1. **Order Confirmation — Your Acknowledgement Needed** — only appears
+1. **Please confirm your order** (button **Yes, this is correct — please go ahead**) — only appears
    when there's a pending OC acknowledgment; see
    [Chapter 4](./04-stage4-order-confirmation.md) for the full mechanics.
 2. **Documents** (unless downloads are hidden for this client — see
@@ -215,17 +221,17 @@ to choose one, never switching silently to PCS):
 
    ![Documents table in the client portal](./images/portal_documents.png)
 
-3. **Buyer PO** — lets the client upload a scanned copy of their own signed
-   Purchase Order, with **Your PO Number** (needed with the first signed
-   copy), rather than relying solely on emailing it to staff. Every past
+3. **Your purchase order** — lets the client upload a scanned copy of their own signed
+   Purchase Order, with **Your PO number** (needed the first time you upload), rather than relying solely on emailing it to staff. Every past
    upload is listed (file name + upload date); re-uploading a corrected
    copy never removes the earlier one. The upload form closes once the
-   advance payment has cleared ("Contact your NexaCrest representative if
-   you need to submit an updated copy"), and it is never offered on a
-   cancelled or lost order ("This order is cancelled, so a Buyer PO can no
-   longer be uploaded" — the server refuses such an upload too, also through
-   the Buyer Action Link; the "upload a scanned copy here any time" line is
-   not shown on such an order, D-269), so in practice only a returning
+   advance payment has cleared ("We have received your advance payment, so you can no longer
+   upload here. If you need to send us a new copy, please contact your NexaCrest contact
+   person."), and it is never offered on a cancelled or lost order ("This order was cancelled" /
+   "This order did not go ahead, so you can no longer upload a purchase order" — the server
+   refuses such an upload too, also through the Buyer Action Link). The invitation line "After
+   you sign your purchase order, upload a scan of it here…" is shown only while upload is open:
+   not on a cancelled or lost order (D-269) and not once the advance has been received (D-330), so in practice only a returning
    client who already has a login uses it — see
    [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the same record
    the internal staff-side upload writes to.
@@ -236,7 +242,9 @@ to choose one, never switching silently to PCS):
 
    ![Order Updates — a two-way conversation thread](./images/portal_chat.png)
 
-5. **Report a Payment** — the buyer's own note that they've paid, covered
+5. **Report a Payment** — the buyer's own note that they've paid (field **Bank reference number
+   (transaction ID, UTR or SWIFT reference)**; earlier reports are listed under **Payments you have
+   told us about** as "Received — we are checking it" or "Reviewed by our team"), covered
    in detail in [Chapter 3](./03-stage3-pi-advance.md) (Payment Status) —
    purely informational, staff still verify against the bank statement
    before recording anything themselves. The amount, if given, must be
@@ -244,11 +252,12 @@ to choose one, never switching silently to PCS):
    the e-mailed buyer link (QA Round 6, R6-N19/N20/N21). The form appears
    only once the Proforma Invoice has been issued, and not on a cancelled
    or lost order (R6-N24).
-6. **Raise a Dispute** — only shown when staff have switched it on for this
+6. **Ask to cancel this order** (staff call it a dispute) — only shown when staff have switched it on for this
    specific order; see [Disputes](./11-disputes.md). For cancel-intent
    messages only — a process flaw with no intent to cancel belongs in
-   "Report a Process Issue" below instead, which is always available.
-7. **Report a Process Issue** — unlike Raise a Dispute, this is **always**
+   "Tell us what we could do better" below instead, which is always available.
+7. **Tell us what we could do better** (a process issue / complaint) — unlike "Ask to cancel this
+   order", this is **always**
    shown, regardless of order status or the dispute toggle above: a
    description box plus, once something's been submitted, the full
    two-way conversation with staff so far. See
@@ -256,14 +265,13 @@ to choose one, never switching silently to PCS):
    who at NexaCrest sees and answers it.
 8. **Order Feedback** — available once the order's documents have been
    sent (status Documents Sent or Complete); before that the section says
-   "Feedback will be available once this order's documents have been sent
-   to you." It is a 1-5 star rating plus a feedback/testimonial box on how
+   "You can leave a review after we send you the shipping documents for this order." It is a 1-5 star rating plus a **Your review** box on how
    this specific order went. The box
    starts with a suggested testimonial written from that order's own
    details (product, quantity, destination port) — different wording per
    order, never the text this client left on an earlier order — with the
-   note "if you want to modify the feedback/testimonial, please update it
-   above" underneath (owner request 2026-10-26), distinct from the
+   note "To help you start, we wrote a suggested review based on your order. You can change it
+   above." underneath (owner request 2026-10-26; wording D-330), distinct from the
    running Order Updates/Complaint conversations above. Submitting it
    again later replaces the earlier rating/comments rather than adding a
    second entry — there's no reason to stop a client revising their own

@@ -4139,7 +4139,7 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
         <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" {{ 'checked' if order.dispute_button_visible_to_client == 1 }}>
-        Show "Raise a Dispute" button to the client in their portal for this order
+        Show "Ask to cancel this order" (dispute) button to the client in their portal for this order
       </label>
     </form>
     {% endif %}

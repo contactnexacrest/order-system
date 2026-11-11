@@ -24,7 +24,7 @@ const fileUploadService = require('./fileUploadService');
 /** Each payment the client can make, in order, with the document it is paid against. */
 const LEGS = {
   advance: { doc: 'PI', label: 'Advance Payment', document: 'Proforma Invoice' },
-  freight: { doc: 'FDN', label: 'Freight & Insurance', document: 'Debit Note' },
+  freight: { doc: 'FDN', label: 'Freight and insurance', document: 'freight bill (debit note)' },
   balance: { doc: 'CI', label: 'Balance Payment', document: 'Commercial Invoice' },
 };
 
@@ -109,7 +109,7 @@ async function report(req, order) {
 
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (transactionRef === '') {
-    return { ok: false, message: 'Enter the transaction ID / UTR of your payment.' };
+    return { ok: false, message: 'Enter the bank reference number of your payment.' };
   }
   const amount = String(req.body.amount || '').trim();
   if (amount === '' || !(parseFloat(amount) > 0) || Number.isNaN(Number(amount))) {
@@ -120,7 +120,7 @@ async function report(req, order) {
     return { ok: false, message: 'Enter the date you paid.' };
   }
   if (!req.file) {
-    return { ok: false, message: 'Attach the payment screenshot or bank remittance advice.' };
+    return { ok: false, message: 'Add a screenshot or the bank receipt of your payment.' };
   }
   let screenshotFileId;
   try {

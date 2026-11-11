@@ -73,7 +73,7 @@ final class OptionalFieldUndefinedArrayKeyWarningTest extends DbTestCase
             ClientIntakeRepository::create([
                 'company_legal_name'     => 'R-14 Test Co',
                 'billing_address'        => '1 Test Street',
-                'contact_person'         => 'Jane Test',
+                'contact_person'         => 'Test Contact',
                 'email'                  => 'r14-test@example.com',
                 'country_of_destination' => 'United Kingdom',
             ], '127.0.0.1');
@@ -87,7 +87,7 @@ final class OptionalFieldUndefinedArrayKeyWarningTest extends DbTestCase
         $id = ClientIntakeRepository::create([
             'company_legal_name'     => 'R-14 Test Co',
             'billing_address'        => '1 Test Street',
-            'contact_person'         => 'Jane Test',
+            'contact_person'         => 'Test Contact',
             'email'                  => 'r14-test@example.com',
             'country_of_destination' => 'United Kingdom',
         ], '127.0.0.1');
@@ -96,7 +96,7 @@ final class OptionalFieldUndefinedArrayKeyWarningTest extends DbTestCase
             ClientIntakeRepository::updateFromClient($id, [
                 'company_legal_name'     => 'R-14 Test Co (updated)',
                 'billing_address'        => '2 Test Street',
-                'contact_person'         => 'Jane Test',
+                'contact_person'         => 'Test Contact',
                 'email'                  => 'r14-test@example.com',
                 'country_of_destination' => 'United Kingdom',
             ]);
@@ -116,7 +116,7 @@ final class OptionalFieldUndefinedArrayKeyWarningTest extends DbTestCase
                 'company_legal_name'             => 'R-14 Test Co',
                 'billing_address'                 => '1 Test Street',
                 'vat_eori_tax_no'                 => 'GB123456789',
-                'contact_person'                  => 'Jane Test',
+                'contact_person'                  => 'Test Contact',
                 'email'                           => 'r14-test@example.com',
                 'phone'                           => '+44 20 1234 5678',
                 'port_of_discharge_text'          => 'Felixstowe',

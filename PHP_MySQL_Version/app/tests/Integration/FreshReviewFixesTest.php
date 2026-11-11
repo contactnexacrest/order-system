@@ -252,11 +252,11 @@ final class FreshReviewFixesTest extends DbTestCase
 
     public function testM5AndL2TheZohoPaymentNamesTheGstOnTheGrossBilled(): void
     {
-        self::assertSame('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹50,000.00, TDS u/s 194H ₹2,500.00 (5%), net paid ₹47,500.00'
+        self::assertSame('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹50,000.00, TDS u/s 194H ₹2,500.00 (5%), net paid ₹47,500.00'
             . " + GST ₹9,000.00 on the associate's tax invoice (input credit), total paid ₹56,500.00 · UTR UTR998877",
-            AssociateTds::paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 50000, 2500, 5.0, '194H', 47500, 'UTR998877', 9000.0));
-        self::assertSame('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹50,000.00, no TDS, net paid ₹50,000.00 · UTR U1',
-            AssociateTds::paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 50000, 0, null, null, 50000, 'U1'), 'no GST: as before');
+            AssociateTds::paymentDescription('Test Associate', ['SC/ORD/26/001'], 50000, 2500, 5.0, '194H', 47500, 'UTR998877', 9000.0));
+        self::assertSame('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹50,000.00, no TDS, net paid ₹50,000.00 · UTR U1',
+            AssociateTds::paymentDescription('Test Associate', ['SC/ORD/26/001'], 50000, 0, null, null, 50000, 'U1'), 'no GST: as before');
 
         // L2: a GST-registered associate paid ₹40,000 with ₹1,000 TDS on a ₹41,500 payout: GST on the ₹41,000 billed.
         [$a, $client] = $this->associate($this->level('Level 2'), '29ABCDE1234F1Z5');

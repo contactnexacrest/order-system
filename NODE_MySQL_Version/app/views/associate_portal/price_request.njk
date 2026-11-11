@@ -6,14 +6,14 @@
   <h1>{{ product.name if product else 'Product' }}</h1>
   <p class="muted">Price request <b>{{ r.number }}</b> · {{ r.selection_text }}</p>
   {% if status == 'pending' %}
-    <div class="alert alert-warning">This is not a standard specification — our team will send the price here and by e-mail within 24 hours (by {{ (r.due_at or '') | string | truncate(16, true, '') }}). It does not use one of your daily price requests.</div>
+    <div class="alert alert-warning">This is not a standard product, so our team will price it. You will get the price here and by e-mail within 24 hours (by {{ (r.due_at or '') | string | truncate(16, true, '') }}). This request does not count toward your daily limit.</div>
   {% elif r.quote !== null %}
-    <p class="muted">{{ 'Expired on ' if status == 'expired' else 'Valid until ' }}{{ r.valid_until | shortDate }} · FOB Indian port, per {{ unit }}</p>
+    <p class="muted">{{ 'Expired on ' if status == 'expired' else 'Valid until ' }}{{ r.valid_until | shortDate }} · price on board the ship at the Indian port (FOB), per {{ unit }}</p>
     <div class="field-grid">
       <div><div class="muted small">Quote price</div><div style="font-size:1.5em;font-weight:700">USD {{ r.quote | money }}{{ ' / CBM' if unit == 'CBM' else '' }}</div></div>
-      <div><div class="muted small">Lowest you may agree</div><div style="font-size:1.5em;font-weight:700">USD {{ r.lowest | money }}{{ ' / CBM' if unit == 'CBM' else '' }}</div></div>
+      <div><div class="muted small">Lowest price you may agree with the buyer</div><div style="font-size:1.5em;font-weight:700">USD {{ r.lowest | money }}{{ ' / CBM' if unit == 'CBM' else '' }}</div></div>
     </div>
-    {% if breakdown.per_m2 %}<p class="muted small">≈ USD {{ breakdown.per_m2 | money }} per m² ({{ breakdown.m2_per_cbm }} m² in one CBM) — for comparison only; the order is in CBM.</p>{% endif %}
+    {% if breakdown.per_m2 %}<p class="muted small">About USD {{ breakdown.per_m2 | money }} per square metre (one cubic metre gives {{ breakdown.m2_per_cbm }} m²). This is only to compare; the order is priced per cubic metre.</p>{% endif %}
     <table class="list">
       {% for l in breakdown.lines or [] %}<tr><td>{{ l.label }}</td><td class="r">{{ l.change }}</td></tr>{% endfor %}
     </table>

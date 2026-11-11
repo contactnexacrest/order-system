@@ -3,9 +3,9 @@
   <h1>Reorder — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted small"><a href="/client/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
   <p class="muted">
-    This copies the product lines from this order as a starting point — edit, remove, or add lines
-    below as needed for the repeat order. It doesn't create a new order right away: our team reviews
-    every reorder request and will confirm it with you once it's set up.
+    We have copied the products from this order to help you start. Change, remove or add products
+    below. This does not place a new order yet. Our team will check your request and confirm the new
+    order with you.
   </p>
 
   <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/reorder">
@@ -28,8 +28,8 @@
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
-          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
+          <label>Quantity<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
+          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Quantity not decided yet</label>
           <label>Unit
             <?php
               // Buyer-portal fixes (7 Nov 2026): the earlier order's unit is matched whatever its case or
@@ -58,7 +58,7 @@
         <?php endforeach; ?>
       </div>
       <div class="btn-row"><button type="button" class="btn-secondary btn-sm" id="add-product-row">+ Add product line</button></div>
-      <p class="muted small">Pricing and HS codes aren't set here — our team confirms those when reviewing your request.</p>
+      <p class="muted small">You do not need to give prices or customs codes (HS codes). Our team adds them when we check your request.</p>
     </fieldset>
 
     <fieldset>

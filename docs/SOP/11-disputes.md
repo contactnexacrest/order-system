@@ -38,7 +38,7 @@ client-facing dispute button. That's now split:
 
 - **Manage disputes** (`manage_disputes`) — view the dispute log, raise a
   dispute, change its status, attach evidence, and enable/disable the
-  client's "Raise a Dispute" button. Privileged by default: only Admin,
+  client's "Ask to cancel this order" button (it was called "Raise a Dispute" before D-330). Privileged by default: only Admin,
   Managing Director, Executive Director, and Super Admin hold it out of
   the box. Grant it to another role from **Roles & Permissions** if that
   business needs it more broadly.
@@ -117,7 +117,7 @@ remember to check.
 
 By default, the buyer has no way to raise a dispute themselves — there's no
 button in their portal. Staff choose, **per order**, whether to expose one:
-a checkbox on the order page, **"Show 'Raise a Dispute' button to the client
+a checkbox on the order page, **"Show 'Ask to cancel this order' (dispute) button to the client
 in their portal for this order,"** turns it on or off. This is deliberately
 not a blanket setting — some orders/relationships may warrant it, others
 not.
@@ -129,7 +129,7 @@ dispute-related screen or button anywhere in their portal for that order.
 
 **If it's on**, the buyer sees a simple form:
 
-![Client portal — Raise a Dispute, only shown when enabled for this order](./images/dispute_client_form.png)
+![Client portal — Ask to cancel this order (a dispute), only shown when enabled for this order](./images/dispute_client_form.png)
 
 They can only submit a description — no status, no resolution, no document
 upload from their side. Once submitted, the same working-days response

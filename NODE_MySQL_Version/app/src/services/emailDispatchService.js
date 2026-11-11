@@ -121,17 +121,17 @@ async function paymentRequestSentence(order, document) {
   if (code === 'CI') {
     const status = await require('../repositories/orderPaymentStatusRepository').find(order.id);
     if (status && (status.balance_remittance_received_at || status.balance_cleared_at)) {
-      return 'Kindly review the invoice value and payment settlement details. The balance payment has already been received — thank you.';
+      return 'Please check the invoice amount and the payment details. We have already received the balance payment — thank you.';
     }
-    return 'Kindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.';
+    return 'Please check the invoice amount and the payment details, and pay the balance as agreed.';
   }
   if (parseFloat(order.advance_pct || 0) > 0) {
-    return 'Kindly arrange the advance payment as per the terms stated to enable us to commence production.';
+    return 'Please pay the advance as agreed, so that we can start production.';
   }
   if (order.payment_method === 'LC') {
-    return 'Kindly arrange the Letter of Credit as per the terms stated to enable us to commence production.';
+    return 'Please open the letter of credit (LC) as agreed, so that we can start production.';
   }
-  return 'Kindly arrange the payment as per the terms stated.';
+  return 'Please pay as set out in the payment terms.';
 }
 
 /**
@@ -143,7 +143,7 @@ async function paymentRequestSentence(order, document) {
  * @returns {subject, body, recipient_email, document, order}
  */
 /** Owner request (2026-10-27): appended to the PI, Debit Note and CI emails. */
-const PAYMENT_LINK_PARAGRAPH = 'PAYMENT DETAILS: once you have completed the payment, please upload the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\nOur team will check them against our bank statement and confirm.';
+const PAYMENT_LINK_PARAGRAPH = 'PAYMENT DETAILS: once you have paid, please send us a screenshot of the payment and its details (bank reference number, amount and date) on this secure link. You do not need to sign in:\n{payment_action_link}\nOur team will check them against our bank statement and confirm.';
 
 async function buildPreview(orderId, documentId, templateKey, senderUserId) {
   const order = await orderRepository.find(orderId);
@@ -629,4 +629,4 @@ async function linkMailOutcome(what, email, sent, link, kind = 'buyer_links', au
   return `${what} e-mailed to ${email}. If they did not get it, copy the link and send it yourself.`;
 }
 
-module.exports = { associateCopyBody, senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };
+module.exports = { PAYMENT_LINK_PARAGRAPH, associateCopyBody, senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };

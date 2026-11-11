@@ -159,7 +159,7 @@ final class AssociateTdsTest extends DbTestCase
         $p = $this->payout($a, 40000);
         $c = AssociateTds::compute($p, '2026-11-02');
         self::assertSame([0.0, 40000.0], [$c['tds'], $c['net']]);
-        self::assertSame(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration'], $c['missing_foreign']);
+        self::assertSame(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration (no fixed place of business in India)'], $c['missing_foreign']);
         self::assertSame(['Form 15CA', 'Form 15CB'], $c['missing_payout']);
         $f = $this->pay($p);
         self::assertSame('Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration, Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate\'s Documents tab; Form 15CA and 15CB are attached to this payment.', $f['message']);
@@ -178,10 +178,10 @@ final class AssociateTdsTest extends DbTestCase
 
     public function testTheD212WordingAndTheZohoBillWithAndWithoutATdsTax(): void
     {
-        self::assertSame('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR UTR123456',
-            AssociateTds::paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 25000, 500, 2.0, '194H', 24500, 'UTR123456'));
-        self::assertSame('Associate commission for Ravi Kumar — orders A, B — gross ₹1,000.00, no TDS, net paid ₹1,000.00 · UTR U1',
-            AssociateTds::paymentDescription('Ravi Kumar', ['A', 'B'], 1000, 0, null, null, 1000, 'U1'));
+        self::assertSame('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR UTR123456',
+            AssociateTds::paymentDescription('Test Associate', ['SC/ORD/26/001'], 25000, 500, 2.0, '194H', 24500, 'UTR123456'));
+        self::assertSame('Associate commission for Test Associate — orders A, B — gross ₹1,000.00, no TDS, net paid ₹1,000.00 · UTR U1',
+            AssociateTds::paymentDescription('Test Associate', ['A', 'B'], 1000, 0, null, null, 1000, 'U1'));
         // Live Zoho check 7 Nov 2026: an associate abroad is paid by SWIFT — the reference is a SWIFT ref, not a UTR.
         self::assertSame('Associate commission for Demo Associate — order NC/SC/26/0711054 — gross ₹104,312.50, no TDS, net paid ₹104,312.50 · SWIFT ref FT2611070101',
             AssociateTds::paymentDescription('Demo Associate', ['NC/SC/26/0711054'], 104312.50, 0, null, null, 104312.50, 'FT2611070101', 0.0, 'SWIFT ref'));

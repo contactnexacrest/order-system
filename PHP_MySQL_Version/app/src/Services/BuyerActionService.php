@@ -58,10 +58,10 @@ final class BuyerActionService
             }
         }
         if (!$ack || $ack['acknowledged_at'] !== null) {
-            return ['ok' => false, 'message' => 'There is nothing awaiting your acknowledgement on this order.'];
+            return ['ok' => false, 'message' => 'There is nothing for you to confirm on this order.'];
         }
         if (!StageGateService::isUnlocked($orderId, 4)) {
-            return ['ok' => false, 'message' => 'This order is not currently awaiting acknowledgement.'];
+            return ['ok' => false, 'message' => 'This order does not need your confirmation right now.'];
         }
         // Owner decision (2026-10-25): the stage completes only once the OC is
         // approved (email off) / sent (email on) — same rule as the staff path.
@@ -115,10 +115,10 @@ final class BuyerActionService
         // built later documents against.
         // Buyer-portal fixes (7 Nov 2026): no Buyer PO on a cancelled or lost order, on either channel.
         if (in_array($order['status'] ?? '', ['cancelled', 'lost'], true)) {
-            return ['ok' => false, 'message' => 'This order is ' . $order['status'] . ', so a Buyer PO can no longer be uploaded. Contact your NexaCrest representative if you have a question.'];
+            return ['ok' => false, 'message' => (($order['status'] ?? '') === 'lost' ? 'This order did not go ahead' : 'This order was cancelled') . ', so you can no longer upload a purchase order. If you have a question, please contact your NexaCrest contact person.'];
         }
         if (self::advanceAlreadyCleared($orderId)) {
-            return ['ok' => false, 'message' => 'The advance payment has already cleared, so self-service Buyer PO upload is now closed. Contact your NexaCrest representative if you need to submit an updated copy.'];
+            return ['ok' => false, 'message' => 'We have received your advance payment, so you can no longer upload here. If you need to send us a new copy, please contact your NexaCrest contact person.'];
         }
 
         // Owner request (2026-10-26): while Step 4 is still open the buyer
@@ -158,7 +158,7 @@ final class BuyerActionService
         }
 
         NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', "The buyer uploaded their signed PO copy" . ($poRef !== '' ? " ({$poRef})" : '') . " on order {$reference} — check it and confirm the Buyer PO (Step 4d).");
-        return ['ok' => true, 'message' => 'Your Buyer PO copy has been uploaded.'];
+        return ['ok' => true, 'message' => 'Your purchase order has been uploaded.'];
     }
 
     /**
@@ -237,7 +237,7 @@ final class BuyerActionService
         $orderId = (int) $order['id'];
 
         if (self::advanceAlreadyCleared($orderId)) {
-            return ['ok' => false, 'message' => 'The advance payment has already been marked cleared on this order — no further report is needed.'];
+            return ['ok' => false, 'message' => 'We have already received your advance payment for this order. You do not need to send the details again.'];
         }
         // QA Round 6, R6-N24: same rule as the portal.
         if ($refusal = ClientPortalService::paymentReportRefusal($order)) {
@@ -246,7 +246,7 @@ final class BuyerActionService
 
         $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
         if ($transactionRef === '') {
-            return ['ok' => false, 'message' => 'Enter the transaction ID/UTR for your advance payment.'];
+            return ['ok' => false, 'message' => 'Enter the bank reference number of your advance payment.'];
         }
         // QA Round 6, R6-N19/N20/N21: same amount and date checks as the portal.
         if ($error = \App\Helpers\FieldValidator::reportedPayment((string) ($_POST['amount'] ?? ''), (string) ($_POST['payment_date'] ?? ''))) {

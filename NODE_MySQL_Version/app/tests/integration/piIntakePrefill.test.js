@@ -41,7 +41,7 @@ describe('PI intake prefill from client/order data', () => {
         consignee_name: 'Same',
         consignee_address: 'Same',
         vat: 'NL123456789B01',
-        contact: 'Jane Buyer',
+        contact: 'Chief Buyer',
         email: JANE_EMAIL,
         phone: '+31-6-12345678',
         notify: 'Acme Freight Forwarders',
@@ -70,7 +70,7 @@ describe('PI intake prefill from client/order data', () => {
     expect(row.consignee_name).toBe('Same');
     expect(row.consignee_address).toBe('Same');
     expect(row.vat_eori_tax_no).toBe('NL123456789B01');
-    expect(row.contact_person).toBe('Jane Buyer');
+    expect(row.contact_person).toBe('Chief Buyer');
     expect(row.email).toBe(JANE_EMAIL);
     expect(row.phone).toBe('+31-6-12345678');
     expect(row.notify_party).toBe('Acme Freight Forwarders');
@@ -134,11 +134,11 @@ describe('PI intake prefill from client/order data', () => {
          consignee_same_as_buyer = 0, consignee_name = 'Delta Warehousing BV',
          consignee_address_line1 = '8 Dock Street', consignee_city = 'Antwerp',
          consignee_postcode = '2000', consignee_country = 'Belgium',
-         consignee_contact_person = 'Piet Jansen', consignee_phone = '+32-3-1234567',
-         consignee_email = 'piet@delta.example', consignee_vat_eori_tax_no = 'BE0123456789',
+         consignee_contact_person = 'Logistics Head', consignee_phone = '+32-3-1234567',
+         consignee_email = 'logistics.head@delta.example', consignee_vat_eori_tax_no = 'BE0123456789',
          notify_party_same_as_consignee = 0, notify_party = 'Acme Freight Forwarders',
          notify_party_address_line1 = '1 Port Lane', notify_party_city = 'Hamburg',
-         notify_party_country = 'Germany', notify_party_contact_person = 'Anna Schulz'
+         notify_party_country = 'Germany', notify_party_contact_person = 'Import Manager'
        WHERE id = :id`,
       { id: clientId }
     );
@@ -151,10 +151,10 @@ describe('PI intake prefill from client/order data', () => {
       billing_address_line1: '12 Harbour Road', billing_address_line2: 'Unit 4', billing_city: 'Rotterdam',
       billing_postcode: '3011 AA', billing_country: 'Netherlands',
       consignee_name: 'Delta Warehousing BV', consignee_address_line1: '8 Dock Street', consignee_city: 'Antwerp',
-      consignee_postcode: '2000', consignee_country: 'Belgium', consignee_contact_person: 'Piet Jansen',
-      consignee_phone: '+32-3-1234567', consignee_email: 'piet@delta.example', consignee_vat_eori_tax_no: 'BE0123456789',
+      consignee_postcode: '2000', consignee_country: 'Belgium', consignee_contact_person: 'Logistics Head',
+      consignee_phone: '+32-3-1234567', consignee_email: 'logistics.head@delta.example', consignee_vat_eori_tax_no: 'BE0123456789',
       notify_party_address_line1: '1 Port Lane', notify_party_city: 'Hamburg', notify_party_country: 'Germany',
-      notify_party_contact_person: 'Anna Schulz',
+      notify_party_contact_person: 'Import Manager',
     };
     for (const [field, value] of Object.entries(expected)) {
       expect(text).toContain(`name="${field}" value="${value}"`);

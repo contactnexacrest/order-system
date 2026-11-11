@@ -90,7 +90,7 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.locator('input[name="billing_address_line1"]').fill('1 Harbour Road');
     await page.locator('input[name="billing_city"]').fill('Rotterdam');
     await page.locator('#billing_country_select').selectOption({ label: 'Netherlands' });
-    await page.locator('input[name="contact_person"]').fill('Jan Buyer');
+    await page.locator('input[name="contact_person"]').fill('Purchase Head');
     await page.locator('input[name="email"]').fill(`jan-${UNIQUE}@buyer-${UNIQUE}.example`);
     await page.locator('input[name="vat_eori_tax_no"]').fill(`NL${UNIQUE}`);
     await page.locator('#country_of_destination_select').selectOption({ label: 'Netherlands' });

@@ -176,7 +176,7 @@ final class AssociateRegistrationController
             $e['email'] = 'Enter a valid e-mail address — it becomes your portal login.';
         }
         if (preg_match('/^[0-9 +()\-]{6,40}$/', $d['phone']) !== 1) {
-            $e['phone'] = 'Enter a phone number with the country code, e.g. +91 98765 43210.';
+            $e['phone'] = 'Enter a phone number with the country code, e.g. +91-0000000000.';
         }
         if (mb_strlen($d['country']) < 2 || mb_strlen($d['country']) > 80) {
             $e['country'] = 'Enter your country.';

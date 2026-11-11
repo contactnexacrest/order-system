@@ -13,7 +13,7 @@ clients and those clients' orders.
 | The associate sees | The associate never sees |
 |---|---|
 | Their clients: registered, protected until, first order, the 10-day window | Unit prices, discounts, costs, profit, margin |
-| Each order: reference, products (description only), product FOB value, stage in plain words (Enquiry & quotation · Order confirmed · In production · Shipping · Shipped) | Suppliers, purchase prices, freight |
+| Each order: reference, products (description only), product FOB value, stage in plain words (Quotation · Order confirmed · In production · Shipping · Shipped; Cancelled / Did not go ahead) — the same words the buyer sees in the client portal (D-330) | Suppliers, purchase prices, freight |
 | Whether the buyer has paid in full — yes / no, no amounts | CAFIN, the annexure, any PI / CI / BL or other document |
 | Their commission per order: rate (personal or standard), amount, and state (waiting for full payment · earned · on hold · paid with date, TDS and bank reference); repeat orders marked "no commission" | The buyer's payment amounts and bank references |
 | Their statement (CSV and printable), Form 16A / 15CA / 15CB uploaded by NexaCrest, their agreement, profile, bank details masked (••••1234) | Other associates and their clients, staff notes, team incentives |
@@ -281,6 +281,17 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   (estimated / earned / paid), due date and payout run. "Counts toward the
   ladder" shows the counting-order number and the threshold to staff only;
   the associate sees just "yes" or "no" (D-263).
+- **Plain words for the associate (D-330, 11 Nov 2026).** The statement's columns and rows read
+  **Invoice value of the goods · Price within range? (Yes / Sold below the lowest price (we agreed
+  to it) — no commission on this line) · Your commission rate · Agreed discount or settled claim ·
+  Commission worked out on · When we pay ("due <date>, paid on <date>") · Counts toward your next
+  commission rate** (staff keep "Counts toward the ladder" and the rupee basis). Notices and
+  e-mails say the same in short sentences: "We have sent the proforma invoice for order … Your
+  commission rate on this order is now final: 5%.", "… stays your client until …", "We have paid
+  your commission for order …: INR …, on …, bank reference …. Before tax it was INR …; we deducted
+  INR … tax (TDS, Income Tax Act section 194H, 5%).", "We will pay it on <date> into your checked
+  bank account". My commission: "We will take this off your next payment" for a deduction, and
+  "Before tax ₹… · Tax we deducted (TDS) ₹… (Income Tax Act section 194H, 5%) · Paid to you ₹…".
 
 ### Fixed at full payment — never changes (owner decision 7 Nov 2026, D-264)
 
@@ -304,8 +315,8 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
 - **Team incentive.** Unchanged: the MD locks it on "Ready to lock" (D-245).
   Locking or unlocking the team never touches the fixed commission.
 - **What the associate sees.** The order currency (USD) everywhere. An
-  associate **in India** also sees, once fixed: "You will be paid ₹X (fixed
-  at ₹R per USD on <date>; will not change)". An associate **abroad** never
+  associate **in India** also sees, once fixed: "We will pay you ₹X (at
+  ₹R per USD, set on <date>; this will not change)". An associate **abroad** never
   sees rupees. The portal explains this in a box at the top of My commission.
 - **Paid in.** India → always INR (the field is locked). Abroad → USD, EUR or
   GBP (default USD); INR is refused.
@@ -617,14 +628,14 @@ Activation of the associate stays as before.
 ## Changing the personal code (owner decision 4 Nov 2026, D-254)
 
 In the portal, **My clients → Change my code**: type the readable part and
-press **⟳ New ending** to see a proposed code (press again for another one,
+press **⟳ Show another ending** to see a proposed code (press again for another one,
 like a captcha refresh), then **Use this code**. Up to 3 changes a year
 (setting `associate_code_changes_per_year`).
 
 **Old codes keep working**: a buyer who uses any of the associate's previous
 codes is still linked to that associate, and links already shared keep
 working. "My codes" lists every code with its dates and status. Clients
-show "Came via" — the code or link they used.
+show "How they came to us" — the code or link they used.
 
 Staff can set a new code on the associate's page; ticking **Block the old
 code** (with a reason, e.g. it leaked) stops that old code from bringing new
@@ -659,7 +670,7 @@ A new associate does not get the whole portal at once. The MD decides how much e
 
 **When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) "Ready for the Quoting level?" shows on the associate page and on the dashboard of everyone with **Manage associates** (D-263). Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
 
-**What the associate sees when something is hidden** — the menu does not show it, and if they open it anyway (for example an old bookmark) they get "Not available at your access level — please contact NexaCrest". The order value and the % are taken out on the server, not just hidden on the screen, and amounts (and the %) are blanked in their notices and e-mails where their level does not show them.
+**What the associate sees when something is hidden** — the menu does not show it, and if they open it anyway (for example an old bookmark) they get "This page is not open for your account" — please contact NexaCrest. The order value and the % are taken out on the server, not just hidden on the screen, and amounts (and the %) are blanked in their notices and e-mails where their level does not show them.
 
 **Never shown to an associate, at any level (owner rule, D-263, 6 Nov 2026)** — a count or total of their orders or of their business; the running number of their counting orders and the ₹ threshold behind the ladder; the name of a commission level or its band (only the rate, and only with "Show commission %"); the FOB in a "commission earned" notice unless "Show FOB order value" is on. The number of clients they brought in is shown.
 

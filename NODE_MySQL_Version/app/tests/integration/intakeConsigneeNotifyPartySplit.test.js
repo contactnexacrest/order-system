@@ -25,8 +25,8 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         company_legal_name: 'QT Test Buyer Ltd',
         billing_address: '1 Buyer Street',
         vat_eori_tax_no: 'GB123456789',
-        contact_person: 'John Buyer',
-        email: 'john@buyer.example',
+        contact_person: 'Main Buyer',
+        email: 'buyer.main@buyer.example',
         phone: '+44 20 1234 5678',
         country_of_destination: 'United Kingdom',
         port_of_discharge_text: 'Felixstowe',
@@ -43,9 +43,9 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         consignee_postcode: 'LS1 1AA',
         consignee_country: 'United Kingdom',
         consignee_vat_eori_tax_no: 'GB987654321',
-        consignee_contact_person: 'Alice Consignee',
+        consignee_contact_person: 'Consignee Manager',
         consignee_phone: '+44 20 9999 0000',
-        consignee_email: 'alice@consignee.example',
+        consignee_email: 'consignee.manager@consignee.example',
       },
       '127.0.0.1'
     );
@@ -54,7 +54,7 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
     expect(parseInt(row.consignee_same_as_buyer, 10)).toBe(0);
     expect(row.consignee_name).toBe('ABC Memorial Stones Ltd');
     expect(row.consignee_city).toBe('Leeds');
-    expect(row.consignee_email).toBe('alice@consignee.example');
+    expect(row.consignee_email).toBe('consignee.manager@consignee.example');
   });
 
   it('client intake submission defaults consignee same-as-buyer', async () => {
@@ -63,7 +63,7 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         company_legal_name: 'QT Test Buyer 2 Ltd',
         billing_address: '2 Buyer Street',
         vat_eori_tax_no: 'GB111111111',
-        contact_person: 'Jo Buyer',
+        contact_person: 'Stock Buyer',
         email: 'jo@buyer2.example',
         phone: null,
         country_of_destination: 'United Kingdom',
@@ -89,8 +89,8 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         company_legal_name: 'QT Accept Test Ltd',
         billing_address: '3 Buyer Street',
         vat_eori_tax_no: 'GB222222222',
-        contact_person: 'Sam Buyer',
-        email: 'sam@buyer3.example',
+        contact_person: 'Buying Agent',
+        email: 'buyer.agent@buyer3.example',
         phone: null,
         country_of_destination: 'United Kingdom',
         port_of_discharge_text: null,
@@ -107,9 +107,9 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         consignee_postcode: 'M1 1AA',
         consignee_country: 'United Kingdom',
         consignee_vat_eori_tax_no: 'GB333333333',
-        consignee_contact_person: 'Pat Consignee',
+        consignee_contact_person: 'Receiving Clerk',
         consignee_phone: '+44 161 000 0000',
-        consignee_email: 'pat@consignee3.example',
+        consignee_email: 'consignee.clerk@consignee3.example',
       },
       null
     );
@@ -163,8 +163,8 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         company_legal_name: 'PI Test Buyer Ltd',
         billing_address: '1 Buyer Street',
         vat_eori_tax_no: 'GB444444444',
-        contact_person: 'Kim Buyer',
-        email: 'kim@buyer.example',
+        contact_person: 'Retail Buyer',
+        email: 'buyer.retail@buyer.example',
         phone: '+44 20 1111 2222',
         port_of_discharge_text: 'Felixstowe',
         country_of_destination: 'United Kingdom',
@@ -184,9 +184,9 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         consignee_postcode: 'BS1 1AA',
         consignee_country: 'United Kingdom',
         consignee_vat_eori_tax_no: 'GB555555555',
-        consignee_contact_person: 'Robin Consignee',
+        consignee_contact_person: 'Receiving Manager',
         consignee_phone: '+44 117 000 0000',
-        consignee_email: 'robin@consignee.example',
+        consignee_email: 'consignee.receiving@consignee.example',
         notify_party_same_as_consignee: 0,
         notify_party: 'Acme Freight Forwarders',
         notify_party_address_line1: '9 Freight Way',
@@ -194,9 +194,9 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         notify_party_city: 'Southampton',
         notify_party_postcode: 'SO1 1AA',
         notify_party_country: 'United Kingdom',
-        notify_party_contact_person: 'Taylor Notify',
+        notify_party_contact_person: 'Notify Contact',
         notify_party_phone: '+44 23 000 0000',
-        notify_party_email: 'taylor@notify.example',
+        notify_party_email: 'notify.contact@notify.example',
       },
       '127.0.0.1'
     );
@@ -208,7 +208,7 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
     expect(parseInt(reloaded.notify_party_same_as_consignee, 10)).toBe(0);
     expect(reloaded.notify_party).toBe('Acme Freight Forwarders');
     expect(reloaded.notify_party_city).toBe('Southampton');
-    expect(reloaded.notify_party_email).toBe('taylor@notify.example');
+    expect(reloaded.notify_party_email).toBe('notify.contact@notify.example');
   });
 
   it('PI intake accept applies the full structured split to the client row', async () => {
@@ -223,8 +223,8 @@ describe('Section BB — intake Consignee/Notify Party structured split', () => 
         company_legal_name: 'PI Accept Buyer Ltd',
         billing_address: '1 Buyer Street',
         vat_eori_tax_no: 'GB666666666',
-        contact_person: 'Lee Buyer',
-        email: 'lee@buyer.example',
+        contact_person: 'Trade Buyer',
+        email: 'buyer.trade@buyer.example',
         phone: '+44 20 3333 4444',
         port_of_discharge_text: 'Felixstowe',
         country_of_destination: 'United Kingdom',

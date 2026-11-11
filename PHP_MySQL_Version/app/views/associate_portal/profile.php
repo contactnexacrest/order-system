@@ -24,7 +24,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <form method="post" action="/associate/profile">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= htmlspecialchars((string) ($me['phone'] ?? '')) ?>" placeholder="e.g. +91 98765 43210"></label>
+        <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= htmlspecialchars((string) ($me['phone'] ?? '')) ?>" placeholder="e.g. +91-0000000000"></label>
         <?php if ($__india): ?><label>PAN<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the card, e.g. ABCDE1234F" value="<?= htmlspecialchars((string) ($me['pan'] ?? '')) ?>" placeholder="e.g. ABCDE1234F"></label><?php endif; ?>
         <label>GSTIN (if registered)<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" value="<?= htmlspecialchars((string) ($me['gstin'] ?? '')) ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>
         <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2" placeholder="e.g. 12 MG Road, Bengaluru 560001"><?= htmlspecialchars((string) ($me['address'] ?? '')) ?></textarea></label>
@@ -42,7 +42,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
       <?php if ($banks === []): ?><tr><td colspan="3" class="muted">None yet.</td></tr><?php endif; ?>
     </table>
     <details><summary><?= $banks === [] ? 'Add my bank details' : 'Change my bank details' ?></summary>
-      <p class="muted small">You confirm new details with a code we e-mail you (within <?= \App\Services\BankDetailsCheck::CONFIRM_DAYS ?> days), then NexaCrest checks them. Until then, payments keep going to your verified account; a changed account is used <?= \App\Services\BankDetailsCheck::waitDays(false) ?> days after it is verified<?= \App\Services\BankDetailsCheck::waitDays(true) > 0 ? ', a first account ' . \App\Services\BankDetailsCheck::waitDays(true) . ' days after' : '' ?>.</p>
+      <p class="muted small">You confirm new details with a code we e-mail you (within <?= \App\Services\BankDetailsCheck::CONFIRM_DAYS ?> days). Then NexaCrest checks them. Until then, we keep paying into your current account. We start paying into a changed account <?= \App\Services\BankDetailsCheck::waitDays(false) ?> days after we have checked it<?= \App\Services\BankDetailsCheck::waitDays(true) > 0 ? ', a first account ' . \App\Services\BankDetailsCheck::waitDays(true) . ' days after' : '' ?>.</p>
       <form method="post" action="/associate/bank" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <?php require __DIR__ . '/_bank_fields.php'; ?>
@@ -52,7 +52,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
   </div>
 
   <div class="section" id="kyc">
-    <h2>My documents and KYC</h2>
+    <h2>My documents (identity and bank checks)</h2>
     <?php // Owner decision D-252 (A3): the KYC checklist — NexaCrest checks each document; commission is paid once all are accepted. ?>
     <table class="list"><tr><th>Needed</th><th>Status</th><th>Document</th></tr>
       <?php foreach ($kyc as $__i): ?>
@@ -62,7 +62,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
           <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—') ?></td></tr>
       <?php endforeach; ?>
     </table>
-    <p class="muted small">Commission is paid once every document above is accepted.</p>
+    <p class="muted small">We pay commission once we have accepted every document above.</p>
     <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($me)) !== null): // D-290 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
     <h3>All documents</h3>
     <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
@@ -77,7 +77,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
       </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
-    <p class="muted small"><?= $__india ? 'India: PAN card, ID proof (Aadhaar card — we keep only its last 4 digits — or an ID document), address proof, bank proof, the signed agreement, GST certificate if registered.' : 'Abroad: ID proof (passport, national ID card, residence permit or driving licence), address proof, bank proof, the signed agreement; also tax residency certificate, Form 10F, no-PE declaration.' ?></p>
+    <p class="muted small"><?= $__india ? 'India: PAN card, ID proof (Aadhaar card — we keep only its last 4 digits — or an ID document), address proof, bank proof, the signed agreement, GST certificate if registered.' : 'Outside India: ID proof (passport, national ID card, residence permit or driving licence), address proof, bank proof, the signed agreement; also tax residency certificate, Form 10F, and a declaration that you have no fixed place of business in India ("no-PE declaration").' ?></p>
     <p class="muted small">ID proof and address proof are two separate uploads. If one document shows both (e.g. a passport with your current address), upload it once as "ID document" and once as "Address proof" — we check each on its own.</p>
   </div>
 </div>

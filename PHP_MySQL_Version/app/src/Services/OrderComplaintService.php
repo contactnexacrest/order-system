@@ -98,7 +98,7 @@ final class OrderComplaintService
             return;
         }
         $sender = UserRepository::findById($authorUserId);
-        $subject = "Update on your complaint for order {$order['order_reference']} — " . (string) \App\Repositories\CompanySettingsRepository::get('legal_name');
+        $subject = "Our reply about the issue you raised on order {$order['order_reference']} — " . (string) \App\Repositories\CompanySettingsRepository::get('legal_name');
         $greeting = 'Dear ' . ($order['contact_person'] ?: 'Sir/Madam') . ",\n\n";
         $signature = trim((string) ($sender['email_signature'] ?? ''));
         $message = $greeting . $body . "\n\n" . ($signature !== ''

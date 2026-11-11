@@ -9,7 +9,7 @@
   {% if not print %}<div class="alert alert-info" data-how-fixed><b>{{ howFixed.title }}</b><br>{{ howFixed.text }}</div>{% endif %}
   <p>Earned in the last {{ totals.months }} months: <b>{{ totalsText.earned }}</b> · Paid in the last {{ totals.months }} months: <b>{{ totalsText.paid }}</b> · Waiting to be paid: <b>{{ totalsText.waiting }}</b>{% if totals.held > 0 %} · On hold: <b>{{ totalsText.held }}</b>{% endif %}</p>
   <p class="muted small" data-commission-period>This shows the commission of the last {{ totals.months }} months, and any commission still waiting to be paid.</p>
-  <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
+  <p class="muted small">We pay each commission in the month shown, after you send us your invoice. Upload your invoice for each line below. We pay only into the bank account we have checked.</p>
   <table class="list">
     {% set __pctCol = access.commission_pct %}{# D-292: the % fixed on each order (with "Show commission %") #}
     <tr><th>Month</th><th>Order</th><th>Client</th>{% if __pctCol %}<th>Your %</th>{% endif %}<th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>
@@ -19,7 +19,7 @@
         <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}{% endif %}{% if p.fixed_rate !== null and p.fixed_rate !== undefined %} <span class="badge badge-active">Fixed</span>{% endif %}
           {% if p.fixed_line %}<br><small data-fixed-rupees>{{ p.fixed_line }}</small>{% elif isIndia and (p.fixed_rate === null or p.fixed_rate === undefined) %}<br><small>₹{{ p.amount_inr | money }}</small>{% endif %}</td>
         <td>{{ p.status_label }}</td>
-        <td>{% if p.status == 'paid' and not isIndia %}{{ p.paid_on | shortDate }} · {{ p.currency_code }} {{ p.amount_fc | money }} sent{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% elif p.status == 'paid' %}{{ p.paid_on | shortDate }}{% if (p.tds_inr | float) > 0 %}<br><small data-tds-breakdown>Gross ₹{{ p.gross_inr | money }} · TDS ₹{{ p.tds_inr | money }}{% if p.tds_section %} (u/s {{ p.tds_section }}{% if p.tdsRateLabel %} at {{ p.tdsRateLabel }}{% endif %}){% endif %}</small><br>Net paid ₹{{ p.paid_inr | money }}{% else %} · ₹{{ p.paid_inr | money }}{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if p.status == 'paid' and not isIndia %}{{ p.paid_on | shortDate }} · {{ p.currency_code }} {{ p.amount_fc | money }} sent{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% elif p.status == 'paid' %}{{ p.paid_on | shortDate }}{% if (p.tds_inr | float) > 0 %}<br><small data-tds-breakdown>Before tax ₹{{ p.gross_inr | money }} · Tax we deducted (TDS) ₹{{ p.tds_inr | money }}{% if p.tds_section %} (Income Tax Act section {{ p.tds_section }}{% if p.tdsRateLabel %}, {{ p.tdsRateLabel }}{% endif %}){% endif %}</small><br>Paid to you ₹{{ p.paid_inr | money }}{% else %} · ₹{{ p.paid_inr | money }}{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
         {% if not print %}<td>
           {% if inv %}<a href="/associate/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>
           {% elif (p.amount_inr | float) > 0 and p.status != 'paid' %}
@@ -34,8 +34,8 @@
   {% if __pctCol %}<p class="muted small">Each order shows the % it was given when its Proforma Invoice was sent. Orders still being paid by the buyer are listed under Orders as "Not earned yet — buyer still paying".</p>{% endif %}
   {% endif %}
   {% if not print and access.tds_certificates %}
-  <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>
-  <p class="small muted">NexaCrest deducts TDS on commission as the law requires and issues your Form 16A each quarter; it appears here.</p>
+  <h2>Tax certificates (Form 16A) and foreign payment forms (15CA / 15CB) from NexaCrest</h2>
+  <p class="small muted">By law, we deduct tax (TDS) from your commission. Every three months we give you a certificate of this tax (Form 16A). You will find it here.</p>
   <table class="list">
     {% for d in documents %}{% if d.kind == 'form_16a' or d.kind == 'form_15ca' or d.kind == 'form_15cb' %}
       <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] }}</a></td><td>{{ d.reference or '' }}</td></tr>

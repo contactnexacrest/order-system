@@ -69,7 +69,7 @@ final class StoneDocumentsUnchangedTest extends DbTestCase
         OrderProductRepository::add($orderId, 2, 'Kashmir White Granite Tiles', '60 x 60 x 2 cm', 'Flamed', '80', false, 'SQM', '32.25');
         Database::connection()->prepare(
             "UPDATE orders SET buyers_po_ref = 'PO-STONE-1', billing_address_line1 = '7 Harbour Road', billing_city = 'Poti',
-                    billing_postcode = '4400', country_of_destination = 'Georgia', contact_person = 'Nino Buyer',
+                    billing_postcode = '4400', country_of_destination = 'Georgia', contact_person = 'Head Buyer',
                     estimated_net_weight_kg = 18500, estimated_package_count = 12 WHERE id = :id"
         )->execute(['id' => $orderId]);
         return $orderId;

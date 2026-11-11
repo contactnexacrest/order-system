@@ -28,7 +28,7 @@ use App\Repositories\IncentiveRepository;
  */
 final class AssociateTds
 {
-    public const FOREIGN_DOCS = ['tax_residency' => 'Tax Residency Certificate (TRC)', 'form_10f' => 'Form 10F', 'no_pe' => 'No-PE declaration'];
+    public const FOREIGN_DOCS = ['tax_residency' => 'Tax Residency Certificate (TRC)', 'form_10f' => 'Form 10F', 'no_pe' => 'No-PE declaration (no fixed place of business in India)'];
 
     /** @return array{section:string, rate:float, threshold:float, no_pan_rate:float, foreign:bool, cb_required:bool, zoho_tax_id:string} */
     public static function settings(): array

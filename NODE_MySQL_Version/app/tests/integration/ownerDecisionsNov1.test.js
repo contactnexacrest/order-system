@@ -215,9 +215,9 @@ describe('Owner decisions of 1 Nov 2026', () => {
     expect(items.filter((i) => i.kind === 'task' && i.text.startsWith(`${order.order_reference} — `))).toHaveLength(1);
     expect(await dailyDigestService.itemsFor(idle.userId)).toEqual([]);
 
-    const mail = dailyDigestService.compose('Asha', [{ kind: 'task', text: 'A' }, { kind: 'review', text: 'B' }], '2026-11-02');
+    const mail = dailyDigestService.compose('Managing Director', [{ kind: 'task', text: 'A' }, { kind: 'review', text: 'B' }], '2026-11-02');
     expect(mail.subject).toBe('NexaCrest — your day 2 Nov 2026: 1 task, 1 review');
-    expect(mail.body).toBe('Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n');
+    expect(mail.body).toBe('Good morning Managing Director,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n');
 
     const date = `2099-01-0${1 + Math.floor(Math.random() * 9)}`;
     dailyDigestService.setSender(async () => true);

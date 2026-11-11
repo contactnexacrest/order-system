@@ -47,7 +47,7 @@ final class DocumentWordingD224Test extends DbTestCase
         $pdo->prepare(
             "UPDATE orders SET buyers_po_ref = :po, billing_address_line1 = '7 Harbour Road', billing_address_line2 = 'Unit 4',
                     billing_city = 'Poti', billing_postcode = '4400', country_of_destination = 'Georgia',
-                    vat_eori_tax_no = 'GE-VAT-778899', contact_person = 'Nino Buyer' WHERE id = :id"
+                    vat_eori_tax_no = 'GE-VAT-778899', contact_person = 'Head Buyer' WHERE id = :id"
         )->execute(['po' => $buyersPo, 'id' => $orderId]);
         $pdo->prepare("UPDATE orders SET client_phone = '+995 555 123 456', client_email = :email WHERE id = :id")->execute(['email' => 'nino-' . $orderId . '@buyer.test', 'id' => $orderId]);
         return $orderId;
@@ -77,7 +77,7 @@ final class DocumentWordingD224Test extends DbTestCase
         foreach ($this->generate($this->order(), 'FDN') as $format => $text) {
             self::assertStringContainsString('2. TO (BUYER)', $text, "FDN {$format}");
             foreach (['Billing Address Line 1', '7 Harbour Road', 'Unit 4', 'City / Town', 'Poti', '4400', 'Georgia',
-                      'VAT / EORI / Tax Reg. No.', 'GE-VAT-778899', 'Nino Buyer', 'Phone', '+995 555 123 456', '@buyer.test'] as $expected) {
+                      'VAT / EORI / Tax Reg. No.', 'GE-VAT-778899', 'Head Buyer', 'Phone', '+995 555 123 456', '@buyer.test'] as $expected) {
                 self::assertStringContainsString($expected, $text, "FDN {$format}: {$expected}");
             }
         }

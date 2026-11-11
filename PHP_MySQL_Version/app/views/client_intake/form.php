@@ -25,7 +25,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
 };
 ?>
 <div class="card">
-  <h1>Quotation Details Form</h1>
+  <h1>Ask us for a quotation</h1>
   <p class="muted">Just your company and shipping details — no product information needed here. We'll review and send your Quotation within 24 hours.</p>
   <div class="intake-summary">
     <span>&#128203; 3 short sections</span>
@@ -45,7 +45,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">1</span> Your Details</legend>
       <div class="field-grid">
-        <label class="full">Company Legal Name *
+        <label class="full">Company name, as registered *
           <input type="text" name="company_legal_name" placeholder="e.g., Test Company Ltd" required>
         </label>
         <label class="full">Billing Address Line 1 *
@@ -72,17 +72,17 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
         <label>Phone
           <input type="text" name="phone" placeholder="e.g., +1 555 123 4567">
         </label>
-        <label>VAT / EORI / Tax Reg. No. *
+        <label>Company tax number (VAT, EORI or tax registration) *
           <input type="text" name="vat_eori_tax_no" placeholder="e.g., GB123456789" required>
-          <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
+          <small class="muted">In the UK, give your EORI number. In other countries, give your company tax or VAT number.</small>
         </label>
-        <label>Country of Destination *
+        <label>Country the goods go to *
           <?php $countryField('country_of_destination', 'country_of_destination', true, $countries); ?>
         </label>
-        <label>Port of Discharge
-          <input type="text" name="port_of_discharge_text" placeholder="Optional — we'll advise">
+        <label>Port where the goods arrive
+          <input type="text" name="port_of_discharge_text" placeholder="Optional — we can suggest one">
         </label>
-        <label class="full">Certificate of Origin Type
+        <label class="full">Certificate of origin you need
           <?php // Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. ?>
           <?php $__coo = \App\Repositories\LookupRepository::matchOption(array_column($cooTypes ?? [], 'option_value'), (string) ('')); ?>
           <select name="coo_type">
@@ -91,14 +91,14 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
               <option value="<?= htmlspecialchars($__o['option_value']) ?>" <?= $__coo === $__o['option_value'] ? 'selected' : '' ?>><?= htmlspecialchars($__o['option_value']) ?></option>
             <?php endforeach; ?>
           </select>
-          <small class="muted">GSP Form A (preferential) / Non-preferential — confirm with your customs broker if unsure</small>
+          <small class="muted">A preferential certificate (GSP Form A) can lower import duty in some countries. If you are not sure, ask your customs agent or choose 'Not sure'.</small>
         </label>
       </div>
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">2</span> Consignee Details</legend>
-      <p class="muted small">The consignee is the company your goods actually ship to — often the same as you, but not always (e.g. if you're a trading company and the goods go straight to your end customer).</p>
+      <legend><span class="intake-step-num">2</span> Who receives the goods (consignee)</legend>
+      <p class="muted small">The consignee is the company the goods are shipped to. It is often your own company. It can be different, for example when you are a trader and we ship straight to your customer.</p>
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" checked> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Legal Name
@@ -119,9 +119,9 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
         <label>Country
           <?php $countryField('consignee_country', 'consignee_country', false, $countries); ?>
         </label>
-        <label>VAT / EORI / Tax Reg. No.
+        <label>Company tax number (VAT, EORI or tax registration)
           <input type="text" name="consignee_vat_eori_tax_no" placeholder="e.g., GB123456789">
-          <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
+          <small class="muted">In the UK, give your EORI number. In other countries, give your company tax or VAT number.</small>
         </label>
         <label>Contact Person
           <input type="text" name="consignee_contact_person" placeholder="e.g., Logistics Manager">
@@ -136,9 +136,9 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
+      <legend><span class="intake-step-num">3</span> How you want the goods shipped</legend>
       <div class="field-grid">
-        <label>Incoterm *
+        <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
             <option value="">— Select —</option>
             <?php foreach ($incoterms as $i): ?>
@@ -146,11 +146,12 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
             <?php endforeach; ?>
             <option value="__other__">Other (not listed) — specify</option>
           </select>
-          <input type="text" id="incoterm_preference_input" name="incoterm_preference" placeholder="Type the Incoterm" style="display:none" readonly>
+          <input type="text" id="incoterm_preference_input" name="incoterm_preference" placeholder="Type the delivery terms, e.g. DAP" style="display:none" readonly>
+          <small class="muted">For example FOB: you book the sea freight. CIF: we book freight and insurance to your port.</small>
         </label>
         <label>Container Type
           <select name="container_type_text">
-            <option value="">— Not sure / To Be Confirmed —</option>
+            <option value="">Not sure yet</option>
             <?php foreach ($containerTypes as $o): ?>
               <option value="<?= htmlspecialchars($o['option_value']) ?>"><?= htmlspecialchars($o['option_value']) ?></option>
             <?php endforeach; ?>
@@ -159,8 +160,8 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
         <label>Company website
           <input type="text" name="website" maxlength="255" placeholder="e.g., www.example.com">
         </label>
-        <label class="full">Your Own Reference Number
-          <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
+        <label class="full">Your reference number
+          <input type="text" name="buyer_own_reference" placeholder="Your own reference for this request. If you have none, write NIL.">
         </label>
         <label class="full">Anything else we should know?
           <textarea name="notes" placeholder="Product details, quantities, timeline, etc."></textarea>

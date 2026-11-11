@@ -107,7 +107,7 @@ describe('Client dashboard grouped by status', () => {
     const res = await render(clientId);
 
     const activeGroup = res.locals.orderGroups.find((g) => g.label === 'Active');
-    const lostGroup = res.locals.orderGroups.find((g) => g.label === 'Lost');
+    const lostGroup = res.locals.orderGroups.find((g) => g.label === 'Did not go ahead');
     expect(activeGroup.orders.length).toBe(1);
     expect(lostGroup.orders.length).toBe(1);
   });
@@ -131,7 +131,7 @@ describe('Client dashboard grouped by status', () => {
     const res = await render(clientId);
     const labels = res.locals.orderGroups.map((g) => g.label);
 
-    expect(labels).not.toContain('Lost');
+    expect(labels).not.toContain('Did not go ahead');
     expect(labels).not.toContain('Cancelled');
     expect(labels).not.toContain('Disputed');
   });
@@ -175,6 +175,6 @@ describe('Client dashboard grouped by status', () => {
     const res = await agent.get('/client');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Active (1)');
-    expect(res.text).toContain('Lost (1)');
+    expect(res.text).toContain('Did not go ahead (1)');
   });
 });

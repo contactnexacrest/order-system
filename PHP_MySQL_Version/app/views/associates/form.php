@@ -23,7 +23,7 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
         <?php endforeach; ?>
       </select><span class="help-line">Abroad: paid in this currency by SWIFT — match the associate's bank account. The amount is fixed in this currency when the buyer completes payment.</span></label>
       <label>E-mail (portal login)<input type="email" name="email" maxlength="190" value="<?= $__v('email') ?>" placeholder="e.g. name@company.com"></label>
-      <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= $__v('phone') ?>" placeholder="e.g. +91 98765 43210"></label>
+      <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= $__v('phone') ?>" placeholder="e.g. +91-0000000000"></label>
       <label>PAN (India)<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the PAN card, e.g. ABCDE1234F" value="<?= $__v('pan') ?>" placeholder="e.g. ABCDE1234F"></label>
       <label>GSTIN<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" title="15 characters" value="<?= $__v('gstin') ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>
       <label>Tax ID (abroad)<input type="text" name="tax_id" maxlength="50" value="<?= $__v('tax_id') ?>" placeholder="e.g. NL123456789B01"></label>

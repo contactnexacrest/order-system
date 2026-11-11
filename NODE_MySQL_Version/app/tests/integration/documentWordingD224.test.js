@@ -47,7 +47,7 @@ describe('D-224 document wording (owner, 2 Nov 2026)', () => {
     await db.execute(
       `UPDATE orders SET buyers_po_ref = :po, billing_address_line1 = '7 Harbour Road', billing_address_line2 = 'Unit 4',
               billing_city = 'Poti', billing_postcode = '4400', country_of_destination = 'Georgia',
-              vat_eori_tax_no = 'GE-VAT-778899', contact_person = 'Nino Buyer',
+              vat_eori_tax_no = 'GE-VAT-778899', contact_person = 'Head Buyer',
               client_phone = '+995 555 123 456', client_email = :email WHERE id = :id`,
       { po: buyersPo, email: `nino-${orderId}@buyer.test`, id: orderId }
     );
@@ -92,7 +92,7 @@ describe('D-224 document wording (owner, 2 Nov 2026)', () => {
     for (const [format, text] of Object.entries(await generate(await order(), 'FDN'))) {
       expect(text).toContain('2. TO (BUYER)');
       for (const expected of ['Billing Address Line 1', '7 Harbour Road', 'Unit 4', 'City / Town', 'Poti', '4400', 'Georgia',
-        'VAT / EORI / Tax Reg. No.', 'GE-VAT-778899', 'Nino Buyer', 'Phone', '+995 555 123 456', '@buyer.test']) {
+        'VAT / EORI / Tax Reg. No.', 'GE-VAT-778899', 'Head Buyer', 'Phone', '+995 555 123 456', '@buyer.test']) {
         expect([format, expected, text.includes(expected)]).toEqual([format, expected, true]);
       }
     }

@@ -26,7 +26,7 @@ final class AssociatePortalRepository
             return 'Cancelled';
         }
         if ($status === 'lost') {
-            return 'Not proceeding';
+            return 'Did not go ahead';
         }
         if (in_array($status, ['shipped_docs_sent', 'complete'], true)) {
             return 'Shipped';
@@ -34,7 +34,7 @@ final class AssociatePortalRepository
         // stages_master: 1 quotation · 2 buyer PO · 3 PI · 4 OC/production · 5 supplier PO · 6 freight · 7 BL · 8 commercial invoice · 9 closure
         $n = (int) ($order['current_stage_number'] ?? 1);
         return match (true) {
-            $n <= 1 => 'Enquiry & quotation',
+            $n <= 1 => 'Quotation',
             $n <= 3 => 'Order confirmed',
             $n <= 5 => 'In production',
             $n <= 8 => 'Shipping',
@@ -74,7 +74,7 @@ final class AssociatePortalRepository
         if ($source === 'link' || ($inv['kind'] ?? '') === 'client_link') {
             return 'Buyer registration link';
         }
-        return ['staff' => 'Linked by NexaCrest', 'md_change' => 'Changed by the MD'][$source] ?? ($source !== '' ? $source : '—');
+        return ['staff' => 'Linked by NexaCrest', 'md_change' => 'Changed by NexaCrest'][$source] ?? ($source !== '' ? $source : '—');
     }
 
     /** @return list<array<string,mixed>> every order of the associate's clients, newest first */
@@ -130,7 +130,7 @@ final class AssociatePortalRepository
         if (in_array($o['status'], ['cancelled', 'lost'], true)) {
             return $none('No commission — order cancelled');
         }
-        $repeat = 'No commission — repeat order (outside the 10 days from the first Buyer PO)';
+        $repeat = 'No commission — this is a repeat order, placed more than 10 days after the first purchase order of this client';
         // D-264: fixed by itself when the buyer paid in full (or with the MD's lock, before D-264).
         if (!empty($o['locked_at']) || !empty($o['associate_fixed_at'])) {
             if ((int) ($o['paid_associate_id'] ?? 0) !== $associateId) {
@@ -169,7 +169,7 @@ final class AssociatePortalRepository
             : self::NOT_EARNED_LABEL;
         return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
             'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
-            'rate_text' => AssociateCommission::rateLabel($c['level']) . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is sent)'), 'detail' => $c];
+            'rate_text' => AssociateCommission::rateLabel($c['level']) . ($c['level_fixed'] ? '' : ' for now — final when we send the buyer the proforma invoice'), 'detail' => $c];
     }
 
     /**

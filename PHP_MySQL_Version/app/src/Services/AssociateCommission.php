@@ -382,7 +382,7 @@ final class AssociateCommission
             'r' => $level['kind'] === 'pct' ? $level['value'] : null, 's' => ($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'fixed' : 'ladder', 'id' => $orderId]);
         if ((int) $order['is_test_data'] !== 1 && (int) $order['is_sample_data'] !== 1) {
             // D-292: the associate is told only their %, never a level name.
-            AssociateService::notify($a, 'order_created', "The Proforma Invoice for order {$order['order_reference']} was issued. Your commission on it is fixed at " . self::rateLabel($level) . ($level['kind'] === 'pct' ? ' of its FOB value' : '') . '.',
+            AssociateService::notify($a, 'order_created', "We have sent the proforma invoice for order {$order['order_reference']}. Your commission rate on this order is now final: " . self::rateLabel($level) . '.',
                 (int) $order['client_id'], $orderId);
         }
     }
@@ -684,8 +684,8 @@ final class AssociateCommission
                 'Registration ended ' . $c['associate_locked_until'] . ' with no order from the buyer.');
             $a = AssociateRepository::find((int) $c['associate_id']);
             if ($a !== null) {
-                AssociateService::notify($a, 'registration_lapsed', "Your registration of {$c['company_legal_name']} ended on " . \App\Helpers\Dates::short((string) $c['associate_locked_until'])
-                    . ' with no order from the buyer, so it has lapsed and the buyer is no longer linked to you.', (int) $c['id'], null);
+                AssociateService::notify($a, 'registration_lapsed', "{$c['company_legal_name']} did not place an order by " . \App\Helpers\Dates::short((string) $c['associate_locked_until'])
+                    . ', so they are no longer your client.', (int) $c['id'], null);
             }
             $n++;
         }

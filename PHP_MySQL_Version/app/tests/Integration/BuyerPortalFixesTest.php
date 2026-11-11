@@ -67,8 +67,8 @@ final class BuyerPortalFixesTest extends DbTestCase
 
         $html = $this->call('showOrder', ['id' => $this->order]);
 
-        self::assertStringContainsString('I acknowledge and confirm to proceed', $html);
-        self::assertMatchesRegularExpression('#<th>Port of Discharge</th><td>Port of Antwerp</td>#', $html);
+        self::assertStringContainsString('Yes, this is correct — please go ahead', $html);
+        self::assertMatchesRegularExpression('#<th>Port where the goods arrive</th><td>Port of Antwerp</td>#', $html);
     }
 
     public function testReorderMatchesTheUnitWhateverItsCaseOrSpacing(): void
@@ -105,11 +105,12 @@ final class BuyerPortalFixesTest extends DbTestCase
 
         $html = $this->call('showOrder', ['id' => $this->order]);
         self::assertStringNotContainsString('/buyer-po" enctype="multipart/form-data"', $html);
-        self::assertStringContainsString('This order is ' . $status . ', so a Buyer PO can no longer be uploaded.', $html);
+        $word = $status === 'lost' ? 'This order did not go ahead' : 'This order was cancelled'; // D-330
+        self::assertStringContainsString($word . ', so you can no longer upload a purchase order.', $html);
 
         $result = BuyerActionService::uploadBuyerPo(OrderRepository::find($this->order));
         self::assertFalse($result['ok']);
-        self::assertSame('This order is ' . $status . ', so a Buyer PO can no longer be uploaded. Contact your NexaCrest representative if you have a question.', $result['message']);
+        self::assertSame($word . ', so you can no longer upload a purchase order. If you have a question, please contact your NexaCrest contact person.', $result['message']);
         $count = (int) Database::connection()->query('SELECT COUNT(*) FROM order_buyer_po_documents WHERE order_id = ' . $this->order)->fetchColumn();
         self::assertSame(0, $count);
     }

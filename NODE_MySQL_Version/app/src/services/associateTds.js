@@ -18,7 +18,7 @@ const db = require('../config/db');
 const associateRepository = require('../repositories/associateRepository');
 const incentiveRepository = require('../repositories/incentiveRepository');
 
-const FOREIGN_DOCS = { tax_residency: 'Tax Residency Certificate (TRC)', form_10f: 'Form 10F', no_pe: 'No-PE declaration' };
+const FOREIGN_DOCS = { tax_residency: 'Tax Residency Certificate (TRC)', form_10f: 'Form 10F', no_pe: 'No-PE declaration (no fixed place of business in India)' };
 
 const { round2 } = require('../helpers/money'); // PHP round(x, 2) (fresh-eyes review M3)
 const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

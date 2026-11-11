@@ -5,8 +5,8 @@
 
   <?php if (!empty($ocAcknowledgment) && $ocAcknowledgment['acknowledged_at'] === null): ?>
   <div class="section">
-    <h2>Order Confirmation — Your Acknowledgement Needed</h2>
-    <p>Please review your Order Confirmation below and confirm to proceed.</p>
+    <h2>Please confirm your order</h2>
+    <p>Please check your order details below. If they are correct, press the button to confirm.</p>
     <table class="list">
       <tr><th>Order Reference</th><td><?= htmlspecialchars($order['order_reference']) ?></td></tr>
       <tr><th>Product(s)</th><td><?php
@@ -17,13 +17,13 @@
         echo implode('<br>', $lines) ?: '—';
       ?></td></tr>
       <tr><th>Total Order Value</th><td><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></td></tr>
-      <tr><th>Incoterm</th><td><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></td></tr>
-      <tr><th>Port of Discharge</th><td><?= htmlspecialchars((string) (($order['port_of_discharge_name'] ?? '') ?: (($order['port_of_discharge_city'] ?? '') ?: (($order['port_of_discharge_text'] ?? '') ?: '—')))) ?></td></tr>
+      <tr><th>Delivery terms (Incoterm)</th><td><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></td></tr>
+      <tr><th>Port where the goods arrive</th><td><?= htmlspecialchars((string) (($order['port_of_discharge_name'] ?? '') ?: (($order['port_of_discharge_city'] ?? '') ?: (($order['port_of_discharge_text'] ?? '') ?: '—')))) ?></td></tr>
     </table>
     <?php if (!$downloadsHidden): ?><p class="muted small">The full Order Confirmation document is available to download above under Documents.</p><?php endif; ?>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/acknowledge-oc">
       <?= Csrf::field() ?>
-      <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success">Yes, this is correct — please go ahead</button>
     </form>
   </div>
   <?php endif; ?>
@@ -51,9 +51,9 @@
   <?php endif; ?>
 
   <div class="section">
-    <h2>Buyer PO</h2>
-    <?php if (!in_array($order['status'] ?? '', ['cancelled', 'lost'], true)): /* D-269: no "upload any time" once upload is closed for good */ ?>
-      <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    <h2>Your purchase order</h2>
+    <?php if (!in_array($order['status'] ?? '', ['cancelled', 'lost'], true) && !$advanceCleared): /* D-269, D-330: no upload invitation once upload is closed (cancelled, did not go ahead, or advance received) */ ?>
+      <p class="muted small">After you sign your purchase order, upload a scan of it here. You can upload a corrected copy later. We keep every copy you upload.</p>
     <?php endif; ?>
     <?php if (!empty($buyerPoDocuments)): ?>
       <table class="list">
@@ -66,17 +66,17 @@
         <?php endforeach; ?>
       </table>
     <?php else: ?>
-      <p class="muted">No Buyer PO copy on file yet.</p>
+      <p class="muted">You have not uploaded your purchase order yet.</p>
     <?php endif; ?>
     <?php if (in_array($order['status'] ?? '', ['cancelled', 'lost'], true)): ?>
-      <p class="muted small">This order is <?= htmlspecialchars((string) $order['status']) ?>, so a Buyer PO can no longer be uploaded.</p>
+      <p class="muted small"><?= ($order['status'] ?? '') === 'lost' ? 'This order did not go ahead' : 'This order was cancelled' ?>, so you can no longer upload a purchase order.</p>
     <?php elseif ($advanceCleared): ?>
-      <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
+      <p class="muted small">We have received your advance payment, so you can no longer upload here. If you need to send us a new copy, please contact your NexaCrest contact person.</p>
     <?php else: ?>
       <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
         <?= Csrf::field() ?>
-        <label>Your PO Number <small class="muted">(needed with your first signed copy)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
-        <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
+        <label>Your PO number <small class="muted">(needed the first time you upload)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
+        <label>Your signed purchase order (file) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
         <button type="submit" class="btn-sm">Upload</button>
       </form>
     <?php endif; ?>
@@ -134,7 +134,7 @@
     <?php if (!empty($paymentReportRefusal)): ?>
     <p class="muted"><strong><?= htmlspecialchars($paymentReportRefusal) ?></strong></p>
     <?php else: ?>
-    <p class="muted">Made a payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order.</p>
+    <p class="muted">Have you paid for this order? Tell us the payment details below. We will check our bank statement and then update your order.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
@@ -146,10 +146,10 @@
             <option value="freight">Freight Payment</option>
           </select>
         </label>
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
       <button type="submit">Submit Payment Details</button>
@@ -157,16 +157,16 @@
     <?php endif; ?>
 
     <?php if (!empty($paymentReports)): ?>
-      <h3 style="margin-top:20px">Previously Reported</h3>
+      <h3 style="margin-top:20px">Payments you have told us about</h3>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
+        <tr><th>Payment</th><th>Bank reference number (transaction ID, UTR or SWIFT reference)</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
         <?php foreach ($paymentReports as $r): ?>
         <tr>
           <td><?= htmlspecialchars(ucfirst($r['payment_type'])) ?></td>
           <td><?= htmlspecialchars($r['transaction_ref']) ?></td>
           <td><?= $r['amount'] !== null ? number_format((float) $r['amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></td>
           <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
-          <td><?= $r['status'] === 'reviewed' ? 'Reviewed by our team' : 'Received — pending review' ?></td>
+          <td><?= $r['status'] === 'reviewed' ? 'Reviewed by our team' : 'Received — we are checking it' ?></td>
           <td>
             <?php if (!empty($r['screenshot_file_id'])): ?>
               <?php $screenshotUrl = '/client/orders/' . (int) $order['id'] . '/payment-reports/' . (int) $r['id'] . '/screenshot'; ?>
@@ -187,18 +187,18 @@
 
   <?php if ((int) $order['dispute_button_visible_to_client'] === 1): ?>
   <div class="section">
-    <h2>Raise a Dispute</h2>
-    <p class="muted">If you want to cancel this order and not proceed with us, let us know here — our team will respond within the timeframe set out in your order terms.</p>
+    <h2>Ask to cancel this order</h2>
+    <p class="muted">Do you want to cancel this order? Tell us here. We will reply within the time given in your order terms.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
       <label>Describe the issue *<textarea name="description" rows="4" required placeholder="Describe the issue"></textarea></label>
-      <button type="submit">Raise a Dispute</button>
+      <button type="submit">Ask to cancel this order</button>
     </form>
   </div>
   <?php endif; ?>
 
   <div class="section" id="order-complaints">
-    <h2>Report a Process Issue</h2>
+    <h2>Tell us what we could do better</h2>
     <p class="muted">Something about this order we could do better next time? Tell us here and a NexaCrest team member will reply.</p>
     <?php foreach ($orderComplaints as $c): ?>
       <div class="card-nested" style="margin-bottom:0.75rem">
@@ -239,15 +239,15 @@
             <?php endfor; ?>
           </select>
         </label>
-        <label>Your feedback / testimonial<textarea name="comments" rows="5" placeholder="Type your comments"><?= htmlspecialchars(!empty($orderFeedback) ? (string) ($orderFeedback['comments'] ?? '') : ($testimonialSuggestion ?? '')) ?></textarea></label>
-        <p class="muted small"><?= !empty($orderFeedback) ? 'This is the feedback you left — if you want to modify it, please update it above.' : 'We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.' ?></p>
+        <label>Your review<textarea name="comments" rows="5" placeholder="Type your comments"><?= htmlspecialchars(!empty($orderFeedback) ? (string) ($orderFeedback['comments'] ?? '') : ($testimonialSuggestion ?? '')) ?></textarea></label>
+        <p class="muted small"><?= !empty($orderFeedback) ? 'This is the review you left. You can change it above.' : 'To help you start, we wrote a suggested review based on your order. You can change it above.' ?></p>
         <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
       </form>
       <?php if (!empty($orderFeedback)): ?>
         <p class="muted small">Last submitted: <?= htmlspecialchars(Dates::human($orderFeedback['submitted_at'])) ?></p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">Feedback will be available once this order's documents have been sent to you.</p>
+      <p class="muted">You can leave a review after we send you the shipping documents for this order.</p>
     <?php endif; ?>
   </div>
 </div>

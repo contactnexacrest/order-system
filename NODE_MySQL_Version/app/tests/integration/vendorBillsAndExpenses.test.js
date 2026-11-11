@@ -182,7 +182,7 @@ describe('vendor bills and order expenses', () => {
     await orderExpenseController.add(req, fakeRes());
     expect(lastFlash(req).message).toContain('staff member');
 
-    req = fakeReq({ id: String(orderId) }, { ...base, paid_by: 'staff', staff_name: 'Ramesh', no_receipt_reason: 'Roadside stop — no bill given' });
+    req = fakeReq({ id: String(orderId) }, { ...base, paid_by: 'staff', staff_name: 'Export Executive', no_receipt_reason: 'Roadside stop — no bill given' });
     await orderExpenseController.add(req, fakeRes());
     expect(lastFlash(req).type).toBe('success');
 

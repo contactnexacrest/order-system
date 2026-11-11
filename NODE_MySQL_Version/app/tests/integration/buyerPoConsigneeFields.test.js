@@ -72,7 +72,7 @@ describe('Buyer PO / BLI / COOPREP show the consignee\'s own details (backlog #1
         city: 'Manchester',
         country: 'United Kingdom',
         vat: 'GB-CONSIGNEE-VAT-999',
-        contact: 'Priya Consignee-Contact',
+        contact: 'Consignee Contact-Contact',
         phone: '+44-7700-900111',
         email: 'consignee-contact@example.test',
         id: clientId,
@@ -101,7 +101,7 @@ describe('Buyer PO / BLI / COOPREP show the consignee\'s own details (backlog #1
     const html = lastRenderedHtml();
 
     expect(html).toContain('GB-CONSIGNEE-VAT-999');
-    expect(html).toContain('Priya Consignee-Contact');
+    expect(html).toContain('Consignee Contact-Contact');
     expect(html).toContain('+44-7700-900111');
     expect(html).toContain('consignee-contact@example.test');
     expect(html).toContain('United Kingdom');
@@ -117,7 +117,7 @@ describe('Buyer PO / BLI / COOPREP show the consignee\'s own details (backlog #1
     const text = extractDocxText(buffer);
 
     expect(text).toContain('GB-CONSIGNEE-VAT-999');
-    expect(text).toContain('Priya Consignee-Contact');
+    expect(text).toContain('Consignee Contact-Contact');
     expect(text).toContain('+44-7700-900111');
     expect(text).toContain('consignee-contact@example.test');
     expect(text).toContain('United Kingdom');

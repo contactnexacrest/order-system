@@ -290,7 +290,7 @@ final class AssociatePortalController
         $code = is_array($proposal) && (int) ($proposal['associate_id'] ?? 0) === (int) $a['id'] ? (string) $proposal['code'] : '';
         $limit = AssociateCodeService::changesPerYear();
         if ($code === '' || ($_POST['code'] ?? '') !== $code) {
-            Flash::set('error', 'Press "New ending" to get a code first, then "Use this code".');
+            Flash::set('error', 'Press "Show another ending" to get a code first, then "Use this code".');
         } elseif (!empty($a['personal_code']) && AssociateCodeService::changesInLastYear((int) $a['id']) >= $limit) {
             Flash::set('error', "You can change your code {$limit} times a year — you have used them. Ask your relationship manager if it must change.");
         } else {
@@ -299,7 +299,7 @@ final class AssociatePortalController
             } catch (\PDOException $e) {
                 // Someone took this code in the meantime (unique): propose again.
                 unset($_SESSION['associate_code_proposal']);
-                Flash::set('error', 'That code was just taken — press "New ending" for another one.');
+                Flash::set('error', 'That code was just taken — press "Show another ending" for another one.');
                 header('Location: /associate/clients#code');
                 return;
             }

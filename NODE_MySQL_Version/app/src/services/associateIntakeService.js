@@ -256,7 +256,7 @@ async function onAccepted(s, clientId, userId) {
   if (invId !== null) await associateInvitationRepository.setStatus(invId, 'accepted', { client_id: clientId });
   await auditLogRepository.log(userId, 'ASSOCIATE_CLIENT_LINKED', 'clients', clientId, 'associate_id', null, String(a.id));
   const until = associateService.addMonths(associateService.todayIst(), await associateService.protectionMonths());
-  await associateService.notify(a, 'client_accepted', `${s.company_legal_name} is now registered as your client. Your protection runs until ${dates.short(until)}`
+  await associateService.notify(a, 'client_accepted', `${s.company_legal_name} is now registered as your client. It stays your client until ${dates.short(until)}`
     + '. Your registration certificate is in the portal (My clients).', clientId, null, invId, userId);
   return `Linked to associate ${a.name} — protected until ${dates.short(until)}.`;
 }

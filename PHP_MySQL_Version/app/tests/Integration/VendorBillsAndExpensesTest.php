@@ -219,7 +219,7 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         (new OrderExpenseController())->add(['id' => (string) $orderId]);
         self::assertStringContainsString('staff member', $this->lastFlash()['message']);
 
-        $_POST['staff_name'] = 'Ramesh';
+        $_POST['staff_name'] = 'Export Executive';
         (new OrderExpenseController())->add(['id' => (string) $orderId]);
         self::assertSame('success', $this->lastFlash()['type']);
 

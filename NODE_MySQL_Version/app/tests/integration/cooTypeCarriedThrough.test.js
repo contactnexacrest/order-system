@@ -64,7 +64,7 @@ describe('Certificate of Origin Type follows the client', () => {
       billing_city: 'Testville',
       billing_country: 'United Kingdom',
       vat_eori_tax_no: 'GB123456789',
-      contact_person: 'Jane Test',
+      contact_person: 'Test Contact',
       email: `coo-${Math.random().toString(16).slice(2, 10)}@example.test`,
       country_of_destination: 'United Kingdom',
       incoterm_preference: 'FOB',

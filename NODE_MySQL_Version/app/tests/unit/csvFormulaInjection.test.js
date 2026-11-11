@@ -48,7 +48,7 @@ describe('csv.stream neutralizes spreadsheet formula injection (QA-5 RPT-02)', (
     expect(firstDataLine('\r=1+1')).toBe('"\'\r=1+1"');
   });
 
-  const SAFE_VALUES = ['Ordinary Trading Co.', 'Client -inline dash is fine mid-string', '', 'john@example.com', 'A-1 Warehouse'];
+  const SAFE_VALUES = ['Ordinary Trading Co.', 'Client -inline dash is fine mid-string', '', 'buyer.main@example.com', 'A-1 Warehouse'];
 
   it.each(SAFE_VALUES)('leaves "%s" unchanged', (value) => {
     expect(firstDataLine(value)).toBe(value);

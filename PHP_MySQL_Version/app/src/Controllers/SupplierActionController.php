@@ -78,7 +78,7 @@ final class SupplierActionController
             $documentId = OrderSupplierPoDocumentRepository::attach((int) $supplierPo['id'], $fileId);
             AuditLogRepository::log(null, 'SUPPLIER_PO_DOCUMENT_UPLOADED_BY_SUPPLIER', 'order_supplier_po_documents', $documentId, null, null, null, 'Uploaded by the supplier via the Supplier Action Link.');
             NotificationRepository::notifyOrderTeam($orderId, 'supplier_po_ack_uploaded_by_supplier', 'The supplier uploaded their signed PO / acknowledgment for ' . ($supplierPo['supplier_po_reference'] ?? 'the Supplier PO') . ' on order ' . ($order['order_reference'] ?? "#{$orderId}") . ' — check it and confirm the supplier signed (Step 7d).');
-            Flash::set('success', 'Thank you — your signed PO / acknowledgment has been received.');
+            Flash::set('success', 'Thank you — we have received your signed purchase order (or acceptance).');
         } catch (\Throwable $e) {
             Flash::set('error', $e->getMessage());
         }

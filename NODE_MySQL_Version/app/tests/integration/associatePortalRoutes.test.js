@@ -265,7 +265,7 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     const company = `Verify Buyer ${tag}`;
     const submitted = await agent.post('/quotation-details/submit').type('form').send({
       _csrf: csrfOf(formPage), associate_inv: inv.token, company_legal_name: company, billing_address_line1: '1 Harbour Road', billing_city: 'Rotterdam',
-      billing_country: 'Netherlands', vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Jan Buyer',
+      billing_country: 'Netherlands', vat_eori_tax_no: `NL${crypto.randomBytes(5).toString('hex').toUpperCase()}`, contact_person: 'Purchase Head',
       email: `jan-${tag.toLowerCase()}@buyer.example`, country_of_destination: 'Netherlands', incoterm_preference: 'FOB', consignee_same_as_buyer: '1', website: '',
     });
     expect([submitted.status, submitted.headers.location]).toEqual([302, '/quotation-details/verify']);

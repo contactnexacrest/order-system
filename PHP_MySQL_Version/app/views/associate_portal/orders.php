@@ -1,9 +1,9 @@
 <div class="card page-wide">
   <h1>Orders of my clients</h1>
-  <p class="muted">Commission is earned on a client's first orders (everything ordered in the 10 days from their first purchase order), once the buyer has paid the order in full — never on the advance alone. Repeat orders after that earn no commission.</p>
+  <p class="muted">You earn commission on a client's first orders: everything they order within 10 days of their first purchase order. You earn it when the buyer has paid the order in full, not when they pay only the advance. Later repeat orders do not earn commission.</p>
   <table class="list">
     <?php $__fob = !empty($access['fob_value']); $__com = !empty($access['commission']); // D-261 ?>
-    <tr><th>Order</th><th>Client</th><th>Products</th><?php if ($__fob): ?><th>FOB value</th><?php endif; ?><th>Stage</th><th>Buyer paid in full</th><?php if ($__com): ?><th>Commission</th><?php endif; ?></tr>
+    <tr><th>Order</th><th>Client</th><th>Products</th><?php if ($__fob): ?><th>Value of the goods (FOB, without freight)</th><?php endif; ?><th>Stage</th><th>Buyer paid in full</th><?php if ($__com): ?><th>Commission</th><?php endif; ?></tr>
     <?php foreach ($orders as $o): ?>
       <tr><td><a href="/associate/orders/<?= (int) $o['id'] ?>"><?= htmlspecialchars((string) $o['order_reference']) ?></a><br><small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short(substr((string) $o['created_at'], 0, 10))) ?></small></td>
         <td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td><td><?= htmlspecialchars((string) $o['products']) ?></td>
@@ -12,5 +12,5 @@
     <?php endforeach; ?>
     <?php if ($orders === []): ?><tr><td colspan="7" class="muted">No orders yet.</td></tr><?php endif; ?>
   </table>
-  <?php if (!$__fob): ?><p class="small muted">The order value (FOB) is not shown at your access level.</p><?php endif; ?>
+  <?php if (!$__fob): ?><p class="small muted">Order values are not shown for your account.</p><?php endif; ?>
 </div>

@@ -67,14 +67,14 @@ describe('Form value retention on validation failure (Batch 3 #4)', () => {
       _csrf: csrf,
       company_legal_name: '',
       billing_address: '',
-      contact_person: 'Jane Node Buyer',
-      email: 'jane.node@example.com',
+      contact_person: 'Node Contact Buyer',
+      email: 'contact.node@example.com',
     });
     expect(storeRes.status).toBe(302);
 
     const reshown = await agent.get('/clients/create');
-    expect(reshown.text).toContain('jane.node@example.com');
-    expect(reshown.text).toContain('Jane Node Buyer');
+    expect(reshown.text).toContain('contact.node@example.com');
+    expect(reshown.text).toContain('Node Contact Buyer');
   });
 
   it('clears old() values after one re-render (one-shot, not reusable on a later visit)', async () => {

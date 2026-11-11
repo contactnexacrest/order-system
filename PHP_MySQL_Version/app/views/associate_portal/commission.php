@@ -15,7 +15,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
   <?php if (!$print): ?><div class="alert alert-info" data-how-fixed><b><?= htmlspecialchars($__box['title']) ?></b><br><?= htmlspecialchars($__box['text']) ?></div><?php endif; ?>
   <p>Earned in the last <?= (int) $totals['months'] ?> months: <b><?= $__fc('earned') ?></b> · Paid in the last <?= (int) $totals['months'] ?> months: <b><?= $__fc('paid') ?></b> · Waiting to be paid: <b><?= $__fc('waiting') ?></b><?= $totals['held'] > 0 ? ' · On hold: <b>' . $__fc('held') . '</b>' : '' ?></p>
   <p class="muted small" data-commission-period>This shows the commission of the last <?= (int) $totals['months'] ?> months, and any commission still waiting to be paid.</p>
-  <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
+  <p class="muted small">We pay each commission in the month shown, after you send us your invoice. Upload your invoice for each line below. We pay only into the bank account we have checked.</p>
   <table class="list">
     <?php $__pctCol = !empty($access['commission_pct']); // D-292: the % fixed on each order (with "Show commission %") ?>
     <tr><th>Month</th><th>Order</th><th>Client</th><?php if ($__pctCol): ?><th>Your %</th><?php endif; ?><th>Amount</th><th>Status</th><th>Paid</th><?php if (!$print): ?><th>Your invoice</th><?php endif; ?></tr>
@@ -24,10 +24,10 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
         <?php if ($__pctCol): ?><td data-order-pct><?= htmlspecialchars(\App\Repositories\AssociatePortalRepository::orderRateText($p) ?? '—') ?></td><?php endif; ?>
         <td><?= $p['amount_fc'] !== null ? htmlspecialchars((string) $p['currency_code']) . ' ' . $__m($p['amount_fc']) : '' ?><?= $p['fixed_rate'] !== null ? ' <span class="badge badge-active">Fixed</span>' : '' ?>
           <?php if ($__india && $p['fixed_rate'] !== null && $p['status'] !== 'paid' && (float) $p['amount_inr'] > 0): ?><br><small data-fixed-rupees><?= htmlspecialchars(\App\Services\AssociatePayoutService::fixedRupeeLine((float) $p['amount_inr'], (float) $p['fixed_rate'], (string) $p['currency_code'], (string) $p['fixed_on'])) ?></small><?php elseif ($__india && $p['fixed_rate'] === null): ?><br><small>₹<?= $__m($p['amount_inr']) ?></small><?php endif; ?></td>
-        <td><?= htmlspecialchars((float) $p['amount_inr'] < 0 && $p['status'] === 'due' ? 'To be deducted' : \App\Repositories\AssociatePortalRepository::payoutLabel($p, false, (string) $p['incentive_month'])) ?></td>
+        <td><?= htmlspecialchars((float) $p['amount_inr'] < 0 && $p['status'] === 'due' ? 'We will take this off your next payment' : \App\Repositories\AssociatePortalRepository::payoutLabel($p, false, (string) $p['incentive_month'])) ?></td>
         <td><?= $p['status'] === 'paid' && !$__india ? $__d($p['paid_on']) . ' · ' . htmlspecialchars((string) $p['currency_code']) . ' ' . $__m($p['amount_fc']) . ' sent' . ($p['paid_reference'] ? '<br><small>Ref ' . htmlspecialchars((string) $p['paid_reference']) . '</small>' : '') : ($p['status'] === 'paid' ? $__d($p['paid_on']) . ((float) $p['tds_inr'] > 0
-            ? '<br><small data-tds-breakdown>Gross ₹' . $__m((float) $p['paid_inr'] + (float) $p['tds_inr']) . ' · TDS ₹' . $__m($p['tds_inr'])
-                . (!empty($p['tds_section']) ? ' (u/s ' . htmlspecialchars((string) $p['tds_section']) . (!empty($p['tds_rate']) ? ' at ' . \App\Services\AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '') . '</small><br>Net paid ₹' . $__m($p['paid_inr'])
+            ? '<br><small data-tds-breakdown>Before tax ₹' . $__m((float) $p['paid_inr'] + (float) $p['tds_inr']) . ' · Tax we deducted (TDS) ₹' . $__m($p['tds_inr'])
+                . (!empty($p['tds_section']) ? ' (Income Tax Act section ' . htmlspecialchars((string) $p['tds_section']) . (!empty($p['tds_rate']) ? ', ' . \App\Services\AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '') . '</small><br>Paid to you ₹' . $__m($p['paid_inr'])
             : ' · ₹' . $__m($p['paid_inr'])) . ($p['paid_reference'] ? '<br><small>Ref ' . htmlspecialchars((string) $p['paid_reference']) . '</small>' : '') : '—') ?></td>
         <?php if (!$print): ?><td>
           <?php if ($inv): ?><a href="/associate/documents/<?= (int) $inv['id'] ?>"><?= htmlspecialchars((string) ($inv['reference'] ?? 'Invoice')) ?></a>
@@ -43,8 +43,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
   <?php if ($__pctCol): ?><p class="muted small">Each order shows the % it was given when its Proforma Invoice was sent. Orders still being paid by the buyer are listed under Orders as "Not earned yet — buyer still paying".</p><?php endif; ?>
   <?php endif; ?>
   <?php if (!$print && !empty($access['tds_certificates'])): ?>
-  <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>
-  <p class="small muted">NexaCrest deducts TDS on commission as the law requires and issues your Form 16A each quarter; it appears here.</p>
+  <h2>Tax certificates (Form 16A) and foreign payment forms (15CA / 15CB) from NexaCrest</h2>
+  <p class="small muted">By law, we deduct tax (TDS) from your commission. Every three months we give you a certificate of this tax (Form 16A). You will find it here.</p>
   <table class="list">
     <?php foreach (array_filter($documents, static fn (array $d): bool => in_array($d['kind'], ['form_16a', 'form_15ca', 'form_15cb'], true)) as $d): ?>
       <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']]) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td></tr>

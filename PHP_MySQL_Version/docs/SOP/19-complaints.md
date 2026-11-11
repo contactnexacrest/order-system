@@ -129,9 +129,9 @@ in both directions — is always part of that order's record:
 
 ## What the client does
 
-A **"Report a Process Issue"** section is always visible on the client's
+A **"Tell us what we could do better"** section (a process issue) is always visible on the client's
 own order page in their portal — regardless of the order's status, and
-regardless of whether the per-order "Raise a Dispute" toggle is on or off
+regardless of whether the per-order "Ask to cancel this order" (dispute) toggle is on or off
 for that client. They submit a description; that's the only field they
 have, same as the Dispute form's client side. Once submitted, staff see it
 immediately in the global Complaints log and on that order's Complaints
@@ -143,7 +143,7 @@ full conversation on their own portal page and can reply again themselves
 status visible to the client (Open/Acknowledged/Resolved is an internal
 staff field; the client just sees the conversation itself):
 
-![Client portal — Report a Process Issue, with the full conversation so far](./images/portal_complaint_form.png)
+![Client portal — Tell us what we could do better, with the full conversation so far](./images/portal_complaint_form.png)
 
 ## What happens next
 

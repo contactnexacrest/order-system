@@ -35,7 +35,7 @@ final class ReportCsvExportTest extends TestCase
     public function testStaffCsvRowsFormatsPerTypeBreakdown(): void
     {
         $rows = [
-            ['user_name' => 'Jane Staff', 'by_type' => ['QT' => 3, 'PI' => 1], 'documents_total' => 4, 'audit_actions' => 12],
+            ['user_name' => 'Staff Member', 'by_type' => ['QT' => 3, 'PI' => 1], 'documents_total' => 4, 'audit_actions' => 12],
             ['user_name' => 'No Activity User', 'by_type' => [], 'documents_total' => 0, 'audit_actions' => 0],
         ];
 
@@ -98,7 +98,7 @@ final class ReportCsvExportTest extends TestCase
     public function testOrderAuditCsvRowsFormatsOldToNewAndFallsBackForSystemActions(): void
     {
         $audit = [
-            ['created_at' => '2026-10-01 09:00:00', 'user_name' => 'Jane Staff', 'action_type' => 'FIELD_EDIT', 'field_name' => 'incoterm_id', 'old_value' => '1', 'new_value' => '2', 'reason' => 'Buyer changed terms'],
+            ['created_at' => '2026-10-01 09:00:00', 'user_name' => 'Staff Member', 'action_type' => 'FIELD_EDIT', 'field_name' => 'incoterm_id', 'old_value' => '1', 'new_value' => '2', 'reason' => 'Buyer changed terms'],
             ['created_at' => '2026-10-01 09:05:00', 'user_name' => null, 'action_type' => 'DOCUMENT_GENERATED', 'field_name' => null, 'old_value' => null, 'new_value' => null, 'reason' => null],
         ];
 

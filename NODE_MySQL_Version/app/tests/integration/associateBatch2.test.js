@@ -177,7 +177,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     expect(await associateRegistrationRepository.usableLink(token)).not.toBeNull(); // a refused form does not use the link
 
     const email = `reg-${tag.toLowerCase()}@assoc.test`;
-    const ok = await call(associateRegistrationController.submit, { params: { token }, body: { name: `Rajesh ${tag}`, email, phone: '+91 98765 43210', country: 'India', based_in: 'india', city: 'Bengaluru', consent: '1' } });
+    const ok = await call(associateRegistrationController.submit, { params: { token }, body: { name: `Associate ${tag}`, email, phone: '+91-0000000000', country: 'India', based_in: 'india', city: 'Bengaluru', consent: '1' } });
     expect(ok.view).toBe('associate_register/done');
     expect(await associateRegistrationRepository.usableLink(token)).toBeNull(); // one use
     expect((await call(associateRegistrationController.submit, { params: { token }, body: {} })).view).toBe('associate_register/unavailable');
@@ -185,7 +185,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     expect(reg.status).toBe('pending');
 
     const list = await call(associateRegistrationController.index, { as: admin, query: {} });
-    expect(list.data.registrations.map((r) => r.name)).toContain(`Rajesh ${tag}`);
+    expect(list.data.registrations.map((r) => r.name)).toContain(`Associate ${tag}`);
     await call(associateRegistrationController.accept, { as: admin, params: { id: String(reg.id) } });
     const a = await associateRepository.findByEmail(email);
     expect([a.status, a.based_in, a.currency_code, a.city, Number(a.portal_enabled)]).toEqual(['invited', 'india', 'INR', 'Bengaluru', 1]);
@@ -214,7 +214,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     asAssociate(a.id);
 
     await call(associatePortalController.chooseCode, { body: { code: 'NXA-WHATEVER-AA' } });
-    expect(flash().message).toContain('New ending'); // nothing switches without a proposal
+    expect(flash().message).toContain('Show another ending'); // nothing switches without a proposal
 
     await call(associatePortalController.proposeCode, { body: { readable: 'Demo Exim' } });
     const p1 = String(session.associate_code_proposal.code);

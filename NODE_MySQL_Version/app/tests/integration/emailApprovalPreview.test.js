@@ -51,7 +51,7 @@ describe('email approvals screen — exact preview + attachment link', () => {
   async function setClientEmail(clientId) {
     await db.execute('UPDATE clients SET email = :email, contact_person = :contact WHERE id = :id', {
       email: JANE_EMAIL,
-      contact: 'Jane Buyer',
+      contact: 'Chief Buyer',
       id: clientId,
     });
   }

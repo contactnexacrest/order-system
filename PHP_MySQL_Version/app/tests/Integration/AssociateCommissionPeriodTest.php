@@ -338,12 +338,12 @@ final class AssociateCommissionPeriodTest extends DbTestCase
 
     public function testTheFobInANoticeFollowsShowFobOrderValue(): void
     {
-        $message = 'Your client paid order NX-1 in full. Commission earned: USD 617.28 (5% on the invoiced FOB of the goods, USD 12,345.67).';
+        $message = 'Your client paid order NX-1 in full. You have earned USD 617.28 commission (5% of the invoice value of the goods, USD 12,345.67).';
         self::assertSame($message, AssociateAccess::maskNotice($this->associate('full'), $message));
-        self::assertSame('Your client paid order NX-1 in full. Commission earned: [amount in your portal] ([rate in your agreement] on the invoiced FOB of the goods).',
+        self::assertSame('Your client paid order NX-1 in full. You have earned [amount in your portal] commission ([rate in your agreement] of the invoice value of the goods).',
             AssociateAccess::maskNotice($this->associate('starter'), $message));
         $c = $this->custom(['clients', 'commission', 'commission_pct', 'notice_amounts'], 'Amounts on, FOB value off for this one');
-        self::assertSame('Your client paid order NX-1 in full. Commission earned: USD 617.28 (5% on the invoiced FOB of the goods).', AssociateAccess::maskNotice($c, $message));
+        self::assertSame('Your client paid order NX-1 in full. You have earned USD 617.28 commission (5% of the invoice value of the goods).', AssociateAccess::maskNotice($c, $message));
     }
 
     public function testMyClientsHidesOrderNumbersWhenOrdersIsOff(): void

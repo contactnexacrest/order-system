@@ -2021,10 +2021,10 @@ async function generatePiFormLink(req, res) {
     const rendered = await emailTemplateRepository.renderOrDefault(
       'pi_form_link',
       { '{order_reference}': order.order_reference, '{pi_form_link}': link },
-      'NexaCrest — confirm your PI-stage details',
+      'NexaCrest — please confirm your details for the proforma invoice',
       'Hello,\n\n'
         + 'Thank you for accepting our Quotation for order {order_reference}.\n\n'
-        + 'To issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\n'
+        + 'Before we can send your proforma invoice, please confirm your shipping details and who receives the goods:\n{pi_form_link}\n\n'
         + 'This link works for 30 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
@@ -2071,9 +2071,9 @@ async function generateBuyerActionLink(req, res) {
     const rendered = await emailTemplateRepository.renderOrDefault(
       'buyer_action_link',
       { '{order_reference}': order.order_reference, '{buyer_action_link}': link },
-      'NexaCrest — acknowledge your order / upload your Buyer PO',
+      'NexaCrest — sign your purchase order and confirm your order',
       'Hello,\n\n'
-        + 'For order {order_reference}, please use this link to download your Purchase Order, upload the signed copy with your PO number, and acknowledge your Order Confirmation once you receive it:\n{buyer_action_link}\n\n'
+        + 'For order {order_reference}, please use this link to:\n1. download your purchase order,\n2. upload the signed copy with your PO number,\n3. confirm your order when you receive our order confirmation.\n\n{buyer_action_link}\n\n'
         + 'This link works for 90 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
@@ -2110,7 +2110,7 @@ async function generatePaymentActionLink(req, res) {
       { '{order_reference}': order.order_reference, '{payment_action_link}': link },
       'NexaCrest — send us your payment details for order {order_reference}',
       'Hello,\n\n'
-        + 'For order {order_reference}: once you have made the payment, please send us the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed:\n{payment_action_link}\n\n'
+        + 'For order {order_reference}: once you have made the payment, please send us a screenshot of the payment and its details (bank reference number, amount and date) on this secure link. You do not need to sign in:\n{payment_action_link}\n\n'
         + 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n'
         + 'NexaCrest International Private Limited'
     );
@@ -3136,7 +3136,7 @@ async function setDisputeButtonVisible(req, res) {
   await orderRepository.setDisputeButtonVisible(orderId, visible);
   const user = req.user;
   await auditLogRepository.log(user.id, 'DISPUTE_BUTTON_VISIBILITY_CHANGED', 'orders', orderId, 'dispute_button_visible_to_client', null, visible ? '1' : '0');
-  flash.set(req, 'success', visible ? 'The client can now raise a dispute on this order from their portal.' : 'The "Raise a Dispute" button is now hidden from the client for this order.');
+  flash.set(req, 'success', visible ? 'The client can now raise a dispute on this order from their portal.' : 'The "Ask to cancel this order" (dispute) button is now hidden from the client for this order.');
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3402,7 +3402,7 @@ async function generateSupplierActionLink(req, res) {
       { '{supplier_po_reference}': String(supplierPo.supplier_po_reference), '{supplier_action_link}': link },
       'NexaCrest — please upload your signed PO {supplier_po_reference}',
       'Hello,\n\n'
-        + 'Please upload the signed and stamped purchase order {supplier_po_reference} (or your written acknowledgment of it) here:\n{supplier_action_link}\n\n'
+        + 'Please sign and stamp purchase order {supplier_po_reference} and upload it here. You can also upload a written note that you accept it:\n{supplier_action_link}\n\n'
         + 'This link works for 60 days.\n\n'
         + 'NexaCrest International Private Limited'
     );

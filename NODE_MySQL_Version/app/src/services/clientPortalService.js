@@ -123,7 +123,7 @@ async function sendSetPasswordLink(clientId, staffUserId) {
     { '{email}': email, '{reset_link}': link, '{login_link}': loginUrl() },
     'Reset your NexaCrest order portal password',
     'Hello,\n\n'
-      + 'A password reset was requested for your NexaCrest order portal account ({email}).\n\n'
+      + 'Someone asked to reset the password of your NexaCrest buyer account ({email}).\n\n'
       + 'To set a new password, open this link within 72 hours:\n{reset_link}\n\n'
       + "If you didn't request this, you can ignore this email — your password will not be changed."
   );
@@ -149,8 +149,8 @@ async function sendSetPasswordEmail(clientId, email) {
     { '{set_password_link}': setUrl, '{email}': email, '{login_link}': loginUrl() }, // D-282: {login_link}
     'Your NexaCrest order portal access',
     'Hello,\n\n'
-      + 'Your advance payment has been received and cleared — thank you.\n\n'
-      + 'You can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\n'
+      + 'Thank you — we have received your advance payment.\n\n'
+      + 'You can now sign in at any time to follow your order and download your documents: the quotation, the proforma invoice and every document we send you from now on.\n\n'
       + 'To set up your login, open this link within 72 hours (it works once):\n{set_password_link}\n\n'
       + 'Your login email will be: {email}\n\n'
       + 'After that, log in any time at:\n{login_link}\n\n'
@@ -325,14 +325,14 @@ async function changePassword(clientId, newPassword, req = null) {
  */
 async function paymentReportRefusal(order) {
   if (['cancelled', 'lost'].includes(order.status)) {
-    return `This order is ${order.status}, so there is no payment to report on it.`;
+    return `${order.status === 'lost' ? 'This order did not go ahead' : 'This order was cancelled'}, so there is no payment to tell us about.`;
   }
   const pi = await db.queryOne(
     `SELECT 1 AS found FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
      WHERE d.order_id = :order_id AND dt.code = 'PI' AND d.status IN ('approved', 'sent', 'superseded') LIMIT 1`,
     { order_id: Number(order.id) }
   );
-  return pi ? null : 'A payment can be reported once we have sent you the Proforma Invoice for this order.';
+  return pi ? null : 'You can tell us about a payment after we send you the proforma invoice for this order.';
 }
 
 module.exports = {

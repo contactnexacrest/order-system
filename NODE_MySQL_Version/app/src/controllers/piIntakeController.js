@@ -142,7 +142,7 @@ async function submit(req, res) {
     return;
   }
   if (!req.body.confirm_lock) {
-    flash.set(req, 'error', 'Please check the confirmation box — the details above must be confirmed as correct before this form can be submitted.');
+    flash.set(req, 'error', 'Please tick the box to confirm the details are correct. You can send the form only after you do.');
     res.redirect(`/pi-details/${token}`);
     return;
   }

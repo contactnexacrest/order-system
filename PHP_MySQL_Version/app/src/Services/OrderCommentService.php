@@ -120,7 +120,7 @@ final class OrderCommentService
         }
 
         if ($linked) {
-            $message .= "The following file(s) are too large to attach directly to this email — view or download them securely from your order portal:\n";
+            $message .= "These files are too big to attach to this e-mail. You can open or download them from your buyer account:\n";
             $baseUrl = rtrim(Env::get('APP_URL', ''), '/');
             foreach ($linked as $file) {
                 $message .= "- {$file['original_filename']}: {$baseUrl}/client/orders/{$order['id']}/comment-attachments/{$file['id']}/download\n";

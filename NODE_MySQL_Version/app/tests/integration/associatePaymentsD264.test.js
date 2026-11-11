@@ -96,7 +96,7 @@ describe('Associate payments (D-264)', () => {
     expect(Number(entry.amount_inr)).toBe(104312.5);
     expect(String(entry.description).endsWith(`; fixed on ${short(todayIst())} at ₹83.45 per USD`)).toBe(true);
     const o = await orderRepository.find(orderId);
-    expect(await lastNotice(a)).toBe(`Your client ${o.company_legal_name} has paid order ${o.order_reference} in full. Your commission is now fixed at ₹104,312.50 (USD 1,250.00, 7% of the invoiced goods value, at ₹83.45 per USD — the rate at which the buyer's payments were converted by the bank). This amount will not change, whatever the exchange rate does from now on. It is due on 12 Dec 2026 and will be paid in the 05 Jan 2027 payout run to your verified bank account, after TDS as the law requires. Please upload your invoice for this commission under My commission. NexaCrest pays all bank charges.`);
+    expect(await lastNotice(a)).toBe(`Your client ${o.company_legal_name} has paid order ${o.order_reference} in full. Your commission is ₹104,312.50 (USD 1,250.00: 7% of the invoice value of the goods, at ₹83.45 per USD, the rate the bank used for the buyer's payment). This amount will not change, even if the exchange rate changes. It is due on 12 Dec 2026. We will pay it on 05 Jan 2027 into your checked bank account, after deducting tax (TDS) as the law requires. Please upload your invoice for this commission under "My commission". We pay all bank charges.`);
 
     // Once only; the MD's later team lock adds the team's part without a second associate payout.
     expect(await associatePayoutService.autoFix(orderId)).toBe(false);
@@ -120,19 +120,19 @@ describe('Associate payments (D-264)', () => {
   });
 
   it('words the display for India and abroad', async () => {
-    expect(associatePayoutService.fixedRupeeLine(104312.5, 83.45, 'USD', '2026-11-12 10:00:00')).toBe('You will be paid ₹104,312.50 (fixed at ₹83.45 per USD on 12 Nov 2026; will not change)');
-    expect((await associatePayoutService.howFixedBox({ based_in: 'india' })).title).toBe('How your commission is fixed — it never changes afterwards');
-    expect((await associatePayoutService.howFixedBox({ based_in: 'india' })).text).toBe("Your commission is a percentage of the goods value (FOB) in the order's currency. On the day the buyer completes payment, it is fixed in rupees at the exchange rate the buyer's payment was actually converted at. That rupee amount is what you are paid. Later changes in the exchange rate do not raise or lower it. NexaCrest pays all bank charges.");
-    expect((await associatePayoutService.howFixedBox({ based_in: 'abroad', currency_code: 'USD' })).text).toBe("Your commission is a percentage of the goods value (FOB). It is fixed in US dollars on the day the buyer completes payment, and you are paid exactly that amount in US dollars to your verified account. NexaCrest pays its own and the intermediary bank's charges. Any conversion into your local currency is done by your own bank.");
+    expect(associatePayoutService.fixedRupeeLine(104312.5, 83.45, 'USD', '2026-11-12 10:00:00')).toBe('We will pay you ₹104,312.50 (at ₹83.45 per USD, set on 12 Nov 2026; this will not change)');
+    expect((await associatePayoutService.howFixedBox({ based_in: 'india' })).title).toBe('How we set your commission — it does not change later');
+    expect((await associatePayoutService.howFixedBox({ based_in: 'india' })).text).toBe("Your commission is a percentage of the value of the goods (FOB), in the order's currency. On the day the buyer finishes paying, we turn it into rupees at the rate the bank used for the buyer's payment. We pay you that rupee amount. If the exchange rate changes later, your amount stays the same. We pay all bank charges.");
+    expect((await associatePayoutService.howFixedBox({ based_in: 'abroad', currency_code: 'USD' })).text).toBe("Your commission is a percentage of the value of the goods (FOB). On the day the buyer finishes paying, we set the amount in US dollars. We pay you exactly that amount in US dollars into your checked bank account. We pay our bank's charges and the charges of any bank in between. If you need it in your local currency, your own bank changes it.");
     await incentiveRepository.setSetting('associate_abroad_charges', 'SHA', admin.id);
-    expect((await associatePayoutService.howFixedBox({ based_in: 'abroad', currency_code: 'USD' })).text).toContain("NexaCrest pays its own bank's charges; your own bank may charge you on receipt.");
+    expect((await associatePayoutService.howFixedBox({ based_in: 'abroad', currency_code: 'USD' })).text).toContain("We pay our own bank's charges; your own bank may charge you when the money arrives.");
     await incentiveRepository.setSetting('associate_abroad_charges', 'OUR', admin.id);
 
     const [a, client] = await associate('abroad', 'USD');
     const orderId = await order(client);
     expect(await associatePayoutService.autoFix(orderId)).toBe(true);
     const msg = await lastNotice(a);
-    expect(msg).toContain('Your commission is now fixed at USD 1,250.00 (7% of the invoiced goods value). This amount will not change. It is due on 12 Dec 2026 and will be paid in the 05 Jan 2027 payout run to your verified bank account, paid in US dollars.');
+    expect(msg).toContain('Your commission is USD 1,250.00 (7% of the invoice value of the goods). This amount will not change. It is due on 12 Dec 2026. We will pay it on 05 Jan 2027 into your checked bank account, in US dollars.');
     expect(msg).not.toContain('₹');
 
     const t = await associatePortalRepository.totals(a, 24, '2027-01-01');

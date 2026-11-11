@@ -371,8 +371,8 @@ async function priceManual(id, userId, quote, lowest, unit, note) {
   if (associate) {
     const associateService = require('./associateService');
     const dates = require('../helpers/dates');
-    await associateService.notify(associate, 'price_ready', `Your price request ${r.number} has a price: quote USD ${money(q)}, lowest USD ${money(l)}`
-      + ` per ${unit}, valid until ${dates.short(validUntil)}.`);
+    await associateService.notify(associate, 'price_ready', `Your price request ${r.number} is ready. Price to quote: USD ${money(q)} per ${unit}. Lowest price you may agree: USD ${money(l)}`
+      + ` per ${unit}. Valid until ${dates.short(validUntil)}.`);
   }
   return null;
 }

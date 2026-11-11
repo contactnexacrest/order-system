@@ -141,10 +141,10 @@ final class AssociateAccessLevelsTest extends DbTestCase
                 $r = $this->call($method, $path);
                 if ($allowed[$feature]) {
                     self::assertNotSame(403, $r['code'], "{$level}: {$path} opens");
-                    self::assertStringNotContainsString('Not available at your access level', $r['body'], "{$level}: {$path}");
+                    self::assertStringNotContainsString('This page is not open for your account', $r['body'], "{$level}: {$path}");
                 } else {
                     self::assertSame(403, $r['code'], "{$level}: {$path} is refused");
-                    self::assertStringContainsString('Not available at your access level', $r['body'], "{$level}: {$path} shows the lock page");
+                    self::assertStringContainsString('This page is not open for your account', $r['body'], "{$level}: {$path} shows the lock page");
                 }
             }
             $home = $this->call('GET', '/associate');
@@ -215,7 +215,7 @@ final class AssociateAccessLevelsTest extends DbTestCase
         $this->asStaff($this->admin);
         Database::connection()->exec("UPDATE users SET is_super_admin = 1 WHERE id = {$this->admin}");
         $name = 'New Assoc ' . bin2hex(random_bytes(3));
-        $this->call('POST', '/associates', ['name' => $name, 'based_in' => 'india', 'currency_code' => 'INR', 'email' => 'new-' . bin2hex(random_bytes(3)) . '@assoc.test', 'phone' => '+91 98765 43210',
+        $this->call('POST', '/associates', ['name' => $name, 'based_in' => 'india', 'currency_code' => 'INR', 'email' => 'new-' . bin2hex(random_bytes(3)) . '@assoc.test', 'phone' => '+91-0000000000',
             'commission_mode' => 'ladder']);
         $new = Database::connection()->prepare('SELECT access_level FROM associates WHERE name = :n');
         $new->execute(['n' => $name]);

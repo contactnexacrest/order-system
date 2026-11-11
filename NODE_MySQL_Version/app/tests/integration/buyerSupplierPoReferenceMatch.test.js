@@ -48,7 +48,7 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
     buyer: {
       company_legal_name: 'Test Buyer Ltd', billing_address: 'Test Address', consignee_name: 'Same',
       consignee_address: 'Same', vat_eori_tax_no: 'VAT123', contact_person: 'Purchasing Manager',
-      phone: '+44123', email: 'john@test.com', country_of_destination: 'Netherlands',
+      phone: '+44123', email: 'buyer.main@test.com', country_of_destination: 'Netherlands',
     },
     products: [{ description: 'Test Granite Slab', quantity: 100, unit: 'm²', unit_price: 25.5 }],
     financial: { fob_value: '2,550.00', advance_pct: 40, balance_pct: 60, balance_terms_text: 'within 3 working days.' },

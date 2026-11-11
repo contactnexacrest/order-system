@@ -109,7 +109,7 @@ describe('D-260 backups — scripts, status, digest warning, Admin › Backups',
     const mdItems = (await dailyDigestService.itemsFor(md.id)).filter((i) => i.kind === 'backup');
     expect(mdItems).toEqual([{ kind: 'backup', text: 'Database copy (nightly): Last run FAILED: db message' }]);
     expect((await dailyDigestService.itemsFor(exec.id)).filter((i) => i.kind === 'backup')).toEqual([]);
-    const mail = dailyDigestService.compose('Asha', mdItems, '2026-11-06');
+    const mail = dailyDigestService.compose('Managing Director', mdItems, '2026-11-06');
     expect(mail.subject).toBe('NexaCrest — your day 6 Nov 2026: 0 tasks, 0 reviews — BACKUP WARNING');
     expect(mail.body).toContain('Backups need attention (Admin › Backups):\n- Database copy (nightly): Last run FAILED: db message');
   });

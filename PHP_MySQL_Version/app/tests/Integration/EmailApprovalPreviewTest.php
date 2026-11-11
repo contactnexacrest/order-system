@@ -24,7 +24,7 @@ final class EmailApprovalPreviewTest extends DbTestCase
     {
         Database::connection()
             ->prepare('UPDATE clients SET email = :email, contact_person = :contact WHERE id = :id')
-            ->execute(['email' => 'jane@buyer.example', 'contact' => 'Jane Buyer', 'id' => $clientId]);
+            ->execute(['email' => 'buyer.contact@buyer.example', 'contact' => 'Chief Buyer', 'id' => $clientId]);
     }
 
     public function testApprovalQueueShowsTheExactBodyAndAttachmentLink(): void

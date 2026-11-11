@@ -28,7 +28,7 @@ final class GenericEmailSendTest extends DbTestCase
     {
         Database::connection()
             ->prepare('UPDATE clients SET email = :email WHERE id = :id')
-            ->execute(['email' => 'jane@buyer.example', 'id' => $clientId]);
+            ->execute(['email' => 'buyer.contact@buyer.example', 'id' => $clientId]);
     }
 
     /**
@@ -147,7 +147,7 @@ final class GenericEmailSendTest extends DbTestCase
         $clientId = $this->createTestClient();
         $this->setClientEmail($clientId);
         $orderId = $this->createTestOrder($clientId);
-        $emailLogId = EmailLogRepository::create($orderId, null, 'bl_copy_sent', 'jane@buyer.example', 'Subject', 'Body', null, $this->createTestUser('Admin'));
+        $emailLogId = EmailLogRepository::create($orderId, null, 'bl_copy_sent', 'buyer.contact@buyer.example', 'Subject', 'Body', null, $this->createTestUser('Admin'));
         EmailLogRepository::approve($emailLogId, $this->createTestUser('Admin'));
 
         $sent = EmailDispatchService::dispatch(EmailLogRepository::find($emailLogId));
@@ -173,7 +173,7 @@ final class GenericEmailSendTest extends DbTestCase
         OrderShippingRepository::upsert($orderId, ['shipping_line' => 'Maersk']);
         OrderShippingRepository::attachBlCopy($orderId, $fileId);
 
-        $emailLogId = EmailLogRepository::create($orderId, null, 'bl_copy_sent', 'jane@buyer.example', 'Subject', 'Body', null, $this->createTestUser('Admin'));
+        $emailLogId = EmailLogRepository::create($orderId, null, 'bl_copy_sent', 'buyer.contact@buyer.example', 'Subject', 'Body', null, $this->createTestUser('Admin'));
         EmailLogRepository::approve($emailLogId, $this->createTestUser('Admin'));
 
         try {

@@ -49,11 +49,11 @@ describe('Freight forwarder from the Logistics Partners directory (owner request
     expect((await save(orderId, { freight_forwarder_partner_id: String(inactive) })).type).toBe('error');
     expect(await orderFreightRepository.find(orderId)).toBeNull();
 
-    const partner = await logisticsPartnerRepository.create({ partner_name: 'Blue Wave Logistics', service_type: 'freight_forwarder', contact_person_name: 'Ravi', phone: '+91 90000 11111', email: 'ops@bluewave.test' }, userId);
+    const partner = await logisticsPartnerRepository.create({ partner_name: 'Blue Wave Logistics', service_type: 'freight_forwarder', contact_person_name: 'Operations Manager', phone: '+91-0000000000', email: 'ops@bluewave.test' }, userId);
     expect((await save(orderId, { freight_forwarder_partner_id: String(partner), freight_forwarder_name: 'ignored free text' })).type).toBe('success');
     const freight = await orderFreightRepository.find(orderId);
     expect(freight.freight_forwarder_name).toBe('Blue Wave Logistics');
-    expect(freight.freight_forwarder_contact).toBe('Ravi · +91 90000 11111 · ops@bluewave.test');
+    expect(freight.freight_forwarder_contact).toBe('Operations Manager · +91-0000000000 · ops@bluewave.test');
     expect(Number(freight.freight_forwarder_partner_id)).toBe(partner);
   });
 

@@ -8,12 +8,12 @@
   </div>
 
   <fieldset class="intake-step action-step">
-    <legend><span class="intake-step-num">1</span> Signed PO / Acknowledgment
+    <legend><span class="intake-step-num">1</span> Signed purchase order (or your written acceptance)
       {% if documents.length %}<span class="action-status done">&#10003; Received</span>{% else %}<span class="action-status todo">Action needed</span>{% endif %}
     </legend>
     <ol class="action-howto">
       <li><strong>Download</strong> the purchase order.</li>
-      <li><strong>Sign and stamp</strong> it (or write your acknowledgment).</li>
+      <li><strong>Sign and stamp</strong> it (or write a short note that you accept it).</li>
       <li><strong>Upload</strong> it below — you can upload more than one file.</li>
     </ol>
     {% if issuedSupplierPo %}
@@ -30,7 +30,7 @@
     <form method="post" action="/supplier-action/{{ token }}/acknowledgment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
-        <label class="full">Signed PO or acknowledgment *<input type="file" name="document" required></label>
+        <label class="full">Signed purchase order, or your written acceptance *<input type="file" name="document" required></label>
       </div>
       <button type="submit">Upload</button>
     </form>

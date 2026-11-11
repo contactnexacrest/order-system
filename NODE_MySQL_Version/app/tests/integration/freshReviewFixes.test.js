@@ -224,11 +224,11 @@ describe('Fresh-eyes review fixes (5 Nov 2026)', () => {
   });
 
   it('M5 and L2: the Zoho payment names the GST on the gross billed', async () => {
-    expect(associateTds.paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 50000, 2500, 5, '194H', 47500, 'UTR998877', '194H', 9000))
-      .toBe('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹50,000.00, TDS u/s 194H ₹2,500.00 (5%), net paid ₹47,500.00'
+    expect(associateTds.paymentDescription('Test Associate', ['SC/ORD/26/001'], 50000, 2500, 5, '194H', 47500, 'UTR998877', '194H', 9000))
+      .toBe('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹50,000.00, TDS u/s 194H ₹2,500.00 (5%), net paid ₹47,500.00'
         + " + GST ₹9,000.00 on the associate's tax invoice (input credit), total paid ₹56,500.00 · UTR UTR998877");
-    expect(associateTds.paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 50000, 0, null, null, 50000, 'U1'))
-      .toBe('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹50,000.00, no TDS, net paid ₹50,000.00 · UTR U1');
+    expect(associateTds.paymentDescription('Test Associate', ['SC/ORD/26/001'], 50000, 0, null, null, 50000, 'U1'))
+      .toBe('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹50,000.00, no TDS, net paid ₹50,000.00 · UTR U1');
 
     const [a, client] = await associate(await level('Level 2'), '29ABCDE1234F1Z5');
     const orderId = await order(client, 'USD', [[10000, 10]], 83);

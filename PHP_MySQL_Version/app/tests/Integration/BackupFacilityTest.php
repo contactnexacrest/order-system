@@ -108,7 +108,7 @@ final class BackupFacilityTest extends DbTestCase
         $mdItems = array_values(array_filter(DailyDigestService::itemsFor($md), static fn (array $i): bool => $i['kind'] === 'backup'));
         self::assertSame([['kind' => 'backup', 'text' => 'Database copy (nightly): Last run FAILED: db message']], $mdItems);
         self::assertSame([], array_values(array_filter(DailyDigestService::itemsFor($exec), static fn (array $i): bool => $i['kind'] === 'backup')));
-        $mail = DailyDigestService::compose('Asha', $mdItems, '2026-11-06');
+        $mail = DailyDigestService::compose('Managing Director', $mdItems, '2026-11-06');
         self::assertSame('NexaCrest — your day 6 Nov 2026: 0 tasks, 0 reviews — BACKUP WARNING', $mail['subject']);
         self::assertStringContainsString("Backups need attention (Admin › Backups):\n- Database copy (nightly): Last run FAILED: db message", $mail['body']);
     }

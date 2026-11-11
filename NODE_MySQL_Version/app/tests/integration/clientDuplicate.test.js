@@ -54,7 +54,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     sourceEmail = `jane-${Math.random().toString(16).slice(2, 10)}@example.test`;
     const result = await db.execute(
       `INSERT INTO clients (client_unique_number, company_legal_name, billing_address, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
-       VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Jane Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)`,
+       VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)`,
       { unique_number: uniqueNumber, email: sourceEmail, created_by: userId }
     );
     return clientRepository.find(result.insertId);

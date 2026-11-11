@@ -43,7 +43,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <?php if ($issuedBuyerPo): ?>
       <p><a class="btn btn-secondary" href="/buyer-action/<?= htmlspecialchars($token) ?>/buyer-po-document">&#11015; Download Purchase Order (<?= htmlspecialchars((string) $issuedBuyerPo['document_reference']) ?>)</a></p>
     <?php else: ?>
-      <p class="intake-note">Your Purchase Order is being prepared — you can already upload your own signed PO below if you have one.</p>
+      <p class="intake-note">We are still preparing your purchase order. If you already have your own signed purchase order, you can upload it below now.</p>
     <?php endif; ?>
     <?php if (!empty($buyerPoDocuments)): ?>
       <table class="list">
@@ -57,7 +57,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
       </table>
     <?php endif; ?>
     <?php if (!empty($advanceCleared)): ?>
-      <p class="muted small">The advance payment has already cleared, so uploads here are closed. Contact your NexaCrest representative if you need to send an updated copy.</p>
+      <p class="muted small">We have received your advance payment, so you can no longer upload here. If you need to send us a new copy, please contact your NexaCrest contact person.</p>
     <?php else: ?>
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/buyer-po" enctype="multipart/form-data">
       <?= Csrf::field() ?>
@@ -75,7 +75,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <legend><span class="intake-step-num">2</span> Advance Payment <span class="action-status todo">Action needed</span></legend>
     <ol class="action-howto">
       <li><strong>Download</strong> your Proforma Invoice and pay the advance shown on it.</li>
-      <li><strong>Tell us</strong> the transaction details below — our team checks them against our bank statement.</li>
+      <li><strong>Tell us</strong> the payment details below (with the bank reference number). Our team checks them against our bank statement.</li>
     </ol>
     <?php if ($issuedPi): ?>
       <p><a class="btn btn-secondary" href="/buyer-action/<?= htmlspecialchars($token) ?>/proforma-invoice">&#11015; Download Proforma Invoice (<?= htmlspecialchars((string) $issuedPi['document_reference']) ?>)</a></p>
@@ -83,10 +83,10 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label class="full">Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
       <button type="submit">Submit Payment Details</button>
@@ -96,18 +96,18 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
   <?php elseif ($task === 'oc'): ?>
   <fieldset class="intake-step action-step">
     <legend><span class="intake-step-num">3</span> Order Confirmation <span class="action-status todo">Action needed</span></legend>
-    <p><strong>Your Acknowledgement Needed</strong> — please read the Order Confirmation, check the summary below and confirm to proceed.</p>
+    <p><strong>Please confirm your order.</strong> Read the order confirmation and check the summary below. If everything is correct, press the button.</p>
     <?php // Owner decision (2026-10-27): the buyer reads the exact document they acknowledge. ?>
     <?php if ($issuedOc): ?>
       <p><a class="btn btn-secondary" href="/buyer-action/<?= htmlspecialchars($token) ?>/order-confirmation">&#11015; Download Order Confirmation (<?= htmlspecialchars((string) $issuedOc['document_reference']) ?>)</a></p>
     <?php endif; ?>
     <div class="action-kv">
       <div><span class="k">Order Reference</span><span class="v"><?= htmlspecialchars($order['order_reference']) ?></span></div>
-      <div><span class="k">Total Order Value (FOB)</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></span></div>
+      <div><span class="k">Total value of the goods (FOB — before freight and insurance)</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></span></div>
       <div><span class="k">Advance Paid</span><span class="v"><?= $advanceReceived !== null ? htmlspecialchars($order['currency_code'] ?? '') . ' ' . number_format($advanceReceived, 2) : '—' ?></span></div>
       <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $balanceDue, 2) ?></span></div>
-      <div><span class="k">Incoterm</span><span class="v"><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></span></div>
-      <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '—') ?></span></div>
+      <div><span class="k">Delivery terms (Incoterm)</span><span class="v"><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></span></div>
+      <div><span class="k">Port where the goods arrive</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '—') ?></span></div>
     </div>
     <table class="list">
       <tr><th>Product</th><th>Quantity</th></tr>
@@ -117,7 +117,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     </table>
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/acknowledge-oc">
       <?= Csrf::field() ?>
-      <button type="submit" class="btn-success"><?= $issuedOc ? 'I have read Order Confirmation ' . htmlspecialchars((string) $issuedOc['document_reference']) . ' — ' : '' ?>I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success"><?= $issuedOc ? 'I have read order confirmation ' . htmlspecialchars((string) $issuedOc['document_reference']) . '. It is correct — please go ahead' : 'Yes, this is correct — please go ahead' ?></button>
     </form>
   </fieldset>
 
@@ -125,13 +125,13 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
   <div class="action-wait">
     <?php if ($task === 'waiting_pi'): ?>
       <h2>&#10003; Thank you — nothing to do right now</h2>
-      <p>We have your signed Purchase Order<?= !empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL' ? ' <strong>' . htmlspecialchars($order['buyers_po_ref']) . '</strong>' : '' ?>. We're preparing your Proforma Invoice and will email you when it's ready — then this same link will show you how to pay the advance.</p>
+      <p>We have your signed purchase order<?= !empty($order['buyers_po_ref']) && $order['buyers_po_ref'] !== 'NIL' ? ' <strong>' . htmlspecialchars($order['buyers_po_ref']) . '</strong>' : '' ?>. We are now preparing your proforma invoice and will e-mail you when it is ready. This same link will then show you how to pay the advance.</p>
     <?php elseif ($task === 'advance_reported'): ?>
       <h2>&#10003; Thank you — we're checking your payment</h2>
       <p>We've received your advance payment details and our team is verifying them against our bank statement. We'll email you as soon as it's confirmed.</p>
     <?php elseif ($task === 'done'): ?>
       <h2>&#10003; All set — thank you</h2>
-      <p>There's nothing left for you to do on this link. Your order is moving ahead; we'll keep you updated by email and in your <a href="/client/login">client portal</a>.</p>
+      <p>There's nothing left for you to do on this link. Your order is moving ahead; we'll keep you updated by e-mail and in your <a href="/client/login">buyer account</a>.</p>
     <?php else: ?>
       <h2>&#10003; Thank you — nothing to do right now</h2>
       <p>Your order is with our team. We'll email you when there's something for you to do next — this same link will show it.</p>
@@ -139,5 +139,5 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
   </div>
   <?php endif; ?>
 
-  <p class="muted small">Questions? Reply to the email this link came with<?= $task !== 'buyer_po' ? ', or <a href="/client/login">log in to your client portal</a> once your advance payment has cleared' : '' ?>.</p>
+  <p class="muted small">Questions? Reply to the email this link came with<?= $task !== 'buyer_po' ? ', or <a href="/client/login">sign in to your buyer account</a> once we have received your advance payment' : '' ?>.</p>
 </div>

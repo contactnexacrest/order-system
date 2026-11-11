@@ -20,8 +20,8 @@
     <legend><span class="intake-step-num">{{ currentNum }}</span> {{ legName }} <span class="action-status todo">Action needed</span></legend>
     <ol class="action-howto">
       <li><strong>Download</strong> the {{ legInfo.document }} — our bank details are on it.</li>
-      <li><strong>Pay</strong> {% if amountDue != null %}<strong>{{ currency }} {{ amountDue | money }}</strong>{% else %}the amount shown on it{% endif %} by T/T (bank transfer).</li>
-      <li><strong>Send us</strong> the transaction details and a screenshot below — our team checks them against our bank statement.</li>
+      <li><strong>Pay</strong> {% if amountDue != null %}<strong>{{ currency }} {{ amountDue | money }}</strong>{% else %}the amount shown on it{% endif %} by bank transfer (T/T).</li>
+      <li><strong>Send us</strong> the payment details (with the bank reference number) and a screenshot below. Our team checks them against our bank statement.</li>
     </ol>
     {% if document %}
       <p><a class="btn btn-secondary" href="/payment-action/{{ token }}/document">&#11015; Download {{ legInfo.document }} ({{ document.document_reference }})</a></p>
@@ -29,11 +29,11 @@
     <form method="post" action="/payment-action/{{ token }}/report" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid ({{ currency }}) *<input type="number" step="0.01" min="0.01" name="amount" required value="{{ amountDue.toFixed(2) if amountDue != null else '' }}" placeholder="e.g. 1500.00"></label>
         <label>Date Paid *<input type="date" name="payment_date" required value="{{ today() }}"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
-        <label class="full">Payment Screenshot / Bank Remittance Advice *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label class="full">Screenshot or bank receipt of your payment *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
       </div>
       <button type="submit">Send Payment Details</button>
     </form>
@@ -45,7 +45,7 @@
       <p>We have your payment details. Our team is verifying them against our bank statement and will confirm by email. Nothing more is needed from you right now.</p>
     {% elif current.state == 'waiting' %}
       <h2>&#10003; Nothing to pay right now</h2>
-      <p>Your next payment is the <strong>{{ legName | lower }}</strong>, against our {{ legInfo.document }}. We'll email it to you when it's due — then this same link will show you what to pay.</p>
+      <p>Your next payment is the <strong>{{ legName | lower }}</strong>. It is shown on our {{ legInfo.document | lower }}, which we will e-mail you when it is due. This same link will then show you what to pay.</p>
     {% else %}
       <h2>&#10003; All payments received — thank you</h2>
       <p>There is nothing left to pay on this order.</p>

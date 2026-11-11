@@ -45,7 +45,7 @@ describe('CAFIN complete order snapshot', () => {
     const partnerId = await logisticsPartnerRepository.create({ partner_name: 'Snapshot CHA', service_type: 'cha' }, userId);
     await orderVendorBillRepository.create(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'cha', bill_no: 'SNAP-CHA-1', bill_date: todayIst(), taxable_inr: 18500, gst_inr: 0 }, userId);
     await orderCostEntryRepository.create(orderId, 'ecgc_insurance', 'ECGC cover', 5000, todayIst(), userId);
-    await orderExpenseRepository.create(orderId, { expense_date: todayIst(), category: 'hotel', details: 'Hotel Kota', amount_inr: 3540, paid_by: 'staff', staff_name: 'Ramesh', no_receipt_reason: 'No bill given at the hotel' }, userId);
+    await orderExpenseRepository.create(orderId, { expense_date: todayIst(), category: 'hotel', details: 'Hotel Kota', amount_inr: 3540, paid_by: 'staff', staff_name: 'Export Executive', no_receipt_reason: 'No bill given at the hotel' }, userId);
     await caExportBenefitRepository.record(orderId, 'RODTEP', 'R-1', 5000, todayIst(), 'INR', null, userId);
 
     const s = await caFinancialSnapshotService.build(orderId);
@@ -58,7 +58,7 @@ describe('CAFIN complete order snapshot', () => {
     expect(s.logistics[0].partner).toBe('Snapshot CHA');
     expect(s.logistics[0].unpaid).toBe(true);
     expect(s.costs[0].category).toBe('ECGC Insurance');
-    expect(s.expenses[0].paid_by).toBe('Staff (to reimburse) — Ramesh');
+    expect(s.expenses[0].paid_by).toBe('Staff (to reimburse) — Export Executive');
     expect(s.benefits[0].status).toBe('Claimed / Pending');
 
     const profit = await orderProfitabilityService.computeForOrder(orderId);

@@ -4,7 +4,7 @@
   <?php if ($me['status'] !== 'active'): ?><div class="alert alert-warning">Your account is <?= htmlspecialchars(strtolower(\App\Repositories\AssociateRepository::STATUSES[$me['status']] ?? $me['status'])) ?>. <?= $me['status'] === 'invited' ? 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' : 'Contact your relationship manager.' ?></div><?php endif; ?>
   <?php $__kycMissing = \App\Services\AssociateKyc::missing($me); if ($__kycMissing !== [] || empty($me['address'])): ?>
     <?php // Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. ?>
-    <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a><?= $__kycMissing !== [] ? ' — still needed or being checked: ' . htmlspecialchars(implode(', ', $__kycMissing)) : '' ?><?= empty($me['address']) ? ($__kycMissing !== [] ? '; ' : ' — ') . 'your address' : '' ?>. Commission is paid once your documents are accepted.</div>
+    <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a><?= $__kycMissing !== [] ? ' — still needed or being checked: ' . htmlspecialchars(implode(', ', $__kycMissing)) : '' ?><?= empty($me['address']) ? ($__kycMissing !== [] ? '; ' : ' — ') . 'your address' : '' ?>. We pay commission once we have accepted your documents.</div>
   <?php endif; ?>
   <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($me)) !== null): // D-290 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
   <?php if (!empty($access['commission'])): // D-261 ?>

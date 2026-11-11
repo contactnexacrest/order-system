@@ -1453,8 +1453,8 @@ quotation details form (`/quotation-details`), PI details form
 
 | Screen | Content |
 |---|---|
-| My Orders | Every order grouped Active / Complete / Disputed / Lost / Cancelled. "Documents Sent" shows as **Complete**. Order history can be limited by `client_portal_show_order_history` (global) and a per-client override. |
-| Inside an order | OC acknowledgement (when pending); Documents (final approved/sent customer-facing PDFs only; can be hidden by `client_portal_show_document_downloads` + per-client override); Buyer PO upload (closes once the advance clears, D-127, and never offered or accepted on a cancelled/lost order, client portal and Buyer Action Link alike; on a cancelled/lost order the "upload a scanned copy here any time" intro is not shown either, only the closed line, D-269); Order Updates chat; Report a Payment (only after the PI is issued, never on cancelled/lost, D-206); Raise a Dispute (only if staff switched it on for that order); Report a Process Issue (always); Order Feedback (after documents are sent, D-133); Reorder This (each line's unit matched to the unit list ignoring case/spaces; an unknown unit is shown and the buyer must choose, never a silent PCS). The OC acknowledgement table's Port of Discharge falls back to the typed port, as the documents do. |
+| My Orders | Every order grouped Active / Complete / Disputed / Did not go ahead (= lost) / Cancelled. "Documents Sent" shows as **Complete**. Columns Order number · Where it is now (the stage in buyer words: Quotation · Order confirmed · In production · Shipping · Shipped — `AssociatePortalRepository::stageLabel`, D-330) · Ordered on · **Open order**. Order history can be limited by `client_portal_show_order_history` (global) and a per-client override. |
+| Inside an order | OC acknowledgement (when pending); Documents (final approved/sent customer-facing PDFs only; can be hidden by `client_portal_show_document_downloads` + per-client override); Buyer PO upload (closes once the advance clears, D-127, and never offered or accepted on a cancelled/lost order, client portal and Buyer Action Link alike; the "After you sign your purchase order, upload a scan of it here…" intro shows only while upload is open — not on a cancelled/lost order (D-269) and not once the advance has been received (D-330); Order Updates chat; Report a Payment (only after the PI is issued, never on cancelled/lost, D-206); **Ask to cancel this order** (a dispute; only if staff switched it on for that order); **Tell us what we could do better** (a process issue / complaint; always); Order Feedback (after documents are sent, D-133); Reorder This (each line's unit matched to the unit list ignoring case/spaces; an unknown unit is shown and the buyer must choose, never a silent PCS). The OC acknowledgement table's Port of Discharge falls back to the typed port, as the documents do. |
 | My Account | Change password only. Forgot-password link valid 72 h, max 5 per client per hour, generic answer. |
 
 **CAFIN never reaches the client (standing rule, D-068, D-106).** The
@@ -1486,6 +1486,43 @@ permanent login page, and staff see whether it was really e-mailed, with
 the set-password link to copy. Buyers get their own login-code wording
 (template `client_login_code`). Buyers are signed out after 2 hours idle
 (`session_timeout_client_minutes`, D-283).
+
+**Plain words for buyers, associates and suppliers (D-330, 11 Nov 2026; owner "23 OK", confirmed
+twice).** Every screen and e-mail a buyer, associate or supplier sees uses short sentences and
+everyday words; staff screens keep their terms. Rules the code follows:
+
+- A buyer never sees an internal step name or the word "lost": stages are Quotation · Order
+  confirmed · In production · Shipping · Shipped (Cancelled / Did not go ahead); refusals say "This
+  order was cancelled" / "This order did not go ahead, so …".
+- Buyer labels: "Bank reference number (transaction ID, UTR or SWIFT reference)" (was "Transaction
+  ID / UTR"), "Paid from (bank and account)", "Delivery terms (Incoterm)", "Port where the goods
+  arrive", "Who receives the goods (consignee)", "Who to tell when the goods arrive (notify party)",
+  "Company tax number (VAT, EORI or tax registration)", "Your purchase order", "Your review";
+  buttons "Yes, this is correct — please go ahead", "Ask to cancel this order" (was "Raise a
+  Dispute"), "Send my details" (PI details form). The process-issue section is "Tell us what we
+  could do better" and the reply e-mail's subject "Our reply about the issue you raised on order
+  … — <company>". The Payment Action Link calls the freight leg "Freight and insurance", paid
+  against the "freight bill (debit note)".
+- Seeded e-mail templates (`email_templates`): the document e-mails say "(your enquiry reference:
+  …)" and "based on quotation / proforma invoice …"; `send_fdn` subject "Freight bill (debit note)
+  … — please pay before we ship"; `shipment_readiness` subject "Your order … is ready to ship
+  (shipment readiness confirmation)" (the documents' payment terms still name the "Shipment
+  Readiness Confirmation"); `pi_form_link`, `buyer_action_link` (a numbered 1-2-3 list),
+  `client_portal_invite`, `client_portal_password_reset`, `quotation_correction_link`,
+  `payment_followup`, `bl_copy_sent`, `balance_receipt_confirmation`, `send_annexa`, `send_esi`
+  reworded. The payment-link paragraph added to PI / debit note / CI e-mails asks for "a
+  screenshot of the payment and its details (bank reference number, amount and date)". An
+  existing database gets the new wording only through the guarded D-330 SQL, which updates a
+  template only while its body is still the old seeded text (an admin's edit is never
+  overwritten; safe to run twice).
+- Associate portal: "This page is not open for your account"; My clients columns "How they came to
+  us · Your client until · Last day for orders that earn commission", code field "Your word for
+  the code", button "Show another ending"; statement and notices as in SOP 24 (no "basis",
+  "ladder", "payout run" or "protection" in what the associate reads; the FOB masking of notices
+  also matches "invoice value of the goods").
+- Supplier link: "Signed purchase order (or your written acceptance)".
+- Not changed: PDF / DOCX documents (8 passages listed for the owner, not confirmed) and staff
+  wording.
 
 ### 4.11 The associate portal and access levels
 
@@ -1913,7 +1950,7 @@ e.g. `SC/PI/26/0511001`.
 
 | | |
 |---|---|
-| User does | 6a Generate OC → approve/send. 6b **Generate OC Confirmation Link** (a button, never automatic; 6b ticks only after it is pressed, D-242). 6c Record the buyer's acknowledgement: the buyer clicks "I have read Order Confirmation SC/OC/… — I acknowledge" on the link or portal, or staff record an e-mail/phone acknowledgement with an evidence note. With mail off, staff press **Mark Order Confirmation Sent to Buyer** to start the clock. |
+| User does | 6a Generate OC → approve/send. 6b **Generate OC Confirmation Link** (a button, never automatic; 6b ticks only after it is pressed, D-242). 6c Record the buyer's acknowledgement: the buyer clicks "I have read order confirmation SC/OC/…. It is correct — please go ahead" on the link (portal: "Yes, this is correct — please go ahead", D-330), or staff record an e-mail/phone acknowledgement with an evidence note. With mail off, staff press **Mark Order Confirmation Sent to Buyer** to start the clock. |
 | Gate | OC issued (approved/sent). Then acknowledgement by any path. If none within `oc_ack_auto_confirm_hours` (48) after the OC was sent and the link generated, the cron `auto_confirm_oc_acknowledgments` confirms it. With `oc_ack_override_restricted` on, staff recording needs `override_buyer_acknowledgment`. |
 | Stored | `order_oc_acknowledgments`, `orders.oc_link_generated_at`. |
 | Document | **OC** `SC/OC/…` — order value, advance due, advance actually received, balance = value − actual advance (D-053). |
@@ -2137,7 +2174,7 @@ on 10 Dec, the balance is due 17 Dec.
 No stage gate is affected. The buyer has no portal screen for it.
 
 **Complaints** (SOP 19): a process issue without intent to cancel. Always
-available to the buyer ("Report a Process Issue"). `manage_complaints`
+available to the buyer ("Tell us what we could do better"; was "Report a Process Issue"). `manage_complaints`
 (status) and `respond_to_complaints` (reply). Tables `order_complaints`,
 `order_complaint_replies`.
 
@@ -2145,7 +2182,7 @@ available to the buyer ("Report a Process Issue"). `manage_complaints`
 date = 10 **working** days (`company_holidays`, `WorkingDaysCalculator`).
 `manage_disputes` (log, status, evidence, client button) and
 `respond_to_disputes` (reply thread). The buyer can raise one only if
-"Show 'Raise a Dispute' button" is ticked for that order. A dispute never
+"Show 'Ask to cancel this order' (dispute) button" is ticked for that order (the buyer's button was "Raise a Dispute" before D-330). A dispute never
 changes stage or status and never exempts the order from Close Order gates.
 Tables `disputes`, `dispute_documents`, `dispute_replies`.
 

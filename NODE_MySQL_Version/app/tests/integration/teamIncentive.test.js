@@ -146,7 +146,7 @@ describe('Team incentive program and associates', () => {
     // One person does Sales and Export; Marketing and Accounts are unticked: 30:15:15 over Sales, Export, Logistics.
     const flashOk = await call('saveOrderPeople', orderId, { gets_it: { sales: '1', export: '1', logistics: '1' },
       people: { sales: [String(people.sales)], export: [String(people.sales)], logistics: [String(people.logistics1), String(people.logistics2)] },
-      people_note: 'Priya did sales and documents' });
+      people_note: 'The Export Executive did sales and documents' });
     expect(flashOk.type).toBe('success');
     calc = await incentiveService.calculate(orderId);
     expect([calc.roles.sales.amount, calc.roles.export.amount, calc.roles.logistics.amount, calc.roles.logistics.each, calc.roles.marketing.gets_it]).toEqual([50000, 25000, 25000, 12500, false]);

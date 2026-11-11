@@ -6,7 +6,7 @@ const db = require('../config/db');
 const KINDS = {
   pan: 'PAN card', aadhaar: 'Aadhaar card', identity: 'ID document', bank_proof: 'Bank proof (cancelled cheque / statement)', agreement: 'Signed agreement', address: 'Address proof', gst: 'GST certificate',
   company: 'Company registration', tax_residency: 'Tax residency certificate', form_10f: 'Form 10F',
-  no_pe: 'No-PE declaration', invoice: 'Commission invoice', form_16a: 'Form 16A (TDS certificate)',
+  no_pe: 'No-PE declaration (no fixed place of business in India)', invoice: 'Commission invoice', form_16a: 'Form 16A (TDS certificate)',
   form_15ca: 'Form 15CA', form_15cb: 'Form 15CB', other: 'Other',
 };
 const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];

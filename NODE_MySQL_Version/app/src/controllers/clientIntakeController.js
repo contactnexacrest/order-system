@@ -65,7 +65,7 @@ async function show(req, res) {
 
 async function submit(req, res) {
   if (await rateLimiter.tooManyRequests(RATE_LIMIT_BUCKET, req.ip || '', RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MINUTES)) {
-    flash.set(req, 'error', 'Too many submissions from this connection. Please wait a few minutes and try again.');
+    flash.set(req, 'error', 'We have received too many forms from your network in a short time. Please wait a few minutes and try again.');
     res.redirect('/quotation-details');
     return;
   }
@@ -348,7 +348,7 @@ async function issueCorrectionLink(submissionId, email) {
     'Your NexaCrest quotation request — correction link',
     'Hello,\n\n'
       + "Thank you for your quotation request. We'll review it and get back to you within 24 hours.\n\n"
-      + "Spotted a mistake in what you submitted? You can correct it yourself, as long as we haven't already processed it, at:\n{correction_link}\n\n"
+      + "Did you make a mistake in your request? You can correct it yourself until our team starts checking it. Use this link:\n{correction_link}\n\n"
       + 'This link works for 7 days.\n\n'
       + 'NexaCrest International Private Limited'
   );

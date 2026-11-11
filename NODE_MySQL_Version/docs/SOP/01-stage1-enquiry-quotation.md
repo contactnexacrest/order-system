@@ -43,7 +43,7 @@ single-field Billing Address column is composed automatically from these
 parts behind the scenes, so every existing report or screen that reads it
 keeps working unchanged. **Container Type** is a dropdown (Admin → Dropdown
 Option Lists, `container_type`), not free text, with a
-"— Not sure / To Be Confirmed —" option for a buyer who genuinely doesn't
+"Not sure yet" option for a buyer who genuinely doesn't
 know yet — same admin-managed-list mechanism as Certificate of Origin Type.
 
 That submission lands in **Operations → Quotation Intake Review**

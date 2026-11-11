@@ -170,7 +170,7 @@ test.describe.serial('Client Intake -> PI Intake -> Reorder Request, one client 
     // also still a plain free-text input.
     await page.locator('input[name="country_of_destination"]').fill('Netherlands');
     await page.locator('label').filter({ hasText: 'I confirm the above is correct' }).locator('input').check();
-    await page.getByRole('button', { name: 'Submit PI Details' }).click();
+    await page.getByRole('button', { name: 'Send my details' }).click();
     await expect(page.locator('h1')).toHaveText('Thank you');
 
     await login(page, 'exportExecutive');

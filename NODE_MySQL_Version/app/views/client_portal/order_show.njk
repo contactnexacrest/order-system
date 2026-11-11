@@ -4,21 +4,21 @@
 
   {% if ocAcknowledgment and ocAcknowledgment.acknowledged_at == null %}
   <div class="section">
-    <h2>Order Confirmation — Your Acknowledgement Needed</h2>
-    <p>Please review your Order Confirmation below and confirm to proceed.</p>
+    <h2>Please confirm your order</h2>
+    <p>Please check your order details below. If they are correct, press the button to confirm.</p>
     <table class="list">
       <tr><th>Order Reference</th><td>{{ order.order_reference }}</td></tr>
       <tr><th>Product(s)</th><td>
         {% for p in products %}{{ p.description }} (Qty: {{ p.quantity }} {{ p.unit or '' }}){% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}
       </td></tr>
       <tr><th>Total Order Value</th><td>{{ order.currency_code or '' }} {{ totalFobValue | money }}</td></tr>
-      <tr><th>Incoterm</th><td>{{ order.incoterm_code or '—' }}</td></tr>
-      <tr><th>Port of Discharge</th><td>{{ order.port_of_discharge_name or order.port_of_discharge_city or order.port_of_discharge_text or '—' }}</td></tr>
+      <tr><th>Delivery terms (Incoterm)</th><td>{{ order.incoterm_code or '—' }}</td></tr>
+      <tr><th>Port where the goods arrive</th><td>{{ order.port_of_discharge_name or order.port_of_discharge_city or order.port_of_discharge_text or '—' }}</td></tr>
     </table>
     {% if not downloadsHidden %}<p class="muted small">The full Order Confirmation document is available to download above under Documents.</p>{% endif %}
     <form method="post" action="/client/orders/{{ order.id }}/acknowledge-oc">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-success">I acknowledge and confirm to proceed</button>
+      <button type="submit" class="btn-success">Yes, this is correct — please go ahead</button>
     </form>
   </div>
   {% endif %}
@@ -45,9 +45,9 @@
   {% endif %}
 
   <div class="section">
-    <h2>Buyer PO</h2>
-    {% if order.status != 'cancelled' and order.status != 'lost' %}{# D-269: no "upload any time" once upload is closed for good #}
-      <p class="muted small">Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.</p>
+    <h2>Your purchase order</h2>
+    {% if order.status != 'cancelled' and order.status != 'lost' and not advanceCleared %}{# D-269, D-330: no upload invitation once upload is closed (cancelled, did not go ahead, or advance received) #}
+      <p class="muted small">After you sign your purchase order, upload a scan of it here. You can upload a corrected copy later. We keep every copy you upload.</p>
     {% endif %}
     {% if buyerPoDocuments.length > 0 %}
       <table class="list">
@@ -60,17 +60,17 @@
         {% endfor %}
       </table>
     {% else %}
-      <p class="muted">No Buyer PO copy on file yet.</p>
+      <p class="muted">You have not uploaded your purchase order yet.</p>
     {% endif %}
     {% if order.status == 'cancelled' or order.status == 'lost' %}
-      <p class="muted small">This order is {{ order.status }}, so a Buyer PO can no longer be uploaded.</p>
+      <p class="muted small">{{ 'This order did not go ahead' if order.status == 'lost' else 'This order was cancelled' }}, so you can no longer upload a purchase order.</p>
     {% elif advanceCleared %}
-      <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
+      <p class="muted small">We have received your advance payment, so you can no longer upload here. If you need to send us a new copy, please contact your NexaCrest contact person.</p>
     {% else %}
       <form method="post" action="/client/orders/{{ order.id }}/buyer-po" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Your PO Number <small class="muted">(needed with your first signed copy)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
-        <label>Upload Buyer PO (signed) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
+        <label>Your PO number <small class="muted">(needed the first time you upload)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
+        <label>Your signed purchase order (file) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
         <button type="submit" class="btn-sm">Upload</button>
       </form>
     {% endif %}
@@ -125,7 +125,7 @@
     {% if paymentReportRefusal %}
     <p class="muted"><strong>{{ paymentReportRefusal }}</strong></p>
     {% else %}
-    <p class="muted">Made a payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order.</p>
+    <p class="muted">Have you paid for this order? Tell us the payment details below. We will check our bank statement and then update your order.</p>
     <form method="post" action="/client/orders/{{ order.id }}/report-payment" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
@@ -137,10 +137,10 @@
             <option value="freight">Freight Payment</option>
           </select>
         </label>
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="{{ today() }}"></label>
-        <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
       <button type="submit">Submit Payment Details</button>
@@ -148,16 +148,16 @@
     {% endif %}
 
     {% if paymentReports and paymentReports.length > 0 %}
-      <h3 style="margin-top:20px">Previously Reported</h3>
+      <h3 style="margin-top:20px">Payments you have told us about</h3>
       <table class="list">
-        <tr><th>Payment</th><th>Transaction ID / UTR</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
+        <tr><th>Payment</th><th>Bank reference number (transaction ID, UTR or SWIFT reference)</th><th>Amount</th><th>Date</th><th>Status</th><th>Attachment</th></tr>
         {% for r in paymentReports %}
         <tr>
           <td>{{ r.payment_type | capitalize }}</td>
           <td>{{ r.transaction_ref }}</td>
           <td>{{ (r.amount | money) ~ ' ' ~ (order.currency_code or '') if r.amount != null else '—' }}</td>
           <td>{{ r.payment_date or '—' }}</td>
-          <td>{{ 'Reviewed by our team' if r.status == 'reviewed' else 'Received — pending review' }}</td>
+          <td>{{ 'Reviewed by our team' if r.status == 'reviewed' else 'Received — we are checking it' }}</td>
           <td>
             {% if r.screenshot_file_id %}
               {% set screenshotUrl = '/client/orders/' ~ order.id ~ '/payment-reports/' ~ r.id ~ '/screenshot' %}
@@ -178,18 +178,18 @@
 
   {% if order.dispute_button_visible_to_client == 1 %}
   <div class="section">
-    <h2>Raise a Dispute</h2>
-    <p class="muted">If you want to cancel this order and not proceed with us, let us know here — our team will respond within the timeframe set out in your order terms.</p>
+    <h2>Ask to cancel this order</h2>
+    <p class="muted">Do you want to cancel this order? Tell us here. We will reply within the time given in your order terms.</p>
     <form method="post" action="/client/orders/{{ order.id }}/disputes">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Describe the issue *<textarea name="description" rows="4" required placeholder="Describe the issue"></textarea></label>
-      <button type="submit">Raise a Dispute</button>
+      <button type="submit">Ask to cancel this order</button>
     </form>
   </div>
   {% endif %}
 
   <div class="section" id="order-complaints">
-    <h2>Report a Process Issue</h2>
+    <h2>Tell us what we could do better</h2>
     <p class="muted">Something about this order we could do better next time? Tell us here and a NexaCrest team member will reply.</p>
     {% for c in orderComplaints %}
       <div class="card-nested" style="margin-bottom:0.75rem">
@@ -230,15 +230,15 @@
             {% endfor %}
           </select>
         </label>
-        <label>Your feedback / testimonial<textarea name="comments" rows="5" placeholder="Type your comments">{% if orderFeedback %}{{ orderFeedback.comments or '' }}{% else %}{{ testimonialSuggestion or '' }}{% endif %}</textarea></label>
-        <p class="muted small">{% if orderFeedback %}This is the feedback you left — if you want to modify it, please update it above.{% else %}We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.{% endif %}</p>
+        <label>Your review<textarea name="comments" rows="5" placeholder="Type your comments">{% if orderFeedback %}{{ orderFeedback.comments or '' }}{% else %}{{ testimonialSuggestion or '' }}{% endif %}</textarea></label>
+        <p class="muted small">{% if orderFeedback %}This is the review you left. You can change it above.{% else %}To help you start, we wrote a suggested review based on your order. You can change it above.{% endif %}</p>
         <button type="submit">{{ 'Update Feedback' if orderFeedback else 'Submit Feedback' }}</button>
       </form>
       {% if orderFeedback %}
         <p class="muted small">Last submitted: {{ orderFeedback.submitted_at | humanDate }}</p>
       {% endif %}
     {% else %}
-      <p class="muted">Feedback will be available once this order's documents have been sent to you.</p>
+      <p class="muted">You can leave a review after we send you the shipping documents for this order.</p>
     {% endif %}
   </div>
 </div>

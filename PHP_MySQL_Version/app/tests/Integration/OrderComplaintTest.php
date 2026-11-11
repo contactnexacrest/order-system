@@ -403,9 +403,9 @@ final class OrderComplaintTest extends DbTestCase
         (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Report a Process Issue', $output);
+        self::assertStringContainsString('Tell us what we could do better', $output);
         self::assertStringContainsString('action="/client/orders/' . $orderId . '/complaints"', $output);
-        self::assertStringNotContainsString('Raise a Dispute', $output);
+        self::assertStringNotContainsString('Ask to cancel this order', $output);
     }
 
     public function testClientPortalOrderPageShowsExistingComplaintConversation(): void

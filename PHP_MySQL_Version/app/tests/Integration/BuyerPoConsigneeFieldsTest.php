@@ -70,7 +70,7 @@ final class BuyerPoConsigneeFieldsTest extends DbTestCase
             'city'    => 'Manchester',
             'country' => 'United Kingdom',
             'vat'     => 'GB-CONSIGNEE-VAT-999',
-            'contact' => 'Priya Consignee-Contact',
+            'contact' => 'Consignee Contact-Contact',
             'phone'   => '+44-7700-900111',
             'email'   => 'consignee-contact@example.test',
             'id'      => $clientId,
@@ -88,7 +88,7 @@ final class BuyerPoConsigneeFieldsTest extends DbTestCase
         $text = $this->extractPdfText((int) $result['pdf_file_id']);
 
         self::assertStringContainsString('GB-CONSIGNEE-VAT-999', $text, 'Buyer PO must show the consignee\'s own VAT/EORI, not the buyer\'s');
-        self::assertStringContainsString('Priya Consignee-Contact', $text);
+        self::assertStringContainsString('Consignee Contact-Contact', $text);
         self::assertStringContainsString('+44-7700-900111', $text);
         self::assertStringContainsString('consignee-contact@example.test', $text);
         self::assertStringContainsString('United Kingdom', $text);
@@ -105,7 +105,7 @@ final class BuyerPoConsigneeFieldsTest extends DbTestCase
         $text = $this->extractDocxText((int) $result['docx_file_id']);
 
         self::assertStringContainsString('GB-CONSIGNEE-VAT-999', $text);
-        self::assertStringContainsString('Priya Consignee-Contact', $text);
+        self::assertStringContainsString('Consignee Contact-Contact', $text);
         self::assertStringContainsString('+44-7700-900111', $text);
         self::assertStringContainsString('consignee-contact@example.test', $text);
         self::assertStringContainsString('United Kingdom', $text);

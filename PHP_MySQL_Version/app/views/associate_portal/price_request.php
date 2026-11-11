@@ -13,14 +13,14 @@ $__unit = (string) ($r['unit'] ?? '');
   <h1><?= View::e($product['name'] ?? 'Product') ?></h1>
   <p class="muted">Price request <b><?= View::e($r['number']) ?></b> · <?= View::e($r['selection_text']) ?></p>
   <?php if ($status === 'pending'): ?>
-    <div class="alert alert-warning">This is not a standard specification — our team will send the price here and by e-mail within 24 hours (by <?= View::e(substr((string) $r['due_at'], 0, 16)) ?>). It does not use one of your daily price requests.</div>
+    <div class="alert alert-warning">This is not a standard product, so our team will price it. You will get the price here and by e-mail within 24 hours (by <?= View::e(substr((string) $r['due_at'], 0, 16)) ?>). This request does not count toward your daily limit.</div>
   <?php elseif ($r['quote'] !== null): ?>
-    <p class="muted"><?= $status === 'expired' ? 'Expired on ' : 'Valid until ' ?><?= $__d($r['valid_until']) ?> · FOB Indian port, per <?= View::e($__unit) ?></p>
+    <p class="muted"><?= $status === 'expired' ? 'Expired on ' : 'Valid until ' ?><?= $__d($r['valid_until']) ?> · price on board the ship at the Indian port (FOB), per <?= View::e($__unit) ?></p>
     <div class="field-grid">
       <div><div class="muted small">Quote price</div><div style="font-size:1.5em;font-weight:700">USD <?= number_format((float) $r['quote'], 2) ?><?= $__unit === 'CBM' ? ' / CBM' : '' ?></div></div>
-      <div><div class="muted small">Lowest you may agree</div><div style="font-size:1.5em;font-weight:700">USD <?= number_format((float) $r['lowest'], 2) ?><?= $__unit === 'CBM' ? ' / CBM' : '' ?></div></div>
+      <div><div class="muted small">Lowest price you may agree with the buyer</div><div style="font-size:1.5em;font-weight:700">USD <?= number_format((float) $r['lowest'], 2) ?><?= $__unit === 'CBM' ? ' / CBM' : '' ?></div></div>
     </div>
-    <?php if (!empty($breakdown['per_m2'])): ?><p class="muted small">≈ USD <?= number_format((float) $breakdown['per_m2'], 2) ?> per m² (<?= View::e((string) $breakdown['m2_per_cbm']) ?> m² in one CBM) — for comparison only; the order is in CBM.</p><?php endif; ?>
+    <?php if (!empty($breakdown['per_m2'])): ?><p class="muted small">About USD <?= number_format((float) $breakdown['per_m2'], 2) ?> per square metre (one cubic metre gives <?= View::e((string) $breakdown['m2_per_cbm']) ?> m²). This is only to compare; the order is priced per cubic metre.</p><?php endif; ?>
     <table class="list">
       <?php foreach ($breakdown['lines'] ?? [] as $l): ?><tr><td><?= View::e($l['label']) ?></td><td class="r"><?= View::e($l['change']) ?></td></tr><?php endforeach; ?>
     </table>

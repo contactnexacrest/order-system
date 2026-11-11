@@ -97,7 +97,7 @@ final class ClientPortalController
             return;
         }
         if ($result['status'] === 'invalid_code') {
-            Flash::set('error', 'Invalid or expired code.');
+            Flash::set('error', 'That code is wrong or too old. Please try again, or ask for a new code.');
             header('Location: /client/login/code');
             return;
         }
@@ -163,7 +163,7 @@ final class ClientPortalController
     public function forgotPassword(array $params): void
     {
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-        $genericMessage = "If {$email} matches an account, a password reset link has been sent to it. The link expires in 72 hours.";
+        $genericMessage = "If we have an account for {$email}, we have sent a password reset link to it. The link works for 72 hours.";
 
         // QA Round 5: a blank or malformed address is answered on the form
         // ("If  matches an account…" read oddly). This only checks the format,
@@ -198,7 +198,7 @@ final class ClientPortalController
                     ['{email}' => $email, '{reset_link}' => $resetUrl],
                     'Reset your NexaCrest order portal password',
                     "Hello,\n\n"
-                        . "A password reset was requested for your NexaCrest order portal account ({email}).\n\n"
+                        . "Someone asked to reset the password of your NexaCrest buyer account ({email}).\n\n"
                         . "To set a new password, open this link within 72 hours:\n{reset_link}\n\n"
                         . "If you didn't request this, you can ignore this email — your password will not be changed."
                 );
@@ -286,11 +286,14 @@ final class ClientPortalController
      */
     private static function groupOrdersByClientFacingStatus(array $orders): array
     {
-        $clientStatusLabels = ['shipped_docs_sent' => 'Complete'];
-        $labelOrder = ['Active', 'Complete', 'Disputed', 'Lost', 'Cancelled'];
+        // D-330: the buyer never sees the word "lost" — such an order "did not go ahead".
+        $clientStatusLabels = ['shipped_docs_sent' => 'Complete', 'lost' => 'Did not go ahead'];
+        $labelOrder = ['Active', 'Complete', 'Disputed', 'Did not go ahead', 'Cancelled'];
 
         $grouped = [];
         foreach ($orders as $o) {
+            // D-330: the stage in the buyer's words (the associate portal's mapping), never our internal step name.
+            $o['buyer_stage'] = \App\Repositories\AssociatePortalRepository::stageLabel($o);
             $label = $clientStatusLabels[$o['status']] ?? ucfirst((string) $o['status']);
             $grouped[$label][] = $o;
         }
@@ -504,7 +507,7 @@ final class ClientPortalController
         foreach ($_FILES as $field => $file) {
             $errors = (array) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
             if ($field !== 'attachments' && array_filter($errors, static fn ($e): bool => (int) $e !== UPLOAD_ERR_NO_FILE) !== []) {
-                Flash::set('error', 'That file could not be accepted by this form — nothing was saved. Attach files with the form\'s own upload button and try again.');
+                Flash::set('error', 'We could not accept that file, so nothing was saved. Please add the file with the "Choose file" button on this form and try again.');
                 Flash::setOld($_POST);
                 header("Location: /client/orders/{$orderId}");
                 return;
@@ -632,7 +635,7 @@ final class ClientPortalController
             return;
         }
         if ((int) $order['dispute_button_visible_to_client'] !== 1) {
-            Flash::set('error', 'Disputes cannot be raised on this order from the portal.');
+            Flash::set('error', 'You cannot ask to cancel this order here. Please send our team a message.');
             header("Location: /client/orders/{$orderId}");
             return;
         }
@@ -657,7 +660,7 @@ final class ClientPortalController
         \App\Repositories\NotificationRepository::notifyRouted(\App\Repositories\PermissionRepository::usersWithPermission('manage_disputes'), \App\Services\StaffRouting::forOrder((int) $orderId, \App\Services\StaffRouting::departmentFor('dispute_raised'))['email'], 'dispute_raised', $orderId, "Client raised a dispute on order {$order['order_reference']}.");
         \App\Repositories\AuditLogRepository::log(null, 'DISPUTE_RAISED', 'disputes', $disputeId, null, null, $description, 'Raised by the client via the client portal.');
 
-        Flash::set('success', 'Your dispute has been logged — our team will respond by ' . $responseDueDate . '.');
+        Flash::set('success', 'We have received your request. Our team will reply by ' . $responseDueDate . '.');
         header("Location: /client/orders/{$orderId}");
     }
 
@@ -686,7 +689,7 @@ final class ClientPortalController
 
         \App\Services\OrderComplaintService::raiseAsClient($orderId, $clientId, $description);
 
-        Flash::set('success', 'Thank you — your feedback has been logged and our team will follow up.');
+        Flash::set('success', 'Thank you. We have received your message and our team will reply.');
         header("Location: /client/orders/{$orderId}");
     }
 
@@ -742,7 +745,7 @@ final class ClientPortalController
         // in progress) asks the client to rate work that isn't finished
         // yet. Same status pair addExportBenefit() already gates on.
         if (!in_array($order['status'], ['shipped_docs_sent', 'complete'], true)) {
-            Flash::set('error', "Feedback can be submitted once this order's documents have been sent to you.");
+            Flash::set('error', "You can leave a review after we send you the shipping documents for this order.");
             header("Location: /client/orders/{$orderId}");
             return;
         }
@@ -796,7 +799,7 @@ final class ClientPortalController
         $paymentType = (string) ($_POST['payment_type'] ?? '');
         $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
         if (!in_array($paymentType, ['advance', 'balance', 'freight'], true) || $transactionRef === '') {
-            Flash::set('error', 'Select which payment this is for and enter the transaction ID/UTR.');
+            Flash::set('error', 'Choose which payment this is, and enter the bank reference number.');
             header("Location: /client/orders/{$orderId}");
             return;
         }

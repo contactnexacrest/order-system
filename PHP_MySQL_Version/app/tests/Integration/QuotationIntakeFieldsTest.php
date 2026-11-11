@@ -39,9 +39,9 @@ final class QuotationIntakeFieldsTest extends DbTestCase
         $html = (string) ob_get_clean();
 
         self::assertStringNotContainsString('placeholder="UK: EORI No.', $html, 'the long VAT/EORI guidance must no longer be crammed into the placeholder');
-        self::assertStringContainsString('UK: EORI No. | Others: Tax Reg. No.', $html, 'the guidance must still be shown, just as help text now');
+        self::assertStringContainsString('In the UK, give your EORI number. In other countries, give your company tax or VAT number.', $html, 'the guidance must still be shown, just as help text now');
         self::assertStringNotContainsString('placeholder="GSP Form A (preferential)', $html, 'the long Certificate of Origin guidance must no longer be crammed into the placeholder');
-        self::assertStringContainsString('GSP Form A (preferential) / Non-preferential', $html, 'the guidance must still be shown, just as help text now');
+        self::assertStringContainsString('A preferential certificate (GSP Form A) can lower import duty', $html, 'the guidance must still be shown, just as help text now');
     }
 
     public function testBillingAndDestinationCountryAreDropdownsWithNotSureAndOtherOptions(): void
@@ -68,7 +68,7 @@ final class QuotationIntakeFieldsTest extends DbTestCase
             'billing_city'           => 'Testville',
             'billing_country'        => 'United Kingdom',
             'vat_eori_tax_no'        => 'GB123456789',
-            'contact_person'         => 'Jane Test',
+            'contact_person'         => 'Test Contact',
             'email'                  => 'jane-' . bin2hex(random_bytes(4)) . '@example.test',
             'country_of_destination' => 'Not sure',
             'incoterm_preference'    => 'FOB',

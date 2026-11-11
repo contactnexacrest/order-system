@@ -65,7 +65,7 @@ final class CooTypeCarriedThroughTest extends DbTestCase
             'billing_city'           => 'Testville',
             'billing_country'        => 'United Kingdom',
             'vat_eori_tax_no'        => 'GB123456789',
-            'contact_person'         => 'Jane Test',
+            'contact_person'         => 'Test Contact',
             'email'                  => 'coo-' . bin2hex(random_bytes(4)) . '@example.test',
             'country_of_destination' => 'United Kingdom',
             'incoterm_preference'    => 'FOB',

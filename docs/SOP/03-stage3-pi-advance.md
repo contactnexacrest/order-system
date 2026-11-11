@@ -392,8 +392,9 @@ on the client's self-report alone.
 ### The Payment Action Link (owner request 2026-10-27)
 
 A no-login link where the client sends their payment details: the
-transaction ID / UTR, the amount, the date, their bank, and a **screenshot
-or bank remittance advice (required)**. It shows **payment only** — never
+**bank reference number (transaction ID, UTR or SWIFT reference)**, the amount, the date, the
+account they paid from, and a **screenshot or bank receipt of the payment (required)** (buyer
+wording D-330). It shows **payment only** — never
 the Buyer PO or the Order Confirmation — and only **one payment at a time**:
 
 | Where the order is | What the client sees on the link |
@@ -401,7 +402,7 @@ the Buyer PO or the Order Confirmation — and only **one payment at a time**:
 | Document for the next payment not issued yet | "Nothing to pay right now", naming the next payment |
 | PI issued, advance not cleared | **Advance Payment** — Download Proforma Invoice, the amount due, the form |
 | Advance details sent | "We're checking your advance payment" (no form) |
-| Debit Note issued (CFR/CIF only), freight not cleared | **Freight & Insurance** — Download Debit Note, the amount, the form |
+| Debit Note issued (CFR/CIF only), freight not cleared | **Freight and insurance** — Download freight bill (debit note), the amount, the form |
 | CI issued, balance not cleared | **Balance Payment** — Download Commercial Invoice, the balance due, the form |
 | Every payment cleared | "All payments received — thank you" |
 

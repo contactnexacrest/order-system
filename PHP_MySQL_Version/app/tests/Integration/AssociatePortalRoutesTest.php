@@ -302,7 +302,7 @@ final class AssociatePortalRoutesTest extends DbTestCase
         self::assertStringContainsString('Link No Longer Valid', $this->call('GET', '/quotation-details/verify')['body'], 'no submission in this browser');
         $pdo = Database::connection();
         $pdo->prepare("INSERT INTO client_intake_submissions (company_legal_name, billing_address, contact_person, email, country_of_destination, status, associate_id, associate_invitation_id)
-                       VALUES (:c, '1 Harbour Road', 'Jan Buyer', :e, 'Netherlands', 'pending', :a, :i)")
+                       VALUES (:c, '1 Harbour Road', 'Purchase Head', :e, 'Netherlands', 'pending', :a, :i)")
             ->execute(['c' => "Verify Buyer {$this->tag}", 'e' => "jan-{$this->tag}@buyer.example", 'a' => $a['id'], 'i' => $inv['id']]);
         $_SESSION = [AssociateIntakeService::SESSION_KEY => (int) $pdo->lastInsertId()];
         $page = $this->call('GET', '/quotation-details/verify');

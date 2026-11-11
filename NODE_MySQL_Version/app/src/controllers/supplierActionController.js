@@ -72,7 +72,7 @@ async function uploadAcknowledgment(req, res) {
     const documentId = await orderSupplierPoDocumentRepository.attach(supplierPo.id, fileId);
     await auditLogRepository.log(null, 'SUPPLIER_PO_DOCUMENT_UPLOADED_BY_SUPPLIER', 'order_supplier_po_documents', documentId, null, null, null, 'Uploaded by the supplier via the Supplier Action Link.');
     await notificationRepository.notifyOrderTeam(orderId, 'supplier_po_ack_uploaded_by_supplier', `The supplier uploaded their signed PO / acknowledgment for ${supplierPo.supplier_po_reference || 'the Supplier PO'} on order ${order.order_reference || `#${orderId}`} — check it and confirm the supplier signed (Step 7d).`);
-    flash.set(req, 'success', 'Thank you — your signed PO / acknowledgment has been received.');
+    flash.set(req, 'success', 'Thank you — we have received your signed purchase order (or acceptance).');
   } catch (e) {
     flash.set(req, 'error', e.message);
   }

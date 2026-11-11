@@ -48,7 +48,7 @@ describe('order create form prefills from the client\'s originating intake (#41/
         billing_postcode: null,
         billing_country: null,
         vat_eori_tax_no: null,
-        contact_person: 'Jane Buyer',
+        contact_person: 'Chief Buyer',
         email: `jane-${Math.random().toString(16).slice(2, 10)}@intake-prefill.example`, // one email per client (R5-02)
         phone: null,
         country_of_destination: 'Netherlands',

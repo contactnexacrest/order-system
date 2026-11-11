@@ -118,7 +118,7 @@ final class AssociateBatch2Test extends DbTestCase
         $html = $this->render(fn () => (new AssociatePortalController())->profile([]));
         self::assertStringContainsString('data-pattern="[0-9]{4}"', $html);
         self::assertStringContainsString('>Aadhaar card</option>', $html);
-        self::assertStringContainsString('My documents and KYC', $html);
+        self::assertStringContainsString('My documents (identity and bank checks)', $html);
     }
 
     public function testKycChecklistReviewAndPayoutGate(): void
@@ -198,7 +198,7 @@ final class AssociateBatch2Test extends DbTestCase
         self::assertNotNull(AssociateRegistrationRepository::usableLink($token), 'a refused form does not use the link');
 
         $email = 'reg-' . strtolower($this->tag) . '@assoc.test';
-        $_POST = ['name' => 'Rajesh ' . $this->tag, 'email' => $email, 'phone' => '+91 98765 43210', 'country' => 'India', 'based_in' => 'india', 'city' => 'Bengaluru', 'consent' => '1'];
+        $_POST = ['name' => 'Associate ' . $this->tag, 'email' => $email, 'phone' => '+91-0000000000', 'country' => 'India', 'based_in' => 'india', 'city' => 'Bengaluru', 'consent' => '1'];
         self::assertStringContainsString('Thank you', $this->render(fn () => (new AssociateRegistrationController())->submit(['token' => $token])));
         self::assertNull(AssociateRegistrationRepository::usableLink($token), 'one use');
         self::assertStringContainsString('This link is no longer open', $this->render(fn () => (new AssociateRegistrationController())->submit(['token' => $token])));
@@ -208,7 +208,7 @@ final class AssociateBatch2Test extends DbTestCase
         // Staff review queue; accept creates the associate (Invited) and sends the portal login link.
         $this->actAs($this->admin);
         $list = $this->render(fn () => (new AssociateRegistrationController())->index([]));
-        self::assertStringContainsString('Rajesh ' . $this->tag, $list);
+        self::assertStringContainsString('Associate ' . $this->tag, $list);
         (new AssociateRegistrationController())->accept(['id' => (string) $reg['id']]);
         $a = AssociateRepository::findByEmail($email);
         self::assertNotNull($a);
@@ -244,7 +244,7 @@ final class AssociateBatch2Test extends DbTestCase
 
         $_POST = ['code' => 'NXA-WHATEVER-AA'];
         (new AssociatePortalController())->chooseCode([]);
-        self::assertStringContainsString('New ending', $this->flash()['message'], 'nothing switches without a proposal');
+        self::assertStringContainsString('Show another ending', $this->flash()['message'], 'nothing switches without a proposal');
 
         $_POST = ['readable' => 'Demo Exim'];
         (new AssociatePortalController())->proposeCode([]);

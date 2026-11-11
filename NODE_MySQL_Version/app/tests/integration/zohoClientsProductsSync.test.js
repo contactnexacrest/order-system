@@ -58,7 +58,7 @@ describe('Zoho Books: clients and products (D-238)', () => {
   async function testClient(name, currency = 'USD') {
     const id = await createTestClient();
     await db.execute(
-      "UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Anna Buyer', phone = '+31 10 555 0101' WHERE id = :id",
+      "UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Project Buyer', phone = '+31 10 555 0101' WHERE id = :id",
       { n: name, id }
     );
     if (currency !== null) await createTestOrder(id, 'FOB', 'Standard — New Buyer', currency);
@@ -137,7 +137,7 @@ describe('Zoho Books: clients and products (D-238)', () => {
     expect(p.contact_type).toBe('customer');
     expect(p.currency_id).toBe('CUR-USD');
     expect(p.billing_address).toEqual({ address: '1 Harbour Road', city: 'Rotterdam', zip: '3011', country: 'Netherlands' });
-    expect(p.contact_persons[0].first_name).toBe('Anna Buyer');
+    expect(p.contact_persons[0].first_name).toBe('Project Buyer');
     expect(p.notes).toContain('NL123456789B01');
     expect(p.gst_treatment).toBe('overseas');
     expect((await db.queryOne('SELECT zoho_contact_id FROM clients WHERE id = :id', { id: b })).zoho_contact_id).toBe('CT-EXIST');

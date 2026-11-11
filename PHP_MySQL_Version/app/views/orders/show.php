@@ -2311,7 +2311,7 @@ $renderBuyerActionLink = function (string $badge, string $anchor, bool $ocMode =
 $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $canManageOrders): void {
     $paymentTokenPlain = \App\Services\EncryptionService::decrypt($order['payment_action_token_plain'] ?? null);
     $paymentLinkValid = !empty($paymentTokenPlain) && !empty($order['payment_action_token_expires_at']) && strtotime((string) $order['payment_action_token_expires_at']) > time();
-    $document = \App\Services\PaymentActionService::LEGS[$leg]['document'];
+    $document = ['advance' => 'Proforma Invoice', 'freight' => 'Debit Note', 'balance' => 'Commercial Invoice'][$leg]; // staff names (the buyer's page says "freight bill (debit note)", D-330)
     ?>
     <div class="pay-link-box">
       <p class="small"><strong>Payment Action Link</strong> <span class="muted">(optional)</span> — the client uploads the payment screenshot and transaction details there, no login needed. It also goes out automatically inside the <?= htmlspecialchars($document) ?> email.</p>
@@ -4890,7 +4890,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?= Csrf::field() ?>
       <label style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:normal">
         <input type="checkbox" name="dispute_button_visible_to_client" value="1" onchange="this.form.submit()" <?= (int) $order['dispute_button_visible_to_client'] === 1 ? 'checked' : '' ?>>
-        Show "Raise a Dispute" button to the client in their portal for this order
+        Show "Ask to cancel this order" (dispute) button to the client in their portal for this order
       </label>
     </form>
     <?php endif; ?>

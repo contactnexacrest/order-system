@@ -206,7 +206,7 @@ describe('QA batch 3 — documents and e-mail', () => {
 
   it('MAIL-6 / 7 / 8 / 11: seeded templates', async () => {
     const tpl = (k) => emailTemplateRepository.find(k);
-    expect((await tpl('send_buyerpo')).body).toContain('issued against Quotation {quotation_ref}');
+    expect((await tpl('send_buyerpo')).body).toContain('based on quotation {quotation_ref}');
     expect((await tpl('send_buyerpo')).body).not.toContain('{oc_ref}');
     for (const r of await db.query("SELECT code FROM document_types WHERE category = 'customer_facing' AND is_active = 1")) {
       expect(await tpl(`send_${String(r.code).toLowerCase()}`)).toBeTruthy();
@@ -247,8 +247,8 @@ describe('QA batch 3 — documents and e-mail', () => {
       return id;
     };
     const preview = async (orderId, code) => (await emailDispatchService.buildPreview(orderId, await doc(orderId, code), `send_${code.toLowerCase()}`, sender)).body;
-    expect(await preview(lc, 'PI')).toContain('Kindly arrange the Letter of Credit');
-    expect(await preview(cash, 'PI')).toContain('Kindly arrange the advance payment');
-    expect(await preview(cash, 'CI')).toContain('arrange the balance payment');
+    expect(await preview(lc, 'PI')).toContain('Please open the letter of credit (LC) as agreed');
+    expect(await preview(cash, 'PI')).toContain('Please pay the advance as agreed');
+    expect(await preview(cash, 'CI')).toContain('pay the balance as agreed');
   });
 });

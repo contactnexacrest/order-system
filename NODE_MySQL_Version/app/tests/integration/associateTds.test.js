@@ -162,7 +162,7 @@ describe('TDS on associate commission (D-235)', () => {
     const p = await payout(a, 40000);
     const c = await associateTds.compute(p, '2026-11-02');
     expect([c.tds, c.net]).toEqual([0, 40000]);
-    expect(c.missing_foreign).toEqual(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration']);
+    expect(c.missing_foreign).toEqual(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration (no fixed place of business in India)']);
     expect(c.missing_payout).toEqual(['Form 15CA', 'Form 15CB']);
     expect((await pay(p)).message).toBe("Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration, Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate's Documents tab; Form 15CA and 15CB are attached to this payment.");
     for (const kind of ['tax_residency', 'form_10f', 'no_pe']) await doc(Number(a.id), kind, null);
@@ -177,10 +177,10 @@ describe('TDS on associate commission (D-235)', () => {
   });
 
   it('the D-212 wording and the Zoho bill with and without a TDS tax', async () => {
-    expect(associateTds.paymentDescription('Ravi Kumar', ['SC/ORD/26/001'], 25000, 500, 2, '194H', 24500, 'UTR123456'))
-      .toBe('Associate commission for Ravi Kumar — order SC/ORD/26/001 — gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR UTR123456');
-    expect(associateTds.paymentDescription('Ravi Kumar', ['A', 'B'], 1000, 0, null, null, 1000, 'U1'))
-      .toBe('Associate commission for Ravi Kumar — orders A, B — gross ₹1,000.00, no TDS, net paid ₹1,000.00 · UTR U1');
+    expect(associateTds.paymentDescription('Test Associate', ['SC/ORD/26/001'], 25000, 500, 2, '194H', 24500, 'UTR123456'))
+      .toBe('Associate commission for Test Associate — order SC/ORD/26/001 — gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR UTR123456');
+    expect(associateTds.paymentDescription('Test Associate', ['A', 'B'], 1000, 0, null, null, 1000, 'U1'))
+      .toBe('Associate commission for Test Associate — orders A, B — gross ₹1,000.00, no TDS, net paid ₹1,000.00 · UTR U1');
     // Live Zoho check 7 Nov 2026: an associate abroad is paid by SWIFT — the reference is a SWIFT ref, not a UTR.
     expect(associateTds.paymentDescription('Demo Associate', ['NC/SC/26/0711054'], 104312.50, 0, null, null, 104312.50, 'FT2611070101', '194H', 0, 'SWIFT ref'))
       .toBe('Associate commission for Demo Associate — order NC/SC/26/0711054 — gross ₹104,312.50, no TDS, net paid ₹104,312.50 · SWIFT ref FT2611070101');

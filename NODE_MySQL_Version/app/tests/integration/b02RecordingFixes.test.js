@@ -103,7 +103,7 @@ describe('D-269 fixes found while recording B02', () => {
 
   // ---- 2. Buyer portal: the Buyer PO intro ----------------------------------------------------
 
-  const BUYER_PO_INTRO = "Once you've signed your Purchase Order, upload a scanned copy here any time — each upload is kept, so re-uploading a corrected copy never loses the earlier one.";
+  const BUYER_PO_INTRO = "After you sign your purchase order, upload a scan of it here. You can upload a corrected copy later. We keep every copy you upload.";
 
   async function portalPage(status) {
     const email = `jest-b02-${crypto.randomBytes(4).toString('hex')}@buyer.test`;
@@ -125,8 +125,10 @@ describe('D-269 fixes found while recording B02', () => {
 
   it.each(['cancelled', 'lost'])('hides the Buyer PO intro on a %s order', async (status) => {
     const html = await portalPage(status);
-    expect(html).not.toContain('upload a scanned copy here any time');
-    expect(html).toContain(`This order is ${status}, so a Buyer PO can no longer be uploaded.`);
+    expect(html).not.toContain('upload a scan of it here');
+    // D-330: buyer words — never the raw status ("lost").
+    const word = status === 'lost' ? 'This order did not go ahead' : 'This order was cancelled';
+    expect(html).toContain(`${word}, so you can no longer upload a purchase order.`);
   });
 
   // ---- 3. Staff Productivity ------------------------------------------------------------------

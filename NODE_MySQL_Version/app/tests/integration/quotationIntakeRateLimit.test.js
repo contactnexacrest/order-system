@@ -18,7 +18,7 @@ function validSubmission(csrfToken) {
     billing_city: 'Testville',
     billing_country: 'Testland',
     vat_eori_tax_no: 'VAT123',
-    contact_person: 'Jane Test',
+    contact_person: 'Test Contact',
     email: `jane-${Math.random().toString(16).slice(2, 10)}@example.test`,
     country_of_destination: 'Testland',
     incoterm_preference: 'FOB',

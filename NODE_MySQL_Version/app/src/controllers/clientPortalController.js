@@ -30,6 +30,7 @@ const orderOcAcknowledgmentRepository = require('../repositories/orderOcAcknowle
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const associatePortalRepository = require('../repositories/associatePortalRepository');
 const orderReorderRequestRepository = require('../repositories/orderReorderRequestRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionRepository = require('../repositories/permissionRepository');
@@ -111,7 +112,7 @@ async function verifyLoginCode(req, res) {
     return;
   }
   if (result.status === 'invalid_code') {
-    flash.set(req, 'error', 'Invalid or expired code.');
+    flash.set(req, 'error', 'That code is wrong or too old. Please try again, or ask for a new code.');
     res.redirect('/client/login/code');
     return;
   }
@@ -171,7 +172,7 @@ async function showForgotPassword(req, res) {
  */
 async function forgotPassword(req, res) {
   const email = String(req.body.email || '').trim().toLowerCase();
-  const genericMessage = `If ${email} matches an account, a password reset link has been sent to it. The link expires in 72 hours.`;
+  const genericMessage = `If we have an account for ${email}, we have sent a password reset link to it. The link works for 72 hours.`;
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   // QA Round 5: a blank or malformed address is answered on the form
@@ -205,7 +206,7 @@ async function forgotPassword(req, res) {
         { '{email}': email, '{reset_link}': resetUrl },
         'Reset your NexaCrest order portal password',
         'Hello,\n\n'
-          + 'A password reset was requested for your NexaCrest order portal account ({email}).\n\n'
+          + 'Someone asked to reset the password of your NexaCrest buyer account ({email}).\n\n'
           + 'To set a new password, open this link within 72 hours:\n{reset_link}\n\n'
           + "If you didn't request this, you can ignore this email — your password will not be changed."
       );
@@ -286,11 +287,14 @@ async function dashboard(req, res) {
  * at the end.
  */
 function groupOrdersByClientFacingStatus(orders) {
-  const clientStatusLabels = { shipped_docs_sent: 'Complete' };
-  const labelOrder = ['Active', 'Complete', 'Disputed', 'Lost', 'Cancelled'];
+  // D-330: the buyer never sees the word "lost" — such an order "did not go ahead".
+  const clientStatusLabels = { shipped_docs_sent: 'Complete', lost: 'Did not go ahead' };
+  const labelOrder = ['Active', 'Complete', 'Disputed', 'Did not go ahead', 'Cancelled'];
 
   const grouped = {};
   for (const o of orders) {
+    // D-330: the stage in the buyer's words (the associate portal's mapping), never our internal step name.
+    o.buyer_stage = associatePortalRepository.stageLabel(o);
     const label = clientStatusLabels[o.status] || (o.status.charAt(0).toUpperCase() + o.status.slice(1));
     if (!grouped[label]) grouped[label] = [];
     grouped[label].push(o);
@@ -593,7 +597,7 @@ async function reportPayment(req, res) {
   const paymentType = String(req.body.payment_type || '');
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (!['advance', 'balance', 'freight'].includes(paymentType) || transactionRef === '') {
-    flash.set(req, 'error', 'Select which payment this is for and enter the transaction ID/UTR.');
+    flash.set(req, 'error', 'Choose which payment this is, and enter the bank reference number.');
     res.redirect(`/client/orders/${orderId}`);
     return;
   }
@@ -686,7 +690,7 @@ async function raiseDispute(req, res) {
     return;
   }
   if (order.dispute_button_visible_to_client !== 1) {
-    flash.set(req, 'error', 'Disputes cannot be raised on this order from the portal.');
+    flash.set(req, 'error', 'You cannot ask to cancel this order here. Please send our team a message.');
     res.redirect(`/client/orders/${orderId}`);
     return;
   }
@@ -714,7 +718,7 @@ async function raiseDispute(req, res) {
   }
   await auditLogRepository.log(null, 'DISPUTE_RAISED', 'disputes', disputeId, null, null, description, 'Raised by the client via the client portal.');
 
-  flash.set(req, 'success', `Your dispute has been logged — our team will respond by ${responseDueDate}.`);
+  flash.set(req, 'success', `We have received your request. Our team will reply by ${responseDueDate}.`);
   res.redirect(`/client/orders/${orderId}`);
 }
 
@@ -741,7 +745,7 @@ async function raiseComplaint(req, res) {
 
   await orderComplaintService.raiseAsClient(orderId, clientId, description);
 
-  flash.set(req, 'success', 'Thank you — your feedback has been logged and our team will follow up.');
+  flash.set(req, 'success', 'Thank you. We have received your message and our team will reply.');
   res.redirect(`/client/orders/${orderId}`);
 }
 
@@ -792,7 +796,7 @@ async function submitFeedback(req, res) {
   // asks the client to rate work that isn't finished yet. Same status
   // pair addExportBenefit() already gates on.
   if (!['shipped_docs_sent', 'complete'].includes(order.status)) {
-    flash.set(req, 'error', "Feedback can be submitted once this order's documents have been sent to you.");
+    flash.set(req, 'error', "You can leave a review after we send you the shipping documents for this order.");
     res.redirect(`/client/orders/${orderId}`);
     return;
   }

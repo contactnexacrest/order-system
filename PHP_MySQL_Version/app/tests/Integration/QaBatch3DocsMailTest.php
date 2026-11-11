@@ -238,7 +238,7 @@ final class QaBatch3DocsMailTest extends DbTestCase
     public function testMail6Mail7Mail8Mail11SeededTemplates(): void
     {
         $tpl = static fn (string $k): ?array => \App\Repositories\EmailTemplateRepository::find($k);
-        self::assertStringContainsString('issued against Quotation {quotation_ref}', (string) $tpl('send_buyerpo')['body']);
+        self::assertStringContainsString('based on quotation {quotation_ref}', (string) $tpl('send_buyerpo')['body']);
         self::assertStringNotContainsString('{oc_ref}', (string) $tpl('send_buyerpo')['body']);
         self::assertNotNull($tpl('send_esi'), 'every customer-facing document type has its send template');
         foreach (Database::connection()->query("SELECT code FROM document_types WHERE category = 'customer_facing' AND is_active = 1")->fetchAll(\PDO::FETCH_COLUMN) as $code) {
@@ -272,9 +272,9 @@ final class QaBatch3DocsMailTest extends DbTestCase
     public function testMail12TheEmailAsksForThePaymentTheOrderNeeds(): void
     {
         $lc = \App\Repositories\OrderRepository::find($this->twoLineOrder('Irrevocable Letter of Credit at Sight'));
-        self::assertStringContainsString('Letter of Credit', EmailDispatchService::paymentRequestSentence($lc, ['document_type_code' => 'PI']));
+        self::assertSame('Please open the letter of credit (LC) as agreed, so that we can start production.', EmailDispatchService::paymentRequestSentence($lc, ['document_type_code' => 'PI']));
         $cash = \App\Repositories\OrderRepository::find($this->twoLineOrder());
-        self::assertStringContainsString('advance payment', EmailDispatchService::paymentRequestSentence($cash, ['document_type_code' => 'PI']));
-        self::assertStringContainsString('arrange the balance payment', EmailDispatchService::paymentRequestSentence($cash, ['document_type_code' => 'CI']));
+        self::assertSame('Please pay the advance as agreed, so that we can start production.', EmailDispatchService::paymentRequestSentence($cash, ['document_type_code' => 'PI']));
+        self::assertStringContainsString('pay the balance as agreed', EmailDispatchService::paymentRequestSentence($cash, ['document_type_code' => 'CI']));
     }
 }

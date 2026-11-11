@@ -32,8 +32,8 @@ final class PiIntakePrefillTest extends DbTestCase
             'consignee_name'    => 'Same',
             'consignee_address' => 'Same',
             'vat'               => 'NL123456789B01',
-            'contact'           => 'Jane Buyer',
-            'email'             => 'jane@buyer.example',
+            'contact'           => 'Chief Buyer',
+            'email'             => 'buyer.contact@buyer.example',
             'phone'             => '+31-6-12345678',
             'notify'            => 'Acme Freight Forwarders',
             'country'           => 'Netherlands',
@@ -65,8 +65,8 @@ final class PiIntakePrefillTest extends DbTestCase
         self::assertSame('Same', $row['consignee_name']);
         self::assertSame('Same', $row['consignee_address']);
         self::assertSame('NL123456789B01', $row['vat_eori_tax_no']);
-        self::assertSame('Jane Buyer', $row['contact_person']);
-        self::assertSame('jane@buyer.example', $row['email']);
+        self::assertSame('Chief Buyer', $row['contact_person']);
+        self::assertSame('buyer.contact@buyer.example', $row['email']);
         self::assertSame('+31-6-12345678', $row['phone']);
         self::assertSame('Acme Freight Forwarders', $row['notify_party']);
         self::assertSame('Netherlands', $row['country_of_destination']);
@@ -135,11 +135,11 @@ final class PiIntakePrefillTest extends DbTestCase
                 consignee_same_as_buyer = 0, consignee_name = 'Delta Warehousing BV',
                 consignee_address_line1 = '8 Dock Street', consignee_city = 'Antwerp',
                 consignee_postcode = '2000', consignee_country = 'Belgium',
-                consignee_contact_person = 'Piet Jansen', consignee_phone = '+32-3-1234567',
-                consignee_email = 'piet@delta.example', consignee_vat_eori_tax_no = 'BE0123456789',
+                consignee_contact_person = 'Logistics Head', consignee_phone = '+32-3-1234567',
+                consignee_email = 'logistics.head@delta.example', consignee_vat_eori_tax_no = 'BE0123456789',
                 notify_party_same_as_consignee = 0, notify_party = 'Acme Freight Forwarders',
                 notify_party_address_line1 = '1 Port Lane', notify_party_city = 'Hamburg',
-                notify_party_country = 'Germany', notify_party_contact_person = 'Anna Schulz'
+                notify_party_country = 'Germany', notify_party_contact_person = 'Import Manager'
              WHERE id = :id"
         )->execute(['id' => $clientId]);
         $orderId = $this->createTestOrder($clientId, 'FOB');
@@ -153,10 +153,10 @@ final class PiIntakePrefillTest extends DbTestCase
             'billing_address_line1' => '12 Harbour Road', 'billing_address_line2' => 'Unit 4', 'billing_city' => 'Rotterdam',
             'billing_postcode' => '3011 AA', 'billing_country' => 'Netherlands',
             'consignee_name' => 'Delta Warehousing BV', 'consignee_address_line1' => '8 Dock Street', 'consignee_city' => 'Antwerp',
-            'consignee_postcode' => '2000', 'consignee_country' => 'Belgium', 'consignee_contact_person' => 'Piet Jansen',
-            'consignee_phone' => '+32-3-1234567', 'consignee_email' => 'piet@delta.example', 'consignee_vat_eori_tax_no' => 'BE0123456789',
+            'consignee_postcode' => '2000', 'consignee_country' => 'Belgium', 'consignee_contact_person' => 'Logistics Head',
+            'consignee_phone' => '+32-3-1234567', 'consignee_email' => 'logistics.head@delta.example', 'consignee_vat_eori_tax_no' => 'BE0123456789',
             'notify_party_address_line1' => '1 Port Lane', 'notify_party_city' => 'Hamburg', 'notify_party_country' => 'Germany',
-            'notify_party_contact_person' => 'Anna Schulz',
+            'notify_party_contact_person' => 'Import Manager',
         ] as $field => $value) {
             self::assertMatchesRegularExpression('/name="' . $field . '" value="' . preg_quote($value, '/') . '"/', $html, "{$field} must be prefilled");
         }

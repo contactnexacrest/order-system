@@ -247,7 +247,7 @@ final class AssociateSystemTest extends DbTestCase
         $a = $this->associate();
         $_POST = ['holder_name' => 'X', 'account_number' => '123456789012', 'account_number_confirm' => '123456789013', 'ifsc' => 'HDFC0001234', 'bank_name' => 'HDFC Bank', 'account_currency' => 'INR'];
         self::assertSame('Enter the account holder\'s name as the bank has it (as on the PAN).', AssociateAdminController::validateBank($a, $_POST));
-        $_POST['holder_name'] = 'Ravi Kumar';
+        $_POST['holder_name'] = 'Test Associate';
         self::assertSame('The two account numbers do not match — type it again.', AssociateAdminController::validateBank($a, $_POST));
         $_POST['account_number_confirm'] = '1234 5678 9012';
         $_POST['ifsc'] = 'HDFC1234';
@@ -257,7 +257,7 @@ final class AssociateSystemTest extends DbTestCase
         self::assertSame('Enter the bank\'s SWIFT / BIC (8 or 11 characters).', AssociateAdminController::validateBank($abroad, ['holder_name' => 'R K', 'account_number' => 'DE89370400440532013000', 'account_number_confirm' => 'DE89370400440532013000', 'bank_name' => 'Deutsche Bank', 'account_currency' => 'EUR']));
 
         $old = $this->verifiedBank($a);
-        $id = AssociateBankRepository::request((int) $a['id'], ['holder_name' => 'Ravi Kumar', 'account_number' => '999988887777', 'ifsc' => 'ICIC0001234', 'swift' => '',
+        $id = AssociateBankRepository::request((int) $a['id'], ['holder_name' => 'Test Associate', 'account_number' => '999988887777', 'ifsc' => 'ICIC0001234', 'swift' => '',
             'bank_name' => 'ICICI Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
         self::assertNotSame('999988887777', Database::connection()->query("SELECT account_number_enc FROM associate_bank_accounts WHERE id = {$id}")->fetchColumn(), 'stored encrypted');
         self::assertSame('999988887777', AssociateBankRepository::fullNumber($id));
@@ -356,7 +356,7 @@ final class AssociateSystemTest extends DbTestCase
     private function intakePost(string $company, array $extra = []): array
     {
         return $extra + ['company_legal_name' => $company, 'billing_address_line1' => '1 Harbour Road', 'billing_city' => 'Rotterdam', 'billing_country' => 'Netherlands',
-            'vat_eori_tax_no' => 'NL' . strtoupper(bin2hex(random_bytes(5))), 'contact_person' => 'Jan Buyer', 'email' => 'jan@' . bin2hex(random_bytes(4)) . '-buyer.example',
+            'vat_eori_tax_no' => 'NL' . strtoupper(bin2hex(random_bytes(5))), 'contact_person' => 'Purchase Head', 'email' => 'jan@' . bin2hex(random_bytes(4)) . '-buyer.example',
             'country_of_destination' => 'Netherlands', 'incoterm_preference' => 'FOB', 'consignee_same_as_buyer' => '1', 'website' => ''];
     }
 

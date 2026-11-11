@@ -5,9 +5,9 @@ $incotermValue = $submission['incoterm_confirmed'] ?? '';
 $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_column($incoterms, 'code'), true);
 ?>
 <div class="card">
-  <h1>Proforma Invoice Details Form</h1>
+  <h1>Your details for the proforma invoice</h1>
   <p class="muted">Order <?= htmlspecialchars($submission['order_reference']) ?> — <?= htmlspecialchars($submission['client_company_legal_name']) ?></p>
-  <p class="muted">Product details were already confirmed in your Quotation — this just locks in the exact wording for your shipping documents. We'll issue your PI within 24 hours.</p>
+  <p class="muted">You already agreed the products in your quotation. Here you confirm the exact names and addresses for your shipping documents. We will send your proforma invoice within 24 hours.</p>
   <div class="intake-summary">
     <span>&#128203; 6 short sections</span>
     <span>&#9989; Fields marked * are required</span>
@@ -21,7 +21,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">1</span> Your Details</legend>
       <div class="field-grid">
-        <label class="full">Company Legal Name *
+        <label class="full">Company name, as registered *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars($submission['company_legal_name'] ?? '') ?>" placeholder="Exact legal name, no abbreviations" required>
         </label>
         <label class="full">Billing Address Line 1 *
@@ -48,15 +48,15 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
         <label>Phone *
           <input type="text" name="phone" value="<?= htmlspecialchars($submission['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" required>
         </label>
-        <label>VAT / EORI / Tax Reg. No. *
-          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." required>
+        <label>Company tax number (VAT, EORI or tax registration) *
+          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number" required>
         </label>
       </div>
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">2</span> Consignee Details</legend>
-      <p class="muted small">The consignee is the company your goods actually ship to and that will appear on the Bill of Lading — often the same as you, but not always.</p>
+      <legend><span class="intake-step-num">2</span> Who receives the goods (consignee)</legend>
+      <p class="muted small">The consignee is the company that receives the goods. Its name goes on the bill of lading (the shipping document). It is often your own company, but not always.</p>
       <?php $consigneeSame = (int) ($submission['consignee_same_as_buyer'] ?? 1) === 1; ?>
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
@@ -78,8 +78,8 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
         <label>Country
           <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>" placeholder="e.g., Netherlands">
         </label>
-        <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+        <label>Company tax number (VAT, EORI or tax registration)
+          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number">
         </label>
         <label>Contact Person
           <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
@@ -94,8 +94,8 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
     </fieldset>
 
     <fieldset class="intake-step">
-      <legend><span class="intake-step-num">3</span> Notify Party</legend>
-      <p class="muted small">The freight forwarder/customs agent to notify when the shipment arrives — not necessarily the consignee itself.</p>
+      <legend><span class="intake-step-num">3</span> Who to tell when the goods arrive (notify party)</legend>
+      <p class="muted small">The company the shipping line tells when the goods arrive. This is usually your freight forwarder or customs agent. It can be different from the consignee.</p>
       <?php $notifySame = (int) ($submission['notify_party_same_as_consignee'] ?? 1) === 1; ?>
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= $notifySame ? 'checked' : '' ?>> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
@@ -132,13 +132,13 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">4</span> Shipping Details</legend>
       <div class="field-grid">
-        <label>Port of Discharge *
-          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" placeholder="Buyer's nominated discharge port" required>
+        <label>Port where the goods arrive *
+          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" placeholder="e.g. Rotterdam" required>
         </label>
         <label>Country of Final Destination *
           <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required>
         </label>
-        <label>Incoterm *
+        <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
             <option value="">— Select —</option>
             <?php foreach ($incoterms as $i): ?>
@@ -146,10 +146,11 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
             <?php endforeach; ?>
             <option value="__other__" <?= $incotermIsOther ? 'selected' : '' ?>>Other (not listed) — specify</option>
           </select>
-          <input type="text" id="incoterm_confirmed_input" name="incoterm_confirmed" value="<?= htmlspecialchars($incotermValue) ?>" placeholder="Type the Incoterm" style="<?= $incotermIsOther ? '' : 'display:none' ?>" <?= $incotermIsOther ? '' : 'readonly' ?>>
+          <input type="text" id="incoterm_confirmed_input" name="incoterm_confirmed" value="<?= htmlspecialchars($incotermValue) ?>" placeholder="Type the delivery terms, e.g. DAP" style="<?= $incotermIsOther ? '' : 'display:none' ?>" <?= $incotermIsOther ? '' : 'readonly' ?>>
+          <small class="muted">For example FOB: you book the sea freight. CIF: we book freight and insurance to your port.</small>
         </label>
         <label>Container Type
-          <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Blank = same as quotation">
+          <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Leave empty to keep the one in your quotation">
         </label>
       </div>
     </fieldset>
@@ -157,13 +158,13 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">5</span> Payment Terms &amp; Order Confirmation</legend>
       <div class="field-grid">
-        <label class="full">Payment Terms Confirmation as per quotation *
+        <label class="full">Please confirm the payment terms from your quotation *
           <textarea name="payment_terms_confirmation" placeholder="<?= htmlspecialchars($paymentTermsPlaceholder) ?>" required><?= htmlspecialchars($submission['payment_terms_confirmation'] ?? $paymentTermsPlaceholder) ?></textarea>
         </label>
-        <label class="full">Acceptance of Quotation No. *
+        <label class="full">Which quotation are you accepting? (quotation number) *
           <textarea name="quotation_acceptance_reference" placeholder="<?= htmlspecialchars($quotationAcceptancePlaceholder) ?>" required><?= htmlspecialchars($submission['quotation_acceptance_reference'] ?? $quotationAcceptancePlaceholder) ?></textarea>
         </label>
-        <label>Certificate of Origin Type <span class="info-bubble" tabindex="0" title="A certificate confirming the goods' country of manufacture, often required for customs/preferential duty. GSP Form A = preferential rate under a trade scheme (if your country qualifies); Non-preferential = standard certificate of origin. Leave blank if you're not sure — we'll confirm with you.">&#9432;</span>
+        <label>Certificate of origin you need <span class="info-bubble" tabindex="0" title="This certificate shows the country where the goods were made. Customs often ask for it. GSP Form A can lower your import duty if your country is part of the scheme. Non-preferential is the standard certificate. If you are not sure, leave it empty and we will check with you.">&#9432;</span>
           <?php // Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. ?>
           <?php $__coo = \App\Repositories\LookupRepository::matchOption(array_column($cooTypes ?? [], 'option_value'), (string) ($submission['coo_type'] ?? '')); ?>
           <select name="coo_type">
@@ -173,11 +174,11 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
             <?php endforeach; ?>
           </select>
         </label>
-        <label>Buyer PO / Reference No.
-          <input type="text" name="buyer_po_ref" value="<?= htmlspecialchars($submission['buyer_po_ref'] ?? '') ?>" placeholder="Write NIL if none">
+        <label>Your purchase order or reference number
+          <input type="text" name="buyer_po_ref" value="<?= htmlspecialchars($submission['buyer_po_ref'] ?? '') ?>" placeholder="If you have none, write NIL">
         </label>
-        <label class="full">Special Document Requirements
-          <textarea name="special_document_requirements" placeholder="e.g. No special requirements / Consular legalised CI required"><?= htmlspecialchars($submission['special_document_requirements'] ?? '') ?></textarea>
+        <label class="full">Any special document needs?
+          <textarea name="special_document_requirements" placeholder="e.g. None, or: commercial invoice must be legalised by the consulate"><?= htmlspecialchars($submission['special_document_requirements'] ?? '') ?></textarea>
         </label>
       </div>
     </fieldset>
@@ -185,12 +186,12 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">6</span> Confirmation</legend>
       <div class="intake-note">
-        <strong>Once submitted, these details are locked permanently</strong> — not by you, and not by NexaCrest, through the ordinary course of business. If something needs correcting after this point, a new client record has to be set up from scratch; there is no edit option once locked.
+        <strong>After you send this form, these details are locked.</strong> Neither you nor NexaCrest can change them in the normal way. If something is wrong later, we have to set up your company again from the start. There is no edit button.
       </div>
       <label><input type="checkbox" name="confirm_lock" value="1" required> I confirm the above is correct and understand it will be locked.</label>
     </fieldset>
 
-    <button type="submit">Submit PI Details</button>
+    <button type="submit">Send my details</button>
   </form>
 </div>
 <script>

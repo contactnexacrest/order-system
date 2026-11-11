@@ -62,7 +62,7 @@ async function sendDetailsLink(kind, id, userId) {
       'NexaCrest — please confirm your company and bank details',
       'Hello,\n\n'
         + 'To set you up for payments from NexaCrest, please fill in your company and bank details on this secure link — no login needed:\n{vendor_details_link}\n\n'
-        + 'Please keep a cancelled cheque or bank letter ready; our team may ask for it to verify the account. The link works once and for 30 days.\n\n'
+        + 'Please keep a cancelled cheque or a letter from your bank ready. Our team may ask for it to check the account. You can use the link once, within 30 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
     sent = await emailService.sendPlainText(email, rendered.subject, rendered.body, { kind: 'supplier_links', audience: 'supplier' });

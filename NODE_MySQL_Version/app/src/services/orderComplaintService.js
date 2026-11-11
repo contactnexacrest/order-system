@@ -80,7 +80,7 @@ async function emailClient(complaintId, authorUserId, body) {
   if (!order || clientEmail === null) return noEmail;
 
   const sender = await userRepository.findById(authorUserId);
-  const subject = `Update on your complaint for order ${order.order_reference} — ${await companySettingsRepository.get('legal_name')}`;
+  const subject = `Our reply about the issue you raised on order ${order.order_reference} — ${await companySettingsRepository.get('legal_name')}`;
   const greeting = `Dear ${order.contact_person || 'Sir/Madam'},\n\n`;
   const signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
   const message = greeting + body + '\n\n' + (signature !== ''

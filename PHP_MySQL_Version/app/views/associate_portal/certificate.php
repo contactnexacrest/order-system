@@ -4,13 +4,13 @@
 <body>
 <p class="noprint"><button onclick="window.print()">Print / save as PDF</button></p>
 <h1>NexaCrest International Private Limited<br><small>Client registration certificate</small></h1>
-<p>This confirms that the company below was registered with NexaCrest as introduced by our associate, under the associate agreement.</p>
+<p>This confirms that the company below registered with NexaCrest and that our associate introduced them, under the associate agreement.</p>
 <table>
   <tr><th>Associate</th><td><?= htmlspecialchars((string) $a['name']) ?><?= !empty($a['personal_code']) ? ' (' . htmlspecialchars((string) $a['personal_code']) . ')' : '' ?></td></tr>
   <tr><th>Client</th><td><?= htmlspecialchars((string) $c['company_legal_name']) ?> — <?= htmlspecialchars((string) $c['client_unique_number']) ?></td></tr>
   <tr><th>Country</th><td><?= htmlspecialchars((string) ($c['country_of_destination'] ?? '')) ?></td></tr>
   <tr><th>Registered on</th><td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $c['associate_registered_on'])) ?></td></tr>
-  <tr><th>Protected until</th><td><?= $c['associate_locked_until'] ? htmlspecialchars(\App\Helpers\Dates::short((string) $c['associate_locked_until'])) : '—' ?></td></tr>
+  <tr><th>Client of this associate until</th><td><?= $c['associate_locked_until'] ? htmlspecialchars(\App\Helpers\Dates::short((string) $c['associate_locked_until'])) : '—' ?></td></tr>
 </table>
 <h2>History</h2>
 <table><?php foreach (array_reverse($events) as $e): ?><tr><td style="white-space:nowrap"><?= htmlspecialchars((string) $e['created_at']) ?></td><td><?= htmlspecialchars((string) $e['message']) ?></td></tr><?php endforeach; ?></table>

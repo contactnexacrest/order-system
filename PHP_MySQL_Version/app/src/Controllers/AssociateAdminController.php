@@ -594,7 +594,7 @@ final class AssociateAdminController
         } else {
             AssociateService::linkClient($clientId, (int) $a['id'], 'staff', null, $registeredOn, (int) $user['id']);
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_LINKED', 'clients', $clientId, 'associate_id', null, (string) $a['id']);
-            AssociateService::notify($a, 'client_accepted', "{$client['company_legal_name']} is registered as your client (linked by NexaCrest: {$reason}). Your protection runs until "
+            AssociateService::notify($a, 'client_accepted', "{$client['company_legal_name']} is now registered as your client (NexaCrest linked them to you: {$reason}). It stays your client until "
                 . \App\Helpers\Dates::short(date('Y-m-d', strtotime('+' . AssociateService::protectionMonths() . ' months'))) . '.', $clientId, null, null, (int) $user['id']);
             Flash::set('success', 'Client linked to the associate.');
         }
@@ -782,7 +782,7 @@ final class AssociateAdminController
             AuditLogRepository::log($uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', (int) $bank['id'], 'status', 'pending', 'verified',
                 trim(($checks !== null ? 'Checked: ' . \App\Services\BankDetailsCheck::checksText($checks) . '. ' : '') . ($selfReason !== null ? 'Own entry — reason: ' . $selfReason : '')) ?: null);
             // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
-            $mailed = AssociateService::notify($a, 'bank_changed', 'Your bank account ' . AssociateBankRepository::masked($b) . ' was verified by NexaCrest. Payments go to it from '
+            $mailed = AssociateService::notify($a, 'bank_changed', 'We have checked your bank account ' . AssociateBankRepository::masked($b) . '. We will pay into it from '
                 . \App\Helpers\Dates::short((string) $b['usable_from']) . '. If you did not ask for this change, contact NexaCrest at once.', null, null, null, $uid);
             // D-280: "e-mailed" only when it was.
             Flash::set('success', 'Verified. Usable from ' . \App\Helpers\Dates::short((string) $b['usable_from']) . ($mailed ? '; the associate was e-mailed.' : '; the associate sees it in their portal (the e-mail could not be sent).'));
@@ -1022,7 +1022,7 @@ final class AssociateAdminController
                 \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET takeback_kind = :k WHERE id = :id')->execute(['k' => $kind, 'id' => $id]);
                 AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CLAWBACK', 'incentive_payouts', $id, 'takeback_kind', null, (string) $amount, $kind . ': ' . $reason);
                 $a = AssociateRepository::find((int) $p['associate_id']);
-                AssociateService::notify($a, 'clawback', 'INR ' . number_format((float) $amount, 2) . ' of the commission paid on order ' . ($order['order_reference'] ?? '') . " is taken back (" . ($kind === 'fraud' ? 'fraud' : 'breach of the agreement') . ") and deducted from your " . IncentiveService::monthLabel($month) . " payout: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
+                AssociateService::notify($a, 'clawback', 'We are taking back INR ' . number_format((float) $amount, 2) . ' of the commission we paid you on order ' . ($order['order_reference'] ?? '') . ', because of ' . ($kind === 'fraud' ? 'fraud' : 'a breach of the agreement') . '. We will take it off your ' . IncentiveService::monthLabel($month) . " payment. Reason: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
                 Flash::set('success', 'Take-back recorded (' . $kind . '); it is deducted from the associate\'s next payout.');
             }
         }

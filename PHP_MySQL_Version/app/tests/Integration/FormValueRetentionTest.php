@@ -57,8 +57,8 @@ final class FormValueRetentionTest extends DbTestCase
         $_POST = [
             'company_legal_name' => '',
             'billing_address'    => '',
-            'contact_person'     => 'Jane Buyer',
-            'email'              => 'jane@example.com',
+            'contact_person'     => 'Chief Buyer',
+            'email'              => 'buyer.contact@example.com',
         ];
 
         ob_start();
@@ -71,8 +71,8 @@ final class FormValueRetentionTest extends DbTestCase
         (new ClientController())->create([]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('jane@example.com', $html, 'previously typed email must be pre-filled on the re-shown form');
-        self::assertStringContainsString('Jane Buyer', $html, 'previously typed contact person must be pre-filled on the re-shown form');
+        self::assertStringContainsString('buyer.contact@example.com', $html, 'previously typed email must be pre-filled on the re-shown form');
+        self::assertStringContainsString('Chief Buyer', $html, 'previously typed contact person must be pre-filled on the re-shown form');
     }
 
     public function testClientCreateFormOldValuesAreOneShot(): void
