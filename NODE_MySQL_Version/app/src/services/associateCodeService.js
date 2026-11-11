@@ -5,7 +5,7 @@ const db = require('../config/db');
 
 /**
  * Port of AssociateCodeService.php. Owner decision 1 Nov 2026 (AS-5, part
- * 4.4-A2): an associate's permanent personal code, e.g. NXA-RAJESH-7K. Every
+ * 4.4-A2): an associate's permanent personal code, e.g. NXA-ASSOCIATE-7K. Every
  * code belongs to one associate for ever (unique, never reused). It ends in
  * a check letter, so a mistyped code is refused instead of matching someone
  * else. Upper / lower case and the look-alikes 0/O and 1/I are read as the same.
@@ -37,7 +37,7 @@ async function generate(readable) {
   if (part.length < 3) {
     part = part.padEnd(3, 'X');
   }
-  // One random letter gives only 31 codes per name part (e.g. many associates called RAJESH, or many
+  // One random letter gives only 31 codes per name part (e.g. many associates with the same first name, or many
   // past codes): after a few clashes the random part grows to 2, then 3 letters (961, 29,791 codes).
   // Old 1-letter codes stay valid; isValid() accepts 1 to 3 random letters before the check letter.
   for (let i = 0; i < 60; i++) {

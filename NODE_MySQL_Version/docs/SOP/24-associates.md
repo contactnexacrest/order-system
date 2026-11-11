@@ -183,8 +183,8 @@ details. Two ways, in any mix:
   link was made for, staff see "The associate made this link for …, but the
   buyer registered as …" on Quotation Intake. The associate can cancel an
   unused link.
-- **Personal code**: every associate has one code, e.g. `NXA-RAJESH-7K`,
-  for all their buyers; the link `…/quotation-details?code=NXA-RAJESH-7K`
+- **Personal code**: every associate has one code, e.g. `NXA-ASSOCIATE-7K`,
+  for all their buyers; the link `…/quotation-details?code=NXA-ASSOCIATE-7K`
   carries it. The last letter is
   a check letter: a mistyped code is refused, never given to someone else.
   0/O and 1/I count as the same, case does not matter (the buyer never

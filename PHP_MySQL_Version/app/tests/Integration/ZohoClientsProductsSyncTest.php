@@ -110,7 +110,7 @@ final class ZohoClientsProductsSyncTest extends DbTestCase
     private function testClient(string $name, ?string $currency = 'USD'): int
     {
         $id = $this->createTestClient();
-        Database::connection()->prepare("UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Project Buyer', phone = '+31 10 555 0101' WHERE id = :id")
+        Database::connection()->prepare("UPDATE clients SET company_legal_name = :n, billing_address_line1 = '1 Harbour Road', billing_city = 'Rotterdam', billing_postcode = '3011', billing_country = 'Netherlands', vat_eori_tax_no = 'NL123456789B01', contact_person = 'Project Buyer', phone = '+91-0000000000' WHERE id = :id")
             ->execute(['n' => $name, 'id' => $id]);
         if ($currency !== null) {
             $this->createTestOrder($id, 'FOB', 'Standard — New Buyer', $currency);
