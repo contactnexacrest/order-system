@@ -17,9 +17,10 @@ use App\Services\PermissionService;
 use App\Services\ProductService;
 
 /**
- * Product Interface — internal product catalog (docs/schema.sql Section
- * U). Completely independent of the order pipeline: nothing here is ever
- * selected into an order, and this catalog is never shown to clients.
+ * Product Interface — the product catalogue (docs/schema.sql Section U).
+ * Products are picked on order lines and used for price checks; prices here
+ * are internal and never shown to buyers. A used product is deactivated,
+ * never deleted (owner, 12 Nov 2026 — see delete()).
  *
  * Two visibility boundaries are enforced SERVER-SIDE (not just hidden in
  * the view), because both are real information-disclosure boundaries:
@@ -48,17 +49,31 @@ final class ProductController
 
         $query = trim((string) ($_GET['q'] ?? ''));
         $searched = $query !== '';
+        // Owner (12 Nov 2026): "Active (n) · Inactive (n) · All (n)" — on the full list and on a search.
+        $status = ProductRepository::statusFilter($_GET['status'] ?? 'active');
+        $statusCounts = null;
 
         if ($searched) {
-            $products = ProductRepository::search($query);
+            $products = ProductRepository::search($query, $status);
+            $statusCounts = ProductRepository::statusCounts($query);
         } elseif ($canBrowse) {
-            $products = ProductRepository::all();
+            $products = ProductRepository::listing($status);
+            $statusCounts = ProductRepository::statusCounts();
         } else {
             // Search-only user with no query submitted yet — no full-list
             // query executes at all. This is the actual enforcement point;
             // everything else here is just what gets rendered.
             $products = [];
         }
+        // An inactive product says where it is used, so it is clear whether it may be deleted.
+        foreach ($products as &$product) {
+            if (empty($product['is_active'])) {
+                $product['usage'] = ProductRepository::usage((int) $product['id']);
+                $product['usage_text'] = ProductRepository::usageText($product['usage']);
+                $product['delete_refusal'] = ProductRepository::deleteRefusal($product, $product['usage']);
+            }
+        }
+        unset($product);
 
         // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote price and
         // lowest price for anyone who may see selling prices. Worked out before anything is stripped.
@@ -116,6 +131,8 @@ final class ProductController
             'products'       => $products,
             'query'          => $query,
             'searched'       => $searched,
+            'status'         => $status,
+            'statusCounts'   => $statusCounts,
             'canBrowse'      => $canBrowse,
             'canViewPricing' => $canSeeHeadlineFob,
             'canManage'      => $canManage,
@@ -273,7 +290,11 @@ final class ProductController
             $tryPrice = ['offered' => $__offered, 'p' => $__offered !== [] ? \App\Services\PricingService::forProduct($details['product'], null, null, null, $__sel) : null];
         }
 
+        $usage = ProductRepository::usage($id);
         View::render('products/show', [
+            'usage'          => $usage,
+            'usageText'      => ProductRepository::usageText($usage),
+            'deleteRefusal'  => ProductRepository::deleteRefusal($details['product'], $usage),
             'readiness'      => $readiness,
             'tryPrice'       => $tryPrice,
             'product'        => $details['product'],
@@ -348,11 +369,56 @@ final class ProductController
             return;
         }
 
+        // Owner (12 Nov 2026): only an inactive product that is not used anywhere is deleted —
+        // checked here, not only by hiding the button.
+        $refusal = ProductRepository::deleteRefusal($product, ProductRepository::usage($id));
+        if ($refusal !== null) {
+            Flash::set('error', 'Not deleted: ' . $refusal);
+            header("Location: /products/{$id}");
+            return;
+        }
+
         $user = AuthService::currentUser();
         ProductRepository::delete($id);
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_DELETED', 'products', $id, null, $product['name'], null);
-        Flash::set('success', 'Product removed from the catalog.');
-        header('Location: /products');
+        Flash::set('success', 'Product "' . $product['name'] . '" deleted.');
+        header('Location: /products?status=inactive');
+    }
+
+    /** Owner (12 Nov 2026): POST /products/{id}/reactivate — back in the active list and the order-line picker. */
+    public function reactivate(array $params): void
+    {
+        $this->setActive($params, true);
+    }
+
+    /** Owner (12 Nov 2026): POST /products/{id}/deactivate — hidden from the active list and the order-line picker; nothing is deleted. */
+    public function deactivate(array $params): void
+    {
+        $this->setActive($params, false);
+    }
+
+    private function setActive(array $params, bool $active): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $product = ProductRepository::find($id);
+        if (!$product) {
+            http_response_code(404);
+            echo 'Product not found.';
+            return;
+        }
+        $back = ($_POST['return_to'] ?? '') === 'list' ? '/products?status=' . ($active ? 'inactive' : 'active') : "/products/{$id}";
+        if ((bool) $product['is_active'] === $active) {
+            Flash::set('success', 'Product "' . $product['name'] . '" is already ' . ($active ? 'active' : 'inactive') . '.');
+            header("Location: {$back}");
+            return;
+        }
+        $user = AuthService::currentUser();
+        ProductRepository::setActive($id, $active, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], $active ? 'PRODUCT_REACTIVATED' : 'PRODUCT_DEACTIVATED', 'products', $id, 'is_active', $active ? '0' : '1', $active ? '1' : '0');
+        Flash::set('success', $active
+            ? 'Product "' . $product['name'] . '" is active again — it shows in the list and can be picked on order lines.'
+            : 'Product "' . $product['name'] . '" is deactivated — it is hidden from the active list and cannot be picked on new order lines.');
+        header("Location: {$back}");
     }
 
     public function uploadImage(array $params): void

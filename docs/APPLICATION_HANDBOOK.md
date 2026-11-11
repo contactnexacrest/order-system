@@ -2381,6 +2381,18 @@ the same filters, counts, fields, actions and money rules on both templates
     (`manage_product_specifications`: Admin, MD). A used option can only
     be deactivated.
   - Category settings are frozen per order at PI approval (D-262).
+  - **Active · Inactive · All (D-334).** The Products list and its search filter by
+    status (`?status=active|inactive|all`, default Active) with a count on each chip.
+    An inactive product cannot be picked on new order lines and shows **Used on**:
+    orders whose lines were picked from it (removed lines included), associate price
+    requests, procurement lines (`ProductRepository::usage()`), or "not used anywhere";
+    the product page shows the same line. `manage_product_catalog` may **Reactivate**
+    it (audit PRODUCT_REACTIVATED) or **Delete…** it only when it is inactive and not
+    used anywhere (supplier prices, images and price history go with it). The server
+    refuses to delete an active product ("Deactivate it first") or a used one; an
+    allowed delete still marks the Zoho item inactive (D-238). An active product's
+    page offers **Deactivate** (audit PRODUCT_DEACTIVATED), not Delete. Routes:
+    POST `/products/{id}/deactivate`, `/products/{id}/reactivate`, `/products/{id}/delete`.
 - **Tables.** `catalog_products`, `catalog_product_images`,
   `catalog_product_suppliers`, `catalog_product_supplier_options`,
   `catalog_product_misc_charges`, `product_categories`,
@@ -2393,7 +2405,7 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Permissions.** `view_product_catalog`, `browse_product_catalog`,
   `manage_product_catalog`, `manage_product_specifications`,
   `view_product_pricing`, `manage_hs_codes`.
-- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1).
+- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334.
 
 ### 6.3 Pricing engine and price requests
 

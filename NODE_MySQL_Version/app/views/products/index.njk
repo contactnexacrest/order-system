@@ -1,12 +1,22 @@
 <div class="card page-wide">
   <h1>Product Catalog</h1>
-  <p class="muted">Internal reference only — specs, HS code, cost, and suppliers for staff to consult while preparing quotations manually. This catalog is completely independent of the order pipeline and is never shown to clients or buyers.</p>
+  <p class="muted">The company's products — specifications, HS code, costs and suppliers. Products are picked on order lines and used for price checks. The prices here are internal and are never shown to buyers; an associate sees only their own price list.</p>
 
   <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
     <input type="text" name="q" value="{{ query }}" placeholder="Search by name, HS code, or specification…" style="flex:1" aria-label="Search by name, HS code, or specification">
+    {% if status != 'active' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
     <button type="submit" class="btn-sm">Search</button>
-    {% if searched %}<a class="btn-sm" href="/products">Clear</a>{% endif %}
+    {% if searched %}<a class="btn-sm" href="/products{% if status != 'active' %}?status={{ status }}{% endif %}">Clear</a>{% endif %}
   </form>
+  {# Owner (12 Nov 2026): Active · Inactive · All — on the full list and on a search. #}
+  {% if statusCounts %}
+    <div class="filter-chip-row" aria-label="Show products by status">
+      {% for k, label in [['active', 'Active'], ['inactive', 'Inactive'], ['all', 'All']] %}
+        <a class="filter-chip{% if status == k %} active{% endif %}" href="/products?status={{ k }}{% if searched %}&amp;q={{ query | urlencode }}{% endif %}">{{ label }} ({{ statusCounts[k] }})</a>
+      {% endfor %}
+    </div>
+    {% if status != 'active' %}<p class="muted small">An inactive product cannot be picked on new order lines. "Used on" shows where it is still used: only a product that is not used anywhere can be deleted.</p>{% endif %}
+  {% endif %}
 
   {# D-304 (point 14): the pricing rate, explained — price build-up viewers only. #}
   {% if canBuildup and fx %}{% include "pricing/_fx_rate_line.njk" %}{% endif %}
@@ -34,6 +44,7 @@
         {# D-305 (point 19): staff see only the quote and their own lowest price. #}
         {% if canStaffPrice %}<th class="num">Quote price<br>USD / {{ headerUnit }}</th><th class="num">Your lowest<br>USD / {{ headerUnit }}</th>{% endif %}
         <th>Status</th>
+        {% if status != 'active' %}<th>Used on</th>{% endif %}
         <th></th>
       </tr>
       {% if not products.length %}
@@ -66,7 +77,17 @@
             <td class="num">{{ '—' if not b else (b.staff_floor | money) }}</td>
           {% endif %}
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
-          <td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td>
+          {% if status != 'active' %}<td{% if p.is_active or p.usage.total == 0 %} class="muted"{% endif %}>{{ '—' if p.is_active else p.usage_text }}</td>{% endif %}
+          <td><a class="btn-sm" href="/products/{{ p.id }}">View</a>
+            {% if canManage and not p.is_active %}
+              <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+              {% if p.delete_refusal === null %}
+                <form method="post" action="/products/{{ p.id }}/delete" class="inline-form" style="display:inline" data-confirm="Delete &quot;{{ p.name }}&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone."><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-danger">Delete…</button></form>
+              {% else %}
+                <button type="button" class="btn-sm btn-secondary" disabled title="{{ p.delete_refusal }}">Delete</button>
+                <div class="muted small">{{ p.delete_refusal }}</div>
+              {% endif %}
+            {% endif %}</td>
         </tr>
       {% endfor %}
     </table>

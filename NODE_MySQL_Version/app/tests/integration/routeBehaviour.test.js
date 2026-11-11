@@ -407,6 +407,9 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', `/products/images/${image}/delete`), 'POST /products/images/:id/delete');
     expect(await value('SELECT id FROM catalog_product_images WHERE id = :id', { id: image })).toBeNull();
 
+    // Owner (12 Nov 2026): an active product is deactivated before it can be deleted.
+    expectDone(await holder.call('POST', `/products/${product}/deactivate`), 'POST /products/:id/deactivate');
+    expect(await audits('PRODUCT_DEACTIVATED', product)).toBe(1);
     expectDone(await holder.call('POST', `/products/${product}/delete`), 'POST /products/:id/delete');
     expect(await audits('PRODUCT_DELETED', product)).toBe(1);
   });

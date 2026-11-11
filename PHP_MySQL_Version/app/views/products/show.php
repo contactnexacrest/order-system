@@ -4,13 +4,31 @@
   <h1><?= View::e($product['name']) ?> <span class="badge <?= $product['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $product['is_active'] ? 'Active' : 'Inactive' ?></span></h1>
   <p class="muted">HS Code: <strong><?= View::e($product['hs_code']) ?></strong> &nbsp;·&nbsp; Origin: <?= View::e($product['origin'] ?? '—') ?></p>
 
+  <?php // Owner (12 Nov 2026): where the product is used; a used or active product is never deleted. ?>
+  <p class="muted">Used on: <strong><?= View::e($usageText) ?></strong></p>
   <?php if ($canManage): ?>
     <p>
       <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/edit">Edit</a>
-      <form method="post" action="/products/<?= (int) $product['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Permanently delete this product and all its images/suppliers/misc charges? This cannot be undone.');">
-        <?= Csrf::field() ?>
-        <button type="submit" class="btn-sm btn-danger">Delete Product</button>
-      </form>
+      <?php if ($product['is_active']): ?>
+        <form method="post" action="/products/<?= (int) $product['id'] ?>/deactivate" style="display:inline" data-confirm="Deactivate &quot;<?= View::e($product['name']) ?>&quot;? It is hidden from the active list and cannot be picked on new order lines. Orders that already use it are not changed. You can reactivate it at any time.">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm btn-secondary">Deactivate</button>
+        </form>
+      <?php else: ?>
+        <form method="post" action="/products/<?= (int) $product['id'] ?>/reactivate" style="display:inline">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm">Reactivate</button>
+        </form>
+        <?php if ($deleteRefusal === null): ?>
+          <form method="post" action="/products/<?= (int) $product['id'] ?>/delete" style="display:inline" data-confirm="Delete &quot;<?= View::e($product['name']) ?>&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone.">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-danger">Delete…</button>
+          </form>
+        <?php else: ?>
+          <button type="button" class="btn-sm btn-secondary" disabled title="<?= View::e($deleteRefusal) ?>">Delete</button>
+          <span class="muted small"><?= View::e($deleteRefusal) ?></span>
+        <?php endif; ?>
+      <?php endif; ?>
     </p>
   <?php endif; ?>
 

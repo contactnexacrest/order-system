@@ -421,3 +421,13 @@ Products › Categories › <category>: **General** (name, units, HS code, packi
 their price effect** (was the separate Specifications page under Pricing) · **Price rules** · **Products in this
 category**. On a product's options page, "edit for all products in <category>" opens the category's
 options; **Change for this product only** changes just that product.
+
+## Inactive products: find, reactivate or delete (owner, 12 Nov 2026)
+
+Products › All products shows **Active (n) · Inactive (n) · All (n)** above the list (also on a search); Active is
+the default. A deactivated product is hidden from the order-line picker but is never lost: open **Inactive** to find it.
+Each inactive product shows **Used on** (e.g. "3 orders · 1 price request", or "not used anywhere"). People who manage
+the product catalogue can **Reactivate** it, or **Delete…** it — only when it is inactive and not used anywhere (its
+supplier prices, images and price history go with it). A used product cannot be deleted, so its orders stay complete.
+On an active product's page the button is **Deactivate**, not Delete. Every deactivation, reactivation and delete is in
+the audit log.
