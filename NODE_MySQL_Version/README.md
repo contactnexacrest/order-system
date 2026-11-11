@@ -131,6 +131,7 @@ storage/
    confirm — see "Placeholder values" below), lookup tables (incoterms,
    currencies, ports, T&C clauses, payment presets), and 4 placeholder brand
    assets (logo, signature, seal, watermark).
+   A fresh install never needs a migration — the tests FreshInstallCompleteTest / freshInstallComplete.test.js check that every file in docs/migrations is already in schema.sql/seed.sql.
 
    **Fix the storage path in the seeded asset rows.** `seed.sql` inserts
    asset rows with a literal placeholder path token — in BOTH the `assets`

@@ -11,6 +11,8 @@ mysql -u <user> -p nexacrest < <stack>/docs/schema.sql
 mysql -u <user> -p nexacrest < <stack>/docs/seed.sql
 ```
 
+A fresh install never needs a migration — the tests FreshInstallCompleteTest / freshInstallComplete.test.js check that every file in docs/migrations is already in schema.sql/seed.sql.
+
 `<stack>` is `PHP_MySQL_Version` or `NODE_MySQL_Version`. Then follow the
 stack README (storage path replacement in `assets`, `user_signature_assets`
 and `reference_library_documents`, the reference-library files, the admin

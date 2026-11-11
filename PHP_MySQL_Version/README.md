@@ -126,6 +126,7 @@ correctly once the password is changed.
    The database user needs the **TRIGGER** privilege (cPanel "All Privileges"
    includes it): the schema creates triggers for the founder-login protection
    and the permanent document image store `document_image_blobs` (D-267).
+   A fresh install never needs a migration — the tests FreshInstallCompleteTest / freshInstallComplete.test.js check that every file in docs/migrations is already in schema.sql/seed.sql.
 2. **Fix the storage path in seed data.** `seed.sql` inserts asset rows with
    a literal placeholder path — in BOTH the `assets` table (company
    logo/seal) and the `user_signature_assets` table (per-user signatures and
