@@ -1,0 +1,43 @@
+{#
+  Owner decision D-303 (point 15, 11 Nov 2026): one-time "Link suppliers" — supplier names typed on product
+  prices before the Suppliers directory became the master. "Match by name" links every exact match at once;
+  pick (or quick-add) the rest one by one. Nothing is lost: the price stays, it only gets its directory
+  supplier. Port of views/products/link_suppliers.php.
+#}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products">&larr; Products</a></p>
+  <h1>Link suppliers</h1>
+  <p class="muted">The supplier of a product price is now a record of the Suppliers directory. These names were typed on prices before — link each one to its supplier.</p>
+  {% if exactCount > 0 %}
+    <form method="post" action="/products/link-suppliers">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="action" value="match_all">
+      <p><button type="submit" class="btn-sm btn-accent">Match by name ({{ exactCount }})</button> <small class="muted">links every typed name that is exactly a directory supplier's name</small></p>
+    </form>
+  {% endif %}
+  <table class="list">
+    <tr><th>Typed name</th><th class="num">Prices</th><th>Link to</th></tr>
+    {% for n in names %}
+      <tr>
+        <td>{{ n.supplier_name }}<br><small class="muted">{{ n.products }} product(s)</small></td>
+        <td class="num">{{ n.prices }}</td>
+        <td>
+          <form method="post" action="/products/link-suppliers" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="typed_name" value="{{ n.supplier_name }}">
+            <input type="text" name="supplier_name" list="link-supplier-list" required autocomplete="off" maxlength="255" data-pick-id="supplier_id" data-in-list="link-supplier-list"
+              data-in-list-message="Pick the supplier from the Suppliers directory — or add it with &quot;+ Add a new supplier (quick)&quot;."
+              value="{{ n.match.name if n.match else '' }}" placeholder="Type the name, e.g. Sri Balaji Granites" aria-label="Directory supplier for {{ n.supplier_name }}">
+            <input type="hidden" name="supplier_id" value="{{ n.match.id if n.match else '' }}">
+            <button type="submit" class="btn-sm">Link</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    {% if not names.length %}<tr><td colspan="3" class="muted">Every product price is linked to a directory supplier — nothing to do.</td></tr>{% endif %}
+  </table>
+  <datalist id="link-supplier-list">
+    {% for sp in pickList %}<option value="{{ sp.name }}" data-id="{{ sp.id }}">{{ sp.shortHint }}</option>{% endfor %}
+  </datalist>
+  {% set quickProductId = 0 %}{% include "products/_supplier_quick_add.njk" %}
+</div>

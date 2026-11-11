@@ -198,7 +198,7 @@ final class PricingRepository
     public static function setSupplierBasis(int $supplierId, string $basis): void
     {
         Database::connection()->prepare('UPDATE catalog_product_suppliers SET price_basis = :b, is_primary = IF(:b2 = \'cbm\', 0, is_primary) WHERE id = :id')
-            ->execute(['b' => $basis === 'cbm' ? 'cbm' : 'unit', 'b2' => $basis, 'id' => $supplierId]);
+            ->execute(['b' => in_array($basis, ['cbm', 'grid'], true) ? $basis : 'unit', 'b2' => $basis, 'id' => $supplierId]); // D-300: 'grid' = every thickness
     }
 
     /** D-255: marks one per-CBM supplier price "used for pricing" thick stone. */
@@ -223,7 +223,7 @@ final class PricingRepository
     public static function purchaseQuotesForProduct(int $productId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT q.id, q.unit_price_inr, q.valid_until, q.quote_reference, q.recorded_at, s.supplier_legal_name, r.unit
+            'SELECT q.id, q.unit_price_inr, q.valid_until, q.quote_reference, q.recorded_at, q.supplier_id, s.supplier_legal_name, r.unit
                FROM purchase_quotes q
                JOIN purchase_requirements r ON r.id = q.requirement_id
                JOIN order_products op ON op.id = r.order_product_id

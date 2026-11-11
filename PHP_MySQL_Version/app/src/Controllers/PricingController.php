@@ -14,6 +14,8 @@ use App\Services\AuthService;
 use App\Services\PermissionService;
 use App\Services\PricingService;
 use App\Services\ProductService;
+use App\Services\ThicknessPrices;
+use App\Repositories\SupplierRepository;
 
 /**
  * Owner decision D-245 (4 Nov 2026), P1: Admin → Pricing settings, associate
@@ -42,9 +44,30 @@ final class PricingController
             'labels' => PricingService::LABELS,
             'canManage' => self::can('manage_pricing'),
             'programOn' => PricingService::programOn(),
+            // D-301 (point 4): the exchange rate in use, its source and date, and the history.
+            'fx' => \App\Services\FxRateService::current(),
+            'fxHistory' => \App\Services\FxRateService::history(30),
+            'fxSources' => \App\Services\FxRateService::SOURCES,
         ], 'layout/base');
     }
 
+    /** D-301: the MD's OK (or not) for a market rate that moved more than 2 % in a day. */
+    public function decideFxRate(array $params): void
+    {
+        $approve = (string) ($_POST['decision'] ?? '') === 'approve';
+        $error = \App\Services\FxRateService::decide((int) ($params['id'] ?? 0), $approve, trim((string) ($_POST['reason'] ?? '')), (int) self::user()['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? ($approve ? 'Rate approved — new quotes use it from now on. Issued Quotations and Proforma Invoices keep their prices.' : 'Rate not used — prices keep the rate in use.'));
+        header('Location: /pricing/settings#exchange-rate');
+    }
+
+    /** D-301: fetch today's rate now (the same as the daily job). */
+    public function fetchFxRate(array $params): void
+    {
+        $r = \App\Services\FxRateService::fetchDaily();
+        AuditLogRepository::log((int) self::user()['id'], 'FX_RATE_FETCHED', 'fx_rates', null, null, null, $r['message']);
+        Flash::set($r['status'] === 'failed' ? 'error' : 'success', $r['message']);
+        header('Location: /pricing/settings#exchange-rate');
+    }
     public function saveSettings(array $params): void
     {
         [$values, $errors] = PricingService::readSettingsForm($_POST);
@@ -269,10 +292,13 @@ final class PricingController
             return;
         }
         $settings = PricingService::settings();
-        $service = new ProductService();
+        $rules = ThicknessPrices::rules($product, $settings);
         $rows = [];
         foreach (ProductSupplierRepository::forProduct($id) as $s) {
-            $s['effective_fob'] = $service->effectiveFobForSupplier($s, $product);
+            $basis = ($s['price_basis'] ?? 'unit') === 'cbm' || ($s['combo_per'] ?? '') === 'cbm' ? 'cbm' : 'unit';
+            $s['fob'] = PricingService::fobParts($product, $s, $basis, null, $settings, $rules);
+            $s['effective_fob'] = ($s['price_basis'] ?? '') === 'grid' ? ($s['fob']['supplier'] ?? null) : (new ProductService())->effectiveFobForSupplier($s, $product);
+            $s['grid'] = ($s['price_basis'] ?? '') === 'grid' ? ThicknessPrices::complete($rules, ThicknessPrices::typedFor((int) $s['id'])) : null;
             $s['staleness'] = PricingService::staleness($s, $settings['stale_days']);
             $s['price_date'] = PricingService::priceDate($s);
             $rows[] = $s;
@@ -289,8 +315,13 @@ final class PricingController
         unset($r);
         $prefill = null;
         if (($_GET['from_quote'] ?? '') !== '' && ($q = PricingRepository::purchaseQuote((int) $_GET['from_quote'], $id)) !== null) {
-            $prefill = ['purchase_quote_id' => (int) $q['id'], 'supplier_name' => (string) $q['supplier_legal_name'], 'price_inr' => number_format((float) $q['unit_price_inr'], 2, '.', ''),
+            $prefill = ['purchase_quote_id' => (int) $q['id'], 'supplier_id' => (int) $q['supplier_id'], 'supplier_name' => (string) $q['supplier_legal_name'],
+                'price_inr' => number_format((float) $q['unit_price_inr'], 2, '.', ''),
                 'quoted_on' => substr((string) $q['recorded_at'], 0, 10), 'valid_until' => (string) ($q['valid_until'] ?? '')];
+        }
+        // D-303: a supplier just added quickly is picked already.
+        if ($prefill === null && ($_GET['supplier_id'] ?? '') !== '' && ($sup = SupplierRepository::find((int) $_GET['supplier_id'])) !== null) {
+            $prefill = ['supplier_id' => (int) $sup['id'], 'supplier_name' => (string) $sup['supplier_legal_name']];
         }
         View::render('products/market_prices', [
             'product' => $product,
@@ -301,11 +332,35 @@ final class PricingController
             'canRecord' => self::can('record_market_prices'),
             'offered' => $offered,
             'prefill' => $prefill,
+            'rules' => $rules,
+            'pickList' => SupplierRepository::pickList(),
+            'supplierTypes' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('supplier_type')),
+            'canQuickAdd' => self::can('record_market_prices') || self::can('manage_suppliers'),
+            'canChangeRules' => self::can('manage_pricing'),
         ], 'layout/base');
     }
 
+    /**
+     * D-303 (point 15): the supplier of a price is a record of the Suppliers directory —
+     * picked by its id (the search-pick fills it), or by its exact name.
+     *
+     * @return array{0: ?array, 1: ?string}
+     */
+    private static function pickedSupplier(): array
+    {
+        $id = (int) ($_POST['supplier_id'] ?? 0);
+        $s = $id > 0 ? SupplierRepository::find($id) : null;
+        if ($s === null && trim((string) ($_POST['supplier_name'] ?? '')) !== '') {
+            $s = SupplierRepository::findByExactName((string) $_POST['supplier_name']);
+        }
+        if ($s === null || (int) $s['is_active'] !== 1) {
+            return [null, 'Pick the supplier from the Suppliers directory — or add it with "+ Add a new supplier (quick)".'];
+        }
+        return [$s, null];
+    }
+
     /** @return array{0: array<string,mixed>, 1: ?string} */
-    private static function readMarketPrice(): array
+    private static function readMarketPrice(bool $grid = false): array
     {
         $num = static function (string $k): ?float {
             $v = trim((string) ($_POST[$k] ?? ''));
@@ -321,21 +376,30 @@ final class PricingController
             'location' => trim((string) ($_POST['location'] ?? '')) ?: null,
             'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
             'fob_source' => 'direct',
-            'fob_value' => $num('price_inr'),
+            'fob_value' => $grid ? null : $num('price_inr'),
             'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null,
             'is_primary' => !empty($_POST['used_for_pricing']) ? 1 : 0,
             'notes' => trim((string) ($_POST['notes'] ?? '')) ?: null,
             'quoted_on' => $date('quoted_on'),
             'valid_until' => $date('valid_until'),
-            // D-255: per unit, or per CBM for thick stone (50 mm and above).
-            'price_basis' => in_array($_POST['price_basis'] ?? 'unit', ['cbm', 'combo'], true) ? (string) $_POST['price_basis'] : 'unit',
+            // D-255: per unit, or per CBM for thick stone; D-256 an exact combination; D-300 every thickness.
+            'price_basis' => in_array($_POST['price_basis'] ?? 'unit', ['cbm', 'combo', 'grid'], true) ? (string) $_POST['price_basis'] : 'unit',
+            // D-300: packing and loading included (ticked by default); CHA + transport per container.
+            'includes_packing_loading' => (string) ($_POST['includes_packing_loading'] ?? '1') === '1',
+            'cha_transport_per_container' => $num('cha_transport_per_container'),
         ];
         if ($data['supplier_name'] === '' || mb_strlen($data['supplier_name']) > 255) {
-            return [$data, 'Enter the supplier\'s name.'];
+            return [$data, 'Pick the supplier from the Suppliers directory.'];
         }
-        $raw = trim((string) ($_POST['price_inr'] ?? ''));
-        if ($data['fob_value'] === null || $data['fob_value'] <= 0 || $data['fob_value'] > 999999999999.99 || preg_match('/^\d+(\.\d{1,2})?$/', $raw) !== 1) {
-            return [$data, 'Enter the supplier\'s price in ₹ (above 0, at most 2 decimals).'];
+        if (!$grid) {
+            $raw = trim((string) ($_POST['price_inr'] ?? ''));
+            if ($data['fob_value'] === null || $data['fob_value'] <= 0 || $data['fob_value'] > 999999999999.99 || preg_match('/^\d+(\.\d{1,2})?$/', $raw) !== 1) {
+                return [$data, 'Enter the supplier\'s price in ₹ (above 0, at most 2 decimals).'];
+            }
+        }
+        $cha = trim((string) ($_POST['cha_transport_per_container'] ?? ''));
+        if ($cha !== '' && preg_match('/^\d{1,10}(\.\d{1,2})?$/', $cha) !== 1) {
+            return [$data, 'CHA + transport per container: enter ₹ (at most 2 decimals), or leave it empty for the product\'s default.'];
         }
         if ($data['quoted_on'] === null) {
             return [$data, 'Enter the date the supplier quoted this price.'];
@@ -393,30 +457,58 @@ final class PricingController
     public function addMarketPrice(array $params): void
     {
         $productId = (int) ($params['id'] ?? 0);
-        if (ProductRepository::find($productId) === null) {
+        $product = ProductRepository::find($productId);
+        if ($product === null) {
             Flash::set('error', 'That product no longer exists.');
             header('Location: /products');
             return;
         }
+        $back = "/products/{$productId}/market-prices";
         $quoteId = null;
         if (($_POST['purchase_quote_id'] ?? '') !== '') {
             $q = PricingRepository::purchaseQuote((int) $_POST['purchase_quote_id'], $productId);
             if ($q === null) {
                 Flash::set('error', 'That supplier quote was not found for this product.');
-                header("Location: /products/{$productId}/market-prices");
+                header("Location: {$back}");
                 return;
             }
             $quoteId = (int) $q['id'];
+            $_POST['supplier_id'] = (string) $q['supplier_id'];
             $_POST['supplier_name'] = $q['supplier_legal_name'];
-            $_POST['price_inr'] = number_format((float) $q['unit_price_inr'], 2, '.', '');
             $_POST['quoted_on'] = substr((string) $q['recorded_at'], 0, 10);
             $_POST['valid_until'] = (string) ($q['valid_until'] ?? '');
             $_POST['notes'] = 'Copied from supplier quote' . (!empty($q['quote_reference']) ? ' ' . $q['quote_reference'] : '') . ' (Procurement).';
+            if (!isset($_POST['price']) && !isset($_POST['price_inr'])) {
+                $_POST['price_inr'] = number_format((float) $q['unit_price_inr'], 2, '.', '');
+            }
         }
-        [$data, $error] = self::readMarketPrice();
+        $settings = PricingService::settings();
+        $rules = ThicknessPrices::rules($product, $settings);
+        // D-300: for a category with thickness price rules the ordinary price is one row for every thickness.
+        if (($_POST['price_basis'] ?? '') === '') {
+            $_POST['price_basis'] = $rules['grid'] && !isset($_POST['price_inr']) ? 'grid' : 'unit';
+        }
+        $grid = $_POST['price_basis'] === 'grid';
+        if ($grid && !$rules['grid']) {
+            Flash::set('error', 'This product\'s category has no thickness price rules — enter one price.');
+            header("Location: {$back}");
+            return;
+        }
+        [$picked, $pickError] = self::pickedSupplier();
+        if ($pickError !== null) {
+            Flash::set('error', $pickError);
+            header("Location: {$back}#add-price");
+            return;
+        }
+        $_POST['supplier_name'] = (string) $picked['supplier_legal_name'];
+        [$data, $error] = self::readMarketPrice($grid);
+        $typed = [];
+        if ($error === null && $grid) {
+            [$typed, $error] = ThicknessPrices::readForm($_POST, $rules);
+        }
         if ($error !== null) {
             Flash::set('error', $error);
-            header("Location: /products/{$productId}/market-prices");
+            header("Location: {$back}#add-price");
             return;
         }
         $data['product_id'] = $productId;
@@ -426,23 +518,27 @@ final class PricingController
         $named = [];
         $per = 'unit';
         if ($data['price_basis'] === 'combo') {
-            [$named, $per, $comboError] = self::readCombo(ProductRepository::find($productId) ?? []);
+            [$named, $per, $comboError] = self::readCombo($product);
             if ($comboError !== null) {
                 Flash::set('error', $comboError);
-                header("Location: /products/{$productId}/market-prices");
+                header("Location: {$back}");
                 return;
             }
         }
-        if ($data['price_basis'] !== 'unit') {
+        if (!in_array($data['price_basis'], ['unit', 'grid'], true)) {
             $data['is_primary'] = 0;
         }
         $id = ProductSupplierRepository::create($data, $userId);
         PricingRepository::setSupplierDates($id, $data['quoted_on'], $data['valid_until'], $quoteId);
+        ProductSupplierRepository::setPriceDetails($id, (int) $picked['id'], $data['includes_packing_loading'], $data['cha_transport_per_container']);
         if ($data['price_basis'] === 'combo') {
             // An exact price is in use (or not) by itself: it never replaces the ordinary price.
             PricingRepository::setCombo($id, $named, $per, $usedForPricing);
         } else {
             PricingRepository::setSupplierBasis($id, $data['price_basis']);
+            if ($grid) {
+                ThicknessPrices::saveTyped($id, $typed, $rules, $userId);
+            }
             if ($usedForPricing && $data['price_basis'] === 'cbm') {
                 PricingRepository::setCbmPrimary($productId, $id);
             } elseif ($usedForPricing) {
@@ -450,10 +546,117 @@ final class PricingController
             }
         }
         $data['is_primary'] = $usedForPricing ? 1 : 0;
-        $comboText = $data['price_basis'] === 'combo' ? PricingService::comboText(\App\Services\ProductSpecs::offered(ProductRepository::find($productId) ?? []), $named) : null;
+        $comboText = $data['price_basis'] === 'combo' ? PricingService::comboText(\App\Services\ProductSpecs::offered($product), $named) : null;
+        $priceText = $grid ? self::gridText($typed, $rules) : '₹' . number_format((float) $data['fob_value'], 2);
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
-            $data['supplier_name'] . ': ₹' . number_format((float) $data['fob_value'], 2) . ($comboText !== null ? ' for ' . $comboText . ($per === 'cbm' ? ' per CBM' : '') : '') . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
+            $data['supplier_name'] . ': ' . $priceText . ($comboText !== null ? ' for ' . $comboText . ($per === 'cbm' ? ' per CBM' : '') : '') . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
         Flash::set('success', 'Supplier price recorded' . ($data['is_primary'] ? ' and used for pricing.' : '.'));
+        header("Location: {$back}");
+    }
+
+    /** "20 mm ₹1,600.00 per m² · 50 mm and above ₹64,000.00 per CBM (typed; others calculated)" for the audit log. */
+    private static function gridText(array $typed, array $rules): string
+    {
+        $parts = [];
+        foreach ($typed as $mm => $v) {
+            $parts[] = ThicknessPrices::label((int) $mm, (int) $rules['cbm_from']) . ' ₹' . number_format((float) $v, 2) . ((int) $mm === ThicknessPrices::CBM ? ' per CBM' : ' per m²');
+        }
+        return implode(' · ', $parts) . ' (typed; others calculated)';
+    }
+
+    /** D-300 (point 12): one supplier price — every thickness, CHA + transport per container, its history. */
+    public function editPrice(array $params): void
+    {
+        $s = ProductSupplierRepository::find((int) ($params['supplierId'] ?? 0));
+        $product = $s !== null ? ProductRepository::find((int) $s['product_id']) : null;
+        if ($s === null || $product === null) {
+            http_response_code(404);
+            echo 'Supplier price not found.';
+            return;
+        }
+        $settings = PricingService::settings();
+        $rules = ThicknessPrices::rules($product, $settings);
+        $grid = ($s['price_basis'] ?? '') === 'grid';
+        View::render('products/supplier_price_edit', [
+            'product' => $product, 'row' => $s, 'rules' => $rules,
+            'grid' => $grid ? ThicknessPrices::complete($rules, ThicknessPrices::typedFor((int) $s['id'])) : null,
+            'fob' => PricingService::fobParts($product, $s, ($s['price_basis'] ?? '') === 'cbm' ? 'cbm' : 'unit', null, $settings, $rules),
+            'history' => ThicknessPrices::historyFor((int) $s['id']),
+            'pickList' => SupplierRepository::pickList(),
+            'canRecord' => self::can('record_market_prices'),
+            'canChangeRules' => self::can('manage_pricing'),
+        ], 'layout/base');
+    }
+
+    public function savePrice(array $params): void
+    {
+        $supplierId = (int) ($params['supplierId'] ?? 0);
+        $s = ProductSupplierRepository::find($supplierId);
+        $product = $s !== null ? ProductRepository::find((int) $s['product_id']) : null;
+        if ($s === null || $product === null) {
+            Flash::set('error', 'That supplier price no longer exists.');
+            header('Location: /products');
+            return;
+        }
+        $productId = (int) $s['product_id'];
+        $back = "/products/suppliers/{$supplierId}/price";
+        $grid = ($s['price_basis'] ?? '') === 'grid';
+        $rules = ThicknessPrices::rules($product);
+        $_POST['price_basis'] = (string) $s['price_basis'];
+        $_POST['supplier_name'] = (string) $s['supplier_name'];
+        $picked = null;
+        if ((int) ($_POST['supplier_id'] ?? 0) > 0 || ($s['supplier_id'] ?? null) === null) {
+            [$picked, $pickError] = self::pickedSupplier();
+            if ($pickError !== null) {
+                Flash::set('error', $pickError);
+                header("Location: {$back}");
+                return;
+            }
+            $_POST['supplier_name'] = (string) $picked['supplier_legal_name'];
+        }
+        [$data, $error] = self::readMarketPrice($grid);
+        $typed = [];
+        if ($error === null && $grid) {
+            [$typed, $error] = ThicknessPrices::readForm($_POST, $rules);
+        }
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: {$back}");
+            return;
+        }
+        $userId = (int) self::user()['id'];
+        $oldPrice = $s['fob_value'] !== null ? number_format((float) $s['fob_value'], 2, '.', '') : null;
+        $before = ($grid ? self::gridText(ThicknessPrices::typedFor($supplierId), $rules) : '₹' . number_format((float) (new ProductService())->effectiveFobForSupplier($s, $product), 2))
+            . ' quoted ' . (PricingService::priceDate($s) ?? '—');
+        $oldCha = $s['cha_transport_per_container'] !== null ? number_format((float) $s['cha_transport_per_container'], 2, '.', '') : null;
+        $oldIncl = (int) ($s['includes_packing_loading'] ?? 1) === 1;
+        $s['fob_source'] = 'direct';
+        if (!$grid) {
+            $s['fob_value'] = $data['fob_value'];
+        }
+        $s['notes'] = $data['notes'];
+        $s['location'] = $data['location'] ?? $s['location'];
+        $s['supplier_name'] = $data['supplier_name'];
+        ProductSupplierRepository::update($supplierId, $s, $userId);
+        PricingRepository::setSupplierDates($supplierId, $data['quoted_on'], $data['valid_until']);
+        ProductSupplierRepository::setPriceDetails($supplierId, $picked !== null ? (int) $picked['id'] : (int) $s['supplier_id'],
+            $data['includes_packing_loading'], $data['cha_transport_per_container']);
+        // D-300: the price history — who, when, old → new.
+        if ($grid) {
+            ThicknessPrices::saveTyped($supplierId, $typed, $rules, $userId);
+        } elseif ($oldPrice !== number_format((float) $data['fob_value'], 2, '.', '')) {
+            ThicknessPrices::history($supplierId, 'Price per ' . ((string) ($product['reference_unit'] ?? '') ?: 'unit'), $oldPrice, number_format((float) $data['fob_value'], 2, '.', ''), $userId);
+        }
+        $newCha = $data['cha_transport_per_container'] !== null ? number_format((float) $data['cha_transport_per_container'], 2, '.', '') : null;
+        if ($oldCha !== $newCha) {
+            ThicknessPrices::history($supplierId, 'CHA + transport per container', $oldCha ?? 'product default', $newCha ?? 'product default', $userId);
+        }
+        if ($oldIncl !== $data['includes_packing_loading']) {
+            ThicknessPrices::history($supplierId, 'Price includes packing and loading', $oldIncl ? 'yes' : 'no', $data['includes_packing_loading'] ? 'yes' : 'no', $userId);
+        }
+        $after = ($grid ? self::gridText($typed, $rules) : '₹' . number_format((float) $data['fob_value'], 2)) . ' quoted ' . $data['quoted_on'];
+        AuditLogRepository::log($userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', $supplierId, null, $before, $after);
+        Flash::set('success', 'Supplier price saved.');
         header("Location: /products/{$productId}/market-prices");
     }
 

@@ -1,0 +1,16 @@
+{#
+  Owner decision D-304 (point 14, 11 Nov 2026): one self-explaining line wherever the pricing rate is shown
+  (the catalogue header and Pricing settings; price build-up viewers only). Never on order lines, quotes or
+  documents. In: fx (fxRateService.current()). Port of views/pricing/_fx_rate_line.php.
+#}
+<p class="fx-rate-line small">
+  {% if fx.mode == 'auto' and fx.market != null %}
+    <b>Pricing rate ₹{{ fx.rate | money }} per USD</b> — set {{ pricingFmt.trim3(fx.cushion) }}% below today's market rate (₹{{ fx.market | money }}) on purpose: it keeps our prices safe if the rupee gets stronger before the buyer pays.
+  {% else %}
+    <b>Pricing rate ₹{{ fx.rate | money }} per USD</b> — {{ 'set by hand (Manual)' if fx.mode == 'manual' else 'the manual rate, until the first daily rate is fetched' }}; keep it a little below the market rate on purpose: it keeps our prices safe if the rupee gets stronger before the buyer pays.
+  {% endif %}
+  <details class="inline-help"><summary>Why?</summary>
+    <span class="help-line">Example: we quote USD 1,000 when the market rate is ₹88.40. The buyer pays 60 days later and the rupee has got stronger: USD 1,000 now brings only ₹86,630 instead of ₹88,400. Our supplier still wants the same rupees. Because our prices were worked out at ₹86.63 (2% below ₹88.40), the cost was covered — the 2% cushion absorbed the move. Without it, the same move would come straight out of our margin.</span>
+  </details>
+  {% for w in fx.warnings %}<br><span class="badge badge-warning">⚠ {{ w }}</span>{% endfor %}
+</p>

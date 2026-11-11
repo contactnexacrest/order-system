@@ -1,25 +1,19 @@
 <?php
 /**
- * Owner decision D-255 (5 Nov 2026): Admin → Pricing → Specifications — a
- * category's specifications and their options (what changes the price). Every
- * option changes the cost; margin, team incentive, associate commission and buffer
- * are added on top, so every option keeps the margin. Node twin: specifications.njk.
+ * Owner decision D-255 (5 Nov 2026): a category's specifications and their options (what
+ * changes the price). Every option changes the cost; margin, team incentive, associate
+ * commission and buffer are added on top, so every option keeps the margin.
+ * D-306 (point 20, 11 Nov 2026): shown as the "Options and their price effect" tab of the
+ * category page (was Admin › Pricing › Specifications). Node twin: pricing/_spec_table.njk.
+ *
+ * In: $categoryId, $specs, $edit, $canManage.
  */
 use App\Helpers\Csrf;
 use App\Helpers\View;
 use App\Services\ProductSpecs;
 $__ro = $canManage ? '' : ' disabled';
 ?>
-<div class="card page-wide">
-  <p class="muted small"><a href="/pricing/settings">&larr; Pricing settings</a></p>
-  <h1>Specifications</h1>
-  <p class="muted">What changes the price, by category. Every option is applied to the <b>cost</b>; the margin, team incentive, associate commission and buffer are then added as usual — so every option keeps your margin. The first (base) option of each changes nothing. % options multiply the cost, USD amounts are added, the quantity discount comes last. A product can hide or change any option, or add its own (Products → a product → Specifications).</p>
-  <form method="get" action="/pricing/specifications" class="field-grid">
-    <label>Category
-      <select name="category" onchange="this.form.submit()">
-        <?php foreach ($categories as $c): ?><option value="<?= (int) $c['id'] ?>"<?= (int) $c['id'] === (int) $categoryId ? ' selected' : '' ?>><?= View::e($c['name']) ?></option><?php endforeach; ?>
-      </select></label>
-  </form>
+  <p class="muted">What changes the price in this category. Every option is applied to the <b>cost</b>; the margin, team incentive, associate commission and buffer are then added as usual — so every option keeps your margin. The first (base) option of each changes nothing. % options multiply the cost, USD amounts are added, the quantity discount comes last. Changes apply to every product in the category except where a product has its own value (shown on that product with a yellow badge); quotes already sent keep their prices. A product can hide or change any option, or add its own (Products → a product → Specifications).</p>
   <table class="list">
     <tr><th>Order</th><th>Specification</th><th>Applies to forms</th><th>Options (first = base)</th><th>Status</th><th>Actions</th></tr>
     <?php foreach ($specs as $s): ?>
@@ -30,7 +24,7 @@ $__ro = $canManage ? '' : ' disabled';
         <td><?php $__parts = []; foreach ($s['options'] as $o) { if ((int) $o['is_active'] === 1) { $__parts[] = View::e($o['name']) . ' <small class="muted">' . View::e(ProductSpecs::changeLabel((string) $o['change_type'], $o['value'] !== null ? (float) $o['value'] : null)) . '</small>'; } } echo implode(' · ', $__parts); ?></td>
         <td><?= (int) $s['is_active'] === 1 ? '<span class="badge badge-active">Active</span>' : '<span class="badge">Inactive</span>' ?></td>
         <td>
-          <a class="btn-sm" href="/pricing/specifications?category=<?= (int) $categoryId ?>&edit=<?= (int) $s['id'] ?>#spec-<?= (int) $s['id'] ?>">Edit</a>
+          <a class="btn-sm" href="/products/categories/<?= (int) $categoryId ?>?tab=options&edit=<?= (int) $s['id'] ?>#spec-<?= (int) $s['id'] ?>">Edit</a>
           <?php if ($canManage): ?>
             <form method="post" action="/pricing/specifications/<?= (int) $s['id'] ?>/active" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary"><?= (int) $s['is_active'] === 1 ? 'Deactivate' : 'Activate' ?></button></form>
             <?php if (!$s['used']): ?><form method="post" action="/pricing/specifications/<?= (int) $s['id'] ?>/delete" style="display:inline" data-confirm="Delete this specification and its options?"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Delete</button></form><?php else: ?><small class="muted">used — can only be deactivated</small><?php endif; ?>
@@ -115,4 +109,3 @@ $__ro = $canManage ? '' : ' disabled';
       <div><button type="submit" class="btn-sm btn-accent">+ Add specification</button></div>
     </form>
   <?php endif; ?>
-</div>

@@ -356,3 +356,69 @@ Word, FOB and CIF) with copies captured before this change.
 Not changed in Phase 1: the Certificate of Origin issuer printed on the documents
 (CAPEXIL) and the fumigation certificate line stay as today for every category.
 
+## Thickness prices, CHA + transport and price rules (D-300, 11 Nov 2026)
+
+**Recording a supplier price (Procurement).** Products › a product › Market prices › Add a price.
+
+1. **Supplier** — type a few letters and pick from the list (it is the Suppliers directory). Not there yet?
+   Use **+ Add a new supplier (quick)**: name, location, phone, type. It is added as *Details pending*;
+   GSTIN, bank and contacts follow later. The **Location** list shows the supplier's factory / quarry addresses.
+2. **Prices by thickness** — type what the supplier quoted, e.g. 20 mm = ₹1,600 per m². The other boxes
+   fill themselves (grey, CALCULATED): 30 mm = 20 mm + 35 % = 2,160, 40 mm = + 70 % = 2,720, 50 mm and above
+   = 20 mm × 40 = ₹64,000 per CBM. If the supplier also quoted 40 mm (say 2,650), type it over the grey box —
+   it turns TYPED. "↺ use calculated" puts the calculated figure back. Empty or 0 = calculated when you save.
+3. **Price includes packing and loading** — leave ticked unless the supplier's price is without them.
+4. **CHA + transport per container (₹)** — e.g. ₹60,000. The screen shows it per CBM (₹7,500 with 8 CBM)
+   and per m² for each thickness (₹150 at 20 mm). Empty = the product's default.
+5. **Price for** — keep "Every thickness". Choose "A special combination" only for one exact price such as
+   "30 mm · Leather".
+6. Tick **Use this price for pricing** and **Save price**.
+
+Later changes: Market prices › **Edit** on the row. When you change a TYPED price, every CALCULATED one
+follows. The page shows the **price history** (who, when, old → new) and what goes into the FOB cost
+(supplier price + CHA and transport per unit).
+
+**Price rules (MD).** Products › Price rules (or Categories › <category> › Price rules): the thickness %s,
+the "× 40" for 50 mm and above, **+ Add a thickness** (e.g. 18 mm −5 %), what one container holds (8 CBM,
+max 27 t) and the stone weight (2.7 t per CBM). The example column changes as you type. Give a reason and
+**Save rules**; it is in the Audit Log. New prices use the rules at once; quotes already sent keep theirs.
+A product can have its own × K or container (Edit product, MD only) — it shows an **own rule** badge.
+
+## Exchange rate (D-301, 11 Nov 2026)
+
+The USD rate is fetched every morning (Frankfurter, European Central Bank; backup open.er-api.com).
+**Pricing rate = market rate − 2 %** on purpose: it keeps our prices safe if the rupee gets stronger before
+the buyer pays. *Example:* we quote USD 1,000 at a market rate of ₹88.40. The buyer pays 60 days later at
+₹86.63; USD 1,000 now brings ₹86,630, not ₹88,400 — because prices were worked out at ₹86.63, the cost is
+still covered.
+
+Products › Pricing settings › **Exchange rate** shows the rate in use, its source and date, warnings and the
+history. The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate
+now**. If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
+day it waits: the MD reads the figures, gives a reason and chooses **Use this rate** or **Keep the rate in
+use**. Quotations and Proforma Invoices already issued never change.
+
+## One master for HS codes and suppliers (D-302, D-303)
+
+- A product's HS code is picked from the HS Code Master List (pre-filled with the category's default).
+  People who manage HS codes see **+ Add a new HS code**. Order lines accept only master-list codes.
+- One-time clean-up: Products › **Fix HS codes** (choose the right code for each product listed) and
+  Products › **Link suppliers** (**Match by name** links exact names at once; pick or quick-add the rest).
+- A supplier's page lists **Prices given for products**; untick **Details pending** once GSTIN, bank and
+  contacts are complete.
+
+## Catalogue labels and who sees which price (D-304, D-305)
+
+- Column headers say the currency and unit, e.g. "Cost USD / CBM", "Supplier price ₹ / CBM" (with
+  "≈ USD" for people who edit products). "Staff lowest" and "Associate lowest" are the lowest prices.
+- Sales staff see only **Quote price** and **Your lowest**. On an order from a client who came through an
+  associate they see **Quote and lowest for this order** and the note "This client came through an
+  associate, so this order's prices are higher" — no associate name, level or %.
+- Associates see no prices in the catalogue; **Get price** gives their own quote and lowest (as before).
+
+## One page per category (D-306)
+
+Products › Categories › <category>: **General** (name, units, HS code, packing, documents) · **Options and
+their price effect** (was Admin › Pricing › Specifications) · **Price rules** · **Products in this
+category**. On a product's options page, "edit for all products in <category>" opens the category's
+options; **Change for this product only** changes just that product.

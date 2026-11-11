@@ -234,6 +234,10 @@ njkEnv.addGlobal('incentiveReportStates', require('./services/incentiveReportSer
 njkEnv.addGlobal('pricingFmt', {
   pct: (v) => require('./services/pricingService').pct(v),
   modeLabel: (m, v) => require('./services/pricingService').modeLabel(m, v),
+  // D-300: "35", "2.5" — PHP ThicknessPrices::fmt(); "" for null.
+  trim3: (v) => (v === null || v === undefined || v === '' ? '' : require('./services/thicknessPrices').fmt(v)),
+  thicknessLabel: (mm, cbmFrom) => require('./services/thicknessPrices').label(mm, cbmFrom),
+  signed: (v) => require('./services/fxRateService').signed(Number(v)),
 });
 // Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
 // are recorded and displayed to 4 decimal places (e.g. "88.5000"), not
@@ -811,6 +815,8 @@ app.post('/suppliers/:id/details-link', requireAuth, requirePermission('manage_s
 for (const [a, m] of [['verify', 'supplierVerify'], ['check', 'supplierCheck'], ['reject', 'supplierReject'], ['resend', 'supplierResend']]) {
   app.post(`/suppliers/:id/bank-changes/:changeId/${a}`, requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(require('./controllers/vendorBankChangeController')[m]));
 }
+// D-303 (point 15): "+ Add a new supplier (quick)" from a product price.
+app.post('/suppliers/quick-add', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(supplierController.quickAdd));
 app.post('/suppliers/:id/factory-addresses', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.addFactoryAddress));
 app.post('/suppliers/:id/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.deleteFactoryAddress));
 
@@ -1384,6 +1390,15 @@ app.get('/products/categories', requireAuth, requirePermission('manage_product_c
 app.post('/products/categories', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.store));
 app.post('/products/categories/:id', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.update));
 app.post('/products/categories/:id/settings', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.settings));
+// Owner decisions D-300..D-306 (11 Nov 2026): one page per category (tabs), its price rules, and the one-time clean-up pages (before /products/:id).
+const catalogueMasterController = require('./controllers/catalogueMasterController');
+app.get('/products/categories/:id', requireAuth, requirePermissionAny(['manage_product_catalog', 'manage_pricing', 'view_price_buildup']), asyncHandler(productCategoryController.show));
+app.post('/products/categories/:id/price-rules', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productCategoryController.saveRules));
+app.get('/products/price-rules', requireAuth, requirePermissionAny(['manage_pricing', 'view_price_buildup']), asyncHandler(productCategoryController.priceRules));
+app.get('/products/fix-hs-codes', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(catalogueMasterController.fixHsCodes));
+app.post('/products/:id/hs-code', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(catalogueMasterController.saveHsCode));
+app.get('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), asyncHandler(catalogueMasterController.linkSuppliers));
+app.post('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(catalogueMasterController.saveLinks));
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));
@@ -1411,6 +1426,11 @@ app.get('/products/:id/market-prices', requireAuth, requirePermissionAny(['recor
 app.post('/products/:id/market-prices', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addMarketPrice));
 app.post('/products/suppliers/:supplierId/use-for-pricing', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.useForPricing));
 app.post('/products/suppliers/:supplierId/market-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.updateMarketDates));
+// D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
+app.get('/products/suppliers/:supplierId/price', requireAuth, requirePermissionAny(['record_market_prices', 'view_price_buildup']), asyncHandler(pricingController.editPrice));
+app.post('/products/suppliers/:supplierId/price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.savePrice));
+app.post('/pricing/fx-rates/fetch', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.fetchFxRate));
+app.post('/pricing/fx-rates/:id/decide', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.decideFxRate));
 // Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).
 const specController = require('./controllers/specController');
 app.get('/pricing/specifications', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(specController.index));

@@ -59,7 +59,7 @@ final class ProductCategoryController
         }
         if ((int) $category['is_system'] === 1) {
             Flash::set('error', 'Natural Stone is today\'s products — its Dimensions and Finish stay as they are.');
-            header('Location: /products/categories');
+            header('Location: ' . self::backTo('/products/categories'));
             return;
         }
         $name = trim((string) ($_POST['name'] ?? ''));
@@ -67,7 +67,7 @@ final class ProductCategoryController
         $error = self::nameError($name, $id) ?? $error;
         if ($error !== null) {
             Flash::set('error', $error);
-            header('Location: /products/categories');
+            header('Location: ' . self::backTo('/products/categories'));
             return;
         }
         $active = !empty($_POST['is_active']);
@@ -75,7 +75,7 @@ final class ProductCategoryController
         AuditLogRepository::log((int) AuthService::currentUserId(), 'PRODUCT_CATEGORY_UPDATED', 'product_categories', $id, 'attributes',
             $category['name'] . ': ' . implode(', ', $category['attributes']), $name . ': ' . implode(', ', $labels) . ($active ? '' : ' (inactive)'));
         Flash::set('success', "Category \"{$name}\" saved.");
-        header('Location: /products/categories');
+        header('Location: ' . self::backTo('/products/categories'));
     }
 
     /**
@@ -100,14 +100,86 @@ final class ProductCategoryController
         );
         if ($error !== null) {
             Flash::set('error', $category['name'] . ': ' . $error);
-            header('Location: /products/categories');
+            header('Location: ' . self::backTo('/products/categories'));
             return;
         }
         ProductCategoryRepository::updateSettings($id, $settings);
         AuditLogRepository::log((int) AuthService::currentUserId(), 'PRODUCT_CATEGORY_SETTINGS_UPDATED', 'product_categories', $id, 'settings',
             ProductCategoryRepository::settingsSummary($category), ProductCategoryRepository::settingsSummary($settings));
         Flash::set('success', "Settings for \"{$category['name']}\" saved.");
-        header('Location: /products/categories');
+        header('Location: ' . self::backTo('/products/categories'));
+    }
+
+    /**
+     * Owner decision D-306 (point 20, 11 Nov 2026): Products › Categories › <category> is one
+     * page with tabs — General (name, units, HS code, packing, documents) | Options and their
+     * price effect (was Admin › Pricing › Specifications) | Price rules (D-300) | Products in
+     * this category.
+     */
+    public function show(array $params): void
+    {
+        $id = (int) $params['id'];
+        $category = ProductCategoryRepository::find($id);
+        if ($category === null) {
+            http_response_code(404);
+            echo 'Category not found.';
+            return;
+        }
+        $user = AuthService::currentUser() ?? [];
+        $can = static fn (string $k): bool => $user !== [] && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, $k);
+        $seesPricing = $can('view_price_buildup') || $can('manage_pricing');
+        $tab = (string) ($_GET['tab'] ?? 'general');
+        if (!in_array($tab, ['general', 'options', 'rules', 'products'], true) || (!$seesPricing && in_array($tab, ['options', 'rules'], true))) {
+            $tab = 'general';
+        }
+        $products = array_values(array_filter(\App\Repositories\ProductRepository::all(false),
+            static fn (array $p): bool => \App\Services\ProductSpecs::categoryIdFor($p) === $id));
+        $data = [
+            'category' => $category, 'tab' => $tab, 'seesPricing' => $seesPricing,
+            'canManageCatalog' => $can('manage_product_catalog'), 'canManagePricing' => $can('manage_pricing'),
+            'products' => $products,
+            'maxAttributes' => ProductCategoryRepository::MAX_ATTRIBUTES,
+            'units' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('unit')),
+            'packageTypes' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('package_type')),
+            'hsCodes' => \App\Repositories\HsCodeRepository::active(),
+            'tcClauseSets' => ProductCategoryRepository::TC_CLAUSE_SETS,
+            'categories' => ProductCategoryRepository::all(),
+        ];
+        if ($tab === 'options') {
+            $data += \App\Controllers\SpecController::categoryData($id) + ['edit' => (int) ($_GET['edit'] ?? 0), 'canManage' => $can('manage_pricing')];
+        }
+        if ($tab === 'rules') {
+            $data['rules'] = \App\Services\PriceRules::forCategory($id);
+        }
+        View::render('products/category', $data, 'layout/base');
+    }
+
+    /** D-300: the category's price rules — MD only (manage_pricing), with a reason. */
+    public function saveRules(array $params): void
+    {
+        $id = (int) $params['id'];
+        [$changes, $error] = \App\Services\PriceRules::save($id, $_POST, (int) AuthService::currentUserId());
+        if ($error !== null) {
+            Flash::set('error', $error);
+            Flash::setOld($_POST);
+        } else {
+            Flash::set('success', $changes === 0 ? 'Nothing changed.' : 'Price rules saved (' . $changes . ' change' . ($changes === 1 ? '' : 's') . '). Prices worked out from now on use them; quotes already sent keep their prices.');
+        }
+        header("Location: /products/categories/{$id}?tab=rules");
+    }
+
+    /** D-300: Products menu › Price rules — the first (system) category's rules page. */
+    public function priceRules(array $params): void
+    {
+        $id = (int) ($_GET['category'] ?? 0) ?: (\App\Repositories\SpecRepository::systemCategoryId() ?? (int) (ProductCategoryRepository::all()[0]['id'] ?? 0));
+        header("Location: /products/categories/{$id}?tab=rules");
+    }
+
+    /** D-306: where to go after saving — back to the category page when the form came from it. */
+    private static function backTo(string $default): string
+    {
+        $to = (string) ($_POST['return_to'] ?? '');
+        return preg_match('#^/products/categories/\d+(\?tab=[a-z]+)?$#', $to) === 1 ? $to : $default;
     }
 
     private static function nameError(string $name, ?int $id): ?string

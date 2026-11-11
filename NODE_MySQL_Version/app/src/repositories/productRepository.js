@@ -113,4 +113,13 @@ async function remove(id) {
   await db.execute('DELETE FROM catalog_products WHERE id = :id', { id });
 }
 
-module.exports = { all, search, find, create, update, remove, forPicker };
+/** D-300 (point 12): the product's CHA + transport default and its own price rules (null = the category's). */
+async function setPriceRuleFields(id, f) {
+  const cols = Object.keys(f).filter((c) => ['cha_transport_per_container', 'thick_k_factor', 'container_cbm', 'container_max_t'].includes(c));
+  if (!cols.length) return;
+  const params = { id };
+  for (const c of cols) params[c] = f[c];
+  await db.execute(`UPDATE catalog_products SET ${cols.map((c) => `${c} = :${c}`).join(', ')} WHERE id = :id`, params);
+}
+
+module.exports = { all, search, find, create, update, remove, forPicker, setPriceRuleFields };

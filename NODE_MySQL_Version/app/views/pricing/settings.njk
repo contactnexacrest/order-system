@@ -11,6 +11,44 @@
     Team incentive program is <strong>{{ 'on' if programOn else 'off' }}</strong>{{ '' if programOn else ' — no reserve is added to prices' }}.
   </div>
 
+  {# D-301 / D-304: the rate in use, explained; source, date, warnings, the MD's OK for a big move, and the history. #}
+  <div class="section" id="exchange-rate">
+    <h2>Exchange rate</h2>
+    {% include "pricing/_fx_rate_line.njk" %}
+    <p class="small muted">{{ 'Automatic' if fx.mode == 'auto' else 'Manual' }}{% if fx.source %} · source {{ fx.source }} · rate of {{ fx.date }}{% endif %}. Prices on Quotations and Proforma Invoices already issued never change.</p>
+    {% if fx.waiting %}{% set w = fx.waiting %}
+      <div class="alert alert-warning">
+        <p><b>Waiting for the MD:</b> today's market rate ₹{{ w.market_rate | fixed4 }} ({{ w.source }}, {{ w.rate_date }}) moved {{ pricingFmt.signed(w.change_pct) }} — more than {{ pricingFmt.trim3(fxJumpPct) }}% in a day. It is not used for prices until approved.</p>
+        {% if canManage %}
+          <form method="post" action="/pricing/fx-rates/{{ w.id }}/decide" class="field-grid">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Reason *<input type="text" name="reason" required minlength="10" maxlength="255" placeholder="e.g. Checked with the bank — the move is real"></label>
+            <div><button type="submit" name="decision" value="approve" class="btn-sm btn-success">Use this rate</button>
+              <button type="submit" name="decision" value="reject" class="btn-sm btn-secondary">Keep the rate in use</button></div>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if canManage %}
+      <form method="post" action="/pricing/fx-rates/fetch" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Fetch today's rate now</button></form>
+    {% endif %}
+    <details><summary>History (last 30 fetches)</summary>
+      <table class="list">
+        <tr><th>Date</th><th class="num">Market rate (₹ per USD)</th><th>Source</th><th class="num">Change</th><th>Status</th><th>Note</th></tr>
+        {% set statusLabels = { 'in_use': 'In use', 'waiting_md': 'Waiting for the MD', 'rejected': 'Not used (MD)', 'failed': 'Fetch failed — last rate kept' } %}
+        {% for h in fxHistory %}
+          <tr><td>{{ h.rate_date }}</td>
+            <td class="num">{{ (h.market_rate | fixed4) if h.market_rate != null else '—' }}</td>
+            <td>{{ h.source or '—' }}</td>
+            <td class="num">{{ pricingFmt.signed(h.change_pct) if h.change_pct != null else '—' }}</td>
+            <td>{{ statusLabels[h.status] or h.status }}</td>
+            <td>{{ ((h.note or '') + ((' ' + (h.decided_by_name or '') + ': ' + h.decision_reason) if h.decision_reason else '')) | trim }}</td></tr>
+        {% endfor %}
+        {% if not fxHistory.length %}<tr><td colspan="6" class="muted">No rate fetched yet — the daily job fetches one every morning (see the README).</td></tr>{% endif %}
+      </table>
+    </details>
+  </div>
+
   <form method="post" action="/pricing/settings">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset><legend>Margin and costs</legend>
@@ -18,10 +56,21 @@
         <input type="number" name="margin_pct" min="0" max="90" step="0.01" required value="{{ settings.margin_pct }}" placeholder="e.g. 20.00"{{ ro }}></label>
       <label class="setting-row"><span class="setting-label">{{ labels.other_cost_pct }} *<small class="muted">Packing, inland transport to port, CHA, inspection, documents and bank charges not already in the supplier price. A product can set its own % or USD amount.</small><span class="help-line">Example: supplier price USD 975.61 + 2.5% = cost USD 1,000.00.</span></span>
         <input type="number" name="other_cost_pct" min="0" max="100" step="0.01" required value="{{ settings.other_cost_pct }}" placeholder="e.g. 2.50"{{ ro }}></label>
-      <label class="setting-row"><span class="setting-label">{{ labels.pricing_fx_rate }} *<small class="muted">Turns supplier prices in ₹ into USD. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
-        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="{{ settings.pricing_fx_rate }}" placeholder="e.g. 82.0000"{{ ro }}></label>
       <label class="setting-row"><span class="setting-label">{{ labels.buffer_pct }} *<small class="muted">Room to negotiate: the quote price is the floor plus this %.</small><span class="help-line">Example: lowest price USD 1,287.50 + 3% → quote price USD 1,326.13; the team may agree anywhere between the two.</span></span>
         <input type="number" name="buffer_pct" min="0" max="100" step="0.01" required value="{{ settings.buffer_pct }}" placeholder="e.g. 3.00"{{ ro }}></label>
+    </fieldset>
+
+    {# D-301 (point 4, 11 Nov 2026): Automatic (fetched daily) or Manual; pricing rate = market × (1 − cushion %). #}
+    <fieldset id="exchange-rate-settings"><legend>Exchange rate (USD → INR)</legend>
+      <label class="setting-row"><span class="setting-label">{{ labels.fx_mode }} *<small class="muted">Automatic: the market rate is fetched every day (Frankfurter — European Central Bank; backup open.er-api.com) and the cushion below is taken off. Manual: the rate typed below is used.</small><span class="help-line">Example: Automatic, market ₹88.40, cushion 2% → pricing rate ₹86.63.</span></span>
+        <select name="fx_mode" required{{ ro }}>
+          <option value="auto"{% if settings.fx_mode != 'manual' %} selected{% endif %}>Automatic — fetched every day</option>
+          <option value="manual"{% if settings.fx_mode == 'manual' %} selected{% endif %}>Manual — the rate typed below</option>
+        </select></label>
+      <label class="setting-row"><span class="setting-label">{{ labels.fx_cushion_pct }} *<small class="muted">0 to 5 %, one decimal. Pricing rate = market rate × (1 − cushion %).</small><span class="help-line">Example: 2 → ₹88.40 × 0.98 = ₹86.63; 2.5 → ₹86.19.</span></span>
+        <input type="number" name="fx_cushion_pct" min="0" max="5" step="0.1" required value="{{ settings.fx_cushion_pct or '2.0' }}" placeholder="e.g. 2.0"{{ ro }}></label>
+      <label class="setting-row"><span class="setting-label">Manual exchange rate (₹ per USD) *<small class="muted">Used in Manual mode, and in Automatic mode until the first rate has been fetched. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
+        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="{{ settings.pricing_fx_rate }}" placeholder="e.g. 82.0000"{{ ro }}></label>
     </fieldset>
 
     <fieldset><legend>Team incentive reserve</legend>
@@ -67,5 +116,5 @@
     <tr><td>Change these settings, product overrides, commission levels and ladder, category specifications</td><td>MD only</td></tr>
     <tr><td>Change one product's specifications (hide, change, add for that product)</td><td>Roles with "Manage a product's specifications" — Admin and MD to start</td></tr>
   </table>
-  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/pricing/specifications">Specifications</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
+  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
 </div>

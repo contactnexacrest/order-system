@@ -6,7 +6,12 @@
   <div class="field-grid">
     <label>Name *<input type="text" name="name" value="{{ product.name or '' }}" placeholder="e.g., Granite Tiles (Polished)" required></label>
     <label class="full">Specifications *<textarea name="specifications" rows="4" placeholder="e.g., Material, size, finish, and packing details" required>{{ product.specifications or '' }}</textarea></label>
-    <label>HS Code * <small class="muted">(mandatory)</small><input type="text" name="hs_code" value="{{ product.hs_code or '' }}" placeholder="e.g., 68022310" required></label>
+    {# D-302 (point 11): picked from the HS Code Master List, pre-filled with the category's default. #}
+    <label>HS Code * <small class="muted">(from the HS Code Master List)</small><input type="text" name="hs_code" list="product_hs_codes" autocomplete="off" maxlength="8"
+      data-in-list="product_hs_codes" data-in-list-message="Pick a code from the HS Code Master List{{ ' — or add it with &quot;+ Add a new HS code&quot;' if canManageHs else '' }}."
+      value="{{ product.hs_code if (product and product.hs_code) else (categoryDefaultHs or '') }}" placeholder="e.g. 68022310 — type the code or words" required>
+      {% if not isEdit and categoryDefaultHs %}<small class="muted">Pre-filled with the default of {{ categoryName }}.</small>{% endif %}</label>
+    <datalist id="product_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description }}{{ ' · category default' if h.code == categoryDefaultHs else '' }}</option>{% endfor %}</datalist>
     <label>Origin<input type="text" name="origin" value="{{ product.origin or '' }}" placeholder="e.g., Rajasthan, India"></label>
   </div>
 
@@ -18,6 +23,18 @@
       <label>Default Packing Cost<input type="number" step="0.01" min="0" name="default_packing_cost" value="{{ product.default_packing_cost if product.default_packing_cost != null else '' }}" placeholder="e.g., 25.00"></label>
       <label>Default Loading Cost<input type="number" step="0.01" min="0" name="default_loading_cost" value="{{ product.default_loading_cost if product.default_loading_cost != null else '' }}" placeholder="e.g., 15.00"></label>
       <label>Default CHA Cost<input type="number" step="0.01" min="0" name="default_cha_cost" value="{{ product.default_cha_cost if product.default_cha_cost != null else '' }}" placeholder="e.g., 20.00"></label>
+    </div>
+  </fieldset>
+
+  {# Owner decision D-300 (point 12): CHA + transport per container (default for this product's supplier prices) and the product's own price rules. #}
+  {% set cr = categoryRules or {} %}{% set rro = '' if canManagePricing else ' disabled' %}
+  <fieldset>
+    <legend>CHA + transport and price rules <small class="muted">(empty = the category's rules{{ (' — ' + categoryName) if categoryName else '' }})</small></legend>
+    <div class="field-grid">
+      <label>CHA + transport per container (₹) <small class="muted">(default for this product's supplier prices)</small><input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="{{ product.cha_transport_per_container if (product and product.cha_transport_per_container != null) else '' }}" placeholder="e.g. 60000.00"></label>
+      <label>50 mm and above: 20 mm price per m² × <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="thick_k_factor" data-max-decimals="3" data-max-value="1000" value="{{ pricingFmt.trim3(product.thick_k_factor) if product else '' }}" placeholder="category {{ pricingFmt.trim3(cr.thick_k_factor) or '—' }}"{{ rro }}></label>
+      <label>Container holds (CBM) <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="{{ pricingFmt.trim3(product.container_cbm) if product else '' }}" placeholder="category {{ pricingFmt.trim3(cr.container_cbm) or '8' }}"{{ rro }}></label>
+      <label>Container maximum (tonnes) <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="{{ pricingFmt.trim3(product.container_max_t) if product else '' }}" placeholder="category {{ pricingFmt.trim3(cr.container_max_t) or '27' }}"{{ rro }}></label>
     </div>
   </fieldset>
 
@@ -40,3 +57,15 @@
 
   <button type="submit">{{ 'Save Changes' if isEdit else 'Add Product' }}</button>
 </form>
+{% if canManageHs %}{# D-302: "+ Add a new HS code" — straight into the master list, back to this form. #}
+<details class="quick-add">
+  <summary class="btn-sm">+ Add a new HS code to the master list…</summary>
+  <form method="post" action="/hs-codes" class="field-grid card-nested">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <input type="hidden" name="return_to" value="{{ ('/products/' ~ product.id ~ '/edit') if isEdit else '/products/create' }}">
+    <label>HS code *<input type="text" name="code" required pattern="\d{6}|\d{8}" maxlength="8" data-pattern-message="6 or 8 digits, no dots." placeholder="e.g. 68029300"></label>
+    <label>Description *<input type="text" name="description" required maxlength="255" placeholder="e.g. Granite, other (polished, worked)"></label>
+    <div><button type="submit" class="btn-sm btn-accent">Add HS code</button></div>
+  </form>
+</details>
+{% endif %}

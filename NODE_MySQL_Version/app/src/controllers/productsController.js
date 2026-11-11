@@ -101,7 +101,13 @@ async function index(req, res) {
         }
       }
       primary = primary ?? (suppliers[0] ?? null);
-      product.headline_fob = primary ? productService.effectiveFobForSupplier(primary, product) : null;
+      // D-304 (point 14): "Supplier price ₹ / unit" — the used-for-pricing price in the product's unit
+      // (D-300: a price for every thickness shows its base thickness).
+      const parts = primary ? await pricingService.fobParts(product, primary, (primary.price_basis || '') === 'cbm' ? 'cbm' : 'unit', null) : null;
+      product.headline_fob = parts ? parts.supplier : null;
+      product.headline_basis = primary === null ? null : ((primary.price_basis || '') === 'grid'
+        ? (parts && parts.mm !== null && parts.mm !== undefined ? `${require('../services/thicknessPrices').fmt(parts.mm)} mm base` : 'base')
+        : ((primary.price_basis || '') === 'cbm' ? 'per CBM' : (Number(primary.is_primary) === 1 ? 'used for pricing' : 'latest price')));
     }
   } else {
     // Strip pricing data out of the response entirely — not just hidden in
@@ -124,27 +130,96 @@ async function index(req, res) {
     canManage,
     canBuildup,
     canStaffPrice,
+    // D-304 (point 14): the rate line (build-up viewers) and "≈ USD" under the supplier price (product editors).
+    fx: canBuildup || (canSeeHeadlineFob && canManage) ? await require('../services/fxRateService').current() : null,
+    canFixHs: canManage,
+    canLinkSuppliers: !!(req.permissions || {}).record_market_prices || !!(req.permissions || {}).manage_suppliers,
+    canPriceRules: canBuildup || !!(req.permissions || {}).manage_pricing,
+    canPricingSettings: canBuildup || !!(req.permissions || {}).manage_pricing,
+    ...catalogueUnits(products),
   }, 'layout/base');
+}
+
+/** D-304: one unit in the column headers when every row shares it, else "unit" and a unit per row. */
+function catalogueUnits(products) {
+  const units = [...new Set(products.map((p) => String(p.reference_unit || '') || 'unit'))];
+  return { headerUnit: units.length === 1 ? units[0] : 'unit', unitPerRow: units.length > 1 };
+}
+
+/**
+ * D-302 (point 11): the HS code is picked from the HS Code Master List, pre-filled with the
+ * category's default; people with manage_hs_codes may add a code there. D-300: the product's
+ * CHA + transport default and its own price rules.
+ */
+async function formExtras(req, product) {
+  const productSpecs = require('../services/productSpecs');
+  const specRepository = require('../repositories/specRepository');
+  const categoryId = product ? await productSpecs.categoryIdFor(product) : await specRepository.systemCategoryId();
+  const category = categoryId ? await require('../repositories/productCategoryRepository').find(categoryId) : null;
+  const p = req.permissions || {};
+  return {
+    hsCodes: await require('../repositories/hsCodeRepository').active(),
+    categoryDefaultHs: String((category && category.default_hs_code) || ''),
+    categoryName: String((category && category.name) || ''),
+    categoryId: categoryId || null,
+    canManageHs: !!p.manage_hs_codes,
+    canManagePricing: !!p.manage_pricing,
+    categoryRules: category || {},
+  };
+}
+
+/** D-300: the CHA + transport default (product editors) and the product's own rules (MD only): [fields, error]. */
+function readPriceRuleFields(req) {
+  const body = req.body || {};
+  const out = {};
+  const spec = { cha_transport_per_container: ['CHA + transport per container (₹)', 0, 9999999999, 2] };
+  if ((req.permissions || {}).manage_pricing) {
+    Object.assign(spec, { thick_k_factor: ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], container_cbm: ['Container holds (CBM)', 0.5, 100, 2],
+      container_max_t: ['Container maximum (tonnes)', 1, 100, 2] });
+  }
+  for (const [key, [lbl, min, max, dec]] of Object.entries(spec)) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const v = String(body[key]).trim();
+    if (v === '') {
+      out[key] = null;
+      continue;
+    }
+    if (!new RegExp(`^\\d{1,10}(\\.\\d{1,${dec}})?$`).test(v) || Number(v) < min || Number(v) > max) {
+      return [{}, `${lbl}: enter a number from ${min} to ${max} with at most ${dec} decimals, or leave it empty for the category's value.`];
+    }
+    out[key] = Number(v).toFixed(dec);
+  }
+  return [out, null];
+}
+
+/** D-302: only a code from the HS Code Master List — so an order line can always use it. */
+async function hsMasterError(req, code) {
+  if (code === '' || (await require('../repositories/hsCodeRepository').isActiveCode(code))) return null;
+  return `HS code "${code}" is not on the HS Code Master List — pick one from the list${(req.permissions || {}).manage_hs_codes ? ', or add it with "+ Add a new HS code".' : ' (ask someone who manages HS codes to add it).'}`;
 }
 
 async function create(req, res) {
   res.renderView('products/create', {
     product: null,
     referenceUnits: await require('../repositories/lookupRepository').dropdownOptions('unit'),
+    ...(await formExtras(req, null)),
   }, 'layout/base');
 }
 
 async function store(req, res) {
   const data = readProductForm(req);
-  const error = validateProduct(data) || (await applySellingUnit(req, data));
+  const [ruleFields, ruleError] = readPriceRuleFields(req);
+  const error = validateProduct(data) || (await hsMasterError(req, data.hs_code)) || (await applySellingUnit(req, data)) || ruleError;
   if (error) {
     flash.set(req, 'error', error);
+    flash.setOld(req, req.body || {});
     res.redirect('/products/create');
     return;
   }
 
   const user = req.user;
   const id = await productRepository.create(data, user.id);
+  await productRepository.setPriceRuleFields(id, ruleFields);
   await auditLogRepository.log(user.id, 'PRODUCT_CREATED', 'products', id, null, null, data.name);
   flash.set(req, 'success', 'Product added to the catalog.');
   res.redirect(`/products/${id}`);
@@ -247,6 +322,8 @@ async function show(req, res) {
     pricingStaff,
     canManagePricing: !!(req.permissions || {}).manage_pricing,
     canMarketPrices: !!(req.permissions || {}).record_market_prices || canBuildup,
+    // D-300 (point 12): the category's price rules page; "own rule" when the product has its own values.
+    productCategoryId: await require('../services/productSpecs').categoryIdFor(details.product),
     pricingOverrideValues: {
       margin: trimOverride(details.product.pricing_margin_pct),
       buffer: trimOverride(details.product.pricing_buffer_pct),
@@ -266,6 +343,7 @@ async function edit(req, res) {
   res.renderView('products/edit', {
     product,
     referenceUnits: await require('../repositories/lookupRepository').dropdownOptions('unit'),
+    ...(await formExtras(req, product)),
   }, 'layout/base');
 }
 
@@ -278,7 +356,8 @@ async function update(req, res) {
   }
 
   const data = readProductForm(req);
-  const error = validateProduct(data) || (await applySellingUnit(req, data));
+  const [ruleFields, ruleError] = readPriceRuleFields(req);
+  const error = validateProduct(data) || (await hsMasterError(req, data.hs_code)) || (await applySellingUnit(req, data)) || ruleError;
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(`/products/${id}/edit`);
@@ -287,6 +366,13 @@ async function update(req, res) {
 
   const user = req.user;
   await productRepository.update(id, data, user.id);
+  for (const [k, v] of Object.entries(ruleFields)) {
+    const old = product[k] ?? null;
+    if ((old === null) !== (v === null) || (old !== null && Number(old) !== Number(v))) {
+      await auditLogRepository.log(user.id, 'PRODUCT_PRICE_RULE_CHANGED', 'products', id, k, old === null ? 'category' : String(old), v ?? 'category');
+    }
+  }
+  await productRepository.setPriceRuleFields(id, ruleFields);
   await auditLogRepository.log(user.id, 'PRODUCT_UPDATED', 'products', id, null, null, data.name);
   flash.set(req, 'success', 'Product updated.');
   res.redirect(`/products/${id}`);

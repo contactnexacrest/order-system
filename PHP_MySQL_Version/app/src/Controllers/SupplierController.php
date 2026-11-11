@@ -86,6 +86,8 @@ final class SupplierController
             'usedOnAnOrder' => SupplierRepository::isUsedOnAnOrder($id),
             'bank' => VendorDetailsRepository::bankDetails($supplier),
             'detailsLink' => self::detailsLinkUrl($supplier),
+            // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
+            'productPrices' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE) ? \App\Repositories\ProductSupplierRepository::forDirectorySupplier($id) : null,
         ], 'layout/base');
     }
 
@@ -118,6 +120,10 @@ final class SupplierController
         }
 
         SupplierRepository::update($id, $data);
+        // D-303: "Details pending" (a supplier added quickly from a price) is cleared here once completed.
+        if (array_key_exists('details_pending', $_POST)) {
+            SupplierRepository::setDetailsPending($id, (string) $_POST['details_pending'] === '1');
+        }
         VendorDetailsService::applyStaffBankInput('supplier', $id, (int) AuthService::currentUserId());
         AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_UPDATED', 'suppliers', $id, 'supplier_legal_name', $supplier['supplier_legal_name'], $data['supplier_legal_name']);
         Flash::set('success', "\"{$data['supplier_legal_name']}\" updated. Orders that already saved Supplier PO terms keep the details they recorded.");
@@ -218,6 +224,44 @@ final class SupplierController
         $sent = VendorDetailsService::sendDetailsLink('supplier', $id, (int) AuthService::currentUserId());
         Flash::set('success', $sent['message'], $sent['link']); // D-280
         header("Location: /suppliers/{$id}/edit#vendor-details-link");
+    }
+
+    /**
+     * D-303 (point 15): "+ Add a new supplier (quick)" from a product price — name, location,
+     * phone and type. The supplier goes into the directory marked "Details pending"; GSTIN,
+     * bank and contacts follow later (details link or Procurement). It is never typed twice.
+     */
+    public function quickAdd(array $params): void
+    {
+        $name = trim((string) ($_POST['quick_name'] ?? ''));
+        $location = trim((string) ($_POST['quick_location'] ?? ''));
+        $phone = trim((string) ($_POST['quick_phone'] ?? ''));
+        $type = trim((string) ($_POST['quick_type'] ?? ''));
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        $back = $productId > 0 ? "/products/{$productId}/market-prices" : '/products/link-suppliers';
+        $types = array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('supplier_type'));
+        $error = null;
+        if (mb_strlen($name) < 2 || mb_strlen($name) > 255) {
+            $error = 'Supplier name: 2 to 255 characters.';
+        } elseif (mb_strlen($location) < 2 || mb_strlen($location) > 120) {
+            $error = 'Location: the town or district and state, e.g. "Ongole, Andhra Pradesh".';
+        } elseif (!preg_match('/^\+?[0-9][0-9 \-]{6,18}$/', $phone)) {
+            $error = 'Phone: digits, spaces or dashes, with the country code, e.g. +91-0000000000.';
+        } elseif ($type !== '' && !in_array($type, $types, true)) {
+            $error = 'Choose the supplier type from the list.';
+        } elseif (SupplierRepository::findByExactName($name) !== null) {
+            $error = "\"{$name}\" is already in the Suppliers directory — pick it from the list.";
+        }
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: {$back}#add-price");
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        $id = SupplierRepository::quickAdd($name, $location, $phone, $type, $userId);
+        AuditLogRepository::log($userId, 'SUPPLIER_QUICK_ADDED', 'suppliers', $id, 'supplier_legal_name', null, "{$name} — {$location} (details pending)");
+        Flash::set('success', "\"{$name}\" added to the Suppliers directory (details pending) and picked below.");
+        header('Location: ' . ($productId > 0 ? "/products/{$productId}/market-prices?supplier_id={$id}#add-price" : '/products/link-suppliers'));
     }
 
     private static function detailsLinkUrl(array $vendor): ?string

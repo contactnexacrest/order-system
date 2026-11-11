@@ -76,6 +76,10 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
   <h3>Products (<?= count($__goods) ?> line<?= count($__goods) === 1 ? '' : 's' ?>)</h3>
   <?php if ($canEditProducts): ?><button type="button" class="btn-primary" data-open-panel="line-panel-new">+ Add product</button><?php endif; ?>
 </div>
+<?php // D-305 (point 19): on an order from an associate's client, staff see this order's figures — never the associate's name, level or %. ?>
+<?php if (!empty($sees['selling']) && !empty($linePricing['ctx']['associate'])): ?>
+  <p class="muted small for-this-order">ⓘ This client came through an associate, so this order's prices are higher.<?= !empty($seesPriceBuildup) ? ' Sold by ' . htmlspecialchars((string) $linePricing['ctx']['label']) . '.' : '' ?></p>
+<?php endif; ?>
 <?php if ($__summary !== null): ?>
   <p class="line-summary <?= $__summary['blocking'] ? 'notice notice-warning' : 'notice notice-success' ?>"><?= htmlspecialchars($__summary['text']) ?><?= $__summary['blocking'] ? ' <a href="#price-check">Show</a>' : '' ?></p>
 <?php endif; ?>
@@ -164,7 +168,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>
           <div class="size-grid">
-            <label>Unit price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?><input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($__p['unit_price'] ?? '')) ?>" placeholder="e.g. 495.00" data-floor-message="Below your lowest price"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '"' : '' ?>></label>
+            <label>Unit price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?><input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($__p['unit_price'] ?? '')) ?>" placeholder="e.g. 495.00" data-floor-message="<?= !empty($linePricing['ctx']['associate']) ? 'Below the lowest for this order' : 'Below your lowest price' ?>"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '"' : '' ?>></label>
             <div class="line-total-box"><span class="muted small">Line total</span><output class="line-total"><?= !$__isNew && $__p['fob_value'] !== null ? number_format((float) $__p['fob_value'], 2) : '—' ?></output></div>
           </div>
           <div class="price-ref-box" aria-live="polite"><?php if ($__lc !== null && $sees['selling']): include __DIR__ . '/_line_price.php'; endif; ?></div>
@@ -188,7 +192,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
                 <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($__p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($__p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
             <label>Category

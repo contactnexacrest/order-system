@@ -141,7 +141,59 @@ async function editForm(req, res) {
     detailsLink: vendorDetailsService.detailsLinkUrl(supplier),
     vendorKind: 'supplier',
     vendor: supplier,
+    // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
+    productPrices: await productPricesFor(req, id),
   }, 'layout/base');
+}
+
+/** D-303: "Prices given for products" for the supplier page, or null when the viewer may not see purchase prices. */
+async function productPricesFor(req, id) {
+  if (!require('../services/moneyVisibility').can(req.permissions, 'purchase')) return null;
+  const thicknessPrices = require('../services/thicknessPrices');
+  const fmt2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const out = [];
+  for (const pp of await require('../repositories/productSupplierRepository').forDirectorySupplier(id)) {
+    let price;
+    if ((pp.price_basis || '') === 'grid') {
+      const g = await thicknessPrices.typedFor(Number(pp.id));
+      price = `${Object.entries(g).map(([mm, v]) => `${Number(mm) === 0 ? '50 mm+' : `${mm} mm`} ₹${fmt2(v)}${Number(mm) === 0 ? ' / CBM' : ' / m²'}`).join(' · ')} (typed; others calculated)`;
+    } else {
+      price = `₹${pp.fob_value !== null ? fmt2(pp.fob_value) : '—'} / ${(pp.price_basis || '') === 'cbm' ? 'CBM' : (String(pp.reference_unit || '') || 'unit')}`;
+    }
+    out.push({ product_name: pp.product_name, price, quoted_on: pp.quoted_on ? String(pp.quoted_on).slice(0, 10) : '—',
+      valid_until: pp.valid_until ? String(pp.valid_until).slice(0, 10) : '—', used: Number(pp.is_primary) === 1 || Number(pp.is_cbm_primary || 0) === 1 || Number(pp.combo_in_use || 0) === 1 });
+  }
+  return out;
+}
+
+/**
+ * D-303 (point 15): "+ Add a new supplier (quick)" from a product price — name, location, phone and
+ * type. The supplier goes into the directory marked "Details pending". Same messages as PHP.
+ */
+async function quickAdd(req, res) {
+  const body = req.body || {};
+  const name = String(body.quick_name ?? '').trim();
+  const location = String(body.quick_location ?? '').trim();
+  const phone = String(body.quick_phone ?? '').trim();
+  const type = String(body.quick_type ?? '').trim();
+  const productId = parseInt(body.product_id, 10) || 0;
+  const back = productId > 0 ? `/products/${productId}/market-prices` : '/products/link-suppliers';
+  const types = (await require('../repositories/lookupRepository').dropdownOptions('supplier_type')).map((o) => String(o.option_value));
+  let error = null;
+  if ([...name].length < 2 || [...name].length > 255) error = 'Supplier name: 2 to 255 characters.';
+  else if ([...location].length < 2 || [...location].length > 120) error = 'Location: the town or district and state, e.g. "Ongole, Andhra Pradesh".';
+  else if (!/^\+?[0-9][0-9 \-]{6,18}$/.test(phone)) error = 'Phone: digits, spaces or dashes, with the country code, e.g. +91-0000000000.';
+  else if (type !== '' && !types.includes(type)) error = 'Choose the supplier type from the list.';
+  else if (await supplierRepository.findByExactName(name)) error = `"${name}" is already in the Suppliers directory — pick it from the list.`;
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(`${back}#add-price`);
+    return;
+  }
+  const id = await supplierRepository.quickAdd(name, location, phone, type, req.user.id);
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_QUICK_ADDED', 'suppliers', id, 'supplier_legal_name', null, `${name} — ${location} (details pending)`);
+  flash.set(req, 'success', `"${name}" added to the Suppliers directory (details pending) and picked below.`);
+  res.redirect(productId > 0 ? `/products/${productId}/market-prices?supplier_id=${id}#add-price` : '/products/link-suppliers');
 }
 
 async function update(req, res) {
@@ -174,6 +226,11 @@ async function update(req, res) {
   }
 
   await supplierRepository.update(id, result.data);
+  // D-303: "Details pending" (a supplier added quickly from a product price) is cleared here once completed.
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'details_pending')) {
+    const v = req.body.details_pending;
+    await supplierRepository.setDetailsPending(id, String(Array.isArray(v) ? v[v.length - 1] : v) === '1');
+  }
   await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body, req);
   await auditLogRepository.log(req.user.id, 'SUPPLIER_UPDATED', 'suppliers', id, 'supplier_legal_name', supplier.supplier_legal_name, result.data.supplier_legal_name);
   flash.set(req, 'success', `"${result.data.supplier_legal_name}" updated. Orders that already saved Supplier PO terms keep the details they recorded.`);
@@ -264,5 +321,5 @@ async function sendDetailsLink(req, res) {
 
 module.exports = {
   sendDetailsLink,
-  index, createForm, create, editForm, update, toggleActive, remove, addFactoryAddress, deleteFactoryAddress,
+  index, createForm, create, editForm, update, toggleActive, remove, addFactoryAddress, deleteFactoryAddress, quickAdd,
 };

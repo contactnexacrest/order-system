@@ -4,6 +4,7 @@
 {% set ro = '' if canEdit else ' disabled' %}
 {% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrfToken }}">{% endmacro %}
 {% macro badge(kind) %}{% if kind == 'category' %}<span class="badge">From category</span>{% elif kind == 'changed' %}<span class="badge badge-warning">Changed for this product</span>{% elif kind == 'product' %}<span class="badge badge-active">This product only</span>{% elif kind == 'hidden' %}<span class="badge badge-danger">Hidden for this product</span>{% endif %}{% endmacro %}
+{% set catName = categoryName or '' %}
 <div class="card page-wide">
   <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
   <h1>Specifications — {{ product.name }}</h1>
@@ -28,7 +29,9 @@
     {% for s in tree %}
       {% set kind = 'product' if s.source == 'product' else ('hidden' if s.hidden else ('changed' if s.changed else 'category')) %}
       <tr id="spec-{{ s.id }}">
-        <td><b>{{ s.name }}</b> {{ badge(kind) }}</td>
+        <td><b>{{ s.name }}</b> {{ badge(kind) }}
+          {# D-306 (point 20): where the category's options are changed for every product. #}
+          {% if s.source == 'category' and catName %}<br><small class="muted">From category {{ catName }} — <a href="/products/categories/{{ categoryId }}?tab=options#spec-{{ s.id }}">edit for all products in {{ catName }}</a></small>{% endif %}</td>
         <td>{% if s.hidden %}<span class="muted">Not offered for this product</span>{% else %}{% for o in s.options %}
           {% set ok = 'hidden' if o.hidden else ('product' if o.source == 'product' else ('changed' if o.source == 'changed' else 'category')) %}
           <span class="badge{{ {'hidden': ' badge-danger', 'product': ' badge-active', 'changed': ' badge-warning', 'category': ''}[ok] }}"{% if o.hidden %} style="text-decoration:line-through"{% endif %}>{{ o.name }} {{ o.change_label }}{% if o.source == 'changed' and o.category_value !== null %} (category {{ o.category_label }}){% endif %}</span>
@@ -38,7 +41,7 @@
             {% if s.hidden %}
               <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/show" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm">Show again</button></form>
             {% else %}
-              <a class="btn-sm" href="/products/{{ product.id }}/specifications?edit={{ s.id }}#spec-{{ s.id }}">{{ 'Edit' if s.changed else 'Change for this product' }}</a>
+              <a class="btn-sm" href="/products/{{ product.id }}/specifications?edit={{ s.id }}#spec-{{ s.id }}">{{ 'Edit for this product only' if s.changed else 'Change for this product only' }}</a>
               <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/hide" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Not offered</button></form>
             {% endif %}
             {% if s.changed %}<form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/reset" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Reset to category</button></form>{% endif %}

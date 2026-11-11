@@ -1,0 +1,59 @@
+{#
+  Owner decision D-300 (point 12, 11 Nov 2026): every rule used for working out a supplier's prices, on one
+  page per category — the thickness %s, × K for 50 mm and above per CBM, "+ Add a thickness", what one
+  container holds and the stone weight, with a live example column (app.js initRulesExample). MD only, with a
+  reason; every change is in the Audit Log. In: rules, rulesView, canManagePricing, categories, category.
+  Port of views/products/_price_rules.php.
+#}
+{% set r = rules %}{% set v = rulesView %}
+{% set ro = '' if canManagePricing else ' disabled' %}
+<form method="get" action="/products/price-rules" class="field-grid">
+  <label>Category
+    <select name="category" onchange="this.form.submit()">
+      {% for cat in categories %}<option value="{{ cat.id }}"{% if cat.id == category.id %} selected{% endif %}>{{ cat.name }}</option>{% endfor %}
+    </select></label>
+  <noscript><button type="submit" class="btn-sm">Open</button></noscript>
+</form>
+
+<form method="post" action="/products/categories/{{ category.id }}/price-rules" data-rules-example data-example="{{ pricingFmt.trim3(v.example) }}">
+  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+  <h2>Thickness</h2>
+  {% if not r.spec %}<p class="muted">This category has no Thickness specification — add one on the "Options and their price effect" tab first.</p>{% endif %}
+  <table class="list">
+    <tr><th>Thickness</th><th>Price compared with {{ r.base_mm }} mm</th><th class="num">Example ({{ r.base_mm }} mm = ₹{{ v.example | money0 }} / m²)</th></tr>
+    {% for t in v.thickness %}
+      <tr data-rule-row data-mm="{{ t.mm }}">
+        <td>{{ t.name }}</td>
+        <td>{% if t.base %}base{% else %}+ <input type="text" inputmode="decimal" name="pct[{{ t.id }}]" data-rule-pct data-max-decimals="2" data-max-value="500" value="{{ t.value }}" placeholder="e.g. 35" aria-label="{{ t.name }}: % compared with {{ r.base_mm }} mm" style="width:6em"{{ ro }}> %{% endif %}</td>
+        <td class="num" data-rule-example>{{ t.example }}</td>
+      </tr>
+    {% endfor %}
+    <tr data-rule-cbm>
+      <td>{{ r.cbm_from }} mm and above (per CBM)</td>
+      <td>{{ r.base_mm }} mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="{{ v.k }}" placeholder="e.g. 40" aria-label="{{ r.cbm_from }} mm and above: {{ r.base_mm }} mm price per m² times" style="width:6em"{{ ro }}></td>
+      <td class="num" data-rule-example>{{ v.kExample }}</td>
+    </tr>
+  </table>
+  {% if canManagePricing and r.spec %}
+  <details class="add-thickness"><summary class="btn-sm">+ Add a thickness</summary>
+    <div class="field-grid">
+      <label>Thickness (mm)<input type="number" name="new_mm" min="1" max="{{ r.cbm_from - 1 }}" step="1" value="{{ v.newMm }}" placeholder="e.g. 18"></label>
+      <label>% compared with {{ r.base_mm }} mm<input type="text" inputmode="decimal" name="new_change" data-max-decimals="2" data-required-if="new_mm" value="{{ v.newChange }}" placeholder="e.g. -5"></label>
+    </div>
+  </details>
+  {% endif %}
+
+  <h2>Container and weight</h2>
+  <div class="field-grid">
+    <label>One container holds (CBM)<input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="{{ v.containerCbm }}" placeholder="e.g. 8"{{ ro }}></label>
+    <label>Maximum (tonnes)<input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="{{ v.containerMaxT }}" placeholder="e.g. 27"{{ ro }}></label>
+    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="{{ v.weight }}" placeholder="e.g. 2.7"{{ ro }}></label>
+  </div>
+  <p class="small muted">The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
+  {% if canManagePricing %}
+    <label>Reason for the change *<textarea name="reason" rows="2" required maxlength="500" placeholder="e.g. Supplier rates for 30 mm went up in November">{{ v.reason }}</textarea></label>
+    <button type="submit">Save rules</button>
+  {% else %}
+    <p class="muted small">Only the MD can change these rules.</p>
+  {% endif %}
+</form>

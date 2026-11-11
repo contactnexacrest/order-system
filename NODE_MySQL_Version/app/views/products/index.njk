@@ -8,10 +8,16 @@
     {% if searched %}<a class="btn-sm" href="/products">Clear</a>{% endif %}
   </form>
 
-  {% if canBuildup %}<p class="muted small">Prices in USD per unit, FOB. Yellow badge = this product overrides a global pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked. <a href="/pricing/settings">Pricing settings</a></p>{% endif %}
-  {% if canManage %}
-    <p><a class="btn-sm btn-accent" href="/products/create">+ Add Product</a> <a class="btn-sm" href="/products/categories">Categories &amp; attributes</a></p>
-  {% endif %}
+  {# D-304 (point 14): the pricing rate, explained — price build-up viewers only. #}
+  {% if canBuildup and fx %}{% include "pricing/_fx_rate_line.njk" %}{% endif %}
+  {% if canBuildup %}<p class="muted small">Supplier prices are in ₹; every other price is in USD per the product's unit, FOB. Yellow badge = this product overrides a global pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked.</p>{% endif %}
+  <p>
+    {% if canManage %}<a class="btn-sm btn-accent" href="/products/create">+ Add Product</a> <a class="btn-sm" href="/products/categories">Categories</a>{% endif %}
+    {% if canPriceRules %}<a class="btn-sm" href="/products/price-rules">Price rules</a>{% endif %}
+    {% if canPricingSettings %}<a class="btn-sm" href="/pricing/settings">Pricing settings</a>{% endif %}
+    {% if canFixHs %}<a class="btn-sm btn-secondary" href="/products/fix-hs-codes">Fix HS codes</a>{% endif %}
+    {% if canLinkSuppliers %}<a class="btn-sm btn-secondary" href="/products/link-suppliers">Link suppliers</a>{% endif %}
+  </p>
 
   {% if not canBrowse and not searched %}
     <p class="muted">Enter a search term above to find a product. You do not have permission to browse the full catalog list.</p>
@@ -21,10 +27,12 @@
         <th>Name</th>
         <th>HS Code</th>
         <th>Origin</th>
-        {% if canViewPricing %}<th>Headline FOB</th>{% endif %}
+        {# D-304 (point 14): every column says its currency and unit — one unit in the header when all rows share it. #}
+        {% if canViewPricing %}<th>Supplier price<br>₹ / {{ headerUnit }}</th>{% endif %}
         {# Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. #}
-        {% if canBuildup %}<th class="num">Cost</th><th class="num">Min price</th><th class="num">Staff floor</th><th class="num">Staff quote</th><th class="num">Assoc. floor (lowest level)</th><th>Supplier price date</th>{% endif %}
-        {% if canStaffPrice %}<th class="num">Quote (USD)</th><th class="num">Lowest (USD)</th>{% endif %}
+        {% if canBuildup %}<th class="num">Cost<br>USD / {{ headerUnit }}</th><th class="num">Min price<br>USD / {{ headerUnit }}</th><th class="num">Staff lowest<br>USD / {{ headerUnit }}</th><th class="num">Staff quote<br>USD / {{ headerUnit }}</th><th class="num">Associate lowest<br>USD / {{ headerUnit }}</th><th>Supplier price date</th>{% endif %}
+        {# D-305 (point 19): staff see only the quote and their own lowest price. #}
+        {% if canStaffPrice %}<th class="num">Quote price<br>USD / {{ headerUnit }}</th><th class="num">Your lowest<br>USD / {{ headerUnit }}</th>{% endif %}
         <th>Status</th>
         <th></th>
       </tr>
@@ -33,11 +41,13 @@
       {% endif %}
       {% for p in products %}
         <tr>
-          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if unitPerRow %} <small class="muted">per {{ p.reference_unit or 'unit' }}</small>{% endif %}{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
           <td>{{ p.hs_code }}</td>
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
-            <td>{{ 'To Be Confirmed' if p.headline_fob == null else (p.headline_fob | money) }}</td>
+            <td>{% if p.headline_fob == null %}To Be Confirmed{% else %}₹{{ p.headline_fob | money }}
+              {% if canManage and fx and fx.rate > 0 %}<br><b class="usd-approx">≈ USD {{ (p.headline_fob / fx.rate) | money }}</b>{% endif %}
+              {% if p.headline_basis %}<br><small class="muted">{{ p.headline_basis }}</small>{% endif %}{% endif %}</td>
           {% endif %}
           {% if canBuildup %}{% set b = p.pricing.build %}
             {% if not b %}

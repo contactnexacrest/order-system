@@ -352,6 +352,8 @@ $router->post('/suppliers/{id}/details-link', [$suppliersDirectory, 'sendDetails
 foreach (['verify' => 'supplierVerify', 'check' => 'supplierCheck', 'reject' => 'supplierReject', 'resend' => 'supplierResend'] as $__a => $__m) {
     $router->post('/suppliers/{id}/bank-changes/{changeId}/' . $__a, [$vendorBankChange, $__m], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 }
+// D-303 (point 15): "+ Add a new supplier (quick)" from a product price (before /suppliers/{id}/…).
+$router->post('/suppliers/quick-add', [$suppliersDirectory, 'quickAdd'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses', [$suppliersDirectory, 'addFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses/{addressId}/delete', [$suppliersDirectory, 'deleteFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 
@@ -1154,6 +1156,15 @@ $router->get('/products/categories', [$productCategories, 'index'], [SessionAuth
 $router->post('/products/categories', [$productCategories, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/categories/{id}', [$productCategories, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/categories/{id}/settings', [$productCategories, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// Owner decisions D-300..D-306 (11 Nov 2026): one page per category (tabs), its price rules, and the one-time clean-up pages (before /products/{id}).
+$catalogueMaster = new \App\Controllers\CatalogueMasterController();
+$router->get('/products/categories/{id}', [$productCategories, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_product_catalog', 'manage_pricing', 'view_price_buildup'])]);
+$router->post('/products/categories/{id}/price-rules', [$productCategories, 'saveRules'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/products/price-rules', [$productCategories, 'priceRules'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_pricing', 'view_price_buildup'])]);
+$router->get('/products/fix-hs-codes', [$catalogueMaster, 'fixHsCodes'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/{id}/hs-code', [$catalogueMaster, 'saveHsCode'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->get('/products/link-suppliers', [$catalogueMaster, 'linkSuppliers'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers'])]);
+$router->post('/products/link-suppliers', [$catalogueMaster, 'saveLinks'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
@@ -1182,6 +1193,11 @@ $router->get('/products/{id}/market-prices', [$pricing, 'marketPrices'], [Sessio
 $router->post('/products/{id}/market-prices', [$pricing, 'addMarketPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/products/suppliers/{supplierId}/use-for-pricing', [$pricing, 'useForPricing'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/products/suppliers/{supplierId}/market-price', [$pricing, 'updateMarketDates'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+// D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
+$router->get('/products/suppliers/{supplierId}/price', [$pricing, 'editPrice'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'view_price_buildup'])]);
+$router->post('/products/suppliers/{supplierId}/price', [$pricing, 'savePrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->post('/pricing/fx-rates/fetch', [$pricing, 'fetchFxRate'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/fx-rates/{id}/decide', [$pricing, 'decideFxRate'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 // Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).
 $specs = new \App\Controllers\SpecController();
 $router->get('/pricing/specifications', [$specs, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);

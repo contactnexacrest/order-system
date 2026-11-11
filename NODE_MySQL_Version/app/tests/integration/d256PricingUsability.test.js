@@ -225,9 +225,12 @@ describe('D-256 pricing usability', () => {
   it('exact prices in Market prices for Procurement, without selling prices', async () => {
     const agent = await login('Procurement Executive');
     const url = `/products/${product}/market-prices`;
+    // D-303 (point 15): the supplier is a record of the Suppliers directory (matched by its exact name).
+    const quarry = `Exact quarry ${require('crypto').randomBytes(3).toString('hex')}`;
+    await require('../../src/repositories/supplierRepository').create({ supplier_legal_name: quarry, types: [] }, null);
     const csrf = (await agent.get(url)).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
     const combo = Object.fromEntries(Object.entries(await sel({ Thickness: '30 mm', 'Surface finish': 'Leather' })).map(([k, v]) => [`combo[${k}]`, String(v)]));
-    await agent.post(url).type('form').send({ _csrf: csrf, supplier_name: 'Exact quarry', price_inr: '4900', quoted_on: today(), valid_until: '', price_basis: 'combo', used_for_pricing: '1', location: '', notes: '', ...combo });
+    await agent.post(url).type('form').send({ _csrf: csrf, supplier_name: quarry, price_inr: '4900', quoted_on: today(), valid_until: '', price_basis: 'combo', used_for_pricing: '1', location: '', notes: '', ...combo });
     const rows = (await productSupplierRepository.forProduct(product)).filter((s) => s.price_basis === 'combo');
     expect(rows.length).toBe(1);
     expect([String(rows[0].combo_per), Number(rows[0].combo_in_use)]).toEqual(['unit', 1]);
@@ -237,7 +240,7 @@ describe('D-256 pricing usability', () => {
     for (const s of ['79.60', '77.28', '83.79', 'Staff floor', 'margin']) {
       expect([s, page.includes(s)]).toEqual([s, false]);
     }
-    await agent.post(url).type('form').send({ _csrf: csrf, supplier_name: 'Exact quarry', price_inr: '4900', quoted_on: today(), valid_until: '', price_basis: 'combo', location: '', notes: '' });
+    await agent.post(url).type('form').send({ _csrf: csrf, supplier_name: quarry, price_inr: '4900', quoted_on: today(), valid_until: '', price_basis: 'combo', location: '', notes: '' });
     expect((await productSupplierRepository.forProduct(product)).filter((s) => s.price_basis === 'combo').length).toBe(1);
   });
 

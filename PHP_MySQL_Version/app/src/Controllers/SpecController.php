@@ -40,9 +40,13 @@ final class SpecController
 
     private static function back(string $to): void
     {
+        // D-306 (point 20): a category's options are a tab of its page now.
+        if (preg_match('~^/pricing/specifications(?:\?category=(\d+))?(?:&edit=(\d+))?(#.*)?$~', $to, $m) === 1) {
+            $cat = $m[1] ?? '' ?: (string) (SpecRepository::systemCategoryId() ?? 0);
+            $to = "/products/categories/{$cat}?tab=options" . (($m[2] ?? '') !== '' ? '&edit=' . $m[2] : '') . ($m[3] ?? '');
+        }
         header('Location: ' . $to);
     }
-
     /**
      * On a product's routes (/products/{pid}/…) the specification or option must be that
      * product's own — never a category one (those need manage_pricing on the category routes).
@@ -63,10 +67,21 @@ final class SpecController
 
     // ------------------------------------------------------------ category level
 
+    /** D-306 (point 20): the old Admin › Pricing › Specifications address opens the category page's Options tab. */
     public function index(array $params): void
     {
-        $categories = ProductCategoryRepository::all(true);
-        $categoryId = (int) ($_GET['category'] ?? 0) ?: (SpecRepository::systemCategoryId() ?? (int) ($categories[0]['id'] ?? 0));
+        $categoryId = (int) ($_GET['category'] ?? 0) ?: (int) (SpecRepository::systemCategoryId() ?? (ProductCategoryRepository::all(true)[0]['id'] ?? 0));
+        $edit = (int) ($_GET['edit'] ?? 0);
+        header("Location: /products/categories/{$categoryId}?tab=options" . ($edit > 0 ? "&edit={$edit}#spec-{$edit}" : ''));
+    }
+
+    /**
+     * A category's specifications and options with whether each is used (for its Options tab).
+     *
+     * @return array{categoryId: int, specs: list<array<string,mixed>>}
+     */
+    public static function categoryData(int $categoryId): array
+    {
         $specs = SpecRepository::categorySpecs($categoryId);
         $options = SpecRepository::optionsFor(array_map(static fn (array $s): int => (int) $s['id'], $specs));
         foreach ($specs as &$s) {
@@ -78,10 +93,7 @@ final class SpecController
             unset($o);
         }
         unset($s);
-        View::render('pricing/specifications', [
-            'categories' => $categories, 'categoryId' => $categoryId, 'specs' => $specs,
-            'edit' => (int) ($_GET['edit'] ?? 0), 'canManage' => self::can('manage_pricing'),
-        ], 'layout/base');
+        return ['categoryId' => $categoryId, 'specs' => $specs];
     }
 
     public function addSpec(array $params): void

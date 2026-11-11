@@ -30,6 +30,13 @@ final class HsCodeController
         ], 'layout/base');
     }
 
+    /** D-302 (point 11): "+ Add a new HS code" on the product form comes back to that form. */
+    private static function returnTo(): string
+    {
+        $to = (string) ($_POST['return_to'] ?? '');
+        return preg_match('#^/products/(create|\d+/edit|fix-hs-codes)$#', $to) === 1 ? $to : '/hs-codes';
+    }
+
     public function create(array $params): void
     {
         $code = trim((string) ($_POST['code'] ?? ''));
@@ -37,17 +44,17 @@ final class HsCodeController
 
         if (!preg_match('/^\d{6}$|^\d{8}$/', $code)) {
             Flash::set('error', 'HS code must be exactly 6 or 8 digits, no dots or other characters.');
-            header('Location: /hs-codes');
+            header('Location: ' . self::returnTo());
             return;
         }
         if ($description === '') {
             Flash::set('error', 'A description is required.');
-            header('Location: /hs-codes');
+            header('Location: ' . self::returnTo());
             return;
         }
         if (HsCodeRepository::findByCode($code)) {
             Flash::set('error', "HS code {$code} already exists.");
-            header('Location: /hs-codes');
+            header('Location: ' . self::returnTo());
             return;
         }
 
@@ -55,7 +62,7 @@ final class HsCodeController
         $id = HsCodeRepository::create($code, $description, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'HS_CODE_ADDED', 'hs_codes', $id, null, null, "{$code}: {$description}");
         Flash::set('success', "HS code {$code} added.");
-        header('Location: /hs-codes');
+        header('Location: ' . self::returnTo());
     }
 
     public function update(array $params): void

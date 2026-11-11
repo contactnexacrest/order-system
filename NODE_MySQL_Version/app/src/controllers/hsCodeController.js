@@ -21,30 +21,36 @@ async function index(req, res) {
   }, 'layout/base');
 }
 
+/** D-302 (point 11): "+ Add a new HS code" on the product form comes back to that form. */
+function returnTo(req) {
+  const to = String((req.body || {}).return_to ?? '');
+  return /^\/products\/(create|\d+\/edit|fix-hs-codes)$/.test(to) ? to : '/hs-codes';
+}
+
 async function create(req, res) {
   const code = String(req.body.code || '').trim();
   const description = String(req.body.description || '').trim();
 
   if (!/^\d{6}$|^\d{8}$/.test(code)) {
     flash.set(req, 'error', 'HS code must be exactly 6 or 8 digits, no dots or other characters.');
-    res.redirect('/hs-codes');
+    res.redirect(returnTo(req));
     return;
   }
   if (description === '') {
     flash.set(req, 'error', 'A description is required.');
-    res.redirect('/hs-codes');
+    res.redirect(returnTo(req));
     return;
   }
   if (await hsCodeRepository.findByCode(code)) {
     flash.set(req, 'error', `HS code ${code} already exists.`);
-    res.redirect('/hs-codes');
+    res.redirect(returnTo(req));
     return;
   }
 
   const id = await hsCodeRepository.create(code, description, req.user.id);
   await auditLogRepository.log(req.user.id, 'HS_CODE_ADDED', 'hs_codes', id, null, null, `${code}: ${description}`);
   flash.set(req, 'success', `HS code ${code} added.`);
-  res.redirect('/hs-codes');
+  res.redirect(returnTo(req));
 }
 
 async function update(req, res) {

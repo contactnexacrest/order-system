@@ -63,6 +63,11 @@
     </fieldset>
     {% include "partials/_vendor_bank_fields.njk" %}
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc.">{{ supplier.notes if isEdit and supplier.notes else '' }}</textarea></label>
+    {# D-303 (point 15): a supplier added quickly from a product price is "Details pending" until completed here or by its details link. #}
+    {% if isEdit %}
+      <input type="hidden" name="details_pending" value="0">
+      <label class="checkbox-row"><input type="checkbox" name="details_pending" value="1"{% if supplier.details_pending == 1 %} checked{% endif %}> Details pending <small class="muted">(GSTIN, bank or contacts still to be completed — untick once they are)</small></label>
+    {% endif %}
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">{{ 'Save Changes' if isEdit else 'Add Supplier' }}</button>
       <a href="/suppliers" class="btn-sm btn-secondary">Cancel</a>
@@ -101,6 +106,18 @@
       <button type="submit" class="btn-sm">Add Factory Address</button>
     </form>
   </div>
+  {% endif %}
+
+  {# D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only). #}
+  {% if isEdit and productPrices %}
+    <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
+    <table class="list">
+      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th></tr>
+      {% for pp in productPrices %}
+        <tr><td>{{ pp.product_name }}</td><td>{{ pp.price }}</td><td>{{ pp.quoted_on }}</td><td>{{ pp.valid_until }}</td><td>{{ 'Yes' if pp.used else '—' }}</td></tr>
+      {% endfor %}
+      {% if not productPrices.length %}<tr><td colspan="5" class="muted">No product prices from this supplier yet.</td></tr>{% endif %}
+    </table>
   {% endif %}
 </div>
 

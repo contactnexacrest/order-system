@@ -836,9 +836,12 @@
   {# Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). #}
   {% if sees.selling and pcLines.length %}
   <div class="price-check" id="price-check">
-    <h3>Price check <small class="muted">(sold by {{ linePricing.ctx.label }})</small></h3>
+    {# D-305 (point 19): staff see "for this order" figures on an associate's client order; only price build-up viewers see who sells it and at what level. #}
+    {% set forOrder = linePricing.ctx.associate %}
+    <h3>Price check <small class="muted">{% if permissions.view_price_buildup %}(sold by {{ linePricing.ctx.label }}){% elif forOrder %}— quote and lowest for this order{% endif %}</small></h3>
+    {% if forOrder %}<p class="muted small">ⓘ This client came through an associate, so this order's prices are higher.</p>{% endif %}
     <table class="list">
-      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      <tr><th>Line</th><th>Description and size</th><th>Your price (USD)</th><th>{{ 'Quote · lowest for this order' if forOrder else 'Quote · your lowest' }}</th><th>Check</th><th></th></tr>
       {% for pc in pcLines %}{% set pl = pc.line %}{% set pf = pc.figures %}{% set pconv = pc.conversion %}{% set pconverted = pconv and pconv.factor !== null and ((pconv.factor - 1) | abs) > 0.000000001 %}
         <tr>
           <td>{{ pl.line_no }}</td>
@@ -858,7 +861,7 @@
             {% elif pc.status == 'no_price' %}
               <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
             {% else %}
-              <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+              <span class="price-badge price-badge-bad">✗ {{ 'Below the lowest for this order' if forOrder else 'Below your lowest price' }}</span>
             {% endif %}
             {% if pc.requested and pc.status != 'approved' %}<div class="muted small">Sent to the MD for approval.</div>{% endif %}
           </td>

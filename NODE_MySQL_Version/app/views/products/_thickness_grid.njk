@@ -1,0 +1,36 @@
+{#
+  Owner decision D-300 (point 12, 11 Nov 2026): the supplier price for every thickness — 20/30/40 mm per
+  m² and 50 mm and above per CBM. Type any one; the others are CALCULATED from the category's price rules
+  (grey). A calculated box can be typed over (it turns TYPED); "↺ use calculated" goes back; app.js
+  recalculates on screen (initThicknessGrid). Saving a box at 0 or empty calculates it again; all empty is
+  refused ("Enter at least one price"). In: rules, gridView (pricingController.gridView), rulesSummary.
+  Port of views/products/_thickness_grid.php.
+#}
+<table class="list thickness-grid" data-thickness-grid data-k="{{ pricingFmt.trim3(rules.k) }}" data-base-mm="{{ rules.base_mm }}">
+  <tr><th>Thickness</th><th>Price (₹)</th><th>Unit</th><th>How it was set</th><th class="num">Same as per CBM</th></tr>
+  {% for g in gridView %}
+    <tr data-mm="{{ g.mm }}"{% if g.cbm %} data-cbm="1"{% else %} data-pct="{{ g.pct }}"{% endif %} class="{{ 'grid-typed' if g.typed else 'grid-calculated' }}">
+      <td>{{ g.label }}</td>
+      <td>
+        <input type="text" inputmode="decimal" name="price[{{ g.mm }}]" class="grid-price" data-max-decimals="2" data-max-value="999999999999.99" data-at-least-one="price["
+          data-at-least-one-message="Enter at least one price."
+          value="{{ g.value }}"
+          placeholder="{{ g.placeholder }}"
+          aria-label="Supplier price for {{ g.label }} (₹ {{ 'per CBM' if g.cbm else 'per m²' }})">
+        <input type="hidden" name="how[{{ g.mm }}]" value="{{ 'typed' if g.typed else 'calculated' }}">
+      </td>
+      <td>{{ 'per CBM' if g.cbm else 'per m²' }}</td>
+      <td class="grid-how">
+        <span class="badge {{ 'badge-typed' if g.typed else 'badge-calculated' }}" data-grid-badge>{{ 'TYPED' if g.typed else 'CALCULATED' }}</span>
+        <small class="muted" data-grid-rule>{{ g.rule }}</small>
+        <small class="muted" data-grid-hint>{{ g.hint }}</small>
+        <button type="button" class="btn-link" data-grid-use-calc{% if not g.typed %} hidden{% endif %}>↺ use calculated</button>
+      </td>
+      <td class="num muted" data-grid-percbm>{{ g.perCbm }}</td>
+    </tr>
+  {% endfor %}
+</table>
+<p class="small muted">Rules for {{ rules.category_name or 'this category' }}{% if rules.own.length %} <span class="badge badge-warning">own rule: {{ rules.own | join(', ') }}</span>{% endif %}: {{ rulesSummary }}.
+  Works in every direction: if only the {{ rules.cbm_from }} mm+ price is typed, {{ rules.base_mm }} mm = that ÷ {{ pricingFmt.trim3(rules.k) }}.
+  A box saved at 0 or empty is calculated again; when a TYPED price changes, every CALCULATED one follows. Every change is kept in the price history.
+  {% if canChangeRules and rules.category_id %}<a class="btn-sm" href="/products/categories/{{ rules.category_id }}?tab=rules">Change these rules</a>{% endif %}</p>

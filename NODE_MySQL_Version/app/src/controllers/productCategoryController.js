@@ -59,7 +59,7 @@ async function update(req, res) {
   }
   if (Number(category.is_system) === 1) {
     flash.set(req, 'error', "Natural Stone is today's products — its Dimensions and Finish stay as they are.");
-    res.redirect('/products/categories');
+    res.redirect(backTo(req, '/products/categories'));
     return;
   }
   const name = String(req.body.name ?? '').trim();
@@ -67,7 +67,7 @@ async function update(req, res) {
   const error = (await nameError(name, id)) ?? labelError;
   if (error !== null) {
     flash.set(req, 'error', error);
-    res.redirect('/products/categories');
+    res.redirect(backTo(req, '/products/categories'));
     return;
   }
   const active = Boolean(req.body.is_active);
@@ -75,7 +75,7 @@ async function update(req, res) {
   await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_UPDATED', 'product_categories', id, 'attributes',
     `${category.name}: ${category.attributes.join(', ')}`, `${name}: ${labels.join(', ')}${active ? '' : ' (inactive)'}`);
   flash.set(req, 'success', `Category "${name}" saved.`);
-  res.redirect('/products/categories');
+  res.redirect(backTo(req, '/products/categories'));
 }
 
 /**
@@ -98,14 +98,97 @@ async function settings(req, res) {
   );
   if (error !== null) {
     flash.set(req, 'error', `${category.name}: ${error}`);
-    res.redirect('/products/categories');
+    res.redirect(backTo(req, '/products/categories'));
     return;
   }
   await productCategoryRepository.updateSettings(id, values);
   await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_SETTINGS_UPDATED', 'product_categories', id, 'settings',
     productCategoryRepository.settingsSummary(category), productCategoryRepository.settingsSummary(values));
   flash.set(req, 'success', `Settings for "${category.name}" saved.`);
-  res.redirect('/products/categories');
+  res.redirect(backTo(req, '/products/categories'));
 }
 
-module.exports = { index, store, update, settings };
+/** D-306: where to go after saving — back to the category page when the form came from it. */
+function backTo(req, fallback) {
+  const to = String((req.body || {}).return_to ?? '');
+  return /^\/products\/categories\/\d+(\?tab=[a-z]+)?$/.test(to) ? to : fallback;
+}
+
+/**
+ * Owner decision D-306 (point 20, 11 Nov 2026): Products › Categories › <category> is one page with
+ * tabs — General | Options and their price effect (was Admin › Pricing › Specifications) | Price
+ * rules (D-300) | Products in this category.
+ */
+async function show(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const category = await productCategoryRepository.find(id);
+  if (!category) {
+    res.status(404).send('Category not found.');
+    return;
+  }
+  const can = (k) => !!(req.permissions && req.permissions[k]);
+  const seesPricing = can('view_price_buildup') || can('manage_pricing');
+  let tab = String(req.query.tab || 'general');
+  if (!['general', 'options', 'rules', 'products'].includes(tab) || (!seesPricing && ['options', 'rules'].includes(tab))) tab = 'general';
+  const productSpecs = require('../services/productSpecs');
+  const products = [];
+  for (const p of await require('../repositories/productRepository').all(false)) {
+    if (Number(await productSpecs.categoryIdFor(p)) === id) products.push(p);
+  }
+  category.allowedUnits = productCategoryRepository.allowedUnits(category);
+  const tabs = [['general', 'General (name, units, HS code, packing, documents)']];
+  if (seesPricing) tabs.push(['options', 'Options and their price effect'], ['rules', 'Price rules (thickness %, container)']);
+  tabs.push(['products', `Products in this category (${products.length})`]);
+  const data = {
+    category, tab, tabs, seesPricing, canManageCatalog: can('manage_product_catalog'), canManagePricing: can('manage_pricing'), products,
+    maxQualityDocuments: productCategoryRepository.MAX_QUALITY_DOCUMENTS,
+    maxAttributes: productCategoryRepository.MAX_ATTRIBUTES,
+    units: (await lookupRepository.dropdownOptions('unit')).map((o) => String(o.option_value)),
+    packageTypes: (await lookupRepository.dropdownOptions('package_type')).map((o) => String(o.option_value)),
+    hsCodes: await require('../repositories/hsCodeRepository').active(),
+    tcClauseSets: productCategoryRepository.TC_CLAUSE_SETS,
+    categories: await productCategoryRepository.all(),
+  };
+  if (tab === 'options') {
+    Object.assign(data, await require('./specController').categoryData(id), { edit: parseInt(req.query.edit, 10) || 0, canManage: can('manage_pricing') });
+  }
+  if (tab === 'rules') {
+    const r = await require('../services/priceRules').forCategory(id);
+    const fmt = require('../services/thicknessPrices').fmt;
+    const ex = 1600;
+    const old = flash.pullOld ? (flash.pullOld(req) || {}) : {};
+    const oldPct = old.pct && typeof old.pct === 'object' ? old.pct : {};
+    data.rules = r;
+    data.rulesView = {
+      example: ex,
+      thickness: r.thickness.map((t) => ({ ...t, value: String(oldPct[t.id] ?? fmt(t.pct)), example: `₹${Math.round(ex * (1 + t.pct / 100)).toLocaleString('en-US')} / m²` })),
+      k: String(old.thick_k_factor ?? (r.k !== null ? fmt(r.k) : '')), kExample: r.k !== null ? `₹${Math.round(ex * r.k).toLocaleString('en-US')} / CBM` : '—',
+      containerCbm: String(old.container_cbm ?? (r.container_cbm !== null ? fmt(r.container_cbm) : '')),
+      containerMaxT: String(old.container_max_t ?? (r.container_max_t !== null ? fmt(r.container_max_t) : '')),
+      weight: String(old.weight_t_per_cbm ?? (r.weight !== null ? fmt(r.weight) : '')),
+      newMm: String(old.new_mm ?? ''), newChange: String(old.new_change ?? ''), reason: String(old.reason ?? ''),
+    };
+  }
+  res.renderView('products/category', data, 'layout/base');
+}
+
+/** D-300: the category's price rules — MD only (manage_pricing), with a reason. */
+async function saveRules(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const [changes, error] = await require('../services/priceRules').save(id, req.body || {}, req.user.id);
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    flash.setOld(req, req.body || {});
+  } else {
+    flash.set(req, 'success', changes === 0 ? 'Nothing changed.' : `Price rules saved (${changes} change${changes === 1 ? '' : 's'}). Prices worked out from now on use them; quotes already sent keep their prices.`);
+  }
+  res.redirect(`/products/categories/${id}?tab=rules`);
+}
+
+/** D-300: Products menu › Price rules — the first (system) category's rules page. */
+async function priceRules(req, res) {
+  const id = parseInt(req.query.category, 10) || (await require('../repositories/specRepository').systemCategoryId()) || Number(((await productCategoryRepository.all())[0] || {}).id || 0);
+  res.redirect(`/products/categories/${id}?tab=rules`);
+}
+
+module.exports = { index, store, update, settings, show, saveRules, priceRules };

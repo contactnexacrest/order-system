@@ -283,7 +283,10 @@ final class D256PricingUsabilityTest extends DbTestCase
     public function testExactPricesInMarketPricesForProcurementWithoutSellingPrices(): void
     {
         $this->actAs($this->createTestUser('Procurement Executive'));
-        $_POST = ['supplier_name' => 'Exact quarry', 'price_inr' => '4900', 'quoted_on' => date('Y-m-d'), 'valid_until' => '', 'price_basis' => 'combo', 'used_for_pricing' => '1',
+        // D-303 (point 15): the supplier is a record of the Suppliers directory (matched by its exact name).
+        $quarry = 'Exact quarry ' . bin2hex(random_bytes(3));
+        \App\Repositories\SupplierRepository::create(['supplier_legal_name' => $quarry, 'types' => []], null);
+        $_POST = ['supplier_name' => $quarry, 'price_inr' => '4900', 'quoted_on' => date('Y-m-d'), 'valid_until' => '', 'price_basis' => 'combo', 'used_for_pricing' => '1',
             'combo' => array_map('strval', $this->sel(['Thickness' => '30 mm', 'Surface finish' => 'Leather'])), 'location' => '', 'notes' => ''];
         $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $this->product]));
         $row = array_values(array_filter(ProductSupplierRepository::forProduct($this->product), static fn ($s) => $s['price_basis'] === 'combo'));
@@ -297,7 +300,7 @@ final class D256PricingUsabilityTest extends DbTestCase
             self::assertStringNotContainsString($s, $page, "Procurement never sees {$s}");
         }
         // Naming nothing is refused.
-        $_POST = ['supplier_name' => 'Exact quarry', 'price_inr' => '4900', 'quoted_on' => date('Y-m-d'), 'valid_until' => '', 'price_basis' => 'combo', 'combo' => [], 'location' => '', 'notes' => ''];
+        $_POST = ['supplier_name' => $quarry, 'price_inr' => '4900', 'quoted_on' => date('Y-m-d'), 'valid_until' => '', 'price_basis' => 'combo', 'combo' => [], 'location' => '', 'notes' => ''];
         $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $this->product]));
         self::assertCount(1, array_filter(ProductSupplierRepository::forProduct($this->product), static fn ($s) => $s['price_basis'] === 'combo'));
     }

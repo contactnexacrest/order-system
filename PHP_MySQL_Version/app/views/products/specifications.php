@@ -15,6 +15,12 @@ $__badge = static function (string $kind): string {
         'product' => '<span class="badge badge-active">This product only</span>', 'hidden' => '<span class="badge badge-danger">Hidden for this product</span>'][$kind] ?? '';
 };
 $__forms = ProductSpecs::productForms($product);
+$__catName = '';
+foreach ($categories as $__c) {
+    if ((int) $__c['id'] === (int) $categoryId) {
+        $__catName = (string) $__c['name'];
+    }
+}
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/products/<?= (int) $product['id'] ?>">&larr; Back to <?= View::e($product['name']) ?></a></p>
@@ -40,7 +46,9 @@ $__forms = ProductSpecs::productForms($product);
     <?php foreach ($tree as $s): ?>
       <?php $__kind = $s['source'] === 'product' ? 'product' : ($s['hidden'] ? 'hidden' : ($s['changed'] ? 'changed' : 'category')); ?>
       <tr id="spec-<?= (int) $s['id'] ?>">
-        <td><b><?= View::e($s['name']) ?></b> <?= $__badge($__kind) ?></td>
+        <td><b><?= View::e($s['name']) ?></b> <?= $__badge($__kind) ?>
+          <?php // D-306 (point 20): where the category's options are changed for every product. ?>
+          <?php if ($s['source'] === 'category' && $__catName !== ''): ?><br><small class="muted">From category <?= View::e($__catName) ?> — <a href="/products/categories/<?= (int) $categoryId ?>?tab=options#spec-<?= (int) $s['id'] ?>">edit for all products in <?= View::e($__catName) ?></a></small><?php endif; ?></td>
         <td><?php if ($s['hidden']): ?><span class="muted">Not offered for this product</span><?php else: foreach ($s['options'] as $o): ?>
           <?php $__ok = $o['hidden'] ? 'hidden' : ($o['source'] === 'product' ? 'product' : ($o['source'] === 'changed' ? 'changed' : 'category')); ?>
           <span class="badge<?= ['hidden' => ' badge-danger', 'product' => ' badge-active', 'changed' => ' badge-warning', 'category' => ''][$__ok] ?>"<?= $o['hidden'] ? ' style="text-decoration:line-through"' : '' ?>><?= View::e($o['name']) ?> <?= View::e(ProductSpecs::changeLabel($o['change_type'], $o['value'])) ?><?= $o['source'] === 'changed' && $o['category_value'] !== null ? ' (category ' . View::e(ProductSpecs::changeLabel($o['change_type'], $o['category_value'])) . ')' : '' ?></span>
@@ -50,7 +58,7 @@ $__forms = ProductSpecs::productForms($product);
             <?php if ($s['hidden']): ?>
               <form method="post" action="/products/<?= (int) $product['id'] ?>/specifications/<?= (int) $s['id'] ?>/show" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Show again</button></form>
             <?php else: ?>
-              <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/specifications?edit=<?= (int) $s['id'] ?>#spec-<?= (int) $s['id'] ?>"><?= $s['changed'] ? 'Edit' : 'Change for this product' ?></a>
+              <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/specifications?edit=<?= (int) $s['id'] ?>#spec-<?= (int) $s['id'] ?>"><?= $s['changed'] ? 'Edit for this product only' : 'Change for this product only' ?></a>
               <form method="post" action="/products/<?= (int) $product['id'] ?>/specifications/<?= (int) $s['id'] ?>/hide" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Not offered</button></form>
             <?php endif; ?>
             <?php if ($s['changed']): ?><form method="post" action="/products/<?= (int) $product['id'] ?>/specifications/<?= (int) $s['id'] ?>/reset" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Reset to category</button></form><?php endif; ?>

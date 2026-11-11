@@ -7,6 +7,7 @@ const autoConfirmOcAcknowledgments = require('./autoConfirmOcAcknowledgments');
 const zohoSync = require('./zohoSync');
 const dailyDigest = require('./dailyDigest');
 const documentCopyCleanup = require('./documentCopyCleanup');
+const fetchFxRate = require('./fetchFxRate');
 const logger = require('../helpers/logger');
 
 /**
@@ -96,7 +97,15 @@ function start() {
     }, { timezone: 'Asia/Kolkata' })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 06:00 IST, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15).');
+  // Daily at 07:05 IST — owner decision D-301 (point 4, 11 Nov 2026): the USD → INR exchange
+  // rate (Frankfurter, backup open.er-api.com); the same time as the PHP stack's crontab entry.
+  tasks.push(
+    cron.schedule('5 7 * * *', () => {
+      fetchFxRate.run().catch((e) => logger.error('scheduler:fetchFxRate', e));
+    }, { timezone: 'Asia/Kolkata' })
+  );
+
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 06:00 IST, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15, fetchFxRate daily @ 07:05).');
   return tasks;
 }
 

@@ -2726,8 +2726,7 @@ SELECT 'bank_details', r.id FROM roles r
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'bank_details');
 
--- ================================================================
--- Owner decisions D-280 / D-281 (11 Nov 2026, point 3): Admin › E-mail settings.
+-- =========================================================-- Owner decisions D-280 / D-281 (11 Nov 2026, point 3): Admin › E-mail settings.
 -- One row per e-mail kind × audience that can be switched (MUST e-mails are
 -- always on and have no row). SHOULD = on, OPTIONAL = off when installed.
 -- The kinds are listed in EmailPolicy::KINDS (PHP) / emailPolicy.KINDS (Node).
@@ -2757,3 +2756,17 @@ INSERT INTO email_settings (email_kind, audience, is_enabled) VALUES
 -- manager, then the Managing Director).
 INSERT INTO compliance_alert_owners (item_key) VALUES
   ('lut'), ('rcmc'), ('agreements'), ('tds'), ('merchant_trade_rbi'), ('ecgc_policy'), ('ebrc_monthly');
+=======
+
+-- D-300 (owner decision 11 Nov 2026, point 12): Natural Stone's price rules —
+-- 50 mm+ per CBM = 20 mm price per m² × 40; one container holds 8 CBM, at most 27 t.
+-- (30 mm +35 % and 40 mm +70 % are the Thickness options above.)
+UPDATE product_categories SET thick_k_factor = 40.000, container_cbm = 8.00, container_max_t = 27.00
+WHERE is_system = 1 AND thick_k_factor IS NULL;
+
+-- D-301 (owner decision 11 Nov 2026, point 4): the exchange rate is fetched every day
+-- (Automatic); pricing rate = market rate × (1 − 2 % cushion). "Manual" uses
+-- pricing_fx_rate as before — it is also the fallback until the first rate is fetched.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('fx_mode', 'auto'),
+  ('fx_cushion_pct', '2.0');
