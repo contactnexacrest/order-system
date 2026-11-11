@@ -48,8 +48,8 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>
-              <option value="ladder"<?= $__mode === 'ladder' ? ' selected' : '' ?>>Ladder (moves up with counting orders)</option>
-              <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed level (stays until you change it)</option>
+              <option value="ladder"<?= $__mode === 'ladder' ? ' selected' : '' ?>>Standard ladder (moves up with counting orders)</option>
+              <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed % (one commission level, stays until the MD changes it)</option>
             </select></label>
           <label>Level (for a fixed level)
             <select name="commission_level_id" data-required-if="commission_mode=fixed" data-required-if-message="Choose the commission level.">
