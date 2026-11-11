@@ -1148,8 +1148,8 @@ Use this checklist when preparing and issuing: Quotation → PI → Order Confir
 - Total PI Value = FOB + Freight + Insurance
 - 40% advance amount = Total PI Value × 0.40 — calculated and stated
 - 60% balance amount = stated (note: calculated on actual CI value, may differ if shipped short)
-- LUT Order No. ZD290626057408W on PI — check it''s current year''s number ⚠ LUT expires 31 March each year — new number required from 1 April
-- Bank details on PI: Account No. 44523788330 · SWIFT SBININBB949 · IFSC SBIN0064074 · Pincode 560095 — verify all four before sending PI to buyer (Any error in bank details means buyer''s wire transfer fails or goes to wrong account.)
+- LUT Order No. AD000000000000X on PI — check it''s current year''s number ⚠ LUT expires 31 March each year — new number required from 1 April
+- Bank details on PI: Account No. 000000000000 · SWIFT XXXXINXXXXX · IFSC XXXX0000000 · Pincode 000000 — verify all four before sending PI to buyer (Any error in bank details means buyer''s wire transfer fails or goes to wrong account.)
 - RBI Purpose Code P0103 printed in PI bank details section (Buyers must quote P0103 in the ''Purpose of Remittance'' field of their wire transfer form when paying the 40% advance. Without this, SBI may hold or return the payment. Verify it is visible in the bank details section before sending PI to buyer.) ⚠⚠ Missing purpose code = risk of payment delay or return by SBI
 - Three legal protection clauses present in PI T&C (Verify PI T&C contains all three: PAYMENT TERMS FINALITY, DISPUTE RESOLUTION & PUBLIC COMMUNICATIONS, and ACCEPTANCE & ORDER OF PRECEDENCE. These are mandatory on every PI issued. If missing — do not send PI until clauses are added.) ⚠⚠ Missing clauses = NexaCrest has no contractual protection against payment term disputes or public naming
 - PI signed and sealed before sending
@@ -1216,7 +1216,7 @@ Use this checklist to verify all payments before and after shipment.
 - 60% Balance Due = Total Invoice Value − Advance − Freight paid
 - Verification row: Advance + Freight + Balance = Total Invoice Value (Arithmetic must balance exactly — check before issuing CI)
 - Amount in Words matches Total Invoice Value figure
-- LUT Order No. ZD290626057408W on CI — current year''s number ⚠ Update every April — wrong LUT number can invalidate IGST refund claim
+- LUT Order No. AD000000000000X on CI — current year''s number ⚠ Update every April — wrong LUT number can invalidate IGST refund claim
 
 ## D. After Shipment — 60% Balance
 - Scanned BL copy received from CHA
@@ -1356,7 +1356,7 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - BL ENDORSEMENT: Endorse (rubber stamp + sign + date on back) all 3 originals only AFTER 60% balance is cleared. Courier endorsed originals to buyer. Never courier un-endorsed originals.
 - DOCUMENT MATCHING: Buyer name/address must match character-for-character across ALL documents: Quotation, PI, PL, CI, BL, COO. Any mismatch = customs problem. Fix before issuing next document.
 - HS CODE: 6802.93 for all worked monumental granite products. Must be identical on PI, PL, CI, COO, and Shipping Bill. Different product: verify HS code before issuing.
-- LUT: LUT Order No. ZD290626057408W on every Commercial Invoice. Valid FY 2026-27 only. New LUT required before 1 April every year. Wrong/expired LUT = IGST refund rejected.
+- LUT: LUT Order No. AD000000000000X on every Commercial Invoice. Valid FY 2026-27 only. New LUT required before 1 April every year. Wrong/expired LUT = IGST refund rejected.
 - RCMC: Check RCMC validity 60 days before expiry. Expired RCMC = CAPEXIL cannot issue COO = shipment documents incomplete = customs hold at destination.
 - COO SEQUENCE: COO application to CAPEXIL only AFTER Shipping Bill is filed by CHA. Never before. Sequence: Packing done → CHA files Shipping Bill → then apply for COO.
 - DRAFT BL APPROVAL: CHA must send draft BL to NexaCrest for written approval before issuing any original BL. NexaCrest checks: consignee wording (TO ORDER OF NEXACREST), BL type (Original Negotiable), freight terms, port names, vessel, crate count. Written approval (email) required before CHA proceeds. Original BL issued without approval = risk of uncorrectable errors.

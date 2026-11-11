@@ -129,7 +129,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
     private const BANK = ['holder_name' => 'Demo Associate', 'account_number' => '501002345678', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank',
         'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'];
 
-    private function status(int $bankId): array
+    private function bankStatus(int $bankId): array
     {
         return Database::connection()->query("SELECT status, cancelled_how FROM associate_bank_accounts WHERE id = {$bankId}")->fetch(\PDO::FETCH_NUM);
     }
@@ -339,7 +339,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
     {
         $a = $this->associate();
         $id = $this->awaiting($a, null);
-        self::assertSame(['awaiting_confirmation', null], $this->status($id));
+        self::assertSame(['awaiting_confirmation', null], $this->bankStatus($id));
         self::assertNotNull(AssociateBankConfirmation::open((int) $a['id']));
         $confirmBy = (string) Database::connection()->query("SELECT confirm_by FROM associate_bank_accounts WHERE id = {$id}")->fetchColumn();
         self::assertSame(date('Y-m-d', strtotime('+7 days')), substr($confirmBy, 0, 10), '7 days to confirm');
@@ -365,7 +365,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         $this->asAssociate($a);
         $r = $this->call('POST', '/associate/bank/confirm', ['last4' => '5678', 'code' => '123456', 'mine' => '1']);
         self::assertStringStartsWith('Thank you — confirmed. NexaCrest will now check the new details.', (string) $r['flash']);
-        self::assertSame('pending', $this->status($id)[0]);
+        self::assertSame('pending', $this->bankStatus($id)[0]);
 
         // One person, at least two checks; the test payment needs its reference.
         $this->asUser($this->staff);
@@ -388,7 +388,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
             "SELECT r.name FROM self_approval_rules s JOIN roles r ON r.id = s.role_id WHERE s.rule_key = 'bank_details' ORDER BY r.name")->fetchAll(\PDO::FETCH_COLUMN));
         $md = $this->createTestUser('Managing Director');
         $third = $this->awaiting($a, $md, '700080009000');
-        self::assertSame(['cancelled', 'replaced'], $this->status($second), 'newer details replace the ones still open');
+        self::assertSame(['cancelled', 'replaced'], $this->bankStatus($second), 'newer details replace the ones still open');
         AssociateBankConfirmation::confirm($a, $third, '9000', '123456', true);
         $this->asUser($md);
         self::assertSame('You entered these details yourself — give the reason you verify them (at least 10 characters).',
@@ -422,7 +422,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         $r = $this->call('POST', '/associate/bank/not-me');
         self::assertSame(AssociateBankConfirmation::NOT_ME_MESSAGE, $r['flash']);
         self::assertSame('Cancelled. Your bank details have not changed. We have told our Managing Director and Finance team. If someone contacted you about your bank details, please reply in Messages.', AssociateBankConfirmation::NOT_ME_MESSAGE);
-        self::assertSame(['cancelled', 'not_me'], $this->status($id));
+        self::assertSame(['cancelled', 'not_me'], $this->bankStatus($id));
         foreach ([$md, $fm] as $u) {
             self::assertStringContainsString("Associate {$a['name']} clicked \"This is not me — cancel it\"", (string) Database::connection()->query(
                 "SELECT message FROM notifications WHERE user_id = {$u} AND type = 'bank_change_refused' ORDER BY id DESC LIMIT 1")->fetchColumn());
@@ -435,7 +435,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         Database::connection()->exec("UPDATE associate_bank_accounts SET confirm_by = DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE id = {$late}");
         self::assertNull(AssociateBankConfirmation::open((int) $a['id']));
         self::assertGreaterThanOrEqual(1, AssociateBankConfirmation::expireOverdue());
-        self::assertSame(['cancelled', 'expired'], $this->status($late));
+        self::assertSame(['cancelled', 'expired'], $this->bankStatus($late));
     }
 
     // ---------------------------------------------------------------- D-294: suppliers confirm through the link
