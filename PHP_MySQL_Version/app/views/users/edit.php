@@ -67,7 +67,7 @@
     <?= \App\Helpers\Csrf::field() ?>
     <label>Department and designation *
       <select name="designation_id" required>
-        <option value="">— choose —</option>
+        <option value="">Choose…</option>
         <?php $group = null; foreach ($designations as $d): ?>
           <?php if ($group !== $d['department_name']): ?><?= $group !== null ? '</optgroup>' : '' ?><optgroup label="<?= htmlspecialchars((string) $d['department_name']) ?>"><?php $group = $d['department_name']; endif; ?>
           <option value="<?= (int) $d['id'] ?>"><?= htmlspecialchars((string) $d['title']) ?></option>

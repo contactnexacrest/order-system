@@ -2,7 +2,7 @@
    Incoterm below, pre-selecting the submission's already-saved value. #}
 {% macro countryField(idPrefix, name, required, value, isOther) %}
 <select id="{{ idPrefix }}_select">
-  <option value="">— Select —</option>
+  <option value="">Choose…</option>
   <option value="Not sure" {% if value == 'Not sure' %}selected{% endif %}>Not sure</option>
   {% for c in countries %}
     <option value="{{ c }}" {% if value == c %}selected{% endif %}>{{ c }}</option>
@@ -117,7 +117,7 @@
       <div class="field-grid">
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             {% for i in incoterms %}
               <option value="{{ i.code }}" {% if submission.incoterm_preference == i.code %}selected{% endif %}>{{ i.code }}</option>
             {% endfor %}

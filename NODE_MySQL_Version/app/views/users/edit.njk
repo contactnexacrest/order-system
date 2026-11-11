@@ -65,7 +65,7 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Department and designation *
       <select name="designation_id" required>
-        <option value="">— choose —</option>
+        <option value="">Choose…</option>
         {% for d in designations %}{% if loop.first or designations[loop.index0 - 1].department_name != d.department_name %}<optgroup label="{{ d.department_name }}">{% endif %}
           <option value="{{ d.id }}">{{ d.title }}</option>
         {% if loop.last or designations[loop.index0 + 1].department_name != d.department_name %}</optgroup>{% endif %}{% endfor %}

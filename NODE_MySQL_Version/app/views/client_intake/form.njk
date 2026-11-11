@@ -4,7 +4,7 @@
    markup three times with copy-paste risk. #}
 {% macro countryField(idPrefix, name, required) %}
 <select id="{{ idPrefix }}_select">
-  <option value="">— Select —</option>
+  <option value="">Choose…</option>
   <option value="Not sure">Not sure</option>
   {% for c in countries %}
     <option value="{{ c }}">{{ c }}</option>
@@ -130,7 +130,7 @@
       <div class="field-grid">
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             {% for i in incoterms %}
               <option value="{{ i.code }}">{{ i.code }}</option>
             {% endfor %}

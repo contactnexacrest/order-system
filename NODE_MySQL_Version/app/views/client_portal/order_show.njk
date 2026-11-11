@@ -131,7 +131,7 @@
       <div class="field-grid">
         <label>Which Payment? *
           <select name="payment_type" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             <option value="advance">Advance Payment</option>
             <option value="balance">Balance Payment</option>
             <option value="freight">Freight Payment</option>
@@ -224,7 +224,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Rating *
           <select name="rating" required>
-            <option value="">Choose a rating</option>
+            <option value="">Choose a rating…</option>
             {% for i in [5, 4, 3, 2, 1] %}
               <option value="{{ i }}" {{ 'selected' if orderFeedback and orderFeedback.rating == i }}>{% for s in range(0, i) %}★{% endfor %}{% for s in range(0, 5 - i) %}☆{% endfor %} ({{ i }}/5)</option>
             {% endfor %}

@@ -46,7 +46,7 @@
         </label>
         <label>Balance Trigger Option *
           <select name="balance_trigger_option" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             <?php foreach ($triggerOptions as $key => $label): ?>
               <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
             <?php endforeach; ?>

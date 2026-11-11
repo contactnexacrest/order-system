@@ -16,7 +16,7 @@
   <form method="get" action="{{ '/orders/' ~ orderId ~ '/documents/' ~ documentId ~ '/send' if documentId else '/orders/' ~ orderId ~ '/email/compose' }}">
     <label>Email Template *
       <select name="template_key" required>
-        <option value="">Select a template…</option>
+        <option value="">Choose a template…</option>
         {% for t in templates %}
           {% if t.is_active %}
           <option value="{{ t.template_key }}" {{ 'selected' if templateKey == t.template_key else '' }}>{{ t.subject }}</option>

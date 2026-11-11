@@ -15,7 +15,7 @@
         </label>
         <label>Service Type *
           <select name="service_type" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             <?php foreach ($serviceTypes as $key => $label): ?>
               <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
             <?php endforeach; ?>

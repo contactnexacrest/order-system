@@ -16,7 +16,7 @@
       <div class="field-grid">
         <label>Scheme
           <select name="scheme_name" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             {% for opt in schemeOptions %}
               <option value="{{ opt.option_value }}" {{ 'selected' if opt.is_default else '' }}>{{ opt.option_value }}</option>
             {% endfor %}

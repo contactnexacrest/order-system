@@ -2190,7 +2190,7 @@
           <div class="field-grid">
           <label>Supplier *
             <select name="supplier_id" id="spo-supplier-select" required>
-              <option value="">Select supplier…</option>
+              <option value="">Choose a supplier…</option>
               {% for sup in suppliers %}
                 <option value="{{ sup.id }}" data-addresses="{{ (supplierFactoryAddressTextsBySupplier[sup.id] or []) | json }}" data-types="{{ sup.types | json }}">{{ sup.supplier_legal_name }}{{ (' — ' + (sup.types | join(', '))) if sup.types.length else '' }}</option>
               {% endfor %}
@@ -2246,7 +2246,7 @@
           <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr" placeholder="e.g. 250000.00"></label>
           <label>Delivery Location
             <select id="spo-delivery-location-select">
-              <option value="">— Select —</option>
+              <option value="">Choose…</option>
               <option value="__other__">Other (not listed) — specify</option>
             </select>
             <input type="text" id="spo-delivery-location-input" name="delivery_location" placeholder="Select a supplier first, or specify" style="display:none">
@@ -2314,7 +2314,7 @@
               if (types.length > 1) {
                 var blank = document.createElement('option');
                 blank.value = '';
-                blank.textContent = '— Select —';
+                blank.textContent = 'Choose…';
                 typeSelect.appendChild(blank);
               }
               types.forEach(function (t) {
@@ -2347,7 +2347,7 @@
               deliverySelect.innerHTML = '';
               var blank = document.createElement('option');
               blank.value = '';
-              blank.textContent = '— Select —';
+              blank.textContent = 'Choose…';
               deliverySelect.appendChild(blank);
               addresses.forEach(function (addr) {
                 var o = document.createElement('option');
@@ -2595,7 +2595,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Logistics partner *
           <select name="logistics_partner_id" required>
-            <option value="">Select…</option>
+            <option value="">Choose…</option>
             {% for lp in activePartners %}
               <option value="{{ lp.id }}">{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
             {% endfor %}
@@ -2660,7 +2660,7 @@
         <label>Freight Forwarder (Logistics Partner) *
           {% set suggestedForwarder = vendorBillsView.suggestedForwarderId(freight, vendorBills, logisticsPartners) %}{# owner request (2 Nov 2026) #}
           <select name="freight_forwarder_partner_id" required>
-            <option value="">Select logistics partner…</option>
+            <option value="">Choose a logistics partner…</option>
             {% for lp in logisticsPartners %}
               <option value="{{ lp.id }}"{{ ' selected' if (lp.id | int) == suggestedForwarder else '' }}>{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
             {% endfor %}
@@ -2800,7 +2800,7 @@
           <label>Actual Quantity Unit
             {% set packingUnit = packing.actual_quantity_unit or (orderedQuantitySummary.comparable and orderedQuantitySummary.unit) or '' %}
             <select name="actual_quantity_unit">
-              <option value="">— Select —</option>
+              <option value="">Choose…</option>
               {% for u in units %}
                 <option value="{{ u.option_value }}" {% if packingUnit == u.option_value %}selected{% endif %}>{{ u.option_value }}</option>
               {% endfor %}
@@ -2825,7 +2825,7 @@
             <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;" placeholder="e.g. NX/01-12" aria-label="Crate marks numbers"></td>
             <td>{% set crateProduct = c.product_description or '' %}{% set crateKnown = (products | whereEq('description', crateProduct) | length) > 0 %}
               <select name="crate_product_description[]" data-crate-product style="width:160px;" aria-label="Crate product description">
-                <option value="" data-hs="">— Product —</option>
+                <option value="" data-hs="">Choose a product…</option>
                 {% for p in products %}
                 <option value="{{ p.description }}" data-hs="{{ p.hs_code }}" {% if crateProduct == p.description %}selected{% endif %}>{{ p.description | truncate(60, true, '…') }}</option>
                 {% endfor %}
@@ -4128,7 +4128,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Rating
             <select name="rating" required>
-              <option value="">Choose a rating</option>
+              <option value="">Choose a rating…</option>
               {% for i in range(5, 0, -1) %}
                 <option value="{{ i }}">{% for s in range(0, i) %}★{% endfor %}{% for s in range(0, 5 - i) %}☆{% endfor %} ({{ i }}/5)</option>
               {% endfor %}
@@ -4254,7 +4254,7 @@
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <input type="hidden" name="department_id" value="{{ o.department_id }}">
                 <select name="user_id" required aria-label="Owner for {{ o.name }}">
-                  <option value="">— choose —</option>
+                  <option value="">Choose…</option>
                   {% for c in o.candidates %}<option value="{{ c.id }}" {{ 'selected' if c.id == o.user_id else '' }}>{{ c.name }} ({{ c.designation_title }})</option>{% endfor %}
                 </select>
                 <button type="submit" class="btn-sm">Set</button>

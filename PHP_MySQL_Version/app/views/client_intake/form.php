@@ -13,7 +13,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
     $req = $required ? 'required' : '';
     ?>
     <select id="<?= $idPrefix ?>_select">
-      <option value="">— Select —</option>
+      <option value="">Choose…</option>
       <option value="Not sure">Not sure</option>
       <?php foreach ($countries as $c): ?>
         <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
@@ -140,7 +140,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
       <div class="field-grid">
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
-            <option value="">— Select —</option>
+            <option value="">Choose…</option>
             <?php foreach ($incoterms as $i): ?>
               <option value="<?= htmlspecialchars($i['code']) ?>"><?= htmlspecialchars($i['code']) ?></option>
             <?php endforeach; ?>

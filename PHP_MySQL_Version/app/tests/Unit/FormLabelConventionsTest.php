@@ -162,6 +162,47 @@ final class FormLabelConventionsTest extends TestCase
         self::assertSame($count, preg_match_all('/' . preg_quote($opening, '/') . '\s*<option value="">Choose…<\/option>/', $text));
     }
 
+    /**
+     * Every drop-down's empty first option reads "Choose…" (or "Choose a …"), on
+     * any drop-down, required or not — never the older "Select…", "— Select —",
+     * "— choose —" or "Please select". Checks the views (scripts included: an
+     * option built in JS) and the sitewide app.js.
+     */
+    public function testNoEmptyOptionUsesTheOldSelectWording(): void
+    {
+        $old = '/^\s*(?:[—–-]+\s*)?(?:please\s+)?(?:select|pick)\b|^\s*[—–-]+\s*choose\s*[—–-]*\s*$/iu';
+        $sources = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::VIEWS));
+        foreach ($files as $file) {
+            if ($file->getExtension() === 'php') {
+                $sources[substr($file->getPathname(), strlen(self::VIEWS) + 1)] = (string) file_get_contents($file->getPathname());
+            }
+        }
+        $sources['public_html/assets/js/app.js'] = (string) file_get_contents(self::APP_JS);
+        $wrong = [];
+        foreach ($sources as $rel => $text) {
+            $found = [];
+            preg_match_all('/<option\b[^>]*\bvalue=(["\'])\1[^>]*>([^<]*)</', $text, $m, PREG_OFFSET_CAPTURE);
+            foreach ($m[2] as [$label, $at]) {
+                $found[] = [$label, $at];
+            }
+            // An option built in JS: var x = document.createElement('option'); … x.textContent = '…';
+            preg_match_all('/\b(\w+)\s*=\s*document\.createElement\([\'"]option[\'"]\)/', $text, $v);
+            foreach (array_unique($v[1]) as $var) {
+                preg_match_all('/\b' . preg_quote($var, '/') . '\.(?:textContent|text|innerText)\s*=\s*([\'"])(.*?)\1/', $text, $t, PREG_OFFSET_CAPTURE);
+                foreach ($t[2] as [$label, $at]) {
+                    $found[] = [$label, $at];
+                }
+            }
+            foreach ($found as [$label, $at]) {
+                if (preg_match($old, html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8'))) {
+                    $wrong[] = $rel . ':' . (substr_count($text, "\n", 0, $at) + 1) . ' ' . trim($label);
+                }
+            }
+        }
+        self::assertSame([], $wrong, 'An empty first option reads "Choose…" (or "Choose a …"), not "Select…" / "— Select —" / "— choose —".');
+    }
+
     public function testNumberFieldsThatCannotBeNegativeHaveAMin(): void
     {
         $audit = (string) file_get_contents(self::VIEWS . '/audit_log/index.php');

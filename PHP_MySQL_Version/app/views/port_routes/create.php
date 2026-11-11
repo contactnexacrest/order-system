@@ -7,7 +7,7 @@
     <div class="field-grid">
       <label>Port of Loading *
         <select name="port_of_loading_id" required>
-          <option value="">— Select —</option>
+          <option value="">Choose…</option>
           <?php foreach ($loadingPorts as $p): ?>
             <option value="<?= (int) $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
           <?php endforeach; ?>
@@ -15,7 +15,7 @@
       </label>
       <label>Port of Discharge *
         <select name="port_of_discharge_id" required>
-          <option value="">— Select —</option>
+          <option value="">Choose…</option>
           <?php foreach ($dischargePorts as $p): ?>
             <option value="<?= (int) $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
           <?php endforeach; ?>

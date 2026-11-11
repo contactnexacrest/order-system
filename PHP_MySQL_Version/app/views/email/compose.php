@@ -19,7 +19,7 @@ $isAnnexureResend = $documentId && ($document['document_type_code'] ?? null) ===
   <form method="get" action="<?= $documentId ? "/orders/{$orderId}/documents/{$documentId}/send" : "/orders/{$orderId}/email/compose" ?>">
     <label>Email Template *
       <select name="template_key" required>
-        <option value="">Select a template…</option>
+        <option value="">Choose a template…</option>
         <?php foreach ($templates as $t): ?>
           <?php if (!$t['is_active']) continue; ?>
           <option value="<?= htmlspecialchars($t['template_key']) ?>" <?= $templateKey === $t['template_key'] ? 'selected' : '' ?>><?= htmlspecialchars($t['subject']) ?></option>

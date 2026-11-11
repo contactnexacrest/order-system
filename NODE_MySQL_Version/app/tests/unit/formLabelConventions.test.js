@@ -124,6 +124,30 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     expect(text.match(new RegExp(`${escapeRe(opening)}\\s*<option value="">Choose…</option>`, 'g'))).toHaveLength(n);
   });
 
+  // Every drop-down's empty first option reads "Choose…" (or "Choose a …"), on
+  // any drop-down, required or not — never the older "Select…", "— Select —",
+  // "— choose —" or "Please select". Checks the views (scripts included: an
+  // option built in JS) and the sitewide app.js.
+  test('no empty option uses the old "Select" wording', () => {
+    const old = /^\s*(?:[—–-]+\s*)?(?:please\s+)?(?:select|pick)\b|^\s*[—–-]+\s*choose\s*[—–-]*\s*$/i;
+    const decode = (s) => s.replace(/&hellip;/g, '…').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–').replace(/&amp;/g, '&');
+    const sources = walk(VIEWS).filter((f) => f.endsWith('.njk')).sort().map((f) => [path.relative(VIEWS, f), fs.readFileSync(f, 'utf8')]);
+    sources.push(['public/js/app.js', fs.readFileSync(APP_JS, 'utf8')]);
+    const wrong = [];
+    for (const [rel, text] of sources) {
+      const found = [...text.matchAll(/<option\b[^>]*\bvalue=(["'])\1[^>]*>([^<]*)</g)].map((m) => [m[2], m.index]);
+      // An option built in JS: var x = document.createElement('option'); … x.textContent = '…';
+      const vars = new Set([...text.matchAll(/\b(\w+)\s*=\s*document\.createElement\(['"]option['"]\)/g)].map((m) => m[1]));
+      for (const v of vars) {
+        for (const m of text.matchAll(new RegExp(`\\b${escapeRe(v)}\\.(?:textContent|text|innerText)\\s*=\\s*(['"])(.*?)\\1`, 'g'))) found.push([m[2], m.index]);
+      }
+      for (const [label, at] of found) {
+        if (old.test(decode(label))) wrong.push(`${rel}:${lineOf(text, at)} ${label.trim()}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
   test('number fields that cannot be negative have a min', () => {
     const audit = fs.readFileSync(path.join(VIEWS, 'audit_log/index.njk'), 'utf8');
     expect(audit).toContain('<input type="number" min="1" step="1" name="entity_id"');

@@ -692,7 +692,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | `initFormDraftRestore()` | Keeps typed input after a refused submit. |
 | `initConfirmDialogs()`, `initLockedSteps()`, `initDatePickers()`, `initSlowDownloadLinks()`, `initTableScrollShadows()` | UI helpers. |
 
-Tests that enforce the conventions: `FormValidationConventionsTest` / `formValidationConventions.test.js` (confirm fields), `FormPlaceholderTest` / `formPlaceholder.test.js` (a placeholder on every typed input and textarea except date, file, checkbox, radio, hidden), `FormLabelConventionsTest` / `formLabelConventions.test.js` (labels, "*", "Choose…" on required drop-downs).
+Tests that enforce the conventions: `FormValidationConventionsTest` / `formValidationConventions.test.js` (confirm fields), `FormPlaceholderTest` / `formPlaceholder.test.js` (a placeholder on every typed input and textarea except date, file, checkbox, radio, hidden), `FormLabelConventionsTest` / `formLabelConventions.test.js` (labels, "*", "Choose…" on required drop-downs; on every drop-down the empty first option reads "Choose…" or "Choose a …" — never "Select…", "— Select —" or "— choose —", 11 Nov 2026).
 
 ### 3.7 The database
 

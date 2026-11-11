@@ -36,7 +36,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
       <?= Csrf::field() ?>
       <label>Department *
         <select name="department_id" required>
-          <option value="">— choose —</option>
+          <option value="">Choose…</option>
           <?php foreach ($departments as $dept): ?><option value="<?= (int) $dept['id'] ?>"><?= htmlspecialchars((string) $dept['name']) ?></option><?php endforeach; ?>
         </select>
       </label>
