@@ -80,6 +80,10 @@ final class LineUnits
         $out = ['factor' => null, 'missing' => [], 'unconvertible' => false];
         $lineRaw = strtoupper(trim((string) $lineUnit));
         $refRaw = strtoupper(trim((string) $refUnit));
+        // A product without a reference unit carries the label "unit" (ProductSpecs): no unit, compared as it is.
+        if ($refRaw === 'UNIT') {
+            $refRaw = '';
+        }
         $lc = self::canonical($lineUnit);
         $rc = self::canonical($refUnit);
         // No unit on the line or the product, or the same unit: compared as it is (as before point 25).

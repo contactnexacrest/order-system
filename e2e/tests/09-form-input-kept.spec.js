@@ -108,7 +108,8 @@ test.describe('Form input is kept and checked before submit', () => {
     await expect(page.locator('input[name="bank_ifsc"] ~ .form-field-error')).toContainText('valid 11-character IFSC');
     await page.locator('input[name="bank_ifsc"]').fill('SBIN0001234');
     await page.getByRole('button', { name: 'Add Supplier' }).click();
-    await expect(page.locator('.alert')).toContainText('added to the suppliers directory');
+    // D-303: the bank details also show an info notice (saved as a change, checked by a second person).
+    await expect(page.locator('.alert-success')).toContainText('added to the suppliers directory');
   });
 
   test('a confirm password that does not match stops the submit', async ({ page }) => {

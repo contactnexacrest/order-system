@@ -39,9 +39,10 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await expect(page.locator('.alert-success')).toContainText(`Associate "${ASSOCIATE_NAME}" added.`);
     associatePath = new URL(page.url()).pathname;
     await expect(page.locator('h1')).toContainText('Invited');
-    // D-245 P3: the profile shows the commission mode and the next ladder level, not per-client rates.
-    await expect(page.locator('#profile')).toContainText('Ladder: 0 counting order(s) so far');
-    await expect(page.locator('#profile')).toContainText('Level 1 — 2%');
+    // D-291 / D-292: the commission rule section shows the rule and the level the next order earns.
+    await expect(page.locator('[data-commission-rule]')).toContainText('Standard ladder');
+    await expect(page.locator('[data-commission-rule]')).toContainText('Next order earns');
+    await expect(page.locator('[data-commission-rule]')).toContainText('Level 1');
 
     verifyAssociateBank(ASSOCIATE_EMAIL);
     await page.locator('#profile select[name="status"]').selectOption('active');

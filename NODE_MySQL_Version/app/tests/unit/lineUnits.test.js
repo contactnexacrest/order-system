@@ -75,4 +75,11 @@ describe('D-270 line units', () => {
     expect(lineUnits.readSize({ piece_width_cm: '1.234' })[1]).not.toBeNull();
     expect(lineUnits.readSize({ piece_thickness_cm: '20000' })[1]).not.toBeNull();
   });
+
+  it('a product without a reference unit is compared as it is', () => {
+    // productSpecs labels a product with no reference unit "unit": any line unit compares 1:1, never "needs MD approval".
+    expect(lineUnits.factor('PCS', 'unit', null, null, null, null)).toEqual({ factor: 1, missing: [], unconvertible: false });
+    expect(lineUnits.factor('SQM', '', null, null, null, null).factor).toBe(1);
+    expect(lineUnits.factor('BOX', 'CBM', null, null, null, null).unconvertible).toBe(true);
+  });
 });

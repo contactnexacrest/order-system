@@ -90,7 +90,9 @@ function volume(canon, l, w, t, tPerCbm, missing) {
 function factor(lineUnit, refUnit, lCm, wCm, tCm, tPerCbm) {
   const out = { factor: null, missing: [], unconvertible: false };
   const lineRaw = String(lineUnit ?? '').trim().toUpperCase();
-  const refRaw = String(refUnit ?? '').trim().toUpperCase();
+  let refRaw = String(refUnit ?? '').trim().toUpperCase();
+  // A product without a reference unit carries the label "unit" (productSpecs): no unit, compared as it is.
+  if (refRaw === 'UNIT') refRaw = '';
   const lc = canonical(lineUnit);
   const rc = canonical(refUnit);
   // No unit on the line or the product, or the same unit: compared as it is (as before point 25).

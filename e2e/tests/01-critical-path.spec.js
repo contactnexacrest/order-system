@@ -340,7 +340,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(buyer.locator('.alert')).toContainText(`(PO-SMOKE-${UNIQUE}) has been received`);
     // One step at a time: the PO is ticked off and the page waits for the PI.
     await expect(buyer.locator('.action-progress li.done')).toContainText('Purchase Order');
-    await expect(buyer.locator('.action-wait')).toContainText("preparing your Proforma Invoice");
+    await expect(buyer.locator('.action-wait')).toContainText("preparing your proforma invoice") // D-330 plain wording;
     await expect(buyer.locator('input[name="buyers_po_ref"]')).toHaveCount(0);
     await buyer.close();
 

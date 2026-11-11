@@ -94,4 +94,12 @@ final class LineUnitsTest extends TestCase
         self::assertNotNull(LineUnits::readSize(['piece_width_cm' => '1.234'])[1]);
         self::assertNotNull(LineUnits::readSize(['piece_thickness_cm' => '20000'])[1]);
     }
+
+    public function testAProductWithoutAReferenceUnitIsComparedAsItIs(): void
+    {
+        // ProductSpecs labels a product with no reference unit "unit": any line unit compares 1:1, never "needs MD approval".
+        self::assertSame(['factor' => 1.0, 'missing' => [], 'unconvertible' => false], LineUnits::factor('PCS', 'unit', null, null, null, null));
+        self::assertSame(1.0, LineUnits::factor('SQM', '', null, null, null, null)['factor']);
+        self::assertTrue(LineUnits::factor('BOX', 'CBM', null, null, null, null)['unconvertible']);
+    }
 }
