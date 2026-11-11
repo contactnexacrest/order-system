@@ -403,29 +403,33 @@ rest of the app from working.
 
 ## Setting up the connection
 
-Under **Settings › Company**, a `zoho_books` group of settings needs filling
-in. NexaCrest uses one Zoho API Console **Self Client** (scope
+Under **Settings › Company**, the **Zoho Books** section needs filling
+in (each setting shows its plain name; the technical name in brackets below
+is the small grey text under it). NexaCrest uses one Zoho API Console **Self Client** (scope
 `ZohoBooks.fullaccess.all`; the Zoho Mail scopes are not needed, because
 the app does not send through Zoho Mail):
 
-- `zoho_books_client_id`, `zoho_books_client_secret`, `zoho_books_refresh_token`
+- **Zoho Books client ID**, **client secret** and **refresh token**
+  (`zoho_books_client_id`, `zoho_books_client_secret`, `zoho_books_refresh_token`)
   — from the Self Client in the Zoho API Console (api-console.zoho.in).
-- `zoho_books_organization_id` — your Zoho Books organization ID (Zoho
+- **Zoho Books organisation ID** (`zoho_books_organization_id`) — your Zoho Books organization ID (Zoho
   Books → Settings → Organization Profile).
-- `zoho_books_deposit_account_id` — the Zoho Books bank account that
+- **Zoho Books bank account for payments received**
+  (`zoho_books_deposit_account_id`) — the Zoho Books bank account that
   synced payments are recorded as deposited into. For NexaCrest this is
   **SBI Bank – Current Account**: all export money arrives there in INR.
-- `zoho_books_accounts_domain` / `zoho_books_api_domain` — these default to
+- **Zoho Books login server** / **Zoho Books server**
+  (`zoho_books_accounts_domain` / `zoho_books_api_domain`) — these default to
   Zoho's Indian data centre (`accounts.zoho.in` / `www.zohoapis.in`), where
   NexaCrest's Zoho One account lives. Change them only if the account
   moves region.
-- `zoho_books_sync_start_date` — the **go-live date** (2026-10-29). Only
+- **Zoho Books start date** (`zoho_books_sync_start_date`) — the **go-live date** (2026-10-29). Only
   CIs, Debit Notes, payments, bills, vendor payments and order expenses
   dated on or after it go to Zoho Books; the CA books everything earlier
   (for example an advance received before go-live) by hand as the opening
   position. **On the live server nothing is sent until it is set.** Pick
   the 1st of a month, ideally the start of a GST return period.
-- `zoho_books_enabled` — flip this on once everything above is filled in.
+- **Send accounts to Zoho Books** (`zoho_books_enabled`) — switch this on once everything above is filled in.
   This is the master switch the sync checks before doing anything.
 
 Then press **Test Books Connection** at the bottom of the Settings page.

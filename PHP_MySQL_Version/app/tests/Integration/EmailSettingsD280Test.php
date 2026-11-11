@@ -59,7 +59,9 @@ final class EmailSettingsD280Test extends DbTestCase
     public function testTheMustEmailsAreTheOnesTheOwnerNamed(): void
     {
         foreach (['login_code' => ['staff', 'associate', 'buyer'], 'set_password_invite' => ['associate', 'buyer'], 'forgot_password' => ['staff', 'associate', 'buyer'],
-                  'bank_details_changed' => ['associate'], 'backup_code_alert' => ['staff'], 'quote_verification_code' => ['buyer']] as $kind => $audiences) {
+                  'bank_details_changed' => ['associate'], 'backup_code_alert' => ['staff'], 'quote_verification_code' => ['buyer'],
+                  // D-293 / D-303 (owner 12 Nov 2026): the bank-details confirmations are listed as MUST rows too.
+                  'bank_confirm_code' => ['associate'], 'vendor_bank_confirm' => ['supplier']] as $kind => $audiences) {
             foreach ($audiences as $a) {
                 self::assertTrue(EmailPolicy::isMust($kind, $a), "{$kind} / {$a} is MUST");
             }
@@ -75,6 +77,19 @@ final class EmailSettingsD280Test extends DbTestCase
             }
         }
         self::assertSame(['buyer_documents|associate'], $optional);
+    }
+
+    public function testTheBankDetailsConfirmationEmailsAreListedAsMustRowsAndSentUnderThatKind(): void
+    {
+        // D-293 / D-303: the page lists them; the senders tag their e-mail with the same kind.
+        $html = $this->renderEmailSettingsPage();
+        self::assertStringContainsString('data-email-kind="bank_confirm_code"', $html);
+        self::assertStringContainsString('data-email-kind="vendor_bank_confirm"', $html);
+        self::assertTrue(EmailPolicy::switchOn('bank_confirm_code', 'associate'), 'MUST: always on');
+        self::assertTrue(EmailPolicy::switchOn('vendor_bank_confirm', 'supplier'), 'MUST: always on');
+        $src = dirname(__DIR__, 2) . '/src/Services/';
+        self::assertStringContainsString("true, 'bank_confirm_code', 'associate')", (string) file_get_contents($src . 'AssociateBankConfirmation.php'));
+        self::assertStringContainsString("true, 'vendor_bank_confirm', 'supplier')", (string) file_get_contents($src . 'VendorBankChangeService.php'));
     }
 
     public function testTheSeedStartsWithShouldOnOptionalOffAndTestingModeOff(): void
@@ -270,6 +285,14 @@ final class EmailSettingsD280Test extends DbTestCase
     // ---- helpers ----
 
     /** @return array<string,string> every switch that is on now, as the form posts it */
+    private function renderEmailSettingsPage(): string
+    {
+        $_SESSION = ['_auth_user_id' => $this->createTestUser('Admin')];
+        ob_start();
+        (new \App\Controllers\EmailSettingsController())->index([]);
+        return (string) ob_get_clean();
+    }
+
     private function currentSwitches(): array
     {
         $on = [];

@@ -71,7 +71,7 @@ final class VendorBankChangeService
             . 'New bank details were recorded for you at NexaCrest: ' . self::name($c, $vendor) . ".\n"
             . "NexaCrest pays into them only after you confirm them here (no login needed), by " . Dates::short(substr((string) $c['confirm_by'], 0, 10)) . ":\n{$link}\n\n"
             . "If you did not send new bank details, open the link and click \"This is not us — cancel it\". Until then, payments go to the account you had.\n\n"
-            . 'NexaCrest International Private Limited', true);
+            . 'NexaCrest International Private Limited', true, 'vendor_bank_confirm', 'supplier');
     }
 
     /** Staff "Send the link again" (e.g. after adding the e-mail): a fresh link to the e-mail on file, 7 more days. */

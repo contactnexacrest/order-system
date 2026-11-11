@@ -82,7 +82,7 @@ final class AssociateBankConfirmation
         EmailService::sendPlainText((string) $associate['email'], 'NexaCrest associate portal — your code to confirm new bank details',
             "Hello {$associate['name']},\n\nYour code to confirm the new bank details " . self::name($b) . " is:\n\n{$code}\n\n"
             . 'It is valid for ' . BankDetailsCheck::CODE_MINUTES . " minutes. Never share it — NexaCrest staff will never ask you for it.\n"
-            . "If you did not ask for new bank details, open your portal and click \"This is not me — cancel it\".\n\nNexaCrest International Private Limited", true);
+            . "If you did not ask for new bank details, open your portal and click \"This is not me — cancel it\".\n\nNexaCrest International Private Limited", true, 'bank_confirm_code', 'associate');
         if (AssociatePortalService::showCodeOnScreen()) {
             $_SESSION['associate_bank_code_dev'] = $code; // dev servers only, as with the login code
         }

@@ -53,6 +53,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-11f-plain-language-email-templates.sql` | D-330 | Plain-language buyer e-mail texts (only templates still at the seeded text) |
 | `2026-11-11g-order-comment-email-status.sql` | D-268 | `order_comments.email_status` |
 | `2026-11-11h-tt-clause-bank-name.sql` | D-331 | T/T definition clause: fixed "State Bank of India" → `{bank_name}`, filled from Settings › Company › Bank name (owner confirmed twice; prints as before with today's bank) |
+| `2026-11-12a-settings-plain-labels.sql` | D-332 | Settings › Company in plain words: 60 setting descriptions rewritten as one plain sentence (only rows still at the old seeded text; an empty protected setting is skipped — the database refuses changes to it, and the screen shows the plain sentence anyway). Keys and values unchanged |
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
@@ -62,6 +63,11 @@ texts of the new `schema.sql` + `seed.sql`. The only differences are on purpose:
 the company's own identity, bank, GSTIN, LUT and RCMC values are kept (a fresh
 install gets placeholders), and `email_testing_mode` is on where
 `mail_sending_enabled` was 0.
+
+`2026-11-12a` was checked on 12 Nov 2026 the same way: a scratch database from the
+`schema.sql` + `seed.sql` of the last commit, the file applied twice without an error;
+its descriptions then match the new `seed.sql` except the empty protected Zoho keys
+(skipped on purpose, see the file header). Applied twice to both development databases.
 
 The live-site order of work (backup, files, cron job, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".

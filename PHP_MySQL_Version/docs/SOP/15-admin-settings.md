@@ -43,13 +43,22 @@ Since 11 Nov 2026 every chapter of this manual uses these menu names; the old "A
 
 ## What staff do
 
+### Reading Settings › Company (D-332, 12 Nov 2026)
+
+Every setting shows a plain name (for example "Staff: log out after …
+minutes idle") with one sentence under it saying what it does. The small
+grey text under that is the setting's technical name — quote it when you
+ask for support. The sections have plain titles too ("Security and logging
+in", "RBI purpose codes", "Screen layout", "Zoho Books" …) and are in A–Z
+order.
+
 ### Sign-in security (D-265)
 
 Every staff member, in every role, and every buyer enters a 6-digit code
 e-mailed at each login. It cannot be switched off for anyone; the Users list
-shows "2FA: Required". Admin's only choice is **Settings › Security →
-`login_remember_browser_days`** (default **30**, 0–90; 0 = the code at every
-login). Above 0, staff (never buyers or associates) see **"This is my own
+shows "2FA: Required". Admin's only choice is **Settings › Security → Remember an office computer
+for … days** (`login_remember_browser_days`; default **30**, 0–90; 0 = the
+code at every login). Above 0, staff (never buyers or associates) see **"This is my own
 office computer"** on the code screen and skip the code on that computer for
 that many days (D-283). A password change or reset forgets every remembered
 computer; putting the setting back to 0 ends them all at once. **Forget all
@@ -58,11 +67,12 @@ in Users → Edit (both audit-logged).
 
 ### Staying logged in (owner, 11 Nov 2026, D-283)
 
-**Settings › Security** has one idle timeout per area:
-`session_timeout_staff_minutes` (**240** = 4 hours), `session_timeout_client_minutes`
-(buyers, **120**) and `session_timeout_associate_minutes` (associates, **120**),
-each 5 to 1440 minutes; and `session_absolute_staff_hours` (**12**, 1 to 24):
-staff log in again at least this often, however active. The app now keeps
+**Settings › Security** has one idle timeout per area: **Staff: log out
+after … minutes idle** (**240** = 4 hours), **Buyers: log out after …
+minutes idle** (**120**) and **Associates: log out after … minutes idle**
+(**120**), each 5 to 1440 minutes; and **Staff: log in again at least every
+… hours** (**12**, 1 to 24): staff log in again at least this often,
+however active. The app now keeps
 these itself — the server no longer drops a session after about 24 minutes.
 Two minutes before an idle sign-out every page shows "You will be signed out
 soon" with **Stay logged in**; before the 12-hour limit it only warns.
@@ -76,6 +86,9 @@ in the Audit Log.
 - **MUST** (locked on, cannot be switched off): login codes, set-password
   invites (buyer portal and associate portal), forgot-password links (staff,
   buyers, associates), the "bank details changed — if this wasn't you" alert,
+  the two bank-details confirmations (the 6-digit code an associate enters to
+  confirm new bank details, and the "please confirm your new bank details"
+  link to a supplier or logistics partner — listed since 12 Nov 2026, D-332),
   the backup-code alert, the quotation verification code.
 - **SHOULD** (on when installed): everything else — documents, links and
   messages to buyers, supplier links, every associate e-mail, staff approvals
@@ -503,10 +516,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   server (Bluehost)** — owner decision 2026-10-29: NexaCrest's mail is
   hosted with Bluehost and Zoho Mail is used only as a mail client, so the
   app never sends through Zoho Mail and its settings are not shown here.
-  The **Zoho_books** section of the same screen holds the Zoho Books
-  connection: the on/off switch (`zoho_books_enabled`), the login details,
-  organization ID, deposit bank account and the go-live date
-  (`zoho_books_sync_start_date`). A second button, **Test Books
+  The **Zoho Books** section of the same screen holds the Zoho Books
+  connection: the on/off switch (**Send accounts to Zoho Books**), the login
+  details, organisation ID, deposit bank account and the go-live date
+  (**Zoho Books start date**). A second button, **Test Books
   Connection** (2026-10-29), logs in to Zoho Books with those settings and
   checks the organisation, the deposit account and the currencies: it
   shows the organisation name and the bank account payments go into, and

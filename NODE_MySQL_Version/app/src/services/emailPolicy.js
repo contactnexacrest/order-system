@@ -36,6 +36,9 @@ const KINDS = {
   set_password_invite: { group: 'A', label: 'Set your password (portal opened / registration accepted)', audiences: { associate: 'must', buyer: 'must' }, access_critical: true },
   forgot_password: { group: 'A', label: 'Forgot password — reset link', audiences: { staff: 'must', associate: 'must', buyer: 'must' } },
   bank_details_changed: { group: 'A', label: 'Bank details changed — "if this wasn\'t you, tell us"', audiences: { associate: 'must' } },
+  // D-293 / D-303: the bank-details confirmations (sent on the security path, never held).
+  bank_confirm_code: { group: 'A', label: 'New bank details — 6-digit code to confirm them in the associate portal', audiences: { associate: 'must' } },
+  vendor_bank_confirm: { group: 'A', label: 'New bank details — link to confirm them, or "This is not us — cancel it" (supplier / logistics partner)', audiences: { supplier: 'must' } },
   backup_code_alert: { group: 'A', label: 'Backup code used — security alert', audiences: { staff: 'must' } },
   quote_verification_code: { group: 'A', label: 'Quotation request — e-mail verification code', audiences: { buyer: 'must' } },
 

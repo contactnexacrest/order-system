@@ -14,6 +14,7 @@ const zohoBooksService = require('../services/zohoBooksService');
 const zohoGuard = require('../services/zohoGuard');
 const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
+const settingLabels = require('../helpers/settingLabels');
 
 // Port of App\Controllers\SettingsController.
 
@@ -27,6 +28,9 @@ async function index(req, res) {
       row.secret_hint = secretSetting.hint(row.setting_value);
       row.setting_value = '';
     }
+    // D-332: the plain name and help sentence (the technical key stays as small grey text).
+    row.plainLabel = settingLabels.label(row.setting_key);
+    row.plainHelp = settingLabels.help(row.setting_key, row.description);
     (grouped[row.category] ||= []).push(row);
   }
   if (!zohoMailService.IN_USE) {
@@ -54,8 +58,12 @@ async function index(req, res) {
   // by-setting_key dropdown special-case as the RBI codes above, sourced
   // from the active UI templates rather than a lookup list.
   const activeUiTemplates = await uiTemplateRepository.active();
+  const sortedGroups = settingLabels.sortSections(grouped); // D-332: sections in the order of their plain titles
+  const sectionTitles = {};
+  for (const category of Object.keys(sortedGroups)) sectionTitles[category] = settingLabels.sectionTitle(category);
   res.renderView('settings/index', {
-    grouped,
+    grouped: sortedGroups,
+    sectionTitles,
     zohoServer: {
       enabled: zohoGuard.integrationEnabled(),
       environment: zohoGuard.environment(),

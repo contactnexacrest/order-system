@@ -635,7 +635,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('iec_pan',               'AAAAA0000A',                               'string', 'company', 'Import Export Code / PAN.', 1),
   ('md_name',               'Managing Director',                        'string', 'company', 'Founder & Managing Director name, for document signature blocks.', 0),
   ('md_title',              'Founder & Managing Director',              'string', 'company', 'MD title as shown on documents.', 0),
-  ('director_name',         'Managing Director',                        'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
+  ('director_name',         'Managing Director',                        'string', 'company', 'Name of the director, used only if a document carries a director''s signature (Quotation, Proforma and OC show the Managing Director only).', 0),
   ('director_title',        'Director',                                 'string', 'company', 'Director title as shown on documents.', 0),
   ('phone',                 '+91-0000000000',                           'string', 'company', 'Company contact phone number.', 0),
   ('email',                 'info@email.com', 'string', 'company', 'Company contact email address.', 0),
@@ -648,55 +648,55 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('bank_pincode',          '000000',                                    'string', 'bank',    'Bank branch pincode.', 1),
   ('lut_number',            'AD000000000000X',                         'string', 'lut',     'Letter of Undertaking (LUT) ARN/number for zero-rated export.', 1),
   ('lut_valid_fy',          'FY 2026-27',                                'string', 'lut',     'Financial year the current LUT is valid for.', 1),
-  ('lut_expiry_date',       '2027-03-31',                                'date',   'lut',     'LUT expiry date — placeholder (FY 2026-27 end date assumed as 31 March 2027) — the source PI template states the FY but not an explicit expiry date; confirm the real one.', 1),
-  ('rcmc_number',           'RCMC/CAPEXIL/00000/2026-2027',             'string', 'capexil', 'CAPEXIL RCMC (Registration-cum-Membership Certificate) number — required on the COO Preparation Sheet (Phase C).', 1),
-  ('rcmc_valid_until',      '2027-03-31',                                'date',   'capexil', 'CAPEXIL RCMC certificate expiry date — placeholder, renew annually. Alerts configured via rcmc_alert_days_a/rcmc_escalation_days_b below.', 1),
+  ('lut_expiry_date',       '2027-03-31',                                'date',   'lut',     'The date the current LUT expires — check it against the LUT certificate.', 1),
+  ('rcmc_number',           'RCMC/CAPEXIL/00000/2026-2027',             'string', 'capexil', 'CAPEXIL Registration-cum-Membership Certificate (RCMC) number, printed on the Certificate of Origin preparation sheet.', 1),
+  ('rcmc_valid_until',      '2027-03-31',                                'date',   'capexil', 'Expiry date of the CAPEXIL RCMC certificate (renewed every year). The reminders follow the RCMC days under "Reminders and alerts".', 1),
   ('rbi_purpose_code_advance', 'P0103', 'string', 'rbi', 'RBI purpose code for advance payment wires.', 0),
   ('rbi_purpose_code_balance', 'P0102', 'string', 'rbi', 'RBI purpose code for balance payment wires.', 0),
   ('rbi_purpose_code_freight', 'P0602', 'string', 'rbi', 'RBI purpose code for freight/insurance payment wires.', 0),
   ('default_currency',      'USD', 'string', 'defaults', 'Default quotation currency.', 0),
-  ('storage_base_path',     'PLACEHOLDER — must match STORAGE_BASE_PATH in .env', 'string', 'system', 'Documentation only — the app reads the real path from .env, not from this row, so it can never drift out of sync with the filesystem.', 0),
+  ('storage_base_path',     'PLACEHOLDER — must match STORAGE_BASE_PATH in .env', 'string', 'system', 'For information only — the app reads the real folder from the server''s .env file, not from here.', 0),
   ('quantity_shortfall_tolerance_pct', '5.00',  'number', 'tolerances', 'Allowed shortfall percentage before a quantity variance is flagged.', 0),
   ('lut_alert_days_x',      '30', 'number', 'alerts', 'Days before LUT expiry to raise an alert.', 0),
   ('lut_escalation_days_y', '15', 'number', 'alerts', 'Days before LUT expiry to escalate to MD.', 0),
   ('rcmc_alert_days_a',     '30', 'number', 'alerts', 'Days before RCMC expiry to raise an alert.', 0),
   ('rcmc_escalation_days_b','15', 'number', 'alerts', 'Days before RCMC expiry to escalate to MD.', 0),
-  ('fdn_overdue_days_c',    '3',  'number', 'alerts', 'WORKING days after FDN issue before a freight payment is flagged overdue — must match the "payable within 3 working days of issue" figure in the CFR/CIF Indicative Freight Validity clause (QT/PI) verbatim, since that clause is the written promise to the buyer. (Corrected from an earlier placeholder of 7, which did not match the clause text and used calendar-day arithmetic instead of working days — see check_alerts.php.)', 0),
+  ('fdn_overdue_days_c',    '3',  'number', 'alerts', 'Days after the date on the freight debit note (FDN) before its payment shows as overdue (calendar days). Keep it the same as the "payable within 3 Calendar Days" in the freight clause of the Quotation and Proforma.', 0),
   ('max_bank_charges_pct', '3', 'number', 'tolerances', 'The most bank charges one buyer remittance may carry, as a % of the amount due. Above it the difference must be recorded as a short payment instead.', 0),
-  ('fema_realization_alert_days', '270', 'number', 'alerts', 'Days after a settlement leg is marked cleared before the CA / Accounting module flags its FIRC/eBRC reference as still missing — 270 days (9 months) mirrors the RBI/FEMA export-proceeds realization period as a practical proof-of-realization deadline, not a legal shipment-date calculation (this system does not track the shipment date this rule technically runs from).', 0),
-  ('session_timeout_staff_minutes', '240', 'number', 'security', 'D-283: staff are signed out after this many minutes without activity (5 to 1440; default 240 = 4 hours). A warning with "Stay logged in" shows 2 minutes before.', 0),
-  ('session_timeout_client_minutes', '120', 'number', 'security', 'D-283: buyers (client portal) are signed out after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
-  ('session_timeout_associate_minutes', '120', 'number', 'security', 'D-283: associates (associate portal) are signed out after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
-  ('session_absolute_staff_hours', '12', 'number', 'security', 'D-283: staff log in again at least this often, however active they are (1 to 24 hours; default 12).', 0),
+  ('fema_realization_alert_days', '270', 'number', 'alerts', 'Days after a payment is marked cleared before it is flagged because its FIRC / eBRC reference is still missing (270 days = the 9-month RBI realisation period).', 0),
+  ('session_timeout_staff_minutes', '240', 'number', 'security', 'Staff are logged out after this many minutes without activity (5 to 1440; default 240 = 4 hours). A "Stay logged in" warning shows 2 minutes before.', 0),
+  ('session_timeout_client_minutes', '120', 'number', 'security', 'Buyers are logged out of their portal after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
+  ('session_timeout_associate_minutes', '120', 'number', 'security', 'Associates are logged out of their portal after this many minutes without activity (5 to 1440; default 120 = 2 hours).', 0),
+  ('session_absolute_staff_hours', '12', 'number', 'security', 'Staff must log in again after this many hours, however active they are (1 to 24; default 12).', 0),
   ('failed_login_lockout_count', '5', 'number', 'security', 'Failed login attempts before account lockout.', 0),
-  ('login_remember_browser_days', '30', 'number', 'security', 'D-265 / D-283: staff may tick "This is my own office computer" on the login-code screen and skip the e-mailed code on that computer for this many days (0 to 90; default 30). 0 = off: the code is asked at every login. A password change or reset, or "Forget all remembered computers" (My Account, or Admin in Users › Edit), forgets them.', 0),
-  ('lockout_duration_minutes', '15', 'number', 'security', 'How long an account stays locked after too many failed attempts. (Addition beyond the spec''s named key list — needed to make failed_login_lockout_count actually enforceable; flagging per architecture doc practice.)', 0),
+  ('login_remember_browser_days', '30', 'number', 'security', 'Staff who tick "This is my own office computer" skip the e-mailed login code on that computer for this many days (0 to 90; default 30; 0 = always ask). A password change or "Forget all remembered computers" ends it.', 0),
+  ('lockout_duration_minutes', '15', 'number', 'security', 'How many minutes an account stays locked after too many failed logins.', 0),
   ('password_min_length',   '10', 'number', 'security', 'Minimum password length.', 0),
   ('password_complexity_json', '{"require_upper":true,"require_number":true,"require_symbol":false}', 'json', 'security', 'Password complexity rules enforced on password change.', 0),
-  ('password_expiry_days',  '0', 'number', 'security', 'Days before a password must be changed. Enforced on every request (SessionAuth) — 0 disables the check (D-313: off by default; staff sign in with an e-mailed code).', 0),
-  ('non_usd_price_buffer_pct', '1.75', 'number', 'tolerances', 'Advisory price buffer shown (not auto-applied) for non-USD quotes, per your instruction.', 0),
-  ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date (Addition beyond the spec''s named key list — the source Quotation template states "30 days" directly in its T&C text; making it a setting instead of a literal keeps that number DB-driven if it ever changes).', 0),
-  ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date. Same addition as quotation_validity_days, for the same reason — the source PI template states "15 days" directly in its T&C text.', 0),
+  ('password_expiry_days',  '0', 'number', 'security', 'Staff must change their password after this many days; 0 = never (the default, as staff log in with an e-mailed code).', 0),
+  ('non_usd_price_buffer_pct', '1.75', 'number', 'tolerances', 'A suggested extra margin shown (not added automatically) on quotes in a currency other than USD.', 0),
+  ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date.', 0),
+  ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date.', 0),
   ('revision_start_number', '1', 'number', 'documents', 'Starting revision number for a new document.', 0),
-  ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Mandatory BL type instruction printed on every BL Instruction Sheet (Addition beyond the spec''s named key list — this hard rule was previously hardcoded directly in the BLI template, with no governance or audit trail if it ever needed a one-off exception; a Sea Waybill/Express BL lets the buyer collect cargo without surrendering any document, eliminating NexaCrest''s financial leverage over the balance payment).', 0),
-  ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Mandatory BL consignee instruction — ensures the BL is to NexaCrest''s order so the buyer cannot use it until NexaCrest endorses and releases it. {company} is substituted with the company legal name at render time. Same addition/rationale as bl_type_instruction.', 0),
+  ('bl_type_instruction', 'ORIGINAL NEGOTIABLE BILL OF LADING — no exceptions. Do not substitute with Sea Waybill or Express BL.', 'string', 'shipping', 'Printed on every BL Instruction Sheet: an original Bill of Lading only — no Sea Waybill or Express BL, which would let the buyer collect the goods before paying the balance.', 0),
+  ('bl_consignee_instruction', 'TO ORDER OF {company}', 'string', 'shipping', 'Printed on every BL Instruction Sheet: the BL is made out to the company''s order, so the buyer cannot use it until the company releases it. {company} becomes the company''s legal name.', 0),
   -- 90-item backlog "Annexure note configurability" — same addition/
   -- rationale as bl_type_instruction/bl_consignee_instruction above:
   -- this exact wording was previously hardcoded straight into the
   -- Annexure A template with no governance or audit trail.
   ('annexure_product_note', 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.', 'string', 'documents', 'Printed in the amber "Note:" banner above every Annexure A''s Product Specification section.', 0),
   ('master_tracking_ref_format', 'NC/SC/{YY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
-  ('order_ref_format',      'NC/SC/ORD/{YY}/{DDMM}{NNN}', 'string', 'formats', 'Order reference format (owner decision 4 Nov 2026, D1): a daily counter, e.g. NC/SC/ORD/26/0411001.', 0),
-  ('dispute_response_days_n', '10', 'number', 'disputes', 'WORKING days allowed for a dispute response before escalation — must match the "ten (10) working days" figure in the Dispute Resolution & Public Communications clause below verbatim, since that clause is the legally binding promise printed on QT/PI/OC/BUYERPO. (Corrected from an earlier placeholder of 7, which did not match the clause text.) response_due_date is computed via WorkingDaysCalculator, which skips weekly_off_days and company_holidays — plain calendar-day arithmetic would silently undercount the deadline by counting Sundays/holidays as working days.', 0),
-  ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0),
-  ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
-  ('zoho_client_id',      '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client ID.', 1),
-  ('zoho_client_secret',  '', 'string',  'zoho', 'Zoho API Console self-client OAuth Client Secret.', 1),
-  ('zoho_refresh_token',  '', 'string',  'zoho', 'Zoho OAuth refresh token (mail.send scope) — exchanged for a short-lived access token on each send.', 1),
-  ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
-  ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
-  ('zoho_accounts_domain', 'accounts.zoho.in', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
-  ('zoho_api_domain',      'mail.zoho.in', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0),
+  ('order_ref_format',      'NC/SC/ORD/{YY}/{DDMM}{NNN}', 'string', 'formats', 'The pattern of order reference numbers: a daily counter, e.g. NC/SC/ORD/26/0411001.', 0),
+  ('dispute_response_days_n', '10', 'number', 'disputes', 'Working days allowed to answer a buyer''s dispute before it is escalated. Keep it the same as the "ten (10) working days" in the dispute clause printed on the Quotation, Proforma, OC and Buyer PO. Weekly days off and company holidays are not counted.', 0),
+  ('weekly_off_days', 'sunday', 'string', 'disputes', 'Days of the week that never count as working days, in small letters and separated by commas (e.g. sunday).', 0),
+  ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Off by default. When off, or when Zoho fails, e-mails go out through the normal mail server.', 0),
+  ('zoho_client_id',      '', 'string',  'zoho', 'The client ID of the "self client" in the Zoho API Console.', 1),
+  ('zoho_client_secret',  '', 'string',  'zoho', 'The client secret of the "self client" in the Zoho API Console.', 1),
+  ('zoho_refresh_token',  '', 'string',  'zoho', 'The long-lasting key from the Zoho API Console that lets the app send e-mail.', 1),
+  ('zoho_account_id',     '', 'string',  'zoho', 'The number Zoho gives the mail account that e-mails are sent from.', 1),
+  ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox e-mails are sent from; it must be one of the account''s verified addresses.', 0),
+  ('zoho_accounts_domain', 'accounts.zoho.in', 'string', 'zoho', 'Zoho''s login address for your region, e.g. accounts.zoho.in for India.', 0),
+  ('zoho_api_domain',      'mail.zoho.in', 'string', 'zoho', 'Zoho Mail''s address for the same region, e.g. mail.zoho.in.', 0),
   -- 90-item backlog "default weight/volume values": New Order's Estimated
   -- Weight & Volume fieldset used to start every order blank, unlike
   -- Package Type/Package Count which already had a configured/hardcoded
@@ -715,16 +715,16 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- CaSyncService treats "not enabled" as a routine no-op, never a blocker
 -- (see ZohoSyncLogRepository/CaSyncService docblocks).
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('zoho_books_enabled',            '0', 'boolean', 'zoho_books', 'Master on/off switch for syncing revenue to Zoho Books. Off by default (no credentials configured yet) — when off, Sync Now and the scheduled job both log a single "skipped, not configured" entry and exit cleanly.', 0),
-  ('zoho_books_client_id',          '', 'string',  'zoho_books', 'Zoho Books API Console self-client OAuth Client ID.', 1),
-  ('zoho_books_client_secret',      '', 'string',  'zoho_books', 'Zoho Books API Console self-client OAuth Client Secret.', 1),
-  ('zoho_books_refresh_token',      '', 'string',  'zoho_books', 'Zoho Books OAuth refresh token (ZohoBooks.fullaccess scope) — exchanged for a short-lived access token on each sync.', 1),
-  ('zoho_books_organization_id',    '', 'string',  'zoho_books', 'Zoho Books organization ID — required on every Books API call.', 1),
-  ('zoho_books_deposit_account_id', '', 'string',  'zoho_books', 'The Zoho Books chart-of-accounts account ID that synced customer payments are recorded as deposited into (e.g. your bank account in Zoho Books).', 1),
-  ('zoho_books_sync_start_date',    '', 'date', 'zoho_books', 'Go-live date for Zoho Books (YYYY-MM-DD). Only CIs, Debit Notes, payments, bills, vendor payments and order expenses dated on or after it are sent; anything earlier is booked by the CA as the opening position. Required on the live server (ZOHO_ENVIRONMENT=production): without it nothing is sent.', 0),
+  ('zoho_books_enabled',            '0', 'boolean', 'zoho_books', 'Off by default. While off, "Sync now" and the scheduled sync only note "skipped — not set up" and send nothing.', 0),
+  ('zoho_books_client_id',          '', 'string',  'zoho_books', 'The client ID of the "self client" in the Zoho API Console.', 1),
+  ('zoho_books_client_secret',      '', 'string',  'zoho_books', 'The client secret of the "self client" in the Zoho API Console.', 1),
+  ('zoho_books_refresh_token',      '', 'string',  'zoho_books', 'The long-lasting key from the Zoho API Console that lets the app work in Zoho Books.', 1),
+  ('zoho_books_organization_id',    '', 'string',  'zoho_books', 'Your organisation''s ID in Zoho Books.', 1),
+  ('zoho_books_deposit_account_id', '', 'string',  'zoho_books', 'The ID of the account in Zoho Books (your bank account there) that buyer payments are recorded into.', 1),
+  ('zoho_books_sync_start_date',    '', 'date', 'zoho_books', 'Only invoices, debit notes, payments, bills and expenses dated on or after this day are sent to Zoho Books; earlier ones are the CA''s opening position. Needed on the live site — without it nothing is sent.', 0),
   ('zoho_books_restore_checked_at', '', 'string', 'zoho_books', 'Set by the app: when the scheduled Zoho sync last checked every record already in Zoho Books and put back what had been deleted or changed there (once a day; Sync Now always checks). Leave it as it is.', 0),
-  ('zoho_books_accounts_domain',    'accounts.zoho.in', 'string', 'zoho_books', 'Zoho OAuth token endpoint domain — region-specific, matching whichever data center the Zoho One account lives in.', 0),
-  ('zoho_books_api_domain',         'www.zohoapis.in', 'string', 'zoho_books', 'Zoho Books API domain — matches zoho_books_accounts_domain''s region (www.zohoapis.com / .eu / .in / .com.cn / .com.au).', 0);
+  ('zoho_books_accounts_domain',    'accounts.zoho.in', 'string', 'zoho_books', 'Zoho''s login address for your region, e.g. accounts.zoho.in for India.', 0),
+  ('zoho_books_api_domain',         'www.zohoapis.in', 'string', 'zoho_books', 'Zoho Books'' address for the same region, e.g. www.zohoapis.in.', 0);
 
 -- Addition beyond the spec's named key list: the signature/seal on generated
 -- documents are electronic marks, not a scan of a wet-ink signature or a
@@ -733,8 +733,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- here (not hardcoded in the templates) so the text can be revised at any
 -- time without a code change — e.g. once a physical company seal exists.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('show_generated_document_disclaimer', '0', 'boolean', 'documents', 'Show the "system-generated document" disclaimer under the signature block on any generated document that carries a signature/seal image. Defaults to OFF (90-item backlog #21) — set to 1 to show it everywhere.', 0),
-  ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'Exact wording shown under the signature block when the disclaimer above is enabled. Edit freely — no code change needed.', 0);
+  ('show_generated_document_disclaimer', '0', 'boolean', 'documents', 'On = documents that carry a signature or seal image show the "system-generated document" note under the signature block. Off by default.', 0),
+  ('generated_document_disclaimer_text', 'This is a system-generated document. The signature and company seal shown are NexaCrest''s authorised electronic signature and digital company seal, applied automatically by the order management system under internal document-authorisation controls.', 'string', 'documents', 'The wording printed under the signature block when the "system-generated document" note is switched on.', 0);
 
 -- Consignee/Notify Party section visibility on buyer-facing documents
 -- (QT/PI/OC/PL/CI). These only ever matter when the Consignee is the
@@ -747,8 +747,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- Buyer) so turning this feature on changes nothing until an Admin
 -- deliberately flips one off.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('always_show_consignee_section', '1', 'boolean', 'documents', 'Print the CONSIGNEE DETAILS section on QT/PI/OC/PL/CI even when the Consignee is identical to the Buyer. Set to 0 to omit that section whenever Consignee = Buyer — it still always prints the moment the two genuinely differ, regardless of this setting.', 0),
-  ('always_show_notify_party_section', '1', 'boolean', 'documents', 'Print the NOTIFY PARTY section on PI/PL/CI even when the Notify Party is identical to the Buyer (directly, or via "same as Consignee" when the Consignee itself is the Buyer). Set to 0 to omit that section whenever Notify Party = Buyer — it still always prints the moment the two genuinely differ, regardless of this setting.', 0);
+  ('always_show_consignee_section', '1', 'boolean', 'documents', 'On = the CONSIGNEE DETAILS section prints on the Quotation, Proforma, OC, Packing List and Commercial Invoice even when the consignee is the buyer. Off = it prints only when the consignee is different.', 0),
+  ('always_show_notify_party_section', '1', 'boolean', 'documents', 'On = the NOTIFY PARTY section prints on the Proforma, Packing List and Commercial Invoice even when the notify party is the buyer. Off = it prints only when the notify party is different.', 0);
 
 -- Wet-signature-required flags. This was discussed early on but left
 -- unbuilt (docs/SOP/README.md "Still pending", task tracker item #106):
@@ -768,8 +768,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- already the ONLY path to an amendment becoming active, so that gate was
 -- never bypassable in the first place.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('wet_signature_required_buyer_po', '1', 'boolean', 'workflow', 'When on, Stage 2 (Buyer PO) cannot be confirmed until the buyer''s signed PO copy has been uploaded for this order via "Attach Buyer PO copy". Default on — this is the fix for a real gap: recording just a reference number used to be enough to pass the gate.', 0),
-  ('wet_signature_required_supplier_po', '1', 'boolean', 'workflow', 'When on, Stage 5 (Supplier PO) cannot be confirmed signed until the supplier''s signed acknowledgment copy has been uploaded for the current Supplier PO version. Default on — same class of gap as the Buyer PO flag above.', 0);
+  ('wet_signature_required_buyer_po', '1', 'boolean', 'workflow', 'On (default) = the Buyer PO step cannot be confirmed until the buyer''s signed PO copy is uploaded; a reference number alone is not enough.', 0),
+  ('wet_signature_required_supplier_po', '1', 'boolean', 'workflow', 'On (default) = the Supplier PO cannot be confirmed as signed until the supplier''s signed copy of the current version is uploaded.', 0);
 
 -- Protected by default: the 12 is_sensitive fields (identity/banking/
 -- compliance — a wrong edit is real financial/legal damage), plus the 3
@@ -1529,10 +1529,10 @@ INSERT INTO compliance_task_types (name, phase, task_key) VALUES
 -- to edit (requires_super_admin = 1).
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('mail_redirect_enabled', '0', 'boolean', 'mail_redirect', 'Independent of Test Mode — when on, every non-security outbound email (order updates, document sends, etc.) is redirected to mail_redirect_address below instead of its real recipient. Staff 2FA codes and password-reset links are never redirected.', 0, 0),
-  ('mail_redirect_address', '', 'email', 'mail_redirect', 'Where redirected mail goes when mail_redirect_enabled is on. Required for the redirect to actually work — if left blank while enabled, redirected mail is logged, never sent.', 0, 0),
-  ('mail_cc_emails', '', 'email_list', 'mail_redirect', 'Comma-separated additional CC addresses applied to every non-security outbound email, regardless of mail_redirect_enabled. Super Admin only.', 0, 1),
-  ('mail_default_cc_email', '', 'email', 'mail_redirect', 'A single default CC address always applied to every non-security outbound email, in addition to mail_cc_emails above. Super Admin only.', 0, 1);
+  ('mail_redirect_enabled', '0', 'boolean', 'mail_redirect', 'On = every e-mail except login codes and password links goes to the address below instead of its real recipient (separate from Test Mode).', 0, 0),
+  ('mail_redirect_address', '', 'email', 'mail_redirect', 'While redirect is on, e-mails go to this address instead of their real recipient. If it is empty, redirected e-mails are only logged, not sent.', 0, 0),
+  ('mail_cc_emails', '', 'email_list', 'mail_redirect', 'Extra addresses, separated by commas, copied on every e-mail except login codes and password links. Only a Super Admin can change this.', 0, 1),
+  ('mail_default_cc_email', '', 'email', 'mail_redirect', 'One address copied on every e-mail except login codes and password links, besides the list above. Only a Super Admin can change this.', 0, 1);
 
 -- ================================================================
 -- DEFERRED-MAIL ADMIN CONTROLS + OC ACKNOWLEDGMENT OVERRIDE (Section AU)
@@ -1541,12 +1541,12 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- manage_orders, and the auto-confirm window stays 48 hours.
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('email_testing_mode', '0', 'boolean', 'mail', 'D-280: Testing mode — hold e-mails to buyers and suppliers. On = e-mails to buyers and suppliers are not sent (the screen says so and shows the link to copy); staff and associate e-mails and every MUST e-mail (login codes, set-password and forgot-password links, security alerts) still go out. Set in Admin › E-mail settings, with the per-e-mail switches.', 0, 0),
-  ('reply_to_email', '', 'email', 'mail', 'External QA report L-43: customer emails (QT/PI/OC/etc.) went out from a no-reply address with no Reply-To, so a buyer reply was lost. Set a monitored sales/support address here so replies reach someone; leave blank to fall back to company_settings.email.', 0, 0),
-  ('mail_approval_queue_enabled', '1', 'boolean', 'mail', 'On (default) = every buyer-facing document send still needs a second person''s Level-2 approval before it goes out (Section 10). Off = a single staff member with generate_documents can send directly — useful for a small team or while testing.', 0, 0),
-  ('oc_ack_override_restricted', '0', 'boolean', 'orders', 'Off (default) = any user with manage_orders can record a buyer''s Order Confirmation acknowledgment manually, as before. On = that action also requires the override_buyer_acknowledgment permission, so it can be restricted to specific roles.', 0, 0),
-  ('oc_ack_auto_confirm_hours', '48', 'number', 'orders', 'Hours after the Order Confirmation email is sent before the order auto-confirms if the buyer hasn''t responded (docs/schema.sql Section AE). Lower it for testing; 48 is the production default.', 0, 0),
-  ('lead_time_display_unit', 'days', 'string', 'orders', '90-item backlog item 16: whether the Production/Sailing Lead Time ranges on the Order Detail page show in days (default) or weeks. Display only — the stored figures and every input field stay in days regardless.', 0, 0);
+  ('email_testing_mode', '0', 'boolean', 'mail', 'On = e-mails to buyers and suppliers are held; staff and associate e-mails and every MUST e-mail still go out. Set on Settings › E-mail.', 0, 0),
+  ('reply_to_email', '', 'email', 'mail', 'Where buyers'' replies go — a sales mailbox someone reads. Leave empty to use the company e-mail address.', 0, 0),
+  ('mail_approval_queue_enabled', '1', 'boolean', 'mail', 'On (default) = every document e-mail to a buyer is approved by a second person before it goes out. Off = one staff member who can generate documents sends it directly.', 0, 0),
+  ('oc_ack_override_restricted', '0', 'boolean', 'orders', 'Off (default) = anyone who manages orders can record the buyer''s acknowledgement of the Order Confirmation by hand. On = only roles given the "Override buyer acknowledgement" permission.', 0, 0),
+  ('oc_ack_auto_confirm_hours', '48', 'number', 'orders', 'Hours after the Order Confirmation e-mail is sent before the order confirms itself if the buyer has not answered (48 on the live site).', 0, 0),
+  ('lead_time_display_unit', 'days', 'string', 'orders', 'How the production and sailing lead times show on the order page. Only the display changes; they are always entered and kept in days.', 0, 0);
 
 -- ================================================================
 -- STAFF CLIENT-PORTAL IMPERSONATION (Section AV) — off by default. Also
@@ -1555,7 +1555,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- default, same tier as manage_disputes/manage_order_financials).
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('client_impersonation_enabled', '0', 'boolean', 'clients', 'Global switch for staff "Log in as this client" (Section AV). Off = the feature is unavailable for every client, regardless of any individual client''s own allow_staff_impersonation flag or who holds the impersonate_client permission.', 0, 0);
+  ('client_impersonation_enabled', '0', 'boolean', 'clients', 'Off = no staff member can open a client''s portal as that client, whatever is set on the client or the role.', 0, 0);
 
 -- ================================================================
 -- 90-item backlog Phase 6 Item B — global default for whether a client's
@@ -1566,7 +1566,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- table) takes precedence over this when set.
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('client_portal_show_order_history', '1', 'boolean', 'clients', 'On (default) = every client sees their full order history, including completed/lost orders, on their portal dashboard. Off = clients see active/disputed orders only, unless an individual client''s own override says otherwise.', 0, 0);
+  ('client_portal_show_order_history', '1', 'boolean', 'clients', 'On (default) = clients see all their orders, including completed and lost ones. Off = only active and disputed orders, unless a client''s own setting says otherwise.', 0, 0);
 
 -- External QA report M-02: same global + per-client override pattern as
 -- client_portal_show_order_history above, for document-download
@@ -1574,7 +1574,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- document_downloads_visibility_override (clients table) takes
 -- precedence over this when set.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('client_portal_show_document_downloads', '1', 'boolean', 'clients', 'On (default) = every client can download their own order''s approved/sent customer-facing documents from the portal. Off = the Documents section is hidden and direct download links are refused, unless an individual client''s own override says otherwise.', 0, 0);
+  ('client_portal_show_document_downloads', '1', 'boolean', 'clients', 'On (default) = clients can download the approved documents of their own orders from the portal. Off = the Documents section is hidden, unless a client''s own setting says otherwise.', 0, 0);
 
 -- ================================================================
 -- SECTION BA — LEGAL TERMS & DEFINITIONS clauses (admin-editable via
@@ -1675,7 +1675,7 @@ INSERT INTO ui_templates (template_key, name, is_active) VALUES
   ('kanban', 'Kanban Board', 1);
 
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('default_ui_template', 'standard', 'string', 'ui', 'Which UI template (see Admin > UI Templates) a user sees when they have not chosen one for themselves on their own Account page. Must be an active template — picking it from the dropdown on this screen enforces that.', 0);
+  ('default_ui_template', 'standard', 'string', 'ui', 'The layout (Standard or Kanban Board) a user sees until they choose their own on My Account. Only active layouts can be picked.', 0);
 
 -- ================================================================
 -- Owner request (2026-10-27): one sample supplier and sample logistics
@@ -2599,7 +2599,7 @@ INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('asso
 -- Management (Admin, MD, ED, System Administrator) also always see everything through manage_company_settings.
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('sop_library_enabled', '1', 'boolean', 'sop_access', 'D-266: the SOP library (menu, chapters, screenshots, Gallery) for staff. Off = only MD and Admin see it; Getting Started stays open. Switched on Admin > SOP access.', 0);
+  ('sop_library_enabled', '1', 'boolean', 'sop_access', 'Off = only the MD and Admin see the SOP library; Getting Started stays open. Set on Settings › SOP access.', 0);
 INSERT INTO sop_chapters (slug, is_enabled) VALUES
   ('00-getting-started', 1),
   ('00-introduction', 1),

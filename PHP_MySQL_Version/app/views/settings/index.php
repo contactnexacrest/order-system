@@ -5,7 +5,7 @@
     <div class="alert alert-warning">&#9888; <?= htmlspecialchars($uploadLimitWarning) ?></div>
   <?php endif; ?>
   <p class="muted">Every value here is what document templates actually read at generation time — nothing is hardcoded in a template. Fields marked <span class="badge badge-sensitive">sensitive</span> affect banking/RBI-facing documents; double-check before saving.</p>
-  <p class="muted small">Spec Section 13 — every edit here is logged with who/when/field/old value/new value/reason, and cannot be undone through this UI; only a further edit can change a value back.</p>
+  <p class="muted small">Every change here is kept in the Audit Log (who, when, which setting, the old and new value and the reason). It cannot be undone on this screen; only a further change sets a value back. The small grey name under each setting is its technical name, for support.</p>
   <p class="muted small">&#128274; <strong>Protected</strong> fields are locked against accidental edits — click <em>Unlock</em> on a row before you can change it. Protecting or unprotecting a field itself is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>
   <p class="muted small">&#9776; <a href="/settings/remittance-reasons">Remittance difference reasons</a> — the list behind "Why is it different?" when a buyer remittance differs from what is due (bank charges, buyer paid less, buyer paid more).</p>
   <p class="muted small">&#8377; <a href="/settings/associate-tds">Associate TDS</a> — section, rate, threshold, rate without PAN and the rules for associates abroad used to work out TDS on associate commission (D-235).</p>
@@ -22,19 +22,22 @@
     <?php foreach ($grouped as $category => $rows): ?>
       <?php // D-320: the id lets Settings › Security / Zoho open their section ?>
       <details class="collapsible-section settings-section" data-category="<?= htmlspecialchars($category) ?>" id="settings-<?= htmlspecialchars($category) ?>">
-      <summary><?= htmlspecialchars(ucfirst($category)) ?> <span class="muted small settings-section-count">(<?= count($rows) ?>)</span></summary>
+      <summary><?= htmlspecialchars(\App\Helpers\SettingLabels::sectionTitle((string) $category)) ?> <span class="muted small settings-section-count">(<?= count($rows) ?>)</span></summary>
       <fieldset>
         <?php foreach ($rows as $row): ?>
           <?php $lockedToSuperAdmin = $row['requires_super_admin'] && !$isSuperAdmin; ?>
           <label class="setting-row<?= $row['is_protected'] ? ' protected-row' : '' ?>">
             <span class="setting-label">
               <?php if ($row['is_protected']): ?><span class="lock-icon" title="Protected — unlock to edit">&#128274;</span><?php endif; ?>
-              <?= htmlspecialchars($row['setting_key']) ?>
+              <?php /* D-332: the plain name; the technical key only as small grey text (for support). */ ?>
+              <span class="setting-name" title="Technical name: <?= htmlspecialchars($row['setting_key']) ?>"><?= htmlspecialchars(\App\Helpers\SettingLabels::label((string) $row['setting_key'])) ?></span>
               <?php if ($row['setting_key'] === 'storage_base_path'): ?><span class="badge badge-superadmin" title="Editing this has no effect on the app — it always reads STORAGE_BASE_PATH from .env, not from this row">read-only</span><?php endif; ?>
               <?php if ($row['is_sensitive']): ?><span class="badge badge-sensitive">sensitive</span><?php endif; ?>
               <?php if ($row['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
               <?php if ($row['requires_super_admin']): ?><span class="badge badge-superadmin" title="Only a Super Admin can change this">Super Admin only</span><?php endif; ?>
-              <?php if ($row['description']): ?><small class="muted"><?= htmlspecialchars($row['description']) ?></small><?php endif; ?>
+              <?php $settingHelp = \App\Helpers\SettingLabels::help((string) $row['setting_key'], $row['description'] ?? null); ?>
+              <?php if ($settingHelp !== ''): ?><small class="muted setting-help"><?= htmlspecialchars($settingHelp) ?></small><?php endif; ?>
+              <small class="muted setting-key" title="Technical name of this setting (for support)"><?= htmlspecialchars($row['setting_key']) ?></small>
             </span>
             <?php /* 90-item backlog #31: special-cased by setting_key rather than
                adding a generic value_type='select' — company_settings.value_type

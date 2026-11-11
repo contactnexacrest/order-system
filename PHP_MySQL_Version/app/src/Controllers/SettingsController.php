@@ -40,6 +40,8 @@ final class SettingsController
         if (isset($grouped['mail'])) {
             $grouped['mail'] = array_values(array_filter($grouped['mail'], static fn (array $r): bool => $r['setting_key'] !== 'email_testing_mode'));
         }
+        // D-332: sections in the order of their plain titles.
+        $grouped = \App\Helpers\SettingLabels::sortSections($grouped);
         $user = AuthService::currentUser();
         View::render('settings/index', [
             'grouped' => $grouped,

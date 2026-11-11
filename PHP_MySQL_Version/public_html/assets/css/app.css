@@ -298,7 +298,7 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
    collapses independently instead of being one long unbroken scroll. */
 .settings-toolbar{display:flex;gap:0.6rem;margin-bottom:0.75rem;}
 .settings-section{border:1px solid var(--line);border-radius:10px;margin-bottom:1rem;}
-.settings-section summary{cursor:pointer;padding:0.75rem 1.25rem;font-weight:700;color:var(--navy);text-transform:capitalize;list-style:none;display:flex;align-items:center;gap:0.5rem;}
+.settings-section summary{cursor:pointer;padding:0.75rem 1.25rem;font-weight:700;color:var(--navy);text-transform:none;list-style:none;display:flex;align-items:center;gap:0.5rem;}
 .settings-section summary::-webkit-details-marker{display:none;}
 .settings-section summary::after{content:"\25BE";margin-left:auto;opacity:0.6;font-size:0.8em;}
 .settings-section[open]>summary::after{content:"\25B4";}
@@ -307,6 +307,10 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .setting-row{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--line);padding:0.5rem 0;margin-bottom:0;}
 .setting-label{flex:0 0 45%;min-width:0;overflow-wrap:break-word;font-size:0.85rem;color:var(--ink);}
 .setting-row input{flex:1;margin-top:0;}
+/* D-332: plain setting name first; its help sentence below; the technical key small and grey (for support). */
+.setting-label .setting-name{font-weight:600;}
+.setting-label .setting-help{display:block;margin-top:2px;}
+.setting-label .setting-key{display:block;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.7rem;opacity:0.7;}
 .badge{display:inline-block;font-size:0.7rem;padding:0.15rem 0.5rem;border-radius:6px;margin-left:0.4rem;font-weight:600;}
 .badge-sensitive{background:var(--danger-soft);color:var(--danger);}
 .badge-active{background:var(--success-soft);color:var(--success);}

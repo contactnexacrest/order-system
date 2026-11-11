@@ -110,8 +110,11 @@ final class MigrationFileConventionsTest extends TestCase
                     preg_split('/\R/', $contents),
                     static fn (string $line): bool => !str_starts_with(trim($line), '--')
                 ));
+                // A quoted text can hold a semicolon too (2026-11-12a: setting
+                // descriptions) — blank out every '…' literal before splitting.
+                $withoutStrings = (string) preg_replace("/'(?:[^'\\\\]|''|\\\\.)*'/s", "''", $withoutComments);
                 $statements = array_filter(
-                    array_map('trim', explode(';', $withoutComments)),
+                    array_map('trim', explode(';', $withoutStrings)),
                     static fn (string $s): bool => $s !== '' && !preg_match('/^(SET NAMES|SELECT)\b/i', $s)
                 );
                 $hasGuard = $statements !== [] && array_reduce(

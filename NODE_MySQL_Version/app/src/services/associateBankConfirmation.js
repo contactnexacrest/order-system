@@ -58,7 +58,7 @@ async function sendCode(associate, b, req = null) {
   await require('./emailService').sendPlainText(String(associate.email), 'NexaCrest associate portal — your code to confirm new bank details',
     `Hello ${associate.name},\n\nYour code to confirm the new bank details ${name(b)} is:\n\n${code}\n\n`
     + `It is valid for ${bankDetailsCheck.CODE_MINUTES} minutes. Never share it — NexaCrest staff will never ask you for it.\n`
-    + 'If you did not ask for new bank details, open your portal and click "This is not me — cancel it".\n\nNexaCrest International Private Limited', { isSecurityEmail: true });
+    + 'If you did not ask for new bank details, open your portal and click "This is not me — cancel it".\n\nNexaCrest International Private Limited', { isSecurityEmail: true, kind: 'bank_confirm_code', audience: 'associate' });
   if (req && req.session && require('./associatePortalService').showCodeOnScreen()) {
     req.session.associateBankCodeDev = code; // dev servers only, as with the login code
   }

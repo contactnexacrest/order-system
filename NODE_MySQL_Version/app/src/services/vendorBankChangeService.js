@@ -39,7 +39,7 @@ async function sendLink(kind, vendor, c, raw, email) {
     + `New bank details were recorded for you at NexaCrest: ${name(c, vendor)}.\n`
     + `NexaCrest pays into them only after you confirm them here (no login needed), by ${short(day(c.confirm_by))}:\n${link}\n\n`
     + 'If you did not send new bank details, open the link and click "This is not us — cancel it". Until then, payments go to the account you had.\n\n'
-    + 'NexaCrest International Private Limited', { isSecurityEmail: true });
+    + 'NexaCrest International Private Limited', { isSecurityEmail: true, kind: 'vendor_bank_confirm', audience: 'supplier' });
 }
 
 /** A change of bank details is recorded and the confirmation link e-mailed to the registered e-mail (the one on file BEFORE this change). */

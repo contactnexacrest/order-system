@@ -97,6 +97,8 @@ describe('D-280 / D-281 / D-282 e-mail settings, routing and portal access', () 
     const must = {
       login_code: ['staff', 'associate', 'buyer'], set_password_invite: ['associate', 'buyer'], forgot_password: ['staff', 'associate', 'buyer'],
       bank_details_changed: ['associate'], backup_code_alert: ['staff'], quote_verification_code: ['buyer'],
+      // D-293 / D-303 (owner 12 Nov 2026): the bank-details confirmations are listed as MUST rows too.
+      bank_confirm_code: ['associate'], vendor_bank_confirm: ['supplier'],
     };
     for (const [kind, audiences] of Object.entries(must)) {
       for (const a of audiences) expect(emailPolicy.isMust(kind, a)).toBe(true);
@@ -107,6 +109,24 @@ describe('D-280 / D-281 / D-282 e-mail settings, routing and portal access', () 
       for (const [a, tier] of Object.entries(def.audiences)) if (tier === 'optional') optional.push(`${kind}|${a}`);
     }
     expect(optional).toEqual(['buyer_documents|associate']);
+  });
+
+  it('the bank-details confirmation e-mails are listed as MUST rows and sent under that kind', async () => {
+    const admin = await createTestUser('Admin');
+    let locals = null;
+    await emailSettingsController.index({ session: {}, user: { id: admin } }, { renderView(view, l) { locals = l; } });
+    const groupA = locals.groups.find((g) => g.key === 'A');
+    for (const kind of ['bank_confirm_code', 'vendor_bank_confirm']) {
+      const row = groupA.kinds.find((k) => k.kind === kind);
+      expect(row.tierLabel).toBe('must');
+    }
+    expect(await emailPolicy.switchOn('bank_confirm_code', 'associate')).toBe(true);
+    expect(await emailPolicy.switchOn('vendor_bank_confirm', 'supplier')).toBe(true);
+    const fs = require('fs');
+    const path = require('path');
+    const src = (f) => fs.readFileSync(path.join(__dirname, '../../src/services', f), 'utf8');
+    expect(src('associateBankConfirmation.js')).toContain("{ isSecurityEmail: true, kind: 'bank_confirm_code', audience: 'associate' }");
+    expect(src('vendorBankChangeService.js')).toContain("{ isSecurityEmail: true, kind: 'vendor_bank_confirm', audience: 'supplier' }");
   });
 
   it('the seed starts with SHOULD on, OPTIONAL off and testing mode off; the old master switch is gone', async () => {
