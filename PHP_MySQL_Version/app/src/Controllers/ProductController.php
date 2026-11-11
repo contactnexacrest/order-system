@@ -157,6 +157,8 @@ final class ProductController
             'canManageHs' => $this->can('manage_hs_codes'),
             'canManagePricing' => $this->can('manage_pricing'),
             'categoryRules' => $category,
+            // D-335: the price rules in effect for this product (category's, or its own) and the container.
+            'productRules' => \App\Services\ThicknessPrices::rules($product ?? ['id' => 0, 'category_id' => $categoryId]),
         ];
     }
 
@@ -170,9 +172,17 @@ final class ProductController
     {
         $out = [];
         $spec = ['cha_transport_per_container' => ['CHA + transport per container (₹)', 0, 9999999999, 2]];
-        if ($this->can('manage_pricing')) {
+        // D-335: "Use own rules for this product" switched off = the category's rules (own values cleared).
+        if ($this->can('manage_pricing') && !empty($_POST['own_rules_shown']) && empty($_POST['own_rules'])) {
+            $out = ['thick_k_factor' => null, 'container_cbm' => null, 'container_max_t' => null];
+            $spec = ['cha_transport_per_container' => $spec['cha_transport_per_container']];
+        } elseif ($this->can('manage_pricing')) {
             $spec += ['thick_k_factor' => ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], 'container_cbm' => ['Container holds (CBM)', 0.5, 100, 2],
                 'container_max_t' => ['Container maximum (tonnes)', 1, 100, 2]];
+        }
+        $packing = trim((string) ($_POST['packing_loading_cost'] ?? ''));
+        if ($packing !== '' && (preg_match('/^\d{1,10}(\.\d{1,2})?$/', $packing) !== 1)) {
+            return [[], 'Packing + loading per unit (₹): enter a number with at most 2 decimals, or leave it empty.'];
         }
         foreach ($spec as $key => [$label, $min, $max, $dec]) {
             if (!array_key_exists($key, $_POST)) {
@@ -315,7 +325,7 @@ final class ProductController
             return;
         }
 
-        $data = $this->readProductForm();
+        $data = $this->readProductForm($product);
         [$ruleFields, $ruleError] = $this->readPriceRuleFields();
         $error = $this->validateProduct($data) ?? $this->applySellingUnit($data) ?? $ruleError;
         if ($error !== null) {
@@ -617,19 +627,27 @@ final class ProductController
         ];
     }
 
-    /** @return array<string,mixed> */
-    private function readProductForm(): array
+    /**
+     * D-335: the form no longer has the default factory / transportation / CHA cost (the columns
+     * stay, kept as they are); "Packing + loading per unit" is stored in default_packing_cost
+     * (default_loading_cost then empty — the two are still added up where they are read).
+     *
+     * @return array<string,mixed>
+     */
+    private function readProductForm(?array $existing = null): array
     {
+        $keep = static fn (string $k): ?float => $existing !== null && ($existing[$k] ?? null) !== null ? (float) $existing[$k] : null;
+        $hasPacking = array_key_exists('packing_loading_cost', $_POST);
         return [
             'name'                        => trim((string) ($_POST['name'] ?? '')),
             'specifications'              => trim((string) ($_POST['specifications'] ?? '')),
             'hs_code'                     => trim((string) ($_POST['hs_code'] ?? '')),
             'origin'                      => $this->nullableString($_POST['origin'] ?? ''),
-            'default_factory_cost'        => $this->nullableDecimal($_POST['default_factory_cost'] ?? ''),
-            'default_transportation_cost' => $this->nullableDecimal($_POST['default_transportation_cost'] ?? ''),
-            'default_packing_cost'        => $this->nullableDecimal($_POST['default_packing_cost'] ?? ''),
-            'default_loading_cost'        => $this->nullableDecimal($_POST['default_loading_cost'] ?? ''),
-            'default_cha_cost'            => $this->nullableDecimal($_POST['default_cha_cost'] ?? ''),
+            'default_factory_cost'        => array_key_exists('default_factory_cost', $_POST) ? $this->nullableDecimal($_POST['default_factory_cost']) : $keep('default_factory_cost'),
+            'default_transportation_cost' => array_key_exists('default_transportation_cost', $_POST) ? $this->nullableDecimal($_POST['default_transportation_cost']) : $keep('default_transportation_cost'),
+            'default_packing_cost'        => $hasPacking ? $this->nullableDecimal($_POST['packing_loading_cost']) : (array_key_exists('default_packing_cost', $_POST) ? $this->nullableDecimal($_POST['default_packing_cost']) : $keep('default_packing_cost')),
+            'default_loading_cost'        => $hasPacking ? null : (array_key_exists('default_loading_cost', $_POST) ? $this->nullableDecimal($_POST['default_loading_cost']) : $keep('default_loading_cost')),
+            'default_cha_cost'            => array_key_exists('default_cha_cost', $_POST) ? $this->nullableDecimal($_POST['default_cha_cost']) : $keep('default_cha_cost'),
             'is_active'                   => isset($_POST['is_active']) ? 1 : 0,
         ];
     }

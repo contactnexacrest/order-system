@@ -841,6 +841,75 @@
     });
   }
 
+  // D-335 (owner, 12 Nov 2026): "Add / update a price" — the amounts of "Also work out from
+  // this … price" while typing: from the entered thickness the base thickness is worked back
+  // (50 mm+: CBM ÷ K; another thickness: ÷ (1 + its %)), then each other thickness = base ×
+  // (1 + its %), 50 mm+ = base × K. The server works them out again on save
+  // (ThicknessPrices::calcFrom / thicknessPrices.calcFrom — same maths, same rounding).
+  function initThicknessCalc() {
+    document.querySelectorAll('[data-thickness-calc]').forEach(function (box) {
+      var k = parseFloat(box.dataset.k) || 0;
+      var baseMm = parseInt(box.dataset.baseMm, 10);
+      var select = box.querySelector('[data-calc-thickness]');
+      var priceInput = box.querySelector('[data-calc-price]');
+      if (!select || !priceInput) return;
+      function round2(v) { return Math.round((v + 1e-9) * 100) / 100; }
+      function fmt(v) { return Number(v).toFixed(3).replace(/0+$/, '').replace(/\.$/, ''); }
+      function money(v) { return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      function amount(v) {
+        v = round2(v);
+        return Math.abs(v - Math.round(v)) < 0.005 ? Math.round(v).toLocaleString('en-US') : money(v);
+      }
+      function update() {
+        var opt = select.options[select.selectedIndex];
+        var from = select.value === '' ? null : parseInt(select.value, 10);
+        var fromCbm = !!(opt && opt.dataset.cbm === '1');
+        var fromPct = opt && opt.dataset.pct !== undefined ? parseFloat(opt.dataset.pct) : 0;
+        var price = parseFloat(String(priceInput.value).replace(/,/g, ''));
+        box.querySelectorAll('[data-calc-from]').forEach(function (el) { el.textContent = opt && from !== null ? opt.textContent.trim() : '…'; });
+        var base = null;
+        var back = '';
+        if (from !== null && price > 0) {
+          if (fromCbm) {
+            if (k > 0) { base = price / k; back = amount(price) + ' per CBM ÷ ' + fmt(k); }
+          } else if (1 + fromPct / 100 > 0) {
+            base = price / (1 + fromPct / 100);
+            back = from === baseMm ? '' : amount(price) + ' ÷ ' + fmt(1 + fromPct / 100);
+          }
+        }
+        if (base !== null) base = round2(base);
+        var root = base === null ? '' : (from === baseMm ? amount(price) : baseMm + ' mm price ₹' + amount(base) + ' (= ' + back + ')');
+        box.querySelectorAll('[data-also-mm]').forEach(function (row) {
+          var mm = parseInt(row.dataset.alsoMm, 10);
+          var cbm = row.dataset.cbm === '1';
+          var pct = parseFloat(row.dataset.pct || '0');
+          row.hidden = from !== null && mm === from;
+          var priceEl = row.querySelector('[data-also-price]');
+          var howEl = row.querySelector('[data-also-how]');
+          if (base === null) {
+            if (priceEl) priceEl.textContent = '…';
+            if (howEl) howEl.textContent = 'type the price to see it';
+            return;
+          }
+          var v;
+          var how;
+          if (cbm) {
+            v = round2(base * k);
+            how = '= ' + baseMm + ' mm price ₹' + amount(base) + ' per m² × ' + fmt(k) + (from !== baseMm ? ' (' + baseMm + ' mm = ' + back + ')' : '');
+          } else {
+            v = round2(base * (1 + pct / 100));
+            how = '= ' + root + (mm === baseMm ? '' : ' ' + (pct < 0 ? '− ' : '+ ') + fmt(Math.abs(pct)) + ' %');
+          }
+          if (priceEl) priceEl.textContent = money(v);
+          if (howEl) howEl.textContent = how;
+        });
+      }
+      select.addEventListener('change', update);
+      priceInput.addEventListener('input', update);
+      update();
+    });
+  }
+
   // D-303 (owner point 15): the supplier of a product price is picked from the Suppliers
   // directory — the hidden id follows the name typed or picked, and the location list is
   // the supplier's factory / quarry addresses (the first is filled in while empty).
@@ -1334,7 +1403,9 @@
       Array.prototype.forEach.call(form.querySelectorAll('[data-show-when]'), function (el) {
         var cond = el.dataset.showWhen.split('=');
         var field = form.elements.namedItem(cond[0]);
-        var show = !!field && field.value === cond[1];
+        // A tick box counts with its value only while ticked (D-335: "Use own rules for this product").
+        var value = field && field.type === 'checkbox' ? (field.checked ? field.value : '') : (field ? field.value : null);
+        var show = !!field && value === cond[1];
         el.hidden = !show;
         el.style.display = show ? '' : 'none';
         Array.prototype.forEach.call(el.querySelectorAll('input, select, textarea'), function (input) {
@@ -1870,6 +1941,7 @@
     initCopyButtons(); // D-280
     initIdleWarning(); // D-283
     initThicknessGrid();
+    initThicknessCalc(); // D-335
     initSupplierPick();
     initRulesExample();
     initSectionMenus(); // D-320

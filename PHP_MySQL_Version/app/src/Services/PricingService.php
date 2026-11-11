@@ -293,14 +293,7 @@ final class PricingService
                 }
             }
         }
-        $effective = [
-            'margin_pct' => $product['pricing_margin_pct'] !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
-            'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
-            'other_value' => $product['pricing_other_cost_mode'] !== null ? (float) $product['pricing_other_cost_value'] : $settings['other_cost_pct'],
-            'incentive_mode' => $product['pricing_incentive_mode'] ?? $settings['incentive_mode'],
-            'incentive_value' => $product['pricing_incentive_mode'] !== null ? (float) $product['pricing_incentive_value'] : $settings['incentive_value'],
-            'buffer_pct' => $product['pricing_buffer_pct'] !== null ? (float) $product['pricing_buffer_pct'] : $settings['buffer_pct'],
-        ];
+        $effective = self::effective($product, $settings);
         $overrides = [];
         if ($product['pricing_margin_pct'] !== null) {
             $overrides[] = 'margin ' . self::pct($effective['margin_pct']);
@@ -369,6 +362,47 @@ final class PricingService
     }
 
     /**
+     * The margin, other costs, incentive and buffer that apply to a product: its own, else the
+     * pricing settings.
+     *
+     * @return array{margin_pct: float, other_mode: string, other_value: float, incentive_mode: string, incentive_value: float, buffer_pct: float}
+     */
+    public static function effective(array $product, ?array $settings = null): array
+    {
+        $settings ??= self::settings();
+        return [
+            'margin_pct' => ($product['pricing_margin_pct'] ?? null) !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
+            'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
+            'other_value' => ($product['pricing_other_cost_mode'] ?? null) !== null ? (float) $product['pricing_other_cost_value'] : $settings['other_cost_pct'],
+            'incentive_mode' => $product['pricing_incentive_mode'] ?? $settings['incentive_mode'],
+            'incentive_value' => ($product['pricing_incentive_mode'] ?? null) !== null ? (float) $product['pricing_incentive_value'] : $settings['incentive_value'],
+            'buffer_pct' => ($product['pricing_buffer_pct'] ?? null) !== null ? (float) $product['pricing_buffer_pct'] : $settings['buffer_pct'],
+        ];
+    }
+
+    /**
+     * D-335: the price build-up from one supplier-price row's FOB cost (₹ per the product's
+     * unit) — supplier USD, cost, minimum and quote — for the "Product price (from the base)"
+     * line on Market prices. Null when the FOB cost is not above 0.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function buildFromFob(array $product, float $fobInr, ?array $settings = null, ?bool $programOn = null): ?array
+    {
+        $settings ??= self::settings();
+        if ($fobInr <= 0) {
+            return null;
+        }
+        $e = self::effective($product, $settings);
+        return PricingEngine::build([
+            'supplier_inr' => $fobInr, 'fx_rate' => $settings['pricing_fx_rate'],
+            'other_mode' => $e['other_mode'], 'other_value' => $e['other_value'], 'margin_pct' => $e['margin_pct'],
+            'incentive_mode' => $e['incentive_mode'], 'incentive_value' => $e['incentive_value'], 'program_on' => $programOn ?? self::programOn(),
+            'buffer_pct' => $e['buffer_pct'],
+        ]) + ['margin_pct' => $e['margin_pct'], 'buffer_pct' => $e['buffer_pct'], 'fx_rate' => (float) $settings['pricing_fx_rate']];
+    }
+
+    /**
      * D-300 (point 12): the FOB cost in ₹ per the product's unit (per CBM for 50 mm and above)
      * from one supplier-price row — supplier price + CHA and transport per unit, + packing and
      * loading when the price does not include them.
@@ -380,7 +414,7 @@ final class PricingService
         $settings ??= self::settings();
         if (($supplier['price_basis'] ?? '') === 'grid') {
             $gridRules ??= ThicknessPrices::rules($product, $settings);
-            return ThicknessPrices::cost($gridRules, ThicknessPrices::typedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
+            return ThicknessPrices::cost($gridRules, ThicknessPrices::storedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
         }
         $base = (new ProductService())->effectiveFobForSupplier($supplier, $product);
         if ($base === null) {

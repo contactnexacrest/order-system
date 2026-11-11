@@ -1,0 +1,55 @@
+{#
+  Owner decision D-335 (12 Nov 2026): one price card per supplier price for every thickness —
+  Thickness · Price (₹) · Unit · How it was set (TYPED / CALCULATED from … / no price) · Since ·
+  FOB cost (₹) incl. CHA · Base for orders (◉ BASE). Below: the product price worked out from the
+  base, "+ Add / update a price" and the history.
+  In: pcRow (supplier-price row), card (pricingController.priceCard), av (addView), pcReturn ('' | 'edit'),
+  rules, product, canRecord, canSeeBuild. Port of views/products/_price_card.php.
+#}
+<div class="card-nested price-card" id="price-card-{{ pcRow.id }}">
+  <h3>{{ pcRow.supplier_name }} — prices{% if pcRow.is_primary == 1 %} <span class="badge badge-active">● used for pricing</span>{% endif %}</h3>
+  <table class="list price-card-table">
+    <tr><th>Thickness</th><th class="num">Price (₹)</th><th>Unit</th><th>How it was set</th><th>Since</th><th class="num">FOB cost (₹) incl. CHA</th><th>Base for orders</th></tr>
+    {% for l in card.lines %}
+      <tr{% if l.is_base %} class="price-card-base"{% endif %}>
+        <td>{% if l.is_base %}<strong>{{ l.label }}</strong>{% else %}{{ l.label }}{% endif %}</td>
+        <td class="num">{{ (l.price | money) if l.price !== null else '—' }}</td>
+        <td>{{ l.unit }}</td>
+        <td>{% if l.how == 'typed' %}<span class="badge badge-typed">TYPED</span>{% elif l.how == 'calculated' %}<span class="badge badge-calculated">CALCULATED</span> <small class="muted">{{ l.note }}</small>{% else %}<span class="badge badge-inactive">no price</span>{% endif %}</td>
+        <td>{{ (l.since | shortDate) if l.since else '' }}</td>
+        <td class="num">{% if l.fob !== null %}{% if l.is_base %}<strong>{{ l.fob | money }}</strong>{% else %}{{ l.fob | money }}{% endif %}<br><small class="muted">{{ l.price | money }} + CHA {{ l.cha | money }}</small>{% else %}—{% endif %}</td>
+        <td>
+          {% if l.is_base %}◉ <span class="badge badge-active">BASE</span>
+          {% elif l.price !== null and canRecord %}
+            <form method="post" action="/products/suppliers/{{ pcRow.id }}/base" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="mm" value="{{ l.mm }}"><input type="hidden" name="return_to" value="{{ pcReturn }}">
+              <button type="submit" class="btn-link" title="Make {{ l.label }} the base for orders">○ make base</button>
+            </form>
+          {% else %}○{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+  <p class="price-card-summary"><strong>Product price (from the base):</strong>
+    {% if card.parts %}₹{{ card.parts.total | money }} per {{ card.unit_label }} · {{ card.base_label }}
+      {% if card.build and canSeeBuild %}→ USD {{ card.build.cost | money }} at ₹{{ card.fx }} · minimum ({{ card.margin }} % margin) USD {{ card.build.minimum | money }} · quote (+{{ card.buffer }} %) USD {{ card.build.staff_quote | money }}{% endif %}
+    {% else %}the base ({{ card.base_label }}) has no price yet — an order line without a thickness goes to the MD.{% endif %}</p>
+  {% if card.cha_per_cbm !== null %}<p class="small muted">CHA + transport ₹{{ card.cha_per_container | money }} per container ÷ {{ card.fits_cbm }} CBM = ₹{{ card.cha_per_cbm | money }} per CBM (per m² = per CBM × the thickness).</p>{% endif %}
+  <p class="small muted">The base is what a new order line without a thickness (or {{ rules.cbm_from }} mm and above) uses. You choose it — the app never swaps it for a calculated price.{% if card.auto %} This price was saved before 12 Nov 2026: a thickness without its own price is still worked out each time, until you add a price below.{% endif %}</p>
+  <div class="price-card-actions">
+    {% if canRecord %}
+    <details class="quick-add price-add">
+      <summary class="btn-sm">+ Add / update a price</summary>
+      <form method="post" action="/products/suppliers/{{ pcRow.id }}/thickness-price" class="card-nested">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ pcReturn }}">
+        <h3>Add / update a price — {{ pcRow.supplier_name }}</h3>
+        {% set afCard = card %}{% set afDate = 'price_quoted_on' %}
+        {% include "products/_price_add.njk" %}
+        <div><button type="submit" class="btn-sm btn-accent">Save price</button></div>
+      </form>
+    </details>
+    {% endif %}
+    {% if pcReturn != 'edit' %}<a class="btn-sm" href="/products/suppliers/{{ pcRow.id }}/price#history">History</a>{% endif %}
+  </div>
+</div>

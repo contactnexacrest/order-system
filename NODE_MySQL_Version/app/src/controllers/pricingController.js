@@ -273,14 +273,19 @@ async function marketPrices(req, res) {
       ...r,
       fob,
       effective_fob: isGrid ? (fob ? fob.supplier : null) : productService.effectiveFobForSupplier(r, product),
-      grid: isGrid ? thicknessPrices.complete(rules, await thicknessPrices.typedFor(Number(r.id))) : null,
+      // D-335: what is stored (typed / calculated), the base, and one price card per supplier row.
+      grid: isGrid ? thicknessPrices.values(rules, await thicknessPrices.storedFor(Number(r.id)), thicknessPrices.autoFill(r)) : null,
       staleness: pricingService.staleness(r, s.stale_days),
       price_date: pricingService.priceDate(r),
       quoted_on: ymdOf(r.quoted_on),
       valid_until: ymdOf(r.valid_until),
     });
   }
-  for (const r of rows) r.grid_list = r.grid && r.grid.ok ? thicknessPrices.ordered(r.grid) : [];
+  for (const r of rows) {
+    r.grid_list = r.grid && r.grid.ok ? thicknessPrices.ordered(r.grid) : [];
+    r.card = r.grid ? await priceCard(req, product, r, rules, s, r.grid) : null;
+    r.addView = r.grid ? addView(rules, r.grid) : null;
+  }
   // Newest first; the ones used for pricing on top.
   const used = (r) => Math.max(Number(r.is_primary), Number(r.is_cbm_primary || 0), Number(r.combo_in_use || 0));
   rows.sort((a, b) => (used(b) - used(a)) || String(b.price_date || '').localeCompare(String(a.price_date || '')));
@@ -314,8 +319,160 @@ async function marketPrices(req, res) {
     supplierTypes: (await lookupRepository.dropdownOptions('supplier_type')).map((o) => String(o.option_value)),
     canQuickAdd: can(req, 'record_market_prices') || can(req, 'manage_suppliers'),
     canChangeRules: can(req, 'manage_pricing'),
+    canSeeBuild: can(req, 'view_price_buildup'),
+    newAddView: rules.grid ? addView(rules, null) : null,
     cha: chaView(rules, product, null),
   }, 'layout/base');
+}
+
+const CBM_ORDER = (a, b) => (a === thicknessPrices.CBM) - (b === thicknessPrices.CBM) || a - b;
+
+/**
+ * D-335: one supplier price for every thickness as a card — every thickness with its price, how it
+ * was set (TYPED / CALCULATED from … / no price), since when, the FOB cost incl. CHA + transport in
+ * its own unit, the BASE, and the product price worked out from the base. Same as PHP priceCard().
+ */
+async function priceCard(req, product, row, rules, s, grid) {
+  const cbmFrom = Number(rules.cbm_from);
+  const baseMm = thicknessPrices.baseOf(row, rules);
+  const cha = thicknessPrices.chaPerCbm(thicknessPrices.chaPerContainer(row, product), Number(rules.container_cbm), rules.container_max_t, rules.t_per_cbm);
+  const mms = thicknessPrices.thicknesses(rules);
+  for (const mm of Object.keys(grid.values).map(Number)) if (!mms.includes(mm)) mms.push(mm);
+  mms.sort(CBM_ORDER);
+  const pct = new Map(rules.rows.map((x) => [Number(x.mm), Number(x.pct)]));
+  const lines = [];
+  let basePrice = null;
+  for (const mm of mms) {
+    const v = grid.values[mm] || null;
+    const isCbm = mm === thicknessPrices.CBM;
+    const chaU = cha.per_cbm !== null ? (isCbm ? cha.per_cbm : cha.per_cbm * mm / 1000) : 0;
+    let note = '';
+    if (v && v.how === 'calculated') {
+      const from = v.calc_from_mm ?? null;
+      const fromLabel = thicknessPrices.label(from !== null ? from : Number(rules.base_mm), cbmFrom);
+      const change = isCbm ? `× ${thicknessPrices.fmt(rules.k)}`
+        : (pct.has(mm) && mm !== Number(rules.base_mm) ? `${pct.get(mm) < 0 ? '− ' : '+ '}${thicknessPrices.fmt(Math.abs(pct.get(mm)))} %` : '');
+      note = `from ${fromLabel}${change !== '' && (from === null || from === Number(rules.base_mm)) ? ` ${change}` : ''}${v.auto ? ' (worked out each time — older price)' : ''}`;
+    }
+    const since = !v ? null : (v.how === 'typed' ? (v.quoted_on || v.since || null) : (v.since || null));
+    lines.push({
+      mm, label: thicknessPrices.label(mm, cbmFrom), unit: isCbm ? 'per CBM' : 'per m²',
+      price: v ? Number(v.price) : null, how: v ? v.how : null, note, since,
+      cha: chaU, fob: v ? Number(v.price) + chaU : null, is_base: mm === baseMm,
+    });
+    if (mm === baseMm && v) basePrice = Number(v.price);
+  }
+  const parts = await pricingService.fobParts(product, row, 'unit', null, s, rules);
+  const build = parts && can(req, 'view_price_buildup') ? await pricingService.buildFromFob(product, parts.total, s) : null;
+  const perContainer = thicknessPrices.chaPerContainer(row, product);
+  return {
+    lines, base_mm: baseMm, base_label: thicknessPrices.label(baseMm, cbmFrom), base_price: basePrice,
+    base_unit: baseMm === thicknessPrices.CBM ? 'CBM' : 'm²', base_chosen: thicknessPrices.rowBase(row) !== null,
+    cha_per_cbm: cha.per_cbm, fits_cbm: thicknessPrices.fmt(Math.round(cha.fits_cbm * 100) / 100), cha_per_container: perContainer,
+    parts, build, auto: thicknessPrices.autoFill(row),
+    unit_label: parts ? (require('../services/lineUnits').label(String(parts.unit)) || String(parts.unit)) : '',
+    fx: build ? thicknessPrices.fmt(build.fx_rate) : '', margin: build ? thicknessPrices.fmt(build.margin_pct) : '', buffer: build ? thicknessPrices.fmt(build.buffer_pct) : '',
+  };
+}
+
+/** D-335: the fields of "Add / update a price" (same as the PHP partial _price_add.php). */
+function addView(rules, grid) {
+  const cbmFrom = Number(rules.cbm_from);
+  const pct = new Map(rules.rows.map((x) => [Number(x.mm), Number(x.pct)]));
+  const vals = grid ? grid.values : {};
+  const rows = thicknessPrices.thicknesses(rules).map((mm) => {
+    const isCbm = mm === thicknessPrices.CBM;
+    const p = pct.get(mm) || 0;
+    const v = vals[mm] || null;
+    const typed = !!v && v.how === 'typed' && !v.auto;
+    return {
+      mm, cbm: isCbm, pct: thicknessPrices.fmt(p), label: thicknessPrices.label(mm, cbmFrom), per: isCbm ? '/ CBM' : '/ m²', typed,
+      typedPrice: typed ? fmt2(v.price) : '', typedOn: typed && v.quoted_on ? v.quoted_on : '',
+      change: isCbm ? `× ${thicknessPrices.fmt(rules.k)}` : (mm === Number(rules.base_mm) ? 'the rules' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} %`),
+    };
+  });
+  return { rows, k: thicknessPrices.fmt(rules.k), baseMm: Number(rules.base_mm), cbmFrom };
+}
+
+/** D-335: reads "Add / update a price": [mm, price, quoted_on, ticked, error]. */
+function readThicknessPrice(body, rules, dateField) {
+  const allowed = thicknessPrices.thicknesses(rules);
+  const rawMm = String(body.thickness_mm ?? '').trim();
+  const mm = /^\d+$/.test(rawMm) ? Number(rawMm) : -1;
+  if (!allowed.includes(mm)) return [0, 0, '', [], 'Choose the thickness of the price.'];
+  const raw = String(body.thickness_price ?? '').replace(/,/g, '').trim();
+  if (!/^\d{1,12}(\.\d{1,2})?$/.test(raw) || !(Number(raw) > 0)) return [mm, 0, '', [], 'Enter the price in ₹ (above 0, at most 2 decimals).'];
+  const q = String(body[dateField] ?? '').trim();
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(q) ? new Date(`${q}T00:00:00Z`) : null;
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== q) return [mm, Number(raw), '', [], 'Enter the date the supplier quoted this price.'];
+  if (q > todayYmd()) return [mm, Number(raw), '', [], 'The quoted date cannot be in the future.'];
+  let also = body.also ?? body['also[]'] ?? [];
+  if (!Array.isArray(also)) also = [also];
+  const ticked = [];
+  for (const a of also) {
+    const x = String(a);
+    if (/^\d+$/.test(x) && allowed.includes(Number(x)) && Number(x) !== mm && !ticked.includes(Number(x))) ticked.push(Number(x));
+  }
+  return [mm, Number(raw), q, ticked, null];
+}
+
+/** D-335: "20 mm ₹4,600.00 per m² typed; worked out: 15 mm, 18 mm" for the audit log. */
+function addText(rules, mm, price, ticked) {
+  const cbmFrom = Number(rules.cbm_from);
+  return `${thicknessPrices.label(mm, cbmFrom)} ₹${fmt2(price)}${mm === thicknessPrices.CBM ? ' per CBM' : ' per m²'} typed`
+    + (ticked.length ? `; worked out: ${ticked.map((m) => thicknessPrices.label(m, cbmFrom)).join(', ')}` : '');
+}
+
+/** D-335: "Add / update a price" on a supplier price for every thickness. */
+async function addThicknessPrice(req, res) {
+  const supplierId = parseInt(req.params.supplierId, 10) || 0;
+  const s = await productSupplierRepository.find(supplierId);
+  const product = s ? await productRepository.find(Number(s.product_id)) : null;
+  if (!s || !product || (s.price_basis || '') !== 'grid') {
+    flash.set(req, 'error', 'That supplier price no longer exists.');
+    res.redirect('/products');
+    return;
+  }
+  const body = req.body || {};
+  const back = body.return_to === 'edit' ? `/products/suppliers/${supplierId}/price` : `/products/${s.product_id}/market-prices#price-card-${supplierId}`;
+  const rules = await thicknessPrices.rules(product);
+  const [mm, price, quotedOn, ticked, readError] = readThicknessPrice(body, rules, 'price_quoted_on');
+  const makeBase = body.base === 'this';
+  const error = readError || (await thicknessPrices.addPrice(s, rules, mm, price, quotedOn, ticked, makeBase, req.user.id));
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(back);
+    return;
+  }
+  await auditLogRepository.log(req.user.id, 'MARKET_PRICE_CHANGED', 'product_suppliers', supplierId, null, null,
+    `${s.supplier_name}: ${addText(rules, mm, price, ticked)} quoted ${quotedOn}${makeBase ? ' (made the base)' : ''}`);
+  flash.set(req, 'success', `Price saved${ticked.length ? ` and ${ticked.length} worked out from it` : ''}.`);
+  res.redirect(back);
+}
+
+/** D-335: make one thickness of a supplier price the BASE for orders. */
+async function setBase(req, res) {
+  const supplierId = parseInt(req.params.supplierId, 10) || 0;
+  const s = await productSupplierRepository.find(supplierId);
+  const product = s ? await productRepository.find(Number(s.product_id)) : null;
+  if (!s || !product || (s.price_basis || '') !== 'grid') {
+    flash.set(req, 'error', 'That supplier price no longer exists.');
+    res.redirect('/products');
+    return;
+  }
+  const body = req.body || {};
+  const rules = await thicknessPrices.rules(product);
+  const raw = String(body.mm ?? '');
+  const mm = /^\d+$/.test(raw) ? Number(raw) : -1;
+  const error = mm < 0 ? 'Choose the thickness to make the base.' : await thicknessPrices.setBase(s, rules, mm, req.user.id);
+  const back = body.return_to === 'edit' ? `/products/suppliers/${supplierId}/price` : `/products/${s.product_id}/market-prices#price-card-${supplierId}`;
+  if (error) {
+    flash.set(req, 'error', error);
+  } else {
+    await auditLogRepository.log(req.user.id, 'MARKET_PRICE_CHANGED', 'product_suppliers', supplierId, 'base_thickness_mm', null, thicknessPrices.label(mm, rules.cbm_from));
+    flash.set(req, 'success', `The base for orders is now ${thicknessPrices.label(mm, rules.cbm_from)}.`);
+  }
+  res.redirect(back);
 }
 
 /** D-300: the rows of the thickness grid for the view (same text as the PHP partial). */
@@ -490,7 +647,16 @@ async function addMarketPrice(req, res) {
   body.supplier_name = String(picked.supplier_legal_name);
   let [data, error] = readMarketPrice(body, grid);
   let typed = {};
-  if (!error && grid) [typed, error] = thicknessPrices.readForm(body, rules);
+  // D-335: one thickness typed (+ the ticked ones worked out); the older grid form (price[mm]) still works.
+  const newGrid = grid && body.thickness_mm !== undefined;
+  let add = null;
+  if (!error && newGrid) {
+    const [aMm, aPrice, , aTicked, aError] = readThicknessPrice(body, rules, 'quoted_on');
+    error = aError;
+    add = { mm: aMm, price: aPrice, ticked: aTicked };
+  } else if (!error && grid) {
+    [typed, error] = thicknessPrices.readForm(body, rules);
+  }
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(`${back}#add-price`);
@@ -519,13 +685,18 @@ async function addMarketPrice(req, res) {
     await pricingRepository.setCombo(id, named, per, usedForPricing);
   } else {
     await pricingRepository.setSupplierBasis(id, data.price_basis);
-    if (grid) await thicknessPrices.saveTyped(id, typed, rules, req.user.id);
+    if (add) {
+      const row = (await productSupplierRepository.find(id)) || { id };
+      await thicknessPrices.addPrice(row, rules, add.mm, add.price, String(data.quoted_on), add.ticked, true, req.user.id);
+    } else if (grid) {
+      await thicknessPrices.saveTyped(id, typed, rules, req.user.id);
+    }
     if (usedForPricing && data.price_basis === 'cbm') await pricingRepository.setCbmPrimary(productId, id);
     else if (usedForPricing) await productService.setPrimarySupplier(productId, id, req.user.id);
   }
   data.is_primary = usedForPricing ? 1 : 0;
   const comboText = data.price_basis === 'combo' ? await pricingService.comboText(await require('../services/productSpecs').offered(product), named) : null;
-  const priceText = grid ? gridText(typed, rules) : `₹${fmt2(data.fob_value)}`;
+  const priceText = add ? addText(rules, add.mm, add.price, add.ticked) : (grid ? gridText(typed, rules) : `₹${fmt2(data.fob_value)}`);
   await auditLogRepository.log(req.user.id, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
     `${data.supplier_name}: ${priceText}${comboText !== null ? ` for ${comboText}${per === 'cbm' ? ' per CBM' : ''}` : ''} quoted ${data.quoted_on}${data.is_primary ? ' (used for pricing)' : ''}`);
   flash.set(req, 'success', `Supplier price recorded${data.is_primary ? ' and used for pricing.' : '.'}`);
@@ -543,12 +714,14 @@ async function editPrice(req, res) {
   const s = await pricingService.settings();
   const rules = await thicknessPrices.rules(product, s);
   const isGrid = (row.price_basis || '') === 'grid';
-  const done = isGrid ? thicknessPrices.complete(rules, await thicknessPrices.typedFor(Number(row.id))) : null;
+  const done = isGrid ? thicknessPrices.values(rules, await thicknessPrices.storedFor(Number(row.id)), thicknessPrices.autoFill(row)) : null;
+  const card = isGrid ? await priceCard(req, product, row, rules, s, done) : null;
   const history = (await thicknessPrices.historyFor(Number(row.id))).map((h) => ({ ...h, changed_at: String(h.changed_at) }));
   const fob = await pricingService.fobParts(product, row, (row.price_basis || '') === 'cbm' ? 'cbm' : 'unit', null, s, rules);
   res.renderView('products/supplier_price_edit', {
     product, row: { ...row, quoted_on: ymdOf(row.quoted_on), valid_until: ymdOf(row.valid_until), updated_on: ymdOf(row.updated_at) },
     rules, rulesSummary: priceRules.summary(rules), grid: done, gridView: isGrid ? gridView(rules, done) : null,
+    card, addView: isGrid ? addView(rules, done) : null, canSeeBuild: can(req, 'view_price_buildup'),
     fob, fobMmLabel: fob && fob.mm !== null && fob.mm !== undefined ? `${thicknessPrices.fmt(fob.mm)} mm` : 'base',
     history, pickList: await supplierRepository.pickList(), today: todayYmd(),
     canRecord: can(req, 'record_market_prices'), canChangeRules: can(req, 'manage_pricing'), cha: chaView(rules, product, row),
@@ -584,7 +757,9 @@ async function savePrice(req, res) {
   }
   let [data, error] = readMarketPrice(body, isGrid);
   let typed = {};
-  if (!error && isGrid) [typed, error] = thicknessPrices.readForm(body, rules);
+  // D-335: thickness prices change through "Add / update a price"; the older grid boxes (price[mm]) still work.
+  const gridBoxes = isGrid && body.price !== null && typeof body.price === 'object';
+  if (!error && gridBoxes) [typed, error] = thicknessPrices.readForm(body, rules);
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(back);
@@ -600,8 +775,10 @@ async function savePrice(req, res) {
   await pricingRepository.setSupplierDates(supplierId, data.quoted_on, data.valid_until);
   await productSupplierRepository.setPriceDetails(supplierId, picked ? Number(picked.id) : Number(s.supplier_id), data.includes_packing_loading, data.cha_transport_per_container);
   // D-300: the price history — who, when, old → new.
-  if (isGrid) {
+  if (gridBoxes) {
     await thicknessPrices.saveTyped(supplierId, typed, rules, userId);
+  } else if (isGrid) {
+    // Nothing: the prices themselves are kept as they are.
   } else if (oldPrice !== Number(data.fob_value).toFixed(2)) {
     await thicknessPrices.history(supplierId, `Price per ${String(product.reference_unit || '') || 'unit'}`, oldPrice, Number(data.fob_value).toFixed(2), userId);
   }
@@ -610,7 +787,7 @@ async function savePrice(req, res) {
   if (oldIncl !== data.includes_packing_loading) {
     await thicknessPrices.history(supplierId, 'Price includes packing and loading', oldIncl ? 'yes' : 'no', data.includes_packing_loading ? 'yes' : 'no', userId);
   }
-  const after = `${isGrid ? gridText(typed, rules) : `₹${fmt2(data.fob_value)}`} quoted ${data.quoted_on}`;
+  const after = `${isGrid ? gridText(gridBoxes ? typed : await thicknessPrices.typedFor(supplierId), rules) : `₹${fmt2(data.fob_value)}`} quoted ${data.quoted_on}`;
   await auditLogRepository.log(userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', supplierId, null, before, after);
   flash.set(req, 'success', 'Supplier price saved.');
   res.redirect(`/products/${productId}/market-prices`);
@@ -678,5 +855,5 @@ async function updateMarketDates(req, res) {
 module.exports = {
   settings, saveSettings, levels, addLevel, updateLevel, toggleLevel, deleteLevel, saveLadder,
   saveProductOverrides, marketPrices, addMarketPrice, useForPricing, updateMarketDates,
-  editPrice, savePrice, decideFxRate, fetchFxRate, gridView, chaView,
+  editPrice, savePrice, decideFxRate, fetchFxRate, gridView, chaView, addThicknessPrice, setBase, priceCard, addView,
 };

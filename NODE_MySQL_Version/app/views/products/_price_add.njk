@@ -1,0 +1,45 @@
+{#
+  Owner decision D-335 (12 Nov 2026): "Add / update a price" — the fields. One thickness is typed
+  (Thickness *, Price *, Quoted on *); "Also work out from this … price" has one tick box per OTHER
+  thickness with the result and how it is worked out ("= 4,600 − 20 %", "change −20 %" opens the
+  product's price rules). Ticked by default: only thicknesses with no TYPED price. app.js
+  (initThicknessCalc) shows the amounts while typing; the server works them out again on save
+  (thicknessPrices.calcFrom). For an existing supplier price: "Base for orders".
+  In: av (pricingController.addView), product, afCard (price card or null), afDate (date field name or '').
+  Port of views/products/_price_add.php.
+#}
+<div class="full thickness-calc" data-thickness-calc data-k="{{ av.k }}" data-base-mm="{{ av.baseMm }}">
+  <div class="field-grid">
+    <label>Thickness *
+      <select name="thickness_mm" required data-calc-thickness>
+        <option value="">Choose…</option>
+        {% for o in av.rows %}
+          <option value="{{ o.mm }}"{% if o.cbm %} data-cbm="1"{% else %} data-pct="{{ o.pct }}"{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select></label>
+    <label>Price (₹ per m², or per CBM for {{ av.cbmFrom }} mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price
+      data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 4600.00"></label>
+    {% if afDate %}
+      <label>Quoted on *<input type="date" name="{{ afDate }}" required max="{{ today }}" value="{{ today }}"></label>
+    {% endif %}
+  </div>
+  <fieldset class="thickness-also">
+    <legend class="legend-sentence">Also work out from this <span data-calc-from>…</span> price <small class="muted">(the price rules in effect for this product)</small></legend>
+    {% for a in av.rows %}
+      <div class="also-row" data-also-mm="{{ a.mm }}"{% if a.cbm %} data-cbm="1"{% else %} data-pct="{{ a.pct }}"{% endif %}>
+        <label class="inline"><input type="checkbox" name="also[]" value="{{ a.mm }}"{% if not a.typed %} checked{% endif %}>
+          <b>{{ a.label }} → ₹<span data-also-price>…</span></b> {{ a.per }}</label>
+        {% if a.typed %}<span class="badge badge-typed">you typed ₹{{ a.typedPrice }}{% if a.typedOn %} on {{ a.typedOn | shortDate }}{% endif %} — kept unless you tick this</span>{% endif %}
+        <br><small class="muted"><span data-also-how></span> · <a href="/products/{{ product.id }}/edit#price-rules">change <span data-also-change>{{ a.change }}</span></a></small>
+      </div>
+    {% endfor %}
+    <p class="small muted">Ticked by default: only thicknesses that have no typed price. A typed price is never ticked — tick it only if you really want to replace it. A thickness you leave unticked keeps the price it has (or stays "no price").</p>
+  </fieldset>
+  {% if afCard %}
+    <fieldset class="thickness-base">
+      <legend class="legend-sentence">Base for orders</legend>
+      <label class="inline"><input type="radio" name="base" value="keep" checked> keep {{ afCard.base_label }}{% if afCard.base_price !== null %} ₹{{ afCard.base_price | money }} / {{ afCard.base_unit }}{% else %} (no price yet){% endif %}</label>
+      <label class="inline"><input type="radio" name="base" value="this"> make this <span data-calc-from>…</span> price the base</label>
+    </fieldset>
+  {% endif %}
+</div>

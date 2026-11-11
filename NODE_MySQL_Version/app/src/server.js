@@ -1440,6 +1440,9 @@ app.post('/products/suppliers/:supplierId/market-price', requireAuth, requirePer
 // D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
 app.get('/products/suppliers/:supplierId/price', requireAuth, requirePermissionAny(['record_market_prices', 'view_price_buildup']), asyncHandler(pricingController.editPrice));
 app.post('/products/suppliers/:supplierId/price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.savePrice));
+// D-335: "Add / update a price" (one thickness typed, the ticked ones worked out) and the BASE for orders.
+app.post('/products/suppliers/:supplierId/thickness-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addThicknessPrice));
+app.post('/products/suppliers/:supplierId/base', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.setBase));
 app.post('/pricing/fx-rates/fetch', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.fetchFxRate));
 app.post('/pricing/fx-rates/:id/decide', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.decideFxRate));
 // Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).

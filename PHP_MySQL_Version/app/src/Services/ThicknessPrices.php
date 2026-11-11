@@ -17,8 +17,20 @@ use App\Repositories\ProductCategoryRepository;
  *
  * It works in every direction: when only 40 mm or only the per-CBM price is
  * typed, the base is worked back from it (64,000 per CBM ÷ 40 = 1,600 per m²).
- * Only TYPED prices are stored; CALCULATED ones are worked out again each time,
- * so a change to a typed price — or to the rules — flows into them at once.
+ *
+ * Owner decision D-335 (12 Nov 2026) — THE ONE RULE:
+ *   1. a price the user TYPED always wins — no rule ever changes it;
+ *   2. each supplier price row has a BASE thickness the user chose
+ *      (catalog_product_suppliers.base_thickness_mm; 0 = 50 mm and above per CBM,
+ *      NULL = the category's base thickness): the product-level price and order
+ *      lines with no thickness use it;
+ *   3. the rules are only a CALCULATOR: a thickness the user ticks while adding a
+ *      price is STORED as CALCULATED ("from 20 mm") and can be typed over; nothing
+ *      is recalculated in the background.
+ * Rows saved before D-335 keep auto_fill = 1: a thickness without a stored price is
+ * still worked out on the fly from the typed ones (so no existing price changes).
+ * With auto_fill = 0 only stored prices exist; a thickness without one has "no
+ * price" (an order line for it goes to the MD).
  *
  * CHA + transport is a price per container. What one container holds comes from
  * the category (8 CBM, at most 27 t; a product may override): a heavy stone
@@ -256,24 +268,42 @@ final class ThicknessPrices
      */
     public static function cost(array $rules, array $typed, array $row, array $product, string $basis, ?float $mm): ?array
     {
-        $done = self::complete($rules, $typed);
+        $auto = self::autoFill($row);
+        $done = self::values($rules, $typed, $auto);
         if (!$done['ok']) {
             return null;
         }
         $cha = self::chaPerCbm(self::chaPerContainer($row, $product), (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
         $packing = empty($row['includes_packing_loading']) ? (float) ($product['default_packing_cost'] ?? 0) + (float) ($product['default_loading_cost'] ?? 0) : 0.0;
-        if ($basis === 'cbm') {
+        // D-335: the row's BASE (the user's choice) is what the product-level price uses.
+        $baseMm = self::rowBase($row);
+        if ($basis === 'cbm' || ($mm === null && $baseMm === self::CBM)) {
             $v = $done['values'][self::CBM] ?? null;
             if ($v === null) {
                 return null;
             }
             $chaU = $cha['per_cbm'] ?? 0.0;
-            return ['supplier' => $v['price'], 'cha' => $chaU, 'packing' => $packing, 'total' => $v['price'] + $chaU + $packing,
-                'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => null];
+            if ($basis === 'cbm') {
+                return ['supplier' => $v['price'], 'cha' => $chaU, 'packing' => $packing, 'total' => $v['price'] + $chaU + $packing,
+                    'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => null];
+            }
+            // The base is the per-CBM price ("50 mm and above"): in the product's unit.
+            $unit = $rules['unit'] !== '' ? $rules['unit'] : 'CBM';
+            $per = self::cbmPerUnit($unit, (float) $rules['cbm_from'], $rules['t_per_cbm']);
+            if ($per === null) {
+                return null;
+            }
+            $supplier = (float) $v['price'] * $per;
+            return ['supplier' => $supplier, 'cha' => $chaU * $per, 'packing' => $packing, 'total' => $supplier + $chaU * $per + $packing,
+                'unit' => $unit, 'mm' => null, 'how' => $v['how'], 'note' => null, 'base' => self::CBM];
         }
-        $mm ??= (float) $rules['base_mm'];
+        $mm ??= (float) ($baseMm ?? $rules['base_mm']);
         $v = $done['values'][(int) round($mm)] ?? null;
         if ($v === null) {
+            if (!$auto) {
+                // D-335: no stored price for this thickness — "no price" (the MD prices the line).
+                return null;
+            }
             // A thickness that is not in the rules (e.g. 25 mm): the base price, no %.
             $v = ['price' => PricingEngine::round2((float) $done['base']), 'how' => 'calculated'];
         }
@@ -287,6 +317,257 @@ final class ThicknessPrices
         $chaU = ($cha['per_cbm'] ?? 0.0) * $cbmPerUnit;
         return ['supplier' => $supplier, 'cha' => $chaU, 'packing' => $packing, 'total' => $supplier + $chaU + $packing,
             'unit' => $unit, 'mm' => $mm, 'how' => $v['how'], 'note' => null];
+    }
+
+    // ------------------------------------------------------------- D-335: typed wins, a base, a calculator
+
+    /** Rows saved before D-335 (auto_fill = 1, or no such field) still complete missing thicknesses on the fly. */
+    public static function autoFill(array $row): bool
+    {
+        return !array_key_exists('auto_fill', $row) || $row['auto_fill'] === null || (int) $row['auto_fill'] === 1;
+    }
+
+    /** The row's BASE thickness the user chose (0 = 50 mm and above per CBM); null = the category's base. */
+    public static function rowBase(array $row): ?int
+    {
+        $v = $row['base_thickness_mm'] ?? null;
+        return $v === null || $v === '' ? null : (int) $v;
+    }
+
+    /** The base thickness in effect for a row (its own, else the category's). */
+    public static function baseOf(array $row, array $rules): int
+    {
+        return self::rowBase($row) ?? (int) $rules['base_mm'];
+    }
+
+    /**
+     * Stored prices in one shape: thickness_mm => [price, how, calc_from_mm, quoted_on, since].
+     * A plain price (float) counts as TYPED.
+     *
+     * @param array<int, float|array<string,mixed>> $stored
+     * @return array<int, array{price: float, how: string, calc_from_mm: ?int, quoted_on: ?string, since: ?string}>
+     */
+    public static function normalise(array $stored): array
+    {
+        $out = [];
+        foreach ($stored as $mm => $s) {
+            if (is_array($s)) {
+                if ((float) ($s['price'] ?? 0) <= 0) {
+                    continue;
+                }
+                $out[(int) $mm] = ['price' => (float) $s['price'], 'how' => ($s['how'] ?? 'typed') === 'calculated' ? 'calculated' : 'typed',
+                    'calc_from_mm' => isset($s['calc_from_mm']) && $s['calc_from_mm'] !== '' ? (int) $s['calc_from_mm'] : null,
+                    'quoted_on' => !empty($s['quoted_on']) ? substr((string) $s['quoted_on'], 0, 10) : null,
+                    'since' => !empty($s['since']) ? substr((string) $s['since'], 0, 10) : null];
+            } elseif ($s !== null && (float) $s > 0) {
+                $out[(int) $mm] = ['price' => (float) $s, 'how' => 'typed', 'calc_from_mm' => null, 'quoted_on' => null, 'since' => null];
+            }
+        }
+        ksort($out);
+        return $out;
+    }
+
+    /**
+     * Every thickness of a row as it is used: with auto_fill the old on-the-fly completion
+     * (stored prices keep how they were set); without, only the stored prices.
+     *
+     * @param array<int, float|array<string,mixed>> $stored
+     * @return array{ok: bool, error: ?string, base: ?float, values: array<int, array<string,mixed>>}
+     */
+    public static function values(array $rules, array $stored, bool $autoFill): array
+    {
+        $norm = self::normalise($stored);
+        if ($autoFill) {
+            $done = self::complete($rules, array_map(static fn (array $s): float => $s['price'], $norm));
+            foreach ($done['values'] as $mm => &$v) {
+                $v += ['calc_from_mm' => null, 'quoted_on' => null, 'since' => null, 'auto' => !isset($norm[$mm])];
+                if (isset($norm[$mm])) {
+                    $v = array_merge($v, $norm[$mm]);
+                }
+            }
+            unset($v);
+            return $done;
+        }
+        $values = [];
+        foreach ($norm as $mm => $s) {
+            $values[$mm] = ['price' => PricingEngine::round2($s['price']), 'how' => $s['how'], 'calc' => PricingEngine::round2($s['price']),
+                'rule' => $s['how'] === 'calculated' && $s['calc_from_mm'] !== null ? 'from ' . self::label($s['calc_from_mm'], (int) $rules['cbm_from']) : '',
+                'auto' => false] + $s;
+        }
+        return ['ok' => $values !== [], 'error' => $values === [] ? 'Enter at least one price.' : null, 'base' => null, 'values' => $values];
+    }
+
+    /** "4,600" or "4,600.50" — a short amount for the "how" texts. */
+    public static function amount(float $v): string
+    {
+        $v = PricingEngine::round2($v);
+        return abs($v - round($v)) < 0.005 ? number_format($v, 0) : number_format($v, 2);
+    }
+
+    /** Every thickness the rules know, in display order (the thicknesses, then 50 mm and above). @return list<int> */
+    public static function thicknesses(array $rules): array
+    {
+        $out = array_map(static fn (array $r): int => (int) $r['mm'], $rules['rows']);
+        if ($rules['k'] !== null && (float) $rules['k'] > 0) {
+            $out[] = self::CBM;
+        }
+        return $out;
+    }
+
+    /**
+     * D-335: the calculator — every OTHER thickness worked out from one entered price, with
+     * how it was worked out ("= 4,600 − 20 %") and the rule ("−20 %"). From a price that is not
+     * the base thickness, the base equivalent is worked back first (50 mm+: CBM ÷ K).
+     *
+     * @return array{ok: bool, error: ?string, base: ?float,
+     *               values: array<int, array{price: float, calc_from_mm: int, how: string, change: string}>}
+     */
+    public static function calcFrom(array $rules, int $fromMm, float $price): array
+    {
+        $pct = [];
+        foreach ($rules['rows'] as $r) {
+            $pct[(int) $r['mm']] = (float) $r['pct'];
+        }
+        $k = $rules['k'] !== null ? (float) $rules['k'] : null;
+        $baseMm = (int) $rules['base_mm'];
+        $cbmFrom = (int) $rules['cbm_from'];
+        if ($price <= 0) {
+            return ['ok' => false, 'error' => 'Enter the price (above 0).', 'base' => null, 'values' => []];
+        }
+        if ($fromMm === self::CBM) {
+            if ($k === null || $k <= 0) {
+                return ['ok' => false, 'error' => 'This product has no "50 mm and above" rule.', 'base' => null, 'values' => []];
+            }
+            $base = $price / $k;
+            $back = self::amount($price) . ' per CBM ÷ ' . self::fmt($k);
+        } elseif (array_key_exists($fromMm, $pct)) {
+            $f = 1 + $pct[$fromMm] / 100;
+            if ($f <= 0) {
+                return ['ok' => false, 'error' => 'The rule for this thickness cannot be worked back.', 'base' => null, 'values' => []];
+            }
+            $base = $price / $f;
+            $back = $fromMm === $baseMm ? '' : self::amount($price) . ' ÷ ' . self::fmt($f);
+        } else {
+            return ['ok' => false, 'error' => 'Choose a thickness from the list.', 'base' => null, 'values' => []];
+        }
+        $base = PricingEngine::round2($base);
+        $root = $fromMm === $baseMm ? self::amount($price) : $baseMm . ' mm price ₹' . self::amount($base) . ' (= ' . $back . ')';
+        $values = [];
+        foreach ($pct as $mm => $p) {
+            if ($mm === $fromMm) {
+                continue;
+            }
+            $change = $mm === $baseMm ? '' : ($p < 0 ? '−' : '+') . self::fmt(abs($p)) . ' %';
+            $values[$mm] = ['price' => PricingEngine::round2($base * (1 + $p / 100)), 'calc_from_mm' => $fromMm,
+                'how' => '= ' . $root . ($change !== '' ? ' ' . ($p < 0 ? '− ' : '+ ') . self::fmt(abs($p)) . ' %' : ''), 'change' => $change];
+        }
+        if ($k !== null && $k > 0 && $fromMm !== self::CBM) {
+            $values[self::CBM] = ['price' => PricingEngine::round2($base * $k), 'calc_from_mm' => $fromMm,
+                'how' => '= ' . $baseMm . ' mm price ₹' . self::amount($base) . ' per m² × ' . self::fmt($k) . ($fromMm !== $baseMm ? ' (' . $baseMm . ' mm = ' . $back . ')' : ''),
+                'change' => '× ' . self::fmt($k)];
+        }
+        return ['ok' => true, 'error' => null, 'base' => $base, 'values' => $values];
+    }
+
+    /** "3,680.00" — a price for the history. */
+    private static function priceText(int $mm, float $price): string
+    {
+        return number_format($price, 2);
+    }
+
+    private static function what(int $mm, int $cbmFrom): string
+    {
+        return self::label($mm, $cbmFrom) . ($mm === self::CBM ? ' per CBM' : ' per m²');
+    }
+
+    /**
+     * D-335: "Add / update a price" — saves the TYPED thickness, the TICKED ones as CALCULATED
+     * (from the typed one), leaves the unticked ones as they are, sets the base when asked and
+     * switches the row to stored prices only (auto_fill 0). A row saved before D-335 first keeps
+     * what it showed for every thickness (stored as CALCULATED), so nothing changes unasked.
+     * Every change goes into the price history. Returns an error or null.
+     *
+     * @param list<int> $ticked
+     */
+    public static function addPrice(array $row, array $rules, int $fromMm, float $price, string $quotedOn, array $ticked, bool $makeBase, int $userId): ?string
+    {
+        $id = (int) $row['id'];
+        $calc = self::calcFrom($rules, $fromMm, $price);
+        if (!$calc['ok']) {
+            return $calc['error'];
+        }
+        $pdo = Database::connection();
+        $stored = self::storedFor($id);
+        $before = self::values($rules, $stored, self::autoFill($row));
+        $up = $pdo->prepare('INSERT INTO catalog_supplier_thickness_prices (product_supplier_id, thickness_mm, price_inr, how, calc_from_mm, quoted_on, updated_by)
+            VALUES (:id, :mm, :p, :how, :cf, :q, :u)
+            ON DUPLICATE KEY UPDATE price_inr = VALUES(price_inr), how = VALUES(how), calc_from_mm = VALUES(calc_from_mm), quoted_on = VALUES(quoted_on), updated_by = VALUES(updated_by)');
+        $put = static function (int $mm, float $p, string $how, ?int $from, ?string $q) use ($up, $id, $userId): void {
+            $up->execute(['id' => $id, 'mm' => $mm, 'p' => number_format($p, 2, '.', ''), 'how' => $how, 'cf' => $from, 'q' => $q, 'u' => $userId]);
+        };
+        $pdo->beginTransaction();
+        try {
+            if (self::autoFill($row) && $before['ok']) {
+                $typedMms = array_keys(array_filter(self::normalise($stored), static fn (array $s): bool => $s['how'] === 'typed'));
+                $from = in_array((int) $rules['base_mm'], $typedMms, true) ? (int) $rules['base_mm'] : ($typedMms[0] ?? null);
+                foreach ($before['values'] as $mm => $v) {
+                    if (!isset($stored[$mm])) {
+                        $put((int) $mm, (float) $v['price'], 'calculated', $from, null);
+                    }
+                }
+            }
+            $put($fromMm, $price, 'typed', null, $quotedOn);
+            foreach ($ticked as $mm) {
+                if (isset($calc['values'][$mm])) {
+                    $put((int) $mm, (float) $calc['values'][$mm]['price'], 'calculated', $fromMm, null);
+                }
+            }
+            $oldBase = self::rowBase($row);
+            $pdo->prepare('UPDATE catalog_product_suppliers SET auto_fill = 0' . ($makeBase ? ', base_thickness_mm = :b' : '') . ',
+                quoted_on = CASE WHEN quoted_on IS NULL OR quoted_on < :q THEN :q2 ELSE quoted_on END WHERE id = :id')
+                ->execute(($makeBase ? ['b' => $fromMm] : []) + ['q' => $quotedOn, 'q2' => $quotedOn, 'id' => $id]);
+            $after = self::values($rules, self::storedFor($id), false);
+            $cbmFrom = (int) $rules['cbm_from'];
+            $keys = array_keys($after['values']);
+            usort($keys, static fn (int $a, int $b): int => [$a === self::CBM ? 1 : 0, $a] <=> [$b === self::CBM ? 1 : 0, $b]);
+            foreach ($keys as $mm) {
+                $v = $after['values'][$mm];
+                $old = $before['values'][$mm] ?? null;
+                $changed = $old === null || abs((float) $old['price'] - (float) $v['price']) > 0.005 || $old['how'] !== $v['how']
+                    || ($v['how'] === 'typed' && (int) $mm === $fromMm);
+                if ($changed) {
+                    self::history($id, self::what((int) $mm, $cbmFrom),
+                        $old === null ? '—' : self::priceText((int) $mm, (float) $old['price']) . ' ' . $old['how'],
+                        self::priceText((int) $mm, (float) $v['price']) . ' ' . $v['how'] . ($v['how'] === 'calculated' && $v['calc_from_mm'] !== null ? ' from ' . self::label((int) $v['calc_from_mm'], $cbmFrom) : ''),
+                        $userId);
+                }
+            }
+            if ($makeBase && $oldBase !== $fromMm) {
+                self::history($id, 'Base', $oldBase === null ? self::label((int) $rules['base_mm'], $cbmFrom) . ' (category)' : self::label($oldBase, $cbmFrom), self::label($fromMm, $cbmFrom), $userId);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        return null;
+    }
+
+    /** D-335: make one thickness (that has a price) the row's BASE for orders. Returns an error or null. */
+    public static function setBase(array $row, array $rules, int $mm, int $userId): ?string
+    {
+        $done = self::values($rules, self::storedFor((int) $row['id']), self::autoFill($row));
+        if (!isset($done['values'][$mm])) {
+            return 'That thickness has no price yet — add one first.';
+        }
+        $old = self::rowBase($row);
+        if ($old === $mm) {
+            return null;
+        }
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET base_thickness_mm = :b WHERE id = :id')->execute(['b' => $mm, 'id' => (int) $row['id']]);
+        $cbmFrom = (int) $rules['cbm_from'];
+        self::history((int) $row['id'], 'Base', $old === null ? self::label((int) $rules['base_mm'], $cbmFrom) . ' (category)' : self::label($old, $cbmFrom), self::label($mm, $cbmFrom), $userId);
+        return null;
     }
 
     /** The row's CHA + transport per container, else the product's default (₹). */
@@ -316,11 +597,29 @@ final class ThicknessPrices
     /** @return array<int,float> the typed prices of a supplier-price row */
     public static function typedFor(int $productSupplierId): array
     {
-        $stmt = Database::connection()->prepare('SELECT thickness_mm, price_inr FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :id ORDER BY thickness_mm');
+        $stmt = Database::connection()->prepare("SELECT thickness_mm, price_inr FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :id AND how = 'typed' ORDER BY thickness_mm");
         $stmt->execute(['id' => $productSupplierId]);
         $out = [];
         foreach ($stmt->fetchAll() as $r) {
             $out[(int) $r['thickness_mm']] = (float) $r['price_inr'];
+        }
+        return $out;
+    }
+
+    /**
+     * D-335: every stored price of a row (TYPED and CALCULATED) with how it was set.
+     *
+     * @return array<int, array{price: float, how: string, calc_from_mm: ?int, quoted_on: ?string, since: ?string}>
+     */
+    public static function storedFor(int $productSupplierId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT thickness_mm, price_inr, how, calc_from_mm, quoted_on, updated_at FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :id ORDER BY thickness_mm');
+        $stmt->execute(['id' => $productSupplierId]);
+        $out = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $out[(int) $r['thickness_mm']] = ['price' => (float) $r['price_inr'], 'how' => (string) $r['how'],
+                'calc_from_mm' => $r['calc_from_mm'] !== null ? (int) $r['calc_from_mm'] : null,
+                'quoted_on' => $r['quoted_on'] !== null ? (string) $r['quoted_on'] : null, 'since' => substr((string) $r['updated_at'], 0, 10)];
         }
         return $out;
     }

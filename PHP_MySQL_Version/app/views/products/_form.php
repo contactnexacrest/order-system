@@ -19,27 +19,49 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
     <label>Origin<input type="text" name="origin" value="<?= View::e($product['origin'] ?? '') ?>" placeholder="e.g., Rajasthan, India"></label>
   </div>
 
-  <fieldset>
-    <legend>Default Cost Components <small class="muted">(catalog-wide fallbacks used by computed-FOB suppliers)</small></legend>
+  <?php // Owner decision D-335 (12 Nov 2026): "Costs to FOB" — the only place for CHA + transport; packing + loading only when a supplier price does not include them.
+  $__pr = $productRules ?? null;
+  $__chaV = ($product['cha_transport_per_container'] ?? null) !== null ? (float) $product['cha_transport_per_container'] : null;
+  $__fit = $__pr !== null ? \App\Services\ThicknessPrices::chaPerCbm($__chaV, (float) $__pr['container_cbm'], $__pr['container_max_t'], $__pr['t_per_cbm']) : null;
+  $__packV = ($product['default_packing_cost'] ?? null) !== null || ($product['default_loading_cost'] ?? null) !== null
+      ? number_format((float) ($product['default_packing_cost'] ?? 0) + (float) ($product['default_loading_cost'] ?? 0), 2, '.', '') : ''; ?>
+  <fieldset id="costs-to-fob">
+    <legend>Costs to FOB <small class="muted">(added to every supplier price of this product — the only place for CHA and transport)</small></legend>
     <div class="field-grid">
-      <label>Default Factory Cost<input type="number" step="0.01" min="0" name="default_factory_cost" value="<?= View::e(($product['default_factory_cost'] ?? '') !== '' ? (string) $product['default_factory_cost'] : '') ?>" placeholder="e.g., 450.00"></label>
-      <label>Default Transportation Cost<input type="number" step="0.01" min="0" name="default_transportation_cost" value="<?= View::e(($product['default_transportation_cost'] ?? '') !== '' ? (string) $product['default_transportation_cost'] : '') ?>" placeholder="e.g., 60.00"></label>
-      <label>Default Packing Cost<input type="number" step="0.01" min="0" name="default_packing_cost" value="<?= View::e(($product['default_packing_cost'] ?? '') !== '' ? (string) $product['default_packing_cost'] : '') ?>" placeholder="e.g., 25.00"></label>
-      <label>Default Loading Cost<input type="number" step="0.01" min="0" name="default_loading_cost" value="<?= View::e(($product['default_loading_cost'] ?? '') !== '' ? (string) $product['default_loading_cost'] : '') ?>" placeholder="e.g., 15.00"></label>
-      <label>Default CHA Cost<input type="number" step="0.01" min="0" name="default_cha_cost" value="<?= View::e(($product['default_cha_cost'] ?? '') !== '' ? (string) $product['default_cha_cost'] : '') ?>" placeholder="e.g., 20.00"></label>
+      <label>CHA + transport per container (₹)<input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="<?= View::e(($product['cha_transport_per_container'] ?? null) !== null ? (string) $product['cha_transport_per_container'] : '') ?>" placeholder="e.g. 80000.00">
+        <?php if ($__fit !== null): ?><small class="muted">÷ <?= View::e(\App\Services\ThicknessPrices::fmt(round((float) $__fit['fits_cbm'], 2))) ?> CBM per container<?= $__fit['per_cbm'] !== null ? ' = ₹' . number_format((float) $__fit['per_cbm'], 2) . ' per CBM' : '' ?><?= $__fit['by_weight'] ? ' (the weight limit is reached first)' : '' ?></small><?php endif; ?></label>
+      <label>Packing + loading per unit (₹)<input type="text" inputmode="decimal" name="packing_loading_cost" data-max-decimals="2" data-max-value="9999999999.99" value="<?= View::e($__packV) ?>" placeholder="e.g. 1500.00">
+        <small class="muted">Added only when a supplier price does NOT include packing and loading.</small></label>
     </div>
   </fieldset>
 
-  <?php // Owner decision D-300 (point 12): CHA + transport per container (default for this product's supplier prices) and the product's own price rules. ?>
-  <fieldset>
-    <legend>CHA + transport and price rules <small class="muted">(empty = the category's rules<?= ($categoryName ?? '') !== '' ? ' — ' . View::e((string) $categoryName) : '' ?>)</small></legend>
-    <div class="field-grid">
-      <label>CHA + transport per container (₹) <small class="muted">(default for this product's supplier prices)</small><input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="<?= View::e(($product['cha_transport_per_container'] ?? null) !== null ? (string) $product['cha_transport_per_container'] : '') ?>" placeholder="e.g. 60000.00"></label>
-      <?php $__cr = $categoryRules ?? []; $__rro = !empty($canManagePricing) ? '' : ' disabled'; ?>
-      <label>50 mm and above: 20 mm price per m² × <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="thick_k_factor" data-max-decimals="3" data-max-value="1000" value="<?= View::e(($product['thick_k_factor'] ?? null) !== null ? rtrim(rtrim((string) $product['thick_k_factor'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['thick_k_factor'] ?? null) !== null ? rtrim(rtrim((string) $__cr['thick_k_factor'], '0'), '.') : '—') ?>"<?= $__rro ?>></label>
-      <label>Container holds (CBM) <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e(($product['container_cbm'] ?? null) !== null ? rtrim(rtrim((string) $product['container_cbm'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['container_cbm'] ?? null) !== null ? rtrim(rtrim((string) $__cr['container_cbm'], '0'), '.') : '8') ?>"<?= $__rro ?>></label>
-      <label>Container maximum (tonnes) <small class="muted">(own rule; MD only)</small><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e(($product['container_max_t'] ?? null) !== null ? rtrim(rtrim((string) $product['container_max_t'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['container_max_t'] ?? null) !== null ? rtrim(rtrim((string) $__cr['container_max_t'], '0'), '.') : '27') ?>"<?= $__rro ?>></label>
-    </div>
+  <?php // D-335: the price rules in effect for this product — the category's, or its own (MD only). ?>
+  <fieldset id="price-rules">
+    <legend>Price rules in effect for this product</legend>
+    <p class="small muted">Used only as a <strong>calculator</strong> — when you tick a thickness to work it out while adding a price. They never change a price you typed or the base price.</p>
+    <?php if ($__pr !== null): $__own = $__pr['own']; $__tag = static fn (bool $own): string => $own ? '<span class="badge badge-warning">own rule</span>' : '<span class="badge">category</span>'; ?>
+      <table class="list">
+        <tr><th>Rule</th><th>Value</th><th>From</th></tr>
+        <?php foreach ($__pr['rows'] as $__r): if ((int) $__r['mm'] === (int) $__pr['base_mm']) { continue; } ?>
+          <tr><td><?= (int) $__r['mm'] ?> mm</td><td><?= (int) $__pr['base_mm'] ?> mm <?= $__r['pct'] < 0 ? '−' : '+' ?> <?= View::e(\App\Services\ThicknessPrices::fmt(abs((float) $__r['pct']))) ?> %</td><td><?= $__tag(in_array($__r['option'], $__own, true)) ?></td></tr>
+        <?php endforeach; ?>
+        <?php if ($__pr['k'] !== null): ?><tr><td><?= (int) $__pr['cbm_from'] ?> mm and above, per CBM</td><td><?= (int) $__pr['base_mm'] ?> mm price per m² × <?= View::e(\App\Services\ThicknessPrices::fmt((float) $__pr['k'])) ?></td><td><?= $__tag(($product['thick_k_factor'] ?? null) !== null) ?></td></tr><?php endif; ?>
+        <tr><td>Container</td><td><?= View::e(\App\Services\ThicknessPrices::fmt((float) $__pr['container_cbm'])) ?> CBM · max <?= View::e(\App\Services\ThicknessPrices::fmt((float) $__pr['container_max_t'])) ?> t</td><td><?= $__tag(($product['container_cbm'] ?? null) !== null || ($product['container_max_t'] ?? null) !== null) ?></td></tr>
+      </table>
+    <?php endif; ?>
+    <?php $__cr = $categoryRules ?? []; $__hasOwn = ($product['thick_k_factor'] ?? null) !== null || ($product['container_cbm'] ?? null) !== null || ($product['container_max_t'] ?? null) !== null; ?>
+    <?php if (!empty($canManagePricing)): ?>
+      <input type="hidden" name="own_rules_shown" value="1">
+      <label class="inline switch"><input type="checkbox" name="own_rules" value="1"<?= $__hasOwn ? ' checked' : '' ?>> Use own rules for this product <small class="muted">(off = the category's rules<?= ($categoryName ?? '') !== '' ? ', ' . View::e((string) $categoryName) : '' ?> · MD only)</small></label>
+      <div class="field-grid" data-show-when="own_rules=1">
+        <label><?= (int) ($__pr['cbm_from'] ?? 50) ?> mm and above, when worked out from <?= (int) ($__pr['base_mm'] ?? 20) ?> mm: <?= (int) ($__pr['base_mm'] ?? 20) ?> mm price per m² ×<input type="text" inputmode="decimal" name="thick_k_factor" data-max-decimals="3" data-max-value="1000" value="<?= View::e(($product['thick_k_factor'] ?? null) !== null ? rtrim(rtrim((string) $product['thick_k_factor'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['thick_k_factor'] ?? null) !== null ? rtrim(rtrim((string) $__cr['thick_k_factor'], '0'), '.') : '—') ?>"></label>
+        <label>Container holds (CBM)<input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e(($product['container_cbm'] ?? null) !== null ? rtrim(rtrim((string) $product['container_cbm'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['container_cbm'] ?? null) !== null ? rtrim(rtrim((string) $__cr['container_cbm'], '0'), '.') : '8') ?>"></label>
+        <label>Container maximum (tonnes)<input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e(($product['container_max_t'] ?? null) !== null ? rtrim(rtrim((string) $product['container_max_t'], '0'), '.') : '') ?>" placeholder="category <?= View::e(($__cr['container_max_t'] ?? null) !== null ? rtrim(rtrim((string) $__cr['container_max_t'], '0'), '.') : '27') ?>"></label>
+      </div>
+    <?php else: ?>
+      <p class="small muted"><?= $__hasOwn ? 'This product uses its own rules (marked "own rule").' : 'This product uses the category\'s rules.' ?> Only the MD can switch on own rules for a product.</p>
+    <?php endif; ?>
+    <p class="small muted">Switch on to edit the rules for this product only; the thickness % are changed on the category's Price rules (or this product's Price options). Category › Price rules keeps the standard for all products.</p>
   </fieldset>
 
   <?php // Owner decision D-245 P2: the product's selling unit (filled into an order line). Prices come from Products → pricing. ?>

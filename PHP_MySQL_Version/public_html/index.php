@@ -1204,6 +1204,9 @@ $router->post('/products/suppliers/{supplierId}/market-price', [$pricing, 'updat
 // D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
 $router->get('/products/suppliers/{supplierId}/price', [$pricing, 'editPrice'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'view_price_buildup'])]);
 $router->post('/products/suppliers/{supplierId}/price', [$pricing, 'savePrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+// D-335: "Add / update a price" (one thickness typed, the ticked ones worked out) and the BASE for orders.
+$router->post('/products/suppliers/{supplierId}/thickness-price', [$pricing, 'addThicknessPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/base', [$pricing, 'setBase'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/pricing/fx-rates/fetch', [$pricing, 'fetchFxRate'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/fx-rates/{id}/decide', [$pricing, 'decideFxRate'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 // Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).

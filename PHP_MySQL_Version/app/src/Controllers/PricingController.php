@@ -298,7 +298,9 @@ final class PricingController
             $basis = ($s['price_basis'] ?? 'unit') === 'cbm' || ($s['combo_per'] ?? '') === 'cbm' ? 'cbm' : 'unit';
             $s['fob'] = PricingService::fobParts($product, $s, $basis, null, $settings, $rules);
             $s['effective_fob'] = ($s['price_basis'] ?? '') === 'grid' ? ($s['fob']['supplier'] ?? null) : (new ProductService())->effectiveFobForSupplier($s, $product);
-            $s['grid'] = ($s['price_basis'] ?? '') === 'grid' ? ThicknessPrices::complete($rules, ThicknessPrices::typedFor((int) $s['id'])) : null;
+            // D-335: what is stored (typed / calculated), the base, and one price card per supplier row.
+            $s['grid'] = ($s['price_basis'] ?? '') === 'grid' ? ThicknessPrices::values($rules, ThicknessPrices::storedFor((int) $s['id']), ThicknessPrices::autoFill($s)) : null;
+            $s['card'] = $s['grid'] !== null ? self::priceCard($product, $s, $rules, $settings, $s['grid']) : null;
             $s['staleness'] = PricingService::staleness($s, $settings['stale_days']);
             $s['price_date'] = PricingService::priceDate($s);
             $rows[] = $s;
@@ -337,7 +339,165 @@ final class PricingController
             'supplierTypes' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('supplier_type')),
             'canQuickAdd' => self::can('record_market_prices') || self::can('manage_suppliers'),
             'canChangeRules' => self::can('manage_pricing'),
+            'canSeeBuild' => self::can('view_price_buildup'),
         ], 'layout/base');
+    }
+
+    /**
+     * D-335: one supplier price for every thickness as a card — every thickness with its price,
+     * how it was set (TYPED / CALCULATED from … / no price), since when, the FOB cost incl. CHA
+     * + transport in its own unit (per m², or per CBM for 50 mm and above), the BASE, and the
+     * product price worked out from the base.
+     *
+     * @param array{ok: bool, values: array<int, array<string,mixed>>} $grid ThicknessPrices::values()
+     * @return array<string,mixed>
+     */
+    private static function priceCard(array $product, array $row, array $rules, array $settings, array $grid): array
+    {
+        $cbmFrom = (int) $rules['cbm_from'];
+        $baseMm = ThicknessPrices::baseOf($row, $rules);
+        $cha = ThicknessPrices::chaPerCbm(ThicknessPrices::chaPerContainer($row, $product), (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
+        $mms = ThicknessPrices::thicknesses($rules);
+        foreach (array_keys($grid['values']) as $mm) {
+            if (!in_array((int) $mm, $mms, true)) {
+                $mms[] = (int) $mm;
+            }
+        }
+        usort($mms, static fn (int $a, int $b): int => [$a === ThicknessPrices::CBM ? 1 : 0, $a] <=> [$b === ThicknessPrices::CBM ? 1 : 0, $b]);
+        $pct = [];
+        foreach ($rules['rows'] as $r) {
+            $pct[(int) $r['mm']] = (float) $r['pct'];
+        }
+        $lines = [];
+        $basePrice = null;
+        foreach ($mms as $mm) {
+            $v = $grid['values'][$mm] ?? null;
+            $isCbm = $mm === ThicknessPrices::CBM;
+            $chaU = $cha['per_cbm'] !== null ? ($isCbm ? $cha['per_cbm'] : $cha['per_cbm'] * $mm / 1000) : 0.0;
+            $note = '';
+            if ($v !== null && $v['how'] === 'calculated') {
+                $from = $v['calc_from_mm'] ?? null;
+                $fromLabel = $from !== null ? ThicknessPrices::label((int) $from, $cbmFrom) : ThicknessPrices::label((int) $rules['base_mm'], $cbmFrom);
+                $change = $isCbm ? '× ' . ThicknessPrices::fmt((float) $rules['k'])
+                    : (isset($pct[$mm]) && $mm !== (int) $rules['base_mm'] ? (($pct[$mm] < 0 ? '− ' : '+ ') . ThicknessPrices::fmt(abs($pct[$mm])) . ' %') : '');
+                $note = 'from ' . $fromLabel . ($change !== '' && ($from === null || $from === (int) $rules['base_mm']) ? ' ' . $change : '') . (!empty($v['auto']) ? ' (worked out each time — older price)' : '');
+            }
+            $since = $v === null ? null : ($v['how'] === 'typed' ? ($v['quoted_on'] ?? $v['since'] ?? null) : ($v['since'] ?? null));
+            $lines[] = [
+                'mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $isCbm ? 'per CBM' : 'per m²',
+                'price' => $v !== null ? (float) $v['price'] : null, 'how' => $v['how'] ?? null, 'note' => $note, 'since' => $since,
+                'cha' => $chaU, 'fob' => $v !== null ? (float) $v['price'] + $chaU : null, 'is_base' => $mm === $baseMm,
+            ];
+            if ($mm === $baseMm && $v !== null) {
+                $basePrice = (float) $v['price'];
+            }
+        }
+        $parts = PricingService::fobParts($product, $row, 'unit', null, $settings, $rules);
+        $build = $parts !== null && self::can('view_price_buildup') ? PricingService::buildFromFob($product, (float) $parts['total'], $settings) : null;
+        return [
+            'lines' => $lines, 'base_mm' => $baseMm, 'base_label' => ThicknessPrices::label($baseMm, $cbmFrom), 'base_price' => $basePrice,
+            'base_unit' => $baseMm === ThicknessPrices::CBM ? 'CBM' : 'm²', 'base_chosen' => ThicknessPrices::rowBase($row) !== null,
+            'cha_per_cbm' => $cha['per_cbm'], 'fits_cbm' => $cha['fits_cbm'], 'cha_per_container' => ThicknessPrices::chaPerContainer($row, $product),
+            'parts' => $parts, 'build' => $build, 'auto' => ThicknessPrices::autoFill($row),
+            'unit_label' => $parts !== null ? (\App\Services\LineUnits::label((string) $parts['unit']) ?: (string) $parts['unit']) : '',
+        ];
+    }
+
+    /**
+     * D-335: reads "Add / update a price" — the thickness, its price, the date and the ticked
+     * thicknesses to work out. Returns [mm, price, quoted_on, ticked, error].
+     *
+     * @return array{0: int, 1: float, 2: string, 3: list<int>, 4: ?string}
+     */
+    private static function readThicknessPrice(array $rules, string $dateField): array
+    {
+        $allowed = ThicknessPrices::thicknesses($rules);
+        $rawMm = trim((string) ($_POST['thickness_mm'] ?? ''));
+        $mm = $rawMm !== '' && ctype_digit($rawMm) ? (int) $rawMm : -1;
+        if (!in_array($mm, $allowed, true)) {
+            return [0, 0.0, '', [], 'Choose the thickness of the price.'];
+        }
+        $raw = trim(str_replace(',', '', (string) ($_POST['thickness_price'] ?? '')));
+        if (preg_match('/^\d{1,12}(\.\d{1,2})?$/', $raw) !== 1 || (float) $raw <= 0) {
+            return [$mm, 0.0, '', [], 'Enter the price in ₹ (above 0, at most 2 decimals).'];
+        }
+        $q = trim((string) ($_POST[$dateField] ?? ''));
+        $d = \DateTime::createFromFormat('!Y-m-d', $q);
+        if ($d === false || $d->format('Y-m-d') !== $q) {
+            return [$mm, (float) $raw, '', [], 'Enter the date the supplier quoted this price.'];
+        }
+        if ($q > date('Y-m-d')) {
+            return [$mm, (float) $raw, '', [], 'The quoted date cannot be in the future.'];
+        }
+        $ticked = [];
+        foreach ((array) ($_POST['also'] ?? []) as $a) {
+            $a = (string) $a;
+            if (ctype_digit($a) && in_array((int) $a, $allowed, true) && (int) $a !== $mm) {
+                $ticked[] = (int) $a;
+            }
+        }
+        return [$mm, (float) $raw, $q, array_values(array_unique($ticked)), null];
+    }
+
+    /** D-335: "20 mm ₹4,600.00 per m² typed; worked out: 15 mm, 18 mm" for the audit log. */
+    private static function addText(array $rules, int $mm, float $price, array $ticked): string
+    {
+        $cbmFrom = (int) $rules['cbm_from'];
+        return ThicknessPrices::label($mm, $cbmFrom) . ' ₹' . number_format($price, 2) . ($mm === ThicknessPrices::CBM ? ' per CBM' : ' per m²') . ' typed'
+            . ($ticked !== [] ? '; worked out: ' . implode(', ', array_map(static fn (int $m): string => ThicknessPrices::label($m, $cbmFrom), $ticked)) : '');
+    }
+
+    /** D-335: "Add / update a price" on a supplier price for every thickness. */
+    public function addThicknessPrice(array $params): void
+    {
+        $supplierId = (int) ($params['supplierId'] ?? 0);
+        $s = ProductSupplierRepository::find($supplierId);
+        $product = $s !== null ? ProductRepository::find((int) $s['product_id']) : null;
+        if ($s === null || $product === null || ($s['price_basis'] ?? '') !== 'grid') {
+            Flash::set('error', 'That supplier price no longer exists.');
+            header('Location: /products');
+            return;
+        }
+        $back = ($_POST['return_to'] ?? '') === 'edit' ? "/products/suppliers/{$supplierId}/price" : "/products/{$s['product_id']}/market-prices#price-card-{$supplierId}";
+        $rules = ThicknessPrices::rules($product);
+        [$mm, $price, $quotedOn, $ticked, $error] = self::readThicknessPrice($rules, 'price_quoted_on');
+        if ($error === null) {
+            $error = ThicknessPrices::addPrice($s, $rules, $mm, $price, $quotedOn, $ticked, ($_POST['base'] ?? 'keep') === 'this', (int) self::user()['id']);
+        }
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: {$back}");
+            return;
+        }
+        AuditLogRepository::log((int) self::user()['id'], 'MARKET_PRICE_CHANGED', 'product_suppliers', $supplierId, null, null,
+            $s['supplier_name'] . ': ' . self::addText($rules, $mm, $price, $ticked) . ' quoted ' . $quotedOn . (($_POST['base'] ?? 'keep') === 'this' ? ' (made the base)' : ''));
+        Flash::set('success', 'Price saved' . ($ticked !== [] ? ' and ' . count($ticked) . ' worked out from it' : '') . '.');
+        header("Location: {$back}");
+    }
+
+    /** D-335: make one thickness of a supplier price the BASE for orders. */
+    public function setBase(array $params): void
+    {
+        $supplierId = (int) ($params['supplierId'] ?? 0);
+        $s = ProductSupplierRepository::find($supplierId);
+        $product = $s !== null ? ProductRepository::find((int) $s['product_id']) : null;
+        if ($s === null || $product === null || ($s['price_basis'] ?? '') !== 'grid') {
+            Flash::set('error', 'That supplier price no longer exists.');
+            header('Location: /products');
+            return;
+        }
+        $rules = ThicknessPrices::rules($product);
+        $raw = (string) ($_POST['mm'] ?? '');
+        $mm = ctype_digit($raw) ? (int) $raw : -1;
+        $error = $mm < 0 ? 'Choose the thickness to make the base.' : ThicknessPrices::setBase($s, $rules, $mm, (int) self::user()['id']);
+        $back = ($_POST['return_to'] ?? '') === 'edit' ? "/products/suppliers/{$supplierId}/price" : "/products/{$s['product_id']}/market-prices#price-card-{$supplierId}";
+        if ($error !== null) {
+            Flash::set('error', $error);
+        } else {
+            AuditLogRepository::log((int) self::user()['id'], 'MARKET_PRICE_CHANGED', 'product_suppliers', $supplierId, 'base_thickness_mm', null, ThicknessPrices::label($mm, (int) $rules['cbm_from']));
+            Flash::set('success', 'The base for orders is now ' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . '.');
+        }
+        header("Location: {$back}");
     }
 
     /**
@@ -503,7 +663,13 @@ final class PricingController
         $_POST['supplier_name'] = (string) $picked['supplier_legal_name'];
         [$data, $error] = self::readMarketPrice($grid);
         $typed = [];
-        if ($error === null && $grid) {
+        // D-335: one thickness typed (+ the ticked ones worked out); the older grid form (price[mm]) still works.
+        $newGrid = $grid && isset($_POST['thickness_mm']);
+        $add = null;
+        if ($error === null && $newGrid) {
+            [$aMm, $aPrice, , $aTicked, $error] = self::readThicknessPrice($rules, 'quoted_on');
+            $add = ['mm' => $aMm, 'price' => $aPrice, 'ticked' => $aTicked];
+        } elseif ($error === null && $grid) {
             [$typed, $error] = ThicknessPrices::readForm($_POST, $rules);
         }
         if ($error !== null) {
@@ -536,7 +702,10 @@ final class PricingController
             PricingRepository::setCombo($id, $named, $per, $usedForPricing);
         } else {
             PricingRepository::setSupplierBasis($id, $data['price_basis']);
-            if ($grid) {
+            if ($add !== null) {
+                $row = ProductSupplierRepository::find($id) ?? ['id' => $id];
+                ThicknessPrices::addPrice($row, $rules, $add['mm'], $add['price'], (string) $data['quoted_on'], $add['ticked'], true, $userId);
+            } elseif ($grid) {
                 ThicknessPrices::saveTyped($id, $typed, $rules, $userId);
             }
             if ($usedForPricing && $data['price_basis'] === 'cbm') {
@@ -547,7 +716,7 @@ final class PricingController
         }
         $data['is_primary'] = $usedForPricing ? 1 : 0;
         $comboText = $data['price_basis'] === 'combo' ? PricingService::comboText(\App\Services\ProductSpecs::offered($product), $named) : null;
-        $priceText = $grid ? self::gridText($typed, $rules) : '₹' . number_format((float) $data['fob_value'], 2);
+        $priceText = $add !== null ? self::addText($rules, $add['mm'], $add['price'], $add['ticked']) : ($grid ? self::gridText($typed, $rules) : '₹' . number_format((float) $data['fob_value'], 2));
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
             $data['supplier_name'] . ': ' . $priceText . ($comboText !== null ? ' for ' . $comboText . ($per === 'cbm' ? ' per CBM' : '') : '') . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
         Flash::set('success', 'Supplier price recorded' . ($data['is_primary'] ? ' and used for pricing.' : '.'));
@@ -579,7 +748,9 @@ final class PricingController
         $grid = ($s['price_basis'] ?? '') === 'grid';
         View::render('products/supplier_price_edit', [
             'product' => $product, 'row' => $s, 'rules' => $rules,
-            'grid' => $grid ? ThicknessPrices::complete($rules, ThicknessPrices::typedFor((int) $s['id'])) : null,
+            'grid' => $grid ? ($__g = ThicknessPrices::values($rules, ThicknessPrices::storedFor((int) $s['id']), ThicknessPrices::autoFill($s))) : null,
+            'card' => $grid ? self::priceCard($product, $s, $rules, $settings, $__g) : null,
+            'canSeeBuild' => self::can('view_price_buildup'),
             'fob' => PricingService::fobParts($product, $s, ($s['price_basis'] ?? '') === 'cbm' ? 'cbm' : 'unit', null, $settings, $rules),
             'history' => ThicknessPrices::historyFor((int) $s['id']),
             'pickList' => SupplierRepository::pickList(),
@@ -616,7 +787,9 @@ final class PricingController
         }
         [$data, $error] = self::readMarketPrice($grid);
         $typed = [];
-        if ($error === null && $grid) {
+        // D-335: thickness prices change through "Add / update a price"; the older grid boxes (price[mm]) still work.
+        $gridBoxes = $grid && is_array($_POST['price'] ?? null);
+        if ($error === null && $gridBoxes) {
             [$typed, $error] = ThicknessPrices::readForm($_POST, $rules);
         }
         if ($error !== null) {
@@ -642,8 +815,10 @@ final class PricingController
         ProductSupplierRepository::setPriceDetails($supplierId, $picked !== null ? (int) $picked['id'] : (int) $s['supplier_id'],
             $data['includes_packing_loading'], $data['cha_transport_per_container']);
         // D-300: the price history — who, when, old → new.
-        if ($grid) {
+        if ($gridBoxes) {
             ThicknessPrices::saveTyped($supplierId, $typed, $rules, $userId);
+        } elseif ($grid) {
+            // Nothing: the prices themselves are kept as they are.
         } elseif ($oldPrice !== number_format((float) $data['fob_value'], 2, '.', '')) {
             ThicknessPrices::history($supplierId, 'Price per ' . ((string) ($product['reference_unit'] ?? '') ?: 'unit'), $oldPrice, number_format((float) $data['fob_value'], 2, '.', ''), $userId);
         }
@@ -654,7 +829,7 @@ final class PricingController
         if ($oldIncl !== $data['includes_packing_loading']) {
             ThicknessPrices::history($supplierId, 'Price includes packing and loading', $oldIncl ? 'yes' : 'no', $data['includes_packing_loading'] ? 'yes' : 'no', $userId);
         }
-        $after = ($grid ? self::gridText($typed, $rules) : '₹' . number_format((float) $data['fob_value'], 2)) . ' quoted ' . $data['quoted_on'];
+        $after = ($grid ? self::gridText($gridBoxes ? $typed : ThicknessPrices::typedFor($supplierId), $rules) : '₹' . number_format((float) $data['fob_value'], 2)) . ' quoted ' . $data['quoted_on'];
         AuditLogRepository::log($userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', $supplierId, null, $before, $after);
         Flash::set('success', 'Supplier price saved.');
         header("Location: /products/{$productId}/market-prices");

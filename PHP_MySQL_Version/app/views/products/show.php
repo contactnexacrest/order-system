@@ -33,16 +33,13 @@
 
   <?php if ($canViewPricing): ?>
   <div class="section">
-    <h2>Default Cost Components</h2>
-    <p class="muted small">These are the catalog-wide fallbacks a computed-FOB supplier uses for any cost component it does not itself override.</p>
+    <?php // Owner decision D-335 (12 Nov 2026): "Costs to FOB" replaces the old default cost components. ?>
+    <h2>Costs to FOB</h2>
+    <p class="muted small">Added to every supplier price of this product: CHA + transport per container (turned into a cost per CBM from what one container holds), and packing + loading when a supplier price does not include them.</p>
     <div class="kv-grid">
-      <?php // Owner decision D-214, phase 2: the factory cost is the buying side; the rest are logistics costs. ?>
-      <?php if ($sees['purchase']): ?><div><span class="k">Factory Cost</span><span class="v"><?= $product['default_factory_cost'] === null ? '—' : number_format((float) $product['default_factory_cost'], 2) ?></span></div><?php endif; ?>
       <?php if ($sees['logistics']): ?>
-      <div><span class="k">Transportation Cost</span><span class="v"><?= $product['default_transportation_cost'] === null ? '—' : number_format((float) $product['default_transportation_cost'], 2) ?></span></div>
-      <div><span class="k">Packing Cost</span><span class="v"><?= $product['default_packing_cost'] === null ? '—' : number_format((float) $product['default_packing_cost'], 2) ?></span></div>
-      <div><span class="k">Loading Cost</span><span class="v"><?= $product['default_loading_cost'] === null ? '—' : number_format((float) $product['default_loading_cost'], 2) ?></span></div>
-      <div><span class="k">CHA Cost</span><span class="v"><?= $product['default_cha_cost'] === null ? '—' : number_format((float) $product['default_cha_cost'], 2) ?></span></div><?php endif; ?>
+      <div><span class="k">CHA + transport per container (₹)</span><span class="v"><?= ($product['cha_transport_per_container'] ?? null) === null ? '—' : number_format((float) $product['cha_transport_per_container'], 2) ?></span></div>
+      <div><span class="k">Packing + loading per unit (₹)</span><span class="v"><?= ($product['default_packing_cost'] ?? null) === null && ($product['default_loading_cost'] ?? null) === null ? '—' : number_format((float) ($product['default_packing_cost'] ?? 0) + (float) ($product['default_loading_cost'] ?? 0), 2) ?></span></div><?php endif; ?>
     </div>
   </div>
   <?php endif; ?>

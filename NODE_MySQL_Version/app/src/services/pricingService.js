@@ -261,14 +261,7 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     }
   }
   const has = (k) => product[k] !== null && product[k] !== undefined;
-  const effective = {
-    margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
-    other_mode: product.pricing_other_cost_mode || 'pct',
-    other_value: has('pricing_other_cost_mode') ? Number(product.pricing_other_cost_value) : s.other_cost_pct,
-    incentive_mode: product.pricing_incentive_mode || s.incentive_mode,
-    incentive_value: has('pricing_incentive_mode') ? Number(product.pricing_incentive_value) : s.incentive_value,
-    buffer_pct: has('pricing_buffer_pct') ? Number(product.pricing_buffer_pct) : s.buffer_pct,
-  };
+  const effective = effectiveFor(product, s);
   const overrides = [];
   if (has('pricing_margin_pct')) overrides.push(`margin ${pct(effective.margin_pct)}`);
   if (has('pricing_other_cost_mode')) overrides.push(`other costs ${modeLabel(effective.other_mode, effective.other_value)}`);
@@ -329,6 +322,37 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   return out;
 }
 
+/** The margin, other costs, incentive and buffer that apply to a product: its own, else the pricing settings. */
+function effectiveFor(product, s) {
+  const has = (k) => product[k] !== null && product[k] !== undefined;
+  return {
+    margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
+    other_mode: product.pricing_other_cost_mode || 'pct',
+    other_value: has('pricing_other_cost_mode') ? Number(product.pricing_other_cost_value) : s.other_cost_pct,
+    incentive_mode: product.pricing_incentive_mode || s.incentive_mode,
+    incentive_value: has('pricing_incentive_mode') ? Number(product.pricing_incentive_value) : s.incentive_value,
+    buffer_pct: has('pricing_buffer_pct') ? Number(product.pricing_buffer_pct) : s.buffer_pct,
+  };
+}
+
+/**
+ * D-335: the price build-up from one supplier-price row's FOB cost (₹ per the product's unit) —
+ * supplier USD, cost, minimum and quote — for the "Product price (from the base)" line on Market
+ * prices. Null when the FOB cost is not above 0.
+ */
+async function buildFromFob(product, fobInr, s = null, program = null) {
+  s = s || (await settings());
+  if (!(Number(fobInr) > 0)) return null;
+  const e = effectiveFor(product, s);
+  const b = pricingEngine.build({
+    supplier_inr: Number(fobInr), fx_rate: s.pricing_fx_rate,
+    other_mode: e.other_mode, other_value: e.other_value, margin_pct: e.margin_pct,
+    incentive_mode: e.incentive_mode, incentive_value: e.incentive_value, program_on: program === null ? await programOn() : program,
+    buffer_pct: e.buffer_pct,
+  });
+  return { ...b, margin_pct: e.margin_pct, buffer_pct: e.buffer_pct, fx_rate: Number(s.pricing_fx_rate) };
+}
+
 /**
  * D-300 (point 12): the FOB cost in ₹ per the product's unit (per CBM for 50 mm and above) from one
  * supplier-price row — supplier price + CHA and transport per unit, + packing and loading when the
@@ -339,7 +363,7 @@ async function fobParts(product, supplier, basis, mm, s = null, gridRules = null
   s = s || (await settings());
   if ((supplier.price_basis || '') === 'grid') {
     const r = gridRules || (await thicknessPrices.rules(product, s));
-    return thicknessPrices.cost(r, await thicknessPrices.typedFor(Number(supplier.id)), supplier, product, basis, mm);
+    return thicknessPrices.cost(r, await thicknessPrices.storedFor(Number(supplier.id)), supplier, product, basis, mm);
   }
   const base = productService.effectiveFobForSupplier(supplier, product);
   if (base === null || base === undefined) return null;
@@ -569,5 +593,5 @@ function readLadderForm(post, levelsById) {
 module.exports = {
   exactPrice, comboText, readiness,
   DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, cbmSupplier, staleness, priceDate,
-  forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm, fobParts,
+  forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm, fobParts, effectiveFor, buildFromFob,
 };

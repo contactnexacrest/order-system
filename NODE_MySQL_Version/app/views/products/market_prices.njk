@@ -3,13 +3,14 @@
   prices only (₹), dated, with history. No selling prices, margins or floors are on this page.
   D-300 (point 12, 11 Nov 2026): one supplier price holds every thickness (grid), packing and loading,
   and CHA + transport per container. D-303 (point 15): the supplier is picked from the Suppliers directory.
-  Port of views/products/market_prices.php.
+  D-335 (12 Nov 2026): one price card per supplier price for every thickness (typed / calculated / no price,
+  the base) and "Add / update a price". Port of views/products/market_prices.php.
 #}
 {% set unitName = product.reference_unit or 'unit' %}
 <div class="card page-wide">
   <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
   <h1>Market Prices — {{ product.name }}</h1>
-  <p class="muted">Supplier prices for this product (₹), newest first, with the ones <strong>used for pricing</strong> on top.{% if rules.grid %} One price holds <strong>every thickness</strong>: type what the supplier quoted; the rest is worked out by the category's price rules.{% endif %} An <strong>exact price for a special combination</strong> (e.g. "30 mm · Leather") is used as it is for the options it names. Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
+  <p class="muted">Supplier prices for this product (₹), newest first, with the ones <strong>used for pricing</strong> on top.{% if rules.grid %} One price card per supplier holds <strong>every thickness</strong>. A price you <strong>typed</strong> always wins — no rule changes it; the <strong>base</strong> you chose (◉) is what the product's price and order lines without a thickness use; the price rules only <strong>work out</strong> the thicknesses you tick while adding a price.{% endif %} An <strong>exact price for a special combination</strong> (e.g. "30 mm · Leather") is used as it is for the options it names. Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
   {% if rules.grid %}<p class="small muted">Rules for {{ rules.category_name }}{% if rules.own.length %} <span class="badge badge-warning">own rule</span>{% endif %}: {{ rulesSummary }}{% if canChangeRules and rules.category_id %} <a class="btn-sm" href="/products/categories/{{ rules.category_id }}?tab=rules">Change these rules</a>{% endif %}</p>{% endif %}
 
   <table class="list">
@@ -23,10 +24,11 @@
         <td>{{ r.supplier_name }}{% if not r.supplier_id %} <span class="badge badge-warning" title="Typed before the Suppliers directory link — link it on Link suppliers">not linked</span>{% endif %}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
         <td>{% if isCombo %}<span class="badge badge-purple">Exact: {{ r.combo_text }}</span> <small class="muted">per {{ 'CBM' if r.combo_per == 'cbm' else unitName }}</small>{% elif isGrid %}every thickness{% elif isCbm %}<span class="badge">CBM — thick stone</span>{% else %}{{ unitName }}{% endif %}</td>
         <td class="num">
-          {% if isGrid and r.grid_list.length %}
-            {% for v in r.grid_list %}<span class="nowrap">{{ pricingFmt.thicknessLabel(v.mm, rules.cbm_from) }}: {{ v.price | money }} <small class="muted">{{ '/CBM' if v.mm == 0 else '/m²' }} · {{ 'typed' if v.how == 'typed' else 'calc.' }}</small></span><br>{% endfor %}
+          {% if isGrid and r.card %}
+            <span class="nowrap">Base: {{ r.card.base_label }} {% if r.card.base_price !== null %}{{ r.card.base_price | money }} <small class="muted">/{{ r.card.base_unit }}</small>{% else %}<small class="muted">no price</small>{% endif %}</span>
+            <br><a class="small" href="#price-card-{{ r.id }}">every thickness ↓</a>
           {% else %}
-            {{ 'To Be Confirmed' if r.effective_fob == null else (r.effective_fob | money) }}{% if r.fob_source == 'computed' %}<br><small class="muted">worked out from cost components</small>{% endif %}
+            {{ 'To Be Confirmed' if r.effective_fob == null else (r.effective_fob | money) }}
           {% endif %}
           {% if r.includes_packing_loading == 0 %}<br><small class="muted">packing and loading not included</small>{% endif %}
         </td>
@@ -47,8 +49,14 @@
     {% endfor %}
   </table>
 
+  {# D-335: one price card per supplier price for every thickness. #}
+  {% for r in rows %}{% if r.card %}
+    {% set pcRow = r %}{% set card = r.card %}{% set av = r.addView %}{% set pcReturn = '' %}
+    {% include "products/_price_card.njk" %}
+  {% endif %}{% endfor %}
+
   {% if canRecord %}
-    <h2 id="add-price">Add a price</h2>
+    <h2 id="add-price">Add a price{% if rules.grid %} from another supplier{% endif %}</h2>
     {% if prefill and prefill.purchase_quote_id %}<p class="small muted">Filled in from the supplier quote — check the price and add it.</p>{% endif %}
     <form method="post" action="/products/{{ product.id }}/market-prices" class="field-grid">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -69,8 +77,9 @@
         </select>
         <small class="muted">Kept only for special combinations, e.g. "30 mm · Leather" quoted as one exact price{% if rules.grid %}; ordinary thickness prices always go in the grid{% endif %}.</small></label>
       {% if rules.grid %}
-        <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
-          {% include "products/_thickness_grid.njk" %}
+        <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>
+          {% set av = newAddView %}{% set afCard = null %}{% set afDate = '' %}
+          {% include "products/_price_add.njk" %}
         </fieldset>
         <label data-show-when="price_basis=combo">Exact price (₹) *<input type="text" inputmode="decimal" name="price_inr" data-max-decimals="2" data-max-value="999999999999.99" data-required-when="price_basis=combo" placeholder="e.g. 4900.00" value="{{ prefill.price_inr if (prefill and prefill.price_inr) else '' }}" disabled></label>
       {% else %}

@@ -2,7 +2,8 @@
   Owner decision D-300 (point 12, 11 Nov 2026): one supplier price — every thickness (TYPED or CALCULATED,
   "↺ use calculated", recalculated on screen), packing and loading, CHA + transport per container, what goes
   into the FOB cost, and the price history (who, when, old → new). D-303: the supplier from the directory.
-  Port of views/products/supplier_price_edit.php.
+  D-335 (12 Nov 2026): the thickness prices are shown as the price card (typed / calculated / no price,
+  the base) with "+ Add / update a price". Port of views/products/supplier_price_edit.php.
 #}
 {% set unitName = product.reference_unit or 'unit' %}
 {% set ro = '' if canRecord else ' disabled' %}
@@ -16,9 +17,7 @@
     <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ row.quoted_on or row.updated_on }}"{{ ro }}></label>
     <label>Valid until<input type="date" name="valid_until" value="{{ row.valid_until or '' }}"{{ ro }}></label>
     {% if gridView %}
-      <fieldset class="full"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
-        {% include "products/_thickness_grid.njk" %}
-      </fieldset>
+      <p class="full small muted">The prices of every thickness are in the price card below ("+ Add / update a price"). This form changes the supplier, the dates, packing and loading, CHA + transport and the notes.</p>
     {% else %}
       <label>Price (₹) per {{ 'CBM' if (row.price_basis == 'cbm' or row.combo_per == 'cbm') else unitName }} *<input type="text" inputmode="decimal" name="price_inr" required data-max-decimals="2" data-max-value="999999999999.99" value="{{ row.fob_value }}" placeholder="e.g. 80000.00"{{ ro }}></label>
     {% endif %}
@@ -26,6 +25,11 @@
     <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"{{ ro }}>{{ row.notes or '' }}</textarea></label>
     {% if canRecord %}<div><button type="submit" class="btn-sm btn-accent">Save price</button></div>{% endif %}
   </form>
+
+  {% if card %}
+    {% set pcRow = row %}{% set av = addView %}{% set pcReturn = 'edit' %}
+    {% include "products/_price_card.njk" %}
+  {% endif %}
 
   {% if fob %}
     <h2>What goes into the cost per {{ (fob.unit | unitLabel) or unitName }} <small class="muted">({{ fobMmLabel }})</small></h2>
@@ -38,7 +42,7 @@
     <p class="small muted">The selling price is then worked out from the FOB cost as usual.{% if fob.note %} {{ fob.note }}{% endif %}</p>
   {% endif %}
 
-  <h2>Price history</h2>
+  <h2 id="history">Price history</h2>
   <table class="list">
     <tr><th>When</th><th>Who</th><th>What</th><th>Old</th><th>New</th></tr>
     {% for h in history %}

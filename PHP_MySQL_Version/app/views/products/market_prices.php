@@ -10,7 +10,9 @@ use App\Services\ThicknessPrices;
  *
  * D-300 (point 12, 11 Nov 2026): one supplier price holds every thickness (grid),
  * packing and loading, and CHA + transport per container. D-303 (point 15): the
- * supplier is picked from the Suppliers directory. Node twin: market_prices.njk.
+ * supplier is picked from the Suppliers directory. D-335 (12 Nov 2026): one price card per
+ * supplier price for every thickness (typed / calculated / no price, the base) and
+ * "Add / update a price". Node twin: market_prices.njk.
  */
 $__today = date('Y-m-d');
 $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
@@ -18,7 +20,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
 <div class="card page-wide">
   <p class="muted small"><a href="/products/<?= (int) $product['id'] ?>">&larr; Back to <?= View::e($product['name']) ?></a></p>
   <h1>Market Prices — <?= View::e($product['name']) ?></h1>
-  <p class="muted">Supplier prices for this product (₹), newest first, with the ones <strong>used for pricing</strong> on top.<?php if ($rules['grid']): ?> One price holds <strong>every thickness</strong>: type what the supplier quoted; the rest is worked out by the category's price rules.<?php endif; ?> An <strong>exact price for a special combination</strong> (e.g. "30 mm · Leather") is used as it is for the options it names. Record a new price as a new row so the history stays; a price older than <?= (int) $staleDays ?> days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
+  <p class="muted">Supplier prices for this product (₹), newest first, with the ones <strong>used for pricing</strong> on top.<?php if ($rules['grid']): ?> One price card per supplier holds <strong>every thickness</strong>. A price you <strong>typed</strong> always wins — no rule changes it; the <strong>base</strong> you chose (◉) is what the product's price and order lines without a thickness use; the price rules only <strong>work out</strong> the thicknesses you tick while adding a price.<?php endif; ?> An <strong>exact price for a special combination</strong> (e.g. "30 mm · Leather") is used as it is for the options it names. Record a new price as a new row so the history stays; a price older than <?= (int) $staleDays ?> days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
   <?php if ($rules['grid']): ?><p class="small muted">Rules for <?= View::e((string) $rules['category_name']) ?><?= $rules['own'] !== [] ? ' <span class="badge badge-warning">own rule</span>' : '' ?>: <?= View::e(\App\Services\PriceRules::summary($rules)) ?><?php if ($canChangeRules && $rules['category_id'] !== null): ?> <a class="btn-sm" href="/products/categories/<?= (int) $rules['category_id'] ?>?tab=rules">Change these rules</a><?php endif; ?></p><?php endif; ?>
 
   <table class="list">
@@ -33,12 +35,11 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         <td><?php if ($__combo): ?><span class="badge badge-purple">Exact: <?= View::e((string) $r['combo_text']) ?></span> <small class="muted">per <?= ($r['combo_per'] ?? 'unit') === 'cbm' ? 'CBM' : View::e($__unit) ?></small>
           <?php elseif ($__gridRow): ?>every thickness<?php else: ?><?= $__cbm ? '<span class="badge">CBM — thick stone</span>' : View::e($__unit) ?><?php endif; ?></td>
         <td class="num">
-          <?php if ($__gridRow && $r['grid'] !== null && $r['grid']['ok']): ?>
-            <?php foreach ($r['grid']['values'] as $__mm => $__v): ?>
-              <span class="nowrap"><?= View::e(ThicknessPrices::label((int) $__mm, (int) $rules['cbm_from'])) ?>: <?= number_format((float) $__v['price'], 2) ?> <small class="muted"><?= (int) $__mm === ThicknessPrices::CBM ? '/CBM' : '/m²' ?> · <?= $__v['how'] === 'typed' ? 'typed' : 'calc.' ?></small></span><br>
-            <?php endforeach; ?>
+          <?php if ($__gridRow && $r['card'] !== null): ?>
+            <span class="nowrap">Base: <?= View::e($r['card']['base_label']) ?> <?= $r['card']['base_price'] !== null ? number_format((float) $r['card']['base_price'], 2) . ' <small class="muted">/' . View::e($r['card']['base_unit']) . '</small>' : '<small class="muted">no price</small>' ?></span>
+            <br><a class="small" href="#price-card-<?= (int) $r['id'] ?>">every thickness ↓</a>
           <?php else: ?>
-            <?= $r['effective_fob'] === null ? 'To Be Confirmed' : number_format((float) $r['effective_fob'], 2) ?><?= $r['fob_source'] === 'computed' ? '<br><small class="muted">worked out from cost components</small>' : '' ?>
+            <?= $r['effective_fob'] === null ? 'To Be Confirmed' : number_format((float) $r['effective_fob'], 2) ?>
           <?php endif; ?>
           <?= empty($r['includes_packing_loading']) ? '<br><small class="muted">packing and loading not included</small>' : '' ?>
         </td>
@@ -59,8 +60,13 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
     <?php endforeach; ?>
   </table>
 
+  <?php // D-335: one price card per supplier price for every thickness. ?>
+  <?php foreach ($rows as $r): if ($r['card'] === null) { continue; } $__pc = ['row' => $r, 'card' => $r['card'], 'grid' => $r['grid'], 'returnTo' => '']; ?>
+    <?php include __DIR__ . '/_price_card.php'; ?>
+  <?php endforeach; ?>
+
   <?php if ($canRecord): ?>
-    <h2 id="add-price">Add a price</h2>
+    <h2 id="add-price">Add a price<?= $rules['grid'] ? ' from another supplier' : '' ?></h2>
     <?php $__pf = $prefill ?? null; ?>
     <?php if (($__pf['purchase_quote_id'] ?? null) !== null): ?><p class="small muted">Filled in from the supplier quote — check the price and add it.</p><?php endif; ?>
     <form method="post" action="/products/<?= (int) $product['id'] ?>/market-prices" class="field-grid">
@@ -81,8 +87,8 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         </select>
         <small class="muted">Kept only for special combinations, e.g. "30 mm · Leather" quoted as one exact price<?= $rules['grid'] ? '; ordinary thickness prices always go in the grid' : '' ?>.</small></label>
       <?php if ($rules['grid']): ?>
-        <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
-          <?php $__grid = null; include __DIR__ . '/_thickness_grid.php'; ?>
+        <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>
+          <?php $__af = ['grid' => null, 'card' => null, 'dateField' => '']; include __DIR__ . '/_price_add.php'; ?>
         </fieldset>
         <label data-show-when="price_basis=combo">Exact price (₹) *<input type="text" inputmode="decimal" name="price_inr" data-max-decimals="2" data-max-value="999999999999.99" data-required-when="price_basis=combo" placeholder="e.g. 4900.00" value="<?= View::e($__pf['price_inr'] ?? '') ?>" disabled></label>
       <?php else: ?>

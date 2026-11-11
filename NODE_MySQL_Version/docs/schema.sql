@@ -6477,7 +6477,7 @@ CREATE TABLE catalog_supplier_thickness_prices (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   product_supplier_id BIGINT UNSIGNED NOT NULL,
   thickness_mm        INT NOT NULL,              -- 0 = 50 mm and above (per CBM); otherwise per m²
-  price_inr           DECIMAL(14,2) NOT NULL,    -- a TYPED price; CALCULATED ones are never stored
+  price_inr           DECIMAL(14,2) NOT NULL,    -- a TYPED price, or (D-335) one CALCULATED when the user ticked it (see how / calc_from_mm below)
   updated_by          BIGINT UNSIGNED NULL,
   updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_supplier_thickness (product_supplier_id, thickness_mm),
@@ -6544,3 +6544,18 @@ CREATE TABLE IF NOT EXISTS setup_checklist_ticks (
   note       VARCHAR(300) NULL,
   CONSTRAINT fk_setup_checklist_ticks_user FOREIGN KEY (ticked_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ================================================================
+-- Owner decision D-335 (12 Nov 2026; migration 2026-11-12b): a price the user TYPED
+-- always wins; each supplier price for every thickness has a BASE the user chose
+-- (base_thickness_mm: 0 = 50 mm and above per CBM; NULL = the category's base
+-- thickness); the price rules are only a calculator — a thickness the user ticks
+-- while adding a price is stored as CALCULATED (how, calc_from_mm) and can be
+-- typed over; nothing is recalculated in the background. auto_fill = 1 keeps the
+-- old on-the-fly completion of missing thicknesses for rows saved before D-335;
+-- the app sets it to 0 the first time a price is added with the new form.
+ALTER TABLE catalog_supplier_thickness_prices ADD COLUMN how ENUM('typed','calculated') NOT NULL DEFAULT 'typed';
+ALTER TABLE catalog_supplier_thickness_prices ADD COLUMN calc_from_mm INT NULL;   -- CALCULATED: worked out from this thickness's price (0 = 50 mm and above)
+ALTER TABLE catalog_supplier_thickness_prices ADD COLUMN quoted_on DATE NULL;     -- TYPED: the date the supplier quoted it
+ALTER TABLE catalog_product_suppliers ADD COLUMN base_thickness_mm INT NULL;      -- grid: the BASE price for orders (0 = 50 mm and above per CBM; NULL = category base)
+ALTER TABLE catalog_product_suppliers ADD COLUMN auto_fill TINYINT(1) NOT NULL DEFAULT 1;

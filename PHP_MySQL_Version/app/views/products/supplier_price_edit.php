@@ -8,6 +8,8 @@ use App\Services\ThicknessPrices;
  * (TYPED or CALCULATED, "↺ use calculated", recalculated on screen), packing and
  * loading, CHA + transport per container, what goes into the FOB cost, and the price
  * history (who, when, old → new). D-303: the supplier from the Suppliers directory.
+ * D-335 (12 Nov 2026): the thickness prices are shown as the price card (typed / calculated /
+ * no price, the base) with "+ Add / update a price".
  * Node twin: views/products/supplier_price_edit.njk.
  */
 $__today = date('Y-m-d');
@@ -23,9 +25,7 @@ $__ro = $canRecord ? '' : ' disabled';
     <label>Quoted on *<input type="date" name="quoted_on" required max="<?= $__today ?>" value="<?= View::e((string) ($row['quoted_on'] ?? substr((string) $row['updated_at'], 0, 10))) ?>"<?= $__ro ?>></label>
     <label>Valid until<input type="date" name="valid_until" value="<?= View::e((string) ($row['valid_until'] ?? '')) ?>"<?= $__ro ?>></label>
     <?php if ($grid !== null): ?>
-      <fieldset class="full"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
-        <?php $__grid = $grid; include __DIR__ . '/_thickness_grid.php'; ?>
-      </fieldset>
+      <p class="full small muted">The prices of every thickness are in the price card below ("+ Add / update a price"). This form changes the supplier, the dates, packing and loading, CHA + transport and the notes.</p>
     <?php else: ?>
       <label>Price (₹) per <?= View::e(($row['price_basis'] ?? '') === 'cbm' || ($row['combo_per'] ?? '') === 'cbm' ? 'CBM' : $__unit) ?> *<input type="text" inputmode="decimal" name="price_inr" required data-max-decimals="2" data-max-value="999999999999.99" value="<?= View::e((string) $row['fob_value']) ?>" placeholder="e.g. 80000.00"<?= $__ro ?>></label>
     <?php endif; ?>
@@ -33,6 +33,10 @@ $__ro = $canRecord ? '' : ' disabled';
     <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"<?= $__ro ?>><?= View::e((string) ($row['notes'] ?? '')) ?></textarea></label>
     <?php if ($canRecord): ?><div><button type="submit" class="btn-sm btn-accent">Save price</button></div><?php endif; ?>
   </form>
+
+  <?php if ($card !== null): $__pc = ['row' => $row, 'card' => $card, 'grid' => $grid, 'returnTo' => 'edit']; ?>
+    <?php include __DIR__ . '/_price_card.php'; ?>
+  <?php endif; ?>
 
   <?php if ($fob !== null): ?>
     <h2>What goes into the cost per <?= View::e(\App\Services\LineUnits::label((string) $fob['unit']) ?: $__unit) ?> <small class="muted">(<?= $fob['mm'] !== null ? View::e(ThicknessPrices::fmt((float) $fob['mm'])) . ' mm' : 'base' ?>)</small></h2>
@@ -45,7 +49,7 @@ $__ro = $canRecord ? '' : ' disabled';
     <p class="small muted">The selling price is then worked out from the FOB cost as usual.<?= $fob['note'] !== null ? ' ' . View::e((string) $fob['note']) : '' ?></p>
   <?php endif; ?>
 
-  <h2>Price history</h2>
+  <h2 id="history">Price history</h2>
   <table class="list">
     <tr><th>When</th><th>Who</th><th>What</th><th>Old</th><th>New</th></tr>
     <?php foreach ($history as $h): ?>

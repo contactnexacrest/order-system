@@ -165,6 +165,31 @@ async function formExtras(req, product) {
     canManageHs: !!p.manage_hs_codes,
     canManagePricing: !!p.manage_pricing,
     categoryRules: category || {},
+    // D-335: "Costs to FOB" and the price rules in effect for this product (category's, or its own).
+    fobForm: await fobFormView(product, categoryId),
+  };
+}
+
+/** D-335: what "Costs to FOB" and "Price rules in effect for this product" show (same as PHP _form.php). */
+async function fobFormView(product, categoryId) {
+  const tp = require('../services/thicknessPrices');
+  const pr = await tp.rules(product || { id: 0, category_id: categoryId });
+  const has = (k) => !!product && product[k] !== null && product[k] !== undefined;
+  const chaV = has('cha_transport_per_container') ? Number(product.cha_transport_per_container) : null;
+  const fit = tp.chaPerCbm(chaV, Number(pr.container_cbm), pr.container_max_t, pr.t_per_cbm);
+  const fmt2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rows = [];
+  for (const r of pr.rows) {
+    if (Number(r.mm) === Number(pr.base_mm)) continue;
+    rows.push({ rule: `${r.mm} mm`, value: `${pr.base_mm} mm ${r.pct < 0 ? '−' : '+'} ${tp.fmt(Math.abs(r.pct))} %`, own: pr.own.includes(r.option) });
+  }
+  if (pr.k !== null && pr.k !== undefined) rows.push({ rule: `${pr.cbm_from} mm and above, per CBM`, value: `${pr.base_mm} mm price per m² × ${tp.fmt(pr.k)}`, own: has('thick_k_factor') });
+  rows.push({ rule: 'Container', value: `${tp.fmt(pr.container_cbm)} CBM · max ${tp.fmt(pr.container_max_t)} t`, own: has('container_cbm') || has('container_max_t') });
+  return {
+    chaHint: `÷ ${tp.fmt(Math.round(fit.fits_cbm * 100) / 100)} CBM per container${fit.per_cbm !== null ? ` = ₹${fmt2(fit.per_cbm)} per CBM` : ''}${fit.by_weight ? ' (the weight limit is reached first)' : ''}`,
+    packV: has('default_packing_cost') || has('default_loading_cost') ? (Number(product.default_packing_cost || 0) + Number(product.default_loading_cost || 0)).toFixed(2) : '',
+    rows, hasOwn: has('thick_k_factor') || has('container_cbm') || has('container_max_t'),
+    cbmFrom: pr.cbm_from, baseMm: pr.base_mm,
   };
 }
 
@@ -172,10 +197,18 @@ async function formExtras(req, product) {
 function readPriceRuleFields(req) {
   const body = req.body || {};
   const out = {};
-  const spec = { cha_transport_per_container: ['CHA + transport per container (₹)', 0, 9999999999, 2] };
-  if ((req.permissions || {}).manage_pricing) {
+  let spec = { cha_transport_per_container: ['CHA + transport per container (₹)', 0, 9999999999, 2] };
+  // D-335: "Use own rules for this product" switched off = the category's rules (own values cleared).
+  if ((req.permissions || {}).manage_pricing && body.own_rules_shown && !body.own_rules) {
+    Object.assign(out, { thick_k_factor: null, container_cbm: null, container_max_t: null });
+    spec = { cha_transport_per_container: spec.cha_transport_per_container };
+  } else if ((req.permissions || {}).manage_pricing) {
     Object.assign(spec, { thick_k_factor: ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], container_cbm: ['Container holds (CBM)', 0.5, 100, 2],
       container_max_t: ['Container maximum (tonnes)', 1, 100, 2] });
+  }
+  const packing = String(body.packing_loading_cost ?? '').trim();
+  if (packing !== '' && !/^\d{1,10}(\.\d{1,2})?$/.test(packing)) {
+    return [{}, 'Packing + loading per unit (₹): enter a number with at most 2 decimals, or leave it empty.'];
   }
   for (const [key, [lbl, min, max, dec]] of Object.entries(spec)) {
     if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
@@ -355,7 +388,7 @@ async function update(req, res) {
     return;
   }
 
-  const data = readProductForm(req);
+  const data = readProductForm(req, product);
   const [ruleFields, ruleError] = readPriceRuleFields(req);
   const error = validateProduct(data) || (await hsMasterError(req, data.hs_code)) || (await applySellingUnit(req, data)) || ruleError;
   if (error) {
@@ -603,18 +636,27 @@ async function deleteMiscCharge(req, res) {
   res.redirect(`/products/${productId}`);
 }
 
-function readProductForm(req) {
+/**
+ * D-335: the form no longer has the default factory / transportation / CHA cost (the columns stay,
+ * kept as they are); "Packing + loading per unit" is stored in default_packing_cost (default_loading_cost
+ * then empty — the two are still added up where they are read).
+ */
+function readProductForm(req, existing = null) {
+  const b = req.body || {};
+  const inBody = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const keep = (k) => (existing && existing[k] !== null && existing[k] !== undefined ? Number(existing[k]) : null);
+  const hasPacking = inBody('packing_loading_cost');
   return {
-    name: String(req.body.name || '').trim(),
-    specifications: String(req.body.specifications || '').trim(),
-    hs_code: String(req.body.hs_code || '').trim(),
-    origin: nullableString(req.body.origin),
-    default_factory_cost: nullableDecimal(req.body.default_factory_cost),
-    default_transportation_cost: nullableDecimal(req.body.default_transportation_cost),
-    default_packing_cost: nullableDecimal(req.body.default_packing_cost),
-    default_loading_cost: nullableDecimal(req.body.default_loading_cost),
-    default_cha_cost: nullableDecimal(req.body.default_cha_cost),
-    is_active: req.body.is_active !== undefined ? 1 : 0,
+    name: String(b.name || '').trim(),
+    specifications: String(b.specifications || '').trim(),
+    hs_code: String(b.hs_code || '').trim(),
+    origin: nullableString(b.origin),
+    default_factory_cost: inBody('default_factory_cost') ? nullableDecimal(b.default_factory_cost) : keep('default_factory_cost'),
+    default_transportation_cost: inBody('default_transportation_cost') ? nullableDecimal(b.default_transportation_cost) : keep('default_transportation_cost'),
+    default_packing_cost: hasPacking ? nullableDecimal(b.packing_loading_cost) : (inBody('default_packing_cost') ? nullableDecimal(b.default_packing_cost) : keep('default_packing_cost')),
+    default_loading_cost: hasPacking ? null : (inBody('default_loading_cost') ? nullableDecimal(b.default_loading_cost) : keep('default_loading_cost')),
+    default_cha_cost: inBody('default_cha_cost') ? nullableDecimal(b.default_cha_cost) : keep('default_cha_cost'),
+    is_active: b.is_active !== undefined ? 1 : 0,
   };
 }
 
