@@ -297,7 +297,29 @@ final class ProductController
         if ($canTry) {
             $__offered = \App\Services\ProductSpecs::offered($details['product']);
             $__sel = is_array($_GET['try'] ?? null) ? array_map('strval', $_GET['try']) : [];
-            $tryPrice = ['offered' => $__offered, 'p' => $__offered !== [] ? \App\Services\PricingService::forProduct($details['product'], null, null, null, $__sel) : null];
+            // The Thickness select starts on "Supplier's base price": no thickness chosen, so the
+            // supplier row's own BASE is priced (D-335) — the same figure as the product list.
+            $__thick = null;
+            foreach ($__offered as $__sp) {
+                if ($__sp['kind'] === 'thickness') {
+                    $__thick = (int) $__sp['id'];
+                    break;
+                }
+            }
+            $__baseLabel = null;
+            if ($__thick !== null) {
+                if (($__sel[$__thick] ?? $__sel[(string) $__thick] ?? '') === '') {
+                    $__sel[$__thick] = \App\Services\ProductSpecs::SUPPLIER_BASE;
+                }
+                $__ps = \App\Services\PricingService::pricingSupplier((int) $details['product']['id']);
+                if ($__ps !== null && ($__ps['price_basis'] ?? '') === 'grid') {
+                    $__rules = \App\Services\ThicknessPrices::rules($details['product']);
+                    $__baseLabel = \App\Services\ThicknessPrices::label(\App\Services\ThicknessPrices::baseOf($__ps, $__rules), (int) $__rules['cbm_from']);
+                }
+            }
+            $tryPrice = ['offered' => $__offered, 'thickSpec' => $__thick,
+                'baseOption' => 'Supplier\'s base price' . ($__baseLabel !== null ? ' (' . $__baseLabel . ')' : ''),
+                'p' => $__offered !== [] ? \App\Services\PricingService::forProduct($details['product'], null, null, null, $__sel) : null];
         }
 
         $usage = ProductRepository::usage($id);

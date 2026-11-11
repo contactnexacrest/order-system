@@ -3385,7 +3385,7 @@ A supplier price is **expired** after its `valid_until` date, and **stale** when
 
 #### Pricing ready? and Try a price (D-256)
 
-`PricingService::readiness()` lists what a product still needs: supplier price per unit used for pricing; per-CBM price if it is sold at the CBM threshold or above; specifications; prices current; exact prices current; open to associates. The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only).
+`PricingService::readiness()` lists what a product still needs: supplier price per unit used for pricing; per-CBM price if it is sold at the CBM threshold or above; specifications; prices current; exact prices current; open to associates. The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only). Its Thickness select starts on **"Supplier's base price (<base, e.g. 50 mm and above>)"** (empty value): the thickness is left out of the selection (`ProductSpecs::SUPPLIER_BASE`), so the supplier row's own BASE is priced (D-335) and the figure equals the product list and build-up; choosing a thickness prices that thickness. The selected option is always the one priced.
 
 #### Products and pricing, 11 Nov 2026 (D-300 to D-306)
 

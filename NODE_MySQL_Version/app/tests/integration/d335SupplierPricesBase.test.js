@@ -192,6 +192,39 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     expect(Number((await productSupplierRepository.find(Number(row.id))).base_thickness_mm)).toBe(20);
   });
 
+  it('owner bug: "Try a price" starts on the supplier\'s base; an explicit thickness prices that thickness', async () => {
+    const productId = await product();
+    const sup = await directorySupplier('D335 Try');
+    const agent = await login(admin);
+    const url = `/products/${productId}/market-prices`;
+    await post(agent, url, url, {
+      supplier_id: String(sup.id), supplier_name: sup.supplier_legal_name, location: 'Test town', quoted_on: '2026-11-11', valid_until: '',
+      price_basis: 'grid', thickness_mm: '0', thickness_price: '180000', includes_packing_loading: '1', cha_transport_per_container: '',
+      used_for_pricing: '1', notes: '',
+    });
+    const row = await gridRow(productId);
+    await post(agent, url, `/products/suppliers/${row.id}/thickness-price`, {
+      thickness_mm: '20', thickness_price: '4600.00', price_quoted_on: '2026-11-11', base: 'keep',
+    });
+    const productSpecs = require('../../src/services/productSpecs');
+    const thick = (await productSpecs.offered(await productRepository.find(productId))).find((sp) => sp.kind === 'thickness');
+    expect(thick).toBeTruthy();
+    const mm20 = thick.options.find((o) => Number(o.thickness_mm) === 20).id;
+
+    const tryPart = (html) => html.replace(/&#39;/g, "'").slice(html.replace(/&#39;/g, "'").indexOf('id="try-price"'));
+    let t = tryPart((await agent.get(`/products/${productId}`)).text);
+    expect(t).toContain('<option value="" selected>Supplier\'s base price (50 mm and above)</option>');
+    expect(t).not.toContain(`<option value="${mm20}" selected>`);
+    expect(t).toContain('Supplier price &#8377;189,756.10');
+    expect(t).toContain('cost USD 1,997.43');
+    expect(t).toContain('Per CBM, FOB, USD.');
+
+    t = tryPart((await agent.get(`/products/${productId}?try[${thick.id}]=${mm20}`)).text);
+    expect(t).toContain(`<option value="${mm20}" selected>`);
+    expect(t).not.toContain('<option value="" selected>');
+    expect(t).toContain('Supplier price &#8377;239,756.10');
+  });
+
   it('a row saved before D-335 keeps what it showed when switched to stored prices', async () => {
     const productId = await product();
     const sup = await directorySupplier('D335 Old');

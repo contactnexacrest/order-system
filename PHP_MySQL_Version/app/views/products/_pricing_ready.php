@@ -37,8 +37,12 @@ if ($readiness === null && $tryPrice === null) {
     <?php foreach ($tryPrice['offered'] as $__sp): ?>
       <label><?= View::e($__sp['name']) ?>
         <select name="try[<?= (int) $__sp['id'] ?>]">
+          <?php $__chosen = isset($__p['spec']['map'][$__sp['id']]) ? (int) $__p['spec']['map'][$__sp['id']] : null; ?>
+          <?php if ((int) $__sp['id'] === $tryPrice['thickSpec']): ?>
+            <option value=""<?= $__chosen === null ? ' selected' : '' ?>><?= View::e($tryPrice['baseOption']) ?></option>
+          <?php endif; ?>
           <?php foreach ($__sp['options'] as $__o): ?>
-            <option value="<?= (int) $__o['id'] ?>"<?= (($__p['spec']['map'][$__sp['id']] ?? null) === $__o['id']) ? ' selected' : '' ?>><?= View::e($__o['name']) ?> — <?= View::e($__o['change_type'] === 'none' ? 'base' : \App\Services\ProductSpecs::changeLabel((string) $__o['change_type'], $__o['value'] !== null ? (float) $__o['value'] : null)) ?></option>
+            <option value="<?= (int) $__o['id'] ?>"<?= $__chosen === (int) $__o['id'] ? ' selected' : '' ?>><?= View::e($__o['name']) ?> — <?= View::e($__o['change_type'] === 'none' ? 'base' : \App\Services\ProductSpecs::changeLabel((string) $__o['change_type'], $__o['value'] !== null ? (float) $__o['value'] : null)) ?></option>
           <?php endforeach; ?>
         </select></label>
     <?php endforeach; ?>

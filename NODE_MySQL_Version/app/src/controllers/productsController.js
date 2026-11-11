@@ -333,12 +333,29 @@ async function show(req, res) {
       const m = /^try\[(\d+)\]$/.exec(k);
       if (m) sel[m[1]] = String(v);
     }
+    // The Thickness select starts on "Supplier's base price": no thickness chosen, so the
+    // supplier row's own BASE is priced (D-335) — the same figure as the product list.
+    const thickSpec = offered.find((sp) => sp.kind === 'thickness');
+    const thick = thickSpec ? Number(thickSpec.id) : null;
+    let baseLabel = null;
+    if (thick !== null) {
+      if ((sel[thick] ?? '') === '') sel[thick] = productSpecs.SUPPLIER_BASE;
+      const ps = await pricingService.pricingSupplier(Number(details.product.id));
+      if (ps !== null && (ps.price_basis || '') === 'grid') {
+        const thicknessPrices = require('../services/thicknessPrices');
+        const r = await thicknessPrices.rules(details.product);
+        baseLabel = thicknessPrices.label(thicknessPrices.baseOf(ps, r), Number(r.cbm_from));
+      }
+    }
+    const baseOption = `Supplier's base price${baseLabel !== null ? ` (${baseLabel})` : ''}`;
     const p = offered.length ? await pricingService.forProduct(details.product, null, null, null, sel) : null;
     if (p !== null) {
       const map = p.spec ? p.spec.map : {};
       const specs = offered.map((sp) => ({
         id: sp.id, name: sp.name,
-        options: sp.options.map((o) => ({ id: o.id, name: o.name, selected: map[sp.id] !== undefined && Number(map[sp.id]) === o.id,
+        baseOption: Number(sp.id) === thick ? baseOption : null,
+        baseSelected: map[sp.id] === undefined,
+        options: sp.options.map((o) => ({ id: o.id, name: o.name, selected: map[sp.id] !== undefined && Number(map[sp.id]) === Number(o.id),
           change: o.change_type === 'none' ? 'base' : productSpecs.changeLabel(String(o.change_type), o.value !== null ? Number(o.value) : null) })),
       }));
       let opts = [];

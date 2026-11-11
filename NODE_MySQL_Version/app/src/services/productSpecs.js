@@ -158,6 +158,9 @@ async function offered(product) {
  * Checks a choice of options against what the product offers. A specification left
  * out takes its base option (or its first option). Returns [map spec id => option id, errors].
  */
+/** Selection value meaning "no thickness chosen — price the supplier's BASE" (Try a price). */
+const SUPPLIER_BASE = 'base';
+
 function normalize(offeredSpecs, raw) {
   const map = {};
   const errors = [];
@@ -165,7 +168,10 @@ function normalize(offeredSpecs, raw) {
   for (const s of offeredSpecs) {
     const sid = s.id;
     const chosen = raw[sid] ?? raw[String(sid)] ?? null;
-    if (chosen === null || chosen === '') {
+    // "Try a price": the supplier's base price — the thickness is left out, so the
+    // supplier row's own BASE is priced (D-335), not the category's base option.
+    if (chosen === SUPPLIER_BASE && s.kind === 'thickness') continue;
+    if (chosen === null || chosen === '' || chosen === SUPPLIER_BASE) {
       const base = s.options.find((o) => o.is_base);
       map[sid] = base ? base.id : s.options[0].id;
       continue;
@@ -346,6 +352,6 @@ function readOptionForm(post) {
 }
 
 module.exports = {
-  FORMS, CHANGE_TYPES, KINDS, RM_UNITS, UNIT_TYPES, validInt, categoryIdFor, productForms, splitForms, formsLabel, appliesTo, tree, offered,
+  FORMS, CHANGE_TYPES, SUPPLIER_BASE, KINDS, RM_UNITS, UNIT_TYPES, validInt, categoryIdFor, productForms, splitForms, formsLabel, appliesTo, tree, offered,
   normalize, describe, adjustments, changeLabel, readSpecForm, readOptionForm,
 };

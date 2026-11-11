@@ -44,6 +44,9 @@ final class ProductSpecs
         'cbm' => 'Priced per CBM',
     ];
 
+    /** Selection value meaning "no thickness chosen — price the supplier's BASE" (Try a price). */
+    public const SUPPLIER_BASE = 'base';
+
     public const KINDS = ['normal' => 'Normal', 'thickness' => 'Thickness (m² or CBM)', 'quantity' => 'Quantity (applied last)'];
 
     /** Units that count as "per running metre" for per-rm amounts. */
@@ -187,7 +190,12 @@ final class ProductSpecs
         foreach ($offered as $s) {
             $sid = $s['id'];
             $chosen = $raw[$sid] ?? $raw[(string) $sid] ?? null;
-            if ($chosen === null || $chosen === '') {
+            // "Try a price": the supplier's base price — the thickness is left out, so the
+            // supplier row's own BASE is priced (D-335), not the category's base option.
+            if ($chosen === self::SUPPLIER_BASE && $s['kind'] === 'thickness') {
+                continue;
+            }
+            if ($chosen === null || $chosen === '' || $chosen === self::SUPPLIER_BASE) {
                 $base = null;
                 foreach ($s['options'] as $o) {
                     if ($o['is_base']) {

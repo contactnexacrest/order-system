@@ -209,6 +209,48 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         self::assertSame(20, (int) ProductSupplierRepository::find((int) $row['id'])['base_thickness_mm']);
     }
 
+    /** Owner bug (11 Nov 2026): "Try a price" starts on the supplier's BASE, the same figure as the product list. */
+    public function testTryAPriceStartsOnTheSuppliersBaseAndAnExplicitThicknessPricesThatThickness(): void
+    {
+        $productId = $this->product();
+        $supId = SupplierRepository::create(['supplier_legal_name' => 'D335 Try ' . bin2hex(random_bytes(3)), 'city' => 'Test town', 'types' => []], $this->admin);
+        $sup = SupplierRepository::find($supId);
+        $this->actAs($this->admin);
+        $_POST = ['supplier_id' => (string) $sup['id'], 'supplier_name' => $sup['supplier_legal_name'], 'location' => 'Test town', 'quoted_on' => '2026-11-11', 'valid_until' => '',
+            'price_basis' => 'grid', 'thickness_mm' => '0', 'thickness_price' => '180000', 'includes_packing_loading' => '1', 'cha_transport_per_container' => '',
+            'used_for_pricing' => '1', 'notes' => ''];
+        $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $productId]));
+        $row = $this->gridRow($productId);
+        $_POST = ['thickness_mm' => '20', 'thickness_price' => '4600.00', 'price_quoted_on' => '2026-11-11', 'base' => 'keep'];
+        $this->render(fn () => (new PricingController())->addThicknessPrice(['supplierId' => (string) $row['id']]));
+        $_POST = [];
+        $thick = null;
+        foreach (\App\Services\ProductSpecs::offered(ProductRepository::find($productId)) as $sp) {
+            if ($sp['kind'] === 'thickness') {
+                $thick = $sp;
+            }
+        }
+        self::assertNotNull($thick, 'the product offers a Thickness');
+        $mm20 = array_values(array_filter($thick['options'], static fn ($o) => $o['thickness_mm'] === 20))[0]['id'];
+
+        // Default: the supplier's base (50 mm and above, per CBM) — 1,80,000 + CHA, as on the product list.
+        $page = $this->render(fn () => (new \App\Controllers\ProductController())->show(['id' => (string) $productId]));
+        $try = substr($page, (int) strpos($page, 'id="try-price"'));
+        self::assertStringContainsString('<option value="" selected>Supplier&#039;s base price (50 mm and above)</option>', $try);
+        self::assertStringNotContainsString('<option value="' . $mm20 . '" selected>', $try);
+        self::assertStringContainsString('Supplier price &#8377;189,756.10', $try);
+        self::assertStringContainsString('cost USD 1,997.43', $try);
+        self::assertStringContainsString('Per CBM, FOB, USD.', $try);
+
+        // An explicit 20 mm prices the 20 mm price (4,600 per m² = 2,30,000 per CBM) and shows it chosen.
+        $_GET = ['try' => [$thick['id'] => (string) $mm20]];
+        $page = $this->render(fn () => (new \App\Controllers\ProductController())->show(['id' => (string) $productId]));
+        $try = substr($page, (int) strpos($page, 'id="try-price"'));
+        self::assertStringContainsString('<option value="' . $mm20 . '" selected>', $try);
+        self::assertStringNotContainsString('<option value="" selected>', $try);
+        self::assertStringContainsString('Supplier price &#8377;239,756.10', $try);
+    }
+
     public function testARowSavedBeforeD335KeepsWhatItShowedWhenSwitchedToStoredPrices(): void
     {
         $productId = $this->product();

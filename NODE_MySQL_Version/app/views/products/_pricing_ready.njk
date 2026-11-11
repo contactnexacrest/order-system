@@ -28,6 +28,7 @@
     {% for sp in tryPrice.specs %}
       <label>{{ sp.name }}
         <select name="try[{{ sp.id }}]">
+          {% if sp.baseOption %}<option value=""{% if sp.baseSelected %} selected{% endif %}>{{ sp.baseOption }}</option>{% endif %}
           {% for o in sp.options %}<option value="{{ o.id }}"{% if o.selected %} selected{% endif %}>{{ o.name }} — {{ o.change }}</option>{% endfor %}
         </select></label>
     {% endfor %}
