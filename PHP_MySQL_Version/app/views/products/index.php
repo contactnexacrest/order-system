@@ -1,13 +1,23 @@
-<?php use App\Helpers\View; ?>
+<?php use App\Helpers\Csrf; use App\Helpers\View; ?>
 <div class="card page-wide">
   <h1>Product Catalog</h1>
-  <p class="muted">Internal reference only — specs, HS code, cost, and suppliers for staff to consult while preparing quotations manually. This catalog is completely independent of the order pipeline and is never shown to clients or buyers.</p>
+  <p class="muted">The company's products — specifications, HS code, costs and suppliers. Products are picked on order lines and used for price checks. The prices here are internal and are never shown to buyers; an associate sees only their own price list.</p>
 
   <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
     <input type="text" name="q" value="<?= View::e($query) ?>" placeholder="Search by name, HS code, or specification…" style="flex:1" aria-label="Search by name, HS code, or specification">
+    <?php if ($status !== 'active'): ?><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php endif; ?>
     <button type="submit" class="btn-sm">Search</button>
-    <?php if ($searched): ?><a class="btn-sm" href="/products">Clear</a><?php endif; ?>
+    <?php if ($searched): ?><a class="btn-sm" href="/products<?= $status !== 'active' ? '?status=' . View::e($status) : '' ?>">Clear</a><?php endif; ?>
   </form>
+  <?php // Owner (12 Nov 2026): Active · Inactive · All — on the full list and on a search. ?>
+  <?php if ($statusCounts !== null): ?>
+    <div class="filter-chip-row" aria-label="Show products by status">
+      <?php foreach (['active' => 'Active', 'inactive' => 'Inactive', 'all' => 'All'] as $__k => $__label): ?>
+        <a class="filter-chip<?= $status === $__k ? ' active' : '' ?>" href="/products?status=<?= $__k ?><?= $searched ? '&amp;q=' . View::e(rawurlencode($query)) : '' ?>"><?= $__label ?> (<?= (int) $statusCounts[$__k] ?>)</a>
+      <?php endforeach; ?>
+    </div>
+    <?php if ($status !== 'active'): ?><p class="muted small">An inactive product cannot be picked on new order lines. "Used on" shows where it is still used: only a product that is not used anywhere can be deleted.</p><?php endif; ?>
+  <?php endif; ?>
 
   <?php // D-304 (point 14): the pricing rate, explained — price build-up viewers only. ?>
   <?php if (!empty($canBuildup) && !empty($fx)): include __DIR__ . '/../pricing/_fx_rate_line.php'; endif; ?>
@@ -39,6 +49,7 @@
         <?php // D-305 (point 19): staff see only the quote and their own lowest price. ?>
         <?php if (!empty($canStaffPrice)): ?><th class="num">Quote price<br>USD / <?= View::e($__hu) ?></th><th class="num">Your lowest<br>USD / <?= View::e($__hu) ?></th><?php endif; ?>
         <th>Status</th>
+        <?php if ($status !== 'active'): ?><th>Used on</th><?php endif; ?>
         <th></th>
       </tr>
       <?php if (empty($products)): ?>
@@ -71,7 +82,17 @@
             <td class="num"><?= $__b === null ? '—' : number_format($__b['staff_floor'], 2) ?></td>
           <?php endif; ?>
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
-          <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a></td>
+          <?php if ($status !== 'active'): ?><td<?= $p['is_active'] || ($p['usage']['total'] ?? 0) === 0 ? ' class="muted"' : '' ?>><?= $p['is_active'] ? '—' : View::e($p['usage_text']) ?></td><?php endif; ?>
+          <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a>
+            <?php if ($canManage && !$p['is_active']): ?>
+              <form method="post" action="/products/<?= (int) $p['id'] ?>/reactivate" class="inline-form" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+              <?php if ($p['delete_refusal'] === null): ?>
+                <form method="post" action="/products/<?= (int) $p['id'] ?>/delete" class="inline-form" style="display:inline" data-confirm="Delete &quot;<?= View::e($p['name']) ?>&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone."><?= Csrf::field() ?><button type="submit" class="btn-sm btn-danger">Delete…</button></form>
+              <?php else: ?>
+                <button type="button" class="btn-sm btn-secondary" disabled title="<?= View::e($p['delete_refusal']) ?>">Delete</button>
+                <div class="muted small"><?= View::e($p['delete_refusal']) ?></div>
+              <?php endif; ?>
+            <?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
     </table>

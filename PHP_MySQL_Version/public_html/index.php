@@ -1177,6 +1177,9 @@ $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), Pe
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/delete', [$products, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).
+$router->post('/products/{id}/deactivate', [$products, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/reactivate', [$products, 'reactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/images/upload', [$products, 'uploadImage'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/images/{imageId}/delete', [$products, 'deleteImage'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 // Streams the actual image bytes (storage lives outside the web root, exactly like AssetController::preview()) — gated on plain view access, not manage.

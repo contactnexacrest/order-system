@@ -16,10 +16,10 @@ const pricingService = require('../services/pricingService');
 const pricingRepository = require('../repositories/pricingRepository');
 
 /**
- * Port of App\Controllers\ProductController — Product Interface / internal
- * product catalog (docs/schema.sql Section U). Completely independent of
- * the order pipeline: nothing here is ever selected into an order, and
- * this catalog is never shown to clients.
+ * Port of App\Controllers\ProductController — the product catalogue
+ * (docs/schema.sql Section U). Products are picked on order lines and used
+ * for price checks; prices here are internal and never shown to buyers. A
+ * used product is deactivated, never deleted (owner, 12 Nov 2026 — see remove()).
  *
  * Two visibility boundaries are enforced SERVER-SIDE (not just hidden in
  * the view), because both are real information-disclosure boundaries:
@@ -61,17 +61,30 @@ async function index(req, res) {
 
   const query = String(req.query.q || '').trim();
   const searched = query !== '';
+  // Owner (12 Nov 2026): "Active (n) · Inactive (n) · All (n)" — on the full list and on a search.
+  const status = productRepository.statusFilter(req.query.status || 'active');
+  let statusCounts = null;
 
   let products;
   if (searched) {
-    products = await productRepository.search(query);
+    products = await productRepository.search(query, status);
+    statusCounts = await productRepository.statusCounts(query);
   } else if (canBrowse) {
-    products = await productRepository.all();
+    products = await productRepository.listing(status);
+    statusCounts = await productRepository.statusCounts();
   } else {
     // Search-only user with no query submitted yet — no full-list query
     // executes at all. This is the actual enforcement point; everything
     // else here is just what gets rendered.
     products = [];
+  }
+  // An inactive product says where it is used, so it is clear whether it may be deleted.
+  for (const product of products) {
+    if (!Number(product.is_active)) {
+      product.usage = await productRepository.usage(product.id);
+      product.usage_text = productRepository.usageText(product.usage);
+      product.delete_refusal = productRepository.deleteRefusal(product, product.usage);
+    }
   }
 
   // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote price and
@@ -125,6 +138,8 @@ async function index(req, res) {
     products,
     query,
     searched,
+    status,
+    statusCounts,
     canBrowse,
     canViewPricing: canSeeHeadlineFob,
     canManage,
@@ -341,7 +356,11 @@ async function show(req, res) {
     }
   }
 
+  const usage = await productRepository.usage(id);
   res.renderView('products/show', {
+    usage,
+    usageText: productRepository.usageText(usage),
+    deleteRefusal: productRepository.deleteRefusal(details.product, usage),
     readiness,
     tryPrice,
     product: details.product,
@@ -419,11 +438,52 @@ async function remove(req, res) {
     return;
   }
 
+  // Owner (12 Nov 2026): only an inactive product that is not used anywhere is deleted —
+  // checked here, not only by hiding the button.
+  const refusal = productRepository.deleteRefusal(product, await productRepository.usage(id));
+  if (refusal !== null) {
+    flash.set(req, 'error', `Not deleted: ${refusal}`);
+    res.redirect(`/products/${id}`);
+    return;
+  }
+
   const user = req.user;
   await productRepository.remove(id);
   await auditLogRepository.log(user.id, 'PRODUCT_DELETED', 'products', id, null, product.name, null);
-  flash.set(req, 'success', 'Product removed from the catalog.');
-  res.redirect('/products');
+  flash.set(req, 'success', `Product "${product.name}" deleted.`);
+  res.redirect('/products?status=inactive');
+}
+
+async function setActive(req, res, active) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const product = await productRepository.find(id);
+  if (!product) {
+    res.status(404).send('Product not found.');
+    return;
+  }
+  const back = (req.body || {}).return_to === 'list' ? `/products?status=${active ? 'inactive' : 'active'}` : `/products/${id}`;
+  if (!!Number(product.is_active) === active) {
+    flash.set(req, 'success', `Product "${product.name}" is already ${active ? 'active' : 'inactive'}.`);
+    res.redirect(back);
+    return;
+  }
+  const user = req.user;
+  await productRepository.setActive(id, active, user.id);
+  await auditLogRepository.log(user.id, active ? 'PRODUCT_REACTIVATED' : 'PRODUCT_DEACTIVATED', 'products', id, 'is_active', active ? '0' : '1', active ? '1' : '0');
+  flash.set(req, 'success', active
+    ? `Product "${product.name}" is active again — it shows in the list and can be picked on order lines.`
+    : `Product "${product.name}" is deactivated — it is hidden from the active list and cannot be picked on new order lines.`);
+  res.redirect(back);
+}
+
+/** Owner (12 Nov 2026): POST /products/:id/reactivate — back in the active list and the order-line picker. */
+async function reactivate(req, res) {
+  await setActive(req, res, true);
+}
+
+/** Owner (12 Nov 2026): POST /products/:id/deactivate — hidden from the active list and the order-line picker; nothing is deleted. */
+async function deactivate(req, res) {
+  await setActive(req, res, false);
 }
 
 async function uploadImage(req, res) {
@@ -736,6 +796,8 @@ module.exports = {
   edit,
   update,
   remove,
+  reactivate,
+  deactivate,
   uploadImage,
   deleteImage,
   viewImage,

@@ -3,13 +3,31 @@
   <h1>{{ product.name }} <span class="badge {{ 'badge-active' if product.is_active else 'badge-inactive' }}">{{ 'Active' if product.is_active else 'Inactive' }}</span></h1>
   <p class="muted">HS Code: <strong>{{ product.hs_code }}</strong> &nbsp;·&nbsp; Origin: {{ product.origin or '—' }}</p>
 
+  {# Owner (12 Nov 2026): where the product is used; a used or active product is never deleted. #}
+  <p class="muted">Used on: <strong>{{ usageText }}</strong></p>
   {% if canManage %}
     <p>
       <a class="btn-sm" href="/products/{{ product.id }}/edit">Edit</a>
-      <form method="post" action="/products/{{ product.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete this product and all its images/suppliers/misc charges? This cannot be undone.');">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm btn-danger">Delete Product</button>
-      </form>
+      {% if product.is_active %}
+        <form method="post" action="/products/{{ product.id }}/deactivate" style="display:inline" data-confirm="Deactivate &quot;{{ product.name }}&quot;? It is hidden from the active list and cannot be picked on new order lines. Orders that already use it are not changed. You can reactivate it at any time.">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm btn-secondary">Deactivate</button>
+        </form>
+      {% else %}
+        <form method="post" action="/products/{{ product.id }}/reactivate" style="display:inline">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <button type="submit" class="btn-sm">Reactivate</button>
+        </form>
+        {% if deleteRefusal === null %}
+          <form method="post" action="/products/{{ product.id }}/delete" style="display:inline" data-confirm="Delete &quot;{{ product.name }}&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone.">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-danger">Delete…</button>
+          </form>
+        {% else %}
+          <button type="button" class="btn-sm btn-secondary" disabled title="{{ deleteRefusal }}">Delete</button>
+          <span class="muted small">{{ deleteRefusal }}</span>
+        {% endif %}
+      {% endif %}
     </p>
   {% endif %}
 

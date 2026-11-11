@@ -1414,6 +1414,9 @@ app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'),
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));
 app.post('/products/:id/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.remove));
+// Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).
+app.post('/products/:id/deactivate', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deactivate));
+app.post('/products/:id/reactivate', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.reactivate));
 app.post('/products/:id/images/upload', requireAuth, requirePermission('manage_product_catalog'), upload.single('image'), verifyCsrf, asyncHandler(productsController.uploadImage));
 app.post('/products/images/:imageId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteImage));
 app.get('/products/images/:imageId/view', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.viewImage));
