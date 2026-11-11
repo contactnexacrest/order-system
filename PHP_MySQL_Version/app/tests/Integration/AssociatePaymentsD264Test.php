@@ -157,8 +157,9 @@ final class AssociatePaymentsD264Test extends DbTestCase
         self::assertSame('USD 1,250.00', AssociatePortalRepository::fcText($t['fc']['waiting']));
         self::assertSame('USD 0.00', AssociatePortalRepository::fcText($t['fc']['paid']));
         $p = $this->payout($orderId);
-        self::assertSame('Fixed — due 12 Dec 2026, paid in the 05 Jan 2027 payout run', AssociatePortalRepository::payoutLabel($p, false, '', '2026-11-20'));
-        self::assertSame('Due — paid in the 05 Jan 2027 payout run', AssociatePortalRepository::payoutLabel($p, false, '', '2026-12-20'));
+        // D-292 (owner 11 Nov 2026): the associate's status wording.
+        self::assertSame('Earned — will be paid on 05 Jan 2027', AssociatePortalRepository::payoutLabel($p, false, '', '2026-11-20'));
+        self::assertSame('Earned — will be paid on 05 Jan 2027', AssociatePortalRepository::payoutLabel($p, false, '', '2026-12-20'));
     }
 
     public function testPaidInCurrencyIndiaAlwaysInrAbroadAnActiveCurrency(): void

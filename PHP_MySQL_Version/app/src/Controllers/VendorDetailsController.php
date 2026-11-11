@@ -77,9 +77,12 @@ final class VendorDetailsController
                 $details[$f] = trim((string) $_POST[$f]) ?: null;
             }
         }
+        $registered = trim((string) ($vendor['email'] ?? '')); // D-294: the e-mail on file before this submit
         VendorDetailsRepository::saveDetailsFromVendor($kind, $id, $details);
+        $confirmTo = null;
         if ($result['bank'] !== null) {
-            VendorDetailsRepository::saveBankDetails($kind, $id, $result['bank'], 'vendor', null);
+            // D-294: their bank details wait for confirmation through a link e-mailed to the registered e-mail, then for staff verification.
+            $confirmTo = \App\Services\VendorBankChangeService::propose($kind, $id, $result['bank'], 'vendor', null, $registered !== '' ? $registered : null)['emailed_to'];
         }
         VendorDetailsRepository::markDetailsSubmitted($kind, $id);
         $after = VendorDetailsRepository::bankDetails(VendorDetailsRepository::find($kind, $id));
@@ -93,6 +96,6 @@ final class VendorDetailsController
             VendorDetailsRepository::maskAccount($after['bank_account_number']),
             "{$vendor[$meta['name']]} filled in their details through the Vendor Details Link — verify the bank account before paying."
         );
-        View::render('vendor_details/thanks', ['vendor' => $vendor, 'meta' => $meta], 'layout/bare');
+        View::render('vendor_details/thanks', ['vendor' => $vendor, 'meta' => $meta, 'bankChanged' => $result['bank'] !== null, 'confirmTo' => $confirmTo !== null ? \App\Services\BankDetailsCheck::maskEmail($confirmTo) : null], 'layout/bare');
     }
 }

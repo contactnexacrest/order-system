@@ -11,8 +11,19 @@
     <fieldset><legend>When commission is paid {% if not canPricing %}<small class="muted">(the MD changes these)</small>{% endif %}</legend>
       <div class="field-grid">
         <label>Days after full payment *<input type="number" name="associate_commission_due_days" required min="0" max="365" step="1" value="{{ commission.due_days }}" placeholder="e.g. 30"{{ __dis }}><span class="help-line">Example: 30 → buyer pays in full on 4 Nov, commission due on 4 Dec.</span></label>
-        <label>Payout run *<select name="associate_payout_run" required{{ __dis }}><option value="">Choose…</option><option value="monthly"{{ ' selected' if commission.run == 'monthly' }}>Monthly</option><option value="weekly"{{ ' selected' if commission.run == 'weekly' }}>Weekly</option></select><span class="help-line">Example: monthly → commission due on 4 Dec is paid in the run on 5 Jan (the first run on or after the due date).</span></label>
-        <label>Payout day * <small class="muted">(1–28 for monthly; 1 = Monday … 7 = Sunday for weekly)</small><input type="number" name="associate_payout_day" required min="1" max="28" step="1" value="{{ commission.day }}" placeholder="e.g. 5"{{ __dis }}><span class="help-line">Example: 5 → runs on the 5th of every month.</span></label>
+        <label>Payment run *<select name="associate_payout_run" required{{ __dis }}><option value="">Choose…</option><option value="monthly"{{ ' selected' if commission.run == 'monthly' }}>Monthly</option><option value="weekly"{{ ' selected' if commission.run == 'weekly' }}>Weekly</option></select><span class="help-line">Example: monthly → commission due on 4 Dec is paid in the run on 31 Dec (the first run on or after the due date).</span></label>
+        {# D-292 (owner 11 Nov 2026): monthly 1st–28th or the last day of the month; weekly Monday–Sunday. #}
+        <label>Pay on (monthly run)<select name="associate_payout_day" data-required-when="associate_payout_run=monthly" data-required-when-message="Choose the day of the month."{{ __dis }}><option value="">Choose…</option>
+          {% for d in monthDays %}<option value="{{ d.value }}"{{ ' selected' if commission.run == 'monthly' and not commission.last_day and commission.day == d.value }}>{{ d.label }}</option>{% endfor %}
+          <option value="last"{{ ' selected' if commission.run == 'monthly' and commission.last_day }}>Last day of the month</option></select>
+          <span class="help-line">Choices: 1st … 28th of the month, or "Last day of the month" (28/29/30/31 as the month has).</span></label>
+        <label>Pay on (weekly run)<select name="associate_payout_weekday" data-required-when="associate_payout_run=weekly" data-required-when-message="Choose the day of the week."{{ __dis }}><option value="">Choose…</option>
+          {% for n, w in weekdays %}<option value="{{ n }}"{{ ' selected' if commission.run == 'weekly' and (commission.day | string) == (n | string) }}>{{ w }}</option>{% endfor %}</select></label>
+        <label>If the payment day is a Sunday or holiday *<select name="associate_payout_holiday_rule" required{{ __dis }}><option value="">Choose…</option>
+          <option value="before"{{ ' selected' if commission.holiday_rule == 'before' }}>Pay on the working day before</option>
+          <option value="after"{{ ' selected' if commission.holiday_rule == 'after' }}>Pay on the working day after</option></select>
+          <span class="help-line">Uses the <a href="/holidays">Holiday Calendar</a>. The associate portal and e-mails always show the actual date (e.g. "31 Dec 2026").</span></label>
+        <label>Reason for changing the payment run <small class="muted">(needed when the run, the day or the Sunday/holiday rule changes; kept in the Audit Log)</small><input type="text" name="payout_reason" minlength="10" maxlength="300" placeholder="e.g. Finance pays all vendors on the last working day"{{ __dis }}></label>
         <label><input type="checkbox" name="associate_claim_hold" value="1"{{ ' checked' if commission.claim_hold }}{{ __dis }}> Hold while a buyer claim (raised on or before the due date) is open</label>
         <label>Commission period shown to associates *<select name="associate_portal_commission_months" required{{ __dis }}><option value="">Choose…</option>{% for __m in [3, 6, 9, 12, 15, 18, 24] %}<option value="{{ __m }}"{{ ' selected' if commission.portal_months == __m }}>{{ __m }} months</option>{% endfor %}</select><span class="help-line">Example: 12 → in the portal an associate sees only the commission of the last 12 months (totals and list); commission still waiting to be paid is always shown. Staff screens show everything.</span></label>
       </div>
@@ -31,9 +42,26 @@
         <label>Zoho account for associate payout costs <small class="muted">(D-264: the Zoho Books account id the exchange difference and transfer charges of each associate payout are booked to, against the bank; empty = they stay in the app only)</small><input type="text" name="zoho_payout_costs_account_id" maxlength="40" pattern="[0-9A-Za-z_\-]*" value="{{ commission.zoho_payout_costs_account_id }}" placeholder="e.g. 460000000067890"{{ __dis }}><span class="help-line">Example: USD 1,250.00 sent abroad cost ₹1,05,125.00 + ₹1,850.00 charges against the fixed ₹1,04,312.50 → one Zoho journal of ₹2,662.50, Associate payout costs debited, the bank credited.</span></label>
       </div>
     </fieldset>
+    <fieldset><legend>Personal code and portal access {% if not canPricing %}<small class="muted">(the MD changes these)</small>{% endif %}</legend>
+      <div class="field-grid">
+        {# Owner decision 11 Nov 2026 (P4): the two settings that were only in the database are editable here. #}
+        <label>Personal code changes allowed per year *<input type="number" name="associate_code_changes_per_year" required min="0" max="12" step="1" value="{{ codeChanges }}" placeholder="e.g. 3"{{ __dis }}><span class="help-line">Example: 3 → an associate may choose a new personal code up to 3 times in 12 months (D-254).</span></label>
+        <label>Suggest "Quoting" access after this many paid orders *<input type="number" name="associate_upgrade_after_orders" required min="1" max="50" step="1" value="{{ upgradeAfter }}" placeholder="e.g. 3"{{ __dis }}><span class="help-line">Example: 3 → after a Starter associate's 3rd completed, paid order the MD is asked "Ready for Quoting?" (D-261).</span></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>Bank details (associates and suppliers)</legend>
+      {# D-293 (owner 11 Nov 2026): who checks new bank details and how long before a verified account is used. #}
+      <div class="field-grid">
+        <label>Bank details check *<select name="bank_details_check_people" required><option value="">Choose…</option>
+          <option value="one"{{ ' selected' if bankPeople == 'one' }}>One person (not the one who entered them)</option>
+          <option value="two"{{ ' selected' if bankPeople == 'two' }}>Two people</option></select>
+          <span class="help-line">"Two people" — for later, when the finance team is bigger. Either way the holder confirms first, and MD/ED may verify their own entry with a reason (Admin › Self-approval rules › Bank details).</span></label>
+        <label>Wait before a FIRST bank account is used (days) *<input type="number" name="associate_bank_wait_first_days" required min="0" max="90" step="1" value="{{ waitFirst }}" placeholder="e.g. 0"></label>
+        <label>Wait before a CHANGED bank account is used (days) *<input type="number" name="associate_bank_wait_change_days" required min="0" max="90" step="1" value="{{ waitChange }}" placeholder="e.g. 15"><span class="help-line">Example: 15 → details verified on 1 Dec are used from 16 Dec; until then payments go to the old account.</span></label>
+      </div>
+    </fieldset>
     <div class="field-grid">
       <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="{{ tdsValue }}" placeholder="e.g. 2.00"></label> <small class="muted">Threshold, rate without PAN and the rules for associates abroad: <a href="/settings/associate-tds">Settings &rarr; Associate TDS</a>.</small>
-      <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="{{ wait }}" placeholder="e.g. 7"></label>
     </div>
     <div class="btn-row"><button type="submit">Save</button> <a href="/associates">Back to associates</a></div>
   </form>

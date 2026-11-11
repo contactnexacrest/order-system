@@ -60,6 +60,7 @@
     </div>
   </form>
   <?php $vendorKind = 'logistics_partner'; $vendorId = (int) $partner['id']; $vendor = $partner; include __DIR__ . '/../partials/_vendor_details_link.php'; ?>
+  <?php include __DIR__ . '/../partials/_vendor_bank_changes.php'; // D-294 ?>
 </div>
 
 <?php $__partyType = "logistics_partner"; $__partyId = (int) $partner["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>

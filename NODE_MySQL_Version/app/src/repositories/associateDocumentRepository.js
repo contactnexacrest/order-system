@@ -4,17 +4,18 @@ const db = require('../config/db');
 
 /** Port of AssociateDocumentRepository.php — an associate's KYC, tax papers, invoices and NexaCrest's certificates. */
 const KINDS = {
-  pan: 'PAN card', aadhaar: 'Aadhaar card', identity: 'Passport / ID', bank_proof: 'Bank proof (cancelled cheque / statement)', agreement: 'Signed agreement', address: 'Address proof', gst: 'GST certificate',
+  pan: 'PAN card', aadhaar: 'Aadhaar card', identity: 'ID document', bank_proof: 'Bank proof (cancelled cheque / statement)', agreement: 'Signed agreement', address: 'Address proof', gst: 'GST certificate',
   company: 'Company registration', tax_residency: 'Tax residency certificate', form_10f: 'Form 10F',
   no_pe: 'No-PE declaration', invoice: 'Commission invoice', form_16a: 'Form 16A (TDS certificate)',
   form_15ca: 'Form 15CA', form_15cb: 'Form 15CB', other: 'Other',
 };
 const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
 
-async function add(associateId, kind, fileId, payoutId, reference, byAssociate, userId) {
+/** idDocType — D-290: the ID document's type (kind 'identity'). */
+async function add(associateId, kind, fileId, payoutId, reference, byAssociate, userId, idDocType = null) {
   const r = await db.execute(
-    'INSERT INTO associate_documents (associate_id, kind, payout_id, file_id, reference, uploaded_by_associate, uploaded_by_user) VALUES (:a, :k, :p, :f, :r, :ba, :u)',
-    { a: associateId, k: kind, p: payoutId ?? null, f: fileId, r: reference ?? null, ba: byAssociate ? 1 : 0, u: userId ?? null }
+    'INSERT INTO associate_documents (associate_id, kind, payout_id, file_id, reference, uploaded_by_associate, uploaded_by_user, id_doc_type) VALUES (:a, :k, :p, :f, :r, :ba, :u, :t)',
+    { a: associateId, k: kind, p: payoutId ?? null, f: fileId, r: reference ?? null, ba: byAssociate ? 1 : 0, u: userId ?? null, t: idDocType ?? null }
   );
   return r.insertId;
 }

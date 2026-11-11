@@ -76,6 +76,7 @@ $selectedTypes = $supplier['types'] ?? [];
 
   <?php if ($isEdit): ?>
   <?php $vendorKind = 'supplier'; $vendorId = (int) $supplier['id']; $vendor = $supplier; include __DIR__ . '/../partials/_vendor_details_link.php'; ?>
+  <?php include __DIR__ . '/../partials/_vendor_bank_changes.php'; // D-294 ?>
   <div class="section" id="factory-addresses">
     <h2 style="font-size:1rem;">Factory Addresses</h2>
     <p class="muted small">Offered as the Delivery Location when saving Supplier PO terms for this supplier. Removing one never changes a Supplier PO that already recorded it.</p>

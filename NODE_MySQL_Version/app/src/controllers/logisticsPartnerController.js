@@ -71,7 +71,7 @@ async function create(req, res) {
   }
 
   const id = await logisticsPartnerRepository.create(result.data, req.user.id);
-  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body);
+  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body, req);
   await auditLogRepository.log(req.user.id, 'LOGISTICS_PARTNER_ADDED', 'logistics_partners', id, null, null, result.data.partner_name);
   flash.set(req, 'success', `"${result.data.partner_name}" added to the logistics partners directory.`);
   res.redirect('/logistics-partners');
@@ -86,6 +86,8 @@ async function editForm(req, res) {
   }
   res.renderView('logistics_partners/edit', {
     partner,
+    // D-294: bank details changes waiting for the partner's confirmation / staff verification.
+    bankPanel: await require('../services/vendorBankChangeService').panelData('logistics_partner', Number(partner.id), Number(req.user.id)),
     agreementCard: await require('./agreementController').partyCard(req, 'logistics_partner', partner.id),
     bank: vendorDetailsRepository.bankDetails(partner),
     bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
@@ -119,7 +121,7 @@ async function update(req, res) {
   }
 
   await logisticsPartnerRepository.update(id, result.data);
-  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body);
+  await vendorDetailsService.applyStaffBankInput('logistics_partner', id, req.user.id, req.body, req);
   await auditLogRepository.log(req.user.id, 'LOGISTICS_PARTNER_UPDATED', 'logistics_partners', id, 'partner_name', partner.partner_name, result.data.partner_name);
   flash.set(req, 'success', `"${result.data.partner_name}" updated.`);
   res.redirect('/logistics-partners');

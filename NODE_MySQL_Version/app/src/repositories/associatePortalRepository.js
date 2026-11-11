@@ -122,11 +122,13 @@ async function commission(associateId, o) {
     const label = payoutLabel(p, claim, String(o.incentive_month || ''));
     const order = await orderRepository.find(Number(o.id));
     const fixed = order ? associateCommission.fixedLevel(order, associateId) : null;
-    const level = fixed ? associateCommission.levelLabel(fixed)
-      : (o.locked_rate !== null && o.locked_rate !== undefined ? `${Number(o.locked_rate).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : null);
+    const lockedPct = o.locked_rate !== null && o.locked_rate !== undefined ? `${Number(o.locked_rate).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : null;
+    const level = fixed ? associateCommission.levelLabel(fixed) : lockedPct;
+    // D-292: the % only (never a level name) for the associate.
+    const rateText = fixed ? associateCommission.rateLabel(fixed) : lockedPct;
     return { state: p.status === 'paid' ? 'paid' : (p.status === 'held' || claim ? 'held' : 'earned'), label,
       rate: o.locked_rate !== null && o.locked_rate !== undefined ? Number(o.locked_rate) : null, source: o.associate_rate_source ?? null,
-      amount: Number(p.amount_fc !== undefined && p.amount_fc !== null ? p.amount_fc : o.associate_amount_fc), level, detail: await associateCommission.forOrder(Number(o.id)),
+      amount: Number(p.amount_fc !== undefined && p.amount_fc !== null ? p.amount_fc : o.associate_amount_fc), level, rate_text: rateText, detail: await associateCommission.forOrder(Number(o.id)),
       // D-264: what an associate in India is paid, fixed in rupees (never shown to an associate abroad).
       fixed_inr: p.amount_inr !== undefined && p.amount_inr !== null ? Number(p.amount_inr) : null,
       fixed_rate: p.fixed_rate !== undefined && p.fixed_rate !== null ? Number(p.fixed_rate) : null,
@@ -137,26 +139,42 @@ async function commission(associateId, o) {
   const order = (await orderRepository.find(Number(o.id))) || {};
   const c = await associateCommission.forOrder(Number(o.id), order);
   if (!c) return none(NONE_REPEAT);
-  const label = (await incentive().fullyPaidOn(Number(o.id))) !== null
-    ? 'Buyer has paid in full — NexaCrest is confirming your commission'
-    : 'Not yet earned — waiting for the buyer\'s full payment';
+  // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
+  const fullyPaidOn = await incentive().fullyPaidOn(Number(o.id));
+  const label = fullyPaidOn !== null
+    ? `Earned — will be paid on ${dates.short(await associateCommission.payoutRunOn(await associateCommission.dueOn(String(fullyPaidOn).slice(0, 10))))}`
+    : NOT_EARNED_LABEL;
   return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
-    level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), detail: c };
+    level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
+    rate_text: associateCommission.rateLabel(c.level) + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is sent)'), detail: c };
 }
 
 /**
  * D-264: a fixed commission is "Fixed — due …" until its due date, then "Due — paid in the … payout run";
  * held (a buyer claim, or by NexaCrest) or paid.
  */
-function payoutLabel(p, claim, incentiveMonth = '', today = null) {
-  const t = today || new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+/** D-292: the associate's commission statuses (exact wording, owner 11 Nov 2026). */
+const NOT_EARNED_LABEL = 'Not earned yet — buyer still paying';
+const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
+
+/**
+ * D-292: "Earned — will be paid on <date>", "Paid on <date> (ref)", "On hold — a buyer claim on this order is
+ * open" ("Not earned yet — buyer still paying" in commission()). A hold by NexaCrest keeps its reason.
+ */
+function payoutLabel(p, claim, incentiveMonth = '', today = null) { // eslint-disable-line no-unused-vars
   const d = (v) => dates.short(String(v).slice(0, 10));
-  if (p.status === 'paid') return `Paid on ${d(p.paid_on)}`;
+  const claimHeld = p.status === 'held' && String(p.hold_reason || '') === require('../services/associatePayoutService').CLAIM_HOLD_REASON;
+  if (p.status === 'paid') return `Paid on ${d(p.paid_on)}${p.paid_reference ? ` (${p.paid_reference})` : ''}`;
+  if (claim || claimHeld) return CLAIM_LABEL;
   if (p.status === 'held') return 'On hold' + (p.hold_reason ? ` — ${p.hold_reason}` : '');
-  if (claim) return 'Fixed — waiting while a buyer claim on the order is open';
-  if (p.due_on && t < String(p.due_on).slice(0, 10)) return `Fixed — due ${d(p.due_on)}, paid in the ${d(p.payout_run_on)} payout run`;
-  if (p.payout_run_on) return `Due — paid in the ${d(p.payout_run_on)} payout run`;
-  return `Fixed — to be paid in the ${incentive().monthLabel(String(incentiveMonth))} payout`;
+  if (p.payout_run_on) return `Earned — will be paid on ${d(p.payout_run_on)}`;
+  return `Earned — will be paid in the ${incentive().monthLabel(String(incentiveMonth))} payout`;
+}
+
+/** D-292: the % fixed on an order, as the associate sees it ("5%"), or null when none is fixed yet. */
+function orderRateText(row) {
+  if (!row.associate_level_kind || row.associate_level_value === null || row.associate_level_value === undefined) return null;
+  return require('../services/associateCommission').rateLabel({ kind: String(row.associate_level_kind), value: Number(row.associate_level_value) });
 }
 
 /** D-264: "USD 1,250.00" (several currencies joined with " + "; "USD 0.00" when there is nothing). */
@@ -171,7 +189,7 @@ function fcText(byCurrency, def = 'USD') {
 /** The associate's payouts (commission lines), newest first. */
 async function payouts(associateId) {
   return db.query(
-    `SELECT p.*, o.order_reference, c.company_legal_name FROM incentive_payouts p JOIN orders o ON o.id = p.order_id JOIN clients c ON c.id = o.client_id
+    `SELECT p.*, o.order_reference, c.company_legal_name, o.associate_level_kind, o.associate_level_value FROM incentive_payouts p JOIN orders o ON o.id = p.order_id JOIN clients c ON c.id = o.client_id
       WHERE p.payee_kind = 'associate' AND p.associate_id = :a ORDER BY p.incentive_month DESC, p.id DESC`,
     { a: associateId }
   );
@@ -221,4 +239,4 @@ async function totals(associateId, months = null, today = null) {
 }
 
 module.exports = {
-  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals, payoutLabel, fcText };
+  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals, payoutLabel, fcText, orderRateText, NOT_EARNED_LABEL, CLAIM_LABEL };

@@ -105,8 +105,9 @@ final class PricingRepository
         $pdo = Database::connection();
         $a = $pdo->prepare('SELECT COUNT(*) FROM associates WHERE commission_level_id = :id');
         $a->execute(['id' => $id]);
-        $s = $pdo->prepare('SELECT COUNT(*) FROM commission_ladder_steps WHERE level_id = :id');
-        $s->execute(['id' => $id]);
+        // D-291: a step of an associate's own ladder uses the level too.
+        $s = $pdo->prepare('SELECT (SELECT COUNT(*) FROM commission_ladder_steps WHERE level_id = :id) + (SELECT COUNT(*) FROM associate_ladder_steps WHERE level_id = :id2)');
+        $s->execute(['id' => $id, 'id2' => $id]);
         return ['associates' => (int) $a->fetchColumn(), 'steps' => (int) $s->fetchColumn()];
     }
 
@@ -152,6 +153,44 @@ final class PricingRepository
     {
         Database::connection()->prepare('UPDATE associates SET commission_mode = :m, commission_level_id = :l WHERE id = :id')
             ->execute(['m' => $mode, 'l' => $levelId, 'id' => $associateId]);
+    }
+
+    /** D-291: an associate's own ladder (empty = none), in order, with each step's level. @return list<array<string,mixed>> */
+    public static function ownLadder(int $associateId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT s.id, s.from_order, s.to_order, s.level_id, l.name AS level_name, l.kind, l.value, l.is_active
+               FROM associate_ladder_steps s JOIN commission_levels l ON l.id = s.level_id
+              WHERE s.associate_id = :a ORDER BY s.from_order'
+        );
+        $stmt->execute(['a' => $associateId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * D-291: the MD sets an associate's commission rule — 'ladder' (the standard ladder), 'own_ladder'
+     * (with its steps) or 'fixed' (a level) — with a reason. The own ladder is kept only while it is the rule.
+     * @param list<array{from:int,to:?int,level_id:int}> $ownSteps
+     */
+    public static function setAssociateRule(int $associateId, string $mode, ?int $levelId, array $ownSteps, string $reason, int $userId): void
+    {
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('DELETE FROM associate_ladder_steps WHERE associate_id = :a')->execute(['a' => $associateId]);
+            if ($mode === 'own_ladder') {
+                $ins = $pdo->prepare('INSERT INTO associate_ladder_steps (associate_id, from_order, to_order, level_id, updated_by) VALUES (:a, :f, :t, :l, :u)');
+                foreach ($ownSteps as $s) {
+                    $ins->execute(['a' => $associateId, 'f' => $s['from'], 't' => $s['to'], 'l' => $s['level_id'], 'u' => $userId]);
+                }
+            }
+            $pdo->prepare('UPDATE associates SET commission_mode = :m, commission_level_id = :l, commission_rule_changed_at = NOW(), commission_rule_changed_by = :u, commission_rule_reason = :r WHERE id = :id')
+                ->execute(['m' => $mode, 'l' => $mode === 'fixed' ? $levelId : null, 'u' => $userId, 'r' => mb_substr($reason, 0, 300), 'id' => $associateId]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 
     /** Market price dates on a supplier row. */

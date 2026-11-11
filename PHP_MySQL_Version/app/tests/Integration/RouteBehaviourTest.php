@@ -537,27 +537,33 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame('Route notes', $this->value("SELECT notes FROM associates WHERE id = {$id}"));
         $this->assertPage($this->call('GET', '/associates/ladder'), 'When commission is paid', 'GET /associates/ladder');
         $this->assertDone($this->call('POST', '/associates/ladder', ['associate_tds_pct' => '2.00', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_claim_hold' => '1',
-            'associate_payout_run' => 'monthly', 'associate_payout_day' => '5', 'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_portal_commission_months' => '12']), 'POST /associates/ladder');
+            'associate_payout_run' => 'monthly', 'associate_payout_day' => '5', 'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_portal_commission_months' => '12',
+            'payout_reason' => 'Route test: pay on the 5th.']), 'POST /associates/ladder'); // D-292: a payment-run change needs a reason
         $this->assertPage($this->call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
 
         $r = $this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']);
-        self::assertSame('An associate becomes Active once Accounts have verified their bank details (two people).', $r['flash'], 'POST /associates/{id}/status');
+        self::assertSame('An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.', $r['flash'], 'POST /associates/{id}/status');
         $r = $this->call('POST', "/associates/{$id}/bank", ['holder_name' => 'Route Associate', 'account_number' => '123456789012', 'account_number_confirm' => '123456789012', 'ifsc' => 'HDFC0001234', 'bank_name' => 'HDFC Bank', 'account_currency' => 'INR']);
         self::assertSame('Attach a cancelled cheque or a bank letter (PDF or image).', $r['flash'], 'POST /associates/{id}/bank');
         $bank = \App\Repositories\AssociateBankRepository::request($id, ['holder_name' => 'Route Associate', 'account_number' => '123456789012', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
-        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$bank}/check", ['check_method' => 'Route test call-back and test credit.']), 'POST /associates/{id}/bank/{bankId}/check');
-        $r = $this->call('POST', "/associates/{$id}/bank/{$bank}/verify");
-        self::assertSame('A different person must verify — you already acted on this request.', $r['flash'], 'POST /associates/{id}/bank/{bankId}/verify');
-        $other = $this->createTestUser('Admin');
-        Database::connection()->exec("UPDATE users SET is_super_admin = 1 WHERE id = {$other}");
-        $this->signIn($other);
-        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$bank}/verify"), 'POST /associates/{id}/bank/{bankId}/verify', 'Verified.');
-        $this->signIn($this->holder);
+        // D-293: one person verifies (default setting) — "First check" is for the two-people setting; at least two ticks.
+        $r = $this->call('POST', "/associates/{$id}/bank/{$bank}/check", ['check_bank_proof' => '1', 'check_phone' => '1']);
+        self::assertSame('One person verifies bank details — use Verify.', $r['flash'], 'POST /associates/{id}/bank/{bankId}/check');
+        $r = $this->call('POST', "/associates/{$id}/bank/{$bank}/verify", ['check_bank_proof' => '1']);
+        self::assertSame('Tick at least two of the ways you checked the bank details.', $r['flash'], 'POST /associates/{id}/bank/{bankId}/verify');
+        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$bank}/verify", ['check_bank_proof' => '1', 'check_phone' => '1']), 'POST /associates/{id}/bank/{bankId}/verify', 'Verified.');
         $r = $this->call('GET', "/associates/{$id}/bank/{$bank}/number");
         $this->assertPage($r, '123456789012', 'GET /associates/{id}/bank/{bankId}/number');
         self::assertSame(1, $this->audits('ASSOCIATE_BANK_NUMBER_VIEWED', $bank));
         $second = \App\Repositories\AssociateBankRepository::request($id, ['holder_name' => 'Route Associate', 'account_number' => '555566667777', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
         $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$second}/reject", ['reason' => 'Name does not match the PAN.']), 'POST /associates/{id}/bank/{bankId}/reject');
+        // D-293: "Remind associate" while new details wait for the associate's confirmation.
+        $third = \App\Repositories\AssociateBankRepository::request($id, ['holder_name' => 'Route Associate', 'account_number' => '777788889999', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
+        \App\Repositories\AssociateBankRepository::markAwaiting($third, $id, date('Y-m-d H:i:s', strtotime('+7 days')));
+        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$third}/remind"), 'POST /associates/{id}/bank/{bankId}/remind', 'Reminder e-mailed to the associate.');
+        // D-291: the MD's commission rule page.
+        $this->assertPage($this->call('GET', "/associates/{$id}/commission-rule"), 'Commission rule — Route Associate', 'GET /associates/{id}/commission-rule');
+        $this->assertDone($this->call('POST', "/associates/{$id}/commission-rule", ['rule' => 'ladder', 'reason' => 'Route test: keep the standard ladder.']), 'POST /associates/{id}/commission-rule', 'Nothing changed.');
         $this->assertDone($this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']), 'POST /associates/{id}/status');
 
         $this->assertDone($this->call('POST', "/associates/{$id}/portal/invite"), 'POST /associates/{id}/portal/invite', "Portal login link e-mailed to {$email}.");

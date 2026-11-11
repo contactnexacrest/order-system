@@ -12,7 +12,7 @@
   </div>
   <?php require __DIR__ . '/_filters.php'; ?>
   <table class="list">
-    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th><?php if ($canManage): ?><th>Commission terms</th><?php endif; ?><?php if ($canManage || $canBank): ?><th>Bank</th><?php endif; ?><th></th></tr>
+    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th><?php if ($canRules): // D-292 ?><th>Commission rule</th><?php endif; ?><?php if ($canManage || $canBank): ?><th>Bank</th><?php endif; ?><th></th></tr>
     <?php foreach ($rows as $a): ?>
       <tr>
         <td><a href="/associates/<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name']) ?></a><?php if (!empty($a['email'])): ?><br><small class="muted"><?= htmlspecialchars((string) $a['email']) ?></small><?php endif; ?></td>
@@ -20,8 +20,8 @@
         <td><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?></td>
         <td><?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></td>
         <td><?= count($a['clients']) ?><?php foreach (array_slice($a['clients'], 0, 3) as $c): ?><br><small><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a></small><?php endforeach; ?></td>
-        <?php if ($canManage): ?><td><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : 'Ladder') ?></td><?php endif; ?>
-        <?php if ($canManage || $canBank): ?><td><?= $a['pending_bank'] > 0 ? '<span class="badge badge-pending">Change to check</span>' : '' ?></td><?php endif; ?>
+        <?php if ($canRules): ?><td><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed %: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : (($a['commission_mode'] ?? 'ladder') === 'own_ladder' ? 'Own ladder' : 'Standard ladder')) ?></td><?php endif; ?>
+        <?php if ($canManage || $canBank): ?><td><?= $a['pending_bank'] > 0 ? '<span class="badge badge-pending">Change to check</span>' : '' ?><?= $a['awaiting_bank'] > 0 ? ' <span class="badge badge-inactive">Waiting for the associate to confirm</span>' : '' ?></td><?php endif; ?>
         <td><a class="btn-sm" href="/associates/<?= (int) $a['id'] ?>">Open</a></td>
       </tr>
     <?php endforeach; ?>

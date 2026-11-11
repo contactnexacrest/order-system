@@ -47,6 +47,33 @@ async function layoutData(req, a) {
     unread: a && a.id ? await associateEventRepository.unreadNotices(Number(a.id)) : 0,
     viewAs: associatePortalService.viewAsStaffId(req) !== null,
     access: a && a.id ? await associateAccess.features(a) : null, // D-261: what the access level shows
+    // D-293: new bank details waiting for the associate's confirmation — a bar on every page.
+    bankWaiting: a && a.id ? await require('../services/associateBankConfirmation').open(Number(a.id)) : null,
+  };
+}
+
+/**
+ * D-292 (owner 11 Nov 2026): the associate's current % only — "5%" + "of the FOB value of each order from the
+ * clients you introduced" — and only with "Show commission %" (D-261). Null otherwise.
+ */
+async function commissionHeadline(a) {
+  if (Number(a.no_commission || 0) === 1 || !(await associateAccess.allows(a, 'commission_pct'))) return null;
+  const associateCommission = require('../services/associateCommission');
+  const [level] = await associateCommission.levelForAssociate(a, null);
+  if (!level) return null;
+  return { rate: associateCommission.rateLabel(level),
+    text: (level.kind || 'pct') === 'pct' ? 'of the FOB value of each order from the clients you introduced' : 'on each order from the clients you introduced' };
+}
+
+/** D-292: the data of the "My commission" box (headline + How it works). */
+async function myCommissionData(a) {
+  const associateCommission = require('../services/associateCommission');
+  const set = await associateCommission.settings();
+  return {
+    headline: await commissionHeadline(a),
+    commissionSettings: set,
+    payDayText: associateCommission.payDayText(set),
+    currencyName: { INR: 'Indian rupees', USD: 'US dollars', EUR: 'euros', GBP: 'pounds sterling' }[String(a.currency_code || 'INR')] || String(a.currency_code || ''),
   };
 }
 
@@ -194,6 +221,7 @@ async function home(req, res) {
     openInvitations: invitations.filter((i) => ['created', 'opened', 'registered'].includes(i.status)).length,
     // D-252 / D-253: after the first login the associate completes the profile and the KYC documents.
     kycMissing: await associateKyc.missing(a),
+    addressGrace: await associateKyc.addressGraceNote(a), // D-290
   });
   await associateEventRepository.markNoticesRead(id);
 }
@@ -358,6 +386,7 @@ async function commission(req, res) {
     p.gross_inr = Number(p.paid_inr || 0) + Number(p.tds_inr || 0);
     p.tdsRateLabel = Number(p.tds_rate || 0) > 0 ? require('../services/associateTds').pct(Number(p.tds_rate)) : '';
     p.status_label = Number(p.amount_inr) < 0 && p.status === 'due' ? 'To be deducted' : associatePortalRepository.payoutLabel(p, false, String(p.incentive_month));
+    p.rate_text = associatePortalRepository.orderRateText(p); // D-292: the % fixed on the order
     if (india && p.fixed_rate !== null && p.fixed_rate !== undefined && p.status !== 'paid' && Number(p.amount_inr) > 0) {
       p.fixed_line = payoutService.fixedRupeeLine(p.amount_inr, p.fixed_rate, p.currency_code, p.fixed_on);
     }
@@ -373,6 +402,8 @@ async function commission(req, res) {
     invoiceByPayout,
     documents: await associateDocumentRepository.forAssociate(id),
     docKinds: associateDocumentRepository.KINDS,
+    // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
+    ...(await myCommissionData(a)),
   });
 }
 
@@ -433,6 +464,7 @@ async function profile(req, res) {
   for (const b of banks) {
     b.masked = associateBankRepository.masked(b);
     b.usable_later = !!b.usable_from && String(b.usable_from).slice(0, 10) > today;
+    b.status_text = require('../services/associateBankConfirmation').associateStatus(b, today); // D-293
   }
   const usable = await associateBankRepository.usable(id);
   const docs = await associateDocumentRepository.forAssociate(id);
@@ -447,8 +479,13 @@ async function profile(req, res) {
     associateKinds: associateDocumentRepository.ASSOCIATE_KINDS.filter((k) => k !== 'invoice'),
     kyc: await associateKyc.checklist(a, docs),
     kycLabels: associateKyc.STATUS_LABELS,
-    docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE,
+    docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE, idDocTypes: associateKyc.ID_DOC_TYPES,
     bankWaitDays: await associateService.bankWaitDays(),
+    // D-293: confirm within 7 days; waits for a first / changed account.
+    bankConfirmDays: require('../services/bankDetailsCheck').CONFIRM_DAYS,
+    bankWaitFirst: await require('../services/bankDetailsCheck').waitDays(true),
+    addressGrace: await associateKyc.addressGraceNote(a), // D-290
+    ...(await myCommissionData(a)),
   });
 }
 
@@ -489,7 +526,8 @@ async function uploadDocument(req, res) {
     return;
   }
   // Owner decision D-251 (A4): the document's number / reference, checked per kind (Aadhaar: last 4 digits only).
-  const [reference, refError] = associateKyc.normaliseReference(kind, (req.body || {}).reference);
+  // D-290: an ID document carries its type and number; ID and address proofs get app-set file names.
+  const [reference, idType, refError] = associateKyc.checkUpload(kind, (req.body || {}).reference, (req.body || {}).id_doc_type);
   if (refError) {
     flash.set(req, 'error', refError);
     res.redirect('/associate/profile');
@@ -497,13 +535,14 @@ async function uploadDocument(req, res) {
   }
   let fileId;
   try {
-    fileId = await fileUploadService.handleUpload(req, 'document_file', 'associate_document', 'associates/documents', null, null, null, null, a.name, KINDS[kind]);
+    fileId = await fileUploadService.handleUpload(req, 'document_file', 'associate_document', 'associates/documents', null, null, null,
+      associateKyc.appFileName(kind, a.name, req.file ? req.file.originalname : ''), a.name, KINDS[kind]);
   } catch (e) {
     flash.setErrorFromException(req, e);
     res.redirect('/associate/profile');
     return;
   }
-  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, reference, true, null);
+  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, reference, true, null, idType);
   await auditLogRepository.log(null, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(a.id), 'kind', null, kind);
   await associateKyc.notifyStaffOfUpload(a, kind);
   flash.set(req, 'success', `${KINDS[kind]} received — NexaCrest will check it.`);
@@ -530,12 +569,80 @@ async function requestBank(req, res) {
     return;
   }
   const id = await associateBankRepository.request(Number(a.id), result, true, null);
-  await auditLogRepository.log(null, 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', id, null, null, 'by associate');
-  await associateService.notify(a, 'bank_changed', `A change of your bank details (to ${result.bank_name} ••••${result.account_number.slice(-4)}) was received on ${associateService.jMY()}. It is used once NexaCrest has checked it. ${await associateService.bankPaymentsSentence(Number(a.id))} If you did not ask for this, contact NexaCrest at once.`);
+  // D-293: the associate confirms it first (code to their registered e-mail), then NexaCrest verifies it.
+  await require('../services/associateBankConfirmation').start(id, a, true, null);
   for (const uid of await permissionRepository.usersWithPermission('manage_associate_bank')) {
-    await notificationRepository.create(uid, null, 'associate_bank_change', null, `Associate ${a.name} asked to change their bank details — two people must verify it.`);
+    await notificationRepository.create(uid, null, 'associate_bank_change', null, `Associate ${a.name} asked to change their bank details — they confirm them first, then one person verifies them.`);
   }
-  flash.set(req, 'success', `Bank change received. It is used once NexaCrest has verified it. ${await associateService.bankPaymentsSentence(Number(a.id))}`);
+  flash.set(req, 'success', `New bank details received. Please confirm them now with the code we e-mail you. ${await associateService.bankPaymentsSentence(Number(a.id))}`);
+  res.redirect('/associate/bank/confirm');
+}
+
+// ---------------------------------------------------------------- D-293: the associate confirms new bank details
+
+/** The confirm page: current vs new, last 4 digits, the e-mailed code, "These are my bank details". */
+async function showBankConfirm(req, res) {
+  const a = await me(req);
+  const confirmation = require('../services/associateBankConfirmation');
+  const b = await confirmation.open(Number(a.id));
+  if (!b) {
+    flash.set(req, 'info', 'No new bank details are waiting for your confirmation.');
+    res.redirect('/associate/profile');
+    return;
+  }
+  const devCode = req.session ? req.session.associateBankCodeDev : null;
+  if (req.session) delete req.session.associateBankCodeDev;
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
+  await render(req, res, 'bank_confirm', {
+    b, current: await associateBankRepository.usable(Number(a.id)),
+    byName: Number(b.requested_by_associate) === 1 ? 'you' : 'NexaCrest (from your signed form)', maskedEmail: bankDetailsCheck.maskEmail(a.email || ''),
+    codeMinutes: bankDetailsCheck.CODE_MINUTES, devCode: associatePortalService.showCodeOnScreen() ? devCode : null,
+  });
+}
+
+async function sendBankCode(req, res) {
+  const a = await me(req);
+  const confirmation = require('../services/associateBankConfirmation');
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
+  const b = await confirmation.open(Number(a.id));
+  if (!b) {
+    flash.set(req, 'error', 'No new bank details are waiting for your confirmation.');
+    res.redirect('/associate/profile');
+    return;
+  }
+  if (await confirmation.sendCode(a, b, req)) {
+    flash.set(req, 'success', `We e-mailed a 6-digit code to ${bankDetailsCheck.maskEmail(a.email)}. It is valid for ${bankDetailsCheck.CODE_MINUTES} minutes.`);
+  } else {
+    flash.set(req, 'error', 'There is no e-mail address on your account — contact NexaCrest.');
+  }
+  res.redirect('/associate/bank/confirm');
+}
+
+async function confirmBank(req, res) {
+  const a = await me(req);
+  const confirmation = require('../services/associateBankConfirmation');
+  const b = await confirmation.open(Number(a.id));
+  const body = req.body || {};
+  const error = !b ? 'No new bank details are waiting for your confirmation.' : await confirmation.confirm(a, Number(b.id), body.last4, body.code, !!body.mine);
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(b ? '/associate/bank/confirm' : '/associate/profile');
+    return;
+  }
+  flash.set(req, 'success', `Thank you — confirmed. NexaCrest will now check the new details. ${await confirmation.usableSentence(Number(a.id))}`);
+  res.redirect('/associate/profile');
+}
+
+async function bankNotMe(req, res) {
+  const a = await me(req);
+  const confirmation = require('../services/associateBankConfirmation');
+  const b = await confirmation.open(Number(a.id));
+  if (!b || !(await confirmation.notMe(a, Number(b.id)))) {
+    flash.set(req, 'error', 'No new bank details are waiting for your confirmation.');
+    res.redirect('/associate/profile');
+    return;
+  }
+  flash.set(req, 'error', confirmation.NOT_ME_MESSAGE);
   res.redirect('/associate/profile');
 }
 
@@ -675,5 +782,6 @@ module.exports = {
   proposeCode,
   codeLink, showLogin, login, showCode, verifyCode, logout, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
+  showBankConfirm, sendBankCode, confirmBank, bankNotMe, commissionHeadline,
   messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,
 };

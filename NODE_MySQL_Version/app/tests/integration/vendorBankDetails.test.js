@@ -8,6 +8,7 @@ const vendorDetailsController = require('../../src/controllers/vendorDetailsCont
 const supplierRepository = require('../../src/repositories/supplierRepository');
 const logisticsPartnerRepository = require('../../src/repositories/logisticsPartnerRepository');
 const vendorDetailsRepository = require('../../src/repositories/vendorDetailsRepository');
+const vendorBankChangeRepository = require('../../src/repositories/vendorBankChangeRepository');
 const { TEST_ADMIN_EMAIL } = require('../support/globalSetup');
 
 /**
@@ -16,6 +17,11 @@ const { TEST_ADMIN_EMAIL } = require('../support/globalSetup');
  * staff on their behalf, or by them through a one-use Vendor Details Link.
  * Account numbers are stored encrypted; a change by the vendor (or by staff
  * without ticking "verified") must be checked again before paying.
+ *
+ * Owner decisions 11 Nov 2026 (D-294): a change no longer replaces the account
+ * in use — it waits (vendor_bank_changes) for the vendor's confirmation through
+ * a link e-mailed to the registered e-mail, then for staff verification. The
+ * full flow is tested in associateOwnerDecisionsNov11.test.js.
  */
 describe('Vendor bank details and the Vendor Details Link (owner request 2026-10-27)', () => {
   let userId;
@@ -57,27 +63,32 @@ describe('Vendor bank details and the Vendor Details Link (owner request 2026-10
     return { id: row ? row.id : null, name, flash: out.flash };
   }
 
-  it('lets staff fill the bank details, stored encrypted', async () => {
+  it('lets staff fill the bank details, stored encrypted — waiting for confirmation (D-294)', async () => {
     const bad = await createSupplier({ ...BANK, bank_account_number_confirm: '999' });
     expect(bad.id).toBeNull();
     expect(bad.flash.message).toContain('do not match');
 
-    const { id, name } = await createSupplier({ ...BANK, bank_verified: '1' });
+    const { id, name } = await createSupplier({ ...BANK });
     const row = await supplierRepository.find(id);
-    expect(String(row.bank_account_number)).not.toContain('123456789012');
-    let bank = vendorDetailsRepository.bankDetails(row);
-    expect(bank.bank_account_number).toBe('123456789012');
-    expect(bank.bank_ifsc).toBe('SBIN0001234');
-    expect(bank.bank_verified_at).toBeTruthy();
+    expect(vendorDetailsRepository.bankDetails(row).has_bank).toBe(false); // not in use until confirmed and verified
+    const [change] = await vendorBankChangeRepository.forVendor('supplier', id);
+    expect(change.status).toBe('awaiting_confirmation');
+    expect(String(change.bank_account_number)).not.toContain('123456789012');
+    expect(vendorBankChangeRepository.number(change)).toBe('123456789012');
+    expect(change.bank_ifsc).toBe('SBIN0001234');
+    expect(change.sent_to_email).toBe('accounts@heera.test');
 
-    const keep = { ...BANK, bank_ifsc: 'SBIN0001234', bank_account_number: '', bank_account_number_confirm: '' };
-    await call(supplierController.update, { id: String(id) }, { supplier_legal_name: name, types: ['Quarry Owner'], address: 'New road', ...keep });
-    expect(vendorDetailsRepository.bankDetails(await supplierRepository.find(id)).bank_verified_at).toBeTruthy();
+    // Editing the address only records no bank change.
+    await call(supplierController.update, { id: String(id) }, { supplier_legal_name: name, types: ['Quarry Owner'], address: 'New road' });
+    expect(await vendorBankChangeRepository.forVendor('supplier', id)).toHaveLength(1);
 
-    await call(supplierController.update, { id: String(id) }, { supplier_legal_name: name, types: ['Quarry Owner'], ...keep, bank_account_number: '555566667777', bank_account_number_confirm: '555566667777' });
-    bank = vendorDetailsRepository.bankDetails(await supplierRepository.find(id));
-    expect(bank.bank_account_number).toBe('555566667777');
-    expect(bank.bank_verified_at).toBeFalsy();
+    // A new account number replaces the change still waiting.
+    await call(supplierController.update, { id: String(id) }, { supplier_legal_name: name, types: ['Quarry Owner'], bank_account_number: '555566667777', bank_account_number_confirm: '555566667777',
+      bank_account_name: 'Heera Granites', bank_name: 'State Bank of India', bank_ifsc: 'SBIN0001234' });
+    const changes = await vendorBankChangeRepository.forVendor('supplier', id);
+    expect(vendorBankChangeRepository.number(changes[0])).toBe('555566667777');
+    expect([changes[0].status, changes[1].status, changes[1].cancelled_how]).toEqual(['awaiting_confirmation', 'cancelled', 'replaced']);
+    expect(vendorDetailsRepository.bankDetails(await supplierRepository.find(id)).has_bank).toBe(false);
   });
 
   it('lets the vendor fill their details once through the link', async () => {
@@ -91,15 +102,16 @@ describe('Vendor bank details and the Vendor Details Link (owner request 2026-10
     const refused = await call(vendorDetailsController.submit, { token }, { ...BANK, bank_ifsc: 'BAD' });
     expect(refused.flash.message).toContain('valid 11-character IFSC');
 
-    const done = await call(vendorDetailsController.submit, { token }, { ...BANK, gstin: '08AAAAA0000A1Z5', contact_person: 'Mahesh' });
+    const done = await call(vendorDetailsController.submit, { token }, { ...BANK, gstin: '08AAAAA0000A1Z5', contact_person: 'Accounts Manager' });
     expect(done.res.view).toBe('vendor_details/thanks');
     const row = await supplierRepository.find(id);
-    const bank = vendorDetailsRepository.bankDetails(row);
-    expect(bank.bank_account_number).toBe('123456789012');
-    expect(bank.bank_updated_source).toBe('vendor');
-    expect(bank.bank_verified_at).toBeFalsy();
+    // D-294: what the vendor typed waits for their confirmation (link to the registered e-mail), then staff verify it.
+    expect(vendorDetailsRepository.bankDetails(row).has_bank).toBe(false);
+    const [change] = await vendorBankChangeRepository.forVendor('supplier', id);
+    expect([change.status, change.entered_source, change.sent_to_email]).toEqual(['awaiting_confirmation', 'vendor', 'accounts@heera.test']);
+    expect(vendorBankChangeRepository.number(change)).toBe('123456789012');
     expect(row.gstin).toBe('08AAAAA0000A1Z5');
-    expect(row.contact_person).toBe('Mahesh');
+    expect(row.contact_person).toBe('Accounts Manager');
     expect((await call(vendorDetailsController.show, { token }, {})).res.view).toBe('vendor_details/link_expired');
   });
 
@@ -111,9 +123,9 @@ describe('Vendor bank details and the Vendor Details Link (owner request 2026-10
     const shown = await call(vendorDetailsController.show, { token }, {});
     expect(shown.res.locals.kind).toBe('logistics_partner');
 
-    await call(vendorDetailsController.submit, { token }, { bank_account_name: 'Blue Wave', bank_name: 'HDFC', bank_ifsc: 'HDFC0000123', contact_person_name: 'Ravi' });
+    await call(vendorDetailsController.submit, { token }, { bank_account_name: 'Blue Wave', bank_name: 'HDFC', bank_ifsc: 'HDFC0000123', contact_person_name: 'Operations Manager' });
     const partner = await logisticsPartnerRepository.find(partnerId);
-    expect(partner.contact_person_name).toBe('Ravi');
+    expect(partner.contact_person_name).toBe('Operations Manager');
     expect(vendorDetailsRepository.bankDetails(partner).bank_account_number).toBe('998877665544');
   });
 });

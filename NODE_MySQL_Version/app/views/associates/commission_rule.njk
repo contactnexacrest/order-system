@@ -1,0 +1,47 @@
+{# Port of associates/commission_rule.php. Owner decisions 11 Nov 2026, point 8 (D-291): the MD sets an associate's
+   commission rule — Standard ladder (default) / Own ladder (a copy of the standard ladder, edited; it overrides it) /
+   Fixed %. A reason is needed (Audit Log); it applies to new orders only.
+   Expects a, chosen, rows, levels (each with label), ruleLabels, currentRule, standardSummary. #}
+{% set __help = {'ladder': '— the default for every associate', 'own_ladder': '— a copy of the standard ladder, changed for this associate; it overrides the standard ladder', 'fixed': '— the same % on every order'} %}
+<div class="card page-wide">
+  <h1>Commission rule — {{ a.name }}</h1>
+  <p class="muted">Now: <b>{{ currentRule }}</b>. The standard ladder: {{ standardSummary }}.
+    A change applies to new orders only — an order keeps the % fixed on it when its Proforma Invoice was issued.</p>
+  <form method="post" action="/associates/{{ a.id }}/commission-rule">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset><legend>Rule *</legend>
+      {% for k, l in ruleLabels %}
+        <label class="checkbox-label"><input type="radio" name="rule" value="{{ k }}" required{% if chosen == k %} checked{% endif %}> {{ l }}
+          <small class="muted">{{ __help[k] }}</small></label>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset><legend>Fixed %</legend>
+      <label>Commission level for a fixed %<select name="commission_level_id" data-required-when="rule=fixed" data-required-when-message="Choose the commission level (its %).">
+        <option value="">Choose…</option>
+        {% for l in levels %}{% if l.is_active == 1 or (l.id | int) == (a.commission_level_id | int) %}
+          <option value="{{ l.id }}"{% if (l.id | int) == (a.commission_level_id | int) %} selected{% endif %}>{{ l.label }} ({{ l.name }})</option>
+        {% endif %}{% endfor %}
+      </select></label>
+    </fieldset>
+
+    <fieldset><legend>Own ladder <small class="muted">(used with "Own ladder"; steps start at order 1 and run on without gaps; leave the last "to" empty)</small></legend>
+      <table class="list">
+        <tr><th>From order no.</th><th>To order no.</th><th>Level</th><th>Remove</th></tr>
+        {% for s in rows %}{% set i = loop.index0 %}
+          <tr>
+            <td><input type="number" name="from[{{ i }}]" min="1" step="1" value="{{ s.from_order }}" placeholder="e.g. 1" aria-label="From order number, step {{ i + 1 }}"></td>
+            <td><input type="number" name="to[{{ i }}]" min="1" step="1" value="{{ s.to_order if s.to_order !== null else '' }}" placeholder="empty = onward" aria-label="To order number, step {{ i + 1 }} (empty = onward)"></td>
+            <td><select name="level_id[{{ i }}]" aria-label="Level, step {{ i + 1 }}"><option value="">—</option>
+              {% for l in levels %}<option value="{{ l.id }}"{% if (s.level_id | string) == (l.id | string) %} selected{% endif %}>{{ l.name }} — {{ l.label }}{{ '' if l.is_active == 1 else ' (inactive)' }}</option>{% endfor %}
+            </select></td>
+            <td>{% if s.from_order !== '' %}<label class="inline"><input type="checkbox" name="remove[{{ i }}]" value="1"> Remove</label>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </fieldset>
+
+    <label>Reason * <small class="muted">(kept in the Audit Log)</small><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="e.g. Strong partner in UAE — agreed 10 Nov"></label>
+    <div class="btn-row"><button type="submit">Save the rule</button> <a href="/associates/{{ a.id }}#commission-rule">Cancel</a></div>
+  </form>
+</div>

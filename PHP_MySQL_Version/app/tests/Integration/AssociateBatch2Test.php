@@ -125,9 +125,10 @@ final class AssociateBatch2Test extends DbTestCase
     {
         $a = $this->associate(['gstin' => '29ABCDE1234F1Z5']);
         $labels = array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($a));
-        self::assertSame(['PAN card', 'Aadhaar card or passport', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate'], $labels);
+        // D-290 (11 Nov 2026): ID proof and address proof are separate required items in India and abroad.
+        self::assertSame(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate'], $labels);
         $abroad = $this->associate(['based_in' => 'abroad', 'currency_code' => 'USD']);
-        self::assertSame(['Passport / ID', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement'], array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($abroad)));
+        self::assertSame(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement'], array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($abroad)));
 
         $pan = $this->doc((int) $a['id'], 'pan', 'ABCDE1234F');
         $aad = $this->doc((int) $a['id'], 'aadhaar', 'XXXX XXXX 1234');

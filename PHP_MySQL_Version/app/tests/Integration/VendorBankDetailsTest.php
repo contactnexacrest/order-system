@@ -11,6 +11,7 @@ use App\Controllers\VendorDetailsController;
 use App\Helpers\Flash;
 use App\Repositories\LogisticsPartnerRepository;
 use App\Repositories\SupplierRepository;
+use App\Repositories\VendorBankChangeRepository;
 use App\Repositories\VendorDetailsRepository;
 use App\Tests\Support\DbTestCase;
 
@@ -20,6 +21,11 @@ use App\Tests\Support\DbTestCase;
  * them through a one-use Vendor Details Link. Account numbers are stored
  * encrypted; a change by the vendor (or by staff without ticking
  * "verified") must be checked again before paying.
+ *
+ * Owner decisions 11 Nov 2026 (D-294): a change no longer replaces the account
+ * in use — it waits (vendor_bank_changes) for the vendor's confirmation through
+ * a link e-mailed to the registered e-mail, then for staff verification. The
+ * full flow is tested in AssociateOwnerDecisionsNov11Test.
  */
 final class VendorBankDetailsTest extends DbTestCase
 {
@@ -61,26 +67,30 @@ final class VendorBankDetailsTest extends DbTestCase
         self::assertNull($this->createSupplier(['bank_account_number_confirm' => '999'] + self::BANK), 'mismatched account numbers save nothing');
         self::assertStringContainsString('do not match', $this->lastFlash()['message']);
 
-        $id = $this->createSupplier(self::BANK + ['bank_verified' => '1']);
+        // D-294: the details wait for the supplier's confirmation — not in use yet, stored encrypted on the change.
+        $id = $this->createSupplier(self::BANK);
         $row = SupplierRepository::find($id);
-        self::assertStringNotContainsString('123456789012', (string) $row['bank_account_number'], 'stored encrypted, never in plain text');
-        $bank = VendorDetailsRepository::bankDetails($row);
-        self::assertSame('123456789012', $bank['bank_account_number']);
-        self::assertSame('SBIN0001234', $bank['bank_ifsc']);
-        self::assertNotNull($bank['bank_verified_at']);
+        self::assertFalse(VendorDetailsRepository::bankDetails($row)['has_bank'], 'not in use until confirmed and verified');
+        $change = VendorBankChangeRepository::forVendor('supplier', $id)[0];
+        self::assertSame('awaiting_confirmation', $change['status']);
+        self::assertStringNotContainsString('123456789012', (string) $change['bank_account_number'], 'stored encrypted, never in plain text');
+        self::assertSame('123456789012', VendorBankChangeRepository::number($change));
+        self::assertSame('SBIN0001234', $change['bank_ifsc']);
+        self::assertSame('accounts@heera.test', $change['sent_to_email'], 'the confirmation link goes to the registered e-mail');
 
-        // Editing the address only keeps the bank details — and their verification.
-        $_POST = ['supplier_legal_name' => $row['supplier_legal_name'], 'types' => ['Quarry Owner'], 'address' => 'New road'] + array_diff_key(self::BANK, ['bank_account_number' => 1, 'bank_account_number_confirm' => 1]) + ['bank_ifsc' => 'SBIN0001234'];
-        $_POST['bank_ifsc'] = 'SBIN0001234';
+        // Editing the address only records no bank change.
+        $_POST = ['supplier_legal_name' => $row['supplier_legal_name'], 'types' => ['Quarry Owner'], 'address' => 'New road'];
         (new SupplierController())->update(['id' => (string) $id]);
-        self::assertNotNull(VendorDetailsRepository::bankDetails(SupplierRepository::find($id))['bank_verified_at']);
+        self::assertCount(1, VendorBankChangeRepository::forVendor('supplier', $id));
 
-        // A new account number without the tick must be verified again.
-        $_POST['bank_account_number'] = $_POST['bank_account_number_confirm'] = '555566667777';
+        // A new account number replaces the change still waiting.
+        $_POST = ['supplier_legal_name' => $row['supplier_legal_name'], 'types' => ['Quarry Owner'], 'bank_account_number' => '555566667777', 'bank_account_number_confirm' => '555566667777',
+            'bank_account_name' => 'Heera Granites', 'bank_name' => 'State Bank of India', 'bank_ifsc' => 'SBIN0001234'];
         (new SupplierController())->update(['id' => (string) $id]);
-        $bank = VendorDetailsRepository::bankDetails(SupplierRepository::find($id));
-        self::assertSame('555566667777', $bank['bank_account_number']);
-        self::assertNull($bank['bank_verified_at']);
+        $changes = VendorBankChangeRepository::forVendor('supplier', $id);
+        self::assertSame('555566667777', VendorBankChangeRepository::number($changes[0]));
+        self::assertSame(['awaiting_confirmation', 'cancelled', 'replaced'], [$changes[0]['status'], $changes[1]['status'], $changes[1]['cancelled_how']]);
+        self::assertFalse(VendorDetailsRepository::bankDetails(SupplierRepository::find($id))['has_bank']);
     }
 
     public function testTheVendorFillsTheirDetailsOnceThroughTheLink(): void
@@ -102,17 +112,18 @@ final class VendorBankDetailsTest extends DbTestCase
         self::assertStringContainsString('valid 11-character IFSC', $this->lastFlash()['message']);
         self::assertFalse(VendorDetailsRepository::bankDetails(SupplierRepository::find($id))['has_bank']);
 
-        $_POST = self::BANK + ['gstin' => '08AAAAA0000A1Z5', 'contact_person' => 'Mahesh'];
+        $_POST = self::BANK + ['gstin' => '08AAAAA0000A1Z5', 'contact_person' => 'Accounts Manager'];
         ob_start();
         (new VendorDetailsController())->submit(['token' => $token]);
         self::assertStringContainsString('Thank you', (string) ob_get_clean());
         $row = SupplierRepository::find($id);
-        $bank = VendorDetailsRepository::bankDetails($row);
-        self::assertSame('123456789012', $bank['bank_account_number']);
-        self::assertSame('vendor', $bank['bank_updated_source']);
-        self::assertNull($bank['bank_verified_at'], 'what the vendor typed is checked by staff before paying');
+        // D-294: what the vendor typed waits for their confirmation (link to the registered e-mail), then staff verify it.
+        self::assertFalse(VendorDetailsRepository::bankDetails($row)['has_bank']);
+        $change = VendorBankChangeRepository::forVendor('supplier', $id)[0];
+        self::assertSame(['awaiting_confirmation', 'vendor', 'accounts@heera.test'], [$change['status'], $change['entered_source'], $change['sent_to_email']]);
+        self::assertSame('123456789012', VendorBankChangeRepository::number($change));
         self::assertSame('08AAAAA0000A1Z5', $row['gstin']);
-        self::assertSame('Mahesh', $row['contact_person']);
+        self::assertSame('Accounts Manager', $row['contact_person']);
 
         ob_start();
         (new VendorDetailsController())->show(['token' => $token]);
@@ -134,12 +145,12 @@ final class VendorBankDetailsTest extends DbTestCase
         self::assertStringContainsString('ending <strong>5544</strong>', $page);
         self::assertStringNotContainsString('998877665544', $page);
 
-        $_POST = ['bank_account_name' => 'Blue Wave', 'bank_name' => 'HDFC', 'bank_ifsc' => 'HDFC0000123', 'contact_person_name' => 'Ravi'];
+        $_POST = ['bank_account_name' => 'Blue Wave', 'bank_name' => 'HDFC', 'bank_ifsc' => 'HDFC0000123', 'contact_person_name' => 'Operations Manager'];
         ob_start();
         (new VendorDetailsController())->submit(['token' => $token]);
         ob_end_clean();
         $partner = LogisticsPartnerRepository::find($partnerId);
-        self::assertSame('Ravi', $partner['contact_person_name']);
+        self::assertSame('Operations Manager', $partner['contact_person_name']);
         self::assertSame('998877665544', VendorDetailsRepository::bankDetails($partner)['bank_account_number'], 'an empty account number keeps the one on file');
     }
 }

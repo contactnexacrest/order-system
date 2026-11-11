@@ -40,6 +40,6 @@ $__bv = static fn(string $k): string => htmlspecialchars((string) ($__b[$k] ?? '
           </select>
         </label>
         <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="<?= $__bv('bank_upi_id') ?>" placeholder="e.g., name@sbi"></label>
-        <label class="checkbox-row full" style="font-weight:normal;"><input type="checkbox" name="bank_verified" value="1"> I have verified these bank details (cancelled cheque / bank letter)</label>
       </div>
+      <p class="muted small" data-bank-change-note>New or changed bank details do not replace the account above straight away: a confirmation link goes to their registered e-mail; once they confirm, someone other than the person who typed them verifies them (Bank details changes, below the form). The account is then used after the waiting days in Associates › Commission settings.</p>
     </fieldset>

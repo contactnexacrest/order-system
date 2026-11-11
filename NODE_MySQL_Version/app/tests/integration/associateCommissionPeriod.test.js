@@ -215,7 +215,7 @@ describe('Associate commission period and no business totals (D-263)', () => {
     const set = await associateCommission.settings();
     const fields = {
       associate_tds_pct: '2', associate_bank_wait_days: '2', associate_commission_due_days: String(set.due_days), associate_payout_run: set.run,
-      associate_payout_day: String(set.day), associate_counting_threshold_inr: String(set.threshold_inr), associate_protection_months: String(set.registration_months),
+      associate_payout_day: set.last_day ? 'last' : String(set.day), associate_counting_threshold_inr: String(set.threshold_inr), associate_protection_months: String(set.registration_months),
       associate_gst_pct: String(set.gst_pct), associate_claim_hold: set.claim_hold ? '1' : '',
     };
     const save = async (agent, months) => {
@@ -284,7 +284,8 @@ describe('Associate commission period and no business totals (D-263)', () => {
 
     const [level] = await associateCommission.levelForAssociate(full, null);
     const fullProfile = (await (await portal(full)).get('/associate/profile')).text;
-    expect(fullProfile).toContain(`Your commission on your next order: ${associateCommission.rateLabel(level)}`);
+    // D-292 (owner 11 Nov 2026): only the current %, "of the FOB value of each order from the clients you introduced".
+    expect(fullProfile).toContain(`>${associateCommission.rateLabel(level)}</span> <b>of the FOB value of each order from the clients you introduced</b>`);
     if (level) expect(fullProfile).not.toContain(`${level.name} —`);
     expect(fullProfile).not.toContain('Ladder — your next order');
 

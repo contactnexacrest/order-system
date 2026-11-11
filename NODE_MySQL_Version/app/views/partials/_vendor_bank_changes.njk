@@ -1,0 +1,53 @@
+{# Port of _vendor_bank_changes.php. Owner decisions 11 Nov 2026, point 18 (D-294): a supplier's / logistics
+   partner's bank details changes — waiting for their confirmation (link to the registered e-mail; "Send the
+   link again"), then verified by one person other than the one who typed them (at least 2 checks; MD/ED may
+   verify their own entry with a reason), then in use after the waiting days. Outside the edit form.
+   Expects bankPanel (vendorBankChangeService.panelData). #}
+{% if bankPanel and bankPanel.changes.length %}
+<div class="section" id="bank-changes">
+  <h2>Bank details changes</h2>
+  <table class="list">
+    <tr><th>Entered</th><th>New account</th><th>Status</th><th>Checks</th><th>Action</th></tr>
+    {% for c in bankPanel.changes %}{% set __act = bankPanel.base ~ '/bank-changes/' ~ c.id %}
+      <tr>
+        <td>{{ c.entered_on }}<br><small class="muted">{% if c.entered_source == 'vendor' %}by them (details link){% else %}by {{ c.entered_by_name or 'staff' }}{% endif %}</small></td>
+        <td>{{ c.name }}<br><small class="muted">{{ ((c.bank_account_name or '') ~ ' ' ~ (c.bank_ifsc or '')) | trim }}</small></td>
+        <td data-bank-status>{{ c.status_text }}</td>
+        <td><small>{{ c.checks_text }}{% if c.first_checked_by_name %}<br>1: {{ c.first_checked_by_name }}{% endif %}{% if c.verified_by_name %}<br>Verified by {{ c.verified_by_name }}{% endif %}{% if c.verify_note %}<br>{{ c.verify_note }}{% endif %}{% if c.self_verify_reason %}<br>Own entry — reason: {{ c.self_verify_reason }}{% endif %}</small></td>
+        <td>
+        {% if c.status == 'awaiting_confirmation' %}
+          <small class="muted">Verify is available once they confirm.</small>
+          <form method="post" action="{{ __act }}/resend" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Send the link again</button></form>
+        {% elif c.status == 'pending' %}
+          {% if c.own and not bankPanel.maySelf %}
+            <small class="muted">Someone else must verify details you entered.</small>
+          {% elif bankPanel.two and c.first_checked_by and (c.first_checked_by | int) == bankPanel.userId %}
+            <small class="muted">A different person verifies — you did the first check.</small>
+          {% elif bankPanel.two and c.first_checked_by %}
+            <form method="post" action="{{ __act }}/verify" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              {% if c.own %}<input type="text" name="self_reason" required minlength="10" maxlength="300" placeholder="e.g. Only finance person is on leave until 20 Nov" aria-label="Why you verify details you entered yourself">{% endif %}
+              <button type="submit" class="btn-sm">Verify (second person)</button></form>
+          {% else %}
+            <form method="post" action="{{ __act }}/{{ 'check' if bankPanel.two else 'verify' }}">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <fieldset><legend>How did you check it? <small class="muted">(tick at least two)</small></legend>
+                <label class="checkbox-label"><input type="checkbox" name="check_bank_proof" value="1" data-min-ticked="check_bank_proof,check_phone,check_test_payment:2" data-min-ticked-message="Tick at least two of the ways you checked the bank details."> Matches the bank proof (cancelled cheque / bank letter)</label>
+                <label class="checkbox-label"><input type="checkbox" name="check_phone" value="1"> Called them on their registered phone number and they confirmed the last 4 digits</label>
+                <label class="checkbox-label"><input type="checkbox" name="check_test_payment" value="1"> Test payment of ₹1 received in the right name</label>
+                <label>Bank reference of the test payment (UTR)<input type="text" name="test_payment_ref" minlength="3" maxlength="60" placeholder="e.g. UTR 412345678901" data-required-when="check_test_payment=1" data-required-when-message="Enter the bank reference (UTR) of the test payment."></label>
+                <label>Note (optional)<input type="text" name="verify_note" maxlength="300" placeholder="e.g. Spoke to their accounts on 11 Nov at 3 pm"></label>
+                {% if c.own %}<label>You entered these details yourself — give the reason you verify them *<input type="text" name="self_reason" required minlength="10" maxlength="300" placeholder="e.g. Only finance person is on leave until 20 Nov"></label>{% endif %}
+              </fieldset>
+              <button type="submit" class="btn-sm">{{ 'First check' if bankPanel.two else 'Verify' }}</button>
+            </form>
+          {% endif %}
+        {% endif %}
+        {% if c.status == 'awaiting_confirmation' or c.status == 'pending' %}
+          <form method="post" action="{{ __act }}/reject" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason for rejecting" aria-label="Reason for rejecting"><button type="submit" class="btn-sm btn-secondary">Reject</button></form>
+        {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

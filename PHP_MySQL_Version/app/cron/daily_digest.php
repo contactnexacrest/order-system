@@ -19,6 +19,12 @@ echo \App\Services\DailyDigestService::summary($result) . "\n";
 $reminders = \App\Services\AssociateService::dailyReminders();
 echo "Associate reminders: {$reminders} sent.\n";
 
+// Owner decisions 11 Nov 2026 (D-293 / D-294): new bank details not confirmed in 7 days are cancelled (the old account stays);
+// supplier bank changes whose waiting days are over are put in use.
+$bankExpired = \App\Services\AssociateBankConfirmation::expireOverdue();
+$vendorBank = \App\Services\VendorBankChangeService::daily();
+echo "Bank changes: {$bankExpired} associate and {$vendorBank['expired']} supplier change(s) cancelled (not confirmed); {$vendorBank['applied']} supplier change(s) put in use.\n";
+
 // Owner decision D-245 P4: N days before each payout run, remind the MD of orders ready to lock but not locked.
 // D-264: associate commission fixed at full payment (catch-up), held / released for buyer claims, worked out again after a settlement, small abroad amounts carried.
 $associatePayouts = \App\Services\AssociatePayoutService::daily();

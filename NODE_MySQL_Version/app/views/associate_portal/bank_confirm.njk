@@ -1,0 +1,38 @@
+{# Port of associate_portal/bank_confirm.php. Owner decision 11 Nov 2026, point 18 (D-293): the associate confirms
+   new bank details — current vs new, re-type the last 4 digits of the NEW account, a fresh 6-digit code sent to the
+   registered e-mail, "These are my bank details". Or "This is not me — cancel it".
+   Expects b, current (verified account in use or null), byName, maskedEmail, codeMinutes, devCode. #}
+<div class="card page-wide">
+  <h1>Please confirm your new bank details</h1>
+  <p>Requested on <b>{{ b.requested_at | shortDate }}</b> by <b>{{ byName }}</b>.</p>
+  <table class="list" data-bank-compare>
+    <tr><th></th><th>Current (paid to now)</th><th>New (waiting for you)</th></tr>
+    <tr><th>Bank</th><td>{{ (current.bank_name or '—') if current else '—' }}</td><td><b>{{ b.bank_name }}</b></td></tr>
+    <tr><th>Account holder</th><td>{{ (current.holder_name or '—') if current else '—' }}</td><td><b>{{ b.holder_name }}</b></td></tr>
+    <tr><th>Account number</th><td>{{ ('••••••••' ~ current.account_last4) if current else '—' }}</td><td><b>••••••••{{ b.account_last4 }}</b></td></tr>
+    <tr><th>IFSC / SWIFT</th><td>{{ ((((current.ifsc or '') ~ ' ' ~ (current.swift or '')) | trim) or '—') if current else '—' }}</td><td><b>{{ ((b.ifsc or '') ~ ' ' ~ (b.swift or '')) | trim }}</b></td></tr>
+    <tr><th>Currency</th><td>{{ (current.account_currency or '—') if current else '—' }}</td><td><b>{{ b.account_currency }}</b></td></tr>
+  </table>
+
+  <form method="post" action="/associate/bank/confirm/code" class="inline-form">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <button type="submit" class="btn-sm btn-secondary">{{ 'E-mail me a code' if not b.confirm_code_hash else 'Send a new code' }}</button>
+    <span class="muted small">to {{ maskedEmail }} — valid {{ codeMinutes }} minutes</span>
+  </form>
+  {% if devCode %}<p class="alert alert-info">Development only — the code is {{ devCode }}.</p>{% endif %}
+
+  <form method="post" action="/associate/bank/confirm">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="field-grid">
+      <label>Type the last 4 digits of the NEW account number *<input type="text" name="last4" required minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="off" placeholder="e.g. 6789" title="The last 4 digits of the new account number"></label>
+      <label>Code we e-mailed to {{ maskedEmail }} *<input type="text" name="code" required minlength="6" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" placeholder="6 digits, e.g. 123456" title="The 6-digit code from the e-mail"></label>
+    </div>
+    <label class="checkbox-label"><input type="checkbox" name="mine" value="1" required> These are my bank details and I want my commission paid to them.</label>
+    <div class="btn-row"><button type="submit">Confirm new bank details</button></div>
+  </form>
+  <form method="post" action="/associate/bank/not-me" data-confirm="Cancel these new bank details? NexaCrest's Managing Director and Finance team will be told.">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <button type="submit" class="btn-danger">This is not me — cancel it</button>
+  </form>
+  <p class="muted small">Not confirmed by <b>{{ b.confirm_by | shortDate }}</b>? The request is cancelled automatically and your current account stays in use.</p>
+</div>

@@ -14,7 +14,7 @@
   </div>
   {% include "associates/_filters.njk" %}
   <table class="list">
-    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th>{% if canManage %}<th>Commission terms</th>{% endif %}{% if canManage or canBank %}<th>Bank</th>{% endif %}<th></th></tr>
+    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th>{% if canRules %}<th>Commission rule</th>{% endif %}{# D-292 #}{% if canManage or canBank %}<th>Bank</th>{% endif %}<th></th></tr>
     {% for a in rows %}
       <tr>
         <td><a href="/associates/{{ a.id }}">{{ a.name }}</a>{% if a.email %}<br><small class="muted">{{ a.email }}</small>{% endif %}</td>
@@ -22,8 +22,8 @@
         <td>{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}</td>
         <td>{{ a.personal_code or '—' }}</td>
         <td>{{ a.clients.length }}{% for c in a.clients.slice(0, 3) %}<br><small><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a></small>{% endfor %}</td>
-        {% if canManage %}<td>{% if a.no_commission == 1 %}No commission{% elif a.commission_mode == 'fixed' %}Fixed: {{ a.commission_level_name or '?' }}{% else %}Ladder{% endif %}</td>{% endif %}
-        {% if canManage or canBank %}<td>{% if a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}</td>{% endif %}
+        {% if canRules %}<td>{% if a.no_commission == 1 %}No commission{% elif a.commission_mode == 'fixed' %}Fixed %: {{ a.commission_level_name or '?' }}{% elif a.commission_mode == 'own_ladder' %}Own ladder{% else %}Standard ladder{% endif %}</td>{% endif %}
+        {% if canManage or canBank %}<td>{% if a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}{% if a.awaiting_bank > 0 %} <span class="badge badge-inactive">Waiting for the associate to confirm</span>{% endif %}</td>{% endif %}
         <td><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></td>
       </tr>
     {% endfor %}

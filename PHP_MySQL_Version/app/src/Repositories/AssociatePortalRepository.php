@@ -146,7 +146,7 @@ final class AssociatePortalRepository
             $label = self::payoutLabel($p, $claim, (string) ($o['incentive_month'] ?? ''));
             return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' || $claim ? 'held' : 'earned'), 'label' => $label,
                 'rate' => $o['locked_rate'] !== null ? (float) $o['locked_rate'] : null, 'source' => $o['associate_rate_source'] ?? null, 'amount' => (float) ($p['amount_fc'] ?? $o['associate_amount_fc']),
-                'level' => self::levelText($o, $associateId), 'detail' => AssociateCommission::forOrder((int) $o['id']),
+                'level' => self::levelText($o, $associateId), 'rate_text' => self::rateText($o, $associateId), 'detail' => AssociateCommission::forOrder((int) $o['id']),
                 // D-264: what an associate in India is paid, fixed in rupees (never shown to an associate abroad).
                 'fixed_inr' => isset($p['amount_inr']) ? (float) $p['amount_inr'] : null, 'fixed_rate' => isset($p['fixed_rate']) && $p['fixed_rate'] !== null ? (float) $p['fixed_rate'] : null,
                 'fixed_on' => $p['fixed_on'] ?? null, 'currency' => (string) $o['currency_code']];
@@ -162,11 +162,14 @@ final class AssociatePortalRepository
         if ($c === null) {
             return $none($repeat);
         }
-        $label = IncentiveService::fullyPaidOn((int) $o['id']) !== null
-            ? 'Buyer has paid in full — NexaCrest is confirming your commission'
-            : 'Not yet earned — waiting for the buyer\'s full payment';
+        // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
+        $fullyPaidOn = IncentiveService::fullyPaidOn((int) $o['id']);
+        $label = $fullyPaidOn !== null
+            ? 'Earned — will be paid on ' . \App\Helpers\Dates::short(AssociateCommission::payoutRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
+            : self::NOT_EARNED_LABEL;
         return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
-            'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), 'detail' => $c];
+            'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
+            'rate_text' => AssociateCommission::rateLabel($c['level']) . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is sent)'), 'detail' => $c];
     }
 
     /**
@@ -175,16 +178,42 @@ final class AssociatePortalRepository
      */
     public static function payoutLabel(array $p, bool $claim, string $incentiveMonth = '', ?string $today = null): string
     {
-        $today ??= date('Y-m-d');
+        // D-292 (owner 11 Nov 2026): the associate's statuses — "Not earned yet — buyer still paying" (see
+        // commission()), "Earned — will be paid on <date>", "Paid on <date> (ref)", "On hold — a buyer claim
+        // on this order is open". A hold by NexaCrest keeps its reason.
         $d = static fn ($v): string => \App\Helpers\Dates::short(substr((string) $v, 0, 10));
+        $claimHeld = $p['status'] === 'held' && (string) ($p['hold_reason'] ?? '') === \App\Services\AssociatePayoutService::CLAIM_HOLD_REASON;
         return match (true) {
-            $p['status'] === 'paid' => 'Paid on ' . $d($p['paid_on']),
+            $p['status'] === 'paid' => 'Paid on ' . $d($p['paid_on']) . (!empty($p['paid_reference']) ? ' (' . $p['paid_reference'] . ')' : ''),
+            $claim || $claimHeld => self::CLAIM_LABEL,
             $p['status'] === 'held' => 'On hold' . (!empty($p['hold_reason']) ? ' — ' . $p['hold_reason'] : ''),
-            $claim => 'Fixed — waiting while a buyer claim on the order is open',
-            !empty($p['due_on']) && $today < (string) $p['due_on'] => 'Fixed — due ' . $d($p['due_on']) . ', paid in the ' . $d($p['payout_run_on']) . ' payout run',
-            !empty($p['payout_run_on']) => 'Due — paid in the ' . $d($p['payout_run_on']) . ' payout run',
-            default => 'Fixed — to be paid in the ' . IncentiveService::monthLabel($incentiveMonth) . ' payout',
+            !empty($p['payout_run_on']) => 'Earned — will be paid on ' . $d($p['payout_run_on']),
+            default => 'Earned — will be paid in the ' . IncentiveService::monthLabel($incentiveMonth) . ' payout',
         };
+    }
+
+    /** D-292: the associate's commission statuses (exact wording, owner 11 Nov 2026). */
+    public const NOT_EARNED_LABEL = 'Not earned yet — buyer still paying';
+    public const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
+
+    /** D-292: the % fixed on an order, as the associate sees it ("5%"), or null when none is fixed yet. */
+    public static function orderRateText(array $row): ?string
+    {
+        if (empty($row['associate_level_kind']) || !isset($row['associate_level_value'])) {
+            return null;
+        }
+        return AssociateCommission::rateLabel(['kind' => (string) $row['associate_level_kind'], 'value' => (float) $row['associate_level_value']]);
+    }
+
+    /** D-292: "5%" — the % fixed on the order (or the rate kept on it); never a level name (the associate's view). */
+    private static function rateText(array $o, int $associateId): ?string
+    {
+        $order = OrderRepository::find((int) $o['id']);
+        $fixed = $order !== null ? AssociateCommission::fixedLevel($order, $associateId) : null;
+        if ($fixed !== null) {
+            return AssociateCommission::rateLabel($fixed);
+        }
+        return $o['locked_rate'] !== null ? rtrim(rtrim(number_format((float) $o['locked_rate'], 2), '0'), '.') . '%' : null;
     }
 
     /** "Level 2 — 5%", as fixed on the order (or the rate kept on it). */
@@ -202,7 +231,7 @@ final class AssociatePortalRepository
     public static function payouts(int $associateId): array
     {
         $stmt = Database::connection()->prepare(
-            "SELECT p.*, o.order_reference, c.company_legal_name FROM incentive_payouts p JOIN orders o ON o.id = p.order_id JOIN clients c ON c.id = o.client_id
+            "SELECT p.*, o.order_reference, c.company_legal_name, o.associate_level_kind, o.associate_level_value FROM incentive_payouts p JOIN orders o ON o.id = p.order_id JOIN clients c ON c.id = o.client_id
               WHERE p.payee_kind = 'associate' AND p.associate_id = :a ORDER BY p.incentive_month DESC, p.id DESC"
         );
         $stmt->execute(['a' => $associateId]);

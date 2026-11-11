@@ -9,7 +9,7 @@
     <tr><th>Agreement</th><td>signed {{ (me.agreement_signed_on | shortDate) if me.agreement_signed_on else '—' }}, ends {{ (me.agreement_ends_on | shortDate) if me.agreement_ends_on else '—' }}{% if me.agreement_file_id %} · <a href="/associate/agreement">Download my agreement</a>{% endif %}</td></tr>
     <tr><th>My commission</th><td>
       {% if me.no_commission == 1 %}No commission under your agreement.{% else %}
-      {{ commissionNow }}<br><small class="muted">On the invoiced FOB of the goods of a client's first orders, at the level fixed on each order when its Proforma Invoice is issued; earned when the buyer has paid in full, due {{ commissionSettings.due_days }} days later and paid in the payout run ({{ runLabel }}).{{ ' GST is added on top once your tax invoice is on file.' if me.gstin }}</small>{% endif %}</td></tr>
+      {% include "associate_portal/_my_commission.njk" %}{# D-292: the current % only, and How it works #}{% endif %}</td></tr>
   </table>
 
   <div class="section">
@@ -31,15 +31,15 @@
     <p>Payments go to: <b>{{ usableBankMasked or 'no verified account yet' }}</b></p>
     <table class="list"><tr><th>Sent</th><th>Account</th><th>Status</th></tr>
       {% for b in banks %}<tr><td>{{ (b.requested_at | shortDate) if b.requested_at else '—' }}</td><td>{{ b.masked }}</td>
-        <td>{% if b.status == 'pending' %}Being checked by NexaCrest{% elif b.status == 'verified' %}Verified{% if b.usable_later %} — used from {{ b.usable_from | shortDate }}{% endif %}{% elif b.status == 'rejected' %}Not accepted: {{ b.rejected_reason }}{% elif b.status == 'superseded' %}Replaced{% else %}{{ b.status }}{% endif %}</td></tr>{% endfor %}
+        <td>{{ b.status_text }}{% if b.status == 'awaiting_confirmation' %} <a class="btn-sm" href="/associate/bank/confirm">Review now</a>{% endif %}</td></tr>{% endfor %}
       {% if banks.length == 0 %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endif %}
     </table>
     <details><summary>{{ 'Add my bank details' if banks.length == 0 else 'Change my bank details' }}</summary>
-      <p class="muted small">A change is checked by two people at NexaCrest and e-mailed to you. Until then, payments keep going to your verified account; a new account is used {{ bankWaitDays }} days after it is verified.</p>
+      <p class="muted small">You confirm new details with a code we e-mail you (within {{ bankConfirmDays }} days), then NexaCrest checks them. Until then, payments keep going to your verified account; a changed account is used {{ bankWaitDays }} days after it is verified{{ (', a first account ' ~ bankWaitFirst ~ ' days after') if bankWaitFirst > 0 }}.</p>
       <form method="post" action="/associate/bank" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {% include "associate_portal/_bank_fields.njk" %}
-        <button type="submit" class="btn-sm">Send for checking</button>
+        <button type="submit" class="btn-sm">Send — then confirm with the e-mailed code</button>
       </form>
     </details>
   </div>
@@ -52,10 +52,11 @@
         <tr><td>{{ i.label }}</td>
           <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ kycLabels[i.status] }}</span>
             {% if i.status == 'rejected' and i.doc and i.doc.review_reason %}<br><small>{{ i.doc.review_reason }} — please upload it again.</small>{% endif %}</td>
-          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}On file at NexaCrest{% else %}—{% endif %}</td></tr>
+          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.id_doc_type %} — {{ idDocTypes[i.doc.id_doc_type] or i.doc.id_doc_type }}{% endif %}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}On file at NexaCrest{% else %}—{% endif %}</td></tr>
       {% endfor %}
     </table>
     <p class="muted small">Commission is paid once every document above is accepted.</p>
+    {% if addressGrace %}<p class="small" data-address-grace>{{ addressGrace }}</p>{% endif %}{# D-290 #}
     <h3>All documents</h3>
     <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
       {% for d in documents %}<tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td>
@@ -69,6 +70,7 @@
       </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
-    <p class="muted small">{{ 'India: PAN card, Aadhaar card (we keep only its last 4 digits) or passport, bank proof, the signed agreement, GST certificate if registered.' if __india else 'Abroad: passport or company registration, bank proof, the signed agreement, tax residency certificate, Form 10F, no-PE declaration.' }}</p>
+    <p class="muted small">{{ 'India: PAN card, ID proof (Aadhaar card — we keep only its last 4 digits — or an ID document), address proof, bank proof, the signed agreement, GST certificate if registered.' if __india else 'Abroad: ID proof (passport, national ID card, residence permit or driving licence), address proof, bank proof, the signed agreement; also tax residency certificate, Form 10F, no-PE declaration.' }}</p>
+    <p class="muted small">ID proof and address proof are two separate uploads. If one document shows both (e.g. a passport with your current address), upload it once as "ID document" and once as "Address proof" — we check each on its own.</p>
   </div>
 </div>

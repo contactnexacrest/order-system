@@ -1,6 +1,6 @@
 <?php
 /** Owner hard rule 2026-11-01: every field, link and action of the Standard list (associates/index.php), as cards by status. */
-$renderKanbanCard = static function (array $a) use ($canManage, $canBank): string {
+$renderKanbanCard = static function (array $a) use ($canManage, $canBank, $canRules): string {
     ob_start();
     ?>
     <div class="entity-card kanban-card">
@@ -8,8 +8,9 @@ $renderKanbanCard = static function (array $a) use ($canManage, $canBank): strin
       <?php if (!empty($a['email'])): ?><div class="muted small"><?= htmlspecialchars((string) $a['email']) ?></div><?php endif; ?>
       <div class="entity-card-sub"><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?> · Code <?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></div>
       <div class="small">Clients: <?= count($a['clients']) ?><?php foreach (array_slice($a['clients'], 0, 3) as $c): ?><br><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a><?php endforeach; ?></div>
-      <?php if ($canManage): ?><div class="muted small"><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : 'Ladder') ?></div><?php endif; ?>
+      <?php if ($canRules): // D-292 ?><div class="muted small"><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed %: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : (($a['commission_mode'] ?? 'ladder') === 'own_ladder' ? 'Own ladder' : 'Standard ladder')) ?></div><?php endif; ?>
       <?php if (($canManage || $canBank) && $a['pending_bank'] > 0): ?><span class="badge badge-pending">Change to check</span><?php endif; ?>
+      <?php if (($canManage || $canBank) && $a['awaiting_bank'] > 0): // D-293 ?><span class="badge badge-inactive">Waiting for the associate to confirm</span><?php endif; ?>
       <div class="entity-card-footer"><a class="btn-sm" href="/associates/<?= (int) $a['id'] ?>">Open</a></div>
     </div>
     <?php

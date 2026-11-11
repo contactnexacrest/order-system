@@ -259,7 +259,7 @@ final class AssociateCommissionPeriodTest extends DbTestCase
         $set = AssociateCommission::settings();
         $fields = [
             'associate_tds_pct' => '2', 'associate_bank_wait_days' => '2', 'associate_commission_due_days' => (string) $set['due_days'], 'associate_payout_run' => $set['run'],
-            'associate_payout_day' => (string) $set['day'], 'associate_counting_threshold_inr' => (string) $set['threshold_inr'],
+            'associate_payout_day' => $set['last_day'] ? 'last' : (string) $set['day'], 'associate_counting_threshold_inr' => (string) $set['threshold_inr'],
             'associate_protection_months' => (string) $set['registration_months'], 'associate_gst_pct' => (string) $set['gst_pct'],
         ] + ($set['claim_hold'] ? ['associate_claim_hold' => '1'] : []);
         $this->asStaff($md);
@@ -325,7 +325,8 @@ final class AssociateCommissionPeriodTest extends DbTestCase
         [$level] = AssociateCommission::levelForAssociate($full, null);
         $this->asAssociate($full);
         $profile = $this->call('GET', '/associate/profile')['body'];
-        self::assertStringContainsString('Your commission on your next order: ' . AssociateCommission::rateLabel($level), $profile);
+        // D-292 (owner 11 Nov 2026): only the current %, "of the FOB value of each order from the clients you introduced".
+        self::assertStringContainsString('>' . AssociateCommission::rateLabel($level) . '</span> <b>of the FOB value of each order from the clients you introduced</b>', $profile);
         if ($level !== null) {
             self::assertStringNotContainsString($level['name'] . ' —', $profile);
         }

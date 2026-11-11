@@ -241,6 +241,11 @@ $router->post('/payment-action/{token}/report', [$paymentAction, 'report'], [Csr
 // Owner request (2026-10-27): no-login Vendor Details Link — a supplier / logistics partner fills in their company and bank details.
 $router->get('/vendor-details/{token}', [$vendorDetails, 'show']);
 $router->post('/vendor-details/{token}', [$vendorDetails, 'submit'], [CsrfCheck::verify()]);
+// Owner decisions 11 Nov 2026 (D-294): the supplier / logistics partner confirms new bank details (link to the registered e-mail).
+$vendorBankChange = new \App\Controllers\VendorBankChangeController();
+$router->get('/vendor-bank-confirm/{token}', [$vendorBankChange, 'show']);
+$router->post('/vendor-bank-confirm/{token}', [$vendorBankChange, 'confirm'], [CsrfCheck::verify()]);
+$router->post('/vendor-bank-confirm/{token}/not-us', [$vendorBankChange, 'notUs'], [CsrfCheck::verify()]);
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -315,6 +320,10 @@ $router->post('/logistics-partners/{id}/update', [$logisticsPartners, 'update'],
 $router->post('/logistics-partners/{id}/toggle', [$logisticsPartners, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/delete', [$logisticsPartners, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
 $router->post('/logistics-partners/{id}/details-link', [$logisticsPartners, 'sendDetailsLink'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+// D-294: verify / first check / reject a bank details change, or e-mail the confirmation link again.
+foreach (['verify' => 'partnerVerify', 'check' => 'partnerCheck', 'reject' => 'partnerReject', 'resend' => 'partnerResend'] as $__a => $__m) {
+    $router->post('/logistics-partners/{id}/bank-changes/{changeId}/' . $__a, [$vendorBankChange, $__m], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_partners'), CsrfCheck::verify()]);
+}
 // Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
 $router->get('/suppliers', [$suppliersDirectory, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
 $router->get('/suppliers/create', [$suppliersDirectory, 'createForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers')]);
@@ -324,6 +333,10 @@ $router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'], [Sessio
 $router->post('/suppliers/{id}/toggle', [$suppliersDirectory, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/delete', [$suppliersDirectory, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/details-link', [$suppliersDirectory, 'sendDetailsLink'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+// D-294: verify / first check / reject a bank details change, or e-mail the confirmation link again.
+foreach (['verify' => 'supplierVerify', 'check' => 'supplierCheck', 'reject' => 'supplierReject', 'resend' => 'supplierResend'] as $__a => $__m) {
+    $router->post('/suppliers/{id}/bank-changes/{changeId}/' . $__a, [$vendorBankChange, $__m], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+}
 $router->post('/suppliers/{id}/factory-addresses', [$suppliersDirectory, 'addFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses/{addressId}/delete', [$suppliersDirectory, 'deleteFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 
@@ -730,6 +743,10 @@ $router->post('/associates/{id}/bank', [$associateAdmin, 'addBank'], [SessionAut
 $router->post('/associates/{id}/bank/{bankId}/check', [$associateAdmin, 'firstCheck'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/bank/{bankId}/verify', [$associateAdmin, 'verifyBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/bank/{bankId}/reject', [$associateAdmin, 'rejectBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+// Owner decisions 11 Nov 2026 (D-291, D-293): remind the associate to confirm new bank details; the MD sets the commission rule.
+$router->post('/associates/{id}/bank/{bankId}/remind', [$associateAdmin, 'remindBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/commission-rule', [$associateAdmin, 'commissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
+$router->post('/associates/{id}/commission-rule', [$associateAdmin, 'saveCommissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
 // Owner decision D-252 (A3): accept / reject one KYC document.
@@ -1075,6 +1092,11 @@ $router->post('/associate/profile', [$associatePortal, 'saveProfile'], [Associat
 $router->post('/associate/documents', [$associatePortal, 'uploadDocument'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/documents/{id}', [$associatePortal, 'downloadDocument'], [AssociateAuth::required()]);
 $router->post('/associate/bank', [$associatePortal, 'requestBank'], [AssociateAuth::required(), CsrfCheck::verify()]);
+// D-293: the associate confirms new bank details (last 4 digits + e-mailed code), or "This is not me — cancel it".
+$router->get('/associate/bank/confirm', [$associatePortal, 'showBankConfirm'], [AssociateAuth::required()]);
+$router->post('/associate/bank/confirm/code', [$associatePortal, 'sendBankCode'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/bank/confirm', [$associatePortal, 'confirmBank'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/bank/not-me', [$associatePortal, 'bankNotMe'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/agreement', [$associatePortal, 'downloadAgreement'], [AssociateAuth::required()]);
 $router->get('/associate/messages', [$associatePortal, 'messages'], [AssociateAuth::required()]);
 $router->post('/associate/messages', [$associatePortal, 'sendMessage'], [AssociateAuth::required(), CsrfCheck::verify()]);

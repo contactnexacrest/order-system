@@ -10,7 +10,7 @@ use App\Config\Database;
 final class AssociateDocumentRepository
 {
     public const KINDS = [
-        'pan' => 'PAN card', 'aadhaar' => 'Aadhaar card', 'identity' => 'Passport / ID', 'bank_proof' => 'Bank proof (cancelled cheque / statement)', 'agreement' => 'Signed agreement', 'address' => 'Address proof', 'gst' => 'GST certificate',
+        'pan' => 'PAN card', 'aadhaar' => 'Aadhaar card', 'identity' => 'ID document', 'bank_proof' => 'Bank proof (cancelled cheque / statement)', 'agreement' => 'Signed agreement', 'address' => 'Address proof', 'gst' => 'GST certificate',
         'company' => 'Company registration', 'tax_residency' => 'Tax residency certificate', 'form_10f' => 'Form 10F',
         'no_pe' => 'No-PE declaration', 'invoice' => 'Commission invoice', 'form_16a' => 'Form 16A (TDS certificate)',
         'form_15ca' => 'Form 15CA', 'form_15cb' => 'Form 15CB', 'other' => 'Other',
@@ -18,12 +18,13 @@ final class AssociateDocumentRepository
     /** What an associate may upload themselves; the rest come from Accounts. */
     public const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
 
-    public static function add(int $associateId, string $kind, int $fileId, ?int $payoutId, ?string $reference, bool $byAssociate, ?int $userId): int
+    /** @param ?string $idDocType D-290: the ID document's type (kind 'identity') — AssociateKyc::ID_DOC_TYPES */
+    public static function add(int $associateId, string $kind, int $fileId, ?int $payoutId, ?string $reference, bool $byAssociate, ?int $userId, ?string $idDocType = null): int
     {
         $pdo = Database::connection();
-        $pdo->prepare('INSERT INTO associate_documents (associate_id, kind, payout_id, file_id, reference, uploaded_by_associate, uploaded_by_user)
-                       VALUES (:a, :k, :p, :f, :r, :ba, :u)')
-            ->execute(['a' => $associateId, 'k' => $kind, 'p' => $payoutId, 'f' => $fileId, 'r' => $reference, 'ba' => $byAssociate ? 1 : 0, 'u' => $userId]);
+        $pdo->prepare('INSERT INTO associate_documents (associate_id, kind, payout_id, file_id, reference, uploaded_by_associate, uploaded_by_user, id_doc_type)
+                       VALUES (:a, :k, :p, :f, :r, :ba, :u, :t)')
+            ->execute(['a' => $associateId, 'k' => $kind, 'p' => $payoutId, 'f' => $fileId, 'r' => $reference, 'ba' => $byAssociate ? 1 : 0, 'u' => $userId, 't' => $idDocType]);
         return (int) $pdo->lastInsertId();
     }
 

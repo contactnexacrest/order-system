@@ -35,6 +35,11 @@ const EXPECTED = [
   'GET /invite/{} public',
   'GET /quotation-details/verify public',
   'POST /associate/bank associate +csrf',
+  // Owner decisions 11 Nov 2026 (D-293): the associate confirms new bank details.
+  'GET /associate/bank/confirm associate',
+  'POST /associate/bank/confirm associate +csrf',
+  'POST /associate/bank/confirm/code associate +csrf',
+  'POST /associate/bank/not-me associate +csrf',
   'POST /associate/code associate +csrf',
   // Owner decisions 4 Nov 2026: the associate's code change (D-254) and the public associate registration form (D-253).
   'POST /associate/code/propose associate +csrf',
@@ -156,6 +161,10 @@ const EXPECTED = [
   'POST /test-mode/enable super-admin +csrf',
   'POST /test-mode/test-email super-admin +csrf',
   'POST /vendor-details/{} public +csrf',
+  // D-294: the supplier / logistics partner confirms new bank details (no login, link to the registered e-mail).
+  'GET /vendor-bank-confirm/{} public',
+  'POST /vendor-bank-confirm/{} public +csrf',
+  'POST /vendor-bank-confirm/{}/not-us public +csrf',
 ];
 
 const PASSWORD = 'UngatedRoutes123!';

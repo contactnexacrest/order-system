@@ -7,6 +7,7 @@
     {# Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. #}
     <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a>{% if kycMissing.length %} — still needed or being checked: {{ kycMissing | join(', ') }}{% endif %}{% if not me.address %}{{ '; ' if kycMissing.length else ' — ' }}your address{% endif %}. Commission is paid once your documents are accepted.</div>
   {% endif %}
+  {% if addressGrace %}<p class="small" data-address-grace>{{ addressGrace }}</p>{% endif %}{# D-290 #}
   {% if access.commission %}{# D-261 #}
   <div class="stat-row">
     {# D-264: the order currency (USD) is the figure an associate sees; rupees only on a fixed line, for an associate in India. #}

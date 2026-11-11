@@ -42,7 +42,9 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
     <?php // Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. ?>
     <fieldset><legend>Commission level (D-245)</legend>
       <?php $__mode = (string) ($__a['commission_mode'] ?? 'ladder'); $__lid = (string) ($__a['commission_level_id'] ?? ''); ?>
-      <?php if (!empty($canPricing)): ?>
+      <?php if (!empty($__a['id'])): // D-291: an existing associate's rule is changed on their page, with a reason ?>
+        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
+      <?php elseif (!empty($canPricing)): ?>
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>

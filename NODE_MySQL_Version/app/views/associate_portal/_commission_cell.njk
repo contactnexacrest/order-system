@@ -1,5 +1,6 @@
 {# Expects: o (order row with currency_code and commission {state, label, amount, level}). D-245 P3: the level, not a rung rate. #}
 {% set cm = o.commission %}
-{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.level %} <small class="muted">({{ cm.level }})</small>{% endif %}<br>{% endif %}
+{# D-292: the % fixed on the order (never a level name) and the owner's statuses. #}
+{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.rate_text %} <small class="muted">({{ cm.rate_text }})</small>{% endif %}<br>{% endif %}
 <span class="badge {{ {'paid': 'badge-active', 'earned': 'badge-active', 'held': 'badge-lost', 'expected': 'badge-pending'}[cm.state] or 'badge-inactive' }}">{{ cm.label }}</span>
 {% if cm.fixed_line %}<br><small data-fixed-rupees>{{ cm.fixed_line }}</small>{% endif %}{# D-264: India only, once fixed (set by the portal controller) #}

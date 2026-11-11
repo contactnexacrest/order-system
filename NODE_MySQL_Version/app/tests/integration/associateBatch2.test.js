@@ -114,14 +114,15 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     const page = await call(associatePortalController.profile);
     expect(page.data.associateKinds).toContain('aadhaar');
     expect(page.data.docRules.aadhaar[0]).toBe('[0-9]{4}');
-    expect(page.data.kyc.map((i) => i.label)).toContain('Aadhaar card or passport');
+    expect(page.data.kyc.map((i) => i.label)).toContain('ID proof (Aadhaar card, passport or other ID document)'); // D-290
   });
 
   it('KYC checklist, review and the payout gate', async () => {
     const a = await associate({ gstin: '29ABCDE1234F1Z5' });
-    expect((await associateKyc.checklist(a)).map((i) => i.label)).toEqual(['PAN card', 'Aadhaar card or passport', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate']);
+    // D-290 (11 Nov 2026): ID proof and address proof are separate required items in India and abroad.
+    expect((await associateKyc.checklist(a)).map((i) => i.label)).toEqual(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate']);
     const abroad = await associate({ based_in: 'abroad', currency_code: 'USD' });
-    expect((await associateKyc.checklist(abroad)).map((i) => i.label)).toEqual(['Passport / ID', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement']);
+    expect((await associateKyc.checklist(abroad)).map((i) => i.label)).toEqual(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement']);
 
     const pan = await doc(a.id, 'pan', 'ABCDE1234F');
     const aad = await doc(a.id, 'aadhaar', 'XXXX XXXX 1234');

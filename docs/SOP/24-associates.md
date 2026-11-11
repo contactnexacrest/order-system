@@ -87,9 +87,13 @@ the same links, filters and actions, and switch to each other.
 **Associates → Commission settings** (`/associates/ladder`). The MD
 (permission `manage_pricing`) sets, and every change is in the audit log:
 - **Days after full payment** before commission is due (default 30).
-- **Payout run**: monthly on day 1–28, or weekly on a weekday (default
-  monthly on the 5th). Commission due on or before a run date is paid in
-  that run.
+- **Payment run** (D-292, 11 Nov 2026): monthly on the 1st–28th or the
+  **Last day of the month**, or weekly on a weekday (default: the last day
+  of the month). **If the payment day is a Sunday or holiday**: pay on the
+  working day before (default) or after — the **Holiday Calendar** is used.
+  The portal and e-mails always show the actual date (e.g. "31 Dec 2026").
+  Commission due on or before a run date is paid in that run. Changing the
+  run, the day or the Sunday/holiday rule needs a **reason** (Audit Log).
 - **Hold while a buyer claim is open** (default on): a claim raised on or
   before the due date holds the payout until it is settled.
 - **Counting order threshold** (default ₹5,00,000 of invoiced FOB).
@@ -111,10 +115,45 @@ the same links, filters and actions, and switch to each other.
 Every setting on this page has a line beneath it with a worked example
 (D-256), e.g. "Example: 30 → buyer pays in full on 4 Nov, commission due on 4 Dec."
 
+The MD also sets (11 Nov 2026) **Personal code changes allowed per year**
+(default 3) and **Suggest "Quoting" access after this many paid orders**
+(default 3).
+
 Staff with Manage associates set the TDS % (section 194H, default 2 %) and
-the waiting days before a new bank account is used (default 7); the other
-fields are shown to them read-only. The levels themselves and the ladder
-steps are in **Admin → Pricing → Commission levels**.
+**Bank details (associates and suppliers)** (D-293): **Bank details check** —
+One person (default; not the one who entered them) or Two people; the wait
+before a **first** bank account is used (default 0 days) and before a
+**changed** account is used (default 15 days), each 0–90. The other fields
+are shown to them read-only. The levels themselves and the standard ladder
+are in **Admin → Pricing → Commission levels**.
+
+### Commission rule per associate (owner decisions 11 Nov 2026, D-291 / D-292)
+
+Every associate starts on the **Standard ladder**. On the associate's page,
+section **Commission**, the MD (Manage pricing) can:
+- **+ Add own ladder for this associate** — opens a copy of the standard
+  ladder to change (steps from order 1, no gaps, last step "onward"). It
+  overrides the standard ladder for this associate. **Edit own ladder** /
+  **Remove own ladder — use the standard ladder** later.
+- **Set a fixed %** — the same % (a commission level) on every order.
+A **reason** is needed (kept in the Audit Log). A change applies to **new
+orders only**: an order keeps the % fixed on it when its Proforma Invoice
+was issued.
+
+**Who sees what.** Staff with **See associate commission rules** (Admin, MD,
+ED, Finance Director, Finance Manager) see the rule (who set it, when, why),
+"Next order earns 5% — Level 2", "Orders counted so far 3 of 5 — 2 more
+counting orders to reach 7%", the step boxes and the counting rule ("An
+order counts once the buyer has paid in full and its invoiced FOB value is
+₹5,00,000 or more"). Other staff see **"Set by the MD."** The associate sees
+**only their current %** — "5% of the FOB value of each order from the
+clients you introduced" — with **How it works** (1. fixed when we send the
+Proforma Invoice; 2. worked out on the FOB value on the Commercial Invoice;
+3. yours when the buyer has paid in full; 4. paid N days later in our
+monthly payment on the last day of the month), the % on each order, and
+these statuses: "Not earned yet — buyer still paying" / "Earned — will be
+paid on <date>" / "Paid on <date> (ref)" / "On hold — a buyer claim on this
+order is open". Never a level name, the ladder, counts or the next step.
 
 **The level is fixed on the order when its Proforma Invoice is issued**
 (the order shows "Level 2 — 5%" and "fixed at PI on …"). Until then the
@@ -368,17 +407,43 @@ on TDS in Zoho Books is a change the CA makes in Zoho (and logs in the Zoho
 change log); then its tax id goes into the setting. A take-back is not sent to Zoho automatically: the CA books the
 recovery (vendor credit) from the associate's statement.
 
-## Bank details (two people, a wait, an e-mail)
+## Bank details (the associate confirms, one person verifies, a wait)
+
+Owner decisions 11 Nov 2026 (D-293). Flow: **entered → the associate
+confirms → staff verify → wait**.
 
 - The associate adds or changes bank details in the portal (account number
   twice, IFSC or SWIFT, bank address abroad, a cancelled cheque or bank
   letter). Accounts can also enter them from the associate's signed form.
 - A change is a **request**: payments keep going to the verified account.
-- **First check** (Finance): how it was checked — call-back on the known
-  number, ₹1 test credit. **Verify** must be a **different person** (and
-  not the one who entered it). Then the account is used after the waiting
-  days (default 7). The associate is e-mailed at each step. **Reject**
-  with a reason. The e-mails say where payments go meanwhile (QA Round 8,
+- **The associate confirms first** — even when they asked for it themselves.
+  They get the "your bank details changed" e-mail and a bar on every portal
+  page ("New bank details are waiting for your confirmation … Review now").
+  The confirm page shows the current and the new account side by side; they
+  re-type the **last 4 digits of the new account**, click **E-mail me a
+  code**, enter the **6-digit code** sent to their **registered e-mail**
+  (valid 10 minutes) and tick "These are my bank details and I want my
+  commission paid to them" → **Confirm new bank details**.
+- **"This is not me — cancel it"** cancels the change at once and alerts
+  the MD and Finance (in the app and by e-mail) — treat it as possible
+  fraud: find out who entered the details.
+- **No answer in 7 days**: the change is cancelled by itself and the old
+  account stays. Staff see "Waiting for the associate — ends <date>" and a
+  **Remind associate** button (the e-mail again).
+- **Verify only after the confirmation.** One person (default setting), who
+  is **not** the person who entered the details, ticks **at least two** of
+  "How did you check it?": matches the bank proof on file / called the
+  associate on their registered phone and they confirmed the last 4 digits /
+  test payment of ₹1 / USD 1 received in the right name (with its bank
+  reference). A note is optional. With the setting **Two people**: a first
+  check (with the ticks), then Verify by a different person.
+- **MD and ED may verify details they entered themselves**, with a reason
+  (Admin › Self-approval rules › Bank details). Everyone else sees "Someone
+  else must verify details you entered."
+- Then the account is used after the waiting days: a **first** account at
+  once (0 days), a **changed** account after 15 days (both settings 0–90).
+  Until then payments go to the old account. The associate is e-mailed at
+  each step. **Reject** with a reason. The e-mails say where payments go meanwhile (QA Round 8,
   R8-N01): "Payments keep going to your verified account (••••1234)." when
   a verified account is in use, otherwise "No payment can be made until
   new bank details are verified." The reason is shown with one full stop,
@@ -496,13 +561,25 @@ To end the "portal link" confusion the screens, e-mails and messages use:
 Every associate document has a **document number / reference**, checked by
 kind in the browser and on the server: PAN `ABCDE1234F`; **Aadhaar card —
 only the last 4 digits are kept, shown as "XXXX XXXX 1234"; a full Aadhaar
-number is refused**; passport / ID 6–9 letters or digits; GSTIN 15
-characters; anything else up to 50 characters.
+number is refused**; an **ID document**: first choose its type — Passport,
+National ID card, Residence permit or Driving licence — then its number,
+5–30 letters, digits, dashes (-), slashes (/) or spaces (D-290, 11 Nov
+2026); GSTIN 15 characters; anything else up to 50 characters.
 
 The **KYC checklist** on the associate's page (staff) and in the portal
-(My profile): India — PAN card, Aadhaar card or passport, bank proof
-(cancelled cheque or statement), signed agreement, and the GST certificate
-when they have a GSTIN; abroad — passport / ID, bank proof, signed agreement.
+(My profile): India — PAN card, **ID proof** (Aadhaar card, passport or
+another ID document), **Address proof**, bank proof (cancelled cheque or
+statement), signed agreement, and the GST certificate when they have a GSTIN;
+abroad — **ID proof** (passport, national ID card, residence permit or
+driving licence), **Address proof**, bank proof, signed agreement.
+**ID proof and address proof are separate items, each checked on its own**
+(D-290). If one document shows both (e.g. a passport with the current
+address), it is uploaded twice — once as "ID document", once as "Address
+proof"; the app names the files "ID proof — <name> — <date>" and "Address
+proof — <name> — <date>". There is no "use the same file" button.
+Associates already accepted on 11 Nov 2026 have **60 days** to add their
+address proof; after that their payouts wait until it is accepted (the date
+shows on their page and in the portal).
 Each item is *Not uploaded yet*, *Pending*, *Accepted* or *Rejected* (with the
 reason). Staff with **Manage associates** accept or reject each document
 (a reason of at least 10 characters is needed to reject; the associate is

@@ -16,7 +16,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <tr><th>Agreement</th><td>signed <?= $__d($me['agreement_signed_on']) ?>, ends <?= $__d($me['agreement_ends_on']) ?><?php if (!empty($me['agreement_file_id'])): ?> · <a href="/associate/agreement">Download my agreement</a><?php endif; ?></td></tr>
     <tr><th>My commission</th><td>
       <?php if ((int) $me['no_commission'] === 1): ?>No commission under your agreement.<?php else: ?>
-      <?= htmlspecialchars($commissionNow) ?><br><small class="muted">On the invoiced FOB of the goods of a client's first orders, at the level fixed on each order when its Proforma Invoice is issued; earned when the buyer has paid in full, due <?= (int) $commissionSettings['due_days'] ?> days later and paid in the payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel($commissionSettings)) ?>).<?= trim((string) ($me['gstin'] ?? '')) !== '' ? ' GST is added on top once your tax invoice is on file.' : '' ?></small><?php endif; ?></td></tr>
+      <?php require __DIR__ . '/_my_commission.php'; // D-292: the current % only, and How it works ?><?php endif; ?></td></tr>
   </table>
 
   <div class="section">
@@ -38,15 +38,15 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <p>Payments go to: <b><?= $__usable ? htmlspecialchars(AssociateBankRepository::masked($__usable)) : 'no verified account yet' ?></b></p>
     <table class="list"><tr><th>Sent</th><th>Account</th><th>Status</th></tr>
       <?php foreach ($banks as $b): ?><tr><td><?= $__d($b['requested_at']) ?></td><td><?= htmlspecialchars(AssociateBankRepository::masked($b)) ?></td>
-        <td><?= htmlspecialchars(['pending' => 'Being checked by NexaCrest', 'verified' => 'Verified' . ($b['usable_from'] > date('Y-m-d') ? ' — used from ' . $__d($b['usable_from']) : ''), 'rejected' => 'Not accepted: ' . $b['rejected_reason'], 'superseded' => 'Replaced'][$b['status']] ?? $b['status']) ?></td></tr><?php endforeach; ?>
+        <td><?= htmlspecialchars(\App\Services\AssociateBankConfirmation::associateStatus($b)) ?><?php if ($b['status'] === 'awaiting_confirmation'): ?> <a class="btn-sm" href="/associate/bank/confirm">Review now</a><?php endif; ?></td></tr><?php endforeach; ?>
       <?php if ($banks === []): ?><tr><td colspan="3" class="muted">None yet.</td></tr><?php endif; ?>
     </table>
     <details><summary><?= $banks === [] ? 'Add my bank details' : 'Change my bank details' ?></summary>
-      <p class="muted small">A change is checked by two people at NexaCrest and e-mailed to you. Until then, payments keep going to your verified account; a new account is used <?= (int) \App\Services\AssociateService::bankWaitDays() ?> days after it is verified.</p>
+      <p class="muted small">You confirm new details with a code we e-mail you (within <?= \App\Services\BankDetailsCheck::CONFIRM_DAYS ?> days), then NexaCrest checks them. Until then, payments keep going to your verified account; a changed account is used <?= \App\Services\BankDetailsCheck::waitDays(false) ?> days after it is verified<?= \App\Services\BankDetailsCheck::waitDays(true) > 0 ? ', a first account ' . \App\Services\BankDetailsCheck::waitDays(true) . ' days after' : '' ?>.</p>
       <form method="post" action="/associate/bank" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <?php require __DIR__ . '/_bank_fields.php'; ?>
-        <button type="submit" class="btn-sm">Send for checking</button>
+        <button type="submit" class="btn-sm">Send — then confirm with the e-mailed code</button>
       </form>
     </details>
   </div>
@@ -59,10 +59,11 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
         <tr><td><?= htmlspecialchars($__i['label']) ?></td>
           <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span>
             <?php if ($__i['status'] === 'rejected' && !empty($__i['doc']['review_reason'])): ?><br><small><?= htmlspecialchars((string) $__i['doc']['review_reason']) ?> — please upload it again.</small><?php endif; ?></td>
-          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—') ?></td></tr>
+          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—') ?></td></tr>
       <?php endforeach; ?>
     </table>
     <p class="muted small">Commission is paid once every document above is accepted.</p>
+    <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($me)) !== null): // D-290 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
     <h3>All documents</h3>
     <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
       <?php foreach ($documents as $d): ?><tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td>
@@ -76,6 +77,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
       </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
-    <p class="muted small"><?= $__india ? 'India: PAN card, Aadhaar card (we keep only its last 4 digits) or passport, bank proof, the signed agreement, GST certificate if registered.' : 'Abroad: passport or company registration, bank proof, the signed agreement, tax residency certificate, Form 10F, no-PE declaration.' ?></p>
+    <p class="muted small"><?= $__india ? 'India: PAN card, ID proof (Aadhaar card — we keep only its last 4 digits — or an ID document), address proof, bank proof, the signed agreement, GST certificate if registered.' : 'Abroad: ID proof (passport, national ID card, residence permit or driving licence), address proof, bank proof, the signed agreement; also tax residency certificate, Form 10F, no-PE declaration.' ?></p>
+    <p class="muted small">ID proof and address proof are two separate uploads. If one document shows both (e.g. a passport with your current address), upload it once as "ID document" and once as "Address proof" — we check each on its own.</p>
   </div>
 </div>

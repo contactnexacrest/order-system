@@ -41,6 +41,10 @@
   <?php if (\App\Services\AssociatePortalService::isSuspended($me ?? null)): ?>
     <div class="alert alert-warning" role="status" data-associate-suspended><?= htmlspecialchars(\App\Services\AssociatePortalService::SUSPENDED_BANNER) ?></div>
   <?php endif; ?>
+  <?php if (!empty($me['id']) && ($__bankWaiting = \App\Services\AssociateBankConfirmation::open((int) $me['id'])) !== null): // D-293: on every page until they confirm or refuse ?>
+    <div class="alert alert-warning" role="status" data-bank-confirm-bar><b>New bank details are waiting for your confirmation.</b> Your commission will only be paid to them after you confirm. If you did not ask for this, tell us now.
+      <a class="btn-sm" href="/associate/bank/confirm">Review now</a></div>
+  <?php endif; ?>
   <?php foreach (Flash::pull() as $f): ?>
     <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
   <?php endforeach; ?>

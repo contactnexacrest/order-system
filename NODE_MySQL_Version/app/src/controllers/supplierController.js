@@ -111,7 +111,7 @@ async function create(req, res) {
   }
 
   const id = await supplierRepository.create(result.data, req.user.id);
-  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body);
+  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body, req);
   if (await testModeService.isEnabled()) {
     await supplierRepository.markTest(id);
   }
@@ -129,6 +129,8 @@ async function editForm(req, res) {
   }
   res.renderView('suppliers/form', {
     supplier,
+    // D-294: bank details changes waiting for the supplier's confirmation / staff verification.
+    bankPanel: await require('../services/vendorBankChangeService').panelData('supplier', Number(supplier.id), Number(req.user.id)),
     agreementCard: await require('./agreementController').partyCard(req, 'supplier', supplier.id),
     editFingerprint: editFingerprintHelper.of(supplier, supplierRepository.EDIT_FIELDS),
     supplierTypes: await typeOptions(supplier.types),
@@ -172,7 +174,7 @@ async function update(req, res) {
   }
 
   await supplierRepository.update(id, result.data);
-  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body);
+  await vendorDetailsService.applyStaffBankInput('supplier', id, req.user.id, req.body, req);
   await auditLogRepository.log(req.user.id, 'SUPPLIER_UPDATED', 'suppliers', id, 'supplier_legal_name', supplier.supplier_legal_name, result.data.supplier_legal_name);
   flash.set(req, 'success', `"${result.data.supplier_legal_name}" updated. Orders that already saved Supplier PO terms keep the details they recorded.`);
   res.redirect('/suppliers');

@@ -148,13 +148,22 @@ roles is ticked here, like everyone else.
 4. A self-review that was assigned while allowed is refused at approval if
    the rule has since been withdrawn.
 
+
+**Bank details** (`bank_details`, owner decision 11 Nov 2026, D-293; seeded
+Managing Director and Executive Director): someone with this rule may verify
+bank details (an associate's, a supplier's or a logistics partner's) that they
+entered themselves — only after the holder has confirmed them, and with a
+written reason that is kept on the record and in the audit log. Everyone else
+sees "Someone else must verify details you entered."
+
 ### Permissions added 1 Nov 2026
 
 | Permission | Who has it | What it allows |
 |---|---|---|
 | Manage associates (`manage_associates`) | MD, ED, Admin | The associate register, rates, status, portal access, personal codes, client links, holds and claw-backs, standard rates, the report ([Chapter 24](./24-associates.md)) |
 | View associates (`view_associates`) | Export Executive, Sales/Export Manager, Sales Director (and MD, ED, Admin) | Who introduced which client — no amounts |
-| Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Associates' bank details: check, verify, full number |
+| Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Associates' bank details: verify (after the associate has confirmed them), full number |
+| See associate commission rules (`view_associate_commission_rules`) — added 11 Nov 2026 (D-292) | Admin, MD, ED, Finance Director, Finance Manager | An associate's commission rule, the % and level of their next order, orders counted and the ladder steps; others see "Set by the MD" ([Chapter 24](./24-associates.md)) |
 | Override shipment gates (`override_shipment_gates`) | MD, ED, Admin | Release the Bill of Lading step (10f) with a written reason when the before-shipment balance or the inspection is not cleared ([Stage 7](./07-stage7-packing-bl.md)) |
 | Approve short payment (`approve_short_payment`) | MD, ED, Admin, Finance Director | Clear a buyer payment that is less than due, with a written reason ([Stage 3](./03-stage3-pi-advance.md), [Stage 8](./08-stage8-ci-balance.md)) |
 | Manage approval limits (`manage_approval_limits`) | MD, ED (and Super Admins) | Change a designation's approval limit or make it 'director' level — never on a designation the person holds ([Chapter 21](./21-departments.md)). Added by QA Round 8 (R8-N10) |
@@ -519,14 +528,27 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Partners, owner request 2026-10-27) — each supplier and partner has a
   **Bank Details** section: account holder, bank, branch, IFSC, account
   number (typed twice; stored encrypted, shown masked in lists), account
-  type and UPI ID. Fill it in on their behalf (e.g. from their email) and
-  tick **"I have verified these bank details"** once checked against a
-  cancelled cheque or bank letter. Or press **Generate & Email Details
-  Link** on their edit page: they get a no-login page to fill in their
-  company and bank details themselves. The link works **once** and for
-  30 days; what they enter lands as **not verified** until you check it,
-  and their existing account number is never shown back to them (only the
-  last four digits). The directory lists show a **Bank** column (✓
+  type and UPI ID. Fill it in on their behalf (e.g. from their email), or
+  press **Generate & Email Details Link** on their edit page: they get a
+  no-login page to fill in their company and bank details themselves. The
+  link works **once** and for 30 days, and their existing account number is
+  never shown back to them (only the last four digits).
+  **Owner decisions 11 Nov 2026 (D-294) — the same rules as for associates:**
+  new or changed bank details do **not** replace the account in use. A
+  confirmation link goes to their **registered e-mail** (the one on file
+  before the change): they see current vs new, re-type the last 4 digits and
+  tick "These are our bank details" → Confirm, or "This is not us — cancel
+  it" (cancelled; MD and Finance alerted). No answer in 7 days → cancelled,
+  the old account stays. Below the form, **Bank details changes** shows each
+  change: "Send the link again" (e.g. after adding their e-mail), **Verify**
+  — only after they confirmed, by one person other than the one who typed
+  them, ticking at least two of: matches the cancelled cheque / bank letter,
+  phone call on their registered number, ₹1 test payment with its UTR (the
+  "Two people" setting and the MD/ED self-approval rule apply as for
+  associates) — and Reject. A first account is used at once, a changed
+  account after 15 days (Associates › Commission settings); then it is copied
+  onto the supplier as ✓ Verified. The old "I have verified these bank
+  details" tick is gone. The directory lists show a **Bank** column (✓
   Verified / ⚠ Not verified / —), and Steps 7e and 10a show the supplier's
   bank details ("Pay to") with the same status, so Accounts pay the right,
   checked account.

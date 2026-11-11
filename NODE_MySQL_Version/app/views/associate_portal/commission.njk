@@ -3,6 +3,7 @@
 <div class="card page-wide">
   <h1>My commission</h1>
   {% if access.commission %}{# D-261 #}
+  {% if not print and me.no_commission != 1 %}{% include "associate_portal/_my_commission.njk" %}{% endif %}{# D-292 #}
   {% if not print and access.commission_statement %}<p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p>{% endif %}
   {# D-264: the order currency is the figure every associate sees; rupees only for an associate in India, once fixed. #}
   {% if not print %}<div class="alert alert-info" data-how-fixed><b>{{ howFixed.title }}</b><br>{{ howFixed.text }}</div>{% endif %}
@@ -10,9 +11,11 @@
   <p class="muted small" data-commission-period>This shows the commission of the last {{ totals.months }} months, and any commission still waiting to be paid.</p>
   <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
   <table class="list">
-    <tr><th>Month</th><th>Order</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>
+    {% set __pctCol = access.commission_pct %}{# D-292: the % fixed on each order (with "Show commission %") #}
+    <tr><th>Month</th><th>Order</th><th>Client</th>{% if __pctCol %}<th>Your %</th>{% endif %}<th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>
     {% for p in payouts %}{% set inv = invoiceByPayout[p.id] %}
       <tr><td>{{ p.month_label }}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td><td>{{ p.company_legal_name }}</td>
+        {% if __pctCol %}<td data-order-pct>{{ p.rate_text or '—' }}</td>{% endif %}
         <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}{% endif %}{% if p.fixed_rate !== null and p.fixed_rate !== undefined %} <span class="badge badge-active">Fixed</span>{% endif %}
           {% if p.fixed_line %}<br><small data-fixed-rupees>{{ p.fixed_line }}</small>{% elif isIndia and (p.fixed_rate === null or p.fixed_rate === undefined) %}<br><small>₹{{ p.amount_inr | money }}</small>{% endif %}</td>
         <td>{{ p.status_label }}</td>
@@ -26,8 +29,9 @@
           {% else %}—{% endif %}
         </td>{% endif %}</tr>
     {% endfor %}
-    {% if payouts.length == 0 %}<tr><td colspan="7" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr>{% endif %}
+    {% if payouts.length == 0 %}<tr><td colspan="8" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr>{% endif %}
   </table>
+  {% if __pctCol %}<p class="muted small">Each order shows the % it was given when its Proforma Invoice was sent. Orders still being paid by the buyer are listed under Orders as "Not earned yet — buyer still paying".</p>{% endif %}
   {% endif %}
   {% if not print and access.tds_certificates %}
   <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>

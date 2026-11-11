@@ -326,7 +326,9 @@ final class AssociatePortalController
             return;
         }
         self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id, $months), 'print' => ($_GET['print'] ?? '') === '1',
-            'documents' => AssociateDocumentRepository::forAssociate($id)]);
+            'documents' => AssociateDocumentRepository::forAssociate($id),
+            // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
+            'headline' => self::commissionHeadline(self::me()), 'commissionSettings' => \App\Services\AssociateCommission::settings()]);
     }
 
     public function uploadInvoice(array $params): void
@@ -375,6 +377,24 @@ final class AssociatePortalController
         View::render('associate_portal/certificate', ['a' => $a, 'c' => $client, 'events' => $events], null);
     }
 
+    /**
+     * D-292 (owner 11 Nov 2026): the associate's current % only — "5%" + "of the FOB value of each order from
+     * the clients you introduced" — and only with "Show commission %" (D-261). Null otherwise.
+     * @return array{rate:string,text:string}|null
+     */
+    public static function commissionHeadline(array $me): ?array
+    {
+        if ((int) ($me['no_commission'] ?? 0) === 1 || !\App\Services\AssociateAccess::allows($me, 'commission_pct')) {
+            return null;
+        }
+        [$level] = \App\Services\AssociateCommission::levelForAssociate($me, null);
+        if ($level === null) {
+            return null;
+        }
+        return ['rate' => \App\Services\AssociateCommission::rateLabel($level),
+            'text' => ($level['kind'] ?? 'pct') === 'pct' ? 'of the FOB value of each order from the clients you introduced' : 'on each order from the clients you introduced'];
+    }
+
     public function profile(array $params): void
     {
         $id = (int) self::me()['id'];
@@ -387,7 +407,7 @@ final class AssociatePortalController
             'commissionNow' => \App\Services\AssociateAccess::allows($me, 'commission_pct')
                 ? (($me['commission_mode'] ?? 'ladder') === 'fixed' ? 'Your commission: ' : 'Your commission on your next order: ') . \App\Services\AssociateCommission::rateLabel($level)
                 : 'Your commission is as set out in your agreement.',
-            'commissionSettings' => \App\Services\AssociateCommission::settings()]);
+            'commissionSettings' => \App\Services\AssociateCommission::settings(), 'headline' => self::commissionHeadline($me)]);
     }
 
     /** D-255 (5 Nov 2026): the P3 price list is replaced by the catalogue and price requests. */
@@ -515,20 +535,22 @@ final class AssociatePortalController
             return;
         }
         // Owner decision D-251 (A4): the document's number / reference, checked per kind (Aadhaar: last 4 digits only).
-        [$reference, $refError] = \App\Services\AssociateKyc::normaliseReference($kind, (string) ($_POST['reference'] ?? ''));
+        // D-290: an ID document carries its type and number; ID and address proofs get app-set file names.
+        [$reference, $idDocType, $refError] = \App\Services\AssociateKyc::checkUpload($kind, (string) ($_POST['reference'] ?? ''), (string) ($_POST['id_doc_type'] ?? ''));
         if ($refError !== null) {
             Flash::set('error', $refError);
             header('Location: /associate/profile');
             return;
         }
         try {
-            $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, null, null, (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
+            $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, null,
+                \App\Services\AssociateKyc::appFileName($kind, (string) $a['name'], (string) ($_FILES['document_file']['name'] ?? '')), (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
             header('Location: /associate/profile');
             return;
         }
-        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, $reference, true, null);
+        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, $reference, true, null, $idDocType);
         AuditLogRepository::log(null, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', (int) $a['id'], 'kind', null, $kind);
         \App\Services\AssociateKyc::notifyStaffOfUpload($a, $kind);
         Flash::set('success', AssociateDocumentRepository::KINDS[$kind] . ' received — NexaCrest will check it.');
@@ -556,13 +578,74 @@ final class AssociatePortalController
             return;
         }
         $id = AssociateBankRepository::request((int) $a['id'], $result, true, null);
-        AuditLogRepository::log(null, 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', $id, null, null, 'by associate');
-        AssociateService::notify($a, 'bank_changed', "A change of your bank details (to {$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') was received on ' . date('j M Y') . '. It is used once NexaCrest has checked it. '
-            . AssociateService::bankPaymentsSentence((int) $a['id']) . ' If you did not ask for this, contact NexaCrest at once.');
+        // D-293: the associate confirms it first (code to their registered e-mail), then NexaCrest verifies it.
+        \App\Services\AssociateBankConfirmation::start($id, $a, true, null);
         foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_associate_bank') as $uid) {
-            \App\Repositories\NotificationRepository::create($uid, null, 'associate_bank_change', null, "Associate {$a['name']} asked to change their bank details — two people must verify it.");
+            \App\Repositories\NotificationRepository::create($uid, null, 'associate_bank_change', null, "Associate {$a['name']} asked to change their bank details — they confirm them first, then one person verifies them.");
         }
-        Flash::set('success', 'Bank change received. It is used once NexaCrest has verified it. ' . AssociateService::bankPaymentsSentence((int) $a['id']));
+        Flash::set('success', 'New bank details received. Please confirm them now with the code we e-mail you. ' . AssociateService::bankPaymentsSentence((int) $a['id']));
+        header('Location: /associate/bank/confirm');
+    }
+
+    // ---------------------------------------------------------------- D-293: the associate confirms new bank details
+
+    /** The confirm page: current vs new, last 4 digits, the e-mailed code, "These are my bank details". */
+    public function showBankConfirm(array $params): void
+    {
+        $me = self::me();
+        $b = \App\Services\AssociateBankConfirmation::open((int) $me['id']);
+        if ($b === null) {
+            Flash::set('info', 'No new bank details are waiting for your confirmation.');
+            header('Location: /associate/profile');
+            return;
+        }
+        $devCode = $_SESSION['associate_bank_code_dev'] ?? null;
+        unset($_SESSION['associate_bank_code_dev']);
+        self::render('bank_confirm', ['b' => $b, 'current' => AssociateBankRepository::usable((int) $me['id']),
+            'byName' => (int) $b['requested_by_associate'] === 1 ? 'you' : 'NexaCrest (from your signed form)', 'maskedEmail' => \App\Services\BankDetailsCheck::maskEmail((string) ($me['email'] ?? '')),
+            'devCode' => \App\Services\AssociatePortalService::showCodeOnScreen() ? $devCode : null]);
+    }
+
+    public function sendBankCode(array $params): void
+    {
+        $me = self::me();
+        $b = \App\Services\AssociateBankConfirmation::open((int) $me['id']);
+        if ($b === null) {
+            Flash::set('error', 'No new bank details are waiting for your confirmation.');
+            header('Location: /associate/profile');
+            return;
+        }
+        \App\Services\AssociateBankConfirmation::sendCode($me, $b)
+            ? Flash::set('success', 'We e-mailed a 6-digit code to ' . \App\Services\BankDetailsCheck::maskEmail((string) $me['email']) . '. It is valid for ' . \App\Services\BankDetailsCheck::CODE_MINUTES . ' minutes.')
+            : Flash::set('error', 'There is no e-mail address on your account — contact NexaCrest.');
+        header('Location: /associate/bank/confirm');
+    }
+
+    public function confirmBank(array $params): void
+    {
+        $me = self::me();
+        $b = \App\Services\AssociateBankConfirmation::open((int) $me['id']);
+        $error = $b === null ? 'No new bank details are waiting for your confirmation.'
+            : \App\Services\AssociateBankConfirmation::confirm($me, (int) $b['id'], (string) ($_POST['last4'] ?? ''), (string) ($_POST['code'] ?? ''), !empty($_POST['mine']));
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header('Location: ' . ($b === null ? '/associate/profile' : '/associate/bank/confirm'));
+            return;
+        }
+        Flash::set('success', 'Thank you — confirmed. NexaCrest will now check the new details. ' . \App\Services\AssociateBankConfirmation::usableSentence((int) $me['id']));
+        header('Location: /associate/profile');
+    }
+
+    public function bankNotMe(array $params): void
+    {
+        $me = self::me();
+        $b = \App\Services\AssociateBankConfirmation::open((int) $me['id']);
+        if ($b === null || !\App\Services\AssociateBankConfirmation::notMe($me, (int) $b['id'])) {
+            Flash::set('error', 'No new bank details are waiting for your confirmation.');
+            header('Location: /associate/profile');
+            return;
+        }
+        Flash::set('error', \App\Services\AssociateBankConfirmation::NOT_ME_MESSAGE);
         header('Location: /associate/profile');
     }
 
