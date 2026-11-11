@@ -248,7 +248,7 @@ final class SelfApprovalActionsTest extends DbTestCase
 
     public function testShortPaymentClearingByWhoeverRecordedTheReceiptsFollowsTheRule(): void
     {
-        $refused = 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.';
+        $refused = 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short. It now waits in Approvals for them.';
         foreach (['Admin' => $this->admin, 'System Administrator' => $this->sysadmin] as $who => $userId) {
             $orderId = $this->shortAdvance($userId);
             $check = PartPaymentService::clearCheck($orderId, 'advance', null, UserRepository::findById($userId), 'Buyer confirmed the rest comes with the balance.');

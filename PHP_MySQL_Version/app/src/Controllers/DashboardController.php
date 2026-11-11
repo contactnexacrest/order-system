@@ -46,6 +46,11 @@ final class DashboardController
             'searchResults' => [],
         ];
 
+        // Owner decision D-310 (point 27): the "My Approvals" tiles count what waits on the Approvals page.
+        $approvalItems = \App\Services\ApprovalsInbox::items($userId, $roleId);
+        $data['approvalCounts'] = \App\Services\ApprovalsInbox::counts($approvalItems);
+        $data['showApprovalTiles'] = $approvalItems !== [] || \App\Services\ApprovalsInbox::isApprover($userId, $roleId);
+
         if ($canManageOrders) {
             $data['stageBreakdown'] = DashboardRepository::activeOrdersByStage();
             $data['activeOrderCount'] = DashboardRepository::activeOrderCount();

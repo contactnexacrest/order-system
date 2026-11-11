@@ -79,7 +79,7 @@ final class ZohoApiLimitsTest extends DbTestCase
             return $json(['code' => 0, 'organizations' => [['organization_id' => '600', 'name' => 'TEST org', 'currency_code' => 'INR']]]);
         }
         if (preg_match('#^/books/v3/organizations/(\d+)$#', $path, $m) === 1) {
-            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => true, 'tax_settings' => ['tax_reg_no' => '29AAKCN8733G1ZZ']]]);
+            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => true, 'tax_settings' => ['tax_reg_no' => '29AAAAA0000A1ZY']]]);
         }
         if ($path === '/books/v3/items' && $method === 'GET') {
             return $json(['code' => 0, 'items' => []]);

@@ -2099,7 +2099,8 @@ CREATE TABLE test_mode_settings (
   FOREIGN KEY (enabled_by) REFERENCES users(id),
   CONSTRAINT chk_test_mode_singleton CHECK (id = 1)
 ) ENGINE=InnoDB;
-INSERT INTO test_mode_settings (id, is_enabled) VALUES (1, 0);
+-- D-313: the test-mode e-mail defaults to the company e-mail (Admin › Settings › email); change it on the Test Mode page.
+INSERT INTO test_mode_settings (id, is_enabled, test_email) VALUES (1, 0, 'info@email.com');
 
 -- Root-aggregate test flag. Everything hanging off an order/client
 -- (documents, amendments, disputes, email_log, file_store, client_logins,
@@ -6511,4 +6512,33 @@ CREATE TABLE fx_rates (
   decision_reason VARCHAR(255) NULL,
   UNIQUE KEY uq_fx_rates_date (rate_date),
   CONSTRAINT fk_fx_rates_decided_by FOREIGN KEY (decided_by) REFERENCES users(id)
+-- ================================================================
+-- Owner decision D-310 (point 27, 11 Nov 2026): a payment that came in short
+-- waits for a manager with "Approve short payment" — filed when the person
+-- clearing it is refused; shown on the Approvals page until the leg is cleared
+-- short or the rest is received. One row per payment leg (milestone_id 0 = the
+-- advance, freight or balance leg itself).
+CREATE TABLE IF NOT EXISTS short_payment_requests (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  leg           VARCHAR(20) NOT NULL,
+  milestone_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  owed_amount   DECIMAL(14,2) NOT NULL,
+  currency_code VARCHAR(3) NULL,
+  requested_by  BIGINT UNSIGNED NOT NULL,
+  requested_at  DATETIME NOT NULL,
+  UNIQUE KEY uq_short_payment_requests_leg (order_id, leg, milestone_id),
+  CONSTRAINT fk_short_payment_requests_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_short_payment_requests_user FOREIGN KEY (requested_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Owner decision D-312 (point 4 B, 11 Nov 2026): the ticks given on Admin ›
+-- Setup checklist (pricing confirmed by the MD, commission levels, TDS and
+-- benefit deadlines confirmed with the CA, this year's holidays added).
+CREATE TABLE IF NOT EXISTS setup_checklist_ticks (
+  item_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+  ticked_by  BIGINT UNSIGNED NULL,
+  ticked_at  DATETIME NOT NULL,
+  note       VARCHAR(300) NULL,
+  CONSTRAINT fk_setup_checklist_ticks_user FOREIGN KEY (ticked_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

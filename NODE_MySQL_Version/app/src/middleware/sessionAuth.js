@@ -230,6 +230,15 @@ function required() {
 
       // Same live-count badge on My Reviews: documents waiting on this user's own review.
       req.myReviewsPendingCount = await documentReviewRepository.pendingCountForReviewer(user.id);
+      // Owner decision D-310 (point 27): "Approvals (n)" — everything this person may approve, on one page.
+      // Worked out only for a page (GET); a form post redirects to one.
+      if (req.method === 'GET') {
+        const approvalsInbox = require('../services/approvalsInbox');
+        req.approvalsCount = await approvalsInbox.countFor(req);
+        req.showApprovals = req.approvalsCount > 0 || approvalsInbox.isApprover(req);
+        // D-312: the Setup checklist's Needed count beside its menu entry.
+        req.setupNeededCount = req.permissions.manage_company_settings ? await require('../services/setupChecklist').neededCount(req) : 0;
+      }
       // Owner decision D-266: the SOP and Gallery menu links follow the SOP library switch.
       req.sopLibraryOpen = await require('../services/sopAccessService').libraryVisibleTo(user.id, req.permissions);
 

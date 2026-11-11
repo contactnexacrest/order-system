@@ -71,7 +71,7 @@ final class ZohoClientsProductsSyncTest extends DbTestCase
             return $json(['access_token' => 'fake-access']);
         }
         if (preg_match('#^/books/v3/organizations/(\d+)$#', $path, $m) === 1) {
-            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => true, 'tax_settings' => ['tax_reg_no' => '29AAKCN8733G1ZZ']]]);
+            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => true, 'tax_settings' => ['tax_reg_no' => '29AAAAA0000A1ZY']]]);
         }
         if ($path === '/books/v3/settings/currencies') {
             return $json(['code' => 0, 'currencies' => [['currency_id' => 'CUR-USD', 'currency_code' => 'USD'], ['currency_id' => 'CUR-EUR', 'currency_code' => 'EUR']]]);

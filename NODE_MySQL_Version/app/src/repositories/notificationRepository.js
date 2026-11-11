@@ -54,11 +54,20 @@ async function emailNotification(userId, message, type = '') {
     return null;
   }
   try {
-    await emailService.sendPlainText(user.email, emailSubject(message), message, { kind, audience: 'staff' });
+    await emailService.sendPlainText(user.email, emailSubject(message), emailBody(message, kind), { kind, audience: 'staff' });
   } catch (e) {
     // Never let a notification-email failure break the action it's reporting on.
   }
   return user.email;
+}
+
+/**
+ * D-310: an approval e-mail ends with the link to the Approvals page, where
+ * the item waits with a button to the exact approval screen.
+ */
+function emailBody(message, kind) {
+  if (kind !== 'staff_approvals') return message;
+  return `${message}\n\nOpen your approvals: ${String(require('../config/env').get('APP_URL', '') || '').replace(/\/+$/, '')}/approvals`;
 }
 
 /**
@@ -174,4 +183,4 @@ async function existsToday(userId, type, relatedOrderId) {
   return row ? parseInt(row.c, 10) > 0 : false;
 }
 
-module.exports = { create, createInAppOnly, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam, notifyRouted };
+module.exports = { create, createInAppOnly, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, emailBody, notifyOrderTeam, notifyRouted };

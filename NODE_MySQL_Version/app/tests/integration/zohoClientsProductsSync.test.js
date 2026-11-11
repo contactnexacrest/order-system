@@ -28,7 +28,7 @@ describe('Zoho Books: clients and products (D-238)', () => {
     const json = (body, status = 200) => ({ status, body: JSON.stringify(body) });
     let m;
     if (p === '/oauth/v2/token') return json({ access_token: 'fake-access' });
-    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAKCN8733G1ZZ' } } });
+    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAAAA0000A1ZY' } } });
     if (p === '/books/v3/settings/currencies') return json({ code: 0, currencies: [{ currency_id: 'CUR-USD', currency_code: 'USD' }, { currency_id: 'CUR-EUR', currency_code: 'EUR' }] });
     if (p === '/books/v3/contacts' && method === 'GET') return json({ code: 0, contacts: Object.values(contacts).filter((c) => c.contact_name === q('contact_name')) });
     if (p === '/books/v3/contacts' && method === 'POST') {

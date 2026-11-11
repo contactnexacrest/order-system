@@ -1137,14 +1137,20 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertPage($r, 'Document copies clean-up', 'GET /settings/document-cleanup');
         self::assertStringContainsString('Never removed, whatever is switched on', $r['body']);
 
+        // D-313: on by default since 11 Nov 2026 (90 / 365 / latest only) — the test keeps whatever is set and puts it back.
+        $keep = [
+            'draft_days' => (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"),
+            'superseded_days' => (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_superseded_days'"),
+            'cafin_mode' => (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_cafin_mode'"),
+        ];
         $bad = $this->call('POST', '/settings/document-cleanup', ['draft_days' => '45', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Save storage space now']);
         self::assertSame('error', $bad['type'], 'only the listed options are accepted');
-        self::assertSame('0', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+        self::assertSame($keep['draft_days'], $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
 
         $before = $this->audits('FIELD_EDIT');
-        $r = $this->call('POST', '/settings/document-cleanup', ['draft_days' => '90', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Save storage space now']);
+        $r = $this->call('POST', '/settings/document-cleanup', ['draft_days' => '180', 'superseded_days' => $keep['superseded_days'], 'cafin_mode' => $keep['cafin_mode'], 'reason' => 'Save storage space now']);
         $this->assertDone($r, 'POST /settings/document-cleanup', 'Document copies clean-up settings saved.');
-        self::assertSame('90', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+        self::assertSame('180', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
         self::assertSame($before + 1, $this->audits('FIELD_EDIT'));
 
         self::assertSame('error', $this->call('POST', '/settings/document-cleanup/run', [])['type'], 'the run needs the confirmation tick');
@@ -1153,9 +1159,9 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertDone($r, 'POST /settings/document-cleanup/run', 'Clean-up done:');
         self::assertSame($runs + 1, $this->audits('DOCUMENT_COPY_CLEANUP_RUN'));
 
-        // Back to the default (all off) for every later test.
-        $this->call('POST', '/settings/document-cleanup', ['draft_days' => '0', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Back to the default, all off']);
-        self::assertSame('0', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+        // Back to what was set before, for every later test.
+        $this->call('POST', '/settings/document-cleanup', $keep + ['reason' => 'Back to the setting before this test']);
+        self::assertSame($keep['draft_days'], $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
     }
 
     /** Owner follow-up on point 18 (2 Nov 2026): Admin → Settings → Remittance difference reasons. */

@@ -48,7 +48,7 @@ describe('D-257 Zoho: the new divisions sync like Export', () => {
     const json = (body, status = 200) => ({ status, body: JSON.stringify(body) });
     let m;
     if (p === '/oauth/v2/token') return json({ access_token: 'fake-access' });
-    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAKCN8733G1ZZ' } } });
+    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAAAA0000A1ZY' } } });
     if (p === '/books/v3/settings/taxes') return json({ code: 0, taxes: [0, 5, 12, 18, 28].flatMap((rate) => [{ tax_id: `TX-GST${rate}`, tax_name: `GST${rate}`, tax_percentage: rate }, { tax_id: `TX-IGST${rate}`, tax_name: `IGST${rate}`, tax_percentage: rate }]) });
     if (p === '/books/v3/settings/currencies') return json({ code: 0, currencies: ['INR', 'USD', 'EUR'].map((c) => ({ currency_id: `CUR-${c}`, currency_code: c })) });
     if (p === '/books/v3/chartofaccounts') {

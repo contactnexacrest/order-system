@@ -26,6 +26,9 @@ $clientIntakePendingCount = $canOrders ? ClientIntakeRepository::pendingCount() 
 $piIntakePendingCount = $canOrders ? PiIntakeRepository::pendingReviewCount() : 0;
 // Same live-count badge on My Reviews: documents waiting on this user's own review.
 $myReviewsPendingCount = $current ? \App\Repositories\DocumentReviewRepository::pendingCountForReviewer((int) $current['id']) : 0;
+// Owner decision D-310 (point 27): "Approvals (n)" — everything this person may approve, on one page.
+$approvalsCount = $current ? \App\Services\ApprovalsInbox::countFor((int) $current['id'], $roleId) : 0;
+$showApprovals = $current && ($approvalsCount > 0 || \App\Services\ApprovalsInbox::isApprover((int) $current['id'], $roleId));
 $canSettings = $can('manage_company_settings');
 // 90-item backlog item #11: a per-field lock badge + save-time warning
 // already existed on the Settings page itself (DashboardRepository::
@@ -169,6 +172,9 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
   <?php endif; ?>
   <nav class="sidebar-nav">
     <a href="/" class="<?= $isActive('/') && $currentPath === '/' ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg></span>Dashboard</a>
+    <?php if ($showApprovals): ?>
+      <a href="/approvals" class="<?= $isActive('/approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Approvals<?= $approvalsCount > 0 ? ' <span class="nav-badge">' . (int) $approvalsCount . '</span>' : '' ?></a>
+    <?php endif; ?>
     <?php if ($current): ?>
       <a href="/getting-started" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg></span>Getting Started</a>
       <a href="/reference-docs" class="<?= $isActive('/reference-docs') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
@@ -225,6 +231,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <details class="nav-group"<?= $adminGroupActive ? ' open' : '' ?>>
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>Admin</summary>
         <div class="nav-dropdown">
+          <?php if ($canSettings): // D-312 ?><a href="/admin/setup-checklist" class="<?= $isActive('/admin/setup-checklist') ? 'active' : '' ?>">Setup Checklist<?php $__setupNeeded = \App\Services\SetupChecklist::neededCount(); if ($__setupNeeded > 0): ?> <span class="nav-badge"><?= (int) $__setupNeeded ?></span><?php endif; ?></a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/settings" class="<?= $isActive('/settings') ? 'active' : '' ?>">Company Settings<?= $settingsExpiryWarningCount > 0 ? ' <span class="nav-badge">' . (int) $settingsExpiryWarningCount . '</span>' : '' ?></a><?php endif; ?>
           <?php if ($canSettings): // D-280 ?><a href="/admin/email-settings" class="<?= $isActive('/admin/email-settings') ? 'active' : '' ?>">E-mail Settings</a><?php endif; ?>
           <?php if ($canSettings): ?><a href="/holidays" class="<?= $isActive('/holidays') ? 'active' : '' ?>">Holiday Calendar</a><?php endif; ?>

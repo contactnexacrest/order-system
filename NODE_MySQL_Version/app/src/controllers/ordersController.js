@@ -1630,9 +1630,17 @@ async function show(req, res) {
       + '. <a href="/reviews">Open Document Review &amp; Approval</a></span></p>';
   };
 
+  // Owner decision D-310 (point 27, mockup approvals.png): a bar at the very top for whoever may approve
+  // something on this order, with a button straight to it; the person who asked sees that it is waiting.
+  const approvalsInbox = require('../services/approvalsInbox');
+  const approvalBar = (await approvalsInbox.forOrder(req, orderId)).filter((i) => i.bar !== '');
+  const approvalWaiting = await approvalsInbox.waitingOnOthers(req, orderId);
+
   res.renderView(
     'orders/show',
     {
+      approvalBar, // D-310
+      approvalWaiting, // D-310
       associateLine: await require('../repositories/associateRepository').lineForClient(Number(order.client_id), req.permissions),
       // Owner decision (2 Nov 2026, gap-list Q-6): ECGC cover, incentive claim tracking, missing eBRC / FIRC.
       complianceTracking: await (async () => {

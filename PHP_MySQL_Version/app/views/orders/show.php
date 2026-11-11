@@ -1239,6 +1239,28 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php
 };
 ?>
+<?php
+// Owner decision D-310 (point 27, mockup approvals.png): a bar at the very top for whoever may approve
+// something on this order, with a button straight to it; the person who asked sees that it is waiting.
+$__apUser = (int) $currentUser['id'];
+$__apRole = $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null;
+$__apMine = array_values(array_filter(\App\Services\ApprovalsInbox::forOrder($__apUser, $__apRole, (int) $order['id']), static fn (array $i): bool => $i['bar'] !== ''));
+$__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRole, (int) $order['id']);
+?>
+<?php if ($__apMine !== []): ?>
+<div class="approval-bar" id="approval-bar" role="status">
+  <?php foreach ($__apMine as $__ap): ?>
+  <div class="approval-bar-row"><span><strong>Waiting for your approval:</strong> <?= htmlspecialchars($__ap['bar']) ?></span><a class="btn-sm" href="<?= htmlspecialchars($__ap['url']) ?>"><?= htmlspecialchars($__ap['bar_button']) ?></a></div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+<?php if ($__apWaiting !== []): ?>
+<div class="approval-bar waiting" id="approval-waiting" role="status">
+  <?php foreach ($__apWaiting as $__apText): ?>
+  <div class="approval-bar-row"><span><?= htmlspecialchars($__apText) ?></span></div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
 <div class="card page-wide">
   <?php if (($_GET['from'] ?? '') === 'kanban'): ?>
   <?php if ($canListOrders): ?><p class="muted small"><a href="/orders">&larr; Back to Board</a></p><?php endif; ?>
@@ -1360,7 +1382,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php endif; ?>
     </p>
   <?php elseif ($__pendingCancellation): ?>
-    <div class="review-banner" style="flex-direction:column;align-items:stretch;gap:6px">
+    <div class="review-banner" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
       <span>Cancellation requested by <?= htmlspecialchars($__pendingCancellation['requested_by_name'] ?? 'unknown') ?> on <?= htmlspecialchars($__pendingCancellation['requested_at']) ?> — awaiting approval.<br>Reason: <?= htmlspecialchars($__pendingCancellation['reason']) ?></span>
       <?php if ($canEditLockedData): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">

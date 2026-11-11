@@ -8,7 +8,7 @@
   <?php endif; ?>
 
   <?php foreach ($pending as $row): ?>
-  <div class="section" style="border:1px solid #dcd6c9; border-radius:4px; padding:12px; margin-bottom:12px;">
+  <div class="section" id="email-<?= (int) $row['id'] ?>" style="border:1px solid #dcd6c9; border-radius:4px; padding:12px; margin-bottom:12px;">
     <div class="kv-grid">
       <div><span class="k">Order</span><span class="v"><?= htmlspecialchars($row['order_reference'] ?? '—') ?></span></div>
       <div><span class="k">To</span><span class="v"><?= htmlspecialchars($row['recipient_email']) ?></span></div>

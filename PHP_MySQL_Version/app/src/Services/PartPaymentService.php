@@ -25,6 +25,8 @@ final class PartPaymentService
 {
     public const LEGS = ['advance', 'freight', 'balance'];
     public const TOLERANCE = 0.01;
+    /** D-310: added to the refusal once the short payment waits in Approvals. */
+    public const SENT_TO_APPROVALS = ' It now waits in Approvals for them.';
 
     public static function label(string $leg, ?array $milestone = null): string
     {
@@ -258,13 +260,16 @@ final class PartPaymentService
         $label = self::label($leg, $milestone);
         $canApprove = PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'approve_short_payment');
         if (!$canApprove) {
+            // D-310: the request now waits in the Approvals page of every manager who may clear it short.
+            ApprovalsInbox::recordShortPaymentRequest($orderId, $leg, $milestone, (int) $user['id'], (float) $s['owed'], $currency);
             return ['error' => "{$label} received so far: " . self::money($currency, $s['received']) . ' of ' . self::money($currency, (float) $s['expected']) . ' due — ' . self::money($currency, $s['owed'])
-                . ' is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.'];
+                . ' is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.' . self::SENT_TO_APPROVALS];
         }
         // QA Round 8, R8-N09: a manager who recorded this payment's receipts clears it short only if their role is ticked.
         if (self::recordedBy($orderId, $leg, $milestone !== null ? (int) $milestone['id'] : null, (int) $user['id'])
             && !MakerCheckerGuard::selfApprovalAllowed('short_payment', (int) $user['id'])) {
-            return ['error' => 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.'];
+            ApprovalsInbox::recordShortPaymentRequest($orderId, $leg, $milestone, (int) $user['id'], (float) $s['owed'], $currency);
+            return ['error' => 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.' . self::SENT_TO_APPROVALS];
         }
         $reason = trim($reason);
         if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {

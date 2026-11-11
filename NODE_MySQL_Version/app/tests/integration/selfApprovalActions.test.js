@@ -195,7 +195,7 @@ describe('Self-approval rules on cancellation, purchase award, amendment and sho
   }
 
   it('short-payment clearing by whoever recorded the receipts follows the rule', async () => {
-    const refused = 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.';
+    const refused = 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short. It now waits in Approvals for them.';
     const reason = 'Buyer confirmed the rest comes with the balance.';
     for (const user of [admin, sysadmin]) {
       const orderId = await shortAdvance(user);

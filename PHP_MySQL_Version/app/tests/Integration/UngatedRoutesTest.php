@@ -40,6 +40,7 @@ final class UngatedRoutesTest extends DbTestCase
         'GET / staff',
         'GET /2fa public',
         'GET /account staff',
+        'GET /approvals staff',
         'GET /buyer-action/{} public',
         'GET /buyer-action/{}/buyer-po-document public',
         'GET /buyer-action/{}/order-confirmation public',

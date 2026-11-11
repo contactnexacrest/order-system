@@ -331,6 +331,43 @@ how to treat it). The page's **"Reasons typed in by hand"** table lists
 those, most used first — add the frequent ones to the list so the team can
 pick them.
 
+### Setup checklist (owner, 11 Nov 2026, D-312 / D-313)
+
+**Admin › Setup Checklist** (needs *Manage company settings*; the menu shows
+how many items are still Needed). Use it on installation day and whenever the
+menu shows a number. Each line says **Done** or **Needed** (Optional for ECGC
+and Zoho) and has a button to the page where it is set:
+
+1. **Company identity** and **Bank details, GSTIN, IEC/PAN** — the new
+   installation starts with placeholders (e.g. "Bank name (to be entered)",
+   GSTIN 29AAAAA0000A1ZY). Enter the real values in Company Settings
+   (Unlock the protected rows, give a reason).
+2. **LUT and RCMC** numbers and expiry dates; **ECGC** if the company has a
+   policy.
+3. **E-mail server** — SMTP in `app/.env` (server side); then send a test
+   e-mail from Company Settings.
+4. **Zoho** (optional), **Backups** (folder, encryption, off-site copy).
+5. **Pricing** (exchange rate and margins) and **Commission levels** — the MD
+   checks them and ticks (only someone who manages pricing may tick).
+6. **TDS and export-benefit deadlines** — tick once confirmed with the CA.
+7. **This year's holidays** — the national holidays (26 Jan, 15 Aug, 2 Oct)
+   come pre-filled for this year and next; add the state and festival
+   holidays in the Holiday Calendar, then tick. A new tick is asked for every
+   year.
+8. **The MD's real e-mail** — no user may keep md@email.com, ed@email.com or
+   admin@email.com.
+9. **storage/sessions writable** (PHP only).
+10. **Settings at the recommended values** — the list underneath shows every
+    setting that differs (document clean-up 90 / 365 / latest only, password
+    expiry off, "my own office computer" 30 days, idle sign-out staff 4 h,
+    buyers 2 h, associates 2 h, staff log in again every 12 h, Test Mode
+    e-mail = company e-mail). Tick the rows, give a reason and press **Apply
+    recommended**; every change is in the Audit Log with the reason.
+
+New installations also start with: document clean-up on (drafts 90 days,
+never-sent superseded revisions 365 days, CAFIN latest only), password expiry
+off, and the Test Mode e-mail set to the company e-mail.
+
 ### Document copies clean-up (owner, 2 Nov 2026)
 
 **Settings → Document copies clean-up** (link at the top of Company
@@ -338,8 +375,9 @@ Settings; needs *Manage company settings*). Every generated document keeps
 several copies: the **DRAFT** copy made when it is generated, the **final**
 copy made on approval (the one the buyer gets), a **SUPERSEDED** copy when a
 newer revision is approved, the internal Word copy, and every **CAFIN** ever
-generated. Three rules remove the ones nobody needs. All three are **off**
-until switched on.
+generated. Three rules remove the ones nobody needs. Since 11 Nov 2026
+(D-313) a new installation starts with all three **on**: drafts 90 days,
+never-sent superseded revisions 365 days, CAFIN latest only.
 
 | Rule | Options | What it removes |
 |---|---|---|

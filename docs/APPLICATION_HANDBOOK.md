@@ -130,12 +130,14 @@ The complete description of the NexaCrest export order system: what it is for, h
   - [6.9 Payments and remittances](#69-payments-and-remittances)
   - [6.10 CAFIN and the CA module](#610-cafin-and-the-ca-module)
   - [6.11 Reports and dashboard](#611-reports-and-dashboard)
+  - [6.11b Approvals page (D-310)](#611b-approvals-page-d-310-11-nov-2026)
   - [6.12 My Tasks and the management cockpit](#612-my-tasks-and-the-management-cockpit)
   - [6.13 E-mail templates](#613-e-mail-templates)
   - [6.14 Zoho Books sync](#614-zoho-books-sync)
   - [6.15 Divisions: Domestic Trade, Import & Distribution, Merchant Trade](#615-divisions-domestic-trade-import--distribution-merchant-trade)
   - [6.16 Backups](#616-backups)
   - [6.17 Admin pages](#617-admin-pages)
+  - [6.17b Setup checklist (D-312)](#617b-setup-checklist-d-312-11-nov-2026)
   - [6.18 Sample data playground](#618-sample-data-playground)
 - [7. Money rules and formulas](#7-money-rules-and-formulas)
   - [7.1 Pricing (D-245, D-255, D-256)](#71-pricing-d-245-d-255-d-256)
@@ -2780,6 +2782,73 @@ the same filters, counts, fields, actions and money rules on both templates
   `DashboardRepository`, `DivisionProfitService`, `IncentiveReportService`.
 - **SOP / decisions.** SOP 14; D-104, D-118, D-183, D-204.
 
+### 6.11b Approvals page (D-310, 11 Nov 2026)
+
+- **Purpose.** One place for everything a person may approve, so nothing
+  waits unseen (the MD could not find where to approve a line price).
+- **Where.** Sidebar **Approvals (n)** (shown to anyone holding an approver
+  permission — `manage_pricing`, `approve_payment_terms`, `approve_email_send`,
+  `approve_documents`, `edit_locked_data`, `approve_purchases`,
+  `approve_short_payment`, `manage_associate_bank`, `manage_associates`,
+  `manage_field_protection` — and to anyone else once something waits for
+  them, e.g. an assigned document review). Route `GET /approvals`
+  (signed-in staff; every row is checked per person).
+- **Tabs and counts.** All · Prices · Payment terms · Documents (= My
+  Reviews) · E-mails (= Email Approvals, Level 2 waiting for approval) ·
+  Bank details · Other (amendments, cancellation requests, purchase
+  approvals, short payments, associate registrations, associate price
+  requests, field-protection requests, reorder requests). The D-240
+  "discount above warning" approval no longer exists separately — since
+  D-245 it is the line-price approval (Prices tab).
+- **Columns.** Waiting since ("Today 10:42", "Yesterday", "9 Nov") · What ·
+  Order / who · Details · a button that opens the **exact existing approval
+  screen** (line price approval page, order Step 1 for payment terms,
+  `/reviews#review-<id>`, `/email-approvals#email-<id>`, the associate /
+  supplier / partner bank section, `/orders/<id>/amendments`, the order's
+  cancellation banner, `/procurement/<id>`, the order's payment step,
+  `/associates/registrations`, `/associates/price-requests?show=pending`,
+  `/admin/field-protection`, `/reorder-requests/<id>`). Nothing is approved
+  on this page.
+- **Who sees a row.** Exactly who could act on it today: the screen's
+  permission, the order visibility rule (division, assignment, archived) for
+  order items, and Admin › Self-approval rules (a price you set yourself, terms
+  of an order you created, a send you requested, an amendment or cancellation
+  you asked for, an award you made, a payment whose receipts you recorded,
+  bank details you entered — only where your role is ticked). Two-people bank
+  checks: the first checker does not see the second check. Purchase awards
+  above the person's approval limit are not shown. Protection requests: not
+  your own (Super Admin excepted).
+- **Kanban template.** The same rows as a board (one column per tab), the same
+  tab chips and buttons, "Switch to list view" / "Switch to board view".
+- **Short payments (new request record).** Clearing a payment that came in
+  short used to be refused with "ask a manager"; the refusal now also files a
+  request in `short_payment_requests` (one per payment leg; owed amount,
+  who asked, when) and tells every holder of `approve_short_payment` once
+  (notification `short_payment_approval`, e-mail kind Staff approvals). The
+  request stays open until the leg is cleared short or the rest is
+  received; the refusal text ends "It now waits in Approvals for them."
+- **Dashboard › My Approvals.** New tiles *Prices waiting for my approval*,
+  *Payment terms*, *Bank details to verify*, *Other approvals* (beside the
+  existing ones) and a button **Open my approvals (n)**.
+- **Order page.** A yellow bar at the very top for anyone who may approve
+  something on that order: "Waiting for your approval: line 2 — USD 320.00 /
+  PCS is below the lowest price (USD 325.41 / PCS). The Quotation is held until
+  it is approved." with a button "Review and approve line 2" (also payment
+  terms, document reviews, e-mails, amendments, cancellation, purchase, short
+  payment). The person who asked sees "Line 2 — sent to the MD for approval on
+  11 Nov, 10:42 — waiting." (and the same for their cancellation, amendment,
+  e-mail and short-payment requests).
+- **E-mails.** Every approval e-mail (kind `staff_approvals`, D-280) ends with
+  "Open your approvals: <APP_URL>/approvals".
+- **Old pages kept.** My Reviews and Email Approvals still work (rows gained
+  anchors `review-<id>` / `email-<id>`); the menu will later point to
+  Approvals only (point 26).
+- **Code.** `ApprovalsInbox` / `approvalsInbox.js`, `ApprovalsController` /
+  `approvalsController.js`, views `approvals/index`, `approvals/index_kanban`;
+  `OrderAccessService::visibilitySqlFor`. Tests `ApprovalsAndSetupD310Test` /
+  `approvalsAndSetupD310.test.js`, `GapPartPaymentsTest` /
+  `gapPartPayments.test.js`. SOP 13, 00.
+
 ### 6.12 My Tasks and the management cockpit
 
 - **Purpose.** Hand work from one department to the next without anyone
@@ -2947,7 +3016,8 @@ Sidebar group **Admin** (each item appears only with its permission):
 | Page | Route | Permission | Notes |
 |---|---|---|---|
 | Company Settings | `/settings` | `manage_company_settings` | Company, bank, LUT/RCMC (expiry alerts), mail, Zoho, portal defaults, Associate TDS, remittance reasons, document clean-up. Secrets shown as "•••• ends in 1a2b". |
-| Holiday Calendar | `/holidays` | `manage_company_settings` | Working-day maths (disputes) |
+| Setup Checklist | `/admin/setup-checklist` | `manage_company_settings` | D-312: Done / Needed per installation item, ticks, Apply recommended (6.17b) |
+| Holiday Calendar | `/holidays` | `manage_company_settings` | Working-day maths (disputes); Indian national holidays (26 Jan, 15 Aug, 2 Oct) seeded for the install year and the next (D-313) |
 | HS Codes | `/hs-codes` | `manage_hs_codes` | |
 | Logistics Partners / Suppliers | `/logistics-partners`, `/suppliers` | `manage_logistics_partners` / `manage_suppliers` | |
 | Ports (+ Port Routes) | `/ports`, `/port-routes` | `manage_ports` | |
@@ -2982,6 +3052,42 @@ Sidebar group **Admin** (each item appears only with its permission):
   controller per list page.
 - **SOP / decisions.** SOP 15, 16, 21, 28; D-124, D-157, D-179–D-182,
   D-214, D-221.
+
+### 6.17b Setup checklist (D-312, 11 Nov 2026)
+
+Admin › **Setup Checklist** (`/admin/setup-checklist`, `manage_company_settings`;
+the menu entry shows how many items are Needed). Each item shows **Done /
+Needed** (or Optional) with a button to the page where it is set:
+
+| Item | Done when | Button |
+|---|---|---|
+| Company identity | name, offices, MD and director names, phone, e-mail are not the seed placeholders | Company Settings |
+| Bank details, GSTIN, IEC/PAN | bank keys, GSTIN and IEC/PAN are not the seed placeholders | Company Settings |
+| LUT and RCMC | numbers entered, expiry dates not passed | Company Settings |
+| ECGC (optional) | no policy = Optional; with a policy, a valid-until date not passed | Company Settings |
+| E-mail server | SMTP_HOST, PORT, USERNAME, PASSWORD, FROM_ADDRESS set in `.env` | Send a test e-mail (`/settings#smtp-test`) |
+| Zoho (optional) | Zoho Books on with an organisation id | Company Settings |
+| Backups | BACKUP_DIR, BACKUP_ENCRYPTION_KEY_FILE, BACKUP_OFFSITE_TARGET set | Backups |
+| Pricing confirmed by the MD | ticked (only `manage_pricing` may tick) | Pricing settings |
+| Commission levels | ticked by the MD and at least one active level | Commission levels |
+| TDS and benefit deadlines confirmed with the CA | ticked | TDS settings |
+| This year's holidays | ticked for the year ("add state and festival holidays for <year>" — a new tick every year); button to add any missing national holidays for this year and next | Holiday Calendar |
+| The MD's real e-mail | no active user still has md@email.com, ed@email.com or admin@email.com | Users |
+| storage/sessions writable | PHP: the folder exists and is writable; Node: always Done (sessions in the database) | Backups |
+| Settings at the recommended values | none differs | the list below |
+
+**Recommended values** (shown with "Differs" and the current value, ticked
+rows applied together with **Apply recommended**, reason of 10+ characters,
+each change audit-logged as `FIELD_EDIT` with the reason plus
+`SETUP_RECOMMENDED_APPLIED`): document clean-up 90 / 365 / latest_only,
+`password_expiry_days` 0, `login_remember_browser_days` 30, session timeouts
+staff 240 / client 120 / associate 120 minutes, absolute 12 hours, Test Mode
+e-mail = the company e-mail.
+
+Ticks are kept in `setup_checklist_ticks` (item key, who, when, note; audit
+`SETUP_CHECKLIST_TICKED` / `_UNTICKED`). Code `SetupChecklist` /
+`setupChecklist.js`, `SetupChecklistController` / `setupChecklistController.js`,
+view `settings/setup_checklist`. SOP 15.
 
 ### 6.18 Sample data playground
 
@@ -3713,7 +3819,7 @@ Settings live in database tables (seeded by `docs/seed.sql`, identical keys on b
 
 #### Company Settings (`company_settings`, `/settings`, `manage_company_settings`)
 
-Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are **protected**: editing needs reason + unlock + confirm, and unprotecting needs a peer-approved request (`field_protection_requests`). Real company identifiers are seeded; they are not repeated in this handbook.
+Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are **protected**: editing needs reason + unlock + confirm, and unprotecting needs a peer-approved request (`field_protection_requests`). Since D-313 (11 Nov 2026) the seed carries **placeholders**, not the company's identifiers: corporate office "Corporate office address, City – 000000, India", GSTIN `29AAAAA0000A1ZY` (passes the GSTIN check; state code 29 kept for the domestic GST split), IEC/PAN `AAAAA0000A`, bank "Bank name (to be entered)" / "Branch (to be entered)" / account `000000000000` / IFSC `XXXX0000000` / SWIFT `XXXXINXXXXX` / "Bank branch address, City – 000000, India" / PIN `000000`, LUT `AD000000000000X`, RCMC `RCMC/CAPEXIL/00000/2026-2027`. Admin › Setup checklist (6.17b) flags each as Needed until the real value is entered at installation (Company Settings, Unlock on the protected rows). The Test Mode e-mail is seeded as the company e-mail (`test_mode_settings.test_email`).
 
 | Group | Keys (default) |
 |---|---|
@@ -3724,7 +3830,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 | Defaults | `default_currency` USD, `default_estimated_total_cbm` 8.2, `default_estimated_gross_weight_kg` 27000, `default_estimated_net_weight_kg` 26000, `default_ui_template` standard |
 | Tolerances | `quantity_shortfall_tolerance_pct` 5.00, `max_bank_charges_pct` 3, `non_usd_price_buffer_pct` 1.75 (advisory) |
 | Alerts | `lut_alert_days_x` 30, `lut_escalation_days_y` 15, `rcmc_alert_days_a` 30, `rcmc_escalation_days_b` 15, `fdn_overdue_days_c` 3 (calendar days since D-051, counted by `check_alerts`; the seed's description still says working days, §14.5), `fema_realization_alert_days` 270 |
-| Security | `session_timeout_staff_minutes` 240, `session_timeout_client_minutes` 120, `session_timeout_associate_minutes` 120, `session_absolute_staff_hours` 12, `login_remember_browser_days` 30 (D-283), `failed_login_lockout_count` 5, `lockout_duration_minutes` 15, `password_min_length` 10, `password_complexity_json` (upper + number), `password_expiry_days` 90 |
+| Security | `session_timeout_staff_minutes` 240, `session_timeout_client_minutes` 120, `session_timeout_associate_minutes` 120, `session_absolute_staff_hours` 12, `login_remember_browser_days` 30 (D-283), `failed_login_lockout_count` 5, `lockout_duration_minutes` 15, `password_min_length` 10, `password_complexity_json` (upper + number), `password_expiry_days` 0 (off, D-313) |
 | Documents | `quotation_validity_days` 30, `pi_validity_days` 15, `revision_start_number` 1, `annexure_product_note`, `show_generated_document_disclaimer` 0, `generated_document_disclaimer_text`, `always_show_consignee_section` 1, `always_show_notify_party_section` 1 |
 | Shipping | `bl_type_instruction`, `bl_consignee_instruction` ("TO ORDER OF {company}") — protected |
 | Formats (protected) | `master_tracking_ref_format` NC/SC/{YY}/{DDMM}{NNN}, `order_ref_format` NC/SC/ORD/{YY}/{DDMM}{NNN} |
@@ -3822,9 +3928,9 @@ Admin › GST rates (`gst_rates`; seed HSN 6802 = 18 %) and Admin › Import dut
 
 | Key | Default | Options |
 |---|---|---|
-| `doc_cleanup_draft_days` | 0 (off) | 0, 30, 90, 180 |
-| `doc_cleanup_superseded_days` | 0 (off) | 0, 90, 180, 365 |
-| `doc_cleanup_cafin_mode` | keep_all | keep_all, latest_only (older copies removed 30 days after a newer one) |
+| `doc_cleanup_draft_days` | 90 (D-313) | 0, 30, 90, 180 |
+| `doc_cleanup_superseded_days` | 365 (D-313) | 0, 90, 180, 365 |
+| `doc_cleanup_cafin_mode` | latest_only (D-313) | keep_all, latest_only (older copies removed 30 days after a newer one) |
 
 Never removed: anything sent to the client, the current copy of every revision, the current internal Word copy, uploaded files, files of an order with an open dispute, documents in a CA-locked financial year. Daily job 02:15.
 
@@ -4414,6 +4520,7 @@ Other open points needing outside answers: O-11 (workflow specification §13 que
 |---|---|---|
 | md@email.com, ed@email.com, "Managing Director" | `users` (protected founder accounts), `company_settings.md_name`, `director_name`, asset names | Real names / e-mails via the real-values SQL (§12.1) |
 | info@email.com, +91-0000000000, "Registered office address, City – 000000, India" | `company_settings` `email`, `phone`, `registered_office` | Real company values |
+| Corporate office, GSTIN, IEC/PAN, bank, LUT and RCMC placeholders (D-313) | `company_settings` | The company's real values — Admin › Setup checklist lists every one still Needed |
 | Password `ChangeMe#2026` (both seeded Super Admins) | seed | Forced change at first login; deactivate the second if not needed |
 | `__STORAGE_BASE_PATH__` | `assets`, `user_signature_assets`, `reference_library_documents` | The absolute storage path |
 | LUT expiry and RCMC valid-until 31 Mar 2027 | `company_settings` | Confirm |

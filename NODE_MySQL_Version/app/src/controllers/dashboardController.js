@@ -38,6 +38,12 @@ async function index(req, res) {
     searchResults: [],
   };
 
+  // Owner decision D-310 (point 27): the "My Approvals" tiles count what waits on the Approvals page.
+  const approvalsInbox = require('../services/approvalsInbox');
+  const approvalItems = await approvalsInbox.items(req);
+  data.approvalCounts = approvalsInbox.counts(approvalItems);
+  data.showApprovalTiles = approvalItems.length > 0 || approvalsInbox.isApprover(req);
+
   if (canManageOrders) {
     data.stageBreakdown = await dashboardRepository.activeOrdersByStage();
     data.activeOrderCount = await dashboardRepository.activeOrderCount();

@@ -135,11 +135,23 @@ final class NotificationRepository
             return null;
         }
         try {
-            \App\Services\EmailService::sendPlainText($user['email'], self::emailSubject($message), $message, false, $kind, 'staff');
+            \App\Services\EmailService::sendPlainText($user['email'], self::emailSubject($message), self::emailBody($message, $kind), false, $kind, 'staff');
         } catch (\Throwable $e) {
             // Never let a notification-email failure break the action it's reporting on.
         }
         return $user['email'];
+    }
+
+    /**
+     * D-310: an approval e-mail ends with the link to the Approvals page, where
+     * the item waits with a button to the exact approval screen.
+     */
+    public static function emailBody(string $message, string $kind): string
+    {
+        if ($kind !== 'staff_approvals') {
+            return $message;
+        }
+        return $message . "\n\nOpen your approvals: " . rtrim((string) \App\Config\Env::get('APP_URL', ''), '/') . '/approvals';
     }
 
     /**
