@@ -12,11 +12,11 @@ or associates beyond their own two prices.**
 | Cost | supplier price "used for pricing" (₹) ÷ pricing exchange rate + other costs to FOB | ₹80,000 ÷ 82.00 = USD 975.61 + 2.5% = **USD 1,000.00** |
 | Minimum price | cost ÷ (1 − margin %) — *margin on the price, not markup* | ÷ 0.80 = **USD 1,250.00** — nobody goes below this |
 | Team incentive reserve | % of (minimum price − cost), or a USD amount; 0 when the incentive program is off | 15% of 250 = USD 37.50 |
-| Staff floor | minimum price + reserve | **USD 1,287.50** |
-| Associate floor | staff floor ÷ (1 − commission %), or + a fixed USD amount | at 5%: **USD 1,355.26** |
+| Staff floor (shown to staff as **Staff lowest**, D-305) | minimum price + reserve | **USD 1,287.50** |
+| Associate floor (shown as **Associate lowest**) | staff floor ÷ (1 − commission %), or + a fixed USD amount | at 5%: **USD 1,355.26** |
 | Quote price | floor × (1 + buffer %) | staff **USD 1,326.13**; associate at 5% **USD 1,395.92** |
 
-Every % or amount has a **global value** (Admin → **Pricing**). A product can override
+Every % or amount has a **global value** (Products › Pricing › **Pricing settings**). A product can override
 any of them on its own page; an empty field means "use the global value".
 
 ## Who sees and changes what
@@ -31,7 +31,7 @@ Sales staff (anyone who may see selling prices) see only **Quote price** and **Y
 lowest price** on the product page and list. Supplier prices and cost components on the
 product page are shown only to people who may see purchase prices.
 
-## Admin → Pricing (MD)
+## Products › Pricing › Pricing settings (MD)
 
 1. **Pricing settings:** minimum margin (% of price), other costs to FOB (%), pricing
    exchange rate (₹ per USD — keep it a little below the market rate), negotiating buffer
@@ -58,7 +58,7 @@ update it before Sales quotes.
 
 ## Prices on order lines (phase P2)
 
-**Goods lines must be picked from Products** (Admin → Pricing, MD only; **on** by default).
+**Goods lines must be picked from Products** (Products › Pricing › Pricing settings, MD only; **on** by default).
 While it is on, a **goods** line on a **USD** order must be picked from Products: a goods
 line typed by hand is refused, with the message beside the picker in the browser ("Pick
 this goods line from Products — on a USD order goods lines cannot be typed by hand (service
@@ -101,7 +101,7 @@ specification options or the unit voids it** and the line goes back to the MD. A
 options or unit after the Proforma Invoice also drops the figures fixed at the PI, so the
 line is checked against the floor of its new options.
 Audit: LINE_PRICE_APPROVAL_REQUESTED, LINE_PRICE_APPROVED, LINE_PRICE_APPROVAL_REFUSED,
-LINE_PRICE_APPROVAL_VOIDED. Admin → Self-approval rules ("price discount") decide whether the
+LINE_PRICE_APPROVAL_VOIDED. Users & roles › Self-approval rules ("price discount") decide whether the
 MD may approve a price they set themselves.
 
 **The Quotation and the Proforma Invoice wait** while any line is below its lowest price,
@@ -133,31 +133,30 @@ rate 0.
 
 ## Settings to check on go-live day (owner decision, 5 Nov 2026)
 
-The installed values below are the owner's chosen starting values. Only the first two need
-entering by hand on the day the site goes live (Admin › Pricing):
+The installed values below are the owner's chosen starting values. Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need entering by hand on the day the site goes live (Products › Pricing › Pricing settings):
 
 | Setting | Value | Where |
 |---|---|---|
-| Pricing exchange rate | **today's market ₹ per USD minus about 1.5%**; review monthly, or when the rupee moves more than 1% | Admin › Pricing |
-| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Admin › Pricing, and per product |
-| Minimum margin | 20% of the price (raise per product where the market allows) | Admin › Pricing |
-| Negotiating buffer | 3% | Admin › Pricing |
-| Team incentive | 15% of profit (review after 6 months) | Admin › Pricing |
-| Supplier price stale after | 60 days | Admin › Pricing |
-| Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission settings |
-| Payout run | monthly, on the 5th | Associates › Commission settings |
-| Counting order | invoiced FOB of ₹5,00,000 or more | Associates › Commission settings |
-| Buyer registration valid | 6 months | Associates › Commission settings |
-| GST on commission | 18% (associates with a GSTIN and a tax invoice) | Associates › Commission settings |
-| Associate registration link | 7 days | Associates › Commission settings |
-| Personal code changes | 3 a year | Associates › Commission settings |
+| Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Pricing › Pricing settings › Exchange rate |
+| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Pricing › Pricing settings, and per product |
+| Minimum margin | 20% of the price (raise per product where the market allows) | Products › Pricing › Pricing settings |
+| Negotiating buffer | 3% | Products › Pricing › Pricing settings |
+| Team incentive | 15% of profit (review after 6 months) | Products › Pricing › Pricing settings |
+| Supplier price stale after | 60 days | Products › Pricing › Pricing settings |
+| Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission › Commission settings and ladder |
+| Payout day | monthly, on the **last day of the month**; a Sunday or holiday moves to the working day before (D-292) | Associates › Commission › Commission settings and ladder |
+| Counting order | invoiced FOB of ₹5,00,000 or more | Associates › Commission › Commission settings and ladder |
+| Buyer registration valid | 6 months | Associates › Commission › Commission settings and ladder |
+| GST on commission | 18% (associates with a GSTIN and a tax invoice) | Associates › Commission › Commission settings and ladder |
+| Associate registration link | 7 days | Associates › Commission › Commission settings and ladder |
+| Personal code changes | 3 a year | Associates › Commission › Commission settings and ladder |
 
 Commission levels and the ladder (P1/P3) and the team incentive (P4) are in use; see SOP 20
 and SOP 24.
 
 ## Specifications that change the price (D-255, 5 Nov 2026)
 
-**Pricing › Specifications** (MD — manage pricing; MD and ED can view) lists, per
+**Products › Pricing › Specifications** (MD — manage pricing; MD and ED can view) lists, per
 category, the specifications and their options. The Natural Stone category starts
 with: Grade / quality, Thickness, Surface finish, Size / format, Edge work,
 Quantity, Packing, Treatment, Calibration. The first (base) option of each changes
@@ -208,9 +207,9 @@ existing fields (description, dimensions, finish, unit); documents are unchanged
 
 | Setting | Default | Where |
 |---|---|---|
-| Price per CBM from (mm) | 50 | Pricing › Settings |
-| Associate price requests per day | 10 | Pricing › Settings (per associate: Associates › Price access) |
-| An associate's price stays valid for (days) | 7 | Pricing › Settings (per associate: Associates › Price access) |
+| Price per CBM from (mm) | 50 | Products › Pricing › Pricing settings |
+| Associate price requests per day | 10 | Products › Pricing › Pricing settings (per associate: Associates › Price access) |
+| An associate's price stays valid for (days) | 7 | Products › Pricing › Pricing settings (per associate: Associates › Price access) |
 
 ## Pricing a new product in 5 steps (D-256, 5 Nov 2026)
 
@@ -320,7 +319,7 @@ awaited. A deleted line no longer asks for its category's documents.
 
 **New list values.** Units MTR, LTR, HOUR and DAY (PCS, SET, KG and MT were already there);
 supplier types Manufacturer, Machine Shop and Forging / Casting Unit (Trader was already
-there). Admin › Dropdowns can rename or hide them.
+there). Settings › Lists › Dropdown lists can rename or hide them.
 
 ## Documents follow the category (D-257 Phase 1, 5 Nov 2026)
 
@@ -337,7 +336,7 @@ categories of the order's goods lines, in PDF and in Word:
 | Terms & conditions | Today's clauses | The clauses of the category's clause set (below) |
 
 **Clause sets.** Most clauses print on every order. A few belong to a set and print only
-when one of the order's categories uses that set (Admin › Overrides shows it as
+when one of the order's categories uses that set (Settings › Admin overrides shows it as
 "only for: …" beside the clause; the wording is edited there as before):
 
 | Set | Clauses (starting wording) |
@@ -392,7 +391,7 @@ the buyer pays. *Example:* we quote USD 1,000 at a market rate of ₹88.40. The 
 ₹86.63; USD 1,000 now brings ₹86,630, not ₹88,400 — because prices were worked out at ₹86.63, the cost is
 still covered.
 
-Products › Pricing settings › **Exchange rate** shows the rate in use, its source and date, warnings and the
+Products › Pricing › Pricing settings › **Exchange rate** shows the rate in use, its source and date, warnings and the
 history. The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate
 now**. If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
 day it waits: the MD reads the figures, gives a reason and chooses **Use this rate** or **Keep the rate in
@@ -402,7 +401,7 @@ use**. Quotations and Proforma Invoices already issued never change.
 
 - A product's HS code is picked from the HS Code Master List (pre-filled with the category's default).
   People who manage HS codes see **+ Add a new HS code**. Order lines accept only master-list codes.
-- One-time clean-up: Products › **Fix HS codes** (choose the right code for each product listed) and
+- One-time clean-up: Products › HS codes › **Fix HS codes on products** (choose the right code for each product listed) and
   Products › **Link suppliers** (**Match by name** links exact names at once; pick or quick-add the rest).
 - A supplier's page lists **Prices given for products**; untick **Details pending** once GSTIN, bank and
   contacts are complete.
@@ -419,6 +418,6 @@ use**. Quotations and Proforma Invoices already issued never change.
 ## One page per category (D-306)
 
 Products › Categories › <category>: **General** (name, units, HS code, packing, documents) · **Options and
-their price effect** (was Admin › Pricing › Specifications) · **Price rules** · **Products in this
+their price effect** (was the separate Specifications page under Pricing) · **Price rules** · **Products in this
 category**. On a product's options page, "edit for all products in <category>" opens the category's
 options; **Change for this product only** changes just that product.

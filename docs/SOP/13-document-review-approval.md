@@ -10,10 +10,8 @@ in this document rather than repeated in each one.
 
 The one rule stated in the [introduction](./00-introduction.md) is worth
 repeating here: **a stage is complete only once its own document is
-finished** (owner decision 2026-10-25). While email sending is off in
-Company Settings, "finished" means **approved** — approval then counts as
-sent, and staff send the PDF to the buyer themselves. While email sending
-is on, it means **sent** to the buyer through the app. Internal documents
+finished** (owner decision 2026-10-25). While document e-mails to buyers are held (Settings › E-mail: Testing mode, or the buyer *Documents* switch off), "finished" means **approved** — approval then counts as
+sent, and staff send the PDF to the buyer themselves. While they are sent (the default), it means **sent** to the buyer through the app. Internal documents
 (Supplier PO, BL Instruction Sheet) only need approval. So a document left
 in draft or review holds up its own stage's gating action — the refusal
 message names it.
@@ -22,7 +20,7 @@ On the order page, the **Document Review & Approval** section opens on
 its own whenever the order has documents (and stays collapsed while it
 has none). Its heading shows **"N need(s) action"** when a document is
 waiting on someone — generated but no reviewer assigned yet, waiting for
-approval, or (with email sending on) approved but not yet sent to the
+approval, or (with buyer e-mails sent) approved but not yet sent to the
 buyer — and each one is listed at the top of the section. Every
 **Generate** button also says when that document already exists
 ("⚠ Already generated: REF Rev.N (status)"), so a duplicate isn't
@@ -87,8 +85,7 @@ approved, a copy stamped "INVALID DOCUMENT — SUPERSEDED". The exact PDF the
 buyer received is now marked *sent to client* — when it is e-mailed, when
 approval counts as sent while e-mail is off, or when the buyer downloads it
 from the client portal. Draft and never-sent copies can be removed after a
-chosen number of days in **Admin → Company Settings → Document copies
-clean-up** (off until switched on); anything sent to the client, the
+chosen number of days in **Settings › Document clean-up** (on by default since 11 Nov 2026, D-313: drafts 90 days after approval); anything sent to the client, the
 current copy of every document and uploaded files are never removed. See
 [Admin & Settings](./15-admin-settings.md).
 
@@ -106,8 +103,7 @@ moved more than 2 % and waits for the MD's OK. Each row shows since when it wait
 or person, the details, and a button that opens the **exact place where it
 is approved** — the approval itself is done there, as before.
 
-- You see only what you may approve: the same permissions and Admin ›
-  Self-approval rules as the approval screen. Something you asked for
+- You see only what you may approve: the same permissions and Users & roles › Self-approval rules as the approval screen. Something you asked for
   yourself appears for someone else.
 - Kanban users see the same rows as a board, one column per tab.
 - The Dashboard's **My Approvals** shows *Prices waiting for my approval*,
@@ -168,8 +164,7 @@ type, normal forward progress through the stages, never triggers it.
 From the order page, staff assign one or more reviewers to a generated
 document — this moves it from draft to **in review**. The person who
 generated the document is left out of the reviewer list — a second pair
-of eyes is the point of the review — unless **Admin → Self-approval
-rules** let their role review a document they generated (by default the
+of eyes is the point of the review — unless **Users & roles › Self-approval rules** let their role review a document they generated (by default the
 Managing Director and Executive Director). Then their name is in the list
 with **(generated it — self-review)** after it (owner decisions 1 Nov
 2026, D-221; QA Round 8). Each assigned
@@ -184,7 +179,7 @@ rejected one in place.
 
 ### Sending to the buyer — a two-level approval
 
-This applies while email sending is **on**. Once approved, **Send to Buyer
+This applies while document e-mails to buyers are **sent** (Settings › E-mail). Once approved, **Send to Buyer
 (deferred, 2-level approval)** — in the document's own review panel, under
 **Send to Buyer** — opens a compose/preview screen. When the
 document being sent has an obvious matching template (the normal case —
@@ -208,12 +203,11 @@ a dedicated one from Email Templates in Settings.
 
 **Submit for Level-2 Approval** doesn't send anything yet — it's Level 1.
 A separate approver (anyone with the `approve_email_send` permission) has
-to clear it from the **Email Send Approvals** queue before it goes out.
+to clear it from the **Email Send Approvals** queue (left menu **Approvals › E-mails**) before it goes out.
 The person who requested the send can never approve it themselves, whatever
 their role (owner decision 1 Nov 2026) — an e-mail to a buyer cannot be
 called back.
-That queue has its own item in the sidebar (next to **My Reviews** — not
-tucked under Insights), carrying a live count badge whenever something is
+That queue is the **E-mails** tab of the left menu's **Approvals** page (next to **Documents**, your document reviews), carrying a live count badge whenever something is
 waiting — same pattern as Quotation Intake Review/PI Intake Review's own
 badges, counting everything still in the deferred window (awaiting
 approval, or already approved but not yet dispatched) so the number always
@@ -248,26 +242,19 @@ never gets buried below older rows still waiting out their own schedule.
 
 ### Admin-configurable: turning sending off, or skipping Level 2
 
-Two independent switches in Company Settings:
+Two independent switches:
 
-- **Testing mode / the "Documents" switch** (Admin → E-mail settings,
+- **Testing mode / the "Documents" switch** (Settings › E-mail,
   D-280; replaced `mail_sending_enabled`) — testing mode holds every
   buyer and supplier e-mail (login codes and password links are never
   affected); the "Documents … — Buyer" switch holds document e-mails only.
   Testing mode is **off** in a fresh installation. While buyer document
   e-mails are held there is **no Send to Buyer**
   at all: a buyer-facing document counts as **sent the moment it is
-  approved** (its panel says "Counted as sent on approval (email sending is
-  off) — send the PDF to the buyer yourself"), the OC acknowledgement clock
+  approved** (its panel says "Counted as sent on approval (document e-mails to the buyer are held) — send the PDF to the buyer yourself"), the OC acknowledgement clock
   starts at approval, and staff send the PDF themselves outside the app.
-  Turn it on only once the SMTP server in `.env` works (use **Send Test
-  Email** on Company Settings).
-  **Since 6 Nov 2026 (D-258) the switch really covers every business
-  e-mail:** document mails, the four buyer link mails (payment, buyer
-  action, registration, Buyer PO), notifications, alerts and digests,
-  portal invitations and supplier mails all go through the one sender that
-  obeys it, Test Mode and the redirect. Only security mail (2FA codes,
-  password resets, associate login and verification codes) bypasses it.
+  Switch Testing mode off (with the Documents switch on) only once the SMTP server in `.env` works (use **Send Test Email** on Settings › Company).
+  **What the switches cover (D-258, D-280):** every business e-mail — document mails, the buyer link mails, notifications, alerts and digests, portal invitations and supplier mails — goes through the one sender that obeys Settings › E-mail, Test Mode and the redirect. Testing mode holds only buyer and supplier e-mails; staff and associate e-mails follow their own switches; MUST e-mails (login codes, set-password and forgot-password links, the security alerts, the quotation verification code) are never held.
   The screen now says honestly whether an e-mail really went; while sending
   is off, the e-mail log keeps the full text so staff can send it
   themselves. A document already sent can be sent again without
@@ -330,15 +317,14 @@ too, just not add or remove them.
 ## What the client does (or doesn't)
 
 Nothing in this workflow involves the buyer directly — they simply receive
-the email once it clears both levels of approval and is actually sent (or,
-while email sending is off, the PDF staff send them themselves).
+the email once it clears both levels of approval and is actually sent (or, while buyer e-mails are held, the PDF staff send them themselves).
 There's no visibility into drafts, review status, or pending approvals from
 their side; they only ever see the final result in their portal's Documents
 list (see [Client Portal](./12-client-portal.md)).
 
 ## What happens next
 
-A finished document (approved, or sent while email sending is on) lets
+A finished document (approved, or sent while buyer e-mails are sent) lets
 its own stage's gating action go through — see the "one rule" note above.
 It also makes sure a document only reaches the buyer in a form that
 reflects real, reviewed figures, which is the entire point of keeping

@@ -177,8 +177,7 @@ What the order pays out goes to Zoho Books too, on the same sync:
   applied to it. The bill's description names the associate, the order,
   the commission level, their invoice and the TDS; the payment's
   gives the gross, the TDS (section and rate), the net and the UTR, and
-  names the bill (D-235). With a Zoho TDS tax id set in Settings →
-  Associate TDS the bill carries the TDS and the payment is the net;
+  names the bill (D-235). With a Zoho TDS tax id set in Settings › Lists › Associate TDS rules the bill carries the TDS and the payment is the net;
   without one the TDS deducted stays open on the bill for the CA to book
   against TDS payable, and the Sync Log says so. A claw-back is not sent:
   the CA books the recovery (vendor credit). In test mode only associates
@@ -186,14 +185,14 @@ What the order pays out goes to Zoho Books too, on the same sync:
 - **GST on associate commission (owner decision D-256, 5 Nov 2026).** When
   a GST-registered associate's tax invoice adds GST on top (e.g. 18 % of
   ₹10,000 = ₹1,800), the commission line of their bill carries the Zoho
-  GST tax chosen in **Associates → Commission settings → Zoho GST tax for
+  GST tax chosen in **Associates › Commission › Commission settings and ladder → Zoho GST tax for
   commission** (the Zoho Books tax id, e.g. `460000000067890`), so the
   input credit is booked and the bill totals ₹11,800; the vendor payment is
   what was paid — the commission after TDS plus the GST (₹11,800 with no
   TDS). If GST was paid and **no Zoho GST tax is chosen**, the sync refuses
   that bill and the Sync Log says: "Associate commission on order … not
   sent: GST of INR 1800.00 was paid on the associate's tax invoice, but no
-  Zoho GST tax is chosen for commission (Associates → Commission settings →
+  Zoho GST tax is chosen for commission (Associates › Commission › Commission settings and ladder →
   Zoho GST tax for commission). Choose it, then sync again." Commission
   without GST is unchanged.
 - **Associate payout costs (owner decision D-264, 7 Nov 2026).** An
@@ -214,7 +213,7 @@ What the order pays out goes to Zoho Books too, on the same sync:
   and transfer charges ₹1,850.00". The bill payment and this journal
   together equal what left the bank. **Set-up:** create an expense account
   "Associate payout costs" in Zoho Books (Accountant → Chart of Accounts)
-  and choose it in **Associates → Commission settings → Zoho account for
+  and choose it in **Associates › Commission › Commission settings and ladder → Zoho account for
   associate payout costs**. Until it is chosen these journals are skipped,
   the Sync Log says "…choose the Zoho account… (N waiting)" and the Payouts
   page shows the same note; nothing is lost — they go at the first sync
@@ -298,7 +297,7 @@ whichever side is wrong.
 
 ## Clients and products in Zoho Books (owner decision 2 Nov 2026)
 
-Two switches under **Admin → Settings → Zoho Books**, both **off** by
+Two switches under **Settings › Zoho**, both **off** by
 default and each saved with a reason (D-238):
 
 | Switch | When on, at every sync (hourly, or Sync now) |
@@ -377,7 +376,7 @@ screen can change them:
 
 | Line | Values | What it does |
 |---|---|---|
-| `ZOHO_INTEGRATION_ENABLED` | `true` / `false` | `false`: this server never contacts Zoho, whatever Admin → Company Settings says. |
+| `ZOHO_INTEGRATION_ENABLED` | `true` / `false` | `false`: this server never contacts Zoho, whatever Settings › Company says. |
 | `ZOHO_ENVIRONMENT` | `test` / `production` | `test`: only customers whose name starts with `TEST-` may go to Zoho. `production`: only real orders — test and sample orders are never sent. Use `production` on the live server only. |
 | `ZOHO_EINVOICE_ENABLED` | `true` / `false` | GST e-invoice (IRN), e-way bill and GST filing. Allowed only when this is `true` **and** `ZOHO_ENVIRONMENT=production`. Keep it `false` until NexaCrest must e-invoice (turnover above ₹5 crore) — an IRN cannot be deleted. |
 
@@ -404,7 +403,7 @@ rest of the app from working.
 
 ## Setting up the connection
 
-Under **Admin → Company Settings**, a `zoho_books` group of settings needs filling
+Under **Settings › Company**, a `zoho_books` group of settings needs filling
 in. NexaCrest uses one Zoho API Console **Self Client** (scope
 `ZohoBooks.fullaccess.all`; the Zoho Mail scopes are not needed, because
 the app does not send through Zoho Mail):
@@ -536,7 +535,7 @@ Do these in order on the **live** server. Each step names who does it.
 5. **Developer / host:** in the live server's `.env`, set
    `ZOHO_INTEGRATION_ENABLED=true` and `ZOHO_ENVIRONMENT=production`.
    Keep `ZOHO_EINVOICE_ENABLED=false` until NexaCrest must e-invoice.
-6. **Admin:** in **Admin → Company Settings**, Zoho Books section, fill in the real
+6. **Admin:** in **Settings › Company**, Zoho Books section, fill in the real
    organisation's login details and organization ID
    (60057714676 — NexaCrest International), the deposit account
    (SBI Bank – Current Account) and the **go-live date**
@@ -607,7 +606,7 @@ Zoho Books limits how many API calls an **organisation** may make — about
 check your own plan). Every Zoho app and integration of the company draws on
 the same limit, so this app keeps to its own share:
 
-| Setting (Admin → Settings → Zoho Books) | Default | What happens when it is reached |
+| Setting (Settings › Zoho) | Default | What happens when it is reached |
 |---|---|---|
 | `zoho_api_daily_limit` — max Zoho calls per day for this app (midnight to midnight, India time) | 800 | Syncing **pauses until midnight**. The run stops with "Paused: daily Zoho allowance for this app (800 calls) used — resumes tomorrow."; the "Waiting for Zoho" badges say "paused — daily Zoho allowance used, resumes tomorrow". |
 | `zoho_api_minute_limit` — max Zoho calls per minute for this app | 30 | The **scheduled (hourly) sync waits** for the next minute and carries on. **Sync Now**, **Sync this order**, **Check against Zoho** and a delete wait at most 5 seconds; otherwise they stop with "Zoho speed limit for this app reached — try again in a minute." |

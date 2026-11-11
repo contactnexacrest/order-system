@@ -30,7 +30,7 @@ Three separate sign-ins, never mixed:
   their access level (Starter, Quoting, Full or Custom). Never costs, margins
   or supplier prices (SOP chapter 24).
 
-What the app does at go-live (updated 6 Nov 2026), in brief — details in the SOP:
+What the app does (updated 11 Nov 2026), in brief — details in the SOP:
 
 - The nine-stage export order with every document (PDF and Word), review and
   approval, and the client portal (SOP chapters 01–13).
@@ -40,11 +40,20 @@ What the app does at go-live (updated 6 Nov 2026), in brief — details in the S
   coordination queues, Export Compliance (ECGC, COO, eBRC, export benefits),
   the Agreements register, associates with commission and TDS (chapters 22–26).
 - Pricing from the supplier price (D-245): minimum price, staff and associate
-  floors and quote prices; below the floor the MD approves, below the minimum
-  nobody does; the Quotation and Proforma Invoice wait for it (chapters 01, 27).
-- Associate commission on the invoiced FOB, full payment only; the team
-  incentive per order, locked by the MD; profit shown estimated / locked / paid
-  (chapters 20, 24).
+  lowest prices and quote prices; below the lowest price the MD approves, below
+  the minimum nobody does; the Quotation and Proforma Invoice wait for it
+  (chapters 01, 27). Since 11 Nov 2026 (D-270–D-306): a line may be quoted in
+  any unit of its category (CBM, m², sq ft, PCS, Ton, RMT) with its piece size;
+  one supplier price holds every thickness (20/30/40 mm and 50 mm+) and CHA +
+  transport per container; per-category Price rules; the USD→INR rate is
+  fetched every day (market rate − 2 % cushion); HS codes and suppliers come
+  from one master list each.
+- Associate commission on the invoiced FOB, full payment only (standard
+  ladder, an associate's own ladder or a fixed level, set by the MD); payout on
+  the last day of the month by default; new bank details confirmed by the
+  associate (or supplier) and checked by one person; the team incentive per
+  order, locked by the MD; profit shown estimated / locked / paid (chapters 20,
+  24).
 - Remittances with "why is it different?" reasons and bank charges booked at
   receipt (chapters 03, 06, 08).
 - Zoho Books: hourly sync (with optional client and product sync), a
@@ -52,14 +61,24 @@ What the app does at go-live (updated 6 Nov 2026), in brief — details in the S
   (CA chapter ca-03).
 - Divisions: today's system is the Export division. Domestic Trade, Import &
   Distribution and Merchant Trade are built but stay off until switched on in
-  Admin › Divisions (chapters 28–31).
+  Settings › Divisions (chapters 28–31).
 - Product categories decide units, HS code, packing, quality documents and T&C;
   Natural Stone documents are unchanged (chapter 27).
 - Team incentive eligibility (per person and designation) and caps; the
   company keeps what is not paid out (chapter 20).
 - Associate access levels set by the MD (chapter 24).
 - 10-year encrypted backups of the database and every document, with a
-  monthly test-restore and Admin › Backups (chapter 32).
+  monthly test-restore and Settings › Backups (chapter 32).
+- Since 11 Nov 2026: a short left menu (13 entries) with a menu bar per section
+  and a sticky action bar on the order page (D-320–D-322, chapter 00); one
+  Approvals page for everything waiting for a person's OK (D-310); Settings ›
+  E-mail with one switch per e-mail and audience and a Testing mode that holds
+  buyer and supplier e-mails (D-280); staff e-mails go to the people of the
+  department assigned to the order (D-281); portal login and forgot-password
+  links for buyers and associates (D-282); idle timeouts of 4 h (staff) and 2 h
+  (buyers, associates) that really apply (D-283); Settings › Setup checklist
+  for installation (D-312); plain wording for buyers, associates and suppliers
+  (D-330).
 
 Where to look:
 
@@ -68,9 +87,12 @@ Where to look:
   `NODE_MySQL_Version/docs/ARCHITECTURE.md` (same content, each with its
   own file names), and the diagram-led overview of both stacks in
   `ARCHITECTURE.html` (open it in a browser).
-- **Database install and changes:** go-live = each stack's `docs/schema.sql` then
-  `docs/seed.sql`, no migrations (D-241). How a change ships after go-live:
-  `docs/migrations/README.md`. `docs/checks/` holds read-only checks for a
+- **Database install and changes:** a new install = each stack's `docs/schema.sql`
+  then `docs/seed.sql`, no migrations (D-241). An existing (live) database is
+  brought up to date with the dated files in `docs/migrations/`, run in filename
+  order after a backup — for the 11 Nov 2026 build `2026-11-11a` … `2026-11-11g`
+  (list and rules: `docs/migrations/README.md`; live-site order of work:
+  `docs/guides/GO_LIVE_CHECKLIST.md`). `docs/checks/` holds read-only checks for a
   database that already held data before an earlier release; the first live
   install starts empty, so they are not needed there.
 - **Go-live day:** `docs/guides/GO_LIVE_CHECKLIST.md`; questions still open with
@@ -83,7 +105,9 @@ Where to look:
 - **Order workflow:** `docs/workflow/` — the workflow specification and the
   staff step-by-step checklist (HTML), kept in step with the order page.
 - **Scheduled jobs:** each stack's README — "Bluehost cron setup" (PHP,
-  `app/cron/`) and "Background jobs" (Node, `app/src/jobs/`).
+  `app/cron/`) and "Background jobs" (Node, `app/src/jobs/`). Since 11 Nov 2026
+  this includes the daily exchange-rate fetch at 07:05 IST, which needs outbound
+  HTTPS to `api.frankfurter.app` and `open.er-api.com`.
 - **Zoho Books integration:** the "Zoho Books" follow-up section of each
   stack's README, the `.env` switches in each `app/.env.example`, and SOP
   chapter `ca-03-zoho-sync.md`. Every change made in Zoho is logged in

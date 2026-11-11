@@ -40,7 +40,7 @@ the normal order is meant to be the exception, not the routine.
 
 | # | Stage | What "passes" this gate | Chapter |
 |---|-------|--------------------------|---------|
-| 1 | Enquiry & Quotation | Quotation (QT) approved — or sent, when email sending is on | [Chapter 1](./01-stage1-enquiry-quotation.md) |
+| 1 | Enquiry & Quotation | Quotation (QT) approved — or sent, when buyer e-mails are sent | [Chapter 1](./01-stage1-enquiry-quotation.md) |
 | 2 | Buyer Purchase Order | Buyer's PO reference confirmed by staff | [Chapter 2](./02-stage2-buyer-po.md) |
 | 3 | Proforma Invoice | Advance payment marked cleared (on a Letter of Credit order: LC confirmed usable) | [Chapter 3](./03-stage3-pi-advance.md) |
 | 4 | Order Confirmation | Buyer acknowledges the OC (or 48h auto-confirm) | [Chapter 4](./04-stage4-order-confirmation.md) |
@@ -134,10 +134,8 @@ own. The stage's gating action (confirming the Buyer PO, clearing the
 advance, recording the OC acknowledgement, and so on) is refused until that
 stage's document is:
 
-- **approved**, while email sending is turned off in Company Settings (the
-  default: approval then counts as sent, and staff send the PDF to the
-  buyer themselves); or
-- **sent to the buyer** through the app, while email sending is on.
+- **approved**, while document e-mails to buyers are held (Settings › E-mail: Testing mode on, or the buyer *Documents* switch off): approval then counts as sent, and staff send the PDF to the buyer themselves; or
+- **sent to the buyer** through the app, while document e-mails to buyers are sent (the default).
 
 Internal documents that never go to the buyer (the Supplier PO and the BL
 Instruction Sheet) only need to be approved. The Quotation has no separate
@@ -236,7 +234,7 @@ database before applying.
   folders keep their names; both styles appear side by side for a while.
 
 This whole structure sits under whatever `STORAGE_BASE_PATH` is configured
-to (see [Admin & Company Settings](./15-admin-settings.md) and the
+to (see [Admin & Settings](./15-admin-settings.md) and the
 deployment guide) — always outside the public web root, so none of it is
 reachable by a direct URL; every download goes through the application,
 which checks permissions before handing back the file.
@@ -294,8 +292,7 @@ Every section starts collapsed except the one holding the order's
 current step, which opens and scrolls to that step; inside it, the
 current step opens and the rest stay collapsed — click any heading to
 open it. Products, Payment Overview, Document Review & Approval and
-**Order Communication** (the conversation with the client, Step 15 — when
-email sending is turned off in Settings, posts go to the client's portal
+**Order Communication** (the conversation with the client, Step 15 — while buyer e-mails are held (Testing mode, or the switch off, in Settings › E-mail), posts go to the client's portal
 only and the box and the confirmation say the client was *not* emailed) stay
 pinned above the sections. Order Communication is always open, since it's
 needed at every step; Document Review opens by itself only when a
@@ -404,7 +401,7 @@ can never be mistaken for, or substituted into, a different document.
 
 ## Roles in this system
 
-Eight roles exist out of the box (sidebar: **Admin → Permissions**):
+Eight roles exist out of the box (left menu: **Users & roles › Roles and permissions**):
 **Admin**, **Managing Director**, **Executive Director**, **Export
 Executive**, **Accounts Executive**, **Logistics Executive**, **Viewer /
 Auditor**, and **CA / Chartered Accountant** (read-only CA / Accounting
@@ -412,7 +409,7 @@ access, and read-only order pages). Who can do what is governed
 by permissions attached to a role (e.g. `manage_orders`, `generate_documents`,
 `approve_documents`, `view_reports`) — a Super Admin bypasses every
 permission check, but not the rule that someone else approves your own
-work: that is set per action in **Admin → Self-approval rules**. This SOP describes actions by *what* they are, not which
+work: that is set per action in **Users & roles › Self-approval rules**. This SOP describes actions by *what* they are, not which
 role does them, since that assignment is configurable per organisation —
 see [Admin & Settings](./15-admin-settings.md) for how to check or change
 who can do what.

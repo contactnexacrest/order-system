@@ -445,7 +445,7 @@ Browser suite: `e2e/tests/10-departments.spec.js` and `11-associates.spec.js`; t
 |---|---|
 | `FormPlaceholderTest` | D-220: every typed input and text area in every view has a placeholder (not date, file, checkbox, radio, hidden or read-only) |
 | `FormLabelConventionsTest` | D-222 R8-N08: every visible field has a label; a label with "*" belongs to a required field; required drop-downs with no sensible default start with "Choose…"; app.js `markRequiredLabels()` |
-| `SelfApprovalRulesTest` | D-221: Admin → Self-approval rules (Super Admins only), defaults MD + ED, a person qualifies through their own roles, every change audited with roles before and after. (Personal rates carrying upward, D-221: `AssociateSystemTest`) |
+| `SelfApprovalRulesTest` | D-221: Users & roles › Self-approval rules (Super Admins only), defaults MD + ED, a person qualifies through their own roles, every change audited with roles before and after. (Personal rates carrying upward, D-221: `AssociateSystemTest`) |
 | `SelfApprovalActionsTest` | D-222 R8-N09: all seven self-approvals go through the rules (cancellation approve/reject, purchase award, amendment MD-approval, short-payment clearing, payment terms, document review, e-mail send), exact refusals, audit codes `…_SELF_APPROVED`; no Super Admin / manage_permissions exemption |
 | `QaRound8Part1Test` | D-222 part 1: GST refund credits and claw-backs saved once under a row lock (concurrent requests); safe commission CSV; one-off invitation links used up at the first registration; `clients.associate_client_number`; suspended associate's read-only portal; bank e-mail wording |
 | `QaRound8Part2Test` | D-222 part 2: original BL copies required 1 to 10; reviewer list leaves out the generator unless self-review is allowed ("(generated it — self-review)"); daily digest counts only real sends, mail off says "Daily digest: e-mail sending is off — nothing sent.", a failed send is retried |
@@ -500,7 +500,7 @@ Totals at go-live (2 Nov 2026): PHPUnit 2,191 tests; Jest 392 suites / 2,258 tes
 | `FreshReviewFixesTest` | Phase 0C.6 review fixes: USD-fixed commission/incentive rate, lock/unlock race, level after a client moves, PHP-equal rounding, option change voids the PI approval, GST in the commission payment text. |
 | `CategoryDrivenDocumentsTest` | Phase 1: a non-stone category prints its own packing words, quality documents and T&C clauses on QT, PI, OC, CI, PL and the supplier PO; mixed orders. |
 | `StoneDocumentsUnchangedTest` | Natural Stone QT, PI, OC, CI, PL, SUPPO, BLI and COO-prep (FOB and CIF, PDF and Word, 32 copies) render text-identical to the stored fixtures, on a fresh schema + seed database. Fixtures changed once, on purpose, by the owner-approved DOC-1/DOC-3 (Word only). |
-| `DomesticTradeTest` | Phase 2: GST maths (CGST + SGST / IGST, paise rounding, round-off), planned-state guarantees, one domestic order end to end, isolation, Zoho payload and Division tag, Admin › Divisions set-up. |
+| `DomesticTradeTest` | Phase 2: GST maths (CGST + SGST / IGST, paise rounding, round-off), planned-state guarantees, one domestic order end to end, isolation, Zoho payload and Division tag, Settings › Divisions set-up. |
 | `ImportDistributionTest` | Phase 3: landed cost and duty maths, stock never below zero (two issues at once), import end to end then a local sale from stock, isolation, list/board parity. |
 | `MerchantTradeTest` | Phase 4: deal end to end, RBI checks and reminders, margin in ₹ and USD, payment race, invoice number `MTT/I/…` (16 characters), isolation, planned state. |
 | `DivisionOverheadAndInvestorTest` | Phase 5: overhead shared by revenue only with two or more active divisions (report unchanged with one); the Investor role walks every route — read only. |
@@ -524,11 +524,28 @@ The master plan for this round is the root [`docs/QA/MASTER_TEST_PLAN.md`](../..
 | e2e `qa-ui-crawl.spec.js` | A human-style click-through of about 420 pages per run, both templates (Standard and Kanban), desktop and phone: every link, tab and step card; forms submitted empty and with bad values; console errors, 4xx/5xx, broken links and overflow. |
 
 | `IncentiveEligibilityTest` / `incentiveEligibility.test.js` | D-259: person and designation eligibility (MD only), caps per order and per month, kept-by-company lines, worked example ₹60,000 → ₹48,000 paid; no caps and everyone eligible gives the same figures as before; locked orders unchanged |
-| `BackupFacilityTest` / `backupFacility.test.js`, `scripts/tests/backup_scripts_test.sh` | D-260: encrypted database copy with checksum, documents stored once (hard links), live files untouched, guard against a backup folder inside the live folders, 10-year retention and thinning, test-restore refuses the live database; Admin › Backups and the digest warning |
+| `BackupFacilityTest` / `backupFacility.test.js`, `scripts/tests/backup_scripts_test.sh` | D-260: encrypted database copy with checksum, documents stored once (hard links), live files untouched, guard against a backup folder inside the live folders, 10-year retention and thinning, test-restore refuses the live database; Settings › Backups and the digest warning |
 | `AssociateAccessLevelsTest` / `associateAccessLevels.test.js` | D-261: each level's allowed and refused pages (lock page, 403), FOB value and commission % hidden at Starter until the matrix enables them, Custom ticks, existing associates Full and new ones Starter, MD-only changes with a reason, amounts masked in notices, upgrade suggestion after 3 completed paid orders |
 | `QaFinalRunTest` / `qaFinalRun.test.js` | Associate personal codes grow from 1 to 3 random letters when a name part runs out of codes |
 
 Existing tests changed on purpose in this round (each listed in the register row): the cancellation-workflow approve test (a refund needs money received), the Merchant Trade staff role (ACC-4), the payment-terms Word wording (DOC-3), vendor payment descriptions with " · bank ref" (ZOH-18), closure fixtures that now record the original BLs (ORD-14), and the Zoho clients/products isolation.
+
+## 15. Added since (11 Nov 2026: the 27-point build, D-268 – D-330)
+
+| Test | What it proves |
+|---|---|
+| `B01RecordingFixesTest`, `B02RecordingFixesTest` | D-268 (Recent Activity scope, the true reason a staff post was not e-mailed — `order_comments.email_status`, Pick from Products button, My Tasks without a department) and D-269 (payment-terms approver wording, Buyer PO note on cancelled / lost orders, Staff Productivity, cockpit shows every department, reason hint only on error) |
+| `D270OrderLineUnitsTest`, `LineUnitsTest` | D-270–D-273: any unit of the category, conversion to the reference unit for the price check (m² ↔ sq ft, by thickness, PCS by L × W × T, RMT, Ton by weight per CBM), "Size needed" instead of "too low", Set / Lot to the MD, options on every line, full Duplicate ("copy of line N", MD approval not copied) |
+| `EmailSettingsD280Test` | D-280–D-282: MUST / SHOULD / OPTIONAL per kind and audience, Testing mode holds only buyer and supplier mail, no false "e-mailed", staff routing to the assigned department (manager, then MD), compliance owners, set-password and forgot-password links with Copy |
+| `SessionTimeoutsD283Test` | D-283: idle limits per area (240 / 120 / 120 minutes), staff 12-hour limit, PHP session life and `storage/sessions`, keep-alive, "This is my own office computer" days |
+| `AssociateOwnerDecisionsNov11Test`, `VendorBankDetailsTest` | D-290–D-294: KYC document type and length, ID and address proof as separate items with the 60-day grace, standard / own ladder / fixed rule by the MD with a reason, "See associate commission rules", payout day (last day, Sunday / holiday rule), bank confirmation by the associate (last 4 digits + code, "This is not me", 7 days), one verifier with at least 2 checks or two people, MD / ED self-verify, wait days 0 / 15; supplier and logistics partner bank changes |
+| `D300ProductsPricingTest` | D-300–D-306: typed / calculated thickness grid, price rules, CHA + transport per container, daily exchange rate (sources, cushion, 2 % jump to the MD, history), HS code and supplier from one master, Fix HS codes and Link suppliers, catalogue labels, who sees which prices, category page |
+| `ApprovalsAndSetupD310Test` | D-310–D-313: the Approvals page per permission and its counts, short-payment requests, Setup checklist items and Apply recommended, the ready-to-use defaults and placeholders |
+| `NavigationMenuD320Test`, `KanbanParityTest` | D-320–D-322: 13 left-menu entries, every old menu page in a section bar, link permission = route permission, counts, order action bar; Standard and Kanban show the same menus |
+| `PlainLanguageD330Test` | D-330: the plain-language texts; applies `tests/fixtures/d330_plain_language_email_templates.sql` (the same statements as the live-site file `docs/migrations/2026-11-11f-plain-language-email-templates.sql`) twice |
+| `MigrationFileConventionsTest`, `MigrationIdempotencyTest` | The seven live-site files `docs/migrations/2026-11-11a` … `g`: `SET NAMES utf8mb4` first, guarded, no MariaDB-only `IF [NOT] EXISTS` on columns or indexes, applied twice without an error |
+
+The e2e suite (`e2e/`) covers the menus in `01-role-visibility.spec.js`. Tutorial scripts are not tests; the videos that no longer match are listed in `tutorials/VIDEO_PROGRESS.md`.
 
 ## Appendix
 

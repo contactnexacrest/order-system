@@ -290,6 +290,8 @@ Amendments can override an order's terms (`AmendmentService`).
 
 ### 2.7 E-mail (36 kinds)
 
+> **Since 11 Nov 2026 (D-280):** the master switch `mail_sending_enabled` named in this section no longer exists. It was replaced by `email_testing_mode` ("Testing mode — hold e-mails to buyers and suppliers", opposite meaning, off in a fresh install) and the per-kind, per-audience switches in the table `email_settings` (Settings › E-mail); MUST e-mails are never held. `EmailPolicy` / `emailPolicy.js` decides before every send. Read `mail_sending_enabled=0` below as "Testing mode on" for buyer and supplier e-mails; the current matrix is tested by `EmailSettingsD280Test` / `emailSettingsD280.test.js`.
+
 **Transports:**
 
 - **Queue** (`EmailDispatchService`). Level-2 approval (`approve_email_send`)
@@ -565,6 +567,8 @@ owner double confirmation before adding any new golden file, because it
 fixes document content.
 
 ### 3.4 Mail conditions
+
+> **Since 11 Nov 2026 (D-280):** the master switch `mail_sending_enabled` named in this section no longer exists. It was replaced by `email_testing_mode` ("Testing mode — hold e-mails to buyers and suppliers", opposite meaning, off in a fresh install) and the per-kind, per-audience switches in the table `email_settings` (Settings › E-mail); MUST e-mails are never held. `EmailPolicy` / `emailPolicy.js` decides before every send. Read `mail_sending_enabled=0` below as "Testing mode on" for buyer and supplier e-mails; the current matrix is tested by `EmailSettingsD280Test` / `emailSettingsD280.test.js`.
 
 Columns are switch settings; rows are e-mail kinds. Expected = delivered
 to whom (R = real recipient, X = redirect address, T = Test Mode address,

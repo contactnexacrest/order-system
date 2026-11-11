@@ -12,7 +12,7 @@ For each question: **Today** is what the system does now; **Where** is the setti
 
 **1. Whole-deal time limit.** Must the whole deal (first payment to the last receipt) be completed within 9 months?
 - Today: 9 months (`mtt_max_months_total`). The system shows amber 30 days before and red after the limit, and reminds staff daily.
-- Where: Admin › Divisions › Merchant Trade.
+- Where: Settings › Divisions › Merchant Trade.
 - Answer: ____________________________________________
 
 **2. Outlay limit.** Must any money we pay out before receiving from the buyer be covered within 4 months?
@@ -35,7 +35,7 @@ For each question: **Today** is what the system does now; **Where** is the setti
 | 6 | Inward remittance advice (sell leg) |
 | 7 | Outward remittance SWIFT copy (buy leg) |
 
-- Where: Admin › Divisions › Merchant Trade › bank documents (`mtt_bank_documents`). A deal cannot be closed until every document is ticked.
+- Where: Settings › Divisions › Merchant Trade › bank documents (`mtt_bank_documents`). A deal cannot be closed until every document is ticked.
 - Answer: ____________________________________________
 
 **5. Your approval.** Do we need your bank's approval or registration before our first merchanting deal? Please give the reference we should record.
@@ -53,7 +53,7 @@ For each question: **Today** is what the system does now; **Where** is the setti
 
 **8. LC for imports.** Will your bank open import LCs for us? Please give the bank and branch name we should record, and any margin money required.
 - Today: empty (`imp_lc_bank`); Import & Distribution cannot be switched on until it is filled.
-- Where: Admin › Divisions › Import & Distribution.
+- Where: Settings › Divisions › Import & Distribution.
 - Answer: ____________________________________________
 
 **9. Payments to suppliers abroad.** What documents do you need for an advance payment, and for a balance payment against shipping documents?

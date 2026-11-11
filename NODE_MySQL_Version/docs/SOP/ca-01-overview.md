@@ -46,7 +46,7 @@ order-management access, or vice versa.
 
 | Permission | What it allows |
 |---|---|
-| `ca_module_view` | See the CA / Accounting module at all (the "CA / Accounting" link in the sidebar, and the `/ca` page) — and, 90-item backlog "SOP/Reference-Library RBAC", every CA / Accounting chapter of this very SOP (the `ca-` prefixed ones): without it, they're left out of the chapter list entirely, and a direct link to one is refused. |
+| `ca_module_view` | See the CA / Accounting module at all (the **CA / Accounting** item on the Finance & accounts menu bar, and the `/ca` page) — and, 90-item backlog "SOP/Reference-Library RBAC", every CA / Accounting chapter of this very SOP (the `ca-` prefixed ones): without it, they're left out of the chapter list entirely, and a direct link to one is refused. |
 | `inr_actual_view` | See the actual INR amount recorded against a cleared advance/balance/freight payment. |
 | `inr_actual_edit` | Record or correct the INR actual amount for a cleared payment. |
 | `inr_actual_delete` | Remove a recorded INR actual amount (a destructive correction — kept separate from edit). |
@@ -69,7 +69,7 @@ everywhere else in the system, so in practice `ca_internal_doc_manage`
 starts out held only by them (and Super Admin) — anyone else needs an
 explicit grant. As with any permission, these can be granted individually
 to any other user (e.g. a Director who isn't normally in Accounts) via
-**Admin → Permissions** or a per-user override — see
+**Users & roles › Roles and permissions** or a per-user override — see
 [Admin & Settings](./15-admin-settings.md).
 
 ## Recording an INR actual amount
@@ -97,7 +97,7 @@ that's the moment the real bank-credited amount is known.
    figure is a correction, not routine data entry.
 
 Every record and delete action here is written to the system's audit log
-(**Insights → Audit Log**, if you hold that permission), same as any other
+(**Reports › Audit log**, if you hold that permission), same as any other
 sensitive field in the system.
 
 ## Order Financials (also on the order's own page)
@@ -133,7 +133,7 @@ structural guarantees:
    the **View & download CAFIN** permission (`view_cafin`). By default
    that is Admin, MD, ED, Accounts Executive and CA / Chartered
    Accountant; Admin can give it to, or take it from, any role or any one
-   person under **Admin → Roles & Permissions** (for example, grant it to
+   person under **Users & roles › Roles and permissions** (for example, grant it to
    the CA for an audit and remove it afterwards). Without it, the box,
    CAFIN in every document list and every CAFIN download are all hidden or
    refused. Someone who also holds `ca_internal_doc_manage` (Admin, MD and
@@ -229,7 +229,7 @@ audit log.
 
 ## The CA / Accounting hub page
 
-**CA / Accounting** in the sidebar (visible only with `ca_module_view`)
+**Finance & accounts › CA / Accounting** in the left menu (visible only with `ca_module_view`)
 opens `/ca` — a hub of card sections, each with a one-line description and
 a button to the screen it leads to, grouped by what they're for:
 **Revenue & Benefits** (FY/calendar-year reports, Government Export

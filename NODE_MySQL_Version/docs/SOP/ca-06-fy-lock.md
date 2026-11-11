@@ -104,7 +104,7 @@ unlocking it for anyone else.
 A Super Admin always has this — it's one of the permissions the Super
 Admin tier is unconditionally granted, with no separate setup. Anyone
 else needs the permission granted explicitly, either through their role
-or as a per-user override (Admin & Settings → Roles & Permissions).
+or as a per-user override (Users & roles › Roles and permissions).
 
 When someone with this permission opens a locked-year record, the page
 doesn't just show the lock notice — it also shows the normal edit form,

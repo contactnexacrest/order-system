@@ -22,7 +22,7 @@ knows who the supplier is.
 ## What staff do
 
 Stage 5 unlocks the moment Stage 4's gate passes. Suppliers are picked from
-the **Suppliers** directory (Admin → Suppliers — see
+the **Suppliers** directory (Procurement & suppliers › Suppliers — see
 [Chapter 15](./15-admin-settings.md#admin--settings)); there is no longer an
 "add supplier" form on the order page. If the supplier isn't listed yet,
 someone with the `manage_suppliers` permission (Admin/MD/ED by default) adds
@@ -137,7 +137,7 @@ order:
 > can't have signed and returned a document they were never actually sent.
 > Unlike the wet-signature gate below, this one has no toggle.
 
-> **Wet-signature gate:** by default (**Admin & Settings → the
+> **Wet-signature gate:** by default (**Settings › Company → the
 > `wet_signature_required_supplier_po` toggle**, on unless an Admin has
 > turned it off), clicking "Confirm Supplier Signed & Returned PO" is
 > **not** enough on its own either — it's refused until at least one file

@@ -17,7 +17,7 @@ supplier's name — never the price.
 
 ## 2. Procurement's queue
 
-**Operations → Procurement** lists every open requirement, earliest need
+**Procurement & suppliers › Procurement** lists every open requirement, earliest need
 first; a late one is marked. Open a requirement to work on it.
 
 ## 3. Quotes and comparison
@@ -38,7 +38,7 @@ working as:
   limit covers it. Within your own limit the award is approved at once —
   the limit is the control; above it, nobody approves their own award
   unless their role is ticked for "Approve a purchase award they made" in
-  Admin → Self-approval rules (default MD and ED; logged as
+  Users & roles › Self-approval rules (default MD and ED; logged as
   PURCHASE_AWARD_SELF_APPROVED). Approval limits themselves are changed only
   by the MD or ED ([Chapter 21](./21-departments.md)).
 
@@ -54,7 +54,7 @@ again shows "The same requirement is already open as PR-N — nothing new
 raised.", and a second award, approval or receipt says someone else has
 just done it.
 
-Starting limits (change them in **Admin → Departments → Edit**):
+Starting limits (change them in **Users & roles › Departments → Edit**):
 
 | Designation | Approves up to |
 |---|---|
@@ -71,7 +71,7 @@ check found unless it passed.
 
 ## 6. Supplier performance
 
-**Procurement → Supplier performance** shows, for each supplier: quotes
+**Procurement & suppliers › Supplier performance** shows, for each supplier: quotes
 given, awards won, receipts, how many came by the needed-by date, and how
 many failed the quality check. The link shows only to people with **Manage
 purchasing**, the permission the page needs.

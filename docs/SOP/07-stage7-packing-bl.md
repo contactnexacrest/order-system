@@ -72,7 +72,7 @@ which runs alongside and never locks anything. Then:
 
    The BL Type and BL Consignee Instruction rows only appear when the
    order's payment preset has **"Include BL Type / BL Consignee
-   Instruction"** checked (Payment Presets, under Admin & Settings) — some
+   Instruction"** checked (Payment presets, under Settings › Lists) — some
    payment terms (e.g. balance paid before shipment) don't need NexaCrest
    to retain the BL as leverage, so that preset can have the checkbox
    unchecked and the sheet simply omits both rows for every order on it.
@@ -105,8 +105,7 @@ which runs alongside and never locks anything. Then:
    actually issues the BL, staff type its **BL Number** and **BL Date**
    here, with an optional scanned-copy upload on the same form. **This is
    the action that passes Stage 7's gate.** It is refused until the
-   Packing List is approved (email sending off) or sent (email sending
-   on), and the BL Instruction Sheet is approved — the message names
+   Packing List is approved (buyer e-mails held) or sent (buyer e-mails sent), and the BL Instruction Sheet is approved — the message names
    whichever is outstanding. If the scanned copy isn't in hand yet,
    confirm with just the number and attach the copy afterward (**Attach
    Scanned BL Copy**, same step) once it arrives.

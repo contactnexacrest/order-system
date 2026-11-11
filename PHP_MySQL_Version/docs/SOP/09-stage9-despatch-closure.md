@@ -338,7 +338,7 @@ Once a pending refund has been sent, press **Mark Refund Completed**.
 The person who requested the cancellation cannot approve or reject it
 ("You requested this cancellation — a different privileged person must
 approve it."). The only exception is a role ticked for this rule in
-**Admin → Self-approval rules** (default: MD and ED). Such a decision is
+**Users & roles › Self-approval rules** (default: MD and ED). Such a decision is
 logged as ORDER_CANCELLATION_SELF_APPROVED or
 ORDER_CANCELLATION_SELF_REJECTED. See [Chapter 15](./15-admin-settings.md).
 

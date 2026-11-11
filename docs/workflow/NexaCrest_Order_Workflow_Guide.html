@@ -147,12 +147,12 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       <li>Skip a step only with a real reason. <b>Not Applicable</b> fills its reason for you; <b>Skipped</b> always needs one typed.</li>
       <li>Supplier and buyer never cross: no buyer name, price or document ever goes to a supplier, and the other way round.</li>
       <li><b>CAFIN</b> (internal financial annexure) is for MD / ED / Admin, Accounts and the CA only, and never goes to the client — not by email, link, download or portal.</li>
-      <li>Record every money receipt with that day's exchange rate, and every payment with its date, mode and UTR. Reference numbers use the 2-digit year (SC/CI/26/…).</li>
+      <li>Record every money receipt with that day's exchange rate, and every payment with its date, mode and bank reference (UTR or SWIFT). Reference numbers use the 2-digit year (SC/CI/26/…).</li>
       <li>Vendor bills: attach the bill, say whether it is a proforma or the tax invoice, pick GST as a % — the amount and total fill in themselves. A bill can be paid in parts.</li>
       <li>Talk to the client through <b>Order Communication</b> on the order page so the history stays with the order.</li>
       <li>A buyer payment can arrive in parts: record each receipt; the step shows what is still owed. Clearing a payment that is short needs a manager with <b>Approve short payment</b> and a written reason.</li>
       <li>The Bill of Lading (Step 10f) waits for a <b>Passed</b> pre-shipment inspection (or the inspection marked not applicable) and, on "before shipment" orders, for the balance to be cleared. Only a manager can release it, with a written reason.</li>
-      <li>Nobody approves their own work — their own document, e-mail send, payment terms, cancellation request, purchase award, amendment, or a short payment whose receipts they recorded; a second person does. The only exception is a role ticked in <b>Admin → Self-approval rules</b> (by default the MD and ED); such a self-approval is shown and audited.</li>
+      <li>Nobody approves their own work — their own document, e-mail send, payment terms, cancellation request, purchase award, amendment, or a short payment whose receipts they recorded; a second person does. The only exception is a role ticked in <b>Users &amp; roles › Self-approval rules</b> (by default the MD and ED); such a self-approval is shown and audited.</li>
       <li>A field marked <b>*</b> must be filled in; a drop-down starting with "Choose…" needs a choice. The page shows the problem beside the field before anything is saved.</li>
     </ul>
     <div class="roles-key" style="margin-top:10px">
@@ -202,7 +202,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       { name: 'Step 6 · Order Confirmation', steps: [
         ['6a', 'Generate Order Confirmation', ['export'], 'Generate the OC once the advance is cleared; approve it.', 'the OC is approved.'],
         ['6b', 'Send Buyer Action Link (OC acknowledgement)', ['export'], 'Send the buyer the link to acknowledge the OC.', 'the link is sent.'],
-        ['6c', 'Record Buyer\'s Acknowledgement', ['export'], 'With e-mail sending off, first press Mark Order Confirmation Sent to Buyer when you send it — the buyer\'s 48 hours start then, after which it confirms itself. Record that the buyer acknowledged this OC version. Change requests go through Amendments.', 'the acknowledgement is recorded.']
+        ['6c', 'Record Buyer\'s Acknowledgement', ['export'], 'While buyer e-mails are held (Testing mode in Settings › E-mail), first press Mark Order Confirmation Sent to Buyer when you send it — the buyer\'s 48 hours start then, after which it confirms itself. Record that the buyer acknowledged this OC version. Change requests go through Amendments.', 'the acknowledgement is recorded.']
       ]}
     ]},
     { key: 'B', color: 'var(--b)', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', groups: [

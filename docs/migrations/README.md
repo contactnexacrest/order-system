@@ -41,6 +41,30 @@ Run new files on the live database in filename order, after a backup:
 mysql -u <user> -p <database> < docs/migrations/<file>.sql
 ```
 
+### Files in this folder (run in this order)
+
+| File | Owner decisions | What it does |
+|---|---|---|
+| `2026-11-11a-quote-any-unit-piece-size.sql` | D-270–D-273 | Order-line piece size (L × W × T cm), "copy of line N", weight per CBM, units TON and RMT, Natural Stone line units |
+| `2026-11-11b-email-settings-sessions.sql` | D-280–D-283 | `email_settings`, `compliance_alert_owners`; `mail_sending_enabled` → `email_testing_mode`; `session_timeout_minutes` → three idle timeouts + staff 12-hour limit; remembered office computer 30 days; buyer login-code e-mail; invite gives the login page |
+| `2026-11-11c-associates-kyc-commission-bank.sql` | D-290–D-294 | KYC document type and address-proof grace (60 days), own ladder, commission-rule permission, payout day "last day of the month", bank-details confirmation (associates and suppliers), "Bank details" self-approval rule |
+| `2026-11-11d-thickness-prices-fx-hs-suppliers.sql` | D-300–D-306 | Thickness price grid, CHA + transport per container, price rules, `fx_rates` and the 2 % cushion, supplier prices linked to the Suppliers directory; converts existing prices |
+| `2026-11-11e-approvals-setup-defaults.sql` | D-310, D-312, D-313 | `short_payment_requests`, `setup_checklist_ticks`, document clean-up and password-expiry defaults (first run only), Test Mode e-mail, national holidays |
+| `2026-11-11f-plain-language-email-templates.sql` | D-330 | Plain-language buyer e-mail texts (only templates still at the seeded text) |
+| `2026-11-11g-order-comment-email-status.sql` | D-268 | `order_comments.email_status` |
+
+Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
+before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
+seven files applied twice without an error, under `ONLY_FULL_GROUP_BY`, and the
+result had exactly the tables, columns, keys, settings, permissions and e-mail
+texts of the new `schema.sql` + `seed.sql`. The only differences are on purpose:
+the company's own identity, bank, GSTIN, LUT and RCMC values are kept (a fresh
+install gets placeholders), and `email_testing_mode` is on where
+`mail_sending_enabled` was 0.
+
+The live-site order of work (backup, files, cron job, settings to check) is in
+`docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".
+
 ### Rules for every migration file (enforced by tests)
 
 - Header comment: what changes, which owner decision (D-number), and that it is

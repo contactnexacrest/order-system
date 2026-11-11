@@ -65,8 +65,8 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (194 tables, 373 foreign keys as
-  of 2026-11-06 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+- `docs/schema.sql` — full database schema (208 tables, 399 foreign keys as
+  of 2026-11-11 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
   live MariaDB instance after every change in this delivery, including the
@@ -179,13 +179,28 @@ correctly once the password is changed.
    ```
    Check it is back with `SHOW TRIGGERS LIKE 'users';` (you should see
    `trg_users_protected_bu`). The three company settings can also be changed
-   later in Admin › Company settings; the two founder logins can't — the app
+   later in Settings › Company; the two founder logins can't — the app
    refuses on purpose — so use this block for them (it is safe to run again
    later to correct a typo). Signature blocks on documents print the
    signatory's `users.name` (and `md_name` where no signatory is chosen), so
    these lines are what make the real names appear on PDFs. You then log in
    with the real e-mail and the seeded password below. This step is also on
    the go-live checklist.
+   **Company identity, bank, GSTIN, IEC/PAN, LUT and RCMC are entered at
+   installation (D-313, 11 Nov 2026).** `seed.sql` no longer holds the
+   company's real values: the corporate office, GSTIN, IEC/PAN, bank name,
+   branch, account number, SWIFT, IFSC, bank address and pincode, LUT number
+   and RCMC number are placeholders (the GSTIN keeps state code 29). After the
+   first login open **Settings › Setup checklist** (`/admin/setup-checklist`,
+   Manage company settings): every item shows **Done** or **Needed** with a
+   link — *Company identity*, *Bank details, GSTIN and IEC / PAN*, *LUT and
+   RCMC — numbers and dates*, *ECGC policy (optional)*, *E-mail server (SMTP)
+   — then send a test e-mail*, *Zoho Books and Zoho Mail (optional)*,
+   *Backups*, *This year's holidays*, *The MD's real e-mail*, *Session folder
+   storage/sessions is writable* and *Settings at the recommended values*
+   (with **Apply recommended**). Enter the real values on **Settings ›
+   Company** (Unlock on the protected rows) until every item is Done; the
+   placeholders print on the documents until then.
 3. **Environment file.** Copy `app/.env.example` to `app/.env` and fill in:
    DB credentials, `STORAGE_BASE_PATH` (absolute path to the `storage/`
    folder in this project), and SMTP details when you have them. Leave the
@@ -203,6 +218,21 @@ correctly once the password is changed.
    `APP_ENV=production`, `DEV_SERVER=false`, `APP_URL`, a fresh `APP_ENCRYPTION_KEY`, `DB_*`,
    `STORAGE_BASE_PATH`, `SMTP_*`, the three `ZOHO_*` switches, `SMS_GATEWAY_*` (may stay empty)
    and the `BACKUP_*` lines (see "Backups").
+   **Session folder (D-283, 11 Nov 2026).** PHP keeps its session files in
+   `storage/sessions/` (under `STORAGE_BASE_PATH`), so the host's own clean-up
+   (often after about 24 minutes) no longer signs people out early. The app
+   creates the folder on first use; on the live server make sure it exists and
+   the web server can write to it (`mkdir -p storage/sessions && chmod 700
+   storage/sessions`, owned by the PHP user). It is outside `public_html/`, so
+   it is never served. Settings › Setup checklist shows **Needed** while it is
+   not writable — staff would then be signed out after about 24 minutes again.
+   **Outbound HTTPS (D-301, 11 Nov 2026).** The daily exchange-rate job calls
+   `https://api.frankfurter.app` (European Central Bank rates) and, if that
+   fails, `https://open.er-api.com`. Both are free and need no key. Ask the
+   host to allow outbound HTTPS to both if the server is firewalled; check it
+   once with **Fetch now** on Products › Pricing › Pricing settings ›
+   Exchange rate. Without it the rate in use stays as it is and the page and
+   the Setup checklist warn.
 4. **Dependencies — already included, nothing to run.** `app/vendor/` in
    this delivery is a real, working copy of DOMPDF, PHPWord, Twig, and
    PHPMailer — the document generation pipeline needs all four.
@@ -421,18 +451,29 @@ CRON_TZ=Asia/Kolkata
 
 Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
 
-- `fetch_fx_rate.php` — once a day at 07:05 IST (owner decision D-301, 11 Nov 2026):
-  fetches the USD→INR market rate (Frankfurter, backup open.er-api.com) into
-  `fx_rates`. A move of more than 2 % waits for the MD's OK (Products ›
-  Pricing settings › Exchange rate, also listed on Approvals). Without this
-  job, Automatic mode keeps the manual rate and warns that no rate was fetched.
+- `fetch_fx_rate.php` — once a day at 07:05 IST (owner decision D-301, 11 Nov
+  2026): fetches the USD → INR market rate from Frankfurter (European Central
+  Bank reference rate of the previous working day) or, if that fails, from
+  open.er-api.com, and keeps it in the history (`fx_rates`). The pricing rate
+  is the market rate minus the cushion (Products › Pricing › Pricing settings:
+  2 % by default, 0–5 %). A failed fetch keeps the rate in use and shows a
+  warning (exit code 1, so cron mails the failure); a change of more than 2 %
+  against the rate in use waits for the MD on the Approvals page. Prices on
+  Quotations and Proforma Invoices already issued never change. In
+  **Manual** mode the rate is still fetched for the history, but pricing uses
+  the rate the MD typed (`pricing_fx_rate`). Needs outbound HTTPS to
+  `api.frankfurter.app` and `open.er-api.com`. Safe to run twice a day (one
+  row per date).
+
 - `document_copy_cleanup.php` — once a day (owner points 5/8/9, 2 Nov 2026):
-  removes the document copies Admin → Settings → Document copies clean-up
-  lists in its preview (drafts of approved documents, never-sent superseded
-  revisions, old CAFIN copies). Removes nothing while every rule there is
-  off (the default). Never removes anything sent to the client, the current
-  copy of a document, uploaded files, files of an order with an open
-  dispute, or documents in a CA-locked financial year.
+  removes the document copies Settings › Document clean-up lists in its
+  preview (drafts of approved documents, never-sent superseded revisions,
+  old CAFIN copies). Since D-313 (11 Nov 2026) the rules are **on** by
+  default: drafts 90 days after approval, never-sent superseded revisions
+  after 365 days (the SUPERSEDED copy is kept), CAFIN latest only; set a rule
+  to 0 / "keep all" to switch it off. Never removes anything sent to the
+  client, the current copy of a document, uploaded files, files of an order
+  with an open dispute, or documents in a CA-locked financial year.
 
 - `daily_digest.php` — once every morning (owner decision 1 Nov 2026): one
   e-mail per person listing their open tasks and documents to review. Set
@@ -451,8 +492,9 @@ Plus the three backup lines (database 02:00, documents 02:30, monthly test-resto
   Auto-confirms any Order Confirmation the buyer hasn't acknowledged
   (client portal button, or a staff-recorded email reply) within 48 hours
   of it being emailed, unlocking Stage 5 (docs/schema.sql Section AE).
-  Gap list G-6 (1 Nov 2026): while e-mail sending is off, the 48 hours
-  start only when staff press "Mark Order Confirmation Sent to Buyer"
+  Gap list G-6 (1 Nov 2026): while buyer e-mails are not sent (Testing
+  mode on, or the buyer documents e-mail switched off in Settings › E-mail),
+  the 48 hours start only when staff press "Mark Order Confirmation Sent to Buyer"
   (Step 6c), not when the OC is approved.
   Idempotent — a row is only ever picked up once it has `acknowledged_at
   IS NULL AND due_at <= NOW()`, and acknowledging it (by any means) before
@@ -492,11 +534,11 @@ Plus the three backup lines (database 02:00, documents 02:30, monthly test-resto
   dated on or after the go-live date (`zoho_books_sync_start_date`) are
   sent; with `ZOHO_ENVIRONMENT=production` nothing is sent until it is
   set. While Zoho is off (`ZOHO_INTEGRATION_ENABLED` not `true` in `.env`,
-  or the Zoho Books switch in Admin → Company Settings off) it logs one "skipped"
+  or the Zoho Books switch in Settings › Zoho off) it logs one "skipped"
   row per part and exits 0. The `/ca/zoho-sync` page shows this job's log
   alongside Sync Now's.
 
-All five scripts print a one-line summary to stdout and exit 0 on
+All seven scripts print a one-line summary to stdout and exit 0 on
 success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
 
@@ -564,13 +606,13 @@ thinning because each file is stored once. Only files named like a backup, insid
    30 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_storage.sh >> /home/yourcpaneluser/logs/backup_storage.log 2>&1
    0 4 1 * *   /home/yourcpaneluser/nexacrest_webapp/scripts/backup_test_restore.sh >> /home/yourcpaneluser/logs/backup_test_restore.log 2>&1
    ```
-5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand, then open **Admin › Backups** — both
+5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand, then open **Settings › Backups** — both
    rows should say OK.
 6. The test-restore needs a MySQL user allowed to create and drop the scratch database
    (`BACKUP_RESTORE_TEST_DB`). On Bluehost create that database once in cPanel → MySQL Databases and give the app
    user all rights on it.
 
-**Watching it:** Admin › Backups (MD / Admin, read-only) shows the last run of each job, sizes, encryption,
+**Watching it:** Settings › Backups (MD / Admin, read-only) shows the last run of each job, sizes, encryption,
 off-site status and the settings. The daily digest warns whoever manages company settings when a nightly copy is
 older than 26 hours, has failed, is not encrypted, the test-restore is older than 35 days or failed, or (on a
 production server) `BACKUP_DIR` is not set.
@@ -886,16 +928,28 @@ chasing, and how many did we actually lose" — `orders.status` only had
 
 ## Placeholder values you must replace before going live
 
-Checked against `docs/seed.sql` on 6 Nov 2026. The company details (legal name, addresses, GSTIN, IEC/PAN, bank,
-SWIFT, LUT number, RCMC number, director name) are already seeded with the real values; check them once on
-**Company Settings** (`/settings`). Still to do on the live install (also in `docs/guides/GO_LIVE_CHECKLIST.md`):
+Checked against `docs/seed.sql` on 11 Nov 2026. Since D-313 the seed holds **no real company values**: the
+corporate office, GSTIN (`29AAAAA0000A1ZY`, state code 29 kept), IEC/PAN, bank name, branch, account number,
+SWIFT, IFSC, bank address and pincode, LUT number and RCMC number are placeholders, like the MD and director
+names, phone, e-mail and registered office. Enter the real values at installation: **Settings › Setup
+checklist** (`/admin/setup-checklist`) shows each group as **Needed** with a link to **Settings › Company**
+(Unlock on the protected rows) until it is done. Still to do on the live install (also in
+`docs/guides/GO_LIVE_CHECKLIST.md`):
 
 - **Logins:** the two seeded Super Admin accounts share the password `ChangeMe#2026`; each must set a new one
   at first login (forced). Deactivate the second one if it is not needed.
+- **Company identity, bank, GSTIN, IEC/PAN, LUT and RCMC:** placeholders until entered (see above); they print
+  on the documents until then.
 - **Dates to confirm:** `lut_expiry_date` and `rcmc_valid_until` are seeded as 31 Mar 2027 — confirm them.
 - **ECGC:** `ecgc_policy_no` and `ecgc_policy_valid_to` are empty; fill them only if there is a policy.
-- **Pricing exchange rate:** `pricing_fx_rate` is seeded as 82.00 — set today's market rate minus about 1.5%
-  under **Admin › Pricing** on go-live day.
+- **Pricing exchange rate (D-301):** fetched automatically every day (Products › Pricing › Pricing settings ›
+  Exchange rate; pricing rate = market rate − 2 % cushion). `pricing_fx_rate` (seeded 82.00) is used only in
+  Manual mode and until the first rate is fetched — press **Fetch now** on go-live day and check the rate.
+- **E-mail (D-280):** Settings › E-mail — every SHOULD e-mail is on and **Testing mode is off** in the seed, so
+  buyers and suppliers are e-mailed from the first day. Switch Testing mode on while you test with real
+  addresses; name the responsible person and backup for the company-level compliance alerts on the same page.
+- **Holidays (D-313):** the Indian national holidays of this year and next are seeded; add the state and festival
+  holidays (Settings › Holidays) and tick the item on the Setup checklist.
 - **Images:** the four company assets (logo, MD signature, company seal, watermark) show a labelled
   placeholder graphic until you upload the real files on **Company Assets** (`/company-assets`).
 - **Storage path:** the `__STORAGE_BASE_PATH__` rows are fixed by the three `UPDATE`s in "First-time setup";
@@ -908,7 +962,7 @@ NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (D-248: NC/SC/ORD/{YY}/{DDMM}{NNN
 
 > **Update 6 Nov 2026:** this list was written phase by phase. Since then several items were built:
 > payment presets have their own Admin page (`/payment-presets`) and T&C clause text is edited under
-> Admin › Overrides; the alert job e-mails as well as notifying in the app; the Buyer PO and supplier
+> Settings › Admin overrides; the alert job e-mails as well as notifying in the app; the Buyer PO and supplier
 > PO have upload flows; most document types now also have a Word copy; users can be edited from
 > `/users`. Items below that are not covered by this note still stand.
 
@@ -1904,7 +1958,7 @@ Playwright e2e suite green on both `BASE_URL`s.
 
 **Database:** these changes are part of `docs/schema.sql` / `docs/seed.sql` — the first live install runs
 no migration (D-241; the file names above are history). Before switching Zoho on, set the go-live
-date in Admin → Company Settings (Zoho Books).
+date in Settings › Company (Zoho Books).
 
 What changed, by area (owner decisions; every item is in both stacks):
 
@@ -1920,7 +1974,7 @@ What changed, by area (owner decisions; every item is in both stacks):
    is `false`); all mail goes through SMTP.
 2. **Zoho Books connection.** The Books credentials (self-client ID,
    secret and refresh token, organisation, deposit account) and the
-   "Zoho Books enabled" switch are company settings (Admin → Company Settings,
+   "Zoho Books enabled" switch are company settings (Settings › Company,
    Zoho Books), with a "Test Books connection" button
    (`POST /settings/test-zoho-books`). Books syncs only when both the
    `.env` switch and this setting are on.
@@ -2209,7 +2263,7 @@ Zoho Books, built from the facts and including the bank reference.
   `POST /admin/preview-as`, `POST /preview/exit`), and the Departments
   section on the user page (`POST /users/{id}/memberships`,
   `.../memberships/{membershipId}/end`, `manage_users`; founder accounts
-  refused). Admin → Permissions: an optional **Until** date on an extra
+  refused). Users & roles › Roles and permissions: an optional **Until** date on an extra
   permission.
 - **Audit:** every row written while signed in carries the department the
   person acted as (`acting_as`), e.g. "Procurement Manager · Procurement", or
@@ -2330,7 +2384,8 @@ Zoho Books, built from the facts and including the bank reference.
   prices, costs, profit, suppliers, CAFIN or documents.
 - **Staff:** `/associates` (Standard list and Kanban board), `/associates/new`,
   `/associates/{id}`, `/associates/ladder`, `/reports/associates`, payouts hold /
-  release / claw-back, bank first check / verify (two people) / reject, read-only
+  release / claw-back, bank verify (one person by default since D-293, after the associate
+  confirms; two people if set) / reject, read-only
   "View their portal".
 - **Buyer:** the associate's link `/invite/{token}` or `?code=` is carried on the
   quotation form as a hidden field (no checkbox, no code box); the buyer confirms the
@@ -2443,25 +2498,25 @@ Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links
 - **All Documents panel:** generated documents and every uploaded file of the order, only those the person may open (Sales sees no supplier or logistics papers). Tests: `OrderAllDocumentsPanelTest`.
 - **Bill forms and guide:** Steps 7e/10a start from the Supplier PO (taxable value, GST rate, amount asked now); Step 9a pre-selects the forwarder already on the order; `/help/supplier-logistics-payments` explains supplier and logistics payments with screenshots; the 21-page *Supplier & Logistics Payments Guide* (PDF + Word) is in `docs/guides/`, `docs/SOP/guides/` and the Reference Library (`storage/assets/reference_library/supplier_and_logistics_payments_guide.*`). Tests: `BillPrefillAndForwarderTest`, `HelpGuideTest`.
 - **Order page (points 10/13/14/16):** no associate controls when the client has no associate; Step 7c starts with the Supplier Link; the COO Prep Sheet can be generated once Stage 8 is open (before the balance clears); "Zoho Sync" in the menu and "Sync this order to Zoho now" (`POST /orders/{id}/zoho-sync`, `ca_module_manage`, also on closed orders) next to the Zoho check. Test: `OrderPageOwnerPointsNov2Test`.
-- **Document copies clean-up (points 5/8/9):** Admin → Company Settings → Document copies clean-up (`/settings/document-cleanup`), off by default: drafts of approved documents, never-sent superseded revisions, older CAFIN copies, after a chosen number of days, with preview and audit; never anything sent to the client, current copies, uploads, open disputes or CA-locked years. The exact PDF the buyer received is now marked `sent_to_client`. Cron `document_copy_cleanup.php` (daily). Test: `DocumentCopyCleanupTest`.
+- **Document copies clean-up (points 5/8/9):** Settings › Document clean-up (`/settings/document-cleanup`), off by default: drafts of approved documents, never-sent superseded revisions, older CAFIN copies, after a chosen number of days, with preview and audit; never anything sent to the client, current copies, uploads, open disputes or CA-locked years. The exact PDF the buyer received is now marked `sent_to_client`. Cron `document_copy_cleanup.php` (daily). Test: `DocumentCopyCleanupTest`.
 - **Export Compliance department (D-226):** Executive / Manager / Director roles for ECGC, COO, phytosanitary/fumigation/inspection, benefit claims and eBRC follow-up; permissions `manage_compliance_checklist`, `manage_export_benefit_claims`, `generate_compliance_documents`, `upload_order_documents`; its own My tasks queue; no purchase, logistics, buyer-payment, profit, incentive or CAFIN figures. SOP 25. Test: `ExportComplianceTest`.
-- **Remittance differences (D-227):** the advance, freight, balance and milestone remittance forms ask "Why is it different?" from Admin-managed reasons (Settings → Remittance difference reasons) or "Other — type the reason"; bank charges become an order cost "Bank Charges" (D-212 description, Zoho `bank_charges`) and the leg counts as fully received (cap `max_bank_charges_pct`, 3%); short and excess are recorded and explained. Tests: `RemittanceDifferenceTest`, `RemittanceDifferenceReasonsTest`.
+- **Remittance differences (D-227):** the advance, freight, balance and milestone remittance forms ask "Why is it different?" from Admin-managed reasons (Settings › Lists › Remittance difference reasons) or "Other — type the reason"; bank charges become an order cost "Bank Charges" (D-212 description, Zoho `bank_charges`) and the leg counts as fully received (cap `max_bank_charges_pct`, 3%); short and excess are recorded and explained. Tests: `RemittanceDifferenceTest`, `RemittanceDifferenceReasonsTest`.
 - **Agreements register (D-228):** `/agreements` (Standard + Kanban) for client, supplier, logistics partner, associate and staff agreements — signed copy, dates, renew, end early; reminders 30 / 7 / 0 days before expiry from `check_alerts.php`; a card on each party's page; client and associate agreements listed automatically. Permissions `manage_agreements`, `view_agreements`. SOP 26. Test: `AgreementsRegisterTest`.
 
 ### TDS on associate commission (D-235, added 2026-11-02)
 
 - Migration `docs/migrations/2026-11-02x-associate-tds.sql` (after 02v).
-- The app works out the TDS on each associate payout: section 194H at 2 % once the associate's commission in the financial year passes ₹20,000 (catch-up on the crossing payment), 20 % (206AA) without an accepted PAN, none for associates abroad once TRC / Form 10F / no-PE are accepted (each payment abroad needs Form 15CA, and 15CB when required). Values: Settings → Associate TDS (`/settings/associate-tds`). Register by quarter with challans: `/associates/tds`.
+- The app works out the TDS on each associate payout: section 194H at 2 % once the associate's commission in the financial year passes ₹20,000 (catch-up on the crossing payment), 20 % (206AA) without an accepted PAN, none for associates abroad once TRC / Form 10F / no-PE are accepted (each payment abroad needs Form 15CA, and 15CB when required). Values: Settings › Lists › Associate TDS rules (`/settings/associate-tds`). Register by quarter with challans: `/associates/tds`.
 - Reminders to *Pay incentives* holders come from the existing daily alert job (`check_alerts`): deposit by the 7th, Form 26Q after each quarter.
-- **Deployment note for the CA:** to have Zoho Books book the TDS on the associate's bill, the CA turns on TDS in Zoho Books (Settings → Taxes → TDS in Zoho, a manual Zoho change — log it in `docs/zoho/zoho-change-log.csv` when done) and puts the 194H tax's id into Settings → Associate TDS → Zoho Books TDS tax id. Until then the bill is the gross, the payment the net, and the Sync Log says the TDS is left on the bill for the CA.
+- **Deployment note for the CA:** to have Zoho Books book the TDS on the associate's bill, the CA turns on TDS in Zoho Books (Settings → Taxes → TDS in Zoho, a manual Zoho change — log it in `docs/zoho/zoho-change-log.csv` when done) and puts the 194H tax's id into Settings › Lists › Associate TDS rules → Zoho Books TDS tax id. Until then the bill is the gross, the payment the net, and the Sync Log says the TDS is left on the bill for the CA.
 
 ### Follow-up (added 2026-11-02): clients and products in Zoho Books (D-238)
 
-Migration `docs/migrations/2026-11-02za-zoho-clients-products.sql` (history — now part of schema.sql / seed.sql, D-241). It adds two switches under **Admin → Settings → Zoho Books**, both **off**: `zoho_sync_clients` (clients as Zoho Books customers) and `zoho_sync_products` (products of the Products menu as Zoho Books items, rate 0 — no cost is ever sent). One way, app → Zoho, done by `app/src/Services/ZohoMasterDataSync.php` inside the existing hourly Zoho sync (`app/cron/zoho_sync.php`) and Sync now — **no new scheduled job**. "Re-push all clients and products" on the Zoho Books Sync page (`POST /ca/zoho-sync/repush-master-data`, `ca_module_manage`) sends everything again. Nothing is deleted in Zoho: inactive or deleted records are marked inactive there. A client goes once its first order has set its currency. See SOP `ca-03-zoho-sync.md` → "Clients and products in Zoho Books". Tests: `ZohoClientsProductsSyncTest` / `zohoClientsProductsSync.test.js`.
+Migration `docs/migrations/2026-11-02za-zoho-clients-products.sql` (history — now part of schema.sql / seed.sql, D-241). It adds two switches under **Settings › Zoho**, both **off**: `zoho_sync_clients` (clients as Zoho Books customers) and `zoho_sync_products` (products of the Products menu as Zoho Books items, rate 0 — no cost is ever sent). One way, app → Zoho, done by `app/src/Services/ZohoMasterDataSync.php` inside the existing hourly Zoho sync (`app/cron/zoho_sync.php`) and Sync now — **no new scheduled job**. "Re-push all clients and products" on the Zoho Books Sync page (`POST /ca/zoho-sync/repush-master-data`, `ca_module_manage`) sends everything again. Nothing is deleted in Zoho: inactive or deleted records are marked inactive there. A client goes once its first order has set its currency. See SOP `ca-03-zoho-sync.md` → "Clients and products in Zoho Books". Tests: `ZohoClientsProductsSyncTest` / `zohoClientsProductsSync.test.js`.
 
 ### Follow-up (added 2026-11-02): Zoho API call limits for this app (D-239)
 
-Migration `docs/migrations/2026-11-02zb-zoho-api-limits.sql` (history — now part of schema.sql / seed.sql, D-241). Zoho limits API calls **per organisation** (about 100 a minute and a daily number by plan) and every Zoho app of the company shares that limit, so this app keeps to its own share: **Admin → Settings → Zoho Books** → `zoho_api_daily_limit` (**800**) and `zoho_api_minute_limit` (**30**). Every Zoho Books call — reads, the OAuth token and sends — is counted in `zoho_api_usage` by `app/src/Services/ZohoApiBudget.php` (meter) and `ZohoBooksService::request()` / `getAccessToken()`. When the day's allowance is used, syncing pauses until midnight (India time); the scheduled sync (`app/cron/zoho_sync.php`) waits out the per-minute limit, while Sync now / Sync this order / the Zoho check stop and ask to try again in a minute. Zoho's own "too many requests" (HTTP 429, codes 44/45, the OAuth "too many requests continuously") **stops the run at once** with one Sync Log line and one failure e-mail (D-233); nothing is lost. The access token is shared (encrypted, `zoho_token_cache`) by every process for 50 minutes and refreshed under a database lock. Usage today and the last 7 days are on the Zoho Books Sync page. See SOP `ca-03-zoho-sync.md` → "Zoho's call limits". Tests: `ZohoApiLimitsTest`.
+Migration `docs/migrations/2026-11-02zb-zoho-api-limits.sql` (history — now part of schema.sql / seed.sql, D-241). Zoho limits API calls **per organisation** (about 100 a minute and a daily number by plan) and every Zoho app of the company shares that limit, so this app keeps to its own share: **Settings › Zoho** → `zoho_api_daily_limit` (**800**) and `zoho_api_minute_limit` (**30**). Every Zoho Books call — reads, the OAuth token and sends — is counted in `zoho_api_usage` by `app/src/Services/ZohoApiBudget.php` (meter) and `ZohoBooksService::request()` / `getAccessToken()`. When the day's allowance is used, syncing pauses until midnight (India time); the scheduled sync (`app/cron/zoho_sync.php`) waits out the per-minute limit, while Sync now / Sync this order / the Zoho check stop and ask to try again in a minute. Zoho's own "too many requests" (HTTP 429, codes 44/45, the OAuth "too many requests continuously") **stops the run at once** with one Sync Log line and one failure e-mail (D-233); nothing is lost. The access token is shared (encrypted, `zoho_token_cache`) by every process for 50 minutes and refreshed under a database lock. Usage today and the last 7 days are on the Zoho Books Sync page. See SOP `ca-03-zoho-sync.md` → "Zoho's call limits". Tests: `ZohoApiLimitsTest`.
 
 ### Follow-up (added 2026-11-02): Logistics enters logistics bills, Accounts pays (D-232)
 
@@ -2471,7 +2526,7 @@ Part of schema.sql / seed.sql (D-241). Permission `manage_logistics_bills`: add 
 
 > **Replaced by D-245 P2 (4 Nov 2026):** the reference selling price, its note settings, the order-level discount approval (`order_price_approvals`, permission `approve_price_discount`) and the Zoho item rate from it are gone. "Pick from Products" now fills the quote price of whoever sells the order (staff, or the client's associate at their commission level) from the product's price build-up; a line below the seller's floor goes to the MD (permission `manage_pricing`), who may approve it down to the minimum price and never below; the PI waits for it and fixes the figures on each line. See docs/SOP/27-pricing.md and register D-245.
 
-Part of schema.sql / seed.sql (D-241). **Products menu:** a product may carry a reference selling price with currency and unit (e.g. "USD 45.00 per SQFT"), seen and changed only with View selling prices (`view_selling_prices`). **Order lines:** "Pick from Products" fills description, HS code, unit and — when the currencies match — the unit price; the line's own price stays editable and **every document prints the line's own price**. **Note beside the price** (selling-visible staff only; never on documents or the client portal), set under **Admin → Settings → Products & pricing**: on/off (`ref_price_note_enabled`), note level (`ref_price_note_pct`, default 5 %), warning level (`ref_price_warning_pct`, default 10 %). **At or beyond the warning level the Proforma Invoice cannot be generated** until someone with `approve_price_discount` (MD, ED) approves the discount with a reason on the order page's Price check (inside the Products card); a further drop or a new line below the warning level cancels the approval; the self-approval rule `price_discount` decides whether the person who set the price may approve it. **Zoho (D-238):** an INR reference price becomes the Zoho item rate; another currency leaves the rate at 0 and puts "Reference price: …" in the item description; invoice lines carry the Zoho item when the line's product is already in Zoho. Tests: ReferencePriceTest / referencePrice.test.js.
+Part of schema.sql / seed.sql (D-241). **Products menu:** a product may carry a reference selling price with currency and unit (e.g. "USD 45.00 per SQFT"), seen and changed only with View selling prices (`view_selling_prices`). **Order lines:** "Pick from Products" fills description, HS code, unit and — when the currencies match — the unit price; the line's own price stays editable and **every document prints the line's own price**. **Note beside the price** (selling-visible staff only; never on documents or the client portal), set under **Products › Pricing › Pricing settings**: on/off (`ref_price_note_enabled`), note level (`ref_price_note_pct`, default 5 %), warning level (`ref_price_warning_pct`, default 10 %). **At or beyond the warning level the Proforma Invoice cannot be generated** until someone with `approve_price_discount` (MD, ED) approves the discount with a reason on the order page's Price check (inside the Products card); a further drop or a new line below the warning level cancels the approval; the self-approval rule `price_discount` decides whether the person who set the price may approve it. **Zoho (D-238):** an INR reference price becomes the Zoho item rate; another currency leaves the rate at 0 and puts "Reference price: …" in the item description; invoice lines carry the Zoho item when the line's product is already in Zoho. Tests: ReferencePriceTest / referencePrice.test.js.
 
 ## Follow-up (added 2026-11-06): divisions, category documents, Zoho for the new divisions, and the full QA programme (D-257, D-258)
 
@@ -2479,18 +2534,18 @@ Everything below is in `docs/schema.sql` / `docs/seed.sql` (no migrations, D-241
 
 **Size now (both stacks, rechecked 6 Nov 2026 after access levels, incentive caps and backups):** 194 tables, 24 roles, **94 permissions** (older sections above quote 60 or 63 — those were the counts at the time), 744 routes (247 GET, 497 POST).
 
-- **Divisions (D-257, SOP 28):** every order, user, department, client, associate and price request belongs to a division. Export (EXP) is active; Domestic Trade (DOM), Import & Distribution (IMP) and Merchant Trade (MTT) are built but **planned**. Admin › Divisions (MD only, `manage_divisions`) shows each division's modules, own settings and number formats, a set-up section (create its departments, move staff) and an **Activate** button with a pre-flight checklist. Company-level users get `see_all_divisions`. New role **Investor (view only)**. Settings read the division's own value first, then the company value. Staff of a division that is not active cannot save anything.
+- **Divisions (D-257, SOP 28):** every order, user, department, client, associate and price request belongs to a division. Export (EXP) is active; Domestic Trade (DOM), Import & Distribution (IMP) and Merchant Trade (MTT) are built but **planned**. Settings › Divisions (MD only, `manage_divisions`) shows each division's modules, own settings and number formats, a set-up section (create its departments, move staff) and an **Activate** button with a pre-flight checklist. Company-level users get `see_all_divisions`. New role **Investor (view only)**. Settings read the division's own value first, then the company value. Staff of a division that is not active cannot save anything.
 - **Product categories (D-257 0B, SOP 27):** each category has units, HS code, packing type, quality documents and a T&C clause set; per-piece / per-kg / per-set prices; a quality-document checklist on the order. Documents take their packing words, quality documents and T&C clauses from the category (Phase 1). **Natural Stone documents are pinned** and proven text-identical by `StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged.test.js`.
-- **Domestic Trade (SOP 29):** `/domestic/orders/…`, GST rates (Admin › GST rates), GST tax invoice / challan / quotation / OC PDFs, e-way bill fields.
-- **Import & Distribution (SOP 30):** `/import…`, Admin › Import duty rates, landed cost, stock with movement log, local sale from stock.
+- **Domestic Trade (SOP 29):** `/domestic/orders/…`, GST rates (Settings › Lists › GST rates), GST tax invoice / challan / quotation / OC PDFs, e-way bill fields.
+- **Import & Distribution (SOP 30):** `/import…`, Settings › Lists › Import duty, landed cost, stock with movement log, local sale from stock.
 - **Merchant Trade (SOP 31):** `/merchant…`, two-leg deals, RBI checks with daily reminders (in `check_alerts`), PO and sale invoice (`MTT/I/26-27/0001`, 16 characters). The selling side is hidden from Procurement.
 - **Overhead sharing:** the Order Profitability report shows *Profit by division* only when two or more divisions are active.
 - **Zoho Books for the new divisions (D-257 (6), SOP ca-03):** invoices, bills, receipts, payments, customs duty, clearance charges and the IGST credit journal sync automatically in the hourly Zoho job; *Check against Zoho Books* on each domestic order, import and deal. Live-tested in the TEST organisation (change log Z-643 to Z-698), including go-live item 0C.2 (the GST commission bill). **Only one sync runs at a time** (database lock), and payments, expenses and journals are looked up in Books before posting, so a retry never duplicates (D-258).
 - **QA programme (D-258, `docs/QA/MASTER_TEST_PLAN.md`):** 107 bugs that no test covered were found and fixed in four batches (access, UI, orders, documents, e-mail, money, Zoho, stack parity); the deferred few are listed in the register (O-22). New tests: `QaBatch1AccessUi`, `QaBatch2`, `QaBatch3DocsMail`, `QaBatch4`, `DivisionIsolation`, `DomesticTrade`, `ImportDistribution`, `MerchantTrade`, `DivisionZohoSync`, `DivisionOverheadAndInvestor`, `CategoryDrivenDocuments`, `StoneDocumentsUnchanged`, `D257ProductNeutral`, `FreshReviewFixes`, the incoterm × preset and mail matrices (`QaIncotermPresetMatrix`, `QaMailMatrix`), and e2e `13-qa-batch1`, `14-qa-batch2`, `qa-roles-permissions-matrix`, `qa-ui-crawl`.
 - **Behaviour changes staff will notice** (all in the SOPs): Preview as is look-only; a payment with a different amount can be saved again; Mark Lost is refused once money has come in; a cancellation refund needs *Record refund paid* with the bank reference; Close Order needs the original BLs received and endorsed (ORD-14); the CI balance is net of amounts written off (ORD-09); export benefits are always in INR; the *sending off* switch now covers every business e-mail; old document revisions show what was really issued; the Word copy matches the PDF; Node prints dates as "05 November 2026" like PHP.
-- **Team incentive eligibility and caps (D-259, SOP 20):** an MD-only "Eligible for team incentive" switch per person (Add / Edit user) and per designation (Admin › Departments), and caps per role per order and per month (Admin › Team Incentives). What a person does not get stays with the company; only orders not yet locked change.
+- **Team incentive eligibility and caps (D-259, SOP 20):** an MD-only "Eligible for team incentive" switch per person (Add / Edit user) and per designation (Users & roles › Departments), and caps per role per order and per month (Finance & accounts › Team incentive settings). What a person does not get stays with the company; only orders not yet locked change.
 - **Associate access levels (D-261, SOP 24):** Starter / Quoting / Full / Custom per associate (MD only, with a reason), the level matrix under Associates › Access levels (FOB value and commission % off for Starter by default), a track record panel and an upgrade suggestion after 3 completed, fully paid orders. New associates start on Starter.
-- **Backups (D-260, SOP 32):** see "Backups" above — encrypted database and document copies kept 10 years, Admin › Backups, a digest warning when a copy is late.
+- **Backups (D-260, SOP 32):** see "Backups" above — encrypted database and document copies kept 10 years, Settings › Backups, a digest warning when a copy is late.
 - **Questions for the CA, AD bank and lawyer:** `docs/external/`.
 - **Cron:** the same app jobs plus the three backup lines (database, documents, monthly test-restore); run them in IST (`CRON_TZ=Asia/Kolkata`). The daily alert job runs at 06:00 IST on both stacks.
 - **Go-live:** `docs/guides/GO_LIVE_CHECKLIST.md`. Still pending from others: the CA (GST for associates abroad; DOM/IMP GST, e-way bill, e-invoice and duty rates; Zoho account names), the AD bank (merchanting rules and approval) and the lawyer (Associate agreement, Schedule A, the new non-stone T&C clauses).
@@ -2504,10 +2559,11 @@ Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
   a 6-digit code e-mailed after the password, at every login (10 minutes, 5 tries, a new code at
   most once a minute). It cannot be switched off per person. **E-mail must work before the first
   login.** MD, ED and Admin make 10 emergency **backup codes** on My Account right after their
-  first login and keep them offline; each use is audited and the MD is told. *Admin › Settings ›
-  Security › Remember this browser* (`login_remember_browser_days`) is **0 = off** by default
-  (code every time); staff only, never buyers or associates. Associates keep their own code.
-- **SOP access by role (D-266, SOP 15):** *Admin › SOP access* — each role sees its own chapters
+  first login and keep them offline; each use is audited and the MD is told. *Settings ›
+  Security* (`login_remember_browser_days`) was **0 = off** by default (code every time);
+  staff only, never buyers or associates. Since 11 Nov 2026 (D-283) the tick reads "This is my own
+  office computer" and the default is 30 days — see the 11 Nov section. Associates keep their own code.
+- **SOP access by role (D-266, SOP 15):** *Users & roles › SOP access* — each role sees its own chapters
   (generous defaults are seeded), extra chapters per person on *Users › Edit*, an on/off switch
   for the whole library and for each chapter. MD, ED, Admin and System Administrator always see
   everything; *Getting started* is always visible; a new chapter file is seen only by them until
@@ -2527,7 +2583,7 @@ Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
   difference is posted to Zoho Books as one journal (*Associate payout costs* debited, the paying
   bank credited; a gain the other way round), reference `<inquiry ref>-APC-<payout id>`, with the
   D-212 description. **Before go-live: create an expense account "Associate payout costs" in Zoho
-  Books and choose it in *Associates › Commission settings*;** until then the sync skips these
+  Books and choose it in *Associates › Commission › Commission settings and ladder*;** until then the sync skips these
   journals and says so in the Sync Log. Checked live in the Zoho test organisation on 7 Nov 2026
   (change log Z-699 … Z-711).
 - **Document images stored once (D-267, owner double-confirmed; SOP 13):** a document's stored
@@ -2540,8 +2596,146 @@ Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
   `schema.sql` needs the **TRIGGER** privilege — "ALL PRIVILEGES" on the database includes it. On
   MySQL with binary logging switched on, creating a trigger may also need SUPER or
   `log_bin_trust_function_creators = 1` (ask the host if the import stops at a `CREATE TRIGGER`).
-- **Data export (Admin › Data export):** the temporary dump file is now always deleted, also when a
+- **Data export (Settings › Data export):** the temporary dump file is now always deleted, also when a
   download is cancelled or the connection drops.
 - **Tutorial videos** (`tutorials/`, catalogue in `tutorials/VIDEO_PROGRESS.md`): videos are never
   committed; a change that alters a recorded video is listed for the owner before any re-recording
   (CLAUDE.md).
+
+## Follow-up (added 2026-11-11): the 27-point build — menus, approvals, e-mail settings, sessions, pricing, associates, setup checklist (D-268 … D-330)
+
+Everything below is in `docs/schema.sql` / `docs/seed.sql` (a new install needs nothing else) and in
+the Application Handbook; the SOP chapters say how staff use it. Go-live and upgrade steps are in
+`docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".
+
+**Upgrading an existing (live) database.** Unlike the first install (D-241), a database that already
+holds data is brought up to date with the dated files in `docs/migrations/` (rules in
+`docs/migrations/README.md`). Back up the database and `storage/` first, put the new code in place,
+then run, in this order:
+
+```bash
+mysql -u <user> -p <database> < docs/migrations/2026-11-11a-quote-any-unit-piece-size.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11b-email-settings-sessions.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11c-associates-kyc-commission-bank.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11d-thickness-prices-fx-hs-suppliers.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11e-approvals-setup-defaults.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11f-plain-language-email-templates.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-11g-order-comment-email-status.sql
+```
+
+Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,
+GSTIN, LUT and RCMC values (only a fresh install starts with placeholders). Then add the `fetch_fx_rate.php` cron line (07:05 IST, see "Bluehost cron setup"), make sure `storage/sessions/` is writable, check outbound HTTPS to `api.frankfurter.app` and `open.er-api.com` (Products › Pricing › Pricing settings › Fetch now), and
+once, as the MD / a product editor: **Products › HS codes › Fix HS codes on products** and
+**Products › Link suppliers** (below).
+
+**Menus (D-320–D-322, SOP 00).** The left menu has 13 entries — Dashboard, Approvals (n), My tasks
+(n) · Orders, Clients, Associates, Products, Procurement & suppliers, Finance & accounts · Reports ·
+Help & SOP · Users & roles, Settings — and every section has a menu bar at the top of its pages
+(`app/src/Config/navigation.json`, the same file on both stacks). The menu paths in the older sections of this README were brought up to date on 11 Nov 2026: what was under Admin is now under *Users & roles* or *Settings* (HS codes and Pricing under Products, Suppliers and Logistics partners under Procurement & suppliers, Team incentives under Finance & accounts); the old Operations pages are under Orders, Clients or Procurement & suppliers, and the old Insights pages under Reports. The order page has a sticky action bar: Edit order ·
+Documents · Full report · Duplicate order · More ▾.
+
+**Approvals (D-310–D-311).** One page, left menu **Approvals (n)** (`/approvals`), with tabs Prices ·
+Payment terms · Documents · E-mails · Bank details · Other; each row opens the exact approval.
+Dashboard tiles per kind; on the order page approvers see "Waiting for your approval …", the person
+who asked sees "Sent to … waiting". A payment that came in short now files a request
+(`short_payment_requests`) that waits there.
+
+**E-mail settings and Testing mode (D-280–D-281, SOP 15).** *Settings › E-mail*
+(`/admin/email-settings`, Manage company settings) lists every e-mail with one switch per audience
+(Staff, Associate, Buyer, Supplier; table `email_settings`). MUST e-mails are always sent and cannot
+be switched off: login codes, set-password invites, forgot-password links (buyers and, new,
+associates), the bank-details-changed alert, the backup-code alert and the quotation verification
+code. SHOULD e-mails are on; the only OPTIONAL one, the copy of buyer documents to the associate, is
+off. The old master switch `mail_sending_enabled` is **gone**: **Testing mode — hold e-mails to
+buyers and suppliers** (`email_testing_mode`, off in the seed) holds only buyer and supplier e-mails;
+the screen then says so and shows the link with a Copy button, and never says "e-mailed" when
+nothing was sent. Staff e-mails about a buyer, supplier or associate go only to the people of the
+relevant department assigned to the order, else that department's manager (with an "assign
+someone" note), else the MD; MD, ED and Coordinator are not e-mailed for routine events (in-app
+notices are unchanged). Company-level compliance alerts (LUT, RCMC, agreements, TDS, merchant-trade
+RBI limits, ECGC policy, monthly eBRC) go to a responsible person and a backup named on the same page
+(`compliance_alert_owners`; empty = the department's manager, then the MD).
+
+**Portal access (D-282).** Accepting an associate registration sends the set-password e-mail (72 h,
+works once) and shows the link with Copy; the e-mail gives the permanent login page
+`/associate/login`. New **Forgot password?** page for associates (`/associate/forgot-password`).
+The associate page has three blocks (Portal login · Quotation link with the Associate code ·
+Personal code); the client page has a "Client portal login" block (`/client/login` with Copy,
+status and last login, Send set-password link, temporary password, Log in as).
+
+**Staying logged in (D-283, SOP 15).** `session_timeout_minutes` is **replaced** by
+`session_timeout_staff_minutes` (240), `session_timeout_client_minutes` (120),
+`session_timeout_associate_minutes` (120) and `session_absolute_staff_hours` (12: staff log in again
+at least every 12 hours), all on *Settings › Security*. A popup 2 minutes before the end offers
+"Stay logged in" (keep-alive addresses `/keep-alive`, `/client/keep-alive`, `/associate/keep-alive`).
+The login-code screen's tick is now **"This is my own office computer"**
+(`login_remember_browser_days`, default **30**, 0–90); "Forget all remembered computers" on My
+Account, and for Admin on Users › Edit. PHP now keeps its session files in `storage/sessions/` and sets its own garbage-collection lifetime and cookie to the longest idle timeout, so the host default (about 24 minutes) no longer signs people out early — the folder must be writable (Setup checklist item).
+
+**Quote in any unit (D-270–D-273, SOPs 01, 17, 27).** A line may be priced in any unit of its
+category (Natural Stone: CBM, m², sq ft, PCS, Ton, RMT; Set or Lot go to the MD). The price check
+converts it to the product's reference unit with the piece size Length × Width × Thickness in cm
+(`order_products.piece_length_cm` / `_width_cm` / `_thickness_cm`) and the weight per CBM
+(`weight_t_per_cbm`, category 2.7 t, product override). Options show as labels on every line;
+Duplicate makes an exact copy right below ("copy of line N", `copied_from_id`); a compact products
+table with a side panel. Natural Stone lines in another unit (BOX, NOS, SET, KG, MT) are refused on
+their next edit until the MD adds the unit in Products › Categories.
+
+**Products and pricing (D-300–D-306, SOP 27).** One supplier price holds every thickness — 20, 30
+and 40 mm per m² and 50 mm+ per CBM — typed or calculated by the category's **Price rules**
+(Products › Price rules: 30 mm +35 %, 40 mm +70 %, 50 mm+ per CBM = 20 mm × 40, container 8 CBM /
+27 t, stone weight; MD only, with a reason). "Price includes packing and loading" (ticked by
+default) and CHA + transport per container (per supplier price; the product has a default).
+**Daily exchange rate** (`fx_rates`; `fx_mode` auto, `fx_cushion_pct` 2.0): pricing rate = market
+rate − 2 %; see the job above. **One master for HS code and supplier:** a product's HS code is
+picked from the HS Code Master List; a product price's supplier is picked from the Suppliers
+directory (quick-add makes a directory record marked *Details pending*). Two **one-time pages** for
+existing data: **Products › HS codes › Fix HS codes on products** (`/products/fix-hs-codes`, Manage
+product catalogue — choose a master code for each product listed) and **Products › Link suppliers**
+(`/products/link-suppliers`, Record market prices or Manage suppliers — *Match by name* links exact
+names at once; pick or quick-add the rest). Catalogue columns show currency and unit; "Supplier
+price ₹ / unit" with ≈ USD for product editors; plain names **Staff lowest** and **Associate
+lowest**. Staff see only Quote and Your lowest; associates see no prices in the catalogue.
+Products › Categories › *category* has tabs General · Options and their price effect · Price rules ·
+Products.
+
+**Associates (D-290–D-294, SOP 24).** KYC: document type first, number 5–30 characters (PAN and
+Aadhaar keep their formats); ID proof and Address proof are separate required items (associates
+already accepted have 60 days, `address_proof_due_on`). Commission: standard ladder by default,
+"+ Add own ladder" (`associate_ladder_steps`) or a fixed level, changed by the MD only with a reason,
+for new orders only; associates see only their current % "of the FOB value"; new permission
+**See associate commission rules** (`view_associate_commission_rules`: Admin, MD, ED, Finance
+Director, Finance Manager) — other staff see "Set by the MD". Payout day: 1–28 or **last day of the
+month** (the new default), or weekly; a Sunday or holiday moves to the working day before
+(`associate_payout_holiday_rule`). Bank details: the associate confirms new details in the portal
+(last 4 digits + a fresh code; "This is not me" cancels and alerts MD and Finance; 7 days without an
+answer cancels); suppliers and logistics partners confirm through a link to their registered e-mail
+(`vendor_bank_changes`). Then **one** staff member who did not enter them verifies, ticking at
+least 2 of bank proof / phone call / test payment (`bank_details_check_people` = one, or two); MD
+and ED may verify their own entry with a reason (self-approval rule *Bank details*). Wait before
+use: first account 0 days, a change 15 days (`associate_bank_wait_first_days` /
+`associate_bank_wait_change_days`, 0–90; they replace `associate_bank_wait_days`). Settings on
+Associates › Commission › Commission settings and ladder.
+
+**Setup checklist and defaults (D-312–D-313, SOP 15).** *Settings › Setup checklist*
+(`/admin/setup-checklist`, table `setup_checklist_ticks`) — see "First-time setup". New defaults:
+document clean-up on (drafts 90 days, superseded never-sent 365 days, CAFIN latest only), password
+expiry off, Test Mode e-mail = the company e-mail, Indian national holidays seeded, the two associate
+settings (personal code changes a year, upgrade after N orders) editable on the commission settings
+page.
+
+**Plain language (D-330).** 190 of the 195 approved rewrites of what buyers, associates and
+suppliers read (buyer stage names, "Ask to cancel this order" in the buyer portal, "Bank reference
+number (transaction ID, UTR or SWIFT reference)"); the e-mail texts stored in the database are
+updated on a live site by `2026-11-11f`. No PDF or document text changed — 8 document passages wait
+for the owner's double confirmation.
+
+**Earlier fixes shipped with it.** D-268: Recent Activity scope, the true reason a staff chat post
+was not e-mailed (`order_comments.email_status`, `2026-11-11g`), "Pick from Products" button, My
+tasks for staff without a department. D-269: payment-terms approver wording, Buyer PO note on
+cancelled or lost orders, Staff Productivity, the cockpit shows every department, reason hint shown
+only on error.
+
+**Tutorial videos.** Many recorded screens changed; the videos are **not** re-recorded. The list of
+what no longer matches is in `tutorials/VIDEO_PROGRESS.md` ("Out of date after the 11 Nov 2026
+build"), waiting for the owner's decision (CLAUDE.md video rule).

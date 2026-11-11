@@ -275,11 +275,11 @@ time, from **Help & SOP** in the left menu, so you never have to go hunting for 
 | Handle a buyer flagging a process issue (no cancel intent) | **Complaints** | [Chapter 19](./19-complaints.md) |
 | Change payment terms after the PI is out | **Amendments**, from the order page | [Chapter 10](./10-amendments.md) |
 | Run a report | **Reports** | [Chapter 14](./14-reports.md) |
-| Check who did what and when | **Reports → Audit log** | — |
+| Check who did what and when | **Reports › Audit log** | — |
 | Manage roles, users, or company settings | **Users & roles**, **Settings** | [Chapter 15](./15-admin-settings.md) |
 | Rehearse something without touching real data | **Test Mode** (if you have access) | [Chapter 16](./16-test-mode.md) |
 | CA / Accounting work | **Finance & accounts → CA / Accounting** | [CA Overview](./ca-01-overview.md) |
-| Check an agreement or when it expires | **Clients → Agreements** | [Chapter 26](./26-agreements.md) |
+| Check an agreement or when it expires | **Clients › Agreements** | [Chapter 26](./26-agreements.md) |
 | Fill in a supplier or CHA / logistics payment | Order page Steps 7e / 10a / Logistics Partner Bills — "How to fill this" link | [Payments guide](./guides/Supplier_and_Logistics_Payments_Guide.pdf) |
 
 ## Your first week

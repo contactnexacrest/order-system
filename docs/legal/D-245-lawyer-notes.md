@@ -30,13 +30,12 @@ We will not use the "Business Introducer Agreement" (India) or the "Business Int
    - If NexaCrest agrees a discount or settles a claim, commission is paid on the reduced invoiced FOB.
 4. **When commission is paid.** The agreement should refer to the timing NexaCrest sets in writing (its system settings), currently:
    - due a set number of days after full payment (now 30 days);
-   - held while a buyer claim on the order, raised on or before the due date, is unresolved;
-   - paid in the next payout run (now monthly on the 5th).
+   - held while a buyer claim on the order, raised on or before the due date, is unresolved;   - paid in the next payout run (since 11 Nov 2026, D-292: monthly on the **last day of the month**; a payout day on a Sunday or holiday moves to the working day before).
 
    Please draft this so NexaCrest can change the timing by written notice for orders that start after the notice.
 5. **No take-back after payment.** Once commission is paid, it is not recovered for a later claim, except for the associate's **fraud or breach**. NexaCrest must record the reason.
-6. **Commission levels and the optional ladder.** The rate is one of NexaCrest's commission levels (now 2%, 5%, 7% or 10%, or a fixed USD amount per unit). For each associate, NexaCrest chooses either:
-   - a **fixed level**; or
+6. **Commission levels and the optional ladder.** The rate is one of NexaCrest's commission levels (now 2%, 5%, 7% or 10%, or a fixed USD amount per unit). For each associate, NexaCrest chooses either:   - a **fixed level**; or
+   - (since 11 Nov 2026, D-291) **an own ladder** for that associate — a copy of the standard ladder that the MD changes, with a reason, for new orders only; or
    - a **ladder**, where the level rises with the number of **counting orders**. A counting order is one fully paid, with invoiced FOB of **₹5 lakh or more** within the price range. A smaller order earns the current level but does not count.
 
    The level is fixed on each order when the Proforma Invoice is issued. Rates and levels can be changed by written rate notice, for orders that start after the notice.
@@ -81,4 +80,4 @@ When an order is for a category other than Natural Stone, the QT, PI, OC, CI and
 - Quality Documents
 - on the supplier PO: Conformity to Specification, and Traceability & Test Certificates
 
-Please review them before the first non-stone sale. The stone clauses are unchanged. The wording can be changed in Admin › Overrides without a code change.
+Please review them before the first non-stone sale. The stone clauses are unchanged. The wording can be changed in Settings › Admin overrides without a code change.

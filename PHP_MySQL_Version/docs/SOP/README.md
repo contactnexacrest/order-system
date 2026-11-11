@@ -33,38 +33,38 @@ implementation detail.
 
 ## Modules alongside the pipeline
 
-> **Menu paths (11 Nov 2026).** The app's left menu now has 13 entries and every section has a menu bar at the top of its pages ([Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)). Where a chapter says *Operations → X*, *Insights → X* or *Admin → X*, open the section that holds X: Orders, Clients, Associates, Products, Procurement & suppliers, Finance & accounts, Reports, Users & roles or Settings.
+> **Menu paths (11 Nov 2026).** The app's left menu has 13 entries and every section has a menu bar at the top of its pages ([Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)). The chapters write a path as *left-menu entry › menu-bar item › page*, for example *Settings › E-mail* or *Products › Pricing › Pricing settings*. Every chapter was brought up to date with these menus on 11 Nov 2026; the old names *Operations*, *Insights* and *Admin* are gone (their pages are now under Orders, Clients, Procurement & suppliers, Reports, Users & roles or Settings).
 
 
 - [Amendments](./10-amendments.md) — changing payment terms after the PI is issued.
-- [Disputes](./11-disputes.md) — a buyer wanting to cancel this order and not proceed, admin-gated per client.
+- [Disputes](./11-disputes.md) — a buyer wanting to cancel this order and not proceed (the buyer's "Ask to cancel this order" button), admin-gated per client.
 - [Client Portal](./12-client-portal.md) — everything the buyer can see and do, in one place.
-- [Document Review & Approval](./13-document-review-approval.md) — the draft → review → approved → sent lifecycle every document goes through.
+- [Document Review & Approval](./13-document-review-approval.md) — the draft → review → approved → sent lifecycle every document goes through, and the one **Approvals** page (D-310).
 - [Reports](./14-reports.md) — every reporting screen and what question it answers.
-- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, suppliers, logistics partners, ports, payment presets, company settings (including the mail and Zoho Books connection tests), email templates, UI Template Preference (Standard/Kanban), who may give which rights, Self-approval rules (who may approve their own work, for eight actions), the permissions added 1 Nov 2026 (including Manage approval limits), and the scheduled jobs.
+- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, suppliers, logistics partners, ports, payment presets, company settings (including the mail and Zoho Books connection tests), email templates, UI Template Preference (Standard/Kanban), who may give which rights, Self-approval rules (who may approve their own work, for nine actions), the permissions added 1 Nov 2026 (including Manage approval limits), the scheduled jobs, and since 11 Nov 2026 the Setup checklist, E-mail settings with Testing mode, staying logged in (idle timeouts, "This is my own office computer") and the menus (D-280 – D-283, D-312, D-313, D-320).
 - [Test Mode](./16-test-mode.md) — a sandboxed way to rehearse the system without touching real data or sending real email.
 - [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.
 - [Complaints](./19-complaints.md) — a buyer flagging a process issue with no intent to cancel, a two-way conversation separate from Disputes.
 - [Incentives](./20-incentives.md) — the incentive cycle, My Incentives, and paying incentives (Accounts).
-- [Associates](./24-associates.md) — the associate portal, how a buyer becomes an associate's client, commission, bank checks and payment.
+- [Associates](./24-associates.md) — the associate portal (login, forgot password), how a buyer becomes an associate's client, KYC (ID and address proof), the commission rule (standard ladder, own ladder or fixed), bank-details confirmation and checks, payout day and payment.
 - [Departments & Log in as](./21-departments.md) — departments and their designations, choosing and switching department, Admin's Preview as, a person's memberships, personal exceptions with an end date.
 - [Procurement](./22-procurement.md) — purchase requirements from Sales, supplier quotes and comparison, award and approval limits, receipt and quality check, supplier performance.
 - [My tasks, owners & cockpit](./23-coordination.md) — each department's task list built from the orders, one owner per department per order, due and escalation days, the management cockpit, the optional Order Coordinator.
 - [Export Compliance](./25-export-compliance.md) — the department for government and agency work (ECGC, Certificate of Origin, phytosanitary / fumigation / inspection, export benefit claims, eBRC / FIRC): its three roles, its task list, and what it never sees.
 - [Agreements](./26-agreements.md) — the register of agreements with clients, suppliers, logistics partners, associates and staff: signed copies, expiry dates, reminders 30 and 7 days before and on the day, renew and end early.
-- [Pricing](./27-pricing.md) — supplier / market prices, the price build-up (cost → minimum price → floors → quote price), who sees which price, and the associate commission levels and ladder (D-245).
-- [Divisions](./28-divisions.md) — Export today; Domestic Trade, Merchant Trade and Import & Distribution planned. What a division is, Admin › Divisions (modules, own settings, numbering), and how to set up and activate a new division (D-257).
+- [Pricing](./27-pricing.md) — supplier / market prices (one row for every thickness, CHA + transport per container), the price rules per category, the daily exchange rate, one master for HS code and supplier, the price build-up (cost → minimum price → lowest prices → quote price), who sees which price, quoting in any unit, and the associate commission levels and ladder (D-245, D-270, D-300 – D-306).
+- [Divisions](./28-divisions.md) — Export today; Domestic Trade, Merchant Trade and Import & Distribution planned. What a division is, Settings › Divisions (modules, own settings, numbering), and how to set up and activate a new division (D-257).
 - [Domestic Trade](./29-domestic-trade.md) — selling to Indian resellers with GST (planned until the MD activates it): set-up and activation, the eight stages, GST on the documents (CGST + SGST or IGST), e-way bill, tax invoice numbering, payments and Zoho (D-257 Phase 2).
 - [Import & Distribution](./30-import-distribution.md) — importing into India, stock and local sales (planned until the MD activates it): set-up and activation, import PO, LC as applicant, bill of entry and duty, landed cost, stock that never goes below zero, the local sale from stock, reports and Zoho (D-257 Phase 3).
 - [Merchant Trade](./31-merchant-trade.md) — buying abroad and selling abroad without the goods entering India (planned until the MD activates it): set-up and activation, the deal and its two currency legs, BL and switch BL, the sale invoice and PO, margin in ₹ and USD, the RBI checks and their reminders, the AD bank's documents, reports and Zoho (D-257 Phase 4).
-- [Backups and restore](./32-backups-restore.md) — what is copied every night and kept 10 years, checking Admin › Backups and the digest warning, restoring one document, the database or all documents
+- [Backups and restore](./32-backups-restore.md) — what is copied every night and kept 10 years, checking Settings › Backups and the digest warning, restoring one document, the database or all documents
 
 ## Guides to print or share
 
-Stand-alone guideline documents that go with this manual. Each one is also in the app's **Reference Library** (menu → Reference Library) so every user finds it in the same place.
+Stand-alone guideline documents that go with this manual. Each one is also in the app's **Reference Library** (left menu **Help & SOP › Reference library**) so every user finds it in the same place.
 
-- **Supplier & Logistics Payments Guide** — [PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx). Only supplier and logistics partner (CHA, transport, freight forwarder) advance and balance payments: what to type in each box, with numbered screenshots, a marked-up sample bill, 10 common mistakes and a one-page cheat sheet. The same steps are on screen at **Help → Supplier & logistics partner payments** (`/help/supplier-logistics-payments`), linked from Steps 7e, 10a and the Logistics Partner Bills card.
+- **Supplier & Logistics Payments Guide** — [PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx). Only supplier and logistics partner (CHA, transport, freight forwarder) advance and balance payments: what to type in each box, with numbered screenshots, a marked-up sample bill, 10 common mistakes and a one-page cheat sheet. The same steps are on screen at **Supplier & logistics partner payments** (`/help/supplier-logistics-payments`), linked from Steps 7e, 10a and the Logistics Partner Bills card; the PDF and Word copies are in **Help & SOP › Reference library**.
 
 ## The running examples
 

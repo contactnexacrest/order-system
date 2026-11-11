@@ -9,7 +9,7 @@
 | The whole database (orders, clients, money, users, settings …) | every night, 02:00 IST | 10 years. Copies older than 120 days are thinned to the first copy of each month |
 | Every order document (generated PDFs/Word files and every uploaded file) | every night, 02:30 IST | 10 years. A file that has not changed is stored **once**, however many nights it is backed up |
 | A full archive of all documents | the first night of each month | 10 years |
-| A test-restore that proves the newest copy really opens | the 1st of each month, 04:00 IST | — (result shown in Admin › Backups) |
+| A test-restore that proves the newest copy really opens | the 1st of each month, 04:00 IST | — (result shown in Settings › Backups) |
 
 - The rule is set in `app/.env`: `BACKUP_KEEP_YEARS=10` and `BACKUP_THIN_AFTER_DAYS=120` (0 keeps every nightly database copy).
 - Copies are **encrypted** with a key file only the company holds. **Keep a copy of the key away from the server** (for example in the MD's safe or password manager): without it the copies cannot be opened.
@@ -17,7 +17,7 @@
 
 ## Checking that backups run (MD / Admin)
 
-1. Open **Admin › Backups**. Each job shows **OK**, **Too old**, **Failed**, **No run yet** or **Not set up**, with the time of the last run, the size, whether it is encrypted and whether the off-site copy went.
+1. Open **Settings › Backups**. Each job shows **OK**, **Too old**, **Failed**, **No run yet** or **Not set up**, with the time of the last run, the size, whether it is encrypted and whether the off-site copy went.
 2. If a backup is late (more than 26 hours), failed, is not encrypted, or the monthly test-restore is late or failed, the **daily digest e-mail** of everyone who manages company settings says **BACKUP WARNING** and lists the problem.
 3. Ask the server administrator to check the log of that job (`backup_db.log`, `backup_storage.log`, `backup_test_restore.log`).
 
@@ -55,4 +55,4 @@ Restoring is **never automatic**. It replaces live data with the copy, so decide
 
 ## Set-up (server administrator, once)
 
-The exact commands are in the README, section **Backups**: create `BACKUP_DIR` and the key file, add the `BACKUP_…` lines to `app/.env`, add the three cron lines, run the two nightly scripts once by hand and check **Admin › Backups**. The scripts refuse to run if `BACKUP_DIR` is inside the live storage or the web root.
+The exact commands are in the README, section **Backups**: create `BACKUP_DIR` and the key file, add the `BACKUP_…` lines to `app/.env`, add the three cron lines, run the two nightly scripts once by hand and check **Settings › Backups**. The scripts refuse to run if `BACKUP_DIR` is inside the live storage or the web root.

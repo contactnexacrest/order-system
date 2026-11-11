@@ -42,7 +42,7 @@ The complete description of the NexaCrest export order system: what it is for, h
 
 - **Both stacks.** A PHP class `App\Services\FooService` (`PHP_MySQL_Version/app/src/Services/FooService.php`) has a Node twin `NODE_MySQL_Version/app/src/services/fooService.js`. Where only the PHP name is given, the Node file is the camelCase twin.
 - **Codes.** `D-nnn` = numbered owner decision; `R1…R26` = standing rules; `O-nn` = open points; QA finding IDs (`ZOH-1`, `PAR-7` …) come from the register. Search the code for a D-code to find where it is built.
-- **Menu paths** are written *Settings › Company › Zoho Books* (left-menu entry › menu-bar item). Section references are written §7.3. Since D-320 (11 Nov 2026) the left menu has 13 entries and every section has a menu bar (§6.0); older paths written *Admin › X* mean the Users & roles or Settings bar, except HS codes (Products), Suppliers, Logistics partners (Procurement & suppliers), Pricing (Products › Pricing) and Team incentives (Finance & accounts).
+- **Menu paths** are written *Settings › Company › Zoho Books* (left-menu entry › menu-bar item). Section references are written §7.3. Since D-320 (11 Nov 2026) the left menu has 13 entries and every section has a menu bar (§6.0); every path in this handbook uses those menus (brought up to date on 11 Nov 2026).
 - **Money.** Amounts are INR (₹) or USD with two decimals; worked examples were recomputed from the code. Dates and times are IST.
 - **Source of truth.** The code. Where this handbook and the code disagree, the code wins and this handbook is wrong: fix it (Appendix B).
 
@@ -175,15 +175,15 @@ The complete description of the NexaCrest export order system: what it is for, h
     - [Company Settings (company_settings, /settings, manage_company_settings)](#company-settings-company_settings-settings-manage_company_settings)
     - [E-mail (in company_settings)](#e-mail-in-company_settings)
     - [Zoho Books (in company_settings, category zoho_books)](#zoho-books-in-company_settings-category-zoho_books)
-    - [Pricing (pricing_settings, Admin › Pricing, MD only, audited)](#pricing-pricing_settings-admin--pricing-md-only-audited)
-    - [Team incentive (incentive_settings, incentive_roles; Admin › Team Incentives, MD)](#team-incentive-incentive_settings-incentive_roles-admin--team-incentives-md)
+    - [Pricing (pricing_settings, Products › Pricing, MD only, audited)](#pricing-pricing_settings-products--pricing-md-only-audited)
+    - [Team incentive (incentive_settings, incentive_roles; Finance & accounts › Team incentive settings, MD)](#team-incentive-incentive_settings-incentive_roles-finance--accounts--team-incentive-settings-md)
     - [Associate commission and TDS (incentive_settings)](#associate-commission-and-tds-incentive_settings)
-    - [Divisions (divisions, division_modules, division_settings; Admin › Divisions, MD, manage_divisions)](#divisions-divisions-division_modules-division_settings-admin--divisions-md-manage_divisions)
+    - [Divisions (divisions, division_modules, division_settings; Settings › Divisions, MD, manage_divisions)](#divisions-divisions-division_modules-division_settings-settings--divisions-md-manage_divisions)
     - [GST and duty rates](#gst-and-duty-rates)
     - [Document copies clean-up (company_settings, category document_cleanup)](#document-copies-clean-up-company_settings-category-document_cleanup)
     - [Watermarks and DOCX](#watermarks-and-docx)
     - [Remittance difference reasons](#remittance-difference-reasons)
-    - [Backups (Admin › Backups, read only, D-260)](#backups-admin--backups-read-only-d-260)
+    - [Backups (Settings › Backups, read only, D-260)](#backups-settings--backups-read-only-d-260)
   - [9.2 .env keys (both app/.env.example files)](#92-env-keys-both-appenvexample-files)
   - [9.3 Installation order (D-241)](#93-installation-order-d-241)
   - [9.4 README go-live SQL block (real values)](#94-readme-go-live-sql-block-real-values)
@@ -259,8 +259,8 @@ One company, several **divisions** (D-257, 5 Nov 2026). Every order belongs to o
 
 Key points:
 
-- A planned division cannot be used until the MD activates it in **Admin › Divisions** (with a pre-flight checklist).
-- **While only one division is active, divisions are invisible** to staff: no switcher, no Division filter, no Division field. Only Admin › Divisions shows them.
+- A planned division cannot be used until the MD activates it in **Settings › Divisions** (with a pre-flight checklist).
+- **While only one division is active, divisions are invisible** to staff: no switcher, no Division filter, no Division field. Only Settings › Divisions shows them.
 - Company-level people (Admin, MD, ED, Finance, Audit, Administration, CA, Investor) hold `see_all_divisions`. Everyone else sees only their own division.
 - Each division can switch **modules** on or off (see Glossary: *module switch*).
 - Each division can override company, pricing and incentive settings (`division_settings`). Export has no overrides.
@@ -422,7 +422,7 @@ Full list with formats, PDF/DOCX and audience: §8.1. All reference formats come
 | **Team incentive** | Reward to staff per order from profit after associate commission; Open → Ready → Locked by MD → Paid; eligibility and caps (D-245 P4, D-259). |
 | **Profit (estimated / locked / paid)** | One profit calculation in `OrderProfitabilityService`: before commission & incentive → commission → incentive → after. |
 | **Vendor bill** | Supplier or logistics bill (proforma or tax invoice), with part payments (`order_vendor_bills`, `order_vendor_bill_payments`). Logistics enters, Accounts pays (D-232). |
-| **Maker-checker / Self-approval** | A person may not approve their own request unless Admin › Self-approval rules allows their role for that rule (seven-plus rules: payment terms, document review, e-mail send, cancellation, purchase award, amendment MD-approval, short-payment, price discount). `MakerCheckerGuard`, `SelfApprovalRules`. |
+| **Maker-checker / Self-approval** | A person may not approve their own request unless Users & roles › Self-approval rules allows their role for that rule (seven-plus rules: payment terms, document review, e-mail send, cancellation, purchase award, amendment MD-approval, short-payment, price discount). `MakerCheckerGuard`, `SelfApprovalRules`. |
 | **Grant guard** | Nobody can grant a right they do not hold or change their own rights (`GrantGuard`, D-216). |
 | **Department / designation** | A person can belong to several departments; they work under one at a time ("Log in as"). Designations (Executive/Manager/Director) map to roles. |
 | **Preview as** | Admin views the app as a designation would see it; read-only (nothing can be posted). |
@@ -701,7 +701,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 
 | Area | Tables |
 |---|---|
-| **Configuration** | `company_settings` (key-value; every configurable business value), `email_settings` + `compliance_alert_owners` (Admin › E-mail settings, D-280 / D-281), `dropdown_options` (many small lists), `ports`, `port_routes`, `incoterms`, `currencies`, `payment_presets`, `document_types`, `document_sections`, `tc_clauses`, `tc_clause_documents`, `email_templates`, `watermark_settings`, `docx_generation_settings`, `file_upload_contexts`, `company_holidays`, `hs_codes`, `hs_code_product_examples`, `reference_sequences`, `ui_templates`, `test_mode_settings`, `remittance_difference_reasons`, `stages_master` |
+| **Configuration** | `company_settings` (key-value; every configurable business value), `email_settings` + `compliance_alert_owners` (Settings › E-mail, D-280 / D-281), `dropdown_options` (many small lists), `ports`, `port_routes`, `incoterms`, `currencies`, `payment_presets`, `document_types`, `document_sections`, `tc_clauses`, `tc_clause_documents`, `email_templates`, `watermark_settings`, `docx_generation_settings`, `file_upload_contexts`, `company_holidays`, `hs_codes`, `hs_code_product_examples`, `reference_sequences`, `ui_templates`, `test_mode_settings`, `remittance_difference_reasons`, `stages_master` |
 | **Auth / RBAC / security** | `users`, `roles`, `permissions`, `role_permissions`, `user_permissions`, `password_reset_tokens`, `login_attempts`, `rate_limit_hits`, `two_fa_backup_codes`, `super_admin_delegations`, `field_protection_requests`, `self_approval_rules` |
 | **Departments & divisions** | `departments`, `department_designations`, `user_department_memberships`, `designations`, `divisions`, `division_modules`, `division_settings`, `client_divisions` |
 | **Signatures & assets** | `assets` (logos, seals, watermarks), `user_signature_assets`, `company_default_signatory`, `document_type_signatories` |
@@ -820,7 +820,7 @@ Order of checks inside `send()`:
 
 | # | Check | Effect | Applies to security e-mails (2FA codes, password reset)? |
 |---|---|---|---|
-| 1 | **Admin › E-mail settings (D-280)** — the e-mail's kind and audience (`EmailPolicy::holdReason`, Node `emailPolicy.js`): a MUST e-mail always goes; a buyer or supplier e-mail is held while **Testing mode** (`company_settings.email_testing_mode = 1`) is on; any other e-mail is held when its switch (`email_settings`) is off | Nothing is sent; the full message is written to the error log so staff can send it by hand; `MailSenderService::$lastOutcome` = `held`. With buyer document e-mails held, approved documents count as sent (`markSentIfMailDisabled`). | MUST kinds are never held |
+| 1 | **Settings › E-mail (D-280)** — the e-mail's kind and audience (`EmailPolicy::holdReason`, Node `emailPolicy.js`): a MUST e-mail always goes; a buyer or supplier e-mail is held while **Testing mode** (`company_settings.email_testing_mode = 1`) is on; any other e-mail is held when its switch (`email_settings`) is off | Nothing is sent; the full message is written to the error log so staff can send it by hand; `MailSenderService::$lastOutcome` = `held`. With buyer document e-mails held, approved documents count as sent (`markSentIfMailDisabled`). | MUST kinds are never held |
 | 2 | **Test Mode** (`TestModeService::resolveEmailRecipient`) | Redirects to the Test Mode address; if none is set, the mail is **not** sent at all | No |
 | 3 | **Mail redirect** (`MailRedirectService`: `mail_redirect_enabled`, `mail_redirect_address`) | Rehearse real mail without Test Mode: all business mail goes to one address | No |
 | 4 | **CC list** (`mail_cc_emails`, `mail_default_cc_email`) | Added to every business mail | No |
@@ -835,7 +835,7 @@ Order of checks inside `send()`:
 
 Payment-request e-mails include the Payment Action Link paragraph. Sending the OC starts the 48-hour acknowledgment clock.
 
-**Admin › E-mail settings (D-280, 11 Nov 2026; `/admin/email-settings`, permission `manage_company_settings`).** One row per e-mail kind, one switch per audience (Staff, Associate, Buyer, Supplier); stored in `email_settings` (kind, audience, is_enabled). Every save needs a reason and is audit-logged (`EMAIL_SETTING_CHANGED`, `EMAIL_TESTING_MODE_CHANGED`). The kinds are listed once in `EmailPolicy::KINDS` / `emailPolicy.KINDS`:
+**Settings › E-mail (D-280, 11 Nov 2026; `/admin/email-settings`, permission `manage_company_settings`).** One row per e-mail kind, one switch per audience (Staff, Associate, Buyer, Supplier); stored in `email_settings` (kind, audience, is_enabled). Every save needs a reason and is audit-logged (`EMAIL_SETTING_CHANGED`, `EMAIL_TESTING_MODE_CHANGED`). The kinds are listed once in `EmailPolicy::KINDS` / `emailPolicy.KINDS`:
 
 | Group | Kind (tier per audience) |
 |---|---|
@@ -872,7 +872,7 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 | Part | Code (PHP; Node has the camelCase twin) | Notes |
 |---|---|---|
 | Hard switches | `.env` `ZOHO_INTEGRATION_ENABLED`, `ZOHO_ENVIRONMENT` (`test`/`production`), `ZOHO_EINVOICE_ENABLED`; `ZohoGuard::assertRequestAllowed()` on every request | Missing/unknown value = off / test / off. No screen can change them. In `test`, only customers named `TEST-…` may be sent; in `production`, test and sample orders are never sent. |
-| Soft switches | Admin › Settings › Zoho Books: credentials (shown masked, `SecretSetting`), `zoho_books_enabled`, go-live date `zoho_books_sync_start_date`, `zoho_sync_clients`, `zoho_sync_products` (off) | Production sends nothing until the go-live date is set. |
+| Soft switches | Settings › Zoho: credentials (shown masked, `SecretSetting`), `zoho_books_enabled`, go-live date `zoho_books_sync_start_date`, `zoho_sync_clients`, `zoho_sync_products` (off) | Production sends nothing until the go-live date is set. |
 | API client | `ZohoBooksService` (OAuth self-client, `zoho.in` data centre by default); `setTransport()` lets tests use a fake Zoho | Looks a record up by its reference before posting, so a retry never duplicates (ZOH-2). |
 | Limits | `ZohoApiBudget`: `zoho_api_daily_limit` 800, `zoho_api_minute_limit` 30; one shared encrypted token for 50 min (`zoho_token_cache`); "too many requests" stops the run (D-239) | Usage shown on the Zoho Books Sync page. |
 | Running | `CaSyncService::fullSync` (hourly cron), *Sync now*, *Sync this order* (`POST /orders/{id}/zoho-sync`); `ZohoSyncLock` one run at a time; `DivisionZohoSync` for DOM/IMP/MTT | |
@@ -890,8 +890,8 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 |---|---|---|
 | **Passwords** | `AuthService`, `bcrypt` (Node) / `password_hash` (PHP) | Password checked *before* revealing account state (AUTH-04/05); dummy hash for unknown e-mails. Expiry (`password_expiry_days`) and forced change on first login / reset. |
 | **Lockout** | `login_attempts`, `failed_login_lockout_count` (5), `lockout_duration_minutes` (15) | Failed attempt recorded before counting (L-03). |
-| **Login code (D-265, 7 Nov 2026)** | `TwoFactorService`, `BackupCodeService`, `RememberBrowserService` (Node `twoFactorService.js`, `backupCodeService.js`, `rememberBrowserService.js`); tables `two_fa_backup_codes`, `login_remembered_browsers`; setting `login_remember_browser_days` | **Every staff member (every role) and every buyer** enters a 6-digit code e-mailed after the password, at every login. Mandatory: it cannot be switched off per person (`users.two_fa_enabled` / `two_fa_method` are no longer read; the Users list shows "Required"). Valid 10 minutes, 5 tries (then sign in again), "Send me a new code" at most once a minute; always e-mail (SMS stays off); sent as security mail, so it goes out even when business e-mail is switched off and is never redirected. Each portal has its own pending slot (`_2fa_pending` staff, `_client_2fa_pending` buyer). Staff: `/2fa`, `/2fa/resend`, `/2fa/backup`; buyers: `/client/login/code`, `/client/login/code/resend`. Staff "Log in as this client" is unaffected. **Emergency backup codes:** an effective Super Admin or anyone holding `manage_company_settings` (MD, ED, Admin) can make 10 one-time codes on My Account (current password needed; shown once; stored hashed; a new set replaces the old) and use one on the code screen ("Use a backup code instead", shown only to them; counts against the same 5 tries). Each use is audited (`LOGIN_BACKUP_CODE_USED`) and every `manage_company_settings` holder gets an in-app notice and e-mail. **"This is my own office computer" (D-283, was "Remember this browser"):** Admin › Settings › Security › `login_remember_browser_days` (default 30, 0–90; 0 = off). When above 0, staff (never buyers or associates) may tick "This is my own office computer" on the code screen: an HttpOnly, SameSite=Lax, Secure-except-local cookie `nexacrest_trusted_browser` (`selector.validator.HMAC` signed with `APP_ENCRYPTION_KEY`) skips the code on that browser for that person only; the server keeps a SHA-256 of the validator and the person's `session_version`. A password change or reset deletes the rows and bumps `session_version`; setting the days to 0 ends every remembered browser; "Forget all remembered computers" on My Account (own) and in Users › Edit (Admin, `manage_users`) deletes them too (`LOGIN_BROWSERS_FORGOTTEN`). In `APP_ENV=local` the code is shown on screen. Associates keep their own e-mailed code (unchanged). |
-| **Sessions (D-283, 11 Nov 2026)** | `SessionTimeouts` (Node `sessionTimeouts.js`), `bootstrap.php` / `server.js`, the three auth middlewares, app.js `initIdleWarning` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax. Idle timeouts per area from Admin › Settings › Security: staff `session_timeout_staff_minutes` 240, buyers `session_timeout_client_minutes` 120, associates `session_timeout_associate_minutes` 120 (5–1440); staff also signed out `session_absolute_staff_hours` (12, 1–24) after sign-in however active. PHP: `session.gc_maxlifetime` and the cookie lifetime follow the longest timeout (+5 min), session files live in `storage/sessions` (no host clean-up at ~24 min), the cookie is re-sent on every request. Node: `cookie.maxAge` = longest timeout, `rolling: true`, so the MySQL session store keeps the session as long. Every signed-in page carries `<meta name="session-idle">`; 2 minutes before the end app.js shows "You will be signed out soon" with **Stay logged in** (POST `/keep-alive`, `/client/keep-alive`, `/associate/keep-alive`); the 12-hour limit can only be warned about. `session_regenerate_id` at login; the idle clock starts at login. |
+| **Login code (D-265, 7 Nov 2026)** | `TwoFactorService`, `BackupCodeService`, `RememberBrowserService` (Node `twoFactorService.js`, `backupCodeService.js`, `rememberBrowserService.js`); tables `two_fa_backup_codes`, `login_remembered_browsers`; setting `login_remember_browser_days` | **Every staff member (every role) and every buyer** enters a 6-digit code e-mailed after the password, at every login. Mandatory: it cannot be switched off per person (`users.two_fa_enabled` / `two_fa_method` are no longer read; the Users list shows "Required"). Valid 10 minutes, 5 tries (then sign in again), "Send me a new code" at most once a minute; always e-mail (SMS stays off); sent as security mail, so it goes out even when business e-mail is switched off and is never redirected. Each portal has its own pending slot (`_2fa_pending` staff, `_client_2fa_pending` buyer). Staff: `/2fa`, `/2fa/resend`, `/2fa/backup`; buyers: `/client/login/code`, `/client/login/code/resend`. Staff "Log in as this client" is unaffected. **Emergency backup codes:** an effective Super Admin or anyone holding `manage_company_settings` (MD, ED, Admin) can make 10 one-time codes on My Account (current password needed; shown once; stored hashed; a new set replaces the old) and use one on the code screen ("Use a backup code instead", shown only to them; counts against the same 5 tries). Each use is audited (`LOGIN_BACKUP_CODE_USED`) and every `manage_company_settings` holder gets an in-app notice and e-mail. **"This is my own office computer" (D-283, was "Remember this browser"):** Settings › Security › `login_remember_browser_days` (default 30, 0–90; 0 = off). When above 0, staff (never buyers or associates) may tick "This is my own office computer" on the code screen: an HttpOnly, SameSite=Lax, Secure-except-local cookie `nexacrest_trusted_browser` (`selector.validator.HMAC` signed with `APP_ENCRYPTION_KEY`) skips the code on that browser for that person only; the server keeps a SHA-256 of the validator and the person's `session_version`. A password change or reset deletes the rows and bumps `session_version`; setting the days to 0 ends every remembered browser; "Forget all remembered computers" on My Account (own) and in Users › Edit (Admin, `manage_users`) deletes them too (`LOGIN_BROWSERS_FORGOTTEN`). In `APP_ENV=local` the code is shown on screen. Associates keep their own e-mailed code (unchanged). |
+| **Sessions (D-283, 11 Nov 2026)** | `SessionTimeouts` (Node `sessionTimeouts.js`), `bootstrap.php` / `server.js`, the three auth middlewares, app.js `initIdleWarning` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax. Idle timeouts per area from Settings › Security: staff `session_timeout_staff_minutes` 240, buyers `session_timeout_client_minutes` 120, associates `session_timeout_associate_minutes` 120 (5–1440); staff also signed out `session_absolute_staff_hours` (12, 1–24) after sign-in however active. PHP: `session.gc_maxlifetime` and the cookie lifetime follow the longest timeout (+5 min), session files live in `storage/sessions` (no host clean-up at ~24 min), the cookie is re-sent on every request. Node: `cookie.maxAge` = longest timeout, `rolling: true`, so the MySQL session store keeps the session as long. Every signed-in page carries `<meta name="session-idle">`; 2 minutes before the end app.js shows "You will be signed out soon" with **Stay logged in** (POST `/keep-alive`, `/client/keep-alive`, `/associate/keep-alive`); the 12-hour limit can only be warned about. `session_regenerate_id` at login; the idle clock starts at login. |
 | **Session versioning** | `users.session_version` | Saved at login; compared on every request; a password change bumps it so every other session (a stolen one too) is logged out (L-26). Deactivation also logs out at once (AUTH-10). |
 | **CSRF** | `Helpers/Csrf` + `Middleware/CsrfCheck` (Node `helpers/csrf.js`, `middleware/csrfCheck.js`) | One random 64-hex token per session, hidden field `_csrf`, `hash_equals` check on every POST route. A failed check redirects to the right login page; an over-size upload gives a clear 413 instead (UP-03). |
 | **RBAC** | `permissions`, `role_permissions`, `user_permissions`; `PermissionCheck` per route; `PermissionService::can()` in views | Plus `OrderAccessService` (one guard on every `/orders/{id}/*` route), `MoneyVisibility`, `GrantGuard`, `MakerCheckerGuard` / `SelfApprovalRules`. Route coverage is tested (`RouteMatrixTest`, `UngatedRoutesTest`). |
@@ -931,7 +931,7 @@ Owner decision **D-260** (6 Nov 2026): keep everything **10 years**; a backup is
 | `backup_test_restore.sh` | Checks checksum, decrypts, loads the newest copy into a **separate scratch database**, counts tables, drops it; checks the newest archive opens | 04:00 on the 1st |
 | `backup_lib.sh` | Shared functions | — |
 
-Retention: database copies older than 120 days thinned to one per month; documents never need thinning. `BACKUP_DIR` must be outside the web root and outside `STORAGE_BASE_PATH` (scripts refuse otherwise). The encryption key file is `chmod 600`, and a copy must be kept away from the server. Off-site copy via `rclone copy --immutable` once `BACKUP_OFFSITE_TARGET` is set (not chosen yet). **Admin › Backups** (`manage_company_settings`: Admin, MD, ED, System Administrator; read-only, `BackupStatusService`) shows the last runs; the daily digest warns if a copy is older than 26 hours, failed, not encrypted, or the test-restore is older than 35 days. Restoring is manual: SOP 32 and §12.3 (set-up and restore steps). Self-test `bash scripts/tests/backup_scripts_test.sh` (also run by `BackupFacilityTest` / Jest).
+Retention: database copies older than 120 days thinned to one per month; documents never need thinning. `BACKUP_DIR` must be outside the web root and outside `STORAGE_BASE_PATH` (scripts refuse otherwise). The encryption key file is `chmod 600`, and a copy must be kept away from the server. Off-site copy via `rclone copy --immutable` once `BACKUP_OFFSITE_TARGET` is set (not chosen yet). **Settings › Backups** (`manage_company_settings`: Admin, MD, ED, System Administrator; read-only, `BackupStatusService`) shows the last runs; the daily digest warns if a copy is older than 26 hours, failed, not encrypted, or the test-restore is older than 35 days. Restoring is manual: SOP 32 and §12.3 (set-up and restore steps). Self-test `bash scripts/tests/backup_scripts_test.sh` (also run by `BackupFacilityTest` / Jest).
 
 ### 3.16 Where to look first (quick map)
 
@@ -1042,7 +1042,7 @@ Compliance Executive/Manager/Director.
 Generated from the seed (`permissions` + `role_permissions`), grouped by the
 `category` column. "What it allows" is the first sentence of the seeded
 description. A Super Admin holds every key regardless of this table. Admin
-can change any role's ticks in **Admin › Permissions**
+can change any role's ticks in **Users & roles › Roles and permissions**
 (`/admin/permissions`), subject to the "nobody raises their own rights" rule
 (4.5).
 
@@ -1231,17 +1231,17 @@ division EXP (Export); the others are company-level (seed line
 1. `department_designations` — the ladder above. Each row has a `level`
    (executive / manager / director / other), a `role_id`, an
    `approval_limit_inr` (purchasing) and `incentive_eligible` (D-259).
-   Managed in **Admin › Departments** (`/admin/departments`,
+   Managed in **Users & roles › Departments** (`/admin/departments`,
    `manage_permissions`).
 2. `designations` — the **signatory titles** printed under a signature on
    documents (seed: "Director", "Founder & Managing Director", "Founder &
-   Executive Director"). Managed in **Admin › Signatories**
+   Executive Director"). Managed in **Settings › Documents › Signatories**
    (`manage_signatories`), with `user_signature_assets` and
    `document_type_signatories` (per document type default; the AMD defaults
    to the MD, D-067).
 
 **Memberships.** `user_department_memberships` (user, designation,
-`starts_on`, `ends_on`, `is_default`). Added and ended on **Admin › Users →
+`starts_on`, `ends_on`, `is_default`). Added and ended on **Users & roles › Users →
 Edit › Departments**. An ended membership stays on record; from the next
 day it cannot be chosen, and if someone is working in it at that moment it
 stops at once.
@@ -1261,7 +1261,7 @@ Node `app/src/services/activeDepartmentService.js`), controller
 `DepartmentController` / `departmentController.js`, admin pages
 `DepartmentAdminController` / `departmentAdminController.js`.
 
-**"Preview as" (view-only).** On Admin › Departments, a holder of
+**"Preview as" (view-only).** On Users & roles › Departments, a holder of
 `manage_permissions` presses **Preview the app as this**
 (`POST /admin/preview-as`). The app is shown exactly as that designation
 sees it: the admin's own extra rights, Super Admin bypass and personal
@@ -1270,7 +1270,7 @@ look-only (D-258, 6 Nov 2026):** `SessionAuth` refuses every POST except
 `/preview/exit` and `/logout` with "You are previewing the app: nothing can
 be saved during a preview."
 
-**Personal exceptions.** Admin › Permissions › *Grant an extra permission*
+**Personal exceptions.** Users & roles › Roles and permissions › *Grant an extra permission*
 writes `user_permissions` with a reason and an optional **Until** date
 (`expires_at`). After that date it is listed as "ended" and no longer
 applies. Use it rarely, e.g. letting one Logistics person download the
@@ -1324,7 +1324,7 @@ made directly in the database by the owner's instruction.
 `makerCheckerGuard.js`) reading `self_approval_rules` via
 `SelfApprovalRules`.
 
-**Admin › Self-approval rules** (`/admin/self-approval`, Super Admins only)
+**Users & roles › Self-approval rules** (`/admin/self-approval`, Super Admins only)
 lists eight rules. For each, tick the roles whose holders may approve their
 **own** work. A person qualifies when any of their own roles (main role,
 acting department, any membership) is ticked. Seed default for every rule:
@@ -1411,7 +1411,7 @@ departments have a division (empty = company level).
 - Everyone else sees only their own division's orders, clients, reports,
   counts, tasks, files and CSV exports.
 - **While only one division is active nothing shows:** no switcher, no
-  Division filter or field. Admin › Divisions (`manage_divisions`: Admin,
+  Division filter or field. Settings › Divisions (`manage_divisions`: Admin,
   MD) is the only visible place.
 - Staff placed in a division that is not active can look but not save.
 - Code: `DivisionService` (PHP/Node), `DivisionController` /
@@ -1435,7 +1435,7 @@ report.", and Order Profitability needs `manage_order_financials`. With the
 seed set-up an Investor can open the dashboard, the cockpit, Operations
 Queues, Conversion and Disputes — counts and status only. If the owner wants
 investors to see revenue or profit, add `view_selling_prices` (and perhaps
-`view_buyer_payments`) to the role in Admin › Permissions; that is a
+`view_buyer_payments`) to the role in Users & roles › Roles and permissions; that is a
 business decision, not a bug fix.
 
 ### 4.10 The client portal (buyers)
@@ -1634,7 +1634,7 @@ Staff permissions for associates: `manage_associates` (Admin, MD, ED),
 
 ### 4.12 SOP access by role (D-266)
 
-Owner decision D-266 (7 Nov 2026). The SOP / Operations Guide (`/sop`) shows each staff member only the chapters for their work. Service `SopAccessService` / `sopAccessService.js`; screen **Admin › SOP access** (`/admin/sop-access`, link at the top of Company Settings and on the SOP home page for those who manage it).
+Owner decision D-266 (7 Nov 2026). The SOP / Operations Guide (`/sop`) shows each staff member only the chapters for their work. Service `SopAccessService` / `sopAccessService.js`; screen **Users & roles › SOP access** (`/admin/sop-access`, link at the top of Company Settings and on the SOP home page for those who manage it).
 
 | Rule | How |
 |---|---|
@@ -1723,7 +1723,7 @@ Products, Payment Overview and Document Review & Approval (D-029).
 
 - **D-001 — a stage passes only once its own document is finished:**
   approved while buyer document e-mails are held (testing mode, or the
-  switch off in Admin › E-mail settings, D-280), sent while they go out. Internal documents (Supplier PO, BLI)
+  switch off in Settings › E-mail, D-280), sent while they go out. Internal documents (Supplier PO, BLI)
   need approval only. The gate button stays disabled and a note above it
   lists what is missing (D-023). Code:
   `DocumentGenerationService::isDocumentComplete()`.
@@ -2118,7 +2118,7 @@ already issued stay as they are. Tests: `OrderSelfContainedTest` /
 
 ### 5.7 Payment presets
 
-`payment_presets` (Admin › Payment Presets, `manage_payment_presets`). All
+`payment_presets` (Settings › Lists › Payment presets, `manage_payment_presets`). All
 five seeded presets are **protected** — unlock through Field Protection
 first (D-073). Preset names are internal and never shown to the client.
 
@@ -2358,7 +2358,7 @@ the same filters, counts, fields, actions and money rules on both templates
   documents and clause sets; specifications change the price.
 - **Screens.** Products (`/products`), Products › Categories, product page
   (Market prices, Price options (specifications), Pricing ready? checklist),
-  Pricing › Specifications.
+  Products › Pricing › Specifications (D-306: also on the category page, tab "Options and their price effect").
 - **Key rules.**
   - Category **Natural Stone** is fixed; others may have up to 6 attributes
     (e.g. Size, Grade, Colour); empty attributes print "To Be Confirmed" (D-215).
@@ -2390,7 +2390,7 @@ the same filters, counts, fields, actions and money rules on both templates
 
 - **Purpose.** Work out a safe selling price per unit (FOB, USD) from the
   supplier price, and stop anyone selling below it.
-- **Screens.** Admin › Pricing (`/pricing/settings`; MD edits, MD/ED view),
+- **Screens.** Products › Pricing › Pricing settings (`/pricing/settings`; MD edits, MD/ED view),
   product page build-up, Procurement › Market prices
   (`/products/{id}/market-prices`), order Products card **Price check**,
   `/orders/{id}/products/{productId}/price-approval` (MD), Associates →
@@ -2533,7 +2533,7 @@ the same filters, counts, fields, actions and money rules on both templates
     proof / phone call on the registered number / test payment with its bank
     reference (note optional); or **Two people** (first check + verify, as
     before). MD and ED may verify their own entry with a reason
-    (Admin › Self-approval rules › "Bank details", `bank_details`). Wait
+    (Users & roles › Self-approval rules › "Bank details", `bank_details`). Wait
     before use: a **first** account 0 days, a **changed** account 15 days
     (both 0–90; `associate_bank_wait_first_days`,
     `associate_bank_wait_change_days`); until then payments go to the old
@@ -2677,8 +2677,7 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Screens.** Order Steps 9, 10, 13b–13e; Logistics Partner Bills &
   Payments card (every incoterm); Procurement & suppliers › Logistics partners
   (`/logistics-partners`); Settings › Lists › Ports (`/ports`) and Port Routes
-  (`/port-routes`, sailing days used to suggest lead times); Insights →
-  Freight Cost Report (`/reports/freight-cost`, `view_logistics_costs`).
+  (`/port-routes`, sailing days used to suggest lead times); Reports › Freight cost (`/reports/freight-cost`, `view_logistics_costs`).
 - **Key rules.**
   - Partner service types: CHA, Transportation, CHA + Transportation,
     Freight Forwarder (D-087).
@@ -2710,7 +2709,7 @@ the same filters, counts, fields, actions and money rules on both templates
   and sending, keep every revision.
 - **Screens.** Order page: Document Review & Approval (pinned), each step's
   Generate button, All Documents quick links; My Reviews (`/reviews`);
-  Email Send Approvals (`/email-approvals`); Admin › Watermarks, Signatories,
+  Email Send Approvals (`/email-approvals`); Settings › Documents › Watermarks, Signatories,
   Assets, Field Protection; Settings › Document copies clean-up.
 - **Life cycle.** `draft → in_review → approved → sent`, later
   `superseded`. All assigned reviewers approve → the app finalises (swaps
@@ -2760,7 +2759,7 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Screens.** Order page: Payment Overview (Payment Snapshot, Payment
   Ledger, Payment schedule), Steps 5d/5e, 9c/9d, 11c/11d, 7e, 10a, Logistics
   Partner Bills; Reports › Payments, Today's Payments, Ageing, Missing eBRC;
-  Admin › Remittance difference reasons; public Payment Action Link.
+  Settings › Lists › Remittance difference reasons; public Payment Action Link.
 - **Key rules.**
   - Record and clear are different permissions (`manage_payments` vs
     `clear_payments`, D-076); clear only after recording (D-077).
@@ -2916,7 +2915,7 @@ the same filters, counts, fields, actions and money rules on both templates
   on this page.
 - **Who sees a row.** Exactly who could act on it today: the screen's
   permission, the order visibility rule (division, assignment, archived) for
-  order items, and Admin › Self-approval rules (a price you set yourself, terms
+  order items, and Users & roles › Self-approval rules (a price you set yourself, terms
   of an order you created, a send you requested, an amendment or cancellation
   you asked for, an award you made, a payment whose receipts you recorded,
   bank details you entered — only where your role is ticked). Two-people bank
@@ -2959,7 +2958,7 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Purpose.** Hand work from one department to the next without anyone
   remembering to do it.
 - **Screens.** My Tasks (`/my-tasks`), Reports › Management cockpit
-  (`/cockpit`, `view_cockpit`), order side panel **Owners**, Admin › Task
+  (`/cockpit`, `view_cockpit`), order side panel **Owners**, Users & roles › Task
   Due Days (`/admin/task-types`, `manage_task_types`).
 - **Key rules.**
   - Tasks are computed from order state (nothing stored per task): when a
@@ -2984,7 +2983,7 @@ the same filters, counts, fields, actions and money rules on both templates
     Admin and the Order Coordinator choose for any department.
   - Cockpit: open/overdue/escalated per department, orders without an
     owner, orders by status, escalations, late suppliers — counts only.
-    Every active department has a row, in Admin › Departments order, with
+    Every active department has a row, in Users & roles › Departments order, with
     0s when it has no open work (D-269); work of an inactive department
     still shows, after the active ones.
   - **Daily digest** 08:15 IST, one e-mail per person; counts as sent only
@@ -2999,7 +2998,7 @@ the same filters, counts, fields, actions and money rules on both templates
 ### 6.13 E-mail templates
 
 - **Purpose.** Editable wording for every system e-mail.
-- **Screens.** Admin › Email Templates (`/email-templates`,
+- **Screens.** Settings › Documents › Email templates (`/email-templates`,
   `manage_email_templates`); compose/preview from Document Review; Email
   Send Approvals.
 - **Seeded templates (21):** `send_qt`, `send_pi`, `send_oc`, `send_ci`,
@@ -3014,7 +3013,7 @@ the same filters, counts, fields, actions and money rules on both templates
     (`email_log.body_snapshot`).
   - A document is sent with its own template (D-142).
   - Security templates fall back to built-in wording if missing or off.
-  - Admin › E-mail settings (D-280) switches each e-mail per audience; MUST
+  - Settings › E-mail (D-280) switches each e-mail per audience; MUST
     e-mails (login and account access) always go; testing mode
     (`email_testing_mode`, off in seed; replaced `mail_sending_enabled`)
     holds only buyer and supplier e-mails. `mail_approval_queue_enabled`
@@ -3036,7 +3035,7 @@ the same filters, counts, fields, actions and money rules on both templates
   to the app, order by order, without re-typing.
 - **Screens.** CA › Zoho Books Sync (`/ca/zoho-sync`: Sync now, Sync Log,
   "Waiting for Zoho: N"), order "App vs Zoho" check
-  (`/orders/{id}/zoho-check`), Admin › Settings › Zoho Books (test
+  (`/orders/{id}/zoho-check`), Settings › Zoho (test
   connection, `zoho_sync_clients`, `zoho_sync_products`).
 - **What goes.** CI and Debit Note as export invoices (same number and
   date, at the shipping-bill customs rate, D-165/D-166); buyer payments as
@@ -3073,7 +3072,7 @@ the same filters, counts, fields, actions and money rules on both templates
 ### 6.15 Divisions: Domestic Trade, Import & Distribution, Merchant Trade
 
 All three are **built but planned** (D-257): nobody sees them until the MD
-activates the division in Admin › Divisions after the pre-flight checklist.
+activates the division in Settings › Divisions after the pre-flight checklist.
 Export is unchanged. Each keeps its company details when its first
 document is fixed (D-262). Each money entry has a D-212 description and a
 required bank reference. Each goes to Zoho Books with its own mapping.
@@ -3100,7 +3099,7 @@ D-262.
 
 - **Purpose.** Keep an extra, encrypted copy of the database and every
   order document for 10 years, without touching live data (D-260).
-- **Screens.** Admin › Backups (`/admin/backups`,
+- **Screens.** Settings › Backups (`/admin/backups`,
   `manage_company_settings`) — read-only status; BACKUP WARNING in the
   daily digest.
 - **Key rules.** Scripts, schedule, encryption, retention, warnings and
@@ -3163,7 +3162,7 @@ suppliers and Finance & accounts bars — see 6.0):
 
 ### 6.17b Setup checklist (D-312, 11 Nov 2026)
 
-Admin › **Setup Checklist** (`/admin/setup-checklist`, `manage_company_settings`;
+Settings › **Setup checklist** (`/admin/setup-checklist`, `manage_company_settings`;
 the menu entry shows how many items are Needed). Each item shows **Done /
 Needed** (or Optional) with a button to the page where it is set:
 
@@ -3201,7 +3200,7 @@ view `settings/setup_checklist`. SOP 15.
 
 - **Purpose.** Load realistic sample clients and orders to practise on, and
   clear them any number of times, without touching real data.
-- **Screens.** Admin › Sample Data (`/sample-data`, `manage_sample_data`):
+- **Screens.** Settings › Sample data (`/sample-data`, `manage_sample_data`):
   Load / Clear.
 - **What it loads** (fictional companies): Client A with two orders (A1 at
   Stage 1; A2 at Stage 2 with a pending PI intake in PI Intake Review,
@@ -3285,7 +3284,7 @@ With the incentive program **off**, the reserve is 0: staff floor = 1,250.00, st
 
 #### Global settings and per-product overrides
 
-Every %, amount and the buffer has a global value (Admin › Pricing, `pricing_settings`) and an optional override on the product (`catalog_products.pricing_margin_pct`, `pricing_other_cost_mode/value`, `pricing_incentive_mode/value`, `pricing_buffer_pct`). An empty override means "use the global value". The build-up lists the overrides in use ("margin 25%, buffer 5%").
+Every %, amount and the buffer has a global value (Products › Pricing, `pricing_settings`) and an optional override on the product (`catalog_products.pricing_margin_pct`, `pricing_other_cost_mode/value`, `pricing_incentive_mode/value`, `pricing_buffer_pct`). An empty override means "use the global value". The build-up lists the overrides in use ("margin 25%, buffer 5%").
 
 #### Who sees what
 
@@ -3448,7 +3447,7 @@ redirects to the Options tab; the specification actions redirect there too. A pr
 
 Comparisons allow 0.0001 for floating noise.
 
-**MD approval** (`approve()`): reason 10–500 characters; refused if below the minimum; refused if the MD set the price personally and Admin › Self-approval rules (`price_discount`) do not allow it (seeded: MD and ED may self-approve). On approval the line stores who, when, the reason, the approved price and options, `price_approval_commission_zero` (an associate's line earns **0 commission**), and `price_approval_incentive_cut` (shown as an explanation only — the incentive is a % of real profit, which the lower price already reduced, so it is never subtracted twice). **Any later price or option change voids the approval.**
+**MD approval** (`approve()`): reason 10–500 characters; refused if below the minimum; refused if the MD set the price personally and Users & roles › Self-approval rules (`price_discount`) do not allow it (seeded: MD and ED may self-approve). On approval the line stores who, when, the reason, the approved price and options, `price_approval_commission_zero` (an associate's line earns **0 commission**), and `price_approval_incentive_cut` (shown as an explanation only — the incentive is a % of real profit, which the lower price already reduced, so it is never subtracted twice). **Any later price or option change voids the approval.**
 
 **Fixed at PI.** When the PI is issued, `snapshotForPi()` stores each checked line's figures in `order_products.price_snapshot`, and `AssociateCommission::fixLevelAtPi()` fixes the associate's level on the order. Later changes to settings or supplier prices do not move that order. A line filled from a valid associate price request keeps the request's figures.
 
@@ -3514,7 +3513,7 @@ About **section 195** (payments to non-residents): the code has **no section-195
 | Receipts | advance USD 6,000 credited ₹5,04,000; balance USD 14,000 credited ₹11,75,300 after ₹700 bank charges | — |
 | Realised rate | (5,04,000 + 11,75,300 + 700) ÷ 20,000 | ₹84.00 |
 | Commission (INR) | 1,000 × 84.00 | **₹84,000.00** |
-| Fully paid 10 Jan 2027 | due 9 Feb 2027; monthly run day 5 | paid in the run of **5 Mar 2027** |
+| Fully paid 10 Jan 2027 | due 9 Feb 2027; monthly run on the last day of the month (D-292; 28 Feb 2027 is a Sunday → the working day before) | paid in the run of **27 Feb 2027** |
 | TDS (PAN verified, first payout of the FY) | round(84,000 × 2 %) | ₹1,680 |
 | Net | 84,000 − 1,680 | ₹82,320.00 |
 | GST (GSTIN + tax invoice) | 18 % × (82,320 + 1,680) | ₹15,120.00 |
@@ -3642,7 +3641,7 @@ There are four different rates. Do not mix them up.
 
 | Rate | Where it comes from | Used for |
 |---|---|---|
-| **Pricing FX** (`pricing_settings.pricing_fx_rate`, seed 82.0000) | MD, Admin › Pricing. Go-live: today's market ₹/USD minus about 1.5 %, reviewed monthly or when the rupee moves more than 1 %. | Turning supplier ₹ into USD prices. Converting USD-per-unit commission/incentive on non-USD orders. Frozen at PI approval as `orders.pricing_fx_rate_at_pi` (D-262). |
+| **Pricing FX** (`pricing_settings.pricing_fx_rate`, seed 82.0000; since D-301 the daily `fx_rates` rate with `fx_mode` auto) | MD, Products › Pricing › Pricing settings. Automatic (default): the market rate fetched daily at 07:05 IST minus the cushion `fx_cushion_pct` (2 %); a daily change over 2 % waits for the MD. `pricing_fx_rate` is used in Manual mode and until the first fetch. | Turning supplier ₹ into USD prices. Converting USD-per-unit commission/incentive on non-USD orders. Frozen at PI approval as `orders.pricing_fx_rate_at_pi` (D-262). |
 | **Recorded remittance rate** | Worked out: INR credited ÷ foreign amount (D-244). Typed only when "INR not known yet" is ticked. | Revenue, realised rate, D-212 descriptions. |
 | **Bank's rate on the advice** (optional) | Typed from the bank advice. | Checking the INR credited. |
 | **MTT USD rate** (`mtt_usd_inr_rate`, 84.0000) | Merchant Trade division setting. | Merchant margin in USD when neither leg is USD. |
@@ -3695,7 +3694,7 @@ Example: FOB USD 20,000, milestone 2 = 30 % "on loading" → planned USD 6,000; 
 - Per line: taxable = quantity (3 decimals) × rate (2 decimals), rounded to the paisa; each tax rounded to the paisa, half away from zero. Totals are sums of lines. An HSN summary groups by HSN + rate.
 - **Round-off**: the invoice total is rounded to the rupee; the difference is the "round off" line.
 - GSTIN check: format plus the base-36 check character (`isValidGstin`).
-- Rates: Admin › GST rates (`gst_rates`, seed HSN 6802 = 18 %); DOM default `dom_default_gst_rate` 18. To be confirmed by the CA.
+- Rates: Settings › Lists › GST rates (`gst_rates`, seed HSN 6802 = 18 %); DOM default `dom_default_gst_rate` 18. To be confirmed by the CA.
 
 **Worked example 5 (GST).** Line 1: 10.000 × ₹1,234.50; line 2: 3 × ₹999.99; 18 %.
 
@@ -3726,7 +3725,7 @@ landed per unit  = landed ÷ quantity (4 decimals)
 suggested price  = landed per unit ÷ (1 − imp_margin_pct)   (before GST)
 ```
 
-Duty rates: the longest matching HSN prefix in Admin › Import duty rates (seed: 6802 → BCD 20 %, SWS 10 %, IGST 18 %), else IMP defaults (BCD 10, SWS 10, IGST 18). All to be confirmed by the CA and the customs agent. Duty and landed cost are **frozen** when the import moves to "cleared"; goods enter stock at landed cost (weighted average, never below zero).
+Duty rates: the longest matching HSN prefix in Settings › Lists › Import duty (seed: 6802 → BCD 20 %, SWS 10 %, IGST 18 %), else IMP defaults (BCD 10, SWS 10, IGST 18). All to be confirmed by the CA and the customs agent. Duty and landed cost are **frozen** when the import moves to "cleared"; goods enter stock at landed cost (weighted average, never below zero).
 
 **Worked example 6 (import).** 100 units × USD 50 at ₹84.0000; freight ₹20,000; insurance ₹2,000; CHA/port/other ₹15,000; HSN 6802.
 
@@ -3852,7 +3851,7 @@ The client portal lists only customer-facing documents that are approved or sent
 - **Two revision numbers.** `revision_number` counts every generation (Rev.00, Rev.01 …, internal). `client_revision_number` counts how many of this type were actually **sent** to the buyer, so internal re-generation never shows the buyer a jump from Rev.00 to Rev.09.
 - **Approval.** When every assigned reviewer approves (none rejects), the document is finalized automatically: the same revision is re-rendered with the final watermark. Only the latest revision can be approved. An inactive user cannot review; the same reviewer cannot be added twice (D-070).
 - **Superseded.** Approving a revision supersedes every other revision of that type on that order. An approved or sent one is re-rendered with the red **"INVALID DOCUMENT — SUPERSEDED"** watermark and saved as `… (SUPERSEDED).pdf`; a draft or in-review one only changes status. Superseded copies are never deleted.
-- **Sending** (e-mail on): two levels — Level 1 submit, Level 2 approval by someone with `approve_email_send` (never the requester), then the deferred dispatch job. With buyer document e-mails held (testing mode or the switch off in Admin › E-mail settings, D-280), approval **counts as sent** and staff send the PDF themselves. `mail_approval_queue_enabled = 0` removes Level 2.
+- **Sending** (e-mail on): two levels — Level 1 submit, Level 2 approval by someone with `approve_email_send` (never the requester), then the deferred dispatch job. With buyer document e-mails held (testing mode or the switch off in Settings › E-mail, D-280), approval **counts as sent** and staff send the PDF themselves. `mail_approval_queue_enabled = 0` removes Level 2.
 - **Drift.** Regenerating an earlier-stage document flags later documents "may be out of step".
 
 **`render_context_json` (QA batch 3, DOC-2; D-258).** `documents.render_context_json` stores the exact context a revision was rendered from. Approval re-renders and superseded copies are drawn from this stored context, with only the watermark changed — never from today's order data. So the superseded and final copies show what was really issued. Revisions made before 6 Nov 2026 have no stored context and use the older live-data path.
@@ -3927,7 +3926,7 @@ Settings live in database tables (seeded by `docs/seed.sql`, identical keys on b
 
 #### Company Settings (`company_settings`, `/settings`, `manage_company_settings`)
 
-Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are **protected**: editing needs reason + unlock + confirm, and unprotecting needs a peer-approved request (`field_protection_requests`). Since D-313 (11 Nov 2026) the seed carries **placeholders**, not the company's identifiers: corporate office "Corporate office address, City – 000000, India", GSTIN `29AAAAA0000A1ZY` (passes the GSTIN check; state code 29 kept for the domestic GST split), IEC/PAN `AAAAA0000A`, bank "Bank name (to be entered)" / "Branch (to be entered)" / account `000000000000` / IFSC `XXXX0000000` / SWIFT `XXXXINXXXXX` / "Bank branch address, City – 000000, India" / PIN `000000`, LUT `AD000000000000X`, RCMC `RCMC/CAPEXIL/00000/2026-2027`. Admin › Setup checklist (6.17b) flags each as Needed until the real value is entered at installation (Company Settings, Unlock on the protected rows). The Test Mode e-mail is seeded as the company e-mail (`test_mode_settings.test_email`).
+Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are **protected**: editing needs reason + unlock + confirm, and unprotecting needs a peer-approved request (`field_protection_requests`). Since D-313 (11 Nov 2026) the seed carries **placeholders**, not the company's identifiers: corporate office "Corporate office address, City – 000000, India", GSTIN `29AAAAA0000A1ZY` (passes the GSTIN check; state code 29 kept for the domestic GST split), IEC/PAN `AAAAA0000A`, bank "Bank name (to be entered)" / "Branch (to be entered)" / account `000000000000` / IFSC `XXXX0000000` / SWIFT `XXXXINXXXXX` / "Bank branch address, City – 000000, India" / PIN `000000`, LUT `AD000000000000X`, RCMC `RCMC/CAPEXIL/00000/2026-2027`. Settings › Setup checklist (6.17b) flags each as Needed until the real value is entered at installation (Company Settings, Unlock on the protected rows). The Test Mode e-mail is seeded as the company e-mail (`test_mode_settings.test_email`).
 
 | Group | Keys (default) |
 |---|---|
@@ -3952,7 +3951,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 
 | Key | Default | Meaning |
 |---|---|---|
-| `email_testing_mode` | 0 | D-280: Testing mode — hold e-mails to buyers and suppliers (not MUST ones). Set on Admin › E-mail settings with the per-e-mail switches (`email_settings`). With buyer document e-mails held, approval counts as sent. Replaced `mail_sending_enabled`. |
+| `email_testing_mode` | 0 | D-280: Testing mode — hold e-mails to buyers and suppliers (not MUST ones). Set on Settings › E-mail with the per-e-mail switches (`email_settings`). With buyer document e-mails held, approval counts as sent. Replaced `mail_sending_enabled`. |
 | `mail_approval_queue_enabled` | 1 | Level-2 approval for buyer e-mails. |
 | `reply_to_email` | empty | Monitored reply address (falls back to `email`). |
 | `mail_redirect_enabled`, `mail_redirect_address` | 0, empty | Redirect all non-security mail to one address (Super Admin). |
@@ -3965,7 +3964,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 
 `zoho_books_enabled` 0; `zoho_books_client_id`, `_client_secret`, `_refresh_token`, `_organization_id`, `_deposit_account_id` (empty, secrets masked "ends in 1a2b"); `zoho_books_sync_start_date` (go-live date; nothing earlier is sent); `zoho_books_restore_checked_at` (set by the app); `zoho_books_accounts_domain` accounts.zoho.in; `zoho_books_api_domain` www.zohoapis.in; `zoho_sync_clients` 0; `zoho_sync_products` 0; `zoho_api_daily_limit` 800; `zoho_api_minute_limit` 30. Books syncs only when `.env` `ZOHO_INTEGRATION_ENABLED=true` **and** `zoho_books_enabled = 1`. "Test Books Connection" only reads.
 
-#### Pricing (`pricing_settings`, Admin › Pricing, MD only, audited)
+#### Pricing (`pricing_settings`, Products › Pricing, MD only, audited)
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -3982,7 +3981,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 
 Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED). Self-approval rule `bank_details` (MD, ED): verify bank details one entered oneself, with a reason (D-293).
 
-#### Team incentive (`incentive_settings`, `incentive_roles`; Admin › Team Incentives, MD)
+#### Team incentive (`incentive_settings`, `incentive_roles`; Finance & accounts › Team incentive settings, MD)
 
 `program_enabled` **0** (on or off as the owner decides at go-live), `lock_reminder_days` 3. Roles and shares §7.4; caps per role (`cap_per_order_inr`, `cap_per_month_inr`, empty); eligibility per designation and per person (D-259).
 
@@ -4018,7 +4017,7 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 
 Associate access levels (`associate_access_level_settings`, D-261): Starter, Quoting, Full — which portal features each sees (FOB value, commission %, catalogue, Get price, documents …).
 
-#### Divisions (`divisions`, `division_modules`, `division_settings`; Admin › Divisions, MD, `manage_divisions`)
+#### Divisions (`divisions`, `division_modules`, `division_settings`; Settings › Divisions, MD, `manage_divisions`)
 
 EXP Export is active; DOM, MTT, IMP are planned. The switcher appears only when two or more divisions are active.
 
@@ -4030,7 +4029,7 @@ EXP Export is active; DOM, MTT, IMP are planned. The switcher appears only when 
 
 #### GST and duty rates
 
-Admin › GST rates (`gst_rates`; seed HSN 6802 = 18 %) and Admin › Import duty rates (`import_duty_rates`; seed 6802 = BCD 20, SWS 10, IGST 18). Shown once DOM or IMP is active. All starting values to be confirmed by the CA.
+Settings › Lists › GST rates (`gst_rates`; seed HSN 6802 = 18 %) and Settings › Lists › Import duty (`import_duty_rates`; seed 6802 = BCD 20, SWS 10, IGST 18). Shown once DOM or IMP is active. All starting values to be confirmed by the CA.
 
 #### Document copies clean-up (`company_settings`, category `document_cleanup`)
 
@@ -4050,7 +4049,7 @@ Never removed: anything sent to the client, the current copy of every revision, 
 
 `remittance_difference_reasons` — Admin-managed list for "Why is it different?" with treatment bank_charges / short / excess.
 
-#### Backups (Admin › Backups, read only, D-260)
+#### Backups (Settings › Backups, read only, D-260)
 
 The page (`manage_company_settings`) only shows what the jobs report; the rules are the `BACKUP_*` keys in `.env` (§9.2). Schedule, retention and warnings: §3.15. Set-up and restore: §12.3.
 
@@ -4160,7 +4159,7 @@ These rules come from `CLAUDE.md` (project instructions) and register §2 (R1–
 
 **No PII (6 Nov 2026, strict hard rule).** No real person's name, e-mail, phone, personal address, personal ID (PAN/Aadhaar/passport) or signature image named after a person in any file: code, comments, SOPs, READMEs, registers, mockups, seed data, tests, fixtures. Use role placeholders: "Managing Director" / md@email.com, "Executive Director" / ed@email.com, "Admin" / admin@email.com, info@email.com, +91-0000000000. Real values are entered only on the live server (§9.4, or Admin). Any occurrence found is fixed at once. Why: the repository and its documents are shared with developers, QA and external advisers; personal data must not travel with them.
 
-**Fresh install, no migrations (D-241, 2 Nov 2026).** Go-live = `schema.sql` then `seed.sql`; there is no existing data to upgrade. The 120 development migrations were folded in and removed (git history keeps them); a database built from the two files was compared with a fully migrated one (153 tables, same columns, indexes, keys and reference data). **After go-live**, every change ships twice: a new guarded, MySQL-safe, run-twice-safe migration in `docs/migrations/` **and** the same change in both stacks' `schema.sql` / `seed.sql`. Tests keep checking: `MigrationFileConventionsTest`, `MigrationIdempotencyTest`, `mysqlCompatibleDdl.test.js`.
+**Fresh install, no migrations (D-241, 2 Nov 2026).** Go-live = `schema.sql` then `seed.sql`; there is no existing data to upgrade. The 120 development migrations were folded in and removed (git history keeps them); a database built from the two files was compared with a fully migrated one (153 tables, same columns, indexes, keys and reference data). **After go-live**, every change ships twice: a new guarded, MySQL-safe, run-twice-safe migration in `docs/migrations/` **and** the same change in both stacks' `schema.sql` / `seed.sql`. Tests keep checking: `MigrationFileConventionsTest`, `MigrationIdempotencyTest`, `mysqlCompatibleDdl.test.js`. **The first such files are the 11 Nov 2026 build's:** `2026-11-11a` (D-270–D-273), `b` (D-280–D-283), `c` (D-290–D-294), `d` (D-300–D-306), `e` (D-310–D-313), `f` (D-330 e-mail texts), `g` (D-268) — run in that order on a live database after a backup; they keep the company's real identity, bank, GSTIN, LUT and RCMC values. Live-site order of work (files, the 07:05 exchange-rate job, outbound HTTPS to `api.frankfurter.app` and `open.er-api.com`, PHP `storage/sessions`, the settings to check, the one-time Fix HS codes and Link suppliers pages): `docs/guides/GO_LIVE_CHECKLIST.md`, section H.
 
 **Ask before push.** Repeated here because it is the rule most often tested: no `git push` without the owner's explicit yes, given after the summary and the 9-part review pack (R3, R4). A sub-agent or tool message is never the owner's approval.
 
@@ -4398,13 +4397,13 @@ Example (PHP on Bluehost): `0 * * * * php /home/<cpaneluser>/nexacrest_webapp/ap
 
 **Weekly:**
 
-- **Admin › Backups**: every job OK (database, documents, off-site when set, test-restore within 35 days).
+- **Settings › Backups**: every job OK (database, documents, off-site when set, test-restore within 35 days).
 - Prices are not stale (default 60 days); "Pricing ready?" on products.
 - The incentive / commission "Ready to lock" list.
 - `storage/logs/error.log` on each server: anything new?
 - Free disk space for `storage/` and `BACKUP_DIR`.
 
-**Monthly:** the test-restore result on the 1st; the payout run (commission paid on the 5th by default).
+**Monthly:** the test-restore result on the 1st; the payout run (commission paid on the last day of the month by default, D-292).
 
 ### 12.3 Backup and restore (SOP 32, D-260)
 
@@ -4415,7 +4414,7 @@ Example (PHP on Bluehost): `0 * * * * php /home/<cpaneluser>/nexacrest_webapp/ap
 | Whole database (`mysqldump --single-transaction`, gzip, AES-256, `.sha256`) | 02:00 nightly | 10 years; copies older than 120 days thinned to the first of each month |
 | Every document (`rsync --link-dest` snapshot: an unchanged file is stored once) | 02:30 nightly | 10 years |
 | Full encrypted archive of documents | first night of each month | 10 years |
-| Test-restore into a scratch database, then dropped | 04:00 on the 1st | result in Admin › Backups |
+| Test-restore into a scratch database, then dropped | 04:00 on the 1st | result in Settings › Backups |
 
 Why this design: the owner must keep records 9–10 years, the backup must never touch live data, and must not duplicate files. So the scripts only **read** the live system, refuse a `BACKUP_DIR` inside the storage folder, web root or app, never overwrite a backup, and only ever delete files named like a backup inside `BACKUP_DIR`.
 
@@ -4424,7 +4423,7 @@ Why this design: the owner must keep records 9–10 years, the backup must never
 1. `mkdir -p <BACKUP_DIR> && chmod 700 <BACKUP_DIR>`; `openssl rand -base64 48 > <keyfile> && chmod 600 <keyfile>`. **Keep a copy of the key away from the server** — without it no copy can be opened.
 2. In `app/.env`: `BACKUP_DIR`, `BACKUP_KEEP_YEARS=10`, `BACKUP_THIN_AFTER_DAYS=120`, `BACKUP_ENCRYPTION_KEY_FILE`, `BACKUP_OFFSITE_TARGET=` (empty until the owner picks a provider; then an rclone remote, copied with `--immutable`), `BACKUP_RESTORE_TEST_DB` (default `<DB_DATABASE>_restore_test`; on Bluehost create it in cPanel and give the app user rights).
 3. `chmod 700 scripts/*.sh`; add the three cron lines.
-4. Run `backup_db.sh` and `backup_storage.sh` by hand, then `backup_test_restore.sh`; Admin › Backups must show OK for each.
+4. Run `backup_db.sh` and `backup_storage.sh` by hand, then `backup_test_restore.sh`; Settings › Backups must show OK for each.
 
 **Restore** is never automatic and is done by the server administrator on the MD's instruction:
 
@@ -4440,7 +4439,7 @@ Safety rails:
 
 - `ZohoGuard` checks every request. Off → no call at all. `test` → only `TEST-` customers. Production → test and sample orders are skipped; nothing is sent before the go-live date (`zoho_books_sync_start_date`). Government features need production **and** e-invoice both true (D-161, R16).
 - One sync at a time (`ZohoSyncLock`, a database lock). Before posting a payment, expense, cost or journal the app looks it up in Books by reference, so a retry never duplicates (D-258 QA4).
-- API budget (D-239): `zoho_api_daily_limit` 800, `zoho_api_minute_limit` 30 (Admin › Settings › Zoho Books); the sync stops at once on "too many requests". Usage shows on the sync page.
+- API budget (D-239): `zoho_api_daily_limit` 800, `zoho_api_minute_limit` 30 (Settings › Zoho); the sync stops at once on "too many requests". Usage shows on the sync page.
 - Restore check (D-164): at most once every 23 h a scheduled run puts back records deleted or changed in Books; *Sync now* always checks.
 - *Check against Zoho Books* (`/orders/{id}/zoho-check` and the division equivalents) reads only and shows match / not sent / different / missing.
 - **CAFIN never goes to Zoho** (R10).
@@ -4465,7 +4464,7 @@ node src/jobs/zohoCleanupTestRecords.js --apply --by "Admin" --log ../docs/zoho/
 | Em-dashes and ₹ show as garbage | `seed.sql` / a migration loaded without `SET NAMES utf8mb4` | Reload; never remove that line |
 | PHP local: a URL gives 404 | `php -S` started without `_dev_router.php` | `php -S 127.0.0.1:8000 _dev_router.php` |
 | Node: "Document generation failed" | `PUPPETEER_EXECUTABLE_PATH` wrong | Point it at Chromium (`which chromium`); details in `storage/logs/error.log` |
-| No e-mails go out | E-mail sending is **off by default** (D-155), SMTP blank, or the send waits in the approval queue (D-123) | Admin › Settings: e-mail sending; check `SMTP_*`; approve the queue; check the dispatch cron |
+| No e-mails go out | Testing mode on or the e-mail's switch off (Settings › E-mail, D-280 — both off / on in a fresh install), SMTP blank, or the send waits in the approval queue (D-123) | Settings › E-mail: Testing mode and the switches; check `SMTP_*`; approve the queue; check the dispatch cron |
 | E-mails go to the wrong address | Mail redirect or Test Mode is on | Switch off redirect / Test Mode. Security mail (2FA, resets, associate and buyer codes) is never redirected (MAIL-13) |
 | Records not in Zoho | Hourly sync not installed; before the go-live date; Zoho off; a TEST/sample order in production | Install the cron; set `zoho_books_sync_start_date`; read the Sync Log row |
 | "Another sync is running" | `ZohoSyncLock` | Wait for the running sync; one Sync Log row records the stop |
@@ -4476,7 +4475,7 @@ node src/jobs/zohoCleanupTestRecords.js --apply --by "Admin" --log ../docs/zoho/
 | Node jobs run twice | Both cron and `RUN_JOBS_IN_PROCESS=true` | Pick one |
 | Alert / digest times are wrong | Cron runs in UTC | `CRON_TZ=Asia/Kolkata` or convert the times |
 | Users see old JS after a deploy | — | Should not happen: `app.js`/`app.css` carry a version stamp (D-189); hard-refresh if a proxy cached it |
-| Admin › Backups says "Not set up" | `BACKUP_DIR` empty, or the folder is inside storage / web root | Fix `app/.env`; the script refuses unsafe folders |
+| Settings › Backups says "Not set up" | `BACKUP_DIR` empty, or the folder is inside storage / web root | Fix `app/.env`; the script refuses unsafe folders |
 | Locked out after failed logins | Account lockout | An admin resets; check `login_attempts` |
 
 ### 12.6 Logs
@@ -4486,7 +4485,7 @@ node src/jobs/zohoCleanupTestRecords.js --apply --by "Admin" --log ../docs/zoho/
 | Application error log | `storage/logs/error.log` on **both** stacks (PHP `app/bootstrap.php`; Node `src/helpers/logger.js`) | Uncaught exceptions, fatal errors, DB connection failures, e-mail attempts on PHP. Not shown on screen in production. |
 | Node process output | `pm2 logs nexacrest` (or the file you redirect to) | Startup lines, `console.error` from e-mail on Node |
 | Cron / job logs | wherever the cron line redirects: e.g. `~/logs/zoho_sync.log` (Bluehost) or `/var/log/nexacrest/*.log` (VPS) | One summary line per run |
-| Backup logs | `backup_db.log`, `backup_storage.log`, `backup_test_restore.log` | Each run; Admin › Backups shows the last result |
+| Backup logs | `backup_db.log`, `backup_storage.log`, `backup_test_restore.log` | Each run; Settings › Backups shows the last result |
 | Audit log | in the app: `/audit-log` and each order's audit log (`audit_log` table) | Every core action, denial (`PERMISSION_DENIED`), override, unlock, download of CAFIN. Amounts masked for people without the money permission (D-229) |
 | Zoho Sync Log | `/ca/zoho-sync` (`zoho_sync_log`) | Every sync part, success or failure, skipped parts |
 | E-mail log | the e-mail approval pages (`email_log`) | Queued, approved, sent, failed |
@@ -4509,7 +4508,7 @@ The full register is `docs/decisions/owner-decisions-register.md` (about 260 dec
 | **Every money record has a correct description.** Built from the facts (what, which order and party, what it settles, bank reference); staff notes only add; money forms refuse to save without the bank reference. Same text in Zoho. | The CA and auditors must understand every entry years later without asking. | D-212 (hard rule) |
 | **Divisions hidden until two are active.** Export is the only active division; DOM, IMP and MTT are built but `planned`. The switcher, report Division filter and user Division field appear only once two divisions are active. | Prepare for new businesses without changing anything for today's Export users. | D-257 (0A), D-257 (5) |
 | **Stages pass only on approved documents, in order.** "One door at a time." | Export compliance and payment safety: no shipment before money and paperwork are right. | D-001–D-027 |
-| **Maker-checker.** A different person approves what someone made; recording and clearing a payment are different people. Self-approval only where Admin › Self-approval rules allow. | Fraud and error control. | D-117, D-076, D-221 |
+| **Maker-checker.** A different person approves what someone made; recording and clearing a payment are different people. Self-approval only where Users & roles › Self-approval rules allow. | Fraud and error control. | D-117, D-076, D-221 |
 | **Zoho is optional and fenced off.** With Zoho off the app works exactly the same; nothing from testing reaches GST/government portals. | Books is the CA's ledger, but the business must never stop because of an integration. | R16, D-161, D-163 |
 | **Mail only when someone must act.** No audit-log e-mails; mail sending off by default; two-level send approval on by default. | One order once produced about 90 e-mails. | D-135, D-155, D-123 |
 | **Mockups first, documents double-confirmed.** | The owner wants to see before building; client-facing documents are legal papers and are correct as they are. | R6, R7, R8 |
@@ -4628,19 +4627,19 @@ Other open points needing outside answers: O-11 (workflow specification §13 que
 |---|---|---|
 | md@email.com, ed@email.com, "Managing Director" | `users` (protected founder accounts), `company_settings.md_name`, `director_name`, asset names | Real names / e-mails via the real-values SQL (§12.1) |
 | info@email.com, +91-0000000000, "Registered office address, City – 000000, India" | `company_settings` `email`, `phone`, `registered_office` | Real company values |
-| Corporate office, GSTIN, IEC/PAN, bank, LUT and RCMC placeholders (D-313) | `company_settings` | The company's real values — Admin › Setup checklist lists every one still Needed |
+| Corporate office, GSTIN, IEC/PAN, bank, LUT and RCMC placeholders (D-313) | `company_settings` | The company's real values — Settings › Setup checklist lists every one still Needed |
 | Password `ChangeMe#2026` (both seeded Super Admins) | seed | Forced change at first login; deactivate the second if not needed |
 | `__STORAGE_BASE_PATH__` | `assets`, `user_signature_assets`, `reference_library_documents` | The absolute storage path |
 | LUT expiry and RCMC valid-until 31 Mar 2027 | `company_settings` | Confirm |
 | ECGC policy number / valid-to | empty | Fill only if there is a policy |
-| `pricing_fx_rate` 82.00 | Admin › Pricing | Today's market rate minus about 1.5% |
-| Other costs to FOB 2.5% | Admin › Pricing | Real figure from the first 3–5 shipments |
+| `pricing_fx_rate` 82.00 | Products › Pricing › Pricing settings | Used only in Manual mode and until the first daily fetch (D-301) — press **Fetch now** on go-live day |
+| Other costs to FOB 2.5% | Products › Pricing | Real figure from the first 3–5 shipments |
 | Logo, MD signature, seal, watermark | `/company-assets` | Real images (placeholders are labelled graphics) |
 | `APP_ENCRYPTION_KEY`, `SESSION_SECRET_KEY` | `.env` | Fresh random values |
 | `zoho_books_sync_start_date` | Settings | The go-live date (nothing is sent in production until set) |
 | `BACKUP_OFFSITE_TARGET` | `.env` | When the owner picks a provider |
-| Division settings "to be confirmed" | Admin › Divisions | CA / bank answers before activating a division |
-| General / engineering T&C wording | Admin › Overrides | Lawyer's wording before the first non-stone sale |
+| Division settings "to be confirmed" | Settings › Divisions | CA / bank answers before activating a division |
+| General / engineering T&C wording | Settings › Admin overrides | Lawyer's wording before the first non-stone sale |
 | Dev-only credentials (e.g. the e2e default DB password) | `e2e/`, dev `.env` | Never used on live |
 
 ### 14.5 Open questions
@@ -4668,8 +4667,8 @@ Every recipe below follows the change checklist in §16: both stacks, both templ
 
 1. Get the CA / bank / lawyer answers for that division (§14.3) and put them into the division's settings.
 2. Zoho: create and confirm the needed accounts in the live Books organisation.
-3. Admin › Departments: set the Division of the departments that will work in it. Admin › Users: set the Division of its staff (company-level people stay "Company level").
-4. Admin › Divisions › (division): tick its modules; add its own settings — at least `order_ref_format` and every value that differs from Export.
+3. Users & roles › Departments: set the Division of the departments that will work in it. Users & roles › Users: set the Division of its staff (company-level people stay "Company level").
+4. Settings › Divisions › (division): tick its modules; add its own settings — at least `order_ref_format` and every value that differs from Export.
 5. Work through **Before activating** (departments, staff, number format, modules, settings), tick the confirmation and press **Activate** (MD, `manage_divisions`; audit-logged).
 6. From now on the division switcher, "All divisions", the report Division filter, the user/department Division field, the Zoho division tag and the Profit-by-division section appear. Test a full record in that division in Test Mode first.
 7. A division with no orders can be set back to planned. Export always stays active.
@@ -4689,8 +4688,8 @@ Every recipe below follows the change checklist in §16: both stacks, both templ
 
 1. **Products › Categories** → add the category (needs *Manage product catalogue*). Add its attributes (e.g. Material, Size) — these print as the document columns.
 2. **Settings: <category>**: default unit, allowed units, default HS code (from the HS master list), packing type, quality documents (max 10), T&C clause set.
-3. Check list values: units, supplier types, package types (Admin › Dropdowns).
-4. Clause set: if none fits, add clauses in Admin › Overrides with the set. **The general and engineering wording is a starting text — the lawyer reviews it before the first sale** (Lawyer_questions §B).
+3. Check list values: units, supplier types, package types (Settings › Lists › Dropdown lists).
+4. Clause set: if none fits, add clauses in Settings › Admin overrides with the set. **The general and engineering wording is a starting text — the lawyer reviews it before the first sale** (Lawyer_questions §B).
 5. Specifications and pricing (SOP 27): options that change the price (per piece / kg / set), CBM rule, supplier prices, "Pricing ready?" all ✓, associate access to the category.
 6. Run `StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged` — Natural Stone must not change.
 7. Generate every document for a sample order of the new category in Test Mode and show the owner; any change to how a category prints is a document change (R6).
@@ -4718,7 +4717,7 @@ No code is needed for a category that fits the existing profile (`CategoryDocume
 4. If it is a money permission, wire it into `MoneyVisibility` (pages, files, CSVs, audit masking).
 5. Tests: `RouteMatrixTest` / `routeMatrix` pick the gate up; add behaviour tests for "with" and "without"; run the roles/permissions matrix e2e. `GrantGuard` already stops people granting what they do not hold.
 
-**Role:** a `roles` row and its grants (migration + seed); place it under a department and designation (Admin › Departments) (D-214); add it to `e2e/seed-ui-test-users.sql` and `e2e/tests/support/auth.js` if e2e should cover it; the money matrix picks every seeded role up. Decide money classes and `see_all_divisions` deliberately.
+**Role:** a `roles` row and its grants (migration + seed); place it under a department and designation (Users & roles › Departments) (D-214); add it to `e2e/seed-ui-test-users.sql` and `e2e/tests/support/auth.js` if e2e should cover it; the money matrix picks every seeded role up. Decide money classes and `see_all_divisions` deliberately.
 
 ### 15.5 Add a report
 

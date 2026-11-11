@@ -27,8 +27,7 @@ two left-menu entries, each with its own menu bar at the top of its pages
   **Suppliers** and **Logistics partners** in **Procurement & suppliers**;
   **Team incentives** in **Finance & accounts**.
 
-Where this manual still says "Admin → X", look for X in these two menu bars
-(or in the section named above).
+Since 11 Nov 2026 every chapter of this manual uses these menu names; the old "Admin → X" paths are gone.
 
 ## The system does this automatically
 
@@ -48,7 +47,7 @@ Where this manual still says "Admin → X", look for X in these two menu bars
 
 Every staff member, in every role, and every buyer enters a 6-digit code
 e-mailed at each login. It cannot be switched off for anyone; the Users list
-shows "2FA: Required". Admin's only choice is **Admin → Settings → Security →
+shows "2FA: Required". Admin's only choice is **Settings › Security →
 `login_remember_browser_days`** (default **30**, 0–90; 0 = the code at every
 login). Above 0, staff (never buyers or associates) see **"This is my own
 office computer"** on the code screen and skip the code on that computer for
@@ -59,7 +58,7 @@ in Users → Edit (both audit-logged).
 
 ### Staying logged in (owner, 11 Nov 2026, D-283)
 
-**Admin → Settings → Security** has one idle timeout per area:
+**Settings › Security** has one idle timeout per area:
 `session_timeout_staff_minutes` (**240** = 4 hours), `session_timeout_client_minutes`
 (buyers, **120**) and `session_timeout_associate_minutes` (associates, **120**),
 each 5 to 1440 minutes; and `session_absolute_staff_hours` (**12**, 1 to 24):
@@ -70,7 +69,7 @@ soon" with **Stay logged in**; before the 12-hour limit it only warns.
 
 ### E-mail settings (owner, 11 Nov 2026, D-280 / D-281)
 
-**Admin → E-mail settings** lists every e-mail the app sends, with one switch
+**Settings › E-mail** lists every e-mail the app sends, with one switch
 per audience (Staff, Associate, Buyer, Supplier). Saving needs a reason and is
 in the Audit Log.
 
@@ -114,9 +113,9 @@ reset that person's password at once (Users → Reset password).
 
 ### Roles & Permissions
 
-> **Departments come first (D-214).** Most access is now given by adding a person to a department on their user page — see [Departments & Log in as](./21-departments.md). Edit a role's permissions only when a designation's rights themselves change. **Admin → Departments** lists every department and the role behind each designation.
+> **Departments come first (D-214).** Most access is now given by adding a person to a department on their user page — see [Departments & Log in as](./21-departments.md). Edit a role's permissions only when a designation's rights themselves change. **Users & roles › Departments** lists every department and the role behind each designation.
 
-Sidebar: **Admin → Permissions**. Create, edit, or delete roles; edit which permissions a role has; or grant
+Left menu: **Users & roles › Roles and permissions**. Create, edit, or delete roles; edit which permissions a role has; or grant
 one specific person an extra permission beyond what their role normally
 gives them (with a mandatory, logged reason):
 
@@ -148,7 +147,7 @@ order rule — covers every page and action of that order too (editing,
 Annexure A, amendments, the Full Report, its document and file
 downloads), not only its main page (QA Round 5). Links and buttons a
 person's permissions don't allow are no longer shown to them at all —
-on the order page, in the sidebar, and in the SOP / Getting Started text
+on the order page, in the left menu and menu bars, and in the SOP / Getting Started text
 (a link there turns into plain text). An order can have more than one
 assignee at once: for example an Export Executive handling office/
 documentation work and a Logistics Executive handling CHA/factory work
@@ -240,7 +239,7 @@ sees "Someone else must verify details you entered."
 ### Products & pricing (owner decision D-245)
 
 Pricing (margin, buffer, pricing exchange rate, team-incentive reserve, stale days, and
-"Goods lines must be picked from Products" — on by default) is set under **Admin → Pricing**
+"Goods lines must be picked from Products" — on by default) is set under **Products › Pricing › Pricing settings**
 (MD only) — see [Pricing](./27-pricing.md). The D-240 reference-price
 note settings and the "Approve price discount" permission were removed by D-245 P2.
 
@@ -278,16 +277,16 @@ Each one has its own chapter; this list is only where to find them.
 
 | Page | Who | Chapter |
 |---|---|---|
-| **Admin › Divisions** (activation check list, division settings) | MD | [SOP 28](./28-divisions.md) |
-| **Admin › GST rates** (shown once Domestic Trade or Import & Distribution is active) | MD | [SOP 29](./29-domestic-trade.md) |
-| **Admin › Import duty rates** (shown once Import & Distribution is active) | MD | [SOP 30](./30-import-distribution.md) |
-| **Team Incentives** — eligibility per designation and caps per role | MD | [SOP 20](./20-incentives.md) |
+| **Settings › Divisions** (activation check list, division settings) | MD | [SOP 28](./28-divisions.md) |
+| **Settings › Lists › GST rates** (shown once Domestic Trade or Import & Distribution is active) | MD | [SOP 29](./29-domestic-trade.md) |
+| **Settings › Lists › Import duty** (shown once Import & Distribution is active) | MD | [SOP 30](./30-import-distribution.md) |
+| **Finance & accounts › Team incentive settings** — eligibility per designation and caps per role | MD | [SOP 20](./20-incentives.md) |
 | **Associates › Access levels** — what Starter, Quoting and Full show | MD | [SOP 24](./24-associates.md) |
-| **Admin › Backups** — last database and documents copies, test-restore, settings (read only) | Manage company settings | [SOP 32](./32-backups-restore.md) |
+| **Settings › Backups** — last database and documents copies, test-restore, settings (read only) | Manage company settings | [SOP 32](./32-backups-restore.md) |
 
 ### SOP access (owner, 7 Nov 2026, D-266)
 
-**Company Settings → SOP access** (`/admin/sop-access`, Manage company
+**Users & roles › SOP access** (`/admin/sop-access`, Manage company
 settings): who sees which chapter of this SOP.
 
 - **SOP library** — one switch. Off hides the SOP menu, every chapter, its
@@ -311,8 +310,8 @@ need the CA permission. Every change is in the Audit Log.
 
 ### Associate TDS (owner, 2 Nov 2026, D-235)
 
-**Settings → Associate TDS** (`/settings/associate-tds`, Manage company
-settings; link at the top of Company Settings): the values the app uses to
+**Settings › Lists › Associate TDS rules** (`/settings/associate-tds`, Manage company
+settings; Settings › Lists): the values the app uses to
 work out TDS on associate commission — TDS section (194H), rate (2 %),
 threshold per associate per financial year (₹20,000), rate without a
 verified PAN (20 %, section 206AA), whether associates abroad have TDS
@@ -324,7 +323,7 @@ recorded keep the TDS they were paid with. How the rules work: [Chapter
 
 ### Remittance difference reasons (owner, 2 Nov 2026)
 
-**Settings → Remittance difference reasons** (link at the top of Company
+**Settings › Lists › Remittance difference reasons** (link at the top of Company
 Settings; needs *Manage company settings*). The list behind **"Why is it
 different?"** on the advance, freight, balance and milestone remittance
 forms, used when the money a buyer sends differs from what is due. Each
@@ -353,19 +352,18 @@ pick them.
 
 ### Setup checklist (owner, 11 Nov 2026, D-312 / D-313)
 
-**Admin › Setup Checklist** (needs *Manage company settings*; the menu shows
+**Settings › Setup checklist** (needs *Manage company settings*; the menu shows
 how many items are still Needed). Use it on installation day and whenever the
 menu shows a number. Each line says **Done** or **Needed** (Optional for ECGC
 and Zoho) and has a button to the page where it is set:
 
 1. **Company identity** and **Bank details, GSTIN, IEC/PAN** — the new
    installation starts with placeholders (e.g. "Bank name (to be entered)",
-   GSTIN 29AAAAA0000A1ZY). Enter the real values in Company Settings
-   (Unlock the protected rows, give a reason).
+   GSTIN 29AAAAA0000A1ZY). Enter the real values on Settings › Company (Unlock the protected rows, give a reason).
 2. **LUT and RCMC** numbers and expiry dates; **ECGC** if the company has a
    policy.
 3. **E-mail server** — SMTP in `app/.env` (server side); then send a test
-   e-mail from Company Settings.
+   e-mail from Settings › Company.
 4. **Zoho** (optional), **Backups** (folder, encryption, off-site copy).
 5. **Pricing** (exchange rate and margins) and **Commission levels** — the MD
    checks them and ticks (only someone who manages pricing may tick).
@@ -390,7 +388,7 @@ off, and the Test Mode e-mail set to the company e-mail.
 
 ### Document copies clean-up (owner, 2 Nov 2026)
 
-**Settings → Document copies clean-up** (link at the top of Company
+**Settings › Document clean-up** (link at the top of Company
 Settings; needs *Manage company settings*). Every generated document keeps
 several copies: the **DRAFT** copy made when it is generated, the **final**
 copy made on approval (the one the buyer gets), a **SUPERSEDED** copy when a
@@ -473,7 +471,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
 
 ### The rest of Admin
 
-- **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
+- **Settings › Company** — legal name, registered/corporate office, GSTIN/IEC,
   bank details, LUT number — the exact fields snapshotted onto every
   generated document (see the note in [Chapter 1](./01-stage1-enquiry-quotation.md)
   about data integrity). The Zoho client secrets and refresh tokens are
@@ -482,9 +480,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   only the last 4 characters (owner decision 1 Nov 2026). The LUT expiry date and RCMC validity date each
   carry their own alert-days setting; once either is within that many
   days of expiring (or already past it), a warning shows on the
-  Dashboard **and** a count badge appears on the sidebar's **Company
-  Settings** link itself — visible from every page, not just the
-  Dashboard. The same screen's **Mail Redirect** section holds
+  Dashboard **and** a count appears beside **Settings** in the left menu and beside **Company** on its menu bar — visible from every page, not just the Dashboard. The same screen's **Mail Redirect** section holds
   four settings, independent of [Test Mode](./16-test-mode.md)'s own email
   redirect: a **Redirect all mail** toggle plus address — when on, every
   non-security outbound email (order updates, document sends, and so on)
@@ -653,7 +649,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   phone call on their registered number, ₹1 test payment with its UTR (the
   "Two people" setting and the MD/ED self-approval rule apply as for
   associates) — and Reject. A first account is used at once, a changed
-  account after 15 days (Associates › Commission settings); then it is copied
+  account after 15 days (Associates › Commission › Commission settings and ladder); then it is copied
   onto the supplier as ✓ Verified. The old "I have verified these bank
   details" tick is gone. The directory lists show a **Bank** column (✓
   Verified / ⚠ Not verified / —), and Steps 7e and 10a show the supplier's
@@ -717,7 +713,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Min/Max (days)** fields (see below) — a suggestion only: it never
   overwrites a value staff already typed, and staff can always change it
   afterward.
-- **Lead Time Display Unit** — a single Company Settings field
+- **Lead Time Display Unit** — a single Settings › Company field
   (`lead_time_display_unit`, in the Orders category, Days by default)
   controlling whether the Order Detail page's Production Lead Time and
   Sailing Lead Time rows show in days or weeks. 90-item backlog item 16:
@@ -936,7 +932,7 @@ final fallback:
    template, or leave it on **"Use company default"** to automatically
    follow whatever the company default is set to, even if that changes
    later.
-2. **The company default** (**Settings → UI**, the `default_ui_template`
+2. **The company default** (**Settings › Company**, UI group, the `default_ui_template`
    setting) — what anyone with no personal preference set sees.
 3. **Standard, hard-coded** — the fallback if the resolved template (a
    personal pick or the company default) turns out to be deactivated.
