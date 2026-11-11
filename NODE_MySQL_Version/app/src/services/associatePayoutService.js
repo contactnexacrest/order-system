@@ -48,6 +48,17 @@ function isIndia(associate) {
   return ((associate && associate.based_in) || 'india') === 'india';
 }
 
+/**
+ * D-264 (B): the currency the associate is paid in — India always INR (whatever an old
+ * record says); abroad their chosen trading currency, USD when none (INR is refused abroad).
+ * The portal's "How it works" and the "How we set your commission" box both use it.
+ */
+function payCurrency(associate) {
+  if (isIndia(associate)) return 'INR';
+  const cur = String((associate && associate.currency_code) || '').trim().toUpperCase();
+  return cur === '' || cur === 'INR' ? 'USD' : cur;
+}
+
 /** "₹83.45" — the fixed rate, to the paisa. */
 function rateText(rate) {
   return `₹${money(rate)}`;
@@ -74,7 +85,7 @@ async function howFixedBox(associate) {
   if (isIndia(associate)) {
     return { title, text: "Your commission is a percentage of the value of the goods (FOB), in the order's currency. On the day the buyer finishes paying, we turn it into rupees at the rate the bank used for the buyer's payment. We pay you that rupee amount. If the exchange rate changes later, your amount stays the same. We pay all bank charges." };
   }
-  const cur = String((associate && associate.currency_code) || 'USD');
+  const cur = payCurrency(associate);
   return { title, text: `Your commission is a percentage of the value of the goods (FOB). On the day the buyer finishes paying, we set the amount in ${currencyName(cur)}. We pay you exactly that amount in ${currencyName(cur)} into your checked bank account. ${await chargesText()} If you need it in your local currency, your own bank changes it.` };
 }
 
@@ -387,7 +398,7 @@ async function payoutCostsForMonth(month) {
 }
 
 module.exports = {
-  CLAIM_HOLD_REASON, UNPAID_HOLD_REASON, isIndia, rateText, fixedRupeeLine, howFixedBox, fixedMessage, afterPaymentChange, autoFix, costDescription,
+  CLAIM_HOLD_REASON, UNPAID_HOLD_REASON, isIndia, payCurrency, rateText, fixedRupeeLine, howFixedBox, fixedMessage, afterPaymentChange, autoFix, costDescription,
   candidateOrderIds, daily, recompute, recomputedMessage, changeCommission, carrySmallAbroad, carriedNote, payoutDifference, recordPaymentCosts,
   payoutCostDescription, payoutCostsForMonth,
 };

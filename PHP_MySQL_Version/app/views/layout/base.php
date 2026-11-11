@@ -58,7 +58,9 @@ if ($current) {
         'approvals_bank' => (int) ($__tabCounts['bank'] ?? 0),
         'approvals_other' => (int) ($__tabCounts['other'] ?? 0),
         'myReviews' => \App\Repositories\DocumentReviewRepository::pendingCountForReviewer($__uid),
-        'emailApprovals' => $can('approve_email_send') ? EmailLogRepository::awaitingDispatchCount() : 0,
+        // The bar's "E-mails" counts what this person may approve — the same rule as the Approvals page's chip and the left-menu badge
+        // (not the whole send queue, which also holds approved e-mails waiting to go out and this person's own requests).
+        'approvals_emails' => (int) ($__tabCounts['emails'] ?? 0),
         'myTasks' => ($can('manage_orders') || $can('view_orders')) ? \App\Controllers\CoordinationController::myTaskCount($__uid) : 0,
         'clientIntake' => $can('manage_orders') ? ClientIntakeRepository::pendingCount() : 0,
         'piIntake' => $can('manage_orders') ? PiIntakeRepository::pendingReviewCount() : 0,

@@ -52,6 +52,20 @@ final class AssociatePayoutService
         return ($associate['based_in'] ?? 'india') === 'india';
     }
 
+    /**
+     * D-264 (B): the currency the associate is paid in — India always INR (whatever an old
+     * record says); abroad their chosen trading currency, USD when none (INR is refused abroad).
+     * The portal's "How it works" and the "How we set your commission" box both use it.
+     */
+    public static function payCurrency(?array $associate): string
+    {
+        if (self::isIndia($associate)) {
+            return 'INR';
+        }
+        $cur = strtoupper(trim((string) ($associate['currency_code'] ?? '')));
+        return $cur === '' || $cur === 'INR' ? 'USD' : $cur;
+    }
+
     public static function money(float $v): string
     {
         return number_format($v, 2);
@@ -76,7 +90,7 @@ final class AssociatePayoutService
         if (self::isIndia($associate)) {
             return ['title' => $title, 'text' => 'Your commission is a percentage of the value of the goods (FOB), in the order\'s currency. On the day the buyer finishes paying, we turn it into rupees at the rate the bank used for the buyer\'s payment. We pay you that rupee amount. If the exchange rate changes later, your amount stays the same. We pay all bank charges.'];
         }
-        $cur = (string) ($associate['currency_code'] ?? 'USD');
+        $cur = self::payCurrency($associate);
         $charges = AssociateCommission::settings()['abroad_charges'] === 'SHA'
             ? 'We pay our own bank\'s charges; your own bank may charge you when the money arrives.'
             : 'We pay our bank\'s charges and the charges of any bank in between.';

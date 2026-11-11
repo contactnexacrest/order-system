@@ -24,13 +24,13 @@
     {% for t in v.thickness %}
       <tr data-rule-row data-mm="{{ t.mm }}">
         <td>{{ t.name }}</td>
-        <td>{% if t.base %}base{% else %}+ <input type="text" inputmode="decimal" name="pct[{{ t.id }}]" data-rule-pct data-max-decimals="2" data-max-value="500" value="{{ t.value }}" placeholder="e.g. 35" aria-label="{{ t.name }}: % compared with {{ r.base_mm }} mm" style="width:6em"{{ ro }}> %{% endif %}</td>
+        <td class="rule-cell">{% if t.base %}base{% else %}+ <input type="text" inputmode="decimal" name="pct[{{ t.id }}]" data-rule-pct data-max-decimals="2" data-max-value="500" value="{{ t.value }}" placeholder="e.g. 35" aria-label="{{ t.name }}: % compared with {{ r.base_mm }} mm" class="rule-input"{{ ro }}> %{% endif %}</td>
         <td class="num" data-rule-example>{{ t.example }}</td>
       </tr>
     {% endfor %}
     <tr data-rule-cbm>
       <td>{{ r.cbm_from }} mm and above (per CBM)</td>
-      <td>{{ r.base_mm }} mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="{{ v.k }}" placeholder="e.g. 40" aria-label="{{ r.cbm_from }} mm and above: {{ r.base_mm }} mm price per m² times" style="width:6em"{{ ro }}></td>
+      <td class="rule-cell">{{ r.base_mm }} mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="{{ v.k }}" placeholder="e.g. 40" aria-label="{{ r.cbm_from }} mm and above: {{ r.base_mm }} mm price per m² times" class="rule-input"{{ ro }}></td>
       <td class="num" data-rule-example>{{ v.kExample }}</td>
     </tr>
   </table>

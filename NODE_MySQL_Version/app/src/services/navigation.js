@@ -213,7 +213,9 @@ function forRequest(req) {
     approvals_bank: tabs.bank || 0,
     approvals_other: tabs.other || 0,
     myReviews: req.myReviewsPendingCount || 0,
-    emailApprovals: req.emailApprovalsPendingCount || 0,
+    // The bar's "E-mails" counts what this person may approve — the same rule as the Approvals page's chip and the left-menu badge
+    // (not the whole send queue, which also holds approved e-mails waiting to go out and this person's own requests).
+    approvals_emails: tabs.emails || 0,
     myTasks: req.myTasksCount || 0,
     clientIntake: req.clientIntakePendingCount || 0,
     piIntake: req.piIntakePendingCount || 0,

@@ -81,7 +81,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         </select>
         <small class="muted">Kept only for special combinations, e.g. "30 mm · Leather" quoted as one exact price<?= $rules['grid'] ? '; ordinary thickness prices always go in the grid' : '' ?>.</small></label>
       <?php if ($rules['grid']): ?>
-        <fieldset class="full" data-show-when="price_basis=grid"><legend>Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
+        <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
           <?php $__grid = null; include __DIR__ . '/_thickness_grid.php'; ?>
         </fieldset>
         <label data-show-when="price_basis=combo">Exact price (₹) *<input type="text" inputmode="decimal" name="price_inr" data-max-decimals="2" data-max-value="999999999999.99" data-required-when="price_basis=combo" placeholder="e.g. 4900.00" value="<?= View::e($__pf['price_inr'] ?? '') ?>" disabled></label>
@@ -89,7 +89,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         <label>Price (₹) *<input type="text" inputmode="decimal" name="price_inr" required data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 80000.00" value="<?= View::e($__pf['price_inr'] ?? '') ?>"></label>
       <?php endif; ?>
       <?php if (($offered ?? []) !== []): ?>
-      <fieldset class="full" data-show-when="price_basis=combo"><legend>The special combination <small class="muted">(leave "any" for what the price does not fix)</small></legend>
+      <fieldset class="full" data-show-when="price_basis=combo"><legend class="legend-sentence">The special combination <small class="muted">(leave "any" for what the price does not fix)</small></legend>
         <div class="field-grid">
         <?php foreach ($offered as $__sp): ?>
           <label><?= View::e($__sp['name']) ?>

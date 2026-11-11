@@ -16,7 +16,7 @@
     <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ row.quoted_on or row.updated_on }}"{{ ro }}></label>
     <label>Valid until<input type="date" name="valid_until" value="{{ row.valid_until or '' }}"{{ ro }}></label>
     {% if gridView %}
-      <fieldset class="full"><legend>Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
+      <fieldset class="full"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
         {% include "products/_thickness_grid.njk" %}
       </fieldset>
     {% else %}

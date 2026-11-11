@@ -20,7 +20,8 @@
       <a href="/suppliers/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Supplier</a>
     </form>
 
-    <table class="list">
+    <div class="table-scroll">
+    <table class="list suppliers-table">
       <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       {% if not suppliers.length %}
       <tr><td colspan="9" class="muted">{{ 'No suppliers match this filter.' if (filterType or search) else 'No suppliers yet — add the first one above.' }}</td></tr>
@@ -42,7 +43,7 @@
         <td>{{ s.gstin or '—' }}</td>
         <td>{% if not s.bank_account_number %}<span class="muted">—</span>{% elif s.bank_verified_at %}<span class="badge good">&#10003; Verified</span>{% else %}<span class="badge warn">&#9888; Not verified</span>{% endif %}</td>
         <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
-        <td>
+        <td><div class="row-actions">
           <a href="/suppliers/{{ s.id }}/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/suppliers/{{ s.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if s.is_active else 'Reactivate' }} ' + {{ s.supplier_legal_name | dump }} + '?{{ ' It will no longer appear in the Supplier PO supplier list.' if s.is_active else '' }}');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -56,9 +57,10 @@
             <button type="submit" class="btn-sm btn-danger">Delete</button>
           </form>
           {% endif %}
-        </td>
+        </div></td>
       </tr>
       {% endfor %}
     </table>
+    </div>
   </div>
 </div>

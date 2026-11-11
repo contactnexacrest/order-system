@@ -23,7 +23,7 @@ $__ro = $canRecord ? '' : ' disabled';
     <label>Quoted on *<input type="date" name="quoted_on" required max="<?= $__today ?>" value="<?= View::e((string) ($row['quoted_on'] ?? substr((string) $row['updated_at'], 0, 10))) ?>"<?= $__ro ?>></label>
     <label>Valid until<input type="date" name="valid_until" value="<?= View::e((string) ($row['valid_until'] ?? '')) ?>"<?= $__ro ?>></label>
     <?php if ($grid !== null): ?>
-      <fieldset class="full"><legend>Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
+      <fieldset class="full"><legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>
         <?php $__grid = $grid; include __DIR__ . '/_thickness_grid.php'; ?>
       </fieldset>
     <?php else: ?>

@@ -37,13 +37,13 @@ $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fm
     <?php foreach ($__r['thickness'] as $__t): ?>
       <tr data-rule-row data-mm="<?= (int) $__t['mm'] ?>">
         <td><?= View::e($__t['name']) ?></td>
-        <td><?php if ($__t['base']): ?>base<?php else: ?>+ <input type="text" inputmode="decimal" name="pct[<?= (int) $__t['id'] ?>]" data-rule-pct data-max-decimals="2" data-max-value="500" value="<?= View::e((string) ($__old['pct'][$__t['id']] ?? $__fmt($__t['pct']))) ?>" placeholder="e.g. 35" aria-label="<?= View::e($__t['name']) ?>: % compared with <?= (int) $__r['base_mm'] ?> mm" style="width:6em"<?= $__ro ?>> %<?php endif; ?></td>
+        <td class="rule-cell"><?php if ($__t['base']): ?>base<?php else: ?>+ <input type="text" inputmode="decimal" name="pct[<?= (int) $__t['id'] ?>]" data-rule-pct data-max-decimals="2" data-max-value="500" value="<?= View::e((string) ($__old['pct'][$__t['id']] ?? $__fmt($__t['pct']))) ?>" placeholder="e.g. 35" aria-label="<?= View::e($__t['name']) ?>: % compared with <?= (int) $__r['base_mm'] ?> mm" class="rule-input"<?= $__ro ?>> %<?php endif; ?></td>
         <td class="num" data-rule-example>₹<?= number_format($__ex * (1 + $__t['pct'] / 100), 0) ?> / m²</td>
       </tr>
     <?php endforeach; ?>
     <tr data-rule-cbm>
       <td><?= (int) $__r['cbm_from'] ?> mm and above (per CBM)</td>
-      <td><?= (int) $__r['base_mm'] ?> mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. 40" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per m² times" style="width:6em"<?= $__ro ?>></td>
+      <td class="rule-cell"><?= (int) $__r['base_mm'] ?> mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. 40" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per m² times" class="rule-input"<?= $__ro ?>></td>
       <td class="num" data-rule-example><?= $__k !== null ? '₹' . number_format($__ex * $__k, 0) . ' / CBM' : '—' ?></td>
     </tr>
   </table>

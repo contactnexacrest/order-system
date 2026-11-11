@@ -69,11 +69,13 @@ async function commissionHeadline(a) {
 async function myCommissionData(a) {
   const associateCommission = require('../services/associateCommission');
   const set = await associateCommission.settings();
+  // D-264: India is always paid in rupees, abroad in the payout currency — the same rule as the "How we set your commission" box.
+  const payCur = require('../services/associatePayoutService').payCurrency(a);
   return {
     headline: await commissionHeadline(a),
     commissionSettings: set,
     payDayText: associateCommission.payDayText(set),
-    currencyName: { INR: 'Indian rupees', USD: 'US dollars', EUR: 'euros', GBP: 'pounds sterling' }[String(a.currency_code || 'INR')] || String(a.currency_code || ''),
+    currencyName: { INR: 'Indian rupees', USD: 'US dollars', EUR: 'euros', GBP: 'pounds sterling' }[payCur] || payCur,
   };
 }
 

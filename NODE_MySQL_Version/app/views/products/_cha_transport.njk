@@ -7,7 +7,7 @@
 <input type="hidden" name="includes_packing_loading" value="0">
 <label class="inline full"><input type="checkbox" name="includes_packing_loading" value="1"{% if cha.includes %} checked{% endif %}> Price includes packing and loading <small class="muted">(usual — then packing and loading are not added again; untick to add the product's packing and loading costs)</small></label>
 <fieldset class="full cha-transport" data-cha-transport data-container-cbm="{{ cha.containerCbm }}" data-fits-cbm="{{ cha.fitsCbm }}">
-  <legend>CHA + transport (one price per container)</legend>
+  <legend class="legend-sentence">CHA + transport (one price per container)</legend>
   <div class="field-grid">
     <label>CHA + transport per container (₹)
       <input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="{{ cha.value }}"

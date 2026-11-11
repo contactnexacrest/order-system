@@ -2276,7 +2276,13 @@ the same filters, counts, fields, actions and money rules on both templates
   something waits, the page shown underlined. Which section a page belongs
   to is decided by its path (longest prefix wins), so a new page under a
   section's path gets the bar with no change to the page. No bar on the
-  Dashboard, Notifications, My account and My tasks.
+  Dashboard, Notifications, My account and My tasks. (11 Nov 2026 build
+  review) A category's Price rules tab (`/products/categories/<id>?tab=rules`,
+  where Products › Price rules leads) underlines **Price rules**, its other
+  tabs **Categories**; an open drop-down's page (e.g. Pricing settings)
+  underlines the drop-down. The Approvals bar's counts are what this person
+  may approve — the same numbers as the Approvals page's chips (E-mails =
+  sends waiting for this person's Level-2 approval, not the whole send queue).
 
 | Section | Menu bar |
 |---|---|
@@ -2460,7 +2466,11 @@ the same filters, counts, fields, actions and money rules on both templates
     introduced" (wording "FOB value", never "goods value"), a 4-step "How it
     works" (fixed at PI; FOB value on the Commercial Invoice; earned when the
     buyer has paid in full; paid N days later in the monthly / weekly
-    payment, in their currency to the verified account), the % fixed on each
+    payment, in the currency they are paid in to the verified account —
+    `AssociatePayoutService::payCurrency` / `payCurrency()`: India always
+    Indian rupees, whatever an old record says; abroad their payout currency,
+    US dollars when none — the same currency as the "How we set your
+    commission" box (11 Nov 2026 build review)), the % fixed on each
     order ("Your %") and the statuses "Not earned yet — buyer still paying" /
     "Earned — will be paid on <date>" / "Paid on <date> (ref)" / "On hold — a
     buyer claim on this order is open" (a NexaCrest hold keeps its reason).

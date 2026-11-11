@@ -28,7 +28,7 @@
         { "label": "Prices", "href": "/approvals?tab=prices", "when": { "any": ["manage_pricing"], "flags": ["approver"] }, "count": "approvals_prices" },
         { "label": "Payment terms", "href": "/approvals?tab=payment_terms", "when": { "any": ["approve_payment_terms"], "flags": ["approver"] }, "count": "approvals_payment_terms" },
         { "label": "Documents", "href": "/reviews", "count": "myReviews" },
-        { "label": "E-mails", "href": "/email-approvals", "when": { "any": ["approve_email_send"] }, "count": "emailApprovals" },
+        { "label": "E-mails", "href": "/email-approvals", "when": { "any": ["approve_email_send"] }, "count": "approvals_emails" },
         { "label": "Bank details", "href": "/approvals?tab=bank", "when": { "flags": ["approver"] }, "count": "approvals_bank" },
         { "label": "Other", "href": "/approvals?tab=other", "when": { "flags": ["approver"] }, "count": "approvals_other" }
       ]
@@ -106,7 +106,7 @@
         { "label": "All products", "href": "/products", "when": { "any": ["view_product_catalog"] } },
         { "label": "+ Add product", "href": "/products/create", "when": { "any": ["manage_product_catalog"] } },
         { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
-        { "label": "Price rules", "href": "/products/price-rules", "when": { "any": ["manage_pricing", "view_price_buildup"] } },
+        { "label": "Price rules", "href": "/products/price-rules", "match": ["/products/categories"], "activeQuery": { "tab": ["rules"] }, "when": { "any": ["manage_pricing", "view_price_buildup"] } },
         { "label": "Pricing", "children": [
           { "label": "Pricing settings (margin, buffer, exchange rate)", "href": "/pricing/settings", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
           { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"] } },

@@ -7,7 +7,9 @@
  */
 use App\Services\AssociateCommission;
 
-$__cur = ['INR' => 'Indian rupees', 'USD' => 'US dollars', 'EUR' => 'euros', 'GBP' => 'pounds sterling'][(string) ($me['currency_code'] ?? 'INR')] ?? (string) ($me['currency_code'] ?? '');
+// D-264: India is always paid in rupees, abroad in the payout currency — the same rule as the "How we set your commission" box.
+$__payCur = \App\Services\AssociatePayoutService::payCurrency($me);
+$__cur = ['INR' => 'Indian rupees', 'USD' => 'US dollars', 'EUR' => 'euros', 'GBP' => 'pounds sterling'][$__payCur] ?? $__payCur;
 ?>
 <?php if ($headline !== null): ?>
   <div class="alert alert-info" data-commission-headline>

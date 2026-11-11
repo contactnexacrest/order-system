@@ -9,7 +9,7 @@
     {% for item in bar.items %}
       {% if item.children %}
         <li class="section-nav-drop{{ ' active' if item.active else '' }}">
-          <details>
+          <details class="section-nav-details">
             <summary>{{ item.label }}{% if item.count > 0 %} <span class="nav-badge">{{ item.count }}</span>{% endif %} <span aria-hidden="true">&#9662;</span></summary>
             <ul class="section-nav-menu">
               {% for child in item.children %}

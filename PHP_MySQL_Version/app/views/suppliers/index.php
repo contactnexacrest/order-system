@@ -21,7 +21,8 @@
       <a href="/suppliers/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Supplier</a>
     </form>
 
-    <table class="list">
+    <div class="table-scroll">
+    <table class="list suppliers-table">
       <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
       <?php if (empty($suppliers)): ?>
       <tr><td colspan="9" class="muted"><?= ($filterType !== '' || $search !== '') ? 'No suppliers match this filter.' : 'No suppliers yet — add the first one above.' ?></td></tr>
@@ -43,7 +44,7 @@
         <td><?= $s['gstin'] ? htmlspecialchars($s['gstin']) : '—' ?></td>
         <td><?php if (empty($s['bank_account_number'])): ?><span class="muted">—</span><?php elseif (!empty($s['bank_verified_at'])): ?><span class="badge good">&#10003; Verified</span><?php else: ?><span class="badge warn">&#9888; Not verified</span><?php endif; ?></td>
         <td><span class="badge <?= $s['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $s['is_active'] ? 'Active' : 'Inactive' ?></span></td>
-        <td>
+        <td><div class="row-actions">
           <a href="/suppliers/<?= (int) $s['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
           <form method="post" action="/suppliers/<?= (int) $s['id'] ?>/toggle" style="display:inline" onsubmit="return confirm('<?= $s['is_active'] ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($s['supplier_legal_name'])) ?>?<?= $s['is_active'] ? ' It will no longer appear in the Supplier PO supplier list.' : '' ?>');">
             <?= Csrf::field() ?>
@@ -57,9 +58,10 @@
             <button type="submit" class="btn-sm btn-danger">Delete</button>
           </form>
           <?php endif; ?>
-        </td>
+        </div></td>
       </tr>
       <?php endforeach; ?>
     </table>
+    </div>
   </div>
 </div>

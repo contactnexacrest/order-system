@@ -16,7 +16,7 @@ $__secCount = static function (array $item): string {
     <?php foreach ($__bar['items'] as $__item): ?>
       <?php if (isset($__item['children'])): ?>
         <li class="section-nav-drop<?= $__item['active'] ? ' active' : '' ?>">
-          <details>
+          <details class="section-nav-details">
             <summary><?= htmlspecialchars($__item['label']) ?><?= $__secCount($__item) ?> <span aria-hidden="true">&#9662;</span></summary>
             <ul class="section-nav-menu">
               <?php foreach ($__item['children'] as $__child): ?>

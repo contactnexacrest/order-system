@@ -781,12 +781,12 @@ details.vendor-bill-add{margin-top:10px;}
 /* Owner request (2026-10-27): the small ▸ "expand" toggles (native
    <details> other than the page's own step/section/nav cards) were easy
    to miss — show each one as a clear navy button with a ▸/▾ marker. */
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary::-webkit-details-marker{display:none;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary::before{content:"\25B8";font-size:1em;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch)[open] > summary::before{content:"\25BE";}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary:hover{background:#dce6f8;border-color:var(--navy);}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary *{color:inherit;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details) > summary::-webkit-details-marker{display:none;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details) > summary::before{content:"\25B8";font-size:1em;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details)[open] > summary::before{content:"\25BE";}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details) > summary:hover{background:#dce6f8;border-color:var(--navy);}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch):not(.section-nav-details) > summary *{color:inherit;}
 
 /* Owner request (2026-10-27): "At a Glance" sits across the top of the
    order page instead of in a 280px side column, so the step sections and
@@ -980,3 +980,18 @@ body.line-panel-open{overflow:hidden}
 .setup-status.done{background:var(--success-soft);color:var(--success);}
 .setup-status.needed{background:var(--danger-soft);color:var(--danger);}
 .setup-status.optional{background:var(--navy-soft);color:var(--navy);}
+/* 11 Nov 2026 build review (screenshots 05a/05b/12a): category tabs on one tidy row,
+   the "+ [ ] %" price-rule input kept on one line, the field-grid "full" fieldsets
+   spanning the form, supplier thickness prices wide enough for 9 digits + decimals,
+   sentence-length legends written as typed (the global legend style capitalises
+   short titles), and the Suppliers list fitting its card. */
+.tab-pills{display:flex;flex-wrap:wrap;gap:0.5rem;margin:0.75rem 0 1.5rem;}
+.tab-pills > a{margin:0;}
+td.rule-cell{white-space:nowrap;}
+td.rule-cell input.rule-input{display:inline-block;width:6em;margin:0 0.25rem;vertical-align:middle;}
+.field-grid > fieldset.full{grid-column:1 / -1;}
+.thickness-grid input.grid-price{min-width:14ch;}
+legend.legend-sentence{text-transform:none;}
+.suppliers-table td:first-child{overflow-wrap:anywhere;min-width:9rem;}
+.suppliers-table .row-actions{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+.suppliers-table .row-actions form{margin:0;}
