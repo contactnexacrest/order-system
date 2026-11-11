@@ -94,6 +94,36 @@ current copy of every document and uploaded files are never removed. See
 
 ## What staff do
 
+### Everything waiting for you: the Approvals page (owner, 11 Nov 2026, D-310)
+
+The menu shows **Approvals (n)** for everyone who approves something. It
+opens one list of everything waiting for **you**, oldest first, with tabs:
+**All · Prices · Payment terms · Documents · E-mails · Bank details · Other**
+(amendments, cancellation requests, purchase approvals, short payments,
+associate registrations, associate price requests, field-protection and
+reorder requests). Each row shows since when it waits, what it is, the order
+or person, the details, and a button that opens the **exact place where it
+is approved** — the approval itself is done there, as before.
+
+- You see only what you may approve: the same permissions and Admin ›
+  Self-approval rules as the approval screen. Something you asked for
+  yourself appears for someone else.
+- Kanban users see the same rows as a board, one column per tab.
+- The Dashboard's **My Approvals** shows *Prices waiting for my approval*,
+  *Payment terms*, *Bank details to verify* and *Other approvals*, and the
+  button **Open my approvals (n)**.
+- On an order, a yellow bar at the very top says what on **this** order waits
+  for you ("Waiting for your approval: line 2 — USD 320.00 / PCS is below the
+  lowest price … ") with a button straight to it. Whoever asked sees "Line 2 —
+  sent to the MD for approval on 11 Nov, 10:42 — waiting."
+- Every approval e-mail ends with a link to the Approvals page.
+- A payment that came in short: when you try to clear it without the
+  *Approve short payment* right, it now goes to the managers' Approvals
+  ("It now waits in Approvals for them."). It leaves the list once a manager
+  clears it short with a reason, or the rest of the money is received.
+- My Reviews and Email Approvals still work; Documents and E-mails on the
+  Approvals page show the same items.
+
 ### Generating and tracking documents
 
 Each document is generated from its own step on the order page (for

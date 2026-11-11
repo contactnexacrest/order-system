@@ -952,3 +952,15 @@ body.line-panel-open{overflow:hidden}
 .idle-warning-box{background:#fff;border-radius:12px;padding:20px 22px;max-width:420px;width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,0.25);}
 .idle-warning-box h2{margin:0 0 8px;font-size:1.1rem;}
 .idle-warning-box .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+/* D-310: Approvals page, the order page's "Waiting for your approval" bar, Setup checklist (D-312). */
+.approval-bar{background:var(--gold-soft);border:1px solid var(--line);border-left:5px solid var(--gold-strong);border-radius:10px;padding:10px 14px;margin:0 0 12px;}
+.approval-bar-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:4px 0;}
+.approval-bar-row + .approval-bar-row{border-top:1px solid var(--line);}
+.approval-bar.waiting{background:var(--navy-soft);border-left-color:var(--navy);}
+.approval-what{display:inline-block;padding:2px 8px;border-radius:8px;font-size:0.78rem;font-weight:600;background:var(--gold-soft);color:var(--gold-strong);}
+.approval-what.red{background:var(--danger-soft);color:var(--danger);}
+.approvals-table td{vertical-align:top;}
+.setup-status{display:inline-block;padding:2px 8px;border-radius:8px;font-size:0.78rem;font-weight:700;}
+.setup-status.done{background:var(--success-soft);color:var(--success);}
+.setup-status.needed{background:var(--danger-soft);color:var(--danger);}
+.setup-status.optional{background:var(--navy-soft);color:var(--navy);}

@@ -29,9 +29,9 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
     company: {
       legal_name: 'NexaCrest International Private Limited',
       registered_office: 'Registered office address, City – 000000, India',
-      corporate_office: 'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India',
-      gstin: '29AAKCN8733G1ZZ',
-      iec_pan: 'AAKCN8733G',
+      corporate_office: 'Corporate office address, City – 000000, India',
+      gstin: '29AAAAA0000A1ZY',
+      iec_pan: 'AAAAA0000A',
       md_name: 'Managing Director',
       md_title: 'Founder & Managing Director',
       phone: '+91-0000000000',
@@ -84,7 +84,7 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
     const html = renderDocumentType('SUPPO');
     expect(html).toContain('1. BUYER (NexaCrest International Private Limited)');
     expect(html).toContain('NexaCrest International Private Limited');
-    expect(html).toContain('29AAKCN8733G1ZZ'); // GSTIN
+    expect(html).toContain('29AAAAA0000A1ZY'); // GSTIN
   });
 
   it("Buyer PO Section 1 is NexaCrest's own company block labelled SUPPLIER", () => {

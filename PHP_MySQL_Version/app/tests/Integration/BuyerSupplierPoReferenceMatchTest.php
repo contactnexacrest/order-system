@@ -80,7 +80,7 @@ final class BuyerSupplierPoReferenceMatchTest extends DbTestCase
 
         self::assertStringContainsString('1. BUYER (NexaCrest International Private Limited)', $text);
         self::assertStringContainsString('NexaCrest International Private Limited', $text);
-        self::assertStringContainsString('29AAKCN8733G1ZZ', $text); // GSTIN
+        self::assertStringContainsString('29AAAAA0000A1ZY', $text); // GSTIN
     }
 
     public function testBuyerPoSection1IsNexaCrestsOwnCompanyBlockLabelledSupplier(): void

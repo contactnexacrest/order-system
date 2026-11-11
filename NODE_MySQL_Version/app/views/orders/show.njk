@@ -614,6 +614,21 @@
 {% macro phaseSummary(ph, badges = '') %}<summary>{% if ph.state == 'any' %}<span class="step-card-icon any" aria-hidden="true">&#8634;</span>{% else %}{{ stepStatusIcon(ph.state) }}{% endif %}<span class="phase-tag">{{ ph.letter }}</span><span class="phase-heading"><h2>{{ ph.title }}{{ badges | safe }}</h2><span class="phase-sub">{{ ph.sub }}</span></span>{% if ph.total %}<span class="phase-progress">{{ ph.done }} of {{ ph.total }} steps done<span class="phase-bar"><i style="width:{{ (100 * ph.done / ph.total) | round }}%"></i></span></span>{% else %}<span class="phase-progress">available any time</span>{% endif %}</summary>{% endmacro %}
 {% macro stepStatusIcon(status) %}{% if status == 'done' %}<span class="step-card-icon done" aria-hidden="true">&#10003;</span>{% elif status == 'current' %}<span class="step-card-icon current" aria-hidden="true">&#9679;</span>{% else %}<span class="step-card-icon locked" aria-hidden="true">&#9675;</span>{% endif %}{% endmacro %}
 
+{# Owner decision D-310 (point 27): "Waiting for your approval" at the very top; the requester sees it waiting. #}
+{% if approvalBar and approvalBar.length %}
+<div class="approval-bar" id="approval-bar" role="status">
+  {% for ap in approvalBar %}
+  <div class="approval-bar-row"><span><strong>Waiting for your approval:</strong> {{ ap.bar }}</span><a class="btn-sm" href="{{ ap.url }}">{{ ap.bar_button }}</a></div>
+  {% endfor %}
+</div>
+{% endif %}
+{% if approvalWaiting and approvalWaiting.length %}
+<div class="approval-bar waiting" id="approval-waiting" role="status">
+  {% for text in approvalWaiting %}
+  <div class="approval-bar-row"><span>{{ text }}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
 <div class="card page-wide">
   {% if query.from == 'kanban' %}
   {% if permissions.manage_orders or permissions.view_orders %}<p class="muted small"><a href="/orders">&larr; Back to Board</a></p>{% endif %}
@@ -729,7 +744,7 @@
       {% endif %}
     </p>
   {% elif pendingCancellation %}
-    <div class="review-banner" style="flex-direction:column;align-items:stretch;gap:6px">
+    <div class="review-banner" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
       <span>Cancellation requested by {{ pendingCancellation.requested_by_name or 'unknown' }} on {{ pendingCancellation.requested_at }} — awaiting approval.<br>Reason: {{ pendingCancellation.reason }}</span>
       {% if permissions.edit_locked_data %}
         <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">

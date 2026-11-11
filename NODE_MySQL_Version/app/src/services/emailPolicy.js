@@ -69,6 +69,7 @@ const NOTIFICATION_KINDS = {
   amendment_pending_md_approval: 'staff_approvals', email_send_pending_approval: 'staff_approvals',
   line_price_approval: 'staff_approvals', price_request: 'staff_approvals', associate_bank_change: 'staff_approvals',
   document_review_assigned: 'staff_approvals', review_assigned: 'staff_approvals',
+  short_payment_approval: 'staff_approvals', // D-310
   buyer_oc_acknowledged: 'staff_counterparty', buyer_po_uploaded_by_client: 'staff_counterparty',
   client_payment_reported: 'staff_counterparty', supplier_po_ack_uploaded_by_supplier: 'staff_counterparty',
   order_comment_from_client: 'staff_counterparty', dispute_raised: 'staff_counterparty',

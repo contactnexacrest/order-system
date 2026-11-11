@@ -892,14 +892,20 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectPage(r, 'Document copies clean-up', 'GET /settings/document-cleanup');
     expect(r.body).toContain('Never removed, whatever is switched on');
 
+    // D-313: on by default since 11 Nov 2026 (90 / 365 / latest only) — the test keeps whatever is set and puts it back.
+    const keep = {
+      draft_days: String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")),
+      superseded_days: String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_superseded_days'")),
+      cafin_mode: String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_cafin_mode'")),
+    };
     const bad = await holder.call('POST', '/settings/document-cleanup', { draft_days: '45', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Save storage space now' });
     expect(bad.type).toBe('error');
-    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('0');
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe(keep.draft_days);
 
     const before = await audits('FIELD_EDIT');
-    expectDone(await holder.call('POST', '/settings/document-cleanup', { draft_days: '90', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Save storage space now' }),
+    expectDone(await holder.call('POST', '/settings/document-cleanup', { draft_days: '180', superseded_days: keep.superseded_days, cafin_mode: keep.cafin_mode, reason: 'Save storage space now' }),
       'POST /settings/document-cleanup', 'Document copies clean-up settings saved.');
-    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('90');
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('180');
     expect(await audits('FIELD_EDIT')).toBe(before + 1);
 
     expect((await holder.call('POST', '/settings/document-cleanup/run', {})).type).toBe('error');
@@ -907,8 +913,8 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', '/settings/document-cleanup/run', { confirm_permanent: '1' }), 'POST /settings/document-cleanup/run', 'Clean-up done:');
     expect(await audits('DOCUMENT_COPY_CLEANUP_RUN')).toBe(runs + 1);
 
-    await holder.call('POST', '/settings/document-cleanup', { draft_days: '0', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Back to the default, all off' });
-    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('0');
+    await holder.call('POST', '/settings/document-cleanup', { ...keep, reason: 'Back to the setting before this test' });
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe(keep.draft_days);
   });
 
   it('remittance difference reasons routes (owner follow-up on point 18, 2 Nov 2026)', async () => {

@@ -3,7 +3,7 @@
   <table class="list">
     <tr><th>Order</th><th>Type</th><th>Reference</th><th>Rev.</th><th>Assigned</th><th>Action</th></tr>
     {% for r in pendingReviews %}
-    <tr>
+    <tr id="review-{{ r.id }}">
       <td><a href="/orders/{{ r.order_id }}">Order #{{ r.order_id }}</a></td>
       <td>{{ r.document_type_code }} — {{ r.document_type_name }}</td>
       <td>{{ r.document_reference or '—' }}</td>

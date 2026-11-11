@@ -32,7 +32,7 @@ describe('Zoho API limits for this app (D-239)', () => {
     let m;
     if (p === '/oauth/v2/token') return json({ access_token: `fake-access-${++tokenNo}` });
     if (p === '/books/v3/organizations') return json({ code: 0, organizations: [{ organization_id: '600', name: 'TEST org', currency_code: 'INR' }] });
-    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAKCN8733G1ZZ' } } });
+    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: true, tax_settings: { tax_reg_no: '29AAAAA0000A1ZY' } } });
     if (p === '/books/v3/items' && method === 'GET') return json({ code: 0, items: [] });
     if (p === '/books/v3/items' && method === 'POST') return json({ code: 0, item: { item_id: `IT-${requests.length}`, name: payload.name, status: 'active' } }, 201);
     return json({ code: 0, message: 'not faked' });

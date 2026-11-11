@@ -105,8 +105,21 @@ describe('Gap list G-5: part payments and short payments', () => {
     expect((await partPaymentService.summary(orderId, 'advance')).owed).toBe(300);
 
     const refused = await call('clearAdvancePayment', orderId, { advance_cleared_at: '2026-10-21' }, accounts);
-    expect(refused.message).toBe('Advance received so far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.');
+    expect(refused.message).toBe('Advance received so far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason. It now waits in Approvals for them.');
     expect((await orderPaymentStatusRepository.find(orderId)).advance_cleared_at).toBeNull();
+    // D-310: the refusal filed a short payment request; the MD (Approve short payment) sees it in Approvals, the clerk sees it waiting.
+    const request = await db.queryOne("SELECT id FROM short_payment_requests WHERE order_id = :o AND leg = 'advance' AND milestone_id = 0", { o: orderId });
+    expect(request).toBeTruthy();
+    const approvalsInbox = require('../../src/services/approvalsInbox');
+    const mdReq = { user: { id: md.id, role_id: md.roleId }, permissions: await permissionsOf(md.roleId), session: {} };
+    const mdItem = (await approvalsInbox.items(mdReq)).find((i) => i.key === `short:${request.id}`);
+    expect(mdItem).toBeTruthy();
+    expect(mdItem.tab).toBe('other');
+    expect(mdItem.url).toBe(`/orders/${orderId}#step-5e-payment-confirm`);
+    expect(mdItem.details).toContain('Advance: USD 300.00 still owed');
+    const clerkReq = { user: { id: accounts.id, role_id: accounts.roleId }, permissions: await permissionsOf(accounts.roleId), session: {} };
+    expect(((await approvalsInbox.waitingOnOthers(clerkReq, orderId))[0] || '').startsWith('Short payment — sent for approval on ')).toBe(true);
+    expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM notifications WHERE type = 'short_payment_approval' AND related_order_id = :o AND user_id = :u", { o: orderId, u: md.id })).n)).toBe(1);
 
     const noReason = await call('clearAdvancePayment', orderId, { advance_cleared_at: '2026-10-21', short_reason: 'short' }, md);
     expect(noReason.message).toBe('USD 300.00 of the advance is still owed. To clear it short, give the reason (10 to 500 characters) — it is recorded and shown on the order.');
@@ -143,7 +156,7 @@ describe('Gap list G-5: part payments and short payments', () => {
     expect((await partPaymentService.receipts(orderId, 'milestone', Number(m.id))).length).toBe(1); // in the history
 
     const refused = await call('clear', orderId, { cleared_on: '2026-10-23' }, accounts, { milestoneId: String(m.id) });
-    expect(refused.message).toBe('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.');
+    expect(refused.message).toBe('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason. It now waits in Approvals for them.');
     // D-245 P3: the manager says what the shortfall is (an agreed discount here).
     const noKind = await call('clear', orderId, { cleared_on: '2026-10-23', short_reason: 'Bank charges taken by the buyer\'s bank, agreed.' }, md, { milestoneId: String(m.id) });
     expect(noKind.message).toBe('Say what the USD 200.00 short is: an agreed discount, a settled buyer claim, or not paid by the buyer.');

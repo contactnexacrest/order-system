@@ -4,7 +4,7 @@
   <table class="list">
     <tr><th>Order</th><th>Type</th><th>Reference</th><th>Rev.</th><th>Assigned</th><th>Action</th></tr>
     <?php foreach ($pendingReviews as $r): ?>
-    <tr>
+    <tr id="review-<?= (int) $r['id'] ?>">
       <td><a href="/orders/<?= (int) $r['order_id'] ?>">Order #<?= (int) $r['order_id'] ?></a></td>
       <td><?= htmlspecialchars($r['document_type_code']) ?> — <?= htmlspecialchars($r['document_type_name']) ?></td>
       <td><?= htmlspecialchars($r['document_reference'] ?? '—') ?></td>

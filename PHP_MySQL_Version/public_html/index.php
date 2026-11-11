@@ -271,6 +271,12 @@ $router->get('/', [$dashboard, 'index'], [SessionAuth::required()]);
 // Owner decisions D-280 / D-281 (11 Nov 2026): Admin › E-mail settings.
 $emailSettings = new \App\Controllers\EmailSettingsController();
 $router->get('/admin/email-settings', [$emailSettings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+// Owner decision D-312 (point 4 B): Admin › Setup checklist.
+$setupChecklist = new \App\Controllers\SetupChecklistController();
+$router->get('/admin/setup-checklist', [$setupChecklist, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/admin/setup-checklist/tick', [$setupChecklist, 'tick'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/admin/setup-checklist/apply-recommended', [$setupChecklist, 'applyRecommended'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/admin/setup-checklist/national-holidays', [$setupChecklist, 'nationalHolidays'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/admin/email-settings', [$emailSettings, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 // D-283: "Stay logged in" (the 2-minute warning in app.js) — one per signed-in area.
 $sessionKeepAlive = new \App\Controllers\SessionController();
@@ -950,6 +956,8 @@ $router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth
 // enforced inside ReviewWorkflowService, not by a permission gate here —
 // that's a per-row authorization check, not a per-route one.
 $router->get('/reviews', [$reviews, 'queue'], [SessionAuth::required()]);
+// Owner decision D-310 (point 27): one Approvals page — each row is shown only to someone who may act on it (the rules are checked per row, as on /reviews).
+$router->get('/approvals', [new \App\Controllers\ApprovalsController(), 'index'], [SessionAuth::required()]);
 $router->post('/documents/{documentId}/reviewers', [$reviews, 'assign'], [SessionAuth::required(), PermissionCheck::requires('approve_documents'), CsrfCheck::verify()]);
 $router->post('/reviews/{reviewId}/approve', [$reviews, 'approve'], [SessionAuth::required(), CsrfCheck::verify()]);
 $router->post('/reviews/{reviewId}/reject', [$reviews, 'reject'], [SessionAuth::required(), CsrfCheck::verify()]);

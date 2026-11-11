@@ -195,8 +195,17 @@ final class OrderAccessService
         if (!$user) {
             return ['', []];
         }
-        $userId = (int) $user['id'];
-        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        return self::visibilitySqlFor((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, $alias);
+    }
+
+    /**
+     * D-310: visibilitySql() for a given person (the Approvals inbox counts
+     * for the signed-in user; tests pass the user they act as).
+     *
+     * @return array{0: string, 1: array<string, int>}
+     */
+    public static function visibilitySqlFor(int $userId, ?int $roleId, string $alias = 'o'): array
+    {
         // D-257: only the request's division(s); "" when it sees every division.
         $sql = DivisionService::sql("{$alias}.division_id");
         $params = [];

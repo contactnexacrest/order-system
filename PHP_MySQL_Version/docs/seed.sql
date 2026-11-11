@@ -621,33 +621,35 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
 -- Values marked PLACEHOLDER need real data before documents go live;
 -- everything else is a working default you can tune from /settings.
 -- ================================================================
--- Company/bank/LUT values below are the REAL values found in your own
--- source documents (01_Quotation.docx, 02_ProformaInvoice.docx), not
--- placeholders — pulled directly during Phase B while building the QT/PI/OC
--- templates against those actual documents.
+-- Owner decision D-313 (11 Nov 2026): the company's own identity, bank,
+-- GSTIN, IEC/PAN, LUT and RCMC values are NOT in this file. The values below
+-- are placeholders that pass the settings checks (the GSTIN keeps state code
+-- 29, Karnataka, which the domestic GST split reads); Admin › Setup checklist
+-- flags each one as Needed until the real value is entered at installation
+-- (Admin › Company Settings, Unlock on the protected rows).
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('legal_name',            'NexaCrest International Private Limited', 'string', 'company', 'Full legal company name as it appears on all documents.', 0),
   ('registered_office',     'Registered office address, City – 000000, India', 'string', 'company', 'Registered office address.', 0),
-  ('corporate_office',      'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India', 'string', 'company', 'Corporate/working office address, if different.', 0),
-  ('gstin',                 '29AAKCN8733G1ZZ',                          'string', 'company', 'GST Identification Number.', 1),
-  ('iec_pan',               'AAKCN8733G',                               'string', 'company', 'Import Export Code / PAN.', 1),
+  ('corporate_office',      'Corporate office address, City – 000000, India', 'string', 'company', 'Corporate/working office address, if different.', 0),
+  ('gstin',                 '29AAAAA0000A1ZY',                          'string', 'company', 'GST Identification Number.', 1),
+  ('iec_pan',               'AAAAA0000A',                               'string', 'company', 'Import Export Code / PAN.', 1),
   ('md_name',               'Managing Director',                        'string', 'company', 'Founder & Managing Director name, for document signature blocks.', 0),
   ('md_title',              'Founder & Managing Director',              'string', 'company', 'MD title as shown on documents.', 0),
   ('director_name',         'Managing Director',                        'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
   ('director_title',        'Director',                                 'string', 'company', 'Director title as shown on documents.', 0),
   ('phone',                 '+91-0000000000',                           'string', 'company', 'Company contact phone number.', 0),
   ('email',                 'info@email.com', 'string', 'company', 'Company contact email address.', 0),
-  ('bank_name',             'State Bank of India',                      'string', 'bank',    'Bank name for buyer remittances.', 1),
-  ('bank_branch',           'Start Up Hub Branch, Koramangala, Bengaluru', 'string', 'bank',  'Bank branch name.', 1),
-  ('bank_account_no',       '44523788330',                              'string', 'bank',    'Bank account number.', 1),
-  ('swift_bic',             'SBININBB949',                              'string', 'bank',    'SWIFT/BIC code.', 1),
-  ('ifsc',                  'SBIN0064074',                              'string', 'bank',    'IFSC code.', 1),
-  ('bank_address',          '1st Floor, 117, 7th Block Industrial Layout, Koramangala, Bengaluru – 560095, India', 'string', 'bank', 'Bank branch address.', 1),
-  ('bank_pincode',          '560095',                                    'string', 'bank',    'Bank branch pincode.', 1),
-  ('lut_number',            'ZD290626057408W',                         'string', 'lut',     'Letter of Undertaking (LUT) ARN/number for zero-rated export.', 1),
+  ('bank_name',             'Bank name (to be entered)',                'string', 'bank',    'Bank name for buyer remittances.', 1),
+  ('bank_branch',           'Branch (to be entered)', 'string', 'bank',  'Bank branch name.', 1),
+  ('bank_account_no',       '000000000000',                             'string', 'bank',    'Bank account number.', 1),
+  ('swift_bic',             'XXXXINXXXXX',                              'string', 'bank',    'SWIFT/BIC code.', 1),
+  ('ifsc',                  'XXXX0000000',                              'string', 'bank',    'IFSC code.', 1),
+  ('bank_address',          'Bank branch address, City – 000000, India', 'string', 'bank', 'Bank branch address.', 1),
+  ('bank_pincode',          '000000',                                    'string', 'bank',    'Bank branch pincode.', 1),
+  ('lut_number',            'AD000000000000X',                         'string', 'lut',     'Letter of Undertaking (LUT) ARN/number for zero-rated export.', 1),
   ('lut_valid_fy',          'FY 2026-27',                                'string', 'lut',     'Financial year the current LUT is valid for.', 1),
   ('lut_expiry_date',       '2027-03-31',                                'date',   'lut',     'LUT expiry date — placeholder (FY 2026-27 end date assumed as 31 March 2027) — the source PI template states the FY but not an explicit expiry date; confirm the real one.', 1),
-  ('rcmc_number',           'RCMC/CAPEXIL/03217/2026-2027',             'string', 'capexil', 'CAPEXIL RCMC (Registration-cum-Membership Certificate) number — required on the COO Preparation Sheet (Phase C).', 1),
+  ('rcmc_number',           'RCMC/CAPEXIL/00000/2026-2027',             'string', 'capexil', 'CAPEXIL RCMC (Registration-cum-Membership Certificate) number — required on the COO Preparation Sheet (Phase C).', 1),
   ('rcmc_valid_until',      '2027-03-31',                                'date',   'capexil', 'CAPEXIL RCMC certificate expiry date — placeholder, renew annually. Alerts configured via rcmc_alert_days_a/rcmc_escalation_days_b below.', 1),
   ('rbi_purpose_code_advance', 'P0103', 'string', 'rbi', 'RBI purpose code for advance payment wires.', 0),
   ('rbi_purpose_code_balance', 'P0102', 'string', 'rbi', 'RBI purpose code for balance payment wires.', 0),
@@ -671,7 +673,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('lockout_duration_minutes', '15', 'number', 'security', 'How long an account stays locked after too many failed attempts. (Addition beyond the spec''s named key list — needed to make failed_login_lockout_count actually enforceable; flagging per architecture doc practice.)', 0),
   ('password_min_length',   '10', 'number', 'security', 'Minimum password length.', 0),
   ('password_complexity_json', '{"require_upper":true,"require_number":true,"require_symbol":false}', 'json', 'security', 'Password complexity rules enforced on password change.', 0),
-  ('password_expiry_days',  '90', 'number', 'security', 'Days before a password must be changed. Enforced on every request (SessionAuth) — 0 disables the check.', 0),
+  ('password_expiry_days',  '0', 'number', 'security', 'Days before a password must be changed. Enforced on every request (SessionAuth) — 0 disables the check (D-313: off by default; staff sign in with an e-mailed code).', 0),
   ('non_usd_price_buffer_pct', '1.75', 'number', 'tolerances', 'Advisory price buffer shown (not auto-applied) for non-USD quotes, per your instruction.', 0),
   ('quotation_validity_days', '30', 'number', 'documents', 'Days a Quotation stays valid from its issue date (Addition beyond the spec''s named key list — the source Quotation template states "30 days" directly in its T&C text; making it a setting instead of a literal keeps that number DB-driven if it ever changes).', 0),
   ('pi_validity_days',       '15', 'number', 'documents', 'Days a Proforma Invoice stays valid from its issue date. Same addition as quotation_validity_days, for the same reason — the source PI template states "15 days" directly in its T&C text.', 0),
@@ -2057,12 +2059,14 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_
 
 
 -- Owner points 5 / 8 / 9 (2 Nov 2026): Admin → Settings → Document copies clean-up.
--- All off by default. Edited on its own page (/settings/document-cleanup), not the generic settings list.
+-- D-313 (owner, 11 Nov 2026): on by default — drafts 90 days after approval, never-sent superseded
+-- revisions after 365 days (the SUPERSEDED copy is kept), CAFIN latest only. Edited on its own page
+-- (/settings/document-cleanup), not the generic settings list.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
 SELECT x.k, x.v, x.t, 'document_cleanup', x.d, 0 FROM (
-  SELECT 'doc_cleanup_draft_days' AS k, '0' AS v, 'number' AS t, 'Remove the DRAFT copy of an approved document after this many days (0 = off; 30, 90 or 180).' AS d
-  UNION ALL SELECT 'doc_cleanup_superseded_days', '0', 'number', 'Remove the copies of a superseded revision that was never sent to the client after this many days (0 = off; 90, 180 or 365). The SUPERSEDED-stamped copy is kept.'
-  UNION ALL SELECT 'doc_cleanup_cafin_mode', 'keep_all', 'string', 'Old CAFIN copies: keep_all, or latest_only (older copies removed 30 days after a newer one was made).'
+  SELECT 'doc_cleanup_draft_days' AS k, '90' AS v, 'number' AS t, 'Remove the DRAFT copy of an approved document after this many days (0 = off; 30, 90 or 180).' AS d
+  UNION ALL SELECT 'doc_cleanup_superseded_days', '365', 'number', 'Remove the copies of a superseded revision that was never sent to the client after this many days (0 = off; 90, 180 or 365). The SUPERSEDED-stamped copy is kept.'
+  UNION ALL SELECT 'doc_cleanup_cafin_mode', 'latest_only', 'string', 'Old CAFIN copies: keep_all, or latest_only (older copies removed 30 days after a newer one was made).'
 ) x WHERE NOT EXISTS (SELECT 1 FROM company_settings c WHERE c.setting_key = x.k);
 
 -- Owner decision 2 Nov 2026 (point 4): Agreements register permissions, upload context and agreement types. Same as docs/migrations/2026-11-02s-agreements-register.sql.
@@ -2757,3 +2761,16 @@ INSERT INTO email_settings (email_kind, audience, is_enabled) VALUES
 -- manager, then the Managing Director).
 INSERT INTO compliance_alert_owners (item_key) VALUES
   ('lut'), ('rcmc'), ('agreements'), ('tds'), ('merchant_trade_rbi'), ('ecgc_policy'), ('ebrc_monthly');
+
+-- Owner decision D-313 (point 4, 11 Nov 2026): the Indian national holidays for the
+-- year of installation and the next one. State and festival holidays are added by the
+-- company (Admin › Holiday Calendar); Admin › Setup checklist reminds every year.
+INSERT INTO company_holidays (holiday_date, description)
+SELECT h.d, h.n FROM (
+  SELECT CAST(CONCAT(YEAR(CURDATE()), '-01-26') AS DATE) AS d, 'Republic Day' AS n
+  UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()), '-08-15') AS DATE), 'Independence Day'
+  UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()), '-10-02') AS DATE), 'Gandhi Jayanti'
+  UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()) + 1, '-01-26') AS DATE), 'Republic Day'
+  UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()) + 1, '-08-15') AS DATE), 'Independence Day'
+  UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()) + 1, '-10-02') AS DATE), 'Gandhi Jayanti'
+) h WHERE NOT EXISTS (SELECT 1 FROM company_holidays c WHERE c.holiday_date = h.d);

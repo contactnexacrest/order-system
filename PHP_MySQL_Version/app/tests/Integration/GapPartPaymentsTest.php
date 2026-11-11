@@ -107,8 +107,21 @@ final class GapPartPaymentsTest extends DbTestCase
 
         $this->as($this->accounts);
         $refused = $this->call('clearAdvancePayment', $orderId, ['advance_cleared_at' => '2026-10-21']);
-        self::assertSame('Advance received so far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.', $refused['message']);
+        self::assertSame('Advance received so far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason. It now waits in Approvals for them.', $refused['message']);
         self::assertNull(OrderPaymentStatusRepository::find($orderId)['advance_cleared_at']);
+        // D-310: the refusal filed a short payment request; the MD (Approve short payment) sees it in Approvals, the clerk sees it waiting.
+        $request = (int) Database::connection()->query("SELECT id FROM short_payment_requests WHERE order_id = {$orderId} AND leg = 'advance' AND milestone_id = 0")->fetchColumn();
+        self::assertGreaterThan(0, $request);
+        \App\Services\ApprovalsInbox::resetCache();
+        $mdUser = \App\Repositories\UserRepository::findById($this->md);
+        $mdItems = array_column(\App\Services\ApprovalsInbox::items($this->md, (int) $mdUser['role_id']), null, 'key');
+        self::assertArrayHasKey('short:' . $request, $mdItems);
+        self::assertSame('other', $mdItems['short:' . $request]['tab']);
+        self::assertSame("/orders/{$orderId}#step-5e-payment-confirm", $mdItems['short:' . $request]['url']);
+        self::assertStringContainsString('Advance: USD 300.00 still owed', $mdItems['short:' . $request]['details']);
+        $clerk = \App\Repositories\UserRepository::findById($this->accounts);
+        self::assertStringStartsWith('Short payment — sent for approval on ', \App\Services\ApprovalsInbox::waitingOnOthers($this->accounts, (int) $clerk['role_id'], $orderId)[0] ?? '');
+        self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE type = 'short_payment_approval' AND related_order_id = {$orderId} AND user_id = {$this->md}")->fetchColumn());
 
         $this->as($this->md);
         $noReason = $this->call('clearAdvancePayment', $orderId, ['advance_cleared_at' => '2026-10-21', 'short_reason' => 'short']);
@@ -150,7 +163,7 @@ final class GapPartPaymentsTest extends DbTestCase
 
         $this->as($this->accounts);
         $refused = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23'], ['milestoneId' => (string) $m['id']]);
-        self::assertSame('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.', $refused['message']);
+        self::assertSame('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason. It now waits in Approvals for them.', $refused['message']);
         $this->as($this->md);
         // D-245 P3: the manager says what the shortfall is (an agreed discount here).
         $noKind = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23', 'short_reason' => 'Bank charges taken by the buyer\'s bank, agreed.'], ['milestoneId' => (string) $m['id']]);

@@ -1,0 +1,17 @@
+{# D-310: the parts of one approval, shared by the list row and the board card. Port of approvals/_cell.php / _tabs.php. #}
+{% macro tabsRow(tabs, counts, tab, listView) %}
+<div class="filter-chip-row" role="tablist" aria-label="Approval types">
+  <a class="filter-chip{{ ' active' if tab == 'all' else '' }}" href="/approvals?tab=all{{ '&amp;view=list' if listView else '' }}">All {{ counts.all }}</a>
+  {% for key, label in tabs %}
+  <a class="filter-chip{{ ' active' if tab == key else '' }}" href="/approvals?tab={{ key }}{{ '&amp;view=list' if listView else '' }}">{{ label }} {{ counts[key] }}</a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro whoPart(i) %}{% if i.order_id %}<a href="/orders/{{ i.order_id }}">{{ i.order_ref }}</a>{% else %}{{ i.order_ref }}{% endif %}{% if i.order_ref and i.who %} · {% endif %}{{ i.who }}{% if not i.order_ref and not i.who %}—{% endif %}{% endmacro %}
+
+{% macro whatPart(i) %}<span class="approval-what{{ ' red' if i.tone == 'red' else '' }}">{{ i.what }}</span>{% endmacro %}
+
+{% macro button(i) %}<a class="btn-sm" href="{{ i.url }}">{{ i.button }}</a>{% endmacro %}
+
+{% macro footer(canEmail) %}<p class="muted small">Shows only what you are allowed to approve: line prices, payment terms, document reviews, buyer e-mails (Level 2), bank-detail checks, amendments, cancellation requests, purchase approvals, short payments, associate registrations, associate price requests, field-protection requests and reorder requests. Each button opens the place where it is approved; it disappears from here once it is approved or refused. The older pages still work: <a href="/reviews">My Reviews</a>{% if canEmail %} · <a href="/email-approvals">Email Approvals</a>{% endif %}.</p>{% endmacro %}

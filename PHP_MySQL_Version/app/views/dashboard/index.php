@@ -69,6 +69,28 @@ if ($__agCanManage || \App\Controllers\AgreementController::can('view_agreements
 <div class="card page-wide">
   <h2 style="margin-top:0;">My Approvals</h2>
   <div class="stat-grid">
+    <?php if (!empty($showApprovalTiles)): // D-310 ?>
+    <div class="stat-tile <?= $approvalCounts['prices'] > 0 ? 'danger' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+      <div class="num"><?= (int) $approvalCounts['prices'] ?></div>
+      <div class="label">Prices waiting for my approval</div>
+    </div>
+    <div class="stat-tile <?= $approvalCounts['payment_terms'] > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg></div>
+      <div class="num"><?= (int) $approvalCounts['payment_terms'] ?></div>
+      <div class="label">Payment terms</div>
+    </div>
+    <div class="stat-tile <?= $approvalCounts['bank'] > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V10l7-5 7 5v11"></path></svg></div>
+      <div class="num"><?= (int) $approvalCounts['bank'] ?></div>
+      <div class="label">Bank details to verify</div>
+    </div>
+    <div class="stat-tile <?= $approvalCounts['other'] > 0 ? 'warn' : '' ?>">
+      <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+      <div class="num"><?= (int) $approvalCounts['other'] ?></div>
+      <div class="label">Other approvals</div>
+    </div>
+    <?php endif; ?>
     <div class="stat-tile <?= $myPendingReviewCount > 0 ? 'warn' : '' ?>">
       <div class="icon-chip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>
       <div class="num"><?= (int) $myPendingReviewCount ?></div>
@@ -90,6 +112,7 @@ if ($__agCanManage || \App\Controllers\AgreementController::can('view_agreements
     <?php endif; ?>
   </div>
   <div class="btn-row">
+    <?php if (!empty($showApprovalTiles)): // D-310 ?><a class="btn-sm" href="/approvals">Open my approvals (<?= (int) $approvalCounts['all'] ?>)</a><?php endif; ?>
     <a class="btn-sm btn-secondary" href="/reviews">My Reviews</a>
     <?php if ($pendingEmailApprovalCount !== null): ?><a class="btn-sm btn-secondary" href="/email-approvals">Email Approvals</a><?php endif; ?>
   </div>

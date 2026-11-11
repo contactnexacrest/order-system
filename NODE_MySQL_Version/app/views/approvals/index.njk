@@ -1,0 +1,22 @@
+{% import "approvals/_parts.njk" as ap %}
+<div class="card page-wide">
+  <h1>Approvals waiting for you ({{ counts.all }})</h1>
+  {% if kanbanUser %}<div class="btn-row"><a class="btn-sm btn-secondary" href="/approvals?tab={{ tab }}">Switch to board view</a></div>{% endif %}
+  {{ ap.tabsRow(tabs, counts, tab, kanbanUser) }}
+  <table class="list approvals-table">
+    <tr><th>Waiting since</th><th>What</th><th>Order / who</th><th>Details</th><th></th></tr>
+    {% for i in items %}
+    <tr id="approval-{{ i.key | replace(':', '-') }}">
+      <td>{{ i.since_label }}</td>
+      <td>{{ ap.whatPart(i) }}</td>
+      <td>{{ ap.whoPart(i) }}</td>
+      <td>{{ i.details }}</td>
+      <td>{{ ap.button(i) }}</td>
+    </tr>
+    {% endfor %}
+    {% if not items.length %}
+    <tr><td colspan="5" class="muted">Nothing is waiting for your approval{{ ' here' if tab != 'all' else '' }}.</td></tr>
+    {% endif %}
+  </table>
+  {{ ap.footer(canEmail) }}
+</div>

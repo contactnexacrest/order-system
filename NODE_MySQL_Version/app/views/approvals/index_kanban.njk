@@ -1,0 +1,36 @@
+{% import "approvals/_parts.njk" as ap %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Approvals waiting for you ({{ counts.all }}) — Kanban Board</h1>
+      <p class="muted" style="margin:0;">One column per kind of approval. Each card opens the place where it is approved.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn-sm btn-secondary" href="/approvals?tab={{ tab }}&amp;view=list">Switch to list view</a>
+    </div>
+  </div>
+  {{ ap.tabsRow(tabs, counts, tab, false) }}
+  <div class="kanban-board">
+    {% for col in columns %}
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">{{ col.label }}</span>
+        <span class="kanban-column-count">{{ col.items.length }}</span>
+      </div>
+      {% if not col.items.length %}
+        <p class="kanban-column-empty">Nothing waiting</p>
+      {% endif %}
+      {% for i in col.items %}
+      <div class="entity-card kanban-card" id="approval-{{ i.key | replace(':', '-') }}">
+        <div class="entity-card-header">{{ ap.whatPart(i) }}</div>
+        <div class="entity-card-sub">{{ ap.whoPart(i) }}</div>
+        <div class="muted small">{{ i.details }}</div>
+        <div class="muted small">Waiting since {{ i.since_label }}</div>
+        <div class="entity-card-footer">{{ ap.button(i) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {{ ap.footer(canEmail) }}
+</div>

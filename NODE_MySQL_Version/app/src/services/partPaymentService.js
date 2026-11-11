@@ -16,6 +16,8 @@ const db = require('../config/db');
 
 const LEGS = ['advance', 'freight', 'balance'];
 const TOLERANCE = 0.01;
+/** D-310: added to the refusal once the short payment waits in Approvals. */
+const SENT_TO_APPROVALS = ' It now waits in Approvals for them.';
 const { round2, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
 const round4 = (n) => Math.round(Number(n) * 10000) / 10000;
 
@@ -253,13 +255,18 @@ async function clearCheck(orderId, leg, milestone, canApprove, reason, userId = 
   const currency = String((order && order.currency_code) || '');
   const lbl = label(leg, milestone);
   if (!canApprove) {
-    return { error: `${lbl} received so far: ${money(currency, s.received)} of ${money(currency, s.expected)} due — ${money(currency, s.owed)} is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.` };
+    // D-310: the request now waits in the Approvals page of every manager who may clear it short.
+    if (userId !== null && userId !== undefined) {
+      await require('./approvalsInbox').recordShortPaymentRequest(orderId, leg, milestone, Number(userId), Number(s.owed), currency);
+    }
+    return { error: `${lbl} received so far: ${money(currency, s.received)} of ${money(currency, s.expected)} due — ${money(currency, s.owed)} is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.${SENT_TO_APPROVALS}` };
   }
   // QA Round 8, R8-N09: a manager who recorded this payment's receipts clears it short only if their role is ticked.
   if (userId !== null && userId !== undefined
     && await recordedBy(orderId, leg, milestone ? milestone.id : null, userId)
     && !(await require('./makerCheckerGuard').selfApprovalAllowed('short_payment', userId))) {
-    return { error: 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.' };
+    await require('./approvalsInbox').recordShortPaymentRequest(orderId, leg, milestone, Number(userId), Number(s.owed), currency);
+    return { error: `You recorded this payment's receipts, so a different manager with "Approve short payment" must clear it short.${SENT_TO_APPROVALS}` };
   }
   const why = String(reason || '').trim();
   if ([...why].length < 10 || [...why].length > 500) {
@@ -314,6 +321,6 @@ async function pageData(orderId, milestones) {
 
 module.exports = {
   receiptExists,
-  LEGS, TOLERANCE, label, money, receipts, receivedTotal, orderReceivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
+  LEGS, TOLERANCE, SENT_TO_APPROVALS, label, money, receipts, receivedTotal, orderReceivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
   clearCheck, recordShortfall, recordedBy, clearedMessage, pageData,
 };

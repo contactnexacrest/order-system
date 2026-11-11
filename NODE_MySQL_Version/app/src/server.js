@@ -492,6 +492,9 @@ app.use((req, res, next) => {
       clientIntakePendingCount: req.clientIntakePendingCount || 0,
       piIntakePendingCount: req.piIntakePendingCount || 0,
       myReviewsPendingCount: req.myReviewsPendingCount || 0,
+      approvalsCount: req.approvalsCount || 0, // D-310
+      showApprovals: !!req.showApprovals, // D-310
+      setupNeededCount: req.setupNeededCount || 0, // D-312
       sopLibraryOpen: req.sopLibraryOpen !== false, // D-266
       sopExtrasCard: req.sopExtrasCard || null, // D-266: Users › Edit
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
@@ -717,6 +720,11 @@ app.get('/', requireAuth, asyncHandler(dashboardController.index));
 // Owner decisions D-280 / D-281 (11 Nov 2026): Admin › E-mail settings.
 app.get('/admin/email-settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(require('./controllers/emailSettingsController').index));
 app.post('/admin/email-settings', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(require('./controllers/emailSettingsController').save));
+// Owner decision D-312 (point 4 B): Admin › Setup checklist.
+app.get('/admin/setup-checklist', requireAuth, requirePermission('manage_company_settings'), asyncHandler(require('./controllers/setupChecklistController').index));
+app.post('/admin/setup-checklist/tick', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(require('./controllers/setupChecklistController').tick));
+app.post('/admin/setup-checklist/apply-recommended', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(require('./controllers/setupChecklistController').applyRecommended));
+app.post('/admin/setup-checklist/national-holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(require('./controllers/setupChecklistController').nationalHolidays));
 // D-283: "Stay logged in" (the 2-minute warning in app.js) — staff; the client and associate ones are with their portals.
 app.post('/keep-alive', requireAuth, verifyCsrf, asyncHandler(require('./controllers/sessionController').staffKeepAlive));
 // D-282: staff send a client a new set-password link (Client portal login block).
@@ -1448,6 +1456,8 @@ app.get('/pricing/line-quote', requireAuth, asyncHandler(priceRequestController.
 // PHP router's identical permission list (approve/reject take no
 // PermissionCheck, only SessionAuth::required()).
 app.get('/reviews', requireAuth, asyncHandler(reviewController.queue));
+// Owner decision D-310 (point 27): one Approvals page — each row is shown only to someone who may act on it (checked per row, as on /reviews).
+app.get('/approvals', requireAuth, asyncHandler(require('./controllers/approvalsController').index));
 app.post('/documents/:documentId/reviewers', requireAuth, requirePermission('approve_documents'), verifyCsrf, asyncHandler(reviewController.assign));
 app.post('/reviews/:reviewId/approve', requireAuth, verifyCsrf, asyncHandler(reviewController.approve));
 app.post('/reviews/:reviewId/reject', requireAuth, verifyCsrf, asyncHandler(reviewController.reject));
