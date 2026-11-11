@@ -109,6 +109,7 @@ describe('Ops nav group visibility (External QA report U-18)', () => {
 
     expect(html).not.toContain('href="/clients"');
     expect(html).not.toContain('href="/orders"');
-    expect(html).not.toContain('>Operations</summary>');
+    expect(html).not.toContain('data-nav="orders"'); // D-320: no Orders entry in the left menu
+    expect(html).not.toContain('data-nav="clients"');
   });
 });

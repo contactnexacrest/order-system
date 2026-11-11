@@ -1,0 +1,248 @@
+{
+  "_about": "Owner decision D-320 (11 Nov 2026, point 26): the one menu config. The left menu (13 entries) and every section's menu bar are built from this file by App\\Services\\Navigation (PHP) and src/services/navigation.js (Node). The file is the same, byte for byte, in both stacks (navigationConfig tests). A section owns the pages whose path starts with one of its prefixes (the longest prefix wins). 'count' on a section shows that count beside its left-menu entry on every page (Approvals, My tasks, Zoho waiting, settings near expiry). A section is shown when the person can open at least one of its items; its left-menu link is the first such item that opens in the same tab. 'when': any = at least one of these permissions, all = every one, flags = every one of these facts (worked out by each stack: superAdmin, sopOpen, approver, mod_<module>, div_gst, div_import_duty). 'count' names a live count. 'children' makes a drop-down. 'activeQuery' marks the item active only for these values of a query parameter ('' = not given). An item whose link has a #part is never marked active.",
+  "groups": {
+    "work": "Work",
+    "overview": "Overview",
+    "help": "Help",
+    "admin": "Admin"
+  },
+  "sections": [
+    {
+      "key": "dashboard",
+      "label": "Dashboard",
+      "group": null,
+      "href": "/",
+      "exact": true,
+      "icon": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\"></rect><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\"></rect><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\"></rect><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\"></rect>",
+      "items": []
+    },
+    {
+      "key": "approvals",
+      "label": "Approvals",
+      "group": null,
+      "count": "approvals",
+      "prefixes": ["/approvals", "/reviews", "/email-approvals"],
+      "icon": "<path d=\"M9 11l3 3L22 4\"></path><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"></path>",
+      "items": [
+        { "label": "All", "href": "/approvals", "activeQuery": { "tab": ["", "all"] }, "when": { "flags": ["approver"] }, "count": "approvals" },
+        { "label": "Prices", "href": "/approvals?tab=prices", "when": { "any": ["manage_pricing"], "flags": ["approver"] }, "count": "approvals_prices" },
+        { "label": "Payment terms", "href": "/approvals?tab=payment_terms", "when": { "any": ["approve_payment_terms"], "flags": ["approver"] }, "count": "approvals_payment_terms" },
+        { "label": "Documents", "href": "/reviews", "count": "myReviews" },
+        { "label": "E-mails", "href": "/email-approvals", "when": { "any": ["approve_email_send"] }, "count": "emailApprovals" },
+        { "label": "Bank details", "href": "/approvals?tab=bank", "when": { "flags": ["approver"] }, "count": "approvals_bank" },
+        { "label": "Other", "href": "/approvals?tab=other", "when": { "flags": ["approver"] }, "count": "approvals_other" }
+      ]
+    },
+    {
+      "key": "tasks",
+      "label": "My tasks",
+      "group": null,
+      "href": "/my-tasks",
+      "when": { "any": ["manage_orders", "view_orders"] },
+      "count": "myTasks",
+      "prefixes": ["/my-tasks"],
+      "icon": "<path d=\"M20 6 9 17l-5-5\"></path>",
+      "items": []
+    },
+    {
+      "key": "orders",
+      "label": "Orders",
+      "group": "work",
+      "prefixes": ["/orders", "/domestic", "/client-intake", "/pi-intake-review", "/reorder-requests", "/disputes", "/complaints"],
+      "icon": "<rect x=\"2\" y=\"7\" width=\"20\" height=\"14\" rx=\"2\"></rect><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"></path>",
+      "items": [
+        { "label": "Active", "href": "/orders", "match": ["/domestic"], "when": { "any": ["manage_orders", "view_orders"] } },
+        { "label": "Archived", "href": "/orders/archived", "when": { "any": ["view_archived_orders"] } },
+        { "label": "Quotation requests", "href": "/client-intake", "when": { "any": ["manage_orders"] }, "count": "clientIntake" },
+        { "label": "PI-stage details", "href": "/pi-intake-review", "when": { "any": ["manage_orders"] }, "count": "piIntake" },
+        { "label": "Reorder requests", "href": "/reorder-requests", "when": { "any": ["manage_orders"] } },
+        { "label": "Disputes", "href": "/disputes", "when": { "any": ["manage_disputes", "respond_to_disputes"] } },
+        { "label": "Complaints", "href": "/complaints", "when": { "any": ["manage_complaints", "respond_to_complaints"] } }
+      ]
+    },
+    {
+      "key": "clients",
+      "label": "Clients",
+      "group": "work",
+      "prefixes": ["/clients", "/agreements"],
+      "icon": "<path d=\"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M23 21v-2a4 4 0 0 0-3-3.87\"></path><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"></path>",
+      "items": [
+        { "label": "All clients", "href": "/clients", "when": { "any": ["manage_orders", "view_clients"] } },
+        { "label": "+ Add client", "href": "/clients/create", "when": { "any": ["manage_orders"] } },
+        { "label": "Agreements", "href": "/agreements", "when": { "any": ["view_agreements", "manage_agreements"] } }
+      ],
+      "crossLinks": [
+        { "label": "Open in Orders ›", "href": "/orders", "onPaths": ["/clients"], "when": { "any": ["manage_orders", "view_orders"] } }
+      ]
+    },
+    {
+      "key": "associates",
+      "label": "Associates",
+      "group": "work",
+      "prefixes": ["/associates", "/reports/associates"],
+      "icon": "<circle cx=\"12\" cy=\"8\" r=\"4\"></circle><path d=\"M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1\"></path>",
+      "items": [
+        { "label": "All associates", "href": "/associates", "when": { "any": ["view_associates", "manage_associates", "manage_associate_bank"], "flags": ["mod_associates"] } },
+        { "label": "+ Add associate", "href": "/associates/new", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] } },
+        { "label": "Registrations", "href": "/associates/registrations", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] }, "count": "associateRegistrations" },
+        { "label": "Price requests", "href": "/associates/price-requests", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } },
+        { "label": "Commission", "children": [
+          { "label": "Commission settings and ladder", "href": "/associates/ladder", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] } },
+          { "label": "Commission levels", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } }
+        ] },
+        { "label": "Payouts", "href": "/incentives/payouts#associate-payouts", "when": { "any": ["pay_incentives"], "flags": ["mod_associates", "mod_team_incentive"] } },
+        { "label": "TDS register", "href": "/associates/tds", "when": { "any": ["manage_incentives", "pay_incentives", "ca_module_view"], "flags": ["mod_associates"] } },
+        { "label": "Access levels", "href": "/associates/access-levels", "when": { "any": ["view_associates", "manage_associates"], "flags": ["mod_associates"] } },
+        { "label": "Report", "href": "/reports/associates", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] } }
+      ]
+    },
+    {
+      "key": "products",
+      "label": "Products",
+      "group": "work",
+      "prefixes": ["/products", "/pricing", "/hs-codes"],
+      "icon": "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"></path>",
+      "items": [
+        { "label": "All products", "href": "/products", "when": { "any": ["view_product_catalog"] } },
+        { "label": "+ Add product", "href": "/products/create", "when": { "any": ["manage_product_catalog"] } },
+        { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
+        { "label": "Price rules", "href": "/products/price-rules", "when": { "any": ["manage_pricing", "view_price_buildup"] } },
+        { "label": "Pricing", "children": [
+          { "label": "Pricing settings (margin, buffer, exchange rate)", "href": "/pricing/settings", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
+          { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
+          { "label": "Exchange-rate history", "href": "/pricing/settings#exchange-rate", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
+          { "label": "Specifications", "href": "/pricing/specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } }
+        ] },
+        { "label": "Price requests", "href": "/associates/price-requests", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } },
+        { "label": "HS codes", "children": [
+          { "label": "HS codes", "href": "/hs-codes", "when": { "any": ["manage_hs_codes"] } },
+          { "label": "Fix HS codes on products", "href": "/products/fix-hs-codes", "when": { "any": ["manage_product_catalog"] } }
+        ] },
+        { "label": "Link suppliers", "href": "/products/link-suppliers", "when": { "any": ["record_market_prices", "manage_suppliers"] } }
+      ],
+      "crossLinks": [
+        { "label": "Open Suppliers in Procurement ›", "href": "/suppliers", "onPaths": ["/products"], "when": { "any": ["manage_suppliers"] } }
+      ]
+    },
+    {
+      "key": "procurement",
+      "label": "Procurement & suppliers",
+      "group": "work",
+      "prefixes": ["/procurement", "/suppliers", "/logistics-partners", "/import", "/merchant"],
+      "icon": "<rect x=\"1\" y=\"3\" width=\"15\" height=\"13\"></rect><path d=\"M16 8h4l3 3v5h-7V8z\"></path><circle cx=\"5.5\" cy=\"18.5\" r=\"2.5\"></circle><circle cx=\"18.5\" cy=\"18.5\" r=\"2.5\"></circle>",
+      "items": [
+        { "label": "Procurement", "href": "/procurement", "when": { "any": ["manage_purchasing", "approve_purchases"], "flags": ["mod_supplier_purchase"] } },
+        { "label": "Suppliers", "href": "/suppliers", "when": { "any": ["manage_suppliers"] } },
+        { "label": "Logistics partners", "href": "/logistics-partners", "when": { "any": ["manage_logistics_partners"] } },
+        { "label": "Supplier performance", "href": "/procurement/suppliers", "when": { "any": ["manage_purchasing"], "flags": ["mod_supplier_purchase"] } },
+        { "label": "Imports & stock", "href": "/import", "when": { "any": ["view_purchase_prices"], "flags": ["mod_import_stock"] } },
+        { "label": "Merchant trade", "href": "/merchant", "when": { "any": ["view_purchase_prices"], "flags": ["mod_merchant_trade"] } }
+      ]
+    },
+    {
+      "key": "finance",
+      "label": "Finance & accounts",
+      "group": "work",
+      "count": "zohoWaiting",
+      "prefixes": ["/ca", "/incentives", "/my-incentives"],
+      "icon": "<line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"23\"></line><path d=\"M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\"></path>",
+      "items": [
+        { "label": "CA / Accounting", "href": "/ca", "when": { "any": ["ca_module_view"] } },
+        { "label": "Zoho sync", "href": "/ca/zoho-sync", "when": { "any": ["ca_module_manage"] }, "count": "zohoWaiting" },
+        { "label": "Incentive payouts", "href": "/incentives/payouts", "when": { "any": ["pay_incentives"], "flags": ["mod_team_incentive"] } },
+        { "label": "My incentives", "href": "/my-incentives", "when": { "any": ["view_own_incentives"], "flags": ["mod_team_incentive"] } },
+        { "label": "Team incentive settings", "href": "/incentives/settings", "match": ["/incentives/ready"], "when": { "any": ["manage_incentives"], "flags": ["mod_team_incentive"] } }
+      ],
+      "crossLinks": [
+        { "label": "Open in Reports ›", "href": "/reports", "onPaths": ["/ca"], "when": { "any": ["view_reports"] } }
+      ]
+    },
+    {
+      "key": "reports",
+      "label": "Reports",
+      "group": "overview",
+      "prefixes": ["/reports", "/cockpit", "/audit-log"],
+      "icon": "<path d=\"M3 3v18h18\"></path><path d=\"M18 17V9\"></path><path d=\"M13 17V5\"></path><path d=\"M8 17v-3\"></path>",
+      "items": [
+        { "label": "All reports", "href": "/reports", "when": { "any": ["view_reports"] } },
+        { "label": "Freight cost", "href": "/reports/freight-cost", "when": { "any": ["view_logistics_costs"] } },
+        { "label": "Supplier report", "href": "/reports/suppliers", "when": { "any": ["view_purchase_prices"] } },
+        { "label": "Management cockpit", "href": "/cockpit", "when": { "any": ["view_cockpit"] } },
+        { "label": "Audit log", "href": "/audit-log", "when": { "any": ["view_audit_log"] } }
+      ]
+    },
+    {
+      "key": "help",
+      "label": "Help & SOP",
+      "group": "help",
+      "prefixes": ["/getting-started", "/sop", "/reference-docs", "/gallery", "/help"],
+      "icon": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"></path><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"></line>",
+      "items": [
+        { "label": "Getting started", "href": "/getting-started", "target": "_blank" },
+        { "label": "SOP", "href": "/sop", "target": "_blank", "when": { "flags": ["sopOpen"] } },
+        { "label": "Reference library", "href": "/reference-docs" },
+        { "label": "Gallery", "href": "/gallery", "when": { "flags": ["sopOpen"] } }
+      ]
+    },
+    {
+      "key": "users",
+      "label": "Users & roles",
+      "group": "admin",
+      "prefixes": ["/users", "/admin/permissions", "/admin/departments", "/admin/task-types", "/admin/self-approval", "/admin/sop-access", "/admin/field-protection"],
+      "icon": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M19 8v6\"></path><path d=\"M22 11h-6\"></path>",
+      "items": [
+        { "label": "Users", "href": "/users", "when": { "any": ["manage_users"] } },
+        { "label": "+ Add user", "href": "/users#create-user", "when": { "any": ["manage_users"] } },
+        { "label": "Roles and permissions", "href": "/admin/permissions", "when": { "any": ["manage_permissions"] } },
+        { "label": "Departments", "href": "/admin/departments", "when": { "any": ["manage_permissions"] } },
+        { "label": "Task due days", "href": "/admin/task-types", "when": { "any": ["manage_task_types"] } },
+        { "label": "Self-approval rules", "href": "/admin/self-approval", "when": { "flags": ["superAdmin"] } },
+        { "label": "SOP access", "href": "/admin/sop-access", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Field protection", "href": "/admin/field-protection", "when": { "any": ["manage_field_protection"] } }
+      ]
+    },
+    {
+      "key": "settings",
+      "label": "Settings",
+      "group": "admin",
+      "count": "settingsExpiry",
+      "prefixes": ["/settings", "/admin", "/holidays", "/email-templates", "/watermarks", "/signatories", "/company-assets", "/ui-templates", "/ports", "/port-routes", "/payment-presets", "/compliance-task-types", "/sample-data", "/test-mode", "/super-admin"],
+      "icon": "<circle cx=\"12\" cy=\"12\" r=\"3\"></circle><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"></path>",
+      "items": [
+        { "label": "Setup checklist", "href": "/admin/setup-checklist", "when": { "any": ["manage_company_settings"] }, "count": "setupNeeded" },
+        { "label": "Company", "href": "/settings", "when": { "any": ["manage_company_settings"] }, "count": "settingsExpiry" },
+        { "label": "E-mail", "href": "/admin/email-settings", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Security", "href": "/settings#settings-security", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Holidays", "href": "/holidays", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Document clean-up", "href": "/settings/document-cleanup", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Backups", "href": "/admin/backups", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Zoho", "href": "/settings#settings-zoho", "when": { "any": ["manage_company_settings"] } },
+        { "label": "Documents", "children": [
+          { "label": "Email templates", "href": "/email-templates", "when": { "any": ["manage_email_templates"] } },
+          { "label": "Watermarks", "href": "/watermarks", "when": { "any": ["manage_company_settings"] } },
+          { "label": "Signatories", "href": "/signatories", "when": { "any": ["manage_signatories"] } },
+          { "label": "Assets", "href": "/company-assets", "when": { "any": ["manage_assets"] } },
+          { "label": "UI templates", "href": "/ui-templates", "when": { "any": ["manage_company_settings"] } }
+        ] },
+        { "label": "Lists", "children": [
+          { "label": "Ports", "href": "/ports", "when": { "any": ["manage_ports"] } },
+          { "label": "Port routes", "href": "/port-routes", "when": { "any": ["manage_ports"] } },
+          { "label": "Payment presets", "href": "/payment-presets", "when": { "any": ["manage_payment_presets"] } },
+          { "label": "Dropdown lists", "href": "/admin/dropdown-options", "when": { "any": ["manage_dropdown_options"] } },
+          { "label": "GST rates", "href": "/admin/gst-rates", "when": { "any": ["manage_divisions"], "flags": ["div_gst"] } },
+          { "label": "Import duty", "href": "/admin/import-duty-rates", "when": { "any": ["manage_divisions"], "flags": ["div_import_duty"] } },
+          { "label": "Compliance task types", "href": "/compliance-task-types", "when": { "any": ["manage_compliance_task_types"] } },
+          { "label": "Remittance difference reasons", "href": "/settings/remittance-reasons", "when": { "any": ["manage_company_settings"] } },
+          { "label": "Associate TDS rules", "href": "/settings/associate-tds", "when": { "any": ["manage_company_settings"] } },
+          { "label": "Reference library categories", "href": "/reference-docs/categories", "when": { "any": ["manage_company_settings"] } }
+        ] },
+        { "label": "Divisions", "href": "/admin/divisions", "when": { "any": ["manage_divisions"] } },
+        { "label": "Admin overrides", "href": "/admin/overrides", "when": { "any": ["edit_locked_data"] } },
+        { "label": "Data export", "href": "/admin/data-export", "when": { "any": ["data_export_run"] } },
+        { "label": "Sample data", "href": "/sample-data", "when": { "any": ["manage_sample_data"] } },
+        { "label": "Test mode", "href": "/test-mode", "when": { "flags": ["superAdmin"] } },
+        { "label": "Super Admin", "href": "/super-admin", "when": { "flags": ["superAdmin"] } }
+      ]
+    }
+  ]
+}

@@ -20,7 +20,8 @@
       <button type="button" class="btn-sm" onclick="toggleAllSettingsSections(false)">Collapse all</button>
     </div>
     <?php foreach ($grouped as $category => $rows): ?>
-      <details class="collapsible-section settings-section" data-category="<?= htmlspecialchars($category) ?>">
+      <?php // D-320: the id lets Settings › Security / Zoho open their section ?>
+      <details class="collapsible-section settings-section" data-category="<?= htmlspecialchars($category) ?>" id="settings-<?= htmlspecialchars($category) ?>">
       <summary><?= htmlspecialchars(ucfirst($category)) ?> <span class="muted small settings-section-count">(<?= count($rows) ?>)</span></summary>
       <fieldset>
         <?php foreach ($rows as $row): ?>

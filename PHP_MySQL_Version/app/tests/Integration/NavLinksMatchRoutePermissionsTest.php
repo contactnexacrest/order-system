@@ -29,9 +29,11 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
     {
         $_SESSION['_auth_user_id'] = $this->createTestUser('Export Executive');
 
+        $_SERVER['REQUEST_URI'] = '/orders'; // D-320: Disputes is in the Orders menu bar, drawn for the page's path
         ob_start();
         (new OrderController())->index([]);
         $html = (string) ob_get_clean();
+        unset($_SERVER['REQUEST_URI']);
 
         // Owner decision 2026-10-30 (QA Round 6, Q-R6-3): respond_to_disputes
         // now opens the list too, scoped to the orders the user may see.
@@ -42,9 +44,11 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
     {
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
 
+        $_SERVER['REQUEST_URI'] = '/orders'; // D-320: Disputes is in the Orders menu bar, drawn for the page's path
         ob_start();
         (new OrderController())->index([]);
         $html = (string) ob_get_clean();
+        unset($_SERVER['REQUEST_URI']);
 
         self::assertStringContainsString('href="/disputes"', $html);
     }

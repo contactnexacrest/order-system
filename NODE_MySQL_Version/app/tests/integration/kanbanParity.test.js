@@ -148,6 +148,22 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     }
   });
 
+  // Owner decision D-320 (point 26): the section menu bar is one shared partial
+  // drawn by the layout, so the list and the board of every page show the very
+  // same bar (same items, same counts, same page marked) and the same left menu.
+  it('shows the same section menu bar on the list and the board', async () => {
+    await seed();
+    const bar = (html) => (html.match(/<nav class="section-nav"[\s\S]*?<\/nav>/) || [''])[0];
+    const side = (html) => (html.match(/<nav class="sidebar-nav"[\s\S]*?<\/nav>/) || [''])[0];
+    for (const [page, listUrl, boardUrl] of [...PAGES, ['Approvals', '/approvals?view=list', '/approvals']]) {
+      const list = (await agent.get(listUrl)).text;
+      const board = (await agent.get(boardUrl)).text;
+      if (page !== 'My tasks') expect([page, bar(list) !== '']).toEqual([page, true]);
+      expect([page, bar(list)]).toEqual([page, bar(board)]);
+      expect([page, side(list)]).toEqual([page, side(board)]);
+    }
+  });
+
   // QA Round 7, R7-N08: with no filter chosen, the list and the board open on
   // the same orders (Active) — the board used to add Docs Sent and Complete.
   it('opens the Orders list and board on the same orders', async () => {

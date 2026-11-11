@@ -94,6 +94,6 @@ final class AdminNavGroupVisibilityTest extends DbTestCase
         $output = $this->renderDashboardAs($userId);
 
         self::assertStringNotContainsString('href="/compliance-task-types"', $output);
-        self::assertStringNotContainsString('>Admin</summary>', $output);
+        self::assertStringNotContainsString('data-nav="settings"', $output); // D-320: no Settings entry in the left menu
     }
 }

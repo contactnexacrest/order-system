@@ -3,9 +3,6 @@
   <h1>{{ client.company_legal_name }}</h1>
   <p class="muted">
     Buyer Inquiry Ref: <strong>{{ client.client_unique_number }}</strong>
-    {% if permissions.view_reports %}
-      &nbsp;&middot;&nbsp; <a href="/reports/client/{{ client.id }}">Full Report</a>
-    {% endif %}
   </p>
   {% include "partials/associate_line.njk" %}
   {% if not client.is_active %}
@@ -19,14 +16,17 @@
       {% for d in duplicatedInto %}{{ ', ' if not loop.first }}<a href="/clients/{{ d.id }}">{{ d.company_legal_name }}</a>{% endfor %}.
     </p>
   {% endif %}
-  {% if permissions.manage_orders %}
-  <div class="btn-row">
-    <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/edit">Edit</a>
+  {% if permissions.manage_orders or permissions.view_reports %}{# D-320 (point 26): the main buttons stay at the top while scrolling #}
+  <div class="btn-row sticky-actions" data-testid="client-actions">
+    {% if permissions.view_reports %}<a class="btn-sm btn-secondary" href="/reports/client/{{ client.id }}">Full report</a>{% endif %}
+    {% if permissions.manage_orders %}
+    <a class="btn-sm" href="/clients/{{ client.id }}/edit">Edit</a>
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" data-confirm="{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>
     </form>
+    {% endif %}
   </div>
   {% endif %}
 

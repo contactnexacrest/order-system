@@ -25,9 +25,6 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   <h1><?= htmlspecialchars($client['company_legal_name']) ?></h1>
   <p class="muted">
     Buyer Inquiry Ref: <strong><?= htmlspecialchars($client['client_unique_number']) ?></strong>
-    <?php if (PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_reports')): ?>
-      &nbsp;·&nbsp; <a href="/reports/client/<?= (int) $client['id'] ?>">Full Report</a>
-    <?php endif; ?>
   </p>
   <?php $__clientId = (int) $client['id']; require dirname(__DIR__) . '/partials/associate_line.php'; ?>
   <?php if ((int) $client['is_active'] === 0): ?>
@@ -41,14 +38,18 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       <?php foreach ($duplicatedInto as $i => $d): ?><?= $i > 0 ? ', ' : '' ?><a href="/clients/<?= (int) $d['id'] ?>"><?= htmlspecialchars($d['company_legal_name']) ?></a><?php endforeach; ?>.
     </p>
   <?php endif; ?>
-  <?php if ($canManageOrders): ?>
-  <div class="btn-row">
-    <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a>
+  <?php $__canClientReport = PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_reports'); ?>
+  <?php if ($canManageOrders || $__canClientReport): // D-320 (point 26): the main buttons stay at the top while scrolling ?>
+  <div class="btn-row sticky-actions" data-testid="client-actions">
+    <?php if ($__canClientReport): ?><a class="btn-sm btn-secondary" href="/reports/client/<?= (int) $client['id'] ?>">Full report</a><?php endif; ?>
+    <?php if ($canManageOrders): ?>
+    <a class="btn-sm" href="/clients/<?= (int) $client['id'] ?>/edit">Edit</a>
     <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>?<?= (int) $client['is_active'] === 1 ? ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' : '' ?>');">
       <?= Csrf::field() ?>
       <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?></button>
     </form>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 

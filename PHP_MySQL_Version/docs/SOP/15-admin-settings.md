@@ -6,9 +6,29 @@ Everything that configures how the system behaves, rather than any single
 order — roles and who can do what, users, company/bank details baked into
 documents, the HS code master list, email templates, watermarks,
 signatories, and a handful of override/protection mechanisms. Only visible
-in the sidebar to staff who actually have the relevant permission — most
-Admin sub-items are simply absent for a role that isn't allowed to touch
-them.
+to staff who actually have the relevant permission — most of these pages
+are simply absent for a role that isn't allowed to touch them.
+
+**Where these pages are (since 11 Nov 2026).** The old "Admin" group is now
+two left-menu entries, each with its own menu bar at the top of its pages
+(see [Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)):
+
+- **Users & roles** — Users · + Add user · Roles and permissions ·
+  Departments · Task due days · Self-approval rules · SOP access · Field
+  protection.
+- **Settings** — Setup checklist · Company · E-mail · Security · Holidays ·
+  Document clean-up · Backups · Zoho · Documents ▾ (email templates,
+  watermarks, signatories, assets, UI templates) · Lists ▾ (ports, port
+  routes, payment presets, dropdown lists, GST rates, import duty,
+  compliance task types, remittance difference reasons, associate TDS
+  rules, reference library categories) · Divisions · Admin overrides · Data
+  export · Sample data · Test mode · Super Admin.
+- Moved out of Admin: **HS codes** and **Pricing** are in **Products**;
+  **Suppliers** and **Logistics partners** in **Procurement & suppliers**;
+  **Team incentives** in **Finance & accounts**.
+
+Where this manual still says "Admin → X", look for X in these two menu bars
+(or in the section named above).
 
 ## The system does this automatically
 

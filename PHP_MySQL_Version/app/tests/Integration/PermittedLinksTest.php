@@ -96,8 +96,14 @@ final class PermittedLinksTest extends DbTestCase
         $this->actAs($this->createTestUser('Admin'));
         $gettingStarted = $this->render(fn () => (new GettingStartedController())->show([]));
         self::assertStringContainsString('href="/settings"', $gettingStarted);
-        $dashboard = $this->render(fn () => (new DashboardController())->index([]));
-        self::assertStringContainsString('href="/pi-intake-review"', $dashboard);
+        // D-320 (point 26): PI-stage details is in the Orders menu bar, shown on every Orders page.
+        $_SERVER['REQUEST_URI'] = '/client-intake';
+        try {
+            $ordersPage = $this->render(fn () => (new \App\Controllers\ClientIntakeReviewController())->index([]));
+        } finally {
+            unset($_SERVER['REQUEST_URI']);
+        }
+        self::assertStringContainsString('href="/pi-intake-review"', $ordersPage);
     }
 
     public function testAUserHoldingOnlyManagePortsGetsTheAdminMenuWithPorts(): void

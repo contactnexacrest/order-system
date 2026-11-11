@@ -11,6 +11,8 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
  * Port of MyReviewsSidebarBadgeTest.php. Owner request (2026-10-26): "My
  * Reviews" shows how many documents are waiting on the signed-in user's
  * review, the same live badge the Quotation/PI Intake Review links carry.
+ * Owner decision D-320 (point 26): My Reviews is now "Documents" in the
+ * Approvals menu bar, with the same count.
  */
 describe('My Reviews sidebar badge', () => {
   afterAll(async () => {
@@ -34,7 +36,7 @@ describe('My Reviews sidebar badge', () => {
   }
 
   async function myReviewsLink(agent) {
-    const { text } = await agent.get('/');
+    const { text } = await agent.get('/reviews');
     const start = text.indexOf('<a href="/reviews"');
     expect(start).toBeGreaterThan(-1);
     return text.slice(start, text.indexOf('</a>', start));

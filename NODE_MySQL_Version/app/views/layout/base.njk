@@ -16,32 +16,6 @@
 {% if devServerEnabled %}
   <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
 {% endif %}
-{% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
-{# docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility split. #}
-{% set canComplaints = permissions.manage_complaints or permissions.respond_to_complaints %}
-{% set canViewComplaintsList = permissions.manage_complaints or permissions.respond_to_complaints %}
-{# External QA report U-18: /clients and /orders each also accept their own narrower view_clients/view_orders permission (server.js) — a Viewer/Auditor holds exactly these two and nothing else in this group, so without them here the whole Operations dropdown never rendered at all, even though both routes worked fine by direct URL. #}
-{# Owner decision D-214, phase 3: Procurement's queue. #}
-{% set canProcurement = (permissions.manage_purchasing or permissions.approve_purchases) and division.modules.supplier_purchase !== false %}{# D-257: a module switched off for the division hides its menu #}
-{% set canImports = permissions.view_purchase_prices and division.modules.import_stock === true %}{# D-257 Phase 3: Import & Distribution's imports and stock — only where its module is on (IMP only) #}
-{% set canMerchant = permissions.view_purchase_prices and division.modules.merchant_trade === true %}{# D-257 Phase 4: Merchant Trade's deals — only where its module is on (MTT only) #}
-{% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or canComplaints or permissions.view_clients or permissions.view_orders or canProcurement or canImports or canMerchant %}
-{# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
-{% set canViewDisputesList = permissions.manage_disputes or permissions.respond_to_disputes %}
-{# Owner decision 1 Nov 2026 (A-7 / A-9): Logistics and Procurement open their own report without the Reports page. #}
-{% set canFreightReport = (not permissions.view_reports) and permissions.view_logistics_costs %}
-{% set canSupplierReport = (not permissions.view_reports) and permissions.view_purchase_prices %}
-{% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.pay_incentives or permissions.view_own_incentives or permissions.view_cockpit or canFreightReport or canSupplierReport %}
-{# 90-item backlog #34: manage_hs_codes/manage_compliance_task_types/
-   manage_dropdown_options/manage_email_templates each gate their own link
-   inside this dropdown but were never added to the group's own visibility
-   check — a role whose ONLY Admin-section permission was one of these
-   four saw no "Admin" dropdown at all. #}
-{% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners or permissions.manage_suppliers or permissions.manage_ports or permissions.manage_payment_presets or permissions.manage_hs_codes or permissions.manage_compliance_task_types or permissions.manage_dropdown_options or permissions.manage_email_templates or permissions.manage_incentives or permissions.view_price_buildup or permissions.manage_pricing or permissions.manage_divisions %}
-{% set opsGroupActive = (currentPath | startswith('/procurement')) or (currentPath | startswith('/clients')) or (currentPath | startswith('/associates')) or (currentPath | startswith('/agreements')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) or (currentPath | startswith('/complaints')) %}
-{% set insightsGroupActive = (currentPath | startswith('/cockpit')) or ((currentPath | startswith('/reports')) and not (currentPath | startswith('/reports/associates'))) or (currentPath | startswith('/audit-log')) or (currentPath | startswith('/incentives/payouts')) or (currentPath | startswith('/my-incentives')) %}
-{% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) or (currentPath | startswith('/ui-templates')) or (currentPath | startswith('/logistics-partners')) or (currentPath | startswith('/suppliers')) or (currentPath | startswith('/ports')) or (currentPath | startswith('/payment-presets')) or (currentPath | startswith('/compliance-task-types')) or (currentPath | startswith('/incentives/settings')) or (currentPath | startswith('/pricing')) %}
-{% set ordersActive = currentPath === '/orders' or ((currentPath | startswith('/orders/')) and not (currentPath | startswith('/orders/archived'))) %}
 <div class="app-shell">
 <header class="sidebar">
   <div class="sidebar-brand">
@@ -54,107 +28,14 @@
     <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox">
     <label for="nav-toggle" class="nav-toggle-label" aria-label="Toggle navigation">&#9776;</label>
   {% endif %}
-  <nav class="sidebar-nav">
-    <a href="/" class="{{ 'active' if currentPath === '/' else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg></span>Dashboard</a>
-    {% if showApprovals %}{# D-310: everything this person may approve, on one page #}
-      <a href="/approvals" class="{{ 'active' if (currentPath | startswith('/approvals')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Approvals{% if approvalsCount > 0 %} <span class="nav-badge">{{ approvalsCount }}</span>{% endif %}</a>
-    {% endif %}
-    {% if currentUser %}
-      <a href="/getting-started" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg></span>Getting Started</a>
-      <a href="/reference-docs" class="{{ 'active' if (currentPath | startswith('/reference-docs')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>Reference Library</a>
-      {% if sopLibraryOpen %}
-      <a href="/sop" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>SOP / Operations Guide</a>
-      <a href="/gallery" class="{{ 'active' if (currentPath | startswith('/gallery')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg></span>Gallery</a>
-      {% endif %}
-      <a href="/reviews" class="{{ 'active' if (currentPath | startswith('/reviews')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews{% if myReviewsPendingCount > 0 %} <span class="nav-badge">{{ myReviewsPendingCount }}</span>{% endif %}</a>
-      {% if permissions.manage_orders or permissions.view_orders %}<a href="/my-tasks" class="{{ 'active' if (currentPath | startswith('/my-tasks')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>My Tasks</a>{% endif %}
-      {% if permissions.approve_email_send %}<a href="/email-approvals" class="{{ 'active' if (currentPath | startswith('/email-approvals')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 6L2 7"></path></svg></span>Email Approvals{% if emailApprovalsPendingCount > 0 %} <span class="nav-badge">{{ emailApprovalsPendingCount }}</span>{% endif %}</a>{% endif %}
-      {% if permissions.ca_module_view %}<a href="/ca" class="{{ 'active' if (currentPath | startswith('/ca')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a>{% endif %}
-      {# Owner 2 Nov 2026 (point 16): app-wide Zoho Sync in the menu #}
-      {% if permissions.ca_module_manage %}<a href="/ca/zoho-sync" class="{{ 'active' if (currentPath | startswith('/ca/zoho-sync')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></span>Zoho Sync{% if zohoWaitingMenu and zohoWaitingMenu > 0 %} <span class="badge badge-warning nav-badge zoho-waiting-menu" title="Waiting for Zoho: {{ zohoWaitingMenu }} — {{ zohoPausedText or 'sent at the next sync (hourly, or Sync now)' }}">{{ zohoWaitingMenu }}</span>{% endif %}</a>{% endif %}
-      {% if permissions.view_product_catalog %}<a href="/products" class="{{ 'active' if (currentPath | startswith('/products')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a>{% endif %}
-    {% endif %}
-    {% if currentUser and opsGroupVisible %}
-      <details class="nav-group" {{ 'open' if opsGroupActive else '' }}>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
-        <div class="nav-dropdown">
-          {% if permissions.manage_orders or permissions.view_clients %}<a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>{% endif %}
-          {% if division.modules.associates !== false and (permissions.view_associates or permissions.manage_associates or permissions.manage_associate_bank) %}<a href="/associates" class="{{ 'active' if (currentPath | startswith('/associates')) else '' }}">Associates</a>{% endif %}
-          {% if permissions.view_agreements or permissions.manage_agreements %}<a href="/agreements" class="{{ 'active' if (currentPath | startswith('/agreements')) else '' }}">Agreements</a>{% endif %}
-          {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>{% endif %}
-          {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
-          {# QA Round 5, R5-22: these three routes need manage_orders. #}
-          {% if permissions.manage_orders %}
-          <a href="/client-intake" class="{{ 'active' if (currentPath | startswith('/client-intake')) else '' }}">Quotation Intake Review{% if clientIntakePendingCount > 0 %} <span class="nav-badge">{{ clientIntakePendingCount }}</span>{% endif %}</a>
-          <a href="/pi-intake-review" class="{{ 'active' if (currentPath | startswith('/pi-intake-review')) else '' }}">PI Intake Review{% if piIntakePendingCount > 0 %} <span class="nav-badge">{{ piIntakePendingCount }}</span>{% endif %}</a>
-          <a href="/reorder-requests" class="{{ 'active' if (currentPath | startswith('/reorder-requests')) else '' }}">Reorder Requests</a>
-          {% endif %}
-          {% if canViewDisputesList %}<a href="/disputes" class="{{ 'active' if (currentPath | startswith('/disputes')) else '' }}">Disputes</a>{% endif %}
-          {% if canViewComplaintsList %}<a href="/complaints" class="{{ 'active' if (currentPath | startswith('/complaints')) else '' }}">Complaints</a>{% endif %}
-          {% if canProcurement %}<a href="/procurement" class="{{ 'active' if (currentPath | startswith('/procurement')) else '' }}">Procurement</a>{% endif %}
-          {% if canImports %}<a href="/import" class="{{ 'active' if (currentPath | startswith('/import')) else '' }}">Imports &amp; stock</a>{% endif %}
-          {% if canMerchant %}<a href="/merchant" class="{{ 'active' if (currentPath | startswith('/merchant')) else '' }}">Merchant trade</a>{% endif %}
-        </div>
-      </details>
-    {% endif %}
-    {% if currentUser and insightsGroupVisible %}
-      <details class="nav-group" {{ 'open' if insightsGroupActive else '' }}>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
-        <div class="nav-dropdown">
-          {% if permissions.view_reports %}<a href="/reports" class="{{ 'active' if (currentPath | startswith('/reports')) else '' }}">Reports</a>{% endif %}
-          {% if canFreightReport %}<a href="/reports/freight-cost" class="{{ 'active' if (currentPath | startswith('/reports/freight-cost')) else '' }}">Freight Cost Report</a>{% endif %}
-          {% if canSupplierReport %}<a href="/reports/suppliers" class="{{ 'active' if (currentPath | startswith('/reports/suppliers')) else '' }}">Supplier Report</a>{% endif %}
-          {% if permissions.pay_incentives and division.modules.team_incentive !== false %}<a href="/incentives/payouts" class="{{ 'active' if (currentPath | startswith('/incentives/payouts')) else '' }}">Incentive Payouts</a>{% endif %}
-          {% if permissions.view_own_incentives and division.modules.team_incentive !== false %}<a href="/my-incentives" class="{{ 'active' if (currentPath | startswith('/my-incentives')) else '' }}">My Incentives</a>{% endif %}
-          {% if permissions.view_cockpit %}<a href="/cockpit" class="{{ 'active' if (currentPath | startswith('/cockpit')) else '' }}">Management Cockpit</a>{% endif %}
-          {% if permissions.view_audit_log %}<a href="/audit-log" class="{{ 'active' if (currentPath | startswith('/audit-log')) else '' }}">Audit Log</a>{% endif %}
-        </div>
-      </details>
-    {% endif %}
-    {% if currentUser and adminGroupVisible %}
-      <details class="nav-group" {{ 'open' if adminGroupActive else '' }}>
-        <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>Admin</summary>
-        <div class="nav-dropdown">
-          {% if permissions.manage_company_settings %}{# D-312 #}<a href="/admin/setup-checklist" class="{{ 'active' if (currentPath | startswith('/admin/setup-checklist')) else '' }}">Setup Checklist{% if setupNeededCount > 0 %} <span class="nav-badge">{{ setupNeededCount }}</span>{% endif %}</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/settings" class="{{ 'active' if (currentPath | startswith('/settings')) else '' }}">Company Settings{% if settingsExpiryWarningCount > 0 %} <span class="nav-badge">{{ settingsExpiryWarningCount }}</span>{% endif %}</a>{% endif %}
-          {% if permissions.manage_company_settings %}{# D-280 #}<a href="/admin/email-settings" class="{{ 'active' if (currentPath | startswith('/admin/email-settings')) else '' }}">E-mail Settings</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/holidays" class="{{ 'active' if (currentPath | startswith('/holidays')) else '' }}">Holiday Calendar</a>{% endif %}
-          {% if permissions.manage_hs_codes %}<a href="/hs-codes" class="{{ 'active' if (currentPath | startswith('/hs-codes')) else '' }}">HS Codes</a>{% endif %}
-          {% if permissions.manage_logistics_partners %}<a href="/logistics-partners" class="{{ 'active' if (currentPath | startswith('/logistics-partners')) else '' }}">Logistics Partners</a>{% endif %}
-          {% if permissions.manage_suppliers %}<a href="/suppliers" class="{{ 'active' if (currentPath | startswith('/suppliers')) else '' }}">Suppliers</a>{% endif %}
-          {% if permissions.manage_ports %}<a href="/ports" class="{{ 'active' if (currentPath | startswith('/ports')) else '' }}">Ports</a>{% endif %}
-          {% if permissions.manage_payment_presets %}<a href="/payment-presets" class="{{ 'active' if (currentPath | startswith('/payment-presets')) else '' }}">Payment Presets</a>{% endif %}
-          {% if permissions.manage_compliance_task_types %}<a href="/compliance-task-types" class="{{ 'active' if (currentPath | startswith('/compliance-task-types')) else '' }}">Compliance Task Types</a>{% endif %}
-          {% if permissions.manage_dropdown_options %}<a href="/admin/dropdown-options" class="{{ 'active' if (currentPath | startswith('/admin/dropdown-options')) else '' }}">Dropdown Option Lists</a>{% endif %}
-          {% if permissions.manage_email_templates %}<a href="/email-templates" class="{{ 'active' if (currentPath | startswith('/email-templates')) else '' }}">Email Templates</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/ui-templates" class="{{ 'active' if (currentPath | startswith('/ui-templates')) else '' }}">UI Templates</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
-          {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
-          {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
-          {% if permissions.manage_divisions %}<a href="/admin/divisions" class="{{ 'active' if (currentPath | startswith('/admin/divisions')) else '' }}">Divisions</a>{% endif %}{# D-257 #}
-          {# QA UI-12: the GST and import duty rate lists, once a division that uses them is active (until then: Admin › Divisions). #}
-          {% set __activeCodes = (division.activeCodes or []) if permissions.manage_divisions else [] %}
-          {% if 'DOM' in __activeCodes or 'IMP' in __activeCodes %}<a href="/admin/gst-rates" class="{{ 'active' if (currentPath | startswith('/admin/gst-rates')) else '' }}">GST Rates</a>{% endif %}
-          {% if 'IMP' in __activeCodes %}<a href="/admin/import-duty-rates" class="{{ 'active' if (currentPath | startswith('/admin/import-duty-rates')) else '' }}">Import Duty Rates</a>{% endif %}
-          {% if permissions.manage_permissions %}<a href="/admin/departments" class="{{ 'active' if (currentPath | startswith('/admin/departments')) else '' }}">Departments</a>{% endif %}
-          {% if permissions.manage_task_types %}<a href="/admin/task-types" class="{{ 'active' if (currentPath | startswith('/admin/task-types')) else '' }}">Task Due Days</a>{% endif %}
-          {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}
-          {% if permissions.manage_users %}<a href="/users" class="{{ 'active' if (currentPath | startswith('/users')) else '' }}">Users</a>{% endif %}
-          {% if permissions.manage_field_protection %}<a href="/admin/field-protection" class="{{ 'active' if (currentPath | startswith('/admin/field-protection')) else '' }}">Field Protection</a>{% endif %}
-          {% if permissions.manage_incentives and division.modules.team_incentive !== false %}<a href="/incentives/settings" class="{{ 'active' if (currentPath | startswith('/incentives/settings')) else '' }}">Team Incentives</a>{% endif %}
-          {% if permissions.view_price_buildup or permissions.manage_pricing %}<a href="/pricing/settings" class="{{ 'active' if (currentPath | startswith('/pricing')) else '' }}">Pricing</a>{% endif %}
-          {% if permissions.edit_locked_data %}<a href="/admin/overrides" class="{{ 'active' if (currentPath | startswith('/admin/overrides')) else '' }}">Admin Overrides</a>{% endif %}
-          {% if permissions.manage_sample_data %}<a href="/sample-data" class="{{ 'active' if (currentPath | startswith('/sample-data')) else '' }}">Sample Data</a>{% endif %}
-          {% if permissions.data_export_run %}<a href="/admin/data-export" class="{{ 'active' if (currentPath | startswith('/admin/data-export')) else '' }}">Data Export / Migration</a>{% endif %}
-          {% if permissions.manage_company_settings %}<a href="/admin/backups" class="{{ 'active' if (currentPath | startswith('/admin/backups')) else '' }}">Backups</a>{% endif %}
-        </div>
-      </details>
-    {% endif %}
-    {% if isSuperAdmin %}
-      <a href="/super-admin" class="{{ 'active' if (currentPath | startswith('/super-admin')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg></span>Super Admin</a>
-      <a href="/admin/self-approval" class="{{ 'active' if (currentPath | startswith('/admin/self-approval')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Self-approval rules</a>
-      <a href="/test-mode" class="{{ 'active' if (currentPath | startswith('/test-mode')) else '' }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"></path><path d="M8.5 14h7"></path></svg></span>Test Mode{% if testModeEnabled %} <span class="nav-live-dot" aria-hidden="true"></span>{% endif %}</a>
-    {% endif %}
+  <nav class="sidebar-nav" data-testid="main-menu">
+    {# Owner decision D-320 (point 26): the short left menu (13 entries), built from src/config/navigation.json (services/navigation.js) — each entry shows only when this person can open at least one page behind it. #}
+    {% if not nav %}
+      <a href="/" class="{{ 'active' if currentPath === '/' else '' }}">Dashboard</a>
+    {% else %}{% for entry in nav.sidebar %}
+      {% if entry.heading %}<div class="nav-heading">{{ entry.heading }}</div>{% endif %}
+      <a href="{{ entry.href }}" class="{{ 'active' if entry.active else '' }}" data-nav="{{ entry.key }}"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ entry.icon | safe }}</svg></span>{{ entry.label }}{% if entry.count > 0 %} <span class="nav-badge">{{ entry.count }}</span>{% endif %}</a>
+    {% endfor %}{% endif %}
   </nav>
   <div class="sidebar-user">
     {% if currentUser %}
@@ -218,6 +99,7 @@
     <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
   {% endif %}
   <main class="page">
+    {% if nav and nav.bar %}{% set bar = nav.bar %}{% include "partials/section_nav.njk" %}{% endif %}{# D-320: this section's menu bar #}
     {% for f in flashes %}
       <div class="alert alert-{{ f.type }}">{{ f.message }}{% if f.copy_link %}{% set copyLink = f.copy_link %}{% set copyNote = null %}{% include "partials/copy_link.njk" %}{% endif %}{# D-280 #}</div>
     {% endfor %}

@@ -56,15 +56,20 @@ describe('Settings expiry warning sidebar badge (Phase 3 item 11)', () => {
     return agent;
   }
 
+  // Owner decision D-320 (point 26): the count now sits on the left menu's "Settings" entry (and on Settings › Company).
+  function settingsEntry(html) {
+    const pos = html.indexOf('data-nav="settings"');
+    expect(pos).toBeGreaterThan(-1);
+    return html.slice(pos, html.indexOf('</a>', pos));
+  }
+
   it('sidebar shows no badge when nothing is near expiry', async () => {
     await companySettingsRepository.set('lut_expiry_date', futureDate(730));
     await companySettingsRepository.set('rcmc_valid_until', futureDate(730));
 
     const agent = await loggedInAgent();
     const res = await agent.get('/');
-    const settingsLinkPos = res.text.indexOf('Company Settings');
-    expect(settingsLinkPos).toBeGreaterThan(-1);
-    const nearbyMarkup = res.text.slice(settingsLinkPos, settingsLinkPos + 120);
+    const nearbyMarkup = settingsEntry(res.text);
 
     expect(nearbyMarkup).not.toContain('nav-badge');
   });
@@ -76,8 +81,7 @@ describe('Settings expiry warning sidebar badge (Phase 3 item 11)', () => {
 
     const agent = await loggedInAgent();
     const res = await agent.get('/');
-    const settingsLinkPos = res.text.indexOf('Company Settings');
-    const nearbyMarkup = res.text.slice(settingsLinkPos, settingsLinkPos + 120);
+    const nearbyMarkup = settingsEntry(res.text);
 
     expect(nearbyMarkup).toContain('nav-badge">1<');
   });
@@ -90,8 +94,7 @@ describe('Settings expiry warning sidebar badge (Phase 3 item 11)', () => {
 
     const agent = await loggedInAgent();
     const res = await agent.get('/');
-    const settingsLinkPos = res.text.indexOf('Company Settings');
-    const nearbyMarkup = res.text.slice(settingsLinkPos, settingsLinkPos + 120);
+    const nearbyMarkup = settingsEntry(res.text);
 
     expect(nearbyMarkup).toContain('nav-badge">2<');
   });

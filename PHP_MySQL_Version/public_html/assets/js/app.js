@@ -1547,6 +1547,35 @@
     });
   }
 
+  // Owner decision D-320 (point 26): the section menu bar's drop-downs (and
+  // the order page's "More" menu) close when another opens or on a click
+  // elsewhere; a menu link to a part of a page (#exchange-rate,
+  // #settings-security, #document-review-approval …) opens the closed card
+  // that holds it and scrolls to it.
+  function initSectionMenus() {
+    var menus = document.querySelectorAll('.section-nav-drop > details, .order-action-more');
+    menus.forEach(function (d) {
+      d.addEventListener('toggle', function () {
+        if (!d.open) return;
+        menus.forEach(function (other) { if (other !== d) other.open = false; });
+      });
+    });
+    document.addEventListener('click', function (e) {
+      menus.forEach(function (d) { if (d.open && !d.contains(e.target)) d.open = false; });
+    });
+    function openTarget() {
+      var id = (window.location.hash || '').replace('#', '');
+      if (!id) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (el.tagName === 'DETAILS') el.open = true;
+      revealElement(el);
+      el.scrollIntoView({ block: 'start' });
+    }
+    openTarget();
+    window.addEventListener('hashchange', openTarget);
+  }
+
   // Owner request (3 Nov 2026): after a link is generated the page comes back to
   // that card (…?open=<card>#<card>); the order page's own script opens and scrolls
   // to it. Then the new link is focused, selected (ready to copy) and briefly
@@ -1842,6 +1871,7 @@
     initThicknessGrid();
     initSupplierPick();
     initRulesExample();
+    initSectionMenus(); // D-320
   }
 
   if (document.readyState === 'loading') {

@@ -120,7 +120,7 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
       const res = await agent.get(`/orders/${orderId}`);
 
       expect(res.status).toBe(200);
-      expect(res.text).not.toContain('Edit Order Details');
+      expect(res.text).not.toContain('/edit">Edit order</a>'); // D-320: the action bar's Edit order button
       expect(res.text).not.toContain('+ Add product');
     });
 
@@ -137,7 +137,8 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
       const res = await agent.get(`/orders/${orderId}`);
 
       expect(res.status).toBe(200);
-      expect(res.text).toContain('Edit Order Details');
+      expect(res.text).toContain(`href="/orders/${orderId}/edit">Edit order</a>`); // D-320: the action bar's Edit order button
+      expect(res.text).not.toContain('Edit Order Details'); // D-320: the old grey text link is gone
       expect(res.text).toContain('+ Add product');
     });
 

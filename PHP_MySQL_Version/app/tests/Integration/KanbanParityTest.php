@@ -190,6 +190,38 @@ final class KanbanParityTest extends DbTestCase
     }
 
     /**
+     * Owner decision D-320 (point 26): the section menu bar is one shared
+     * partial drawn by the layout, so the list and the board of every page
+     * show the very same bar (same items, same counts, same page marked).
+     */
+    public function testTheSectionMenuBarIsTheSameOnTheListAndTheBoard(): void
+    {
+        $this->seed();
+        $pages = array_merge($this->pages(), [['Approvals', new \App\Controllers\ApprovalsController(), 'index', ['view' => 'list'], [], '/approvals']]);
+        try {
+            foreach ($pages as [$page, $controller, $action, $listQuery, $boardQuery, $path]) {
+                $_SERVER['REQUEST_URI'] = $path;
+                \App\Services\ApprovalsInbox::resetCache();
+                $list = $this->render($controller, $action, $listQuery);
+                \App\Services\ApprovalsInbox::resetCache();
+                $board = $this->render($controller, $action, $boardQuery);
+                $bar = static function (string $html): string {
+                    return preg_match('#<nav class="section-nav".*?</nav>#s', $html, $m) ? $m[0] : '';
+                };
+                if ($page !== 'My tasks') {
+                    self::assertNotSame('', $bar($list), "{$page}: the list shows its section's menu bar");
+                }
+                self::assertSame($bar($list), $bar($board), "{$page}: the same menu bar on the list and the board");
+                preg_match('#<nav class="sidebar-nav".*?</nav>#s', $list, $l);
+                preg_match('#<nav class="sidebar-nav".*?</nav>#s', $board, $b);
+                self::assertSame($l[0] ?? '', $b[0] ?? '', "{$page}: the same left menu on the list and the board");
+            }
+        } finally {
+            unset($_SERVER['REQUEST_URI']);
+        }
+    }
+
+    /**
      * QA Round 7, R7-N08: with no filter chosen, the list and the board open
      * on the same orders (Active) — the board used to add Docs Sent and
      * Complete orders.

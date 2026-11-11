@@ -83,7 +83,8 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
   it('an Admin still sees every link', async () => {
     const agent = await loginAs('Admin');
     expect((await agent.get('/getting-started')).text).toContain('href="/settings"');
-    expect((await agent.get('/')).text).toContain('href="/pi-intake-review"');
+    // D-320 (point 26): PI-stage details is in the Orders menu bar, shown on every Orders page.
+    expect((await agent.get('/client-intake')).text).toContain('href="/pi-intake-review"');
   });
 
   // QA Round 6, R6-N02: every page route under a rule needs exactly what

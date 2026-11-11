@@ -119,9 +119,14 @@ final class BackupFacilityTest extends DbTestCase
         $this->writeStatus('storage', 'ok', '2026-11-06T02:30:00+0530');
         $_ENV['BACKUP_ENCRYPTION_KEY_FILE'] = '/home/x/.backup_key';
         $_SESSION = ['_auth_user_id' => $this->createTestUser('Managing Director')];
+        $_SERVER['REQUEST_URI'] = '/admin/backups'; // D-320: the Settings menu bar is drawn for the page's path
         ob_start();
-        (new BackupController())->index([]);
-        $html = (string) ob_get_clean();
+        try {
+            (new BackupController())->index([]);
+        } finally {
+            $html = (string) ob_get_clean();
+            unset($_SERVER['REQUEST_URI']);
+        }
         self::assertStringContainsString('<h1>Backups</h1>', $html);
         self::assertStringContainsString('data-job="db"', $html);
         self::assertStringContainsString('1.5 MB', $html);
@@ -131,6 +136,6 @@ final class BackupFacilityTest extends DbTestCase
         self::assertStringContainsString('On (key file set', $html);
         self::assertStringContainsString('Not chosen yet — copies stay on this server only', $html);
         self::assertStringNotContainsString('/home/x/.backup_key', $html, 'the key file path is never shown');
-        self::assertStringContainsString('href="/admin/backups"', $html, 'Admin menu link');
+        self::assertStringContainsString('href="/admin/backups" class="active"', $html, 'Settings menu bar: Backups (D-320)');
     }
 }

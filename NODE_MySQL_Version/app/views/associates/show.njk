@@ -8,7 +8,7 @@
 {% set full = canManage or canBank %}
 {% set __sourceLabel = {'link': 'buyer registration link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD'} %}
 <div class="card page-wide">
-  <div class="page-header-row">
+  <div class="page-header-row sticky-actions" data-testid="associate-actions">{# D-320 (point 26): name and main buttons stay at the top while scrolling #}
     <div>
       <h1>{{ a.name }} {% set __st = a.status %}{% include "associates/_status_badge.njk" %}</h1>
       <p class="muted" style="margin:0">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}

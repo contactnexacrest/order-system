@@ -42,7 +42,7 @@ The complete description of the NexaCrest export order system: what it is for, h
 
 - **Both stacks.** A PHP class `App\Services\FooService` (`PHP_MySQL_Version/app/src/Services/FooService.php`) has a Node twin `NODE_MySQL_Version/app/src/services/fooService.js`. Where only the PHP name is given, the Node file is the camelCase twin.
 - **Codes.** `D-nnn` = numbered owner decision; `R1…R26` = standing rules; `O-nn` = open points; QA finding IDs (`ZOH-1`, `PAR-7` …) come from the register. Search the code for a D-code to find where it is built.
-- **Menu paths** are written *Admin › Settings › Zoho Books*. Section references are written §7.3.
+- **Menu paths** are written *Settings › Company › Zoho Books* (left-menu entry › menu-bar item). Section references are written §7.3. Since D-320 (11 Nov 2026) the left menu has 13 entries and every section has a menu bar (§6.0); older paths written *Admin › X* mean the Users & roles or Settings bar, except HS codes (Products), Suppliers, Logistics partners (Procurement & suppliers), Pricing (Products › Pricing) and Team incentives (Finance & accounts).
 - **Money.** Amounts are INR (₹) or USD with two decimals; worked examples were recomputed from the code. Dates and times are IST.
 - **Source of truth.** The code. Where this handbook and the code disagree, the code wins and this handbook is wrong: fix it (Appendix B).
 
@@ -119,6 +119,7 @@ The complete description of the NexaCrest export order system: what it is for, h
   - [5.9 Amendments, complaints, disputes, cancellation, Mark Lost](#59-amendments-complaints-disputes-cancellation-mark-lost)
   - [5.10 Editing, duplicating, archiving](#510-editing-duplicating-archiving)
 - [6. Modules](#6-modules)
+  - [6.0 Menus: the left menu and the section menu bars (D-320–D-322, 11 Nov 2026)](#60-menus-the-left-menu-and-the-section-menu-bars-d-320d-322-11-nov-2026)
   - [6.1 Clients and intake](#61-clients-and-intake)
   - [6.2 Products, categories and specifications](#62-products-categories-and-specifications)
   - [6.3 Pricing engine and price requests](#63-pricing-engine-and-price-requests)
@@ -1755,7 +1756,7 @@ route goes through `OrderLockGuard` (D-019).
 login; rate-limited). It asks for company, billing (structured address),
 consignee, notify party, Incoterm, container type, port, CoO type — never
 product details. The submission lands in `client_intake_submissions` and in
-**Operations › Quotation Intake Review** (`/client-intake`, live count
+**Orders › Quotation requests** (`/client-intake`, live count
 badge). Staff choose:
 
 - **Accept & Create Client** → creates the `clients` row (with its
@@ -2228,7 +2229,7 @@ reported as lost.
   replaced silently (the edit form keeps it selected with that text; its
   price check is "no price" until a new option is chosen).
 - **Client reorder request**: the buyer's "Reorder This" lands in
-  **Operations › Reorder Requests** (`order_reorder_requests`).
+  **Orders › Reorder requests** (`order_reorder_requests`).
 - **Archive** (`POST /orders/{id}/archive`, `manage_orders`): sets
   `is_archived = 1`, `ORDER_ARCHIVED` audit row. Visibility only — nothing is
   deleted. Archived orders are listed at `/orders/archived`
@@ -2255,15 +2256,78 @@ the same filters, counts, fields, actions and money rules on both templates
 
 ---
 
+### 6.0 Menus: the left menu and the section menu bars (D-320–D-322, 11 Nov 2026)
+
+- **Purpose.** Everything visible at first glance: a short left menu, one
+  menu bar per section, real buttons for main actions (owner point 26).
+- **Left menu (13 entries).** Dashboard · Approvals (n) · My tasks (n) ·
+  WORK Orders, Clients, Associates, Products, Procurement & suppliers,
+  Finance & accounts · OVERVIEW Reports · HELP Help & SOP · ADMIN Users &
+  roles, Settings. An entry shows only when the person can open at least one
+  page of its section and links to the first such page that opens in the
+  same tab (Help & SOP → Reference library). Counts beside entries:
+  Approvals (everything waiting for this person), My tasks (the tasks the
+  My tasks page opens on), Finance & accounts (records waiting for Zoho),
+  Settings (LUT / RCMC near expiry). Approvals shows for everyone: it holds
+  Documents (My Reviews); the other tabs show only to approvers.
+- **Section menu bar.** On every page of a section, at the top of the page:
+  the section's pages, drop-downs (▾) for sub-pages, a count where
+  something waits, the page shown underlined. Which section a page belongs
+  to is decided by its path (longest prefix wins), so a new page under a
+  section's path gets the bar with no change to the page. No bar on the
+  Dashboard, Notifications, My account and My tasks.
+
+| Section | Menu bar |
+|---|---|
+| Approvals | All · Prices · Payment terms · Documents (`/reviews`) · E-mails (`/email-approvals`) · Bank details · Other |
+| Orders | Active · Archived · Quotation requests (n) · PI-stage details (n) · Reorder requests · Disputes · Complaints |
+| Clients | All clients · + Add client · Agreements; button "Open in Orders ›" |
+| Associates | All · + Add · Registrations (n) · Price requests · Commission ▾ (settings and ladder, levels) · Payouts · TDS register · Access levels · Report |
+| Products | All · + Add · Categories · Price rules · Pricing ▾ (settings, commission levels and ladder, exchange-rate history, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products) · Link suppliers; button "Open Suppliers in Procurement ›" |
+| Procurement & suppliers | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
+| Finance & accounts | CA / Accounting · Zoho sync (n) · Incentive payouts · My incentives · Team incentive settings; on CA pages "Open in Reports ›" |
+| Reports | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
+| Help & SOP | Getting started · SOP · Reference library · Gallery |
+| Users & roles | Users · + Add user · Roles and permissions · Departments · Task due days · Self-approval rules · SOP access · Field protection |
+| Settings | Setup checklist (n) · Company (n) · E-mail · Security · Holidays · Document clean-up · Backups · Zoho · Documents ▾ (email templates, watermarks, signatories, assets, UI templates) · Lists ▾ (ports, port routes, payment presets, dropdown lists, GST rates, import duty, compliance task types, remittance difference reasons, associate TDS rules, reference library categories) · Divisions · Admin overrides · Data export · Sample data · Test mode · Super Admin |
+
+- **Permissions.** Each link needs exactly the permission its page needs
+  (tested against the routes); Super Admin pages need the Super Admin; a
+  module switched off for the division (D-257) hides its pages.
+- **Order page action bar (D-321).** A bar of buttons at the top that stays
+  visible while scrolling: Edit order · Documents (jumps to Document Review
+  & Approval) · Full report · Duplicate order · More ▾ (Request
+  cancellation, Log in as client, Audit trail), each shown only to those
+  allowed. The client and associate pages keep their main buttons at the
+  top while scrolling.
+- **Config and code.** One config, `app/src/Config/navigation.json` (PHP) =
+  `app/src/config/navigation.json` (Node), byte for byte; engine
+  `App\Services\Navigation` / `services/navigation.js` (pure: permissions,
+  facts, counts and path in; menus out); one shared partial
+  `views/partials/section_nav.php` / `.njk` drawn by `layout/base`, so the
+  Standard and Kanban templates show the same menus. Counts: PHP in
+  `layout/base.php`, Node in `middleware/sessionAuth.js`
+  (`CoordinationController::myTaskCount`). Drop-downs close on a click
+  elsewhere and a menu link to a part of a page opens the closed card that
+  holds it (`app.js` `initSectionMenus`).
+- **Tests.** `NavigationMenuD320Test` / `navigationMenuD320.test.js` (13
+  entries, every old menu page in a bar, link = route permission, first
+  page, active item, counts, order action bar, sticky CSS);
+  `KanbanParityTest` / `kanbanParity.test.js` (same bar and left menu on the
+  list and the board); e2e `01-role-visibility.spec.js`.
+- **SOP / decisions.** SOP 00 (Finding your way); D-320, D-321, D-322.
+
+---
+
 ### 6.1 Clients and intake
 
 - **Purpose.** Hold one record per buyer; take enquiries from the public
   form; take PI-stage details from the buyer before the PI.
-- **Screens.** Operations › Clients (`/clients`), Add Client
+- **Screens.** Clients › All clients (`/clients`), + Add client
   (`/clients/create`), client page (Duplicate, Client Portal Access,
   Agreements card, associate line, GST registration once Domestic is
-  active); Operations › Quotation Intake Review (`/client-intake`);
-  Operations › PI Intake Review (`/pi-intake-review`). Public:
+  active); Orders › Quotation requests (`/client-intake`);
+  Orders › PI-stage details (`/pi-intake-review`). Public:
   `/quotation-details`, `/pi-details/{token}`.
 - **Key rules.**
   - One e-mail per client, enforced in code and by a unique index (D-129, D-210).
@@ -2365,7 +2429,7 @@ the same filters, counts, fields, actions and money rules on both templates
 ### 6.4 Associates and commission / TDS
 
 - **Purpose.** Outside agents who introduce buyers and earn commission.
-- **Screens.** Operations › Associates (`/associates`; register, associate
+- **Screens.** Associates › All associates (`/associates`; register, associate
   page with Portal access, Track record, Payouts, Price access), Associates
   → Access levels, → Price requests, → Registrations; Reports › Associates
   (`/reports/associates`); Associate TDS register (`/associates/tds`);
@@ -2577,8 +2641,8 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Purpose.** Buy what an order needs, keep buying prices with
   Procurement/Finance/management.
 - **Screens.** Order page "Purchase Requirements — for Procurement" card
-  (next to Step 7); Operations › Procurement (`/procurement`, queue);
-  Procurement › Supplier performance; Admin › Suppliers (`/suppliers`);
+  (next to Step 7); Procurement & suppliers › Procurement (`/procurement`, queue);
+  › Supplier performance; › Suppliers (`/suppliers`);
   order Step 7 (Supplier PO); public Supplier Link page.
 - **Key rules.**
   - Sales raises a requirement (product, quantity, needed-by) — never a
@@ -2611,8 +2675,8 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Purpose.** Freight terms, packing, shipping, BL, the CHA, and paying
   logistics partners.
 - **Screens.** Order Steps 9, 10, 13b–13e; Logistics Partner Bills &
-  Payments card (every incoterm); Admin › Logistics Partners
-  (`/logistics-partners`); Admin › Ports (`/ports`) and Port Routes
+  Payments card (every incoterm); Procurement & suppliers › Logistics partners
+  (`/logistics-partners`); Settings › Lists › Ports (`/ports`) and Port Routes
   (`/port-routes`, sailing days used to suggest lead times); Insights →
   Freight Cost Report (`/reports/freight-cost`, `view_logistics_costs`).
 - **Key rules.**
@@ -2783,7 +2847,7 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Screens.** Dashboard (`/`): search, Active Orders by Stage, My
   Approvals, Overdue Payments, Balance/Freight payment overdue, Compliance
   Expiry Warnings (LUT/RCMC), Agreements expiring, Team incentives ready to
-  lock, Associates ready for Quoting, Recent Activity. Insights › Reports
+  lock, Associates ready for Quoting, Recent Activity. Reports › All reports
   (`/reports`).
 - **Recent Activity (D-268).** Shown with `view_reports` or
   `view_audit_log`. With `view_audit_log` (Admin, MD, ED): the latest 15
@@ -2823,7 +2887,8 @@ the same filters, counts, fields, actions and money rules on both templates
 
 - **Purpose.** One place for everything a person may approve, so nothing
   waits unseen (the MD could not find where to approve a line price).
-- **Where.** Sidebar **Approvals (n)** (shown to anyone holding an approver
+- **Where.** Left menu **Approvals (n)** (since D-322 shown to everyone, as it
+  holds Documents = My Reviews; its tabs show to anyone holding an approver
   permission — `manage_pricing`, `approve_payment_terms`, `approve_email_send`,
   `approve_documents`, `edit_locked_data`, `approve_purchases`,
   `approve_short_payment`, `manage_associate_bank`, `manage_associates`,
@@ -2890,7 +2955,7 @@ the same filters, counts, fields, actions and money rules on both templates
 
 - **Purpose.** Hand work from one department to the next without anyone
   remembering to do it.
-- **Screens.** My Tasks (`/my-tasks`), Insights › Management Cockpit
+- **Screens.** My Tasks (`/my-tasks`), Reports › Management cockpit
   (`/cockpit`, `view_cockpit`), order side panel **Owners**, Admin › Task
   Due Days (`/admin/task-types`, `manage_task_types`).
 - **Key rules.**
@@ -3013,7 +3078,7 @@ required bank reference. Each goes to Zoho Books with its own mapping.
 | | Domestic Trade (DOM) | Import & Distribution (IMP) | Merchant Trade (MTT) |
 |---|---|---|---|
 | What | Sell to Indian resellers in ₹ with GST | Import into India, hold stock, sell locally with GST | Buy abroad, sell abroad; goods never enter India (RBI merchanting) |
-| Menu | Orders › New order (domestic form) `/domestic/orders/create` | Operations › Imports & stock `/import` + local-sale orders | Operations › Merchant trade `/merchant` |
+| Menu | Orders › New order (domestic form) `/domestic/orders/create` | Procurement & suppliers › Imports & stock `/import` + local-sale orders | Procurement & suppliers › Merchant trade `/merchant` |
 | Stages | Enquiry → Quotation → OC → Purchase → Dispatch (tax invoice number fixed, e-way bill) → Tax invoice → Payment → Closed | Ordered (LC, import PO) → Shipped (bill of entry, customs rate, charges) → Cleared (duty + landed cost frozen) → In stock → Closed | Contracted (buy/sell lines, PO, BL / switch BL) → Shipped (sale invoice) → Settled (AD-bank checklist) → Closed |
 | Money rules | CGST+SGST same state, IGST otherwise; invoice `DOM/26-27/0001` (≤ 16 chars, per FY) | Landed cost = assessable value + BCD + SWS + charges; IGST is input credit, not cost; stock at weighted average, never below zero | Margin = ₹ received − ₹ paid at bank rates; RBI checks: 9 months total, 4-month outlay, USD 5,00,000 advance limit without LC/BG, documents with AD bank |
 | Settings (to confirm with CA/bank) | `dom_default_gst_rate` 18, `dom_eway_threshold_inr` 50000, `dom_e_invoice_applicable` 0, `dom_payment_terms_days` 30 | `imp_default_bcd_pct` 10, `imp_default_sws_pct` 10, `imp_default_igst_pct` 18, `imp_margin_pct` 20 | `mtt_max_months_total` 9, `mtt_max_outlay_months` 4, `mtt_advance_limit_usd` 500000, `mtt_usd_inr_rate` 84 |
@@ -3048,7 +3113,10 @@ D-262.
 
 ### 6.17 Admin pages
 
-Sidebar group **Admin** (each item appears only with its permission):
+Left menu **Users & roles** and **Settings** (D-320; each page appears in
+their menu bars only with its permission; HS codes, Suppliers, Logistics
+partners, Team incentives and Pricing now sit in the Products, Procurement &
+suppliers and Finance & accounts bars — see 6.0):
 
 | Page | Route | Permission | Notes |
 |---|---|---|---|

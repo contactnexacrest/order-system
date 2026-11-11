@@ -106,6 +106,42 @@ a.js-slow-download.is-loading{pointer-events:none;opacity:0.7;}
 .nav-dropdown a{display:block;color:rgba(255,255,255,0.62);font-size:13px;font-weight:500;padding:7px 10px;border-radius:8px;text-decoration:none;}
 .nav-dropdown a:hover{background:rgba(255,255,255,0.08);color:#fff;text-decoration:none;}
 .nav-dropdown a.active{background:rgba(255,255,255,0.14);color:#fff;font-weight:700;box-shadow:inset 3px 0 0 0 var(--gold);}
+/* Owner decision D-320 (11 Nov 2026, point 26): the short left menu has group
+   headings (Work / Overview / Help / Admin); every page of a section shows
+   that section's menu bar at the top, with small drop-downs for sub-pages and
+   counts where something waits. Same in both templates and both stacks. */
+.nav-heading{color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:12px 12px 4px;}
+.section-nav{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:6px 12px;margin-bottom:1rem;}
+.section-nav-title{font-weight:700;color:var(--navy);font-size:1rem;margin-right:6px;}
+.section-nav-items{display:flex;flex-wrap:wrap;align-items:center;gap:2px;list-style:none;margin:0;padding:0;flex:1 1 auto;}
+.section-nav-items > li{position:relative;}
+.section-nav-items > li > a,.section-nav-drop summary{display:inline-flex;align-items:center;gap:4px;padding:7px 10px;border-radius:8px;color:var(--navy);font-size:0.9rem;font-weight:500;text-decoration:none;cursor:pointer;list-style:none;border-bottom:3px solid transparent;}
+.section-nav-drop summary::-webkit-details-marker{display:none;}
+.section-nav-items > li > a:hover,.section-nav-drop summary:hover{background:rgba(1,48,144,0.06);text-decoration:none;}
+.section-nav-items > li > a.active,.section-nav-drop.active > details > summary{font-weight:700;border-bottom-color:var(--gold);}
+.section-nav-menu{position:absolute;top:100%;left:0;z-index:60;min-width:260px;list-style:none;margin:4px 0 0;padding:4px 0;background:var(--surface);border:1px solid var(--navy);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);}
+.section-nav-menu a{display:block;padding:8px 14px;color:var(--navy);font-size:0.9rem;text-decoration:none;}
+.section-nav-menu a:hover{background:rgba(1,48,144,0.06);text-decoration:none;}
+.section-nav-menu a.active{font-weight:700;box-shadow:inset 3px 0 0 0 var(--gold);}
+.section-nav-cross{margin-left:auto;}
+/* Point 26: long pages keep their main buttons at the top while scrolling
+   (order page action bar; client and associate pages). */
+.order-action-bar,.sticky-actions{position:sticky;top:0;z-index:40;background:var(--surface);}
+.order-action-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;border:1px solid var(--line);border-radius:var(--radius);padding:10px 16px;margin-bottom:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+.order-action-bar-title{flex:1 1 auto;min-width:0;}
+.order-action-bar-title strong{color:var(--navy);font-size:1.05rem;}
+.order-action-bar-buttons{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.order-action-bar-buttons form{display:inline;margin:0;}
+.order-action-more{position:relative;}
+.order-action-more summary{list-style:none;cursor:pointer;}
+.order-action-more summary::-webkit-details-marker{display:none;}
+.order-action-more-menu{position:absolute;right:0;top:100%;z-index:60;min-width:220px;margin-top:4px;padding:4px 0;background:var(--surface);border:1px solid var(--navy);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);display:flex;flex-direction:column;}
+.order-action-more-menu a,.order-action-more-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;color:var(--navy);font-size:0.9rem;cursor:pointer;text-decoration:none;}
+.order-action-more-menu a:hover,.order-action-more-menu button:hover{background:rgba(1,48,144,0.06);text-decoration:none;}
+.sticky-actions{padding:8px 0;}
+.card:has(.sticky-actions){overflow:visible;}
+@media (max-width:900px){.section-nav{padding:6px 8px;}.section-nav-menu{position:static;box-shadow:none;}.order-action-bar{position:static;}}
+
 .sidebar-user{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14);display:flex;flex-direction:column;gap:4px;flex:0 0 auto;}
 .sidebar-user-notif{position:relative;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.72);font-size:13px;font-weight:500;padding:8px 12px;border-radius:10px;text-decoration:none;}
 .sidebar-user-notif:hover{background:rgba(255,255,255,0.08);color:#fff;text-decoration:none;}

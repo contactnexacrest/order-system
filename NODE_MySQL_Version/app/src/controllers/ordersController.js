@@ -1444,6 +1444,11 @@ async function show(req, res) {
   const pendingCancellation = await orderCancellationRepository.findPendingForOrder(orderId);
   const cancellationHistory = await orderCancellationRepository.forOrder(orderId);
   const approvedCancellation = cancellationHistory.find((c) => c.status === 'approved') || cancellationHistory[0] || null;
+  // Owner decision D-320 (point 26): "Log in as client" in the order page's More menu —
+  // the same four checks as the button on the client page.
+  const actionBarClient = (req.permissions || {}).impersonate_client ? await clientRepository.find(order.client_id) : null;
+  const canLogInAsClient = !!(actionBarClient && Number(actionBarClient.allow_staff_impersonation) === 1 && Number(actionBarClient.is_active) === 1
+    && (await companySettingsRepository.get('client_impersonation_enabled')) === '1');
 
   // Real gap this closes: emailLogRepository.forOrder() already existed
   // but nothing on this page ever called it, so the "Send to Buyer" link
@@ -1746,6 +1751,7 @@ async function show(req, res) {
       visibleDocuments,
       regenerationRisk,
       pendingCancellation,
+      canLogInAsClient, // D-320
       approvedCancellation,
       reviewsByDocument,
       crossVerificationsByDocument,

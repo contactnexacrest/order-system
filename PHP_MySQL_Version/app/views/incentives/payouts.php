@@ -88,7 +88,7 @@ foreach ($rows as $r) {
   </table>
 
   <?php if (!empty($payoutCosts)): ?>
-  <h2>Associate payout costs — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
+  <h2 id="associate-payouts">Associate payout costs — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
   <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
   <?php if (\App\Services\AssociateCommission::settings()['zoho_payout_costs_account_id'] === ''): ?><div class="alert alert-warning small" data-payout-costs-unmapped><?= htmlspecialchars(\App\Services\CaSyncService::PAYOUT_COSTS_UNMAPPED) ?></div><?php endif; ?>
   <table class="list" data-payout-costs>
