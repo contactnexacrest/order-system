@@ -1,0 +1,11 @@
+{# Port of bank_confirm_done.php. D-294: after the vendor's choice on the bank confirmation link. #}
+<div class="card card-narrow">
+  {% if confirmed %}
+    <h1>&#10003; Thank you — confirmed</h1>
+    <p>NexaCrest will now check the new bank details. Until then, payments go to the account we already have.</p>
+  {% else %}
+    <h1>Cancelled</h1>
+    <p data-not-us>Your bank details have not changed. We have told our Managing Director and Finance team. If someone contacted you about your bank details, please reply to our e-mail.</p>
+  {% endif %}
+  <p class="muted small">This link has now been used.</p>
+</div>

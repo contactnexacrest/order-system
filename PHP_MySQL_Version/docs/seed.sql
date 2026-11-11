@@ -1963,14 +1963,13 @@ UPDATE payment_presets SET allow_zero_advance = 1 WHERE payment_method = 'LC';
 -- ---------------------------------------------------------------- settings: TDS, buyer registration, bank wait, and when commission is paid
 -- D-245 P3 (4 Nov 2026): the old rung rates are gone (commission levels and ladder replace them); a buyer
 -- registration lapses after 6 months with no first PO; commission is due 30 days after full payment, held
--- while a buyer claim is open, paid in the monthly run on the 5th; a counting order is invoiced FOB of
+-- while a buyer claim is open, paid in the monthly run (D-292, 11 Nov 2026: on the last day of the month); a counting order is invoiced FOB of
 -- ₹5 lakh or more; GST 18% on top for GST-registered associates with a tax invoice.
 INSERT INTO incentive_settings (setting_key, setting_value)
 SELECT k, v FROM (
   SELECT 'associate_tds_pct' AS k, '2.00' AS v UNION ALL SELECT 'associate_protection_months', '6'
-  UNION ALL SELECT 'associate_bank_wait_days', '7'
   UNION ALL SELECT 'associate_commission_due_days', '30' UNION ALL SELECT 'associate_claim_hold', '1'
-  UNION ALL SELECT 'associate_payout_run', 'monthly' UNION ALL SELECT 'associate_payout_day', '5'
+  UNION ALL SELECT 'associate_payout_run', 'monthly' UNION ALL SELECT 'associate_payout_day', 'last'
   UNION ALL SELECT 'associate_counting_threshold_inr', '500000' UNION ALL SELECT 'associate_gst_pct', '18.00'
   -- Owner 4 Nov 2026: associate registration links last 7 days (D-253); a personal code may change 3 times a year (D-254).
   UNION ALL SELECT 'associate_registration_link_days', '7' UNION ALL SELECT 'associate_code_changes_per_year', '3') d
@@ -1981,7 +1980,7 @@ INSERT INTO permissions (permission_key, name, description, category)
 SELECT k, n, d, 'Associates' FROM (
   SELECT 'manage_associates' AS k, 'Manage associates' AS n, 'Associate register, agreements, rates, invitations, client links and their changes, portal access' AS d
   UNION ALL SELECT 'view_associates', 'View associates', 'See which client was introduced by which associate (no amounts, bank details or agreements)'
-  UNION ALL SELECT 'manage_associate_bank', 'Associate bank & tax details', 'See associates'' full bank details and verify bank changes (two people)') p
+  UNION ALL SELECT 'manage_associate_bank', 'Associate bank & tax details', 'See associates'' full bank details and verify bank changes (once the associate has confirmed them; one or two people — Associates › Commission settings)') p
 WHERE NOT EXISTS (SELECT 1 FROM permissions x WHERE x.permission_key = p.k);
 
 INSERT INTO role_permissions (role_id, permission_id)
@@ -2690,3 +2689,33 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
 SELECT 'unit', u.v, u.s, 0, 1 FROM (SELECT 'TON' AS v, 14 AS s UNION ALL SELECT 'RMT', 15) u
 WHERE NOT EXISTS (SELECT 1 FROM dropdown_options d WHERE d.list_key = 'unit' AND d.option_value = u.v);
 UPDATE product_categories SET allowed_units = 'CBM,SQM,SQFT,PCS,TON,RMT', weight_t_per_cbm = 2.700 WHERE is_system = 1 AND allowed_units IS NULL;
+-- ---------------------------------------------------------------------------
+-- Owner decisions 11 Nov 2026 (D-291 … D-294): associates — commission rule
+-- permission, payout day, bank details checks.
+-- ---------------------------------------------------------------------------
+-- D-292: who sees an associate's commission rule, level and progress (others see "Set by the MD").
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'view_associate_commission_rules', 'See associate commission rules', 'See an associate''s commission rule (standard ladder, own ladder or fixed), the level and % of their next order, how many orders have counted and the ladder steps. Without it staff see "Set by the MD". Changing the rule needs Manage pricing (the MD).', 'Associates'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'view_associate_commission_rules');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'view_associate_commission_rules'
+ WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Finance Director', 'Finance Manager')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- D-292: payout day — monthly 1–28 or "last" (last day of the month), weekly 1–7 (Monday–Sunday);
+-- a payout day on a Sunday or a Holiday Calendar day moves to the working day before (default) or after.
+-- D-293: bank details — wait before a FIRST account is used (0 days) and before a CHANGED account is used (15 days),
+-- both 0–90; checked by one person (default) or two; the associate has 7 days to confirm.
+INSERT INTO incentive_settings (setting_key, setting_value)
+SELECT k, v FROM (
+  SELECT 'associate_payout_holiday_rule' AS k, 'before' AS v
+  UNION ALL SELECT 'associate_bank_wait_first_days', '0'
+  UNION ALL SELECT 'associate_bank_wait_change_days', '15'
+  UNION ALL SELECT 'bank_details_check_people', 'one') d
+WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
+
+-- D-293: Admin › Self-approval rules — MD and ED may verify bank details they entered themselves (with a reason).
+INSERT INTO self_approval_rules (rule_key, role_id)
+SELECT 'bank_details', r.id FROM roles r
+ WHERE r.name IN ('Managing Director', 'Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'bank_details');

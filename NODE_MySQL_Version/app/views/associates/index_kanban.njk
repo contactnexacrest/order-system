@@ -1,13 +1,14 @@
 {# Owner hard rule 2026-11-01: every field, link and action of the Standard list (associates/index.njk), as cards by status.
    Expects: same as index.njk (rows, status, q, counts, statuses, canManage, canBank, pendingBank). #}
-{% macro kanbanCard(a, canManage, canBank) %}
+{% macro kanbanCard(a, canManage, canBank, canRules) %}
     <div class="entity-card kanban-card">
       <div class="entity-card-header"><a class="entity-card-title" href="/associates/{{ a.id }}">{{ a.name }}</a></div>
       {% if a.email %}<div class="muted small">{{ a.email }}</div>{% endif %}
       <div class="entity-card-sub">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %} · Code {{ a.personal_code or '—' }}</div>
       <div class="small">Clients: {{ a.clients.length }}{% for c in a.clients.slice(0, 3) %}<br><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a>{% endfor %}</div>
-      {% if canManage %}<div class="muted small">{% if a.no_commission == 1 %}No commission{% elif a.commission_mode == 'fixed' %}Fixed: {{ a.commission_level_name or '?' }}{% else %}Ladder{% endif %}</div>{% endif %}
+      {% if canRules %}<div class="muted small">{% if a.no_commission == 1 %}No commission{% elif a.commission_mode == 'fixed' %}Fixed %: {{ a.commission_level_name or '?' }}{% elif a.commission_mode == 'own_ladder' %}Own ladder{% else %}Standard ladder{% endif %}</div>{% endif %}{# D-292 #}
       {% if (canManage or canBank) and a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}
+      {% if (canManage or canBank) and a.awaiting_bank > 0 %}<span class="badge badge-inactive">Waiting for the associate to confirm</span>{% endif %}{# D-293 #}
       <div class="entity-card-footer"><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></div>
     </div>
 {% endmacro %}
@@ -30,7 +31,7 @@
       <div class="kanban-column">
         <div class="kanban-column-header"><span class="kanban-column-title">{{ label }}</span><span class="kanban-column-count">{{ __in.length }}</span></div>
         {% if __in.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% endif %}
-        {% for a in __in %}{{ kanbanCard(a, canManage, canBank) }}{% endfor %}
+        {% for a in __in %}{{ kanbanCard(a, canManage, canBank, canRules) }}{% endfor %}
       </div>
     {% endif %}{% endfor %}
   </div>

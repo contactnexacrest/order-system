@@ -1,0 +1,26 @@
+{# Port of vendor_details/bank_confirm.php. Owner decision 11 Nov 2026, point 18 (D-294): a supplier /
+   logistics partner confirms new bank details through the link e-mailed to their registered e-mail —
+   current vs new, re-type the last 4 digits, "These are our bank details"; or "This is not us — cancel it". #}
+<div class="card card-narrow">
+  <h1>Please confirm your new bank details</h1>
+  <p>{{ vendor[meta.name] }} — new bank details were recorded on <b>{{ c.entered_at | shortDate }}</b>
+    {{ 'through your details link' if c.entered_source == 'vendor' else 'by NexaCrest' }}.</p>
+  <table class="list" data-bank-compare>
+    <tr><th></th><th>Current (paid to now)</th><th>New (waiting for you)</th></tr>
+    <tr><th>Bank</th><td>{{ current.bank_name or '—' }}</td><td><b>{{ c.bank_name or '—' }}</b></td></tr>
+    <tr><th>Account holder</th><td>{{ current.bank_account_name or '—' }}</td><td><b>{{ c.bank_account_name or '—' }}</b></td></tr>
+    <tr><th>Account number</th><td>{{ currentMasked }}</td><td><b>••••{{ c.account_last4 }}</b></td></tr>
+    <tr><th>IFSC</th><td>{{ current.bank_ifsc or '—' }}</td><td><b>{{ c.bank_ifsc or '—' }}</b></td></tr>
+  </table>
+  <form method="post" action="/vendor-bank-confirm/{{ token }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Type the last 4 digits of the NEW account number *<input type="text" name="last4" required minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="off" placeholder="e.g. 6789" title="The last 4 digits of the new account number"></label>
+    <label class="checkbox-label"><input type="checkbox" name="ours" value="1" required> These are our bank details and we want NexaCrest to pay us into them.</label>
+    <div class="btn-row"><button type="submit">Confirm new bank details</button></div>
+  </form>
+  <form method="post" action="/vendor-bank-confirm/{{ token }}/not-us" data-confirm="Cancel these new bank details? NexaCrest's Managing Director and Finance team will be told.">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <button type="submit" class="btn-danger">This is not us — cancel it</button>
+  </form>
+  <p class="muted small">Not confirmed by <b>{{ c.confirm_by | shortDate }}</b>? The change is cancelled automatically and the account we have stays in use.</p>
+</div>

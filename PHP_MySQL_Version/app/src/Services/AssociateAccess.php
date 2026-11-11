@@ -179,6 +179,7 @@ final class AssociateAccess
         if (!$pct && isset($o['commission']) && is_array($o['commission'])) {
             $o['commission']['level'] = null;
             $o['commission']['rate'] = null;
+            $o['commission']['rate_text'] = null; // D-292
         }
         // D-263 (owner 6 Nov 2026): an associate never sees the ladder level name (it points to an order-count band) —
         // only their rate, and only with "Show commission %".

@@ -142,6 +142,7 @@ function filterOrder(access, o) {
     if (!pct) {
       out.commission.level = null;
       out.commission.rate = null;
+      out.commission.rate_text = null; // D-292
     } else {
       // D-263 (owner 6 Nov 2026): an associate never sees the ladder level name (it points to an order-count band) —
       // only their rate, and only with "Show commission %".

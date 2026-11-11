@@ -17,18 +17,25 @@ use App\Repositories\VendorDetailsRepository;
  */
 final class VendorDetailsService
 {
+    /** D-294: the vendor's e-mail as it was before this save (the REGISTERED e-mail the confirm link goes to). */
+    private static array $emailBefore = [];
+
     /** Validates the form's bank section without saving — null when it is fine. */
     public static function bankInputError(string $kind, ?int $id): ?string
     {
-        $current = VendorDetailsRepository::bankDetails($id !== null ? VendorDetailsRepository::find($kind, $id) : null);
+        $vendor = $id !== null ? VendorDetailsRepository::find($kind, $id) : null;
+        if ($vendor !== null) {
+            self::$emailBefore[$kind . ':' . $id] = trim((string) ($vendor['email'] ?? ''));
+        }
+        $current = VendorDetailsRepository::bankDetails($vendor);
         return BankDetailsInput::collect($_POST, $current, false)['error'];
     }
 
     /**
-     * Saves the form's bank section entered by staff (on the vendor's behalf,
-     * e.g. from their email). "verified" is set only when staff tick that they
-     * checked it (cancelled cheque / bank letter); any change without the
-     * tick clears the mark.
+     * Owner decisions 11 Nov 2026, point 18 (D-294): bank details typed by staff (on the vendor's behalf,
+     * e.g. from their e-mail) no longer replace the account in use. They become a change waiting for the
+     * vendor's confirmation — a link e-mailed to their REGISTERED e-mail (the one on file before this save;
+     * for a new record, the e-mail entered with it) — then for staff verification (VendorBankChangeService).
      */
     public static function applyStaffBankInput(string $kind, int $id, int $userId): ?string
     {
@@ -38,14 +45,12 @@ final class VendorDetailsService
         if ($result['error'] !== null) {
             return $result['error'];
         }
-        $verifiedTick = !empty($_POST['bank_verified']);
-        $table = VendorDetailsRepository::KINDS[$kind]['table'];
         if ($result['bank'] !== null) {
-            VendorDetailsRepository::saveBankDetails($kind, $id, $result['bank'], 'staff', $verifiedTick ? $userId : null);
-            AuditLogRepository::log($userId, 'VENDOR_BANK_DETAILS_SAVED', $table, $id, 'bank_account_number', VendorDetailsRepository::maskAccount($current['bank_account_number']), VendorDetailsRepository::maskAccount($result['bank']['bank_account_number'] ?? $current['bank_account_number']), $verifiedTick ? 'Entered by staff and marked verified' : 'Entered by staff');
-        } elseif ($verifiedTick && $current['has_bank'] && empty($current['bank_verified_at'])) {
-            VendorDetailsRepository::markBankVerified($kind, $id, $userId);
-            AuditLogRepository::log($userId, 'VENDOR_BANK_DETAILS_VERIFIED', $table, $id, null, null, VendorDetailsRepository::maskAccount($current['bank_account_number']));
+            $registered = self::$emailBefore[$kind . ':' . $id] ?? trim((string) ($vendor['email'] ?? ''));
+            $r = VendorBankChangeService::propose($kind, $id, $result['bank'], 'staff', $userId, $registered !== '' ? $registered : null);
+            \App\Helpers\Flash::set('info', $r['emailed_to'] !== null
+                ? 'The new bank details are saved as a change: a confirmation link was e-mailed to ' . $r['emailed_to'] . '. They are used only after they confirm (within ' . BankDetailsCheck::CONFIRM_DAYS . ' days) and someone other than you verifies them.'
+                : 'The new bank details are saved as a change, but there is no registered e-mail to send the confirmation link to — add their e-mail, then use "Send the link again" under Bank details changes.');
         }
         return null;
     }

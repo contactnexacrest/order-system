@@ -69,7 +69,8 @@ async function found(req, res) {
 /** D-245 P3: "Fixed: Level 2" or "Ladder" (or no commission) — the register's terms column. */
 function termsText(a) {
   if (Number(a.no_commission) === 1) return 'No commission';
-  return (a.commission_mode || 'ladder') === 'fixed' ? `Fixed: ${a.commission_level_name || '?'}` : 'Ladder';
+  if ((a.commission_mode || 'ladder') === 'fixed') return `Fixed %: ${a.commission_level_name || '?'}`;
+  return (a.commission_mode || 'ladder') === 'own_ladder' ? 'Own ladder' : 'Standard ladder'; // D-292
 }
 
 // ------------------------------------------------------------ register
@@ -86,6 +87,8 @@ async function index(req, res) {
   for (const r of rows) {
     r.clients = await associateRepository.clients(Number(r.id));
     r.pending_bank = Number((await db.queryOne("SELECT COUNT(*) AS n FROM associate_bank_accounts WHERE status = 'pending' AND associate_id = :a", { a: r.id })).n);
+    // D-293: new details still waiting for the associate's confirmation.
+    r.awaiting_bank = Number((await db.queryOne("SELECT COUNT(*) AS n FROM associate_bank_accounts WHERE status = 'awaiting_confirmation' AND associate_id = :a", { a: r.id })).n);
     r.terms = termsText(r);
   }
   const data = {
@@ -96,6 +99,7 @@ async function index(req, res) {
     statuses: associateRepository.STATUSES,
     canManage: can(req, 'manage_associates'),
     canBank: can(req, 'manage_associate_bank'),
+    canRules: can(req, 'view_associate_commission_rules'), // D-292
     pendingBank: await associateBankRepository.pendingCount(),
     pendingRegistrations: await require('../repositories/associateRegistrationRepository').pendingCount(),
     pendingPriceRequests: await require('../services/priceRequestService').pendingCount(),
@@ -121,7 +125,8 @@ async function form(req, res, a) {
 
 /** Owner decision D-245: the associate's commission mode and level, read only for people with manage_pricing. */
 async function readCommissionLevel(req, existing) {
-  if (!can(req, 'manage_pricing')) return [null, null];
+  // D-291 (11 Nov 2026): an existing associate's rule is changed on their page (Commission rule), with a reason.
+  if (!can(req, 'manage_pricing') || existing) return [null, null];
   const body = req.body || {};
   const mode = String(body.commission_mode ?? '');
   if (!['fixed', 'ladder'].includes(mode)) return [null, 'Choose whether this associate has a fixed commission level or follows the ladder.'];
@@ -298,6 +303,9 @@ async function show(req, res) {
     commissionLevel,
     canManage,
     canBank,
+    // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
+    rule: can(req, 'view_associate_commission_rules') ? await require('../services/associateCommission').ruleProgress(a) : null,
+    canPricing: can(req, 'manage_pricing'),
     canChangeLink: await associateService.canChangeLink(req),
     clients: await associatePortalRepository.clients(id),
     me: req.user,
@@ -314,7 +322,21 @@ async function show(req, res) {
       if (inv) invoiceByPayout[p.id] = { id: Number(inv.id), reference: inv.reference };
     }
     const banks = await associateBankRepository.forAssociate(id);
-    for (const b of banks) b.masked = associateBankRepository.masked(b);
+    // D-293: the confirmation / verification state of each request, and what this user may do.
+    const bankConfirmation = require('../services/associateBankConfirmation');
+    const bankDetailsCheck = require('../services/bankDetailsCheck');
+    for (const b of banks) {
+      b.masked = associateBankRepository.masked(b);
+      b.status_text = bankConfirmation.staffStatus(b);
+      b.checks_text = bankDetailsCheck.checksText(b);
+      b.own = Number(b.requested_by_user || 0) === Number(req.user.id);
+    }
+    data.bankTwo = (await bankDetailsCheck.people()) === 'two';
+    data.maySelfVerify = await bankDetailsCheck.maySelfVerify(req.user.id);
+    data.bankWaitFirst = await bankDetailsCheck.waitDays(true);
+    data.bankWaitChange = await bankDetailsCheck.waitDays(false);
+    data.bankConfirmDays = bankDetailsCheck.CONFIRM_DAYS;
+    data.myId = Number(req.user.id);
     const usableBank = await associateBankRepository.usable(id);
     const invitations = await associateInvitationRepository.forAssociate(id);
     for (const inv of invitations) inv.usable = associateInvitationRepository.isUsable(inv);
@@ -330,9 +352,10 @@ async function show(req, res) {
       documents: docs,
       docKinds: associateDocumentRepository.KINDS,
       kyc: await associateKyc.checklist(a, docs),
+      addressGrace: await associateKyc.addressGraceNote(a), // D-290
       kycLabels: associateKyc.STATUS_LABELS,
       codes: await associateCodeService.codes(id),
-      docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE, allDocKinds: Object.keys(associateDocumentRepository.KINDS),
+      docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE, allDocKinds: Object.keys(associateDocumentRepository.KINDS), idDocTypes: associateKyc.ID_DOC_TYPES,
       events: await associateEventRepository.forAssociate(id, null, 200),
       messages: await associateEventRepository.messages(id),
       unlinkedClients: await associateRepository.unlinkedClients(),
@@ -383,8 +406,8 @@ async function changeStatus(req, res) {
     flash.set(req, 'error', 'The associate already has this status.');
   } else if (len(reason) < 10 || len(reason) > 300) {
     flash.set(req, 'error', 'Give the reason for the change (10 to 300 characters).');
-  } else if (status === 'active' && !(await associateBankRepository.usable(Number(a.id), associateService.addDays(associateService.todayIst(), await associateService.bankWaitDays())))) {
-    flash.set(req, 'error', 'An associate becomes Active once Accounts have verified their bank details (two people).');
+  } else if (status === 'active' && !(await associateBankRepository.hasVerified(Number(a.id)))) {
+    flash.set(req, 'error', 'An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.');
   } else {
     await associateRepository.setFields(Number(a.id), { status, status_reason: reason });
     await auditLogRepository.log(user.id, 'ASSOCIATE_STATUS_CHANGED', 'associates', Number(a.id), 'status', String(a.status), status);
@@ -572,6 +595,10 @@ function validateBank(associate, post) {
 }
 
 /** Accounts enter the bank details themselves (from the associate's signed form) — still checked by two people. */
+/**
+ * Accounts enter the bank details themselves (from the associate's signed form). D-293: the associate
+ * confirms them first (portal + e-mailed code), then one person other than the enterer verifies them.
+ */
 async function addBank(req, res) {
   const a = await found(req, res);
   if (!a) return;
@@ -589,53 +616,180 @@ async function addBank(req, res) {
     return;
   }
   const id = await associateBankRepository.request(Number(a.id), result, false, req.user.id);
-  await auditLogRepository.log(req.user.id, 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', id, null, null, 'by staff');
-  await associateService.notify(a, 'bank_changed', `NexaCrest recorded new bank details for you (${result.bank_name} ••••${result.account_number.slice(-4)}) on ${associateService.jMY()}. They are used once checked. ${await associateService.bankPaymentsSentence(Number(a.id))} If you did not send these details, contact NexaCrest at once.`, null, null, null, req.user.id);
-  flash.set(req, 'success', 'Bank details recorded — two people must now check them.');
+  await require('../services/associateBankConfirmation').start(id, a, false, req.user.id);
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
+  flash.set(req, 'success', `Bank details recorded. The associate must now confirm them in their portal (they were e-mailed, ${bankDetailsCheck.CONFIRM_DAYS} days to answer); then `
+    + ((await bankDetailsCheck.people()) === 'two' ? 'two people other than you check them.' : 'one person other than you verifies them.'));
   back(res, a.id, 'bank');
 }
 
+/** D-293: the checks every verifier must pass — confirmed by the associate, not the enterer (unless the self-approval rule allows, with a reason). */
+async function bankCheckRefusal(bank, uid, body) {
+  if (bank.status === 'awaiting_confirmation') return 'Verify is available once the associate confirms the new details.';
+  if (bank.status !== 'pending') return 'This request is no longer waiting to be checked.';
+  return require('../services/bankDetailsCheck').selfCheckError(bank.requested_by_user ?? null, uid, (body || {}).self_reason);
+}
+
+/** Two-people setting only: the first of the two checks (with the "how I checked" ticks). */
 async function firstCheck(req, res) {
   const a = await found(req, res);
   if (!a) return;
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
   const bank = await associateBankRepository.find(parseInt(req.params.bankId, 10));
-  const method = String((req.body || {}).check_method || '').trim();
+  const uid = Number(req.user.id);
+  const body = req.body || {};
+  const [checks, checkError] = bankDetailsCheck.readChecks(body);
+  let refusal = null;
   if (!bank || Number(bank.associate_id) !== Number(a.id)) {
     flash.set(req, 'error', 'Bank request not found.');
-  } else if (len(method) < 10 || len(method) > 300) {
-    flash.set(req, 'error', 'Say how you checked it (e.g. "Called the associate on their known number; test credit of ₹1 confirmed") — 10 to 300 characters.');
-  } else if (Number(bank.requested_by_user || 0) === Number(req.user.id)) {
-    flash.set(req, 'error', 'You entered these bank details, so two other people must check them.');
-  } else if (!(await associateBankRepository.firstCheck(Number(bank.id), req.user.id, method))) {
+  } else if ((await bankDetailsCheck.people()) !== 'two') {
+    flash.set(req, 'error', 'One person verifies bank details — use Verify.');
+  } else if ((refusal = await bankCheckRefusal(bank, uid, body)) !== null) {
+    flash.set(req, 'error', refusal);
+  } else if (checkError) {
+    flash.set(req, 'error', checkError);
+  } else if (!(await associateBankRepository.firstCheck(Number(bank.id), uid, bankDetailsCheck.checksText(checks)))) {
     flash.set(req, 'error', 'This request was already checked or is no longer pending.');
   } else {
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_BANK_FIRST_CHECK', 'associate_bank_accounts', Number(bank.id), null, null, method);
+    const selfReason = Number(bank.requested_by_user || 0) === uid ? String(body.self_reason || '').trim() : null;
+    await associateBankRepository.saveChecks(Number(bank.id), checks, selfReason);
+    await auditLogRepository.log(uid, 'ASSOCIATE_BANK_FIRST_CHECK', 'associate_bank_accounts', Number(bank.id), null, null, bankDetailsCheck.checksText(checks), selfReason);
     flash.set(req, 'success', 'First check recorded. A different person now verifies it.');
   }
   back(res, a.id, 'bank');
 }
 
+/**
+ * D-293: Verify — one person (default), ticking at least 2 of the checks; with the "Two people" setting, the
+ * second person after the first check. Usable after the waiting days (first account / change of account).
+ * The associate is always e-mailed (the bank-changed alert, MUST).
+ */
 async function verifyBank(req, res) {
   const a = await found(req, res);
   if (!a) return;
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
   const bank = await associateBankRepository.find(parseInt(req.params.bankId, 10));
   const uid = Number(req.user.id);
+  const body = req.body || {};
+  const two = (await bankDetailsCheck.people()) === 'two';
+  const [checks, checkError] = two ? [null, null] : bankDetailsCheck.readChecks(body);
+  const wait = bank ? await bankDetailsCheck.waitDays(!(await associateBankRepository.hasVerified(Number(bank.associate_id), Number(bank.id)))) : 0;
+  let refusal = null;
   if (!bank || Number(bank.associate_id) !== Number(a.id)) {
     flash.set(req, 'error', 'Bank request not found.');
-  } else if (!bank.first_checked_by) {
+  } else if ((refusal = await bankCheckRefusal(bank, uid, body)) !== null) {
+    flash.set(req, 'error', refusal);
+  } else if (two && !bank.first_checked_by) {
     flash.set(req, 'error', 'Record the first check before verifying.');
-  } else if (Number(bank.first_checked_by) === uid || Number(bank.requested_by_user || 0) === uid) {
+  } else if (two && Number(bank.first_checked_by) === uid) {
     flash.set(req, 'error', 'A different person must verify — you already acted on this request.');
-  } else if (!(await associateBankRepository.verify(Number(bank.id), uid, await associateService.bankWaitDays()))) {
+  } else if (checkError) {
+    flash.set(req, 'error', checkError);
+  } else if (!(two ? await associateBankRepository.verify(Number(bank.id), uid, wait) : await associateBankRepository.verifyOne(Number(bank.id), uid, wait))) {
     flash.set(req, 'error', 'This request is no longer pending.');
   } else {
+    const selfReason = Number(bank.requested_by_user || 0) === uid ? String(body.self_reason || '').trim() : null;
+    if (checks) await associateBankRepository.saveChecks(Number(bank.id), checks, selfReason);
     const b = await associateBankRepository.find(Number(bank.id));
-    await auditLogRepository.log(uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', Number(bank.id), 'status', 'pending', 'verified');
+    await auditLogRepository.log(uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', Number(bank.id), 'status', 'pending', 'verified',
+      `${checks ? `Checked: ${bankDetailsCheck.checksText(checks)}. ` : ''}${selfReason !== null ? `Own entry — reason: ${selfReason}` : ''}`.trim() || null);
+    // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
     await associateService.notify(a, 'bank_changed', `Your bank account ${associateBankRepository.masked(b)} was verified by NexaCrest. Payments go to it from `
       + `${dates.short(String(b.usable_from))}. If you did not ask for this change, contact NexaCrest at once.`, null, null, null, uid);
     flash.set(req, 'success', `Verified. Usable from ${dates.short(String(b.usable_from))}; the associate was e-mailed.`);
   }
   back(res, a.id, 'bank');
+}
+
+/** D-293: "Remind associate" — the confirmation e-mail again while they have not answered. */
+async function remindBank(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const bank = await associateBankRepository.find(parseInt(req.params.bankId, 10));
+  if (!bank || Number(bank.associate_id) !== Number(a.id) || !(await require('../services/associateBankConfirmation').remind(Number(bank.id), req.user.id))) {
+    flash.set(req, 'error', 'These bank details are no longer waiting for the associate.');
+  } else {
+    flash.set(req, 'success', 'Reminder e-mailed to the associate.');
+  }
+  back(res, a.id, 'bank');
+}
+
+// ------------------------------------------------------------ D-291: commission rule (the MD)
+
+/** The rule page: Standard ladder / Own ladder (a copy of the standard ladder to change) / Fixed %. */
+async function commissionRule(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const associateCommission = require('../services/associateCommission');
+  let chosen = String(req.query.rule || a.commission_mode || 'ladder');
+  if (!associateCommission.RULE_LABELS[chosen]) chosen = 'ladder';
+  const own = await pricingRepository.ownLadder(Number(a.id));
+  const standard = await pricingRepository.ladder();
+  const rows = (own.length ? own : standard).map((s) => ({ from_order: s.from_order, to_order: s.to_order, level_id: s.level_id }));
+  const blank = { from_order: '', to_order: '', level_id: '' };
+  const levels = (await pricingRepository.levels()).map((l) => ({ ...l, label: pricingService.levelLabel(l) }));
+  res.renderView('associates/commission_rule', {
+    a, chosen, rows: [...rows, blank, { ...blank }], levels, ruleLabels: associateCommission.RULE_LABELS,
+    currentRule: associateCommission.RULE_LABELS[a.commission_mode] || 'Standard ladder', standardSummary: associateCommission.ladderSummary(standard),
+  }, 'layout/base');
+}
+
+async function saveCommissionRule(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const associateCommission = require('../services/associateCommission');
+  const body = req.body || {};
+  const mode = String(body.rule || '');
+  const reason = String(body.reason || '').trim();
+  const fail = (msg) => {
+    flash.set(req, 'error', msg);
+    res.redirect(`/associates/${Number(a.id)}/commission-rule?rule=${encodeURIComponent(mode)}`);
+  };
+  if (!associateCommission.RULE_LABELS[mode]) return fail('Choose the rule: Standard ladder, Own ladder or Fixed %.');
+  if (len(reason) < 10 || len(reason) > 300) return fail('Give the reason for the change (10 to 300 characters) — it is kept in the Audit Log.');
+  const levelsById = {};
+  for (const l of await pricingRepository.levels()) levelsById[Number(l.id)] = l;
+  let levelId = null;
+  let steps = [];
+  if (mode === 'fixed') {
+    const l = levelsById[parseInt(body.commission_level_id, 10) || 0];
+    if (!l || (Number(l.is_active) !== 1 && Number(a.commission_level_id || 0) !== Number(l.id))) return fail('Choose an active commission level for the fixed %.');
+    levelId = Number(l.id);
+  } else if (mode === 'own_ladder') {
+    const [parsed, errors] = pricingService.readLadderForm(body, levelsById);
+    if (errors.length) return fail(`Own ladder: ${errors.join(' ')}`);
+    steps = parsed;
+  }
+  const describe = (m, lid, rows) => {
+    if (m === 'fixed') {
+      const l = levelsById[Number(lid)];
+      return `Fixed %: ${l ? `${l.name} — ${pricingService.levelLabel(l)}` : '?'}`;
+    }
+    if (m === 'own_ladder') {
+      return `Own ladder: ${rows.map((s) => `${s.from ?? s.from_order}–${(s.to ?? s.to_order ?? null) === null ? 'onward' : (s.to ?? s.to_order)}: ${(levelsById[Number(s.level_id)] || {}).name || '?'}`).join('; ')}`;
+    }
+    return 'Standard ladder';
+  };
+  const oldMode = String(a.commission_mode || 'ladder');
+  const before = describe(oldMode, a.commission_level_id, oldMode === 'own_ladder' ? await pricingRepository.ownLadder(Number(a.id)) : []);
+  const after = describe(mode, levelId, steps);
+  if (before === after) {
+    flash.set(req, 'success', 'Nothing changed.');
+    res.redirect(`/associates/${Number(a.id)}#commission-rule`);
+    return undefined;
+  }
+  const rateBefore = associateCommission.rateLabel((await associateCommission.levelForAssociate(a, null))[0]);
+  await pricingRepository.setAssociateRule(Number(a.id), mode, levelId, steps, reason, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ASSOCIATE_COMMISSION_RULE_CHANGED', 'associates', Number(a.id), 'commission_rule', before, after, reason);
+  const fresh = (await associateRepository.find(Number(a.id))) || a;
+  const rateAfter = associateCommission.rateLabel((await associateCommission.levelForAssociate(fresh, null))[0]);
+  if (rateAfter !== rateBefore) {
+    // D-292: the associate sees only their current % — never the rule, levels or ladder.
+    await associateEventRepository.add(Number(a.id), 'rates_changed', `Your commission for new orders is now ${rateAfter} of the FOB value of each order from the clients you introduced. Orders whose Proforma Invoice was already sent keep their %.`, null, null, null, req.user.id, true);
+  }
+  flash.set(req, 'success', `Commission rule saved: ${after}. It applies to new orders only.`);
+  res.redirect(`/associates/${Number(a.id)}#commission-rule`);
+  return undefined;
 }
 
 async function rejectBank(req, res) {
@@ -685,7 +839,8 @@ async function uploadDocument(req, res) {
     return;
   }
   // Owner decision D-251 (A4): checked per kind; an Aadhaar card keeps only its last 4 digits.
-  const [refValue, refError] = associateKyc.normaliseReference(kind, reference);
+  // D-290: an ID document carries its type and number; ID and address proofs get app-set file names.
+  const [refValue, idType, refError] = associateKyc.checkUpload(kind, reference, (req.body || {}).id_doc_type);
   if (refError) {
     flash.set(req, 'error', refError);
     back(res, a.id, 'documents');
@@ -693,13 +848,14 @@ async function uploadDocument(req, res) {
   }
   let fileId;
   try {
-    fileId = await fileUploadService.handleUpload(req, 'document_file', 'associate_document', 'associates/documents', null, null, req.user.id, null, a.name, KINDS[kind]);
+    fileId = await fileUploadService.handleUpload(req, 'document_file', 'associate_document', 'associates/documents', null, null, req.user.id,
+      associateKyc.appFileName(kind, a.name, req.file ? req.file.originalname : ''), a.name, KINDS[kind]);
   } catch (e) {
     flash.setErrorFromException(req, e);
     back(res, a.id, 'documents');
     return;
   }
-  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, refValue, false, req.user.id);
+  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, refValue, false, req.user.id, idType);
   await auditLogRepository.log(req.user.id, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(a.id), 'kind', null, kind);
   if (['form_16a', 'form_15ca', 'form_15cb'].includes(kind)) {
     await associateService.notify(a, 'document_added', `${KINDS[kind]}${refValue ? ` (${refValue})` : ''} is in your portal.`, null, null, null, req.user.id);
@@ -841,7 +997,14 @@ async function ladder(req, res) {
   const commission = await associateCommission.settings();
   res.renderView('associates/ladder', {
     tdsValue: (await associateService.tdsPct()).toFixed(2),
-    wait: await associateService.bankWaitDays(),
+    // D-293: two waits (first account / change of account) and one or two people check.
+    waitFirst: await require('../services/bankDetailsCheck').waitDays(true),
+    waitChange: await require('../services/bankDetailsCheck').waitDays(false),
+    bankPeople: await require('../services/bankDetailsCheck').people(),
+    codeChanges: await associateCodeService.changesPerYear(),
+    upgradeAfter: await require('../services/associateAccess').upgradeAfter(),
+    weekdays: associateCommission.WEEKDAYS,
+    monthDays: Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${associateCommission.ordinal(i + 1)} of the month` })),
     commission,
     thresholdValue: commission.threshold_inr.toFixed(0),
     gstValue: commission.gst_pct.toFixed(2),
@@ -855,19 +1018,35 @@ async function saveLadder(req, res) {
   const values = {};
   const int = (v) => (/^-?\d+$/.test(String(v ?? '').trim()) ? parseInt(v, 10) : null);
   const tds = isNum(body.associate_tds_pct) ? Number(body.associate_tds_pct) : null;
-  const wait = int(body.associate_bank_wait_days);
-  if (tds === null || tds < 0 || tds > 30 || wait === null || wait < 0 || wait > 60) {
-    flash.set(req, 'error', 'Enter TDS as 0–30 % and the bank waiting days as 0–60.');
+  // D-293: two waits (0–90) and one or two people; left as they are when not on the form.
+  const bankDetailsCheck = require('../services/bankDetailsCheck');
+  const waitFirst = int(body.associate_bank_wait_first_days ?? await bankDetailsCheck.waitDays(true));
+  const waitChange = int(body.associate_bank_wait_change_days ?? await bankDetailsCheck.waitDays(false));
+  const people = String(body.bank_details_check_people ?? await bankDetailsCheck.people());
+  if (tds === null || tds < 0 || tds > 30 || waitFirst === null || waitFirst < 0 || waitFirst > 90 || waitChange === null || waitChange < 0 || waitChange > 90) {
+    flash.set(req, 'error', 'Enter TDS as 0–30 % and each bank waiting time as 0–90 days.');
+    res.redirect('/associates/ladder');
+    return;
+  }
+  if (!['one', 'two'].includes(people)) {
+    flash.set(req, 'error', 'Choose who checks new bank details: one person or two people.');
     res.redirect('/associates/ladder');
     return;
   }
   values.associate_tds_pct = tds.toFixed(2);
-  values.associate_bank_wait_days = String(wait);
+  values.associate_bank_wait_first_days = String(waitFirst);
+  values.associate_bank_wait_change_days = String(waitChange);
+  values.bank_details_check_people = people;
   // The commission rules: the MD only (fields posted by others are ignored).
   if (can(req, 'manage_pricing')) {
     const days = int(body.associate_commission_due_days);
     const run = String(body.associate_payout_run || '');
-    const day = int(body.associate_payout_day);
+    // D-292: monthly 1–28 or 'last'; weekly 1–7 (the weekday field, or the old single field).
+    const rawDay = String((run === 'weekly' ? (body.associate_payout_weekday ?? body.associate_payout_day) : body.associate_payout_day) ?? '').trim();
+    const day = run === 'monthly' && rawDay === 'last' ? 'last' : int(rawDay);
+    const holidayRule = String(body.associate_payout_holiday_rule ?? (await associateCommission.settings()).holiday_rule);
+    const codeChanges = int(body.associate_code_changes_per_year ?? await associateCodeService.changesPerYear());
+    const upgradeAfter = int(body.associate_upgrade_after_orders ?? await require('../services/associateAccess').upgradeAfter());
     const threshold = isNum(body.associate_counting_threshold_inr) ? Number(body.associate_counting_threshold_inr) : null;
     const months = int(body.associate_protection_months);
     const gst = isNum(body.associate_gst_pct) ? Number(body.associate_gst_pct) : null;
@@ -880,7 +1059,10 @@ async function saveLadder(req, res) {
     let error = null;
     if (days === null || days < 0 || days > 365) error = 'Enter the days after full payment as 0 to 365.';
     else if (!['monthly', 'weekly'].includes(run)) error = 'Choose a monthly or a weekly payout run.';
-    else if (day === null || (run === 'monthly' && (day < 1 || day > 28)) || (run === 'weekly' && (day < 1 || day > 7))) error = 'Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.';
+    else if (day === null || (day !== 'last' && ((run === 'monthly' && (day < 1 || day > 28)) || (run === 'weekly' && (day < 1 || day > 7))))) error = 'Choose the payout day: the 1st to the 28th or the last day of the month for a monthly run, a weekday for a weekly run.';
+    else if (!['before', 'after'].includes(holidayRule)) error = 'Choose what happens when the payment day is a Sunday or holiday: the working day before or after.';
+    else if (codeChanges === null || codeChanges < 0 || codeChanges > 12) error = 'Enter the personal code changes allowed per year as 0 to 12.';
+    else if (upgradeAfter === null || upgradeAfter < 1 || upgradeAfter > 50) error = 'Enter after how many paid orders "Quoting" is suggested, 1 to 50.';
     else if (threshold === null || threshold < 0 || threshold > 1000000000) error = 'Enter the counting-order threshold in rupees (0 or more).';
     else if (months === null || months < 1 || months > 60) error = 'Enter the buyer registration period as 1 to 60 months.';
     else if (gst === null || gst < 0 || gst > 28) error = 'Enter the GST on commission as 0 to 28 %.';
@@ -896,6 +1078,19 @@ async function saveLadder(req, res) {
     values.associate_claim_hold = body.associate_claim_hold ? '1' : '0';
     values.associate_payout_run = run;
     values.associate_payout_day = String(day);
+    values.associate_payout_holiday_rule = holidayRule;
+    values.associate_code_changes_per_year = String(codeChanges);
+    values.associate_upgrade_after_orders = String(upgradeAfter);
+    // D-292: a change of the payment run (run, day, Sunday/holiday rule) needs a reason, kept in the Audit Log.
+    const now = await incentiveRepository.settings();
+    const runChanged = String(now.associate_payout_run ?? 'monthly') !== run || String(now.associate_payout_day ?? 'last') !== String(day)
+      || String(now.associate_payout_holiday_rule ?? 'before') !== holidayRule;
+    const payoutReason = String(body.payout_reason || '').trim();
+    if (runChanged && (len(payoutReason) < 10 || len(payoutReason) > 300)) {
+      flash.set(req, 'error', 'Give the reason for changing the payment run (10 to 300 characters) — it is kept in the Audit Log.');
+      res.redirect('/associates/ladder');
+      return;
+    }
     values.associate_counting_threshold_inr = threshold.toFixed(2);
     values.associate_protection_months = String(months);
     values.associate_gst_pct = gst.toFixed(2);
@@ -923,7 +1118,8 @@ async function saveLadder(req, res) {
   for (const [k, v] of Object.entries(values)) {
     if (String(before[k] ?? '') !== v) {
       await incentiveRepository.setSetting(k, v, req.user.id);
-      await auditLogRepository.log(req.user.id, 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, k, before[k] ?? null, v);
+      await auditLogRepository.log(req.user.id, 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, k, before[k] ?? null, v,
+        ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'].includes(k) ? (String(body.payout_reason || '').trim() || null) : null);
     }
   }
   flash.set(req, 'success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');
@@ -993,6 +1189,6 @@ module.exports = {
   abroadCurrencyCodes,
   reviewDocument,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
-  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, bankNumber, uploadDocument, downloadDocument, reply,
+  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, bankNumber, uploadDocument, downloadDocument, reply,
   holdPayout, releasePayout, clawback, ladder, saveLadder, report,
 };

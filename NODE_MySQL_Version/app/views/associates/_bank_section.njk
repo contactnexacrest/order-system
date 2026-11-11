@@ -1,0 +1,63 @@
+{# Port of _bank_section.php. Owner decisions 11 Nov 2026, points 10 and 18 (D-293): the associate's bank details on
+   their staff page. Entered → the associate confirms (portal, e-mailed code, 7 days) → one person other than the
+   enterer verifies ("how did you check it?", at least 2 ticks; MD/ED may verify their own entry with a reason —
+   Admin › Self-approval rules › Bank details) → used after the waiting days.
+   Expects a, id, banks (each with masked, status_text, checks_text, own), usableBankMasked, canBank, bankTwo,
+   maySelfVerify, bankWaitFirst, bankWaitChange, bankConfirmDays, myId. #}
+  <div class="section" id="bank">
+    <h2>Bank details</h2>
+    <p>Payments go to: <b>{{ (usableBankMasked ~ ' (verified)') if usableBankMasked else 'no verified account yet' }}</b></p>
+    <table class="list">
+      <tr><th>Requested</th><th>Account</th><th>Holder</th><th>IFSC / SWIFT</th><th>Status</th><th>Checks</th><th>Action</th></tr>
+      {% for b in banks %}
+        <tr><td>{{ (b.requested_at | shortDate) if b.requested_at else '—' }}<br><small class="muted">{{ 'by the associate' if b.requested_by_associate == 1 else ('by ' ~ (b.requested_by_name or 'NexaCrest')) }}</small></td>
+          <td>{{ b.masked }} <small class="muted">{{ b.account_currency }}</small>{% if canBank %}<br><a class="small" href="/associates/{{ id }}/bank/{{ b.id }}/number">Show full number</a>{% endif %}</td>
+          <td>{{ b.holder_name }}</td><td>{{ ((b.ifsc or '') ~ ' ' ~ (b.swift or '')) | trim }}</td>
+          <td data-bank-status>{{ b.status_text }}{% if b.rejected_reason %}<br><small>{{ b.rejected_reason }}</small>{% endif %}</td>
+          <td><small>{% if b.first_checked_by_name %}{{ '1: ' if bankTwo }}{{ b.first_checked_by_name }} — {{ b.check_method }}{% endif %}
+            {% if b.verified_by_name %}<br>{{ '2: ' if bankTwo else 'Verified by ' }}{{ b.verified_by_name }}{% if not bankTwo and b.checks_text %} — {{ b.checks_text }}{% endif %}{% endif %}
+            {% if b.verify_note %}<br>{{ b.verify_note }}{% endif %}{% if b.self_verify_reason %}<br>Own entry — reason: {{ b.self_verify_reason }}{% endif %}</small></td>
+          <td>
+          {% if canBank and b.status == 'awaiting_confirmation' %}
+            <small class="muted">Verify is available once the associate confirms.</small>
+            <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/remind" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Remind associate</button></form>
+          {% elif canBank and b.status == 'pending' %}
+            {% if b.own and not maySelfVerify %}
+              <small class="muted">Someone else must verify details you entered.</small>
+            {% elif bankTwo and b.first_checked_by and (b.first_checked_by | int) == myId %}
+              <small class="muted">A different person verifies — you did the first check.</small>
+            {% elif bankTwo and b.first_checked_by %}
+              <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/verify" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                {% if b.own %}<input type="text" name="self_reason" required minlength="10" maxlength="300" placeholder="e.g. Only finance person is on leave until 20 Nov" aria-label="Why you verify details you entered yourself">{% endif %}
+                <button type="submit" class="btn-sm">Verify (second person)</button></form>
+            {% else %}
+              <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/{{ 'check' if bankTwo else 'verify' }}" data-bank-verify-form>
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <fieldset><legend>How did you check it? <small class="muted">(tick at least two)</small></legend>
+                  <label class="checkbox-label"><input type="checkbox" name="check_bank_proof" value="1" data-min-ticked="check_bank_proof,check_phone,check_test_payment:2" data-min-ticked-message="Tick at least two of the ways you checked the bank details."> Matches the bank proof on file (cancelled cheque / bank statement)</label>
+                  <label class="checkbox-label"><input type="checkbox" name="check_phone" value="1"> Called the associate on their registered phone and they confirmed the last 4 digits</label>
+                  <label class="checkbox-label"><input type="checkbox" name="check_test_payment" value="1"> Test payment of ₹1 / USD 1 received in the right name</label>
+                  <label>Bank reference of the test payment (UTR / SWIFT)<input type="text" name="test_payment_ref" minlength="3" maxlength="60" placeholder="e.g. UTR 412345678901" data-required-when="check_test_payment=1" data-required-when-message="Enter the bank reference (UTR / SWIFT) of the test payment."></label>
+                  <label>Note (optional)<input type="text" name="verify_note" maxlength="300" placeholder="e.g. Spoke to them on 11 Nov at 3 pm"></label>
+                  {% if b.own %}<label>You entered these details yourself — give the reason you verify them *<input type="text" name="self_reason" required minlength="10" maxlength="300" placeholder="e.g. Only finance person is on leave until 20 Nov"></label>{% endif %}
+                </fieldset>
+                <button type="submit" class="btn-sm">{{ 'First check' if bankTwo else 'Verify' }}</button>
+              </form>
+            {% endif %}
+            <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/reject" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason (shown to the associate)" aria-label="Reason for rejecting"><button type="submit" class="btn-sm btn-secondary">Reject</button></form>
+          {% endif %}</td></tr>
+      {% endfor %}
+      {% if banks.length == 0 %}<tr><td colspan="7" class="muted">No bank details yet — the associate adds them in their portal, or Accounts enter them below.</td></tr>{% endif %}
+    </table>
+    <p class="muted small">New bank details are used only after the associate confirms them in the portal (code to their registered e-mail, within {{ bankConfirmDays }} days — otherwise cancelled; "This is not me" cancels and alerts the MD and Finance) and
+      {{ 'two people' if bankTwo else 'one person' }} other than the one who entered them verified them. Then a first account is used after {{ bankWaitFirst }} days, a changed account after {{ bankWaitChange }} days (Associates › Commission settings).</p>
+    {% if canBank %}
+    <details><summary>Enter bank details from the associate's signed form</summary>
+      <form method="post" action="/associates/{{ id }}/bank" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% set __india = a.based_in == 'india' %}{% include "associate_portal/_bank_fields.njk" %}
+        <button type="submit" class="btn-sm">Record — the associate then confirms them</button>
+      </form>
+    </details>
+    {% endif %}
+  </div>

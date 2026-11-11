@@ -717,7 +717,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 | **Procurement** | `purchase_requirements`, `purchase_quotes` |
 | **Coordination** | `department_task_types` |
 | **Agreements** | `agreements`, `agreement_alerts_sent` |
-| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps` |
+| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps`, `associate_ladder_steps` (D-291), `vendor_bank_changes` (D-294) |
 | **Team incentive** | `incentive_settings`, `incentive_roles`, `user_incentive_roles`, `order_incentives`, `order_incentive_people`, `order_incentive_roles`, `order_incentive_history`, `incentive_payouts`, `incentive_kept` |
 | **Reference library** | `internal_reference_docs`, `reference_library_documents`, `reference_library_categories` |
 | **Domestic Trade (DOM)** | `indian_states`, `gst_rates`, `domestic_orders`, `domestic_order_lines`, `domestic_payments`, `domestic_documents`, `domestic_counters` |
@@ -1056,7 +1056,8 @@ can change any role's ticks in **Admin › Permissions**
 | Key | What it allows | Roles that hold it (seed) |
 |---|---|---|
 | `manage_associates` | Associate register, agreements, rates, invitations, client links and their changes, portal access | Admin, MD, ED |
-| `manage_associate_bank` | See associates' full bank details and verify bank changes (two people) | Admin, MD, FinMgr, FinDir |
+| `manage_associate_bank` | See associates' full bank details and verify bank changes (once the associate has confirmed them; one or two people — setting) | Admin, MD, FinMgr, FinDir |
+| `view_associate_commission_rules` | See associate commission rules — an associate's rule (standard ladder / own ladder / fixed %), the % and level of their next order, orders counted ("3 of 5") and the steps; without it staff see "Set by the MD" (D-292) | Admin, MD, ED, FinDir, FinMgr |
 | `view_associates` | See which client was introduced by which associate (no amounts, bank details or agreements) | Admin, MD, ED, ExpEx, SalesMgr, SalesDir |
 
 **Category: ca**
@@ -2284,6 +2285,41 @@ the same filters, counts, fields, actions and money rules on both templates
   - Commission is on the **final invoiced FOB of the goods**, line by line;
     level fixed on the order at the PI; fixed level or ladder by counting
     orders (invoiced FOB ≥ ₹5 lakh) (D-245 P3).
+  - **Commission rule per associate (D-291, 11 Nov 2026):** Standard ladder
+    (default) / **Own ladder** (a copy of the standard ladder, edited for this
+    associate; it overrides the standard one — `associate_ladder_steps`;
+    "+ Add own ladder" / Edit / Remove) / **Fixed %** (a commission level).
+    Only the MD (`manage_pricing`) on the associate page › Commission
+    (`/associates/{id}/commission-rule`), with a reason (Audit Log
+    `ASSOCIATE_COMMISSION_RULE_CHANGED`; `associates.commission_rule_*`); new
+    orders only (an order keeps the level fixed at its PI). The edit form no
+    longer changes an existing associate's rule (a new associate may start on
+    Standard ladder or Fixed). `AssociateCommission::ladderFor()`.
+  - **Who sees what (D-292):** with `view_associate_commission_rules` (Admin,
+    MD, ED, Finance Director, Finance Manager) the associate page shows the
+    rule (with who set it, when and why), "Next order earns x% — Level n",
+    "Orders counted so far x of y — n more counting orders to reach z%", the
+    step boxes (current step marked) and the counting rule; the Level column
+    of the orders table and the list's "Commission rule" column (Standard and
+    Kanban). Everyone else sees "Set by the MD." The associate sees **only**
+    the current %: "x% of the FOB value of each order from the clients you
+    introduced" (wording "FOB value", never "goods value"), a 4-step "How it
+    works" (fixed at PI; FOB value on the Commercial Invoice; earned when the
+    buyer has paid in full; paid N days later in the monthly / weekly
+    payment, in their currency to the verified account), the % fixed on each
+    order ("Your %") and the statuses "Not earned yet — buyer still paying" /
+    "Earned — will be paid on <date>" / "Paid on <date> (ref)" / "On hold — a
+    buyer claim on this order is open" (a NexaCrest hold keeps its reason).
+    Never a level, the ladder, counts or the next step; the PI notice says
+    "Your commission on it is fixed at 5% of its FOB value".
+  - **Payout day (D-292):** monthly 1st–28th or **Last day of the month**,
+    weekly Monday–Sunday; "If the payment day is a Sunday or holiday: pay on
+    the working day before (default) / after" using the Holiday Calendar (a
+    working day = not a Sunday, not in `company_holidays`); if "before" lands
+    before the due date the commission goes in the next run. Seed: last day
+    of the month, working day before. A change of the payment run needs a
+    reason (Audit Log). `AssociateCommission::payoutRunOn / scheduledRunOn /
+    workingDay / payDayText`.
   - Only orders in the 10 days from the client's first PO received; later
     only the MD can force "associate: yes" with a reason.
   - Earned only when the buyer has **paid in full**; no pro rata; nothing on
@@ -2327,11 +2363,46 @@ the same filters, counts, fields, actions and money rules on both templates
     what was sent are kept (`incentive_payouts.zoho_cost_journal_id`, `zoho_cost_hash`), so
     it is sent once and updated on a change. Without the account nothing is sent: the Sync
     Log and the payouts page say so. Live TEST-org check pending.
-  - **Bank details:** a change is a request; two different Finance people
-    check and verify; 7-day wait before first use; encrypted, masked;
-    payment only into a verified usable account.
+  - **Bank details (D-293, 11 Nov 2026):** new details (portal, or staff
+    from the signed form) are `awaiting_confirmation`: the associate gets the
+    bank-changed e-mail (MUST) and a bar on every portal page; on
+    `/associate/bank/confirm` they see current vs new, re-type the last 4
+    digits of the NEW account, enter a fresh 6-digit code e-mailed to their
+    REGISTERED e-mail (valid 10 minutes, 5 tries) and tick "These are my bank
+    details" → Confirm (status `pending`), or "This is not me — cancel it"
+    (cancelled, `cancelled_how = not_me`; the MD, Finance Director and
+    Finance Manager are alerted in-app and by e-mail). No answer in 7 days →
+    cancelled by the daily job (`expired`); the old account stays. Newer
+    details replace open ones (`replaced`). Staff see "Waiting for the
+    associate — ends <date>" and **Remind associate**; **Verify only after the
+    confirmation**. Setting "Bank details check": **One person** (default) —
+    one verifier who is not the enterer ticks at least 2 of: matches the bank
+    proof / phone call on the registered number / test payment with its bank
+    reference (note optional); or **Two people** (first check + verify, as
+    before). MD and ED may verify their own entry with a reason
+    (Admin › Self-approval rules › "Bank details", `bank_details`). Wait
+    before use: a **first** account 0 days, a **changed** account 15 days
+    (both 0–90; `associate_bank_wait_first_days`,
+    `associate_bank_wait_change_days`); until then payments go to the old
+    account. Encrypted, masked; payment only into a verified usable account.
+    `AssociateBankConfirmation`, `BankDetailsCheck`. The same rules apply to
+    suppliers and logistics partners (D-294, §6.4b).
   - **KYC** checklist must be complete before any commission is paid
     (D-252); Aadhaar last 4 digits only (D-251).
+  - **KYC (D-290, 11 Nov 2026):** the ID document's type is chosen
+    (Passport / National ID card / Residence permit / Driving licence,
+    `associate_documents.id_doc_type`) and its number is 5–30 letters,
+    digits, dashes, slashes or spaces (PAN and Aadhaar unchanged). **ID proof**
+    and **Address proof** are separate required items in India and abroad
+    (India: PAN, ID proof = Aadhaar or an ID document, address proof, bank
+    proof, agreement, GST certificate with a GSTIN; abroad: ID proof, address
+    proof, bank proof, agreement). The same document may be uploaded under
+    each — two records whose file names the app sets ("ID proof — <name> —
+    <date>", "Address proof — <name> — <date>"); no "use the same file"
+    button. Associates accepted before the change have until
+    `associates.address_proof_due_on` (60 days, set at go-live of this
+    change) before payouts are held for a missing address proof
+    (`AssociateKyc::missingForPayout`).
   - Self-registration link (7 days), code change (up to 3, old codes keep
     working) (D-253, D-254).
 - **Tables.** `associates`, `associate_codes`, `associate_invitations`,
@@ -2341,12 +2412,39 @@ the same filters, counts, fields, actions and money rules on both templates
   `associate_access_level_settings`, `associate_access_log`,
   `associate_price_access`, `incentive_payouts`.
 - **Code.** `AssociateAdminController`, `AssociatePortalController`,
+  `AssociateBankConfirmation`, `BankDetailsCheck` (D-293),
   `AssociateRegistrationController`, `AssociateAccessController`,
   `AssociateTdsController`, `AssociateService`, `AssociateCommission`,
   `AssociateTds`, `AssociateKyc`, `AssociateCodeService`,
   `AssociateAccess`, `AssociatePortalService`.
 - **SOP / decisions.** SOP 24, 20; D-175, D-176, D-217, D-235, D-245,
   D-246, D-250–D-254, D-261.
+
+
+### 6.4b Supplier and logistics-partner bank details (D-294, 11 Nov 2026)
+
+- **Purpose.** The same protection as for associates: new bank details are
+  never paid into before the vendor confirms them and NexaCrest verifies them.
+- **Flow.** A change typed by staff (supplier / logistics partner form) or by
+  the vendor (Vendor Details Link) does **not** replace the account on the
+  supplier: it is a row in `vendor_bank_changes` (`awaiting_confirmation`).
+  A confirmation link is e-mailed to the vendor's **registered** e-mail (the
+  one on file before the change; for a new record, the one entered with it):
+  `/vendor-bank-confirm/{token}` shows current vs new, the last 4 digits are
+  re-typed, "These are our bank details" ticked → Confirm (`pending`), or
+  "This is not us — cancel it" (cancelled; MD and Finance alerted). No answer
+  in 7 days → cancelled by the daily job; the old account stays. On the
+  supplier page, **Bank details changes**: "Send the link again" (to the
+  e-mail on file), **Verify** (only after the confirmation; one person other
+  than the one who typed them, at least 2 checks; two-people setting; MD/ED
+  self-verify with a reason), Reject. After verification the change waits
+  its days (first account 0 / change 15) and is then copied onto the
+  supplier as verified (`applied`; on the page and by the daily job). The old
+  "I have verified these bank details" tick on the form is gone.
+- **Code.** `VendorBankChangeService`, `VendorBankChangeRepository`,
+  `VendorBankChangeController` (Node: `vendorBankChange*`); routes
+  `/suppliers/{id}/bank-changes/{changeId}/verify|check|reject|resend`, the
+  same under `/logistics-partners/`.
 
 ### 6.5 Team incentive (eligibility and caps)
 
@@ -3039,7 +3137,7 @@ Associates are the only partner type and the only people outside the company who
 | Level 3 | 7 % | 11–20 |
 | Level 4 | 10 % | 21 onward |
 
-A level may also be a fixed USD amount per unit. Per associate the MD chooses **Ladder** or **Fixed level**. Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
+A level may also be a fixed USD amount per unit. Per associate the MD chooses **Standard ladder** (default), **Own ladder** (a copy of the standard ladder, changed for that associate; it overrides the standard one) or **Fixed %** — with a reason, new orders only (D-291). Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
 
 **Counting order.** A fully paid order whose in-range invoiced FOB in INR is at least `associate_counting_threshold_inr` (₹5,00,000). A smaller order earns the current step and does not count.
 
@@ -3057,8 +3155,8 @@ A level may also be a fixed USD amount per unit. Per associate the MD chooses **
 |---|---|---|
 | `associate_commission_due_days` | 30 | Due date = date of full payment + 30 days. |
 | `associate_claim_hold` | 1 (on) | Held while a buyer claim opened on or before the due date is open. |
-| `associate_payout_run`, `associate_payout_day` | monthly, 5 | Paid in the first payout run on or after the due date (monthly day 1–28, or weekly day 1–7). |
-| KYC (D-252) | — | **Mark paid** is refused until the associate's KYC is complete. |
+| `associate_payout_run`, `associate_payout_day`, `associate_payout_holiday_rule` | monthly, last, before | Paid in the first payout run on or after the due date (monthly day 1–28 or `last` = the last day of the month, or weekly day 1–7); a run day on a Sunday or a Holiday Calendar day moves to the working day before (or after) (D-292). |
+| KYC (D-252, D-290) | — | **Mark paid** is refused until the associate's KYC is complete (address proof: not before `address_proof_due_on` for associates accepted before 11 Nov 2026). |
 
 Take-back after payment only for fraud or breach, with a reason (audited).
 
@@ -3552,7 +3650,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 | `price_request_daily_limit` | 10 | Associate automatic price requests per day |
 | `price_request_valid_days` | 7 | Associate price validity |
 
-Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED).
+Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED). Self-approval rule `bank_details` (MD, ED): verify bank details one entered oneself, with a reason (D-293).
 
 #### Team incentive (`incentive_settings`, `incentive_roles`; Admin › Team Incentives, MD)
 
@@ -3564,7 +3662,8 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 |---|---|---|
 | `associate_commission_due_days` | 30 | Associates › Commission settings (MD) |
 | `associate_claim_hold` | 1 | 〃 |
-| `associate_payout_run` / `associate_payout_day` | monthly / 5 | 〃 |
+| `associate_payout_run` / `associate_payout_day` | monthly / last | 〃 — day 1–28 or `last` (D-292); a change of the run needs a reason |
+| `associate_payout_holiday_rule` | before | 〃 — Sunday / holiday: the working day before or after (D-292) |
 | `associate_counting_threshold_inr` | 500000 | 〃 |
 | `associate_gst_pct` | 18.00 | 〃 |
 | `associate_portal_commission_months` | 12 | 〃 — commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months (D-263) |
@@ -3572,9 +3671,11 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 | `associate_abroad_min_payout_usd` | 100 | 〃 — smallest payout abroad; less carries to the next run (D-264) |
 | `associate_protection_months` | 6 | 〃 (buyer registration) |
 | `associate_registration_link_days` | 7 | 〃 (D-253) |
-| `associate_code_changes_per_year` | 3 | 〃 (D-254) |
-| `associate_bank_wait_days` | 7 | Bank-detail change wait |
-| `associate_upgrade_after_orders` | 3 | Access level upgrade (D-261) |
+| `associate_code_changes_per_year` | 3 | 〃 (D-254) — editable on the page since 11 Nov 2026 (0–12) |
+| `associate_bank_wait_first_days` | 0 | 〃 — wait before a FIRST bank account is used, 0–90 (D-293; associates and suppliers) |
+| `associate_bank_wait_change_days` | 15 | 〃 — wait before a CHANGED bank account is used, 0–90 (D-293) — replaces `associate_bank_wait_days` |
+| `bank_details_check_people` | one | 〃 — "Bank details check": one person (not the enterer) or two people (D-293) |
+| `associate_upgrade_after_orders` | 3 | 〃 — access level upgrade (D-261), editable on the page since 11 Nov 2026 (1–50) |
 | `zoho_gst_commission_tax_id` | empty | Zoho GST tax for commission bills (D-256) |
 | `zoho_payout_costs_account_id` | empty | Zoho account for associate payout costs (D-264); empty = not sent |
 | `associate_tds_section` | 194H | Settings › Associate TDS (`manage_company_settings`, reason required) |

@@ -46,10 +46,10 @@ final class AssociateService
         return rtrim(trim($reason), ". \t\n\r\0\x0B");
     }
 
+    /** D-293: the wait before a CHANGED account is used (a first account: BankDetailsCheck::waitDays(true)). */
     public static function bankWaitDays(): int
     {
-        $v = IncentiveRepository::settings()['associate_bank_wait_days'] ?? '7';
-        return max(0, (int) $v);
+        return BankDetailsCheck::waitDays(false);
     }
 
     public static function tdsPct(): float

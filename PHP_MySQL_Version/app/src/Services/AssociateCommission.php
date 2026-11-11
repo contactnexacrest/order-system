@@ -48,12 +48,18 @@ final class AssociateCommission
     {
         $s = IncentiveRepository::settings();
         $run = ($s['associate_payout_run'] ?? 'monthly') === 'weekly' ? 'weekly' : 'monthly';
-        $day = (int) ($s['associate_payout_day'] ?? 5);
+        // D-292 (owner 11 Nov 2026): monthly on day 1–28 or 'last' (the last day of the month), weekly 1–7 (Monday–Sunday);
+        // a run day on a Sunday or a Holiday Calendar day moves to the working day before (default) or after.
+        $rawDay = (string) ($s['associate_payout_day'] ?? 'last');
+        $last = $run === 'monthly' && $rawDay === 'last';
+        $day = (int) $rawDay;
         return [
+            'last_day' => $last,
+            'holiday_rule' => ($s['associate_payout_holiday_rule'] ?? 'before') === 'after' ? 'after' : 'before',
             'due_days' => max(0, (int) ($s['associate_commission_due_days'] ?? 30)),
             'claim_hold' => ($s['associate_claim_hold'] ?? '1') === '1',
             'run' => $run,
-            'day' => $run === 'weekly' ? max(1, min(7, $day > 0 ? $day : 5)) : max(1, min(28, $day > 0 ? $day : 5)),
+            'day' => $run === 'weekly' ? max(1, min(7, $day > 0 ? $day : 5)) : ($last ? 0 : max(1, min(28, $day > 0 ? $day : 5))),
             'threshold_inr' => (float) ($s['associate_counting_threshold_inr'] ?? 500000),
             'gst_pct' => (float) ($s['associate_gst_pct'] ?? 18),
             'zoho_gst_tax_id' => trim((string) ($s['zoho_gst_commission_tax_id'] ?? '')),
@@ -85,26 +91,76 @@ final class AssociateCommission
         return date('Y-m-d', (int) strtotime(substr($fullyPaidOn, 0, 10) . ' +' . $settings['due_days'] . ' days'));
     }
 
-    /** The first payout run on or after the due date. */
+    /**
+     * The first payout run on or after the due date. D-292: on a Sunday or a Holiday Calendar day the
+     * run moves to the working day before (default) or after; if "before" would land before the due
+     * date, the commission goes in the next run.
+     */
     public static function payoutRunOn(string $dueOn, ?array $settings = null): string
     {
         $settings ??= self::settings();
-        $due = (int) strtotime($dueOn);
-        if ($settings['run'] === 'weekly') {
-            $w = (int) date('N', $due);
-            return date('Y-m-d', (int) strtotime($dueOn . ' +' . (($settings['day'] - $w + 7) % 7) . ' days'));
+        $rule = (string) ($settings['holiday_rule'] ?? 'before');
+        $candidate = self::scheduledRunOn($dueOn, $settings);
+        $run = self::workingDay($candidate, $rule);
+        if ($run < $dueOn) {
+            $run = self::workingDay(self::scheduledRunOn(date('Y-m-d', (int) strtotime($candidate . ' +1 day')), $settings), $rule);
         }
-        $candidate = date('Y-m-', $due) . sprintf('%02d', $settings['day']);
-        if ($candidate < $dueOn) {
-            $candidate = date('Y-m-', (int) strtotime(date('Y-m-01', $due) . ' +1 month')) . sprintf('%02d', $settings['day']);
+        return $run;
+    }
+
+    /** The calendar day of the first run on or after $from, before any Sunday / holiday move. */
+    public static function scheduledRunOn(string $from, array $settings): string
+    {
+        $ts = (int) strtotime($from);
+        if ($settings['run'] === 'weekly') {
+            $w = (int) date('N', $ts);
+            return date('Y-m-d', (int) strtotime($from . ' +' . (($settings['day'] - $w + 7) % 7) . ' days'));
+        }
+        $dayIn = static fn (string $monthStart): string => date('Y-m-', (int) strtotime($monthStart))
+            . sprintf('%02d', !empty($settings['last_day']) ? (int) date('t', (int) strtotime($monthStart)) : (int) $settings['day']);
+        $candidate = $dayIn(date('Y-m-01', $ts));
+        if ($candidate < $from) {
+            $candidate = $dayIn(date('Y-m-01', (int) strtotime(date('Y-m-01', $ts) . ' +1 month')));
         }
         return $candidate;
+    }
+
+    /** D-292: $date, or the nearest working day before / after it when it is a Sunday or in the Holiday Calendar. */
+    public static function workingDay(string $date, string $rule = 'before'): string
+    {
+        $holidays = array_flip(array_map(static fn ($d): string => substr((string) $d, 0, 10),
+            \App\Repositories\CompanyHolidayRepository::datesBetween(date('Y-m-d', (int) strtotime($date . ' -40 days')), date('Y-m-d', (int) strtotime($date . ' +40 days')))));
+        $step = $rule === 'after' ? '+1 day' : '-1 day';
+        for ($i = 0; $i < 40 && ((int) date('N', (int) strtotime($date)) === 7 || isset($holidays[$date])); $i++) {
+            $date = date('Y-m-d', (int) strtotime($date . ' ' . $step));
+        }
+        return $date;
+    }
+
+    /** "1st", "2nd", "23rd", "28th". */
+    public static function ordinal(int $n): string
+    {
+        $suffix = ($n % 100 >= 11 && $n % 100 <= 13) ? 'th' : (['th', 'st', 'nd', 'rd'][$n % 10] ?? 'th');
+        return $n . $suffix;
     }
 
     public static function runLabel(?array $settings = null): string
     {
         $settings ??= self::settings();
-        return $settings['run'] === 'weekly' ? 'weekly, every ' . self::WEEKDAYS[$settings['day']] : 'monthly, on day ' . $settings['day'];
+        $move = ($settings['holiday_rule'] ?? 'before') === 'after' ? 'the working day after' : 'the working day before';
+        return ($settings['run'] === 'weekly' ? 'weekly, every ' . self::WEEKDAYS[$settings['day']]
+            : (!empty($settings['last_day']) ? 'monthly, on the last day of the month' : 'monthly, on day ' . $settings['day']))
+            . '; on a Sunday or holiday, ' . $move;
+    }
+
+    /** D-292: the associate's wording — "monthly payment on the last day of the month" / "on the 5th" / "weekly payment every Friday". */
+    public static function payDayText(?array $settings = null): string
+    {
+        $settings ??= self::settings();
+        if ($settings['run'] === 'weekly') {
+            return 'weekly payment every ' . self::WEEKDAYS[$settings['day']];
+        }
+        return 'monthly payment on the ' . (!empty($settings['last_day']) ? 'last day of the month' : self::ordinal((int) $settings['day']));
     }
 
     /** A buyer complaint or claim opened on or before the due date and not resolved. */
@@ -129,7 +185,7 @@ final class AssociateCommission
         }
         // Owner decision D-252 (A3): no commission is paid until the associate's KYC is complete.
         $a = !empty($payout['associate_id']) ? AssociateRepository::find((int) $payout['associate_id']) : null;
-        if ($a !== null && ($missing = AssociateKyc::missing($a)) !== []) {
+        if ($a !== null && ($missing = AssociateKyc::missingForPayout($a, $on)) !== []) { // D-290: address proof waits until address_proof_due_on
             return "The associate's KYC is not complete — still to be accepted: " . implode(', ', $missing) . '.';
         }
         return null;
@@ -180,12 +236,85 @@ final class AssociateCommission
         }
         $count = self::countingOrders((int) $associate['id'], $excludeOrderId);
         $position = ($orderInRangeInr === null || $orderInRangeInr >= self::settings()['threshold_inr']) ? $count + 1 : max($count, 1);
-        foreach (PricingRepository::ladder() as $step) {
+        foreach (self::ladderFor($associate) as $step) { // D-291: their own ladder overrides the standard one
             if ($position >= (int) $step['from_order'] && ($step['to_order'] === null || $position <= (int) $step['to_order'])) {
                 return [PricingRepository::findLevel((int) $step['level_id']), $count];
             }
         }
         return [null, $count];
+    }
+
+    /** D-291: the commission rules an associate can have (the MD sets it; the standard ladder is the default). */
+    public const RULE_LABELS = ['ladder' => 'Standard ladder', 'own_ladder' => 'Own ladder', 'fixed' => 'Fixed %'];
+
+    /** D-291: the ladder an associate follows — their own ladder when that is their rule (and it has steps), else the standard ladder. */
+    public static function ladderFor(array $associate): array
+    {
+        if (($associate['commission_mode'] ?? 'ladder') === 'own_ladder' && !empty($associate['id'])) {
+            $own = PricingRepository::ownLadder((int) $associate['id']);
+            if ($own !== []) {
+                return $own;
+            }
+        }
+        return PricingRepository::ladder();
+    }
+
+    /** "Orders 1–5" / "Orders 6 onwards" / "Order 1". */
+    public static function stepLabel(array $step): string
+    {
+        $from = (int) $step['from_order'];
+        if ($step['to_order'] === null || $step['to_order'] === '') {
+            return 'Orders ' . $from . ' onwards';
+        }
+        $to = (int) $step['to_order'];
+        return $to === $from ? 'Order ' . $from : 'Orders ' . $from . '–' . $to;
+    }
+
+    /** "Orders 1–5: 2% · Orders 6+: 5%" — a ladder in one line (staff with the permission only). */
+    public static function ladderSummary(array $steps): string
+    {
+        return implode(' · ', array_map(static fn (array $s): string => (($s['to_order'] === null || $s['to_order'] === '') ? 'Orders ' . (int) $s['from_order'] . '+' : self::stepLabel($s))
+            . ': ' . self::rateLabel(['kind' => $s['kind'], 'value' => $s['value']]), $steps));
+    }
+
+    /**
+     * D-292 (point 9): the staff progress view of an associate's commission — seen only with
+     * "See associate commission rules": the rule, the % and level of their next order, the
+     * counting orders so far ("3 of 5"), how many more reach the next step, and the steps.
+     * @return array<string,mixed>
+     */
+    public static function ruleProgress(array $a): array
+    {
+        $mode = (string) ($a['commission_mode'] ?? 'ladder');
+        $mode = isset(self::RULE_LABELS[$mode]) ? $mode : 'ladder';
+        [$level, $count] = self::levelForAssociate($a, null);
+        $set = self::settings();
+        $out = ['mode' => $mode, 'rule' => self::RULE_LABELS[$mode], 'level' => $level, 'rate' => self::rateLabel($level),
+            'level_name' => $level['name'] ?? null, 'count' => (int) ($count ?? 0), 'of' => null, 'more' => null, 'next_rate' => null, 'steps' => [],
+            'standard' => self::ladderSummary(PricingRepository::ladder()), 'threshold_inr' => (float) $set['threshold_inr'],
+            'changed_at' => $a['commission_rule_changed_at'] ?? null, 'reason' => $a['commission_rule_reason'] ?? null,
+            'changed_by' => !empty($a['commission_rule_changed_by']) ? (\App\Repositories\UserRepository::findById((int) $a['commission_rule_changed_by'])['name'] ?? null) : null,
+            'own_on_file' => $mode === 'own_ladder' && PricingRepository::ownLadder((int) $a['id']) !== []];
+        if ($mode === 'fixed') {
+            return $out;
+        }
+        $position = $out['count'] + 1;
+        $steps = self::ladderFor($a);
+        foreach ($steps as $i => $s) {
+            $current = $position >= (int) $s['from_order'] && ($s['to_order'] === null || $position <= (int) $s['to_order']);
+            $steps[$i]['label'] = self::stepLabel($s);
+            $steps[$i]['rate'] = self::rateLabel(['kind' => $s['kind'], 'value' => $s['value']]);
+            $steps[$i]['current'] = $current;
+            if ($current) {
+                $out['of'] = $s['to_order'] !== null ? (int) $s['to_order'] : null;
+            }
+            if ($out['next_rate'] === null && (int) $s['from_order'] > $position) {
+                $out['next_rate'] = $steps[$i]['rate'];
+                $out['more'] = (int) $s['from_order'] - 1 - $out['count'];
+            }
+        }
+        $out['steps'] = $steps;
+        return $out;
     }
 
     /**
@@ -252,7 +381,8 @@ final class AssociateCommission
         )->execute(['a' => $a['id'], 'l' => $level['id'], 'n' => $level['name'], 'k' => $level['kind'], 'v' => $level['value'],
             'r' => $level['kind'] === 'pct' ? $level['value'] : null, 's' => ($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'fixed' : 'ladder', 'id' => $orderId]);
         if ((int) $order['is_test_data'] !== 1 && (int) $order['is_sample_data'] !== 1) {
-            AssociateService::notify($a, 'order_created', "The Proforma Invoice for order {$order['order_reference']} was issued. Commission level fixed on it: " . self::levelLabel($level) . '.',
+            // D-292: the associate is told only their %, never a level name.
+            AssociateService::notify($a, 'order_created', "The Proforma Invoice for order {$order['order_reference']} was issued. Your commission on it is fixed at " . self::rateLabel($level) . ($level['kind'] === 'pct' ? ' of its FOB value' : '') . '.',
                 (int) $order['client_id'], $orderId);
         }
     }

@@ -42,6 +42,10 @@
   {% if me and me.status == 'suspended' %}
     <div class="alert alert-warning" role="status" data-associate-suspended>Your account is suspended — you can see your clients, orders and commission, but cannot invite clients or change your details.</div>
   {% endif %}
+  {% if me and bankWaiting %}{# D-293: on every page until they confirm or refuse #}
+    <div class="alert alert-warning" role="status" data-bank-confirm-bar><b>New bank details are waiting for your confirmation.</b> Your commission will only be paid to them after you confirm. If you did not ask for this, tell us now.
+      <a class="btn-sm" href="/associate/bank/confirm">Review now</a></div>
+  {% endif %}
   {% for f in flashes %}
     <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
   {% endfor %}

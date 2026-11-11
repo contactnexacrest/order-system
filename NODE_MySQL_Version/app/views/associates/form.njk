@@ -38,7 +38,9 @@
     {# Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. #}
     <fieldset><legend>Commission level (D-245)</legend>
       {% set cmode = a0.commission_mode or 'ladder' %}{% set clid = (a0.commission_level_id or '') | string %}
-      {% if canPricing %}
+      {% if a0.id %}{# D-291: an existing associate's rule is changed on their page, with a reason #}
+        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
+      {% elif canPricing %}
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>

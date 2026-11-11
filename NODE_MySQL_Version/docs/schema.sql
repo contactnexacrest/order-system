@@ -6297,3 +6297,112 @@ ALTER TABLE order_products ADD COLUMN copied_from_id BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_copied_from FOREIGN KEY (copied_from_id) REFERENCES order_products(id) ON DELETE SET NULL;
 ALTER TABLE product_categories ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
 ALTER TABLE catalog_products ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
+-- Owner decisions 11 Nov 2026, points 6 and 7 (D-290): KYC. The ID document's
+-- type (Passport / National ID card / Residence permit / Driving licence) is
+-- kept with the document; ID proof and Address proof are separate required
+-- items. An associate accepted before this change has until
+-- address_proof_due_on (60 days) before payouts are held for a missing
+-- address proof.
+-- ---------------------------------------------------------------------------
+ALTER TABLE associate_documents ADD COLUMN id_doc_type VARCHAR(30) NULL;
+ALTER TABLE associates ADD COLUMN address_proof_due_on DATE NULL;
+
+-- ---------------------------------------------------------------------------
+-- Owner decisions 11 Nov 2026, points 8, 9 and 16 (D-291): an associate's
+-- commission rule — the standard ladder (default), their own ladder (a copy
+-- of the standard ladder, edited; it overrides it) or a fixed level. Set by
+-- the MD (manage_pricing) with a reason; applies to new orders only (an order
+-- keeps the level fixed on it at its Proforma Invoice).
+-- ---------------------------------------------------------------------------
+ALTER TABLE associates MODIFY COLUMN commission_mode ENUM('fixed','ladder','own_ladder') NOT NULL DEFAULT 'ladder';
+ALTER TABLE associates
+  ADD COLUMN commission_rule_changed_at DATETIME NULL,
+  ADD COLUMN commission_rule_changed_by BIGINT UNSIGNED NULL,
+  ADD COLUMN commission_rule_reason VARCHAR(300) NULL,
+  ADD CONSTRAINT fk_associates_commission_rule_by FOREIGN KEY (commission_rule_changed_by) REFERENCES users(id);
+CREATE TABLE associate_ladder_steps (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  associate_id BIGINT UNSIGNED NOT NULL,
+  from_order   INT NOT NULL,
+  to_order     INT NULL,                              -- NULL = the open-ended last step
+  level_id     BIGINT UNSIGNED NOT NULL,
+  updated_by   BIGINT UNSIGNED NULL,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_associate_ladder_from (associate_id, from_order),
+  CONSTRAINT fk_associate_ladder_associate FOREIGN KEY (associate_id) REFERENCES associates(id),
+  CONSTRAINT fk_associate_ladder_level FOREIGN KEY (level_id) REFERENCES commission_levels(id),
+  CONSTRAINT fk_associate_ladder_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
+-- Owner decisions 11 Nov 2026, points 10 and 18 (D-293): new bank details are
+-- used only after the associate CONFIRMS them in the portal (last 4 digits +
+-- a 6-digit code sent to the registered e-mail, within 7 days, else
+-- cancelled) and ONE staff member other than the person who entered them
+-- VERIFIES them (at least 2 of: bank proof / phone call on the registered
+-- number / test payment with its reference). 'awaiting_confirmation' comes
+-- before 'pending' (= confirmed, waiting for staff).
+-- ---------------------------------------------------------------------------
+ALTER TABLE associate_bank_accounts MODIFY COLUMN status ENUM('awaiting_confirmation','pending','verified','rejected','superseded','cancelled') NOT NULL DEFAULT 'pending';
+ALTER TABLE associate_bank_accounts
+  ADD COLUMN confirm_by            DATETIME NULL,
+  ADD COLUMN confirm_code_hash     CHAR(64) NULL,
+  ADD COLUMN confirm_code_expires  DATETIME NULL,
+  ADD COLUMN confirm_code_attempts INT NOT NULL DEFAULT 0,
+  ADD COLUMN confirmed_at          DATETIME NULL,
+  ADD COLUMN reminded_at           DATETIME NULL,
+  ADD COLUMN cancelled_at          DATETIME NULL,
+  ADD COLUMN cancelled_how         VARCHAR(20) NULL,  -- not_me / expired / replaced
+  ADD COLUMN check_bank_proof      TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN check_phone           TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN check_test_payment    TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN test_payment_ref      VARCHAR(60) NULL,
+  ADD COLUMN verify_note           VARCHAR(300) NULL,
+  ADD COLUMN self_verify_reason    VARCHAR(300) NULL;
+
+-- D-294: the same rules for a supplier's or logistics partner's bank details.
+-- A change waits here; the supplier record keeps the account in use until the
+-- change is confirmed (link e-mailed to the registered e-mail), verified and
+-- its waiting days are over — then it is copied onto the supplier.
+CREATE TABLE vendor_bank_changes (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  vendor_kind           ENUM('supplier','logistics_partner') NOT NULL,
+  vendor_id             BIGINT UNSIGNED NOT NULL,
+  status                ENUM('awaiting_confirmation','pending','verified','applied','rejected','cancelled') NOT NULL DEFAULT 'awaiting_confirmation',
+  bank_account_name     VARCHAR(255) NULL,
+  bank_name             VARCHAR(150) NULL,
+  bank_branch           VARCHAR(150) NULL,
+  bank_account_number   TEXT NULL,                     -- encrypted; NULL = keeps the number on file
+  account_last4         VARCHAR(4) NULL,
+  bank_ifsc             VARCHAR(20) NULL,
+  bank_account_type     VARCHAR(30) NULL,
+  bank_upi_id           VARCHAR(100) NULL,
+  entered_source        ENUM('staff','vendor') NOT NULL,
+  entered_by            BIGINT UNSIGNED NULL,
+  entered_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_to_email         VARCHAR(190) NULL,
+  confirm_token_hash    CHAR(64) NULL,
+  confirm_by            DATETIME NULL,
+  confirmed_at          DATETIME NULL,
+  reminded_at           DATETIME NULL,
+  cancelled_at          DATETIME NULL,
+  cancelled_how         VARCHAR(20) NULL,              -- not_me / expired / replaced
+  first_checked_by      BIGINT UNSIGNED NULL,
+  first_checked_at      DATETIME NULL,
+  check_bank_proof      TINYINT(1) NOT NULL DEFAULT 0,
+  check_phone           TINYINT(1) NOT NULL DEFAULT 0,
+  check_test_payment    TINYINT(1) NOT NULL DEFAULT 0,
+  test_payment_ref      VARCHAR(60) NULL,
+  verify_note           VARCHAR(300) NULL,
+  self_verify_reason    VARCHAR(300) NULL,
+  verified_by           BIGINT UNSIGNED NULL,
+  verified_at           DATETIME NULL,
+  usable_from           DATE NULL,
+  applied_at            DATETIME NULL,
+  rejected_reason       VARCHAR(300) NULL,
+  KEY idx_vendor_bank_changes_vendor (vendor_kind, vendor_id, status),
+  KEY idx_vendor_bank_changes_token (confirm_token_hash),
+  CONSTRAINT fk_vendor_bank_changes_entered FOREIGN KEY (entered_by) REFERENCES users(id),
+  CONSTRAINT fk_vendor_bank_changes_first FOREIGN KEY (first_checked_by) REFERENCES users(id),
+  CONSTRAINT fk_vendor_bank_changes_verified FOREIGN KEY (verified_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -41,14 +41,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
           On the invoiced FOB of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
           due <?= (int) $commissionSettings['due_days'] ?> days later and paid in the payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel($commissionSettings)) ?>).
         <?php endif; ?></td></tr>
-      <?php // Owner decision D-245 (4 Nov 2026): fixed level or the ladder (used for commission from phase P3). ?>
-      <tr><th>Commission level</th><td>
-        <?php if (($a['commission_mode'] ?? 'ladder') === 'fixed' && !empty($a['commission_level_id']) && ($__lvl = \App\Repositories\PricingRepository::findLevel((int) $a['commission_level_id'])) !== null): ?>
-          Fixed level: <b><?= htmlspecialchars($__lvl['name']) ?></b> — <?= htmlspecialchars(\App\Services\PricingService::levelLabel($__lvl)) ?><?= (int) $__lvl['is_active'] === 1 ? '' : ' <span class="badge badge-inactive">inactive</span>' ?>
-        <?php else: ?>
-          Ladder: <?= (int) ($commissionNow[1] ?? 0) ?> counting order(s) so far — next order <?= $commissionNow[0] !== null ? '<b>' . htmlspecialchars(\App\Services\AssociateCommission::levelLabel($commissionNow[0])) . '</b>' : 'no level' ?>
-          <span class="muted small">(a counting order has invoiced FOB of ₹<?= number_format((float) $commissionSettings['threshold_inr'], 0) ?> or more on lines within range — <a href="/pricing/commission-levels#ladder">see the ladder</a>)</span>
-        <?php endif; ?></td></tr>
+      <?php // D-291 / D-292 (11 Nov 2026): the rule, level and progress are in the Commission section below. ?>
     </table>
     <form method="post" action="/associates/<?= $id ?>/status" class="inline-form">
       <?= Csrf::field() ?>
@@ -85,6 +78,8 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   </div>
   <?php if (isset($portalAccess)) { require __DIR__ . '/_portal_access.php'; } // D-261 ?>
   <?php endif; ?>
+
+  <?php require __DIR__ . '/_commission_rule.php'; // D-291 / D-292 ?>
 
   <div class="section" id="clients">
     <h2>Clients introduced (<?= count($clients) ?>)</h2>
@@ -143,11 +138,11 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">
-      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><th>Level</th><th>Commission</th></tr>
+      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><?php if ($rule !== null): ?><th>Level</th><?php endif; ?><th>Commission</th></tr>
       <?php foreach ($orders as $o): $cm = $o['commission']; ?>
         <tr><td><a href="/orders/<?= (int) $o['id'] ?>"><?= htmlspecialchars((string) $o['order_reference']) ?></a></td><td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td><td><?= htmlspecialchars((string) $o['stage']) ?></td>
           <td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= $__money($o['fob_value']) ?></td><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'No' ?></td>
-          <td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td>
+          <?php if ($rule !== null): // D-292: levels only with "See associate commission rules" ?><td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td><?php endif; ?>
           <td><?= $cm['amount'] !== null ? htmlspecialchars((string) $o['currency_code']) . ' ' . $__money($cm['amount']) . '<br>' : '' ?><small><?= htmlspecialchars($cm['label']) ?></small></td></tr>
       <?php endforeach; ?>
       <?php if ($orders === []): ?><tr><td colspan="7" class="muted">No orders yet.</td></tr><?php endif; ?>
@@ -180,38 +175,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   </div>
   <?php endif; ?>
 
-  <div class="section" id="bank">
-    <h2>Bank details</h2>
-    <p>Payments go to: <b><?= $usableBank ? htmlspecialchars(AssociateBankRepository::masked($usableBank)) . ' (verified)' : 'no verified account yet' ?></b></p>
-    <table class="list">
-      <tr><th>Requested</th><th>Account</th><th>Holder</th><th>IFSC / SWIFT</th><th>Status</th><th>Checks</th><th>Action</th></tr>
-      <?php foreach ($banks as $b): ?>
-        <tr><td><?= $__d($b['requested_at']) ?><br><small class="muted"><?= (int) $b['requested_by_associate'] === 1 ? 'by the associate' : 'by NexaCrest' ?></small></td>
-          <td><?= htmlspecialchars(AssociateBankRepository::masked($b)) ?> <small class="muted"><?= htmlspecialchars((string) $b['account_currency']) ?></small><?php if ($canBank): ?><br><a class="small" href="/associates/<?= $id ?>/bank/<?= (int) $b['id'] ?>/number">Show full number</a><?php endif; ?></td>
-          <td><?= htmlspecialchars((string) $b['holder_name']) ?></td><td><?= htmlspecialchars(trim((string) $b['ifsc'] . ' ' . (string) $b['swift'])) ?></td>
-          <td><?= htmlspecialchars(ucfirst((string) $b['status'])) ?><?= $b['status'] === 'verified' && $b['usable_from'] ? '<br><small>usable from ' . $__d($b['usable_from']) . '</small>' : '' ?><?= $b['rejected_reason'] ? '<br><small>' . htmlspecialchars((string) $b['rejected_reason']) . '</small>' : '' ?></td>
-          <td><small><?= $b['first_checked_by_name'] ? '1: ' . htmlspecialchars((string) $b['first_checked_by_name']) . ' — ' . htmlspecialchars((string) $b['check_method']) : '' ?><?= $b['verified_by_name'] ? '<br>2: ' . htmlspecialchars((string) $b['verified_by_name']) : '' ?></small></td>
-          <td><?php if ($canBank && $b['status'] === 'pending'): ?>
-            <?php if (!$b['first_checked_by']): ?>
-              <form method="post" action="/associates/<?= $id ?>/bank/<?= (int) $b['id'] ?>/check" class="inline-form"><?= Csrf::field() ?><input type="text" name="check_method" required minlength="10" maxlength="300" placeholder="How you checked it (call-back, test credit)" aria-label="How you checked it"><button type="submit" class="btn-sm">First check</button></form>
-            <?php else: ?>
-              <form method="post" action="/associates/<?= $id ?>/bank/<?= (int) $b['id'] ?>/verify" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Verify (second person)</button></form>
-            <?php endif; ?>
-            <form method="post" action="/associates/<?= $id ?>/bank/<?= (int) $b['id'] ?>/reject" class="inline-form"><?= Csrf::field() ?><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason" aria-label="Reason for rejecting"><button type="submit" class="btn-sm btn-secondary">Reject</button></form>
-          <?php endif; ?></td></tr>
-      <?php endforeach; ?>
-      <?php if ($banks === []): ?><tr><td colspan="7" class="muted">No bank details yet — the associate adds them in their portal, or Accounts enter them below.</td></tr><?php endif; ?>
-    </table>
-    <?php if ($canBank): ?>
-    <details><summary>Enter bank details from the associate's signed form</summary>
-      <form method="post" action="/associates/<?= $id ?>/bank" enctype="multipart/form-data">
-        <?= Csrf::field() ?>
-        <?php $__india = $a['based_in'] === 'india'; require dirname(__DIR__) . '/associate_portal/_bank_fields.php'; ?>
-        <button type="submit" class="btn-sm">Record — two people then check it</button>
-      </form>
-    </details>
-    <?php endif; ?>
-  </div>
+  <?php require __DIR__ . '/_bank_section.php'; // D-293 ?>
 
   <div class="section" id="documents">
     <h2>KYC and documents</h2>
@@ -220,15 +184,17 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       <?php foreach ($kyc as $__i): ?>
         <tr><td><?= htmlspecialchars($__i['label']) ?></td>
           <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span></td>
-          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'Agreement on the associate record' : '—') ?></td></tr>
+          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'Agreement on the associate record' : '—') ?></td></tr>
       <?php endforeach; ?>
     </table>
     <?php $__missing = array_filter($kyc, static fn (array $i): bool => $i['status'] !== 'accepted'); ?>
     <p class="<?= $__missing === [] ? 'muted' : 'review-banner bad' ?> small"><?= $__missing === [] ? 'KYC complete — commission can be paid.' : 'KYC not complete — commission cannot be marked paid until every item is accepted.' ?></p>
+    <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($a)) !== null): // D-290: 60 days for an associate accepted before 11 Nov 2026 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
+    <p class="muted small">ID proof and address proof are separate items, each checked on its own. The same document (e.g. a passport showing the address) may be uploaded under each; the app names the files "ID proof — name — date" and "Address proof — name — date".</p>
     <table class="list">
       <tr><th>Added</th><th>Document</th><th>Number / reference</th><th>From</th><th>Status</th><?php if ($canManage): ?><th>Check</th><?php endif; ?></tr>
       <?php foreach ($documents as $d): ?>
-        <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td><td><?= (int) $d['uploaded_by_associate'] === 1 ? 'Associate' : 'NexaCrest' ?></td>
+        <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a><?= !empty($d['id_doc_type']) ? ' <small class="muted">' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$d['id_doc_type']] ?? (string) $d['id_doc_type']) . '</small>' : '' ?></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td><td><?= (int) $d['uploaded_by_associate'] === 1 ? 'Associate' : 'NexaCrest' ?></td>
           <td><?= htmlspecialchars(['accepted' => 'Accepted', 'rejected' => 'Rejected', 'received' => 'Not checked yet'][$d['status']] ?? (string) $d['status']) ?><?php if (!empty($d['reviewed_at'])): ?><br><small class="muted"><?= htmlspecialchars((string) ($d['reviewed_by_name'] ?? '')) ?>, <?= $__d($d['reviewed_at']) ?><?= !empty($d['review_reason']) ? ' — ' . htmlspecialchars((string) $d['review_reason']) : '' ?></small><?php endif; ?></td>
           <?php if ($canManage): ?><td>
             <form method="post" action="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>/review" class="inline-form">

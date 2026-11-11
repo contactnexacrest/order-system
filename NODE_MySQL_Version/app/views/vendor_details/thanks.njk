@@ -1,5 +1,8 @@
 <div class="card card-narrow">
   <h1>&#10003; Thank you</h1>
   <p>We have your details, {{ vendor[meta.name] }}. Our accounts team will verify the bank account before the first payment and may contact you for a cancelled cheque or bank letter.</p>
+  {% if bankChanged %}{# D-294 #}
+    <p data-bank-confirm-needed><b>One more step for your bank details:</b> {% if confirmTo %}we have e-mailed a confirmation link to {{ confirmTo }} (the e-mail we have on file). Please open it and confirm within {{ confirmDays }} days — we pay into new bank details only after you confirm them.{% else %}we have no e-mail on file to send the confirmation link to — our team will contact you.{% endif %}</p>
+  {% endif %}
   <p class="muted small">This link has now been used. Reply to our email if anything changes.</p>
 </div>

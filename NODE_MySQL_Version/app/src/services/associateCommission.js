@@ -46,14 +46,20 @@ function addDays(date, days) {
 async function settings() {
   const s = await incentiveRepository.settings();
   const run = (s.associate_payout_run || 'monthly') === 'weekly' ? 'weekly' : 'monthly';
-  let day = parseInt(s.associate_payout_day ?? '5', 10);
+  // D-292 (owner 11 Nov 2026): monthly on day 1–28 or 'last' (the last day of the month), weekly 1–7 (Monday–Sunday);
+  // a run day on a Sunday or a Holiday Calendar day moves to the working day before (default) or after.
+  const rawDay = String(s.associate_payout_day ?? 'last');
+  const lastDay = run === 'monthly' && rawDay === 'last';
+  let day = parseInt(rawDay, 10);
   if (!(day > 0)) day = 5;
   const months = parseInt(s.associate_protection_months ?? '6', 10);
   return {
     due_days: Math.max(0, parseInt(s.associate_commission_due_days ?? '30', 10) || 0),
     claim_hold: (s.associate_claim_hold ?? '1') === '1',
     run,
-    day: run === 'weekly' ? Math.max(1, Math.min(7, day)) : Math.max(1, Math.min(28, day)),
+    last_day: lastDay,
+    holiday_rule: (s.associate_payout_holiday_rule || 'before') === 'after' ? 'after' : 'before',
+    day: run === 'weekly' ? Math.max(1, Math.min(7, day)) : (lastDay ? 0 : Math.max(1, Math.min(28, day))),
     threshold_inr: Number(s.associate_counting_threshold_inr ?? 500000),
     gst_pct: Number(s.associate_gst_pct ?? 18),
     zoho_gst_tax_id: String(s.zoho_gst_commission_tax_id ?? '').trim(),
@@ -82,24 +88,61 @@ async function dueOn(fullyPaidOn, set = null) {
 }
 
 /** The first payout run on or after the due date. */
-async function payoutRunOn(due, set = null) {
-  set = set || await settings();
-  const d = new Date(`${ymd(due)}T00:00:00Z`);
+/** The calendar day of the first run on or after `from`, before any Sunday / holiday move. */
+function scheduledRunOn(from, set) {
+  const d = new Date(`${ymd(from)}T00:00:00Z`);
   if (set.run === 'weekly') {
     const w = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-    return addDays(due, (set.day - w + 7) % 7);
+    return addDays(from, (set.day - w + 7) % 7);
   }
   const pad = (n) => String(n).padStart(2, '0');
-  let candidate = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(set.day)}`;
-  if (candidate < ymd(due)) {
+  const dayIn = (y, m) => `${y}-${pad(m + 1)}-${pad(set.last_day ? new Date(Date.UTC(y, m + 1, 0)).getUTCDate() : set.day)}`;
+  let candidate = dayIn(d.getUTCFullYear(), d.getUTCMonth());
+  if (candidate < ymd(from)) {
     const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
-    candidate = `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(set.day)}`;
+    candidate = dayIn(next.getUTCFullYear(), next.getUTCMonth());
   }
   return candidate;
 }
 
+/** D-292: `date`, or the nearest working day before / after it when it is a Sunday or in the Holiday Calendar. */
+async function workingDay(date, rule = 'before') {
+  const holidays = new Set((await require('../repositories/companyHolidayRepository').datesBetween(addDays(date, -40), addDays(date, 40))).map((h) => ymd(h)));
+  let d = ymd(date);
+  for (let i = 0; i < 40 && (new Date(`${d}T00:00:00Z`).getUTCDay() === 0 || holidays.has(d)); i += 1) {
+    d = addDays(d, rule === 'after' ? 1 : -1);
+  }
+  return d;
+}
+
+/**
+ * The first payout run on or after the due date. D-292: on a Sunday or a Holiday Calendar day the run moves to
+ * the working day before (default) or after; if "before" would land before the due date, it goes in the next run.
+ */
+async function payoutRunOn(due, set = null) {
+  set = set || await settings();
+  const rule = set.holiday_rule || 'before';
+  const candidate = scheduledRunOn(due, set);
+  let run = await workingDay(candidate, rule);
+  if (run < ymd(due)) run = await workingDay(scheduledRunOn(addDays(candidate, 1), set), rule);
+  return run;
+}
+
+/** "1st", "2nd", "23rd", "28th". */
+function ordinal(n) {
+  const suffix = (n % 100 >= 11 && n % 100 <= 13) ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+  return `${n}${suffix}`;
+}
+
 function runLabel(set) {
-  return set.run === 'weekly' ? `weekly, every ${WEEKDAYS[set.day]}` : `monthly, on day ${set.day}`;
+  const move = (set.holiday_rule || 'before') === 'after' ? 'the working day after' : 'the working day before';
+  return `${set.run === 'weekly' ? `weekly, every ${WEEKDAYS[set.day]}` : (set.last_day ? 'monthly, on the last day of the month' : `monthly, on day ${set.day}`)}; on a Sunday or holiday, ${move}`;
+}
+
+/** D-292: the associate's wording — "monthly payment on the last day of the month" / "on the 5th" / "weekly payment every Friday". */
+function payDayText(set) {
+  if (set.run === 'weekly') return `weekly payment every ${WEEKDAYS[set.day]}`;
+  return `monthly payment on the ${set.last_day ? 'last day of the month' : ordinal(Number(set.day))}`;
 }
 
 /** A buyer complaint or claim opened on or before the due date and not resolved. */
@@ -121,7 +164,7 @@ async function payBlockReason(payout, on) {
   // Owner decision D-252 (A3): no commission is paid until the associate's KYC is complete.
   const a = payout.associate_id ? await require('../repositories/associateRepository').find(Number(payout.associate_id)) : null;
   if (a) {
-    const miss = await require('./associateKyc').missing(a);
+    const miss = await require('./associateKyc').missingForPayout(a, ymd(on)); // D-290: address proof waits until address_proof_due_on
     if (miss.length) return `The associate's KYC is not complete — still to be accepted: ${miss.join(', ')}.`;
   }
   return null;
@@ -164,12 +207,70 @@ async function levelForAssociate(associate, excludeOrderId, orderInRangeInr = nu
   const count = await countingOrders(Number(associate.id), excludeOrderId);
   const set = await settings();
   const position = (orderInRangeInr === null || orderInRangeInr >= set.threshold_inr) ? count + 1 : Math.max(count, 1);
-  for (const step of await pricingRepository.ladder()) {
+  for (const step of await ladderFor(associate)) { // D-291: their own ladder overrides the standard one
     if (position >= Number(step.from_order) && (step.to_order === null || position <= Number(step.to_order))) {
       return [await pricingRepository.findLevel(Number(step.level_id)), count];
     }
   }
   return [null, count];
+}
+
+/** D-291: the commission rules an associate can have (the MD sets it; the standard ladder is the default). */
+const RULE_LABELS = { ladder: 'Standard ladder', own_ladder: 'Own ladder', fixed: 'Fixed %' };
+
+/** D-291: their own ladder when that is their rule (and it has steps), else the standard ladder. */
+async function ladderFor(associate) {
+  if ((associate.commission_mode || 'ladder') === 'own_ladder' && associate.id) {
+    const own = await pricingRepository.ownLadder(Number(associate.id));
+    if (own.length) return own;
+  }
+  return pricingRepository.ladder();
+}
+
+function stepLabel(step) {
+  const from = Number(step.from_order);
+  if (step.to_order === null || step.to_order === undefined || step.to_order === '') return `Orders ${from} onwards`;
+  const to = Number(step.to_order);
+  return to === from ? `Order ${from}` : `Orders ${from}–${to}`;
+}
+
+function ladderSummary(steps) {
+  return steps.map((s) => `${(s.to_order === null || s.to_order === undefined || s.to_order === '') ? `Orders ${Number(s.from_order)}+` : stepLabel(s)}: ${rateLabel({ kind: s.kind, value: s.value })}`).join(' · ');
+}
+
+/**
+ * D-292 (point 9): the staff progress view of an associate's commission — seen only with "See associate
+ * commission rules": the rule, the % and level of their next order, the counting orders so far ("3 of 5"),
+ * how many more reach the next step, and the steps.
+ */
+async function ruleProgress(a) {
+  let mode = String(a.commission_mode || 'ladder');
+  if (!RULE_LABELS[mode]) mode = 'ladder';
+  const [level, count] = await levelForAssociate(a, null);
+  const set = await settings();
+  const changedBy = a.commission_rule_changed_by ? await require('../repositories/userRepository').findById(Number(a.commission_rule_changed_by)) : null;
+  const out = {
+    mode, rule: RULE_LABELS[mode], level, rate: rateLabel(level), level_name: level ? level.name : null, count: Number(count || 0), of: null, more: null, next_rate: null, steps: [],
+    standard: ladderSummary(await pricingRepository.ladder()), threshold_inr: Number(set.threshold_inr),
+    changed_at: a.commission_rule_changed_at || null, reason: a.commission_rule_reason || null, changed_by: changedBy ? changedBy.name : null,
+    own_on_file: mode === 'own_ladder' && (await pricingRepository.ownLadder(Number(a.id))).length > 0,
+  };
+  if (mode === 'fixed') return out;
+  const position = out.count + 1;
+  const steps = (await ladderFor(a)).map((s) => ({ ...s }));
+  for (const s of steps) {
+    const current = position >= Number(s.from_order) && (s.to_order === null || position <= Number(s.to_order));
+    s.label = stepLabel(s);
+    s.rate = rateLabel({ kind: s.kind, value: s.value });
+    s.current = current;
+    if (current) out.of = s.to_order !== null ? Number(s.to_order) : null;
+    if (out.next_rate === null && Number(s.from_order) > position) {
+      out.next_rate = s.rate;
+      out.more = Number(s.from_order) - 1 - out.count;
+    }
+  }
+  out.steps = steps;
+  return out;
 }
 
 /** Task #80 / D-263: the rate alone, without the level name (what an associate may see). */
@@ -251,7 +352,8 @@ async function fixLevelAtPi(orderId) {
       s: (a.commission_mode || 'ladder') === 'fixed' ? 'fixed' : 'ladder', id: orderId }
   );
   if (Number(order.is_test_data) !== 1 && Number(order.is_sample_data) !== 1) {
-    await require('./associateService').notify(a, 'order_created', `The Proforma Invoice for order ${order.order_reference} was issued. Commission level fixed on it: ${levelLabel(level)}.`,
+    // D-292: the associate is told only their %, never a level name.
+    await require('./associateService').notify(a, 'order_created', `The Proforma Invoice for order ${order.order_reference} was issued. Your commission on it is fixed at ${rateLabel(level)}${level.kind === 'pct' ? ' of its FOB value' : ''}.`,
       Number(order.client_id), orderId);
   }
 }
@@ -453,6 +555,7 @@ async function lapseRegistrations(today = null) {
 
 module.exports = {
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
+  RULE_LABELS, ladderFor, stepLabel, ladderSummary, ruleProgress, scheduledRunOn, workingDay, ordinal, payDayText,
   earningAssociate, countingOrders, levelForAssociate, levelLabel, rateLabel, PORTAL_MONTH_CHOICES, portalMonths, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
   settlements, realisedRate, usdRate, estimateInr, forOrder, gstFor, payoutDescription, lapseRegistrations,
 };

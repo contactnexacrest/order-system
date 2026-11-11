@@ -6,6 +6,7 @@
     <?php // Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. ?>
     <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a><?= $__kycMissing !== [] ? ' — still needed or being checked: ' . htmlspecialchars(implode(', ', $__kycMissing)) : '' ?><?= empty($me['address']) ? ($__kycMissing !== [] ? '; ' : ' — ') . 'your address' : '' ?>. Commission is paid once your documents are accepted.</div>
   <?php endif; ?>
+  <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($me)) !== null): // D-290 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
   <?php if (!empty($access['commission'])): // D-261 ?>
   <?php // D-264: the order currency (USD) is the figure an associate sees; rupees only on a fixed line, for an associate in India. ?>
   <?php $__fc = static fn (string $k): string => htmlspecialchars(\App\Repositories\AssociatePortalRepository::fcText($totals['fc'][$k] ?? [])); ?>

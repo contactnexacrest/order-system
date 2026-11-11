@@ -785,6 +785,15 @@
         return el.dataset.refuseMessage || 'Correct this field before saving.';
       }
     }
+    // data-min-ticked="<name>,<name>,…:<n>": at least n of those checkboxes of
+    // the same form are ticked (D-293: "How did you check the bank details?"
+    // — tick at least two). Put it on the first checkbox of the group.
+    if (el.dataset.minTicked && el.form) {
+      var spec = el.dataset.minTicked.split(':');
+      var need = parseInt(spec[1] || '1', 10);
+      var ticked = spec[0].split(',').filter(function (n) { var c = el.form.elements.namedItem(n); return c && c.checked; }).length;
+      if (ticked < need) return el.dataset.minTickedMessage || 'Tick at least ' + need + '.';
+    }
     if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url' || type === 'password' || type === 'number')) {
       return 'This field is required.';
     }

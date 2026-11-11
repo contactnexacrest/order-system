@@ -471,24 +471,33 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(await value('SELECT notes FROM associates WHERE id = :id', { id })).toBe('Route notes');
     expectPage(await holder.call('GET', '/associates/ladder'), 'When commission is paid', 'GET /associates/ladder');
     expectDone(await holder.call('POST', '/associates/ladder', { associate_tds_pct: '2.00', associate_bank_wait_days: '7', associate_commission_due_days: '30', associate_claim_hold: '1',
-      associate_payout_run: 'monthly', associate_payout_day: '5', associate_counting_threshold_inr: '500000', associate_protection_months: '6', associate_gst_pct: '18', associate_portal_commission_months: '12' }), 'POST /associates/ladder');
+      associate_payout_run: 'monthly', associate_payout_day: '5', associate_counting_threshold_inr: '500000', associate_protection_months: '6', associate_gst_pct: '18', associate_portal_commission_months: '12',
+      payout_reason: 'Route test: pay on the 5th.' }), 'POST /associates/ladder'); // D-292: a payment-run change needs a reason
     expectPage(await holder.call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
 
     let r = await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' });
-    expect(r.flash).toBe('An associate becomes Active once Accounts have verified their bank details (two people).');
+    expect(r.flash).toBe('An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.');
     r = await holder.call('POST', `/associates/${id}/bank`, { holder_name: 'Route Associate', account_number: '123456789012', account_number_confirm: '123456789012', ifsc: 'HDFC0001234', bank_name: 'HDFC Bank', account_currency: 'INR' });
     expect(r.flash).toBe('Attach a cancelled cheque or a bank letter (PDF or image).');
     const bankRow = { holder_name: 'Route Associate', account_number: '123456789012', ifsc: 'HDFC0001234', swift: '', bank_name: 'HDFC Bank', bank_branch_address: '', intermediary_bank: '', account_currency: 'INR' };
     const bank = await associateBankRepository.request(id, bankRow, true, null);
-    expectDone(await holder.call('POST', `/associates/${id}/bank/${bank}/check`, { check_method: 'Route test call-back and test credit.' }), 'POST /associates/:id/bank/:bankId/check');
-    r = await holder.call('POST', `/associates/${id}/bank/${bank}/verify`);
-    expect(r.flash).toBe('A different person must verify — you already acted on this request.');
-    const other = await signIn(await staffUser('Admin', true));
-    expectDone(await other.call('POST', `/associates/${id}/bank/${bank}/verify`), 'POST /associates/:id/bank/:bankId/verify', 'Verified.');
+    // D-293: one person verifies (default setting) — "First check" is for the two-people setting; at least two ticks.
+    r = await holder.call('POST', `/associates/${id}/bank/${bank}/check`, { check_bank_proof: '1', check_phone: '1' });
+    expect(r.flash).toBe('One person verifies bank details — use Verify.');
+    r = await holder.call('POST', `/associates/${id}/bank/${bank}/verify`, { check_bank_proof: '1' });
+    expect(r.flash).toBe('Tick at least two of the ways you checked the bank details.');
+    expectDone(await holder.call('POST', `/associates/${id}/bank/${bank}/verify`, { check_bank_proof: '1', check_phone: '1' }), 'POST /associates/:id/bank/:bankId/verify', 'Verified.');
     expectPage(await holder.call('GET', `/associates/${id}/bank/${bank}/number`), '123456789012', 'GET /associates/:id/bank/:bankId/number');
     expect(await audits('ASSOCIATE_BANK_NUMBER_VIEWED', bank)).toBe(1);
     const second = await associateBankRepository.request(id, { ...bankRow, account_number: '555566667777' }, true, null);
     expectDone(await holder.call('POST', `/associates/${id}/bank/${second}/reject`, { reason: 'Name does not match the PAN.' }), 'POST /associates/:id/bank/:bankId/reject');
+    // D-293: "Remind associate" while new details wait for the associate's confirmation.
+    const third = await associateBankRepository.request(id, { ...bankRow, account_number: '777788889999' }, true, null);
+    await associateBankRepository.markAwaiting(third, id, 7);
+    expectDone(await holder.call('POST', `/associates/${id}/bank/${third}/remind`), 'POST /associates/:id/bank/:bankId/remind', 'Reminder e-mailed to the associate.');
+    // D-291: the MD's commission rule page.
+    expectPage(await holder.call('GET', `/associates/${id}/commission-rule`), 'Commission rule — Route Associate', 'GET /associates/:id/commission-rule');
+    expectDone(await holder.call('POST', `/associates/${id}/commission-rule`, { rule: 'ladder', reason: 'Route test: keep the standard ladder.' }), 'POST /associates/:id/commission-rule', 'Nothing changed.');
     expectDone(await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' }), 'POST /associates/:id/status');
 
     expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite', `Portal login link e-mailed to ${email}.`);

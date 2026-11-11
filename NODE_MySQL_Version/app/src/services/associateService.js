@@ -71,9 +71,9 @@ function cleanReason(reason) {
   return String(reason ?? '').trim().replace(/[.\s]+$/u, '');
 }
 
+/** D-293: the wait before a CHANGED account is used (a first account: bankDetailsCheck.waitDays(true)). */
 async function bankWaitDays() {
-  const v = (await incentiveRepository.settings()).associate_bank_wait_days ?? '7';
-  return Math.max(0, parseInt(v, 10) || 0);
+  return require('./bankDetailsCheck').waitDays(false);
 }
 
 async function tdsPct() {

@@ -78,7 +78,8 @@ async function deleteLevel(id) {
 /** How many associates and ladder steps use the level (a used level can only be deactivated). */
 async function levelUse(id) {
   const a = await db.queryOne('SELECT COUNT(*) AS n FROM associates WHERE commission_level_id = :id', { id });
-  const s = await db.queryOne('SELECT COUNT(*) AS n FROM commission_ladder_steps WHERE level_id = :id', { id });
+  // D-291: a step of an associate's own ladder uses the level too.
+  const s = await db.queryOne('SELECT (SELECT COUNT(*) FROM commission_ladder_steps WHERE level_id = :id) + (SELECT COUNT(*) FROM associate_ladder_steps WHERE level_id = :id2) AS n', { id, id2: id });
   return { associates: Number(a.n), steps: Number(s.n) };
 }
 
@@ -109,6 +110,29 @@ async function replaceLadder(steps, userId) {
 
 async function setAssociateCommission(associateId, mode, levelId) {
   await db.execute('UPDATE associates SET commission_mode = :m, commission_level_id = :l WHERE id = :id', { m: mode, l: levelId, id: associateId });
+}
+
+/** D-291: an associate's own ladder (empty = none), in order, with each step's level. */
+async function ownLadder(associateId) {
+  return db.query(
+    `SELECT s.id, s.from_order, s.to_order, s.level_id, l.name AS level_name, l.kind, l.value, l.is_active
+       FROM associate_ladder_steps s JOIN commission_levels l ON l.id = s.level_id
+      WHERE s.associate_id = :a ORDER BY s.from_order`, { a: associateId });
+}
+
+/** D-291: the MD sets an associate's commission rule ('ladder' / 'own_ladder' with its steps / 'fixed' with a level), with a reason. */
+async function setAssociateRule(associateId, mode, levelId, ownSteps, reason, userId) {
+  await db.transaction(async (c) => {
+    await c.execute('DELETE FROM associate_ladder_steps WHERE associate_id = :a', { a: associateId });
+    if (mode === 'own_ladder') {
+      for (const s of ownSteps) {
+        await c.execute('INSERT INTO associate_ladder_steps (associate_id, from_order, to_order, level_id, updated_by) VALUES (:a, :f, :t, :l, :u)',
+          { a: associateId, f: s.from, t: s.to ?? null, l: s.level_id, u: userId });
+      }
+    }
+    await c.execute('UPDATE associates SET commission_mode = :m, commission_level_id = :l, commission_rule_changed_at = NOW(), commission_rule_changed_by = :u, commission_rule_reason = :r WHERE id = :id',
+      { m: mode, l: mode === 'fixed' ? levelId : null, u: userId, r: [...String(reason)].slice(0, 300).join(''), id: associateId });
+  });
 }
 
 /** D-255: a supplier price per unit (the selling unit) or per CBM (thick stone). */
@@ -185,5 +209,5 @@ async function setComboInUse(supplierId, inUse) {
 module.exports = {
   comboOptions, setCombo, setComboInUse,
   settings, setSetting, saveProductOverrides, levels, findLevel, levelNameTaken, createLevel, updateLevel, setLevelActive, deleteLevel,
-  levelUse, associatesPerLevel, ladder, replaceLadder, setAssociateCommission, setSupplierBasis, setCbmPrimary, setSupplierDates, purchaseQuotesForProduct, purchaseQuote,
+  levelUse, associatesPerLevel, ladder, replaceLadder, setAssociateCommission, ownLadder, setAssociateRule, setSupplierBasis, setCbmPrimary, setSupplierDates, purchaseQuotesForProduct, purchaseQuote,
 };

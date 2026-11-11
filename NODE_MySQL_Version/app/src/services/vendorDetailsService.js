@@ -13,29 +13,37 @@ const emailService = require('./emailService');
  * and of the Vendor Details Link, shared by both directories.
  */
 
+/** D-294: the vendor's e-mail as it was before this save (the REGISTERED e-mail), kept on the request body. */
+const EMAIL_BEFORE = Symbol('vendorEmailBefore');
+
 /** Validates the form's bank section without saving — null when it is fine. */
 async function bankInputError(kind, id, body) {
-  const current = vendorDetailsRepository.bankDetails(id !== null ? await vendorDetailsRepository.find(kind, id) : null);
+  const vendor = id !== null ? await vendorDetailsRepository.find(kind, id) : null;
+  if (vendor && body && typeof body === 'object') body[EMAIL_BEFORE] = String(vendor.email || '').trim();
+  const current = vendorDetailsRepository.bankDetails(vendor);
   return bankDetailsInput.collect(body, current, false).error;
 }
 
 /**
- * Saves the form's bank section entered by staff (on the vendor's behalf,
- * e.g. from their email). "verified" is set only when staff tick that they
- * checked it; any change without the tick clears the mark.
+ * Owner decisions 11 Nov 2026, point 18 (D-294): bank details typed by staff (on the vendor's behalf,
+ * e.g. from their e-mail) no longer replace the account in use. They become a change waiting for the
+ * vendor's confirmation — a link e-mailed to their REGISTERED e-mail (the one on file before this save;
+ * for a new record, the e-mail entered with it) — then for staff verification (vendorBankChangeService).
  */
-async function applyStaffBankInput(kind, id, userId, body) {
-  const current = vendorDetailsRepository.bankDetails(await vendorDetailsRepository.find(kind, id));
+async function applyStaffBankInput(kind, id, userId, body, req = null) {
+  const vendor = await vendorDetailsRepository.find(kind, id);
+  const current = vendorDetailsRepository.bankDetails(vendor);
   const result = bankDetailsInput.collect(body, current, false);
   if (result.error) return result.error;
-  const verifiedTick = !!body.bank_verified;
-  const tableName = vendorDetailsRepository.KINDS[kind].table;
   if (result.bank) {
-    await vendorDetailsRepository.saveBankDetails(kind, id, result.bank, 'staff', verifiedTick ? userId : null);
-    await auditLogRepository.log(userId, 'VENDOR_BANK_DETAILS_SAVED', tableName, id, 'bank_account_number', vendorDetailsRepository.maskAccount(current.bank_account_number), vendorDetailsRepository.maskAccount(result.bank.bank_account_number || current.bank_account_number), verifiedTick ? 'Entered by staff and marked verified' : 'Entered by staff');
-  } else if (verifiedTick && current.has_bank && !current.bank_verified_at) {
-    await vendorDetailsRepository.markBankVerified(kind, id, userId);
-    await auditLogRepository.log(userId, 'VENDOR_BANK_DETAILS_VERIFIED', tableName, id, null, null, vendorDetailsRepository.maskAccount(current.bank_account_number));
+    const registered = body && body[EMAIL_BEFORE] !== undefined ? body[EMAIL_BEFORE] : String((vendor && vendor.email) || '').trim();
+    const r = await require('./vendorBankChangeService').propose(kind, id, result.bank, 'staff', userId, registered || null);
+    if (req) {
+      const { CONFIRM_DAYS } = require('./bankDetailsCheck');
+      require('../helpers/flash').set(req, 'info', r.emailedTo
+        ? `The new bank details are saved as a change: a confirmation link was e-mailed to ${r.emailedTo}. They are used only after they confirm (within ${CONFIRM_DAYS} days) and someone other than you verifies them.`
+        : 'The new bank details are saved as a change, but there is no registered e-mail to send the confirmation link to — add their e-mail, then use "Send the link again" under Bank details changes.');
+    }
   }
   return null;
 }

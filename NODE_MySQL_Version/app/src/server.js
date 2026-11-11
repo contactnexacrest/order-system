@@ -673,6 +673,11 @@ app.post('/payment-action/:token/report', uploadLarge.single('screenshot'), veri
 // Owner request (2026-10-27): no-login Vendor Details Link — a supplier / logistics partner fills in their company and bank details.
 app.get('/vendor-details/:token', asyncHandler(vendorDetailsController.show));
 app.post('/vendor-details/:token', verifyCsrf, asyncHandler(vendorDetailsController.submit));
+// Owner decisions 11 Nov 2026 (D-294): the supplier / logistics partner confirms new bank details (link to the registered e-mail).
+const vendorBankChangeController = require('./controllers/vendorBankChangeController');
+app.get('/vendor-bank-confirm/:token', asyncHandler(vendorBankChangeController.show));
+app.post('/vendor-bank-confirm/:token', verifyCsrf, asyncHandler(vendorBankChangeController.confirm));
+app.post('/vendor-bank-confirm/:token/not-us', verifyCsrf, asyncHandler(vendorBankChangeController.notUs));
 
 // Client portal login/set-password — public (unauthenticated) by nature,
 // gated instead by the client_logins row provisioned at the Stage 3
@@ -765,6 +770,10 @@ app.post('/logistics-partners/:id/update', requireAuth, requirePermission('manag
 app.post('/logistics-partners/:id/toggle', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.toggleActive));
 app.post('/logistics-partners/:id/delete', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.remove));
 app.post('/logistics-partners/:id/details-link', requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(logisticsPartnerController.sendDetailsLink));
+// D-294: verify / first check / reject a bank details change, or e-mail the confirmation link again.
+for (const [a, m] of [['verify', 'partnerVerify'], ['check', 'partnerCheck'], ['reject', 'partnerReject'], ['resend', 'partnerResend']]) {
+  app.post(`/logistics-partners/:id/bank-changes/:changeId/${a}`, requireAuth, requirePermission('manage_logistics_partners'), verifyCsrf, asyncHandler(require('./controllers/vendorBankChangeController')[m]));
+}
 // Suppliers directory (docs/schema.sql Section BZ) — same shape as Logistics Partners.
 app.get('/suppliers', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.index));
 app.get('/suppliers/create', requireAuth, requirePermission('manage_suppliers'), asyncHandler(supplierController.createForm));
@@ -774,6 +783,10 @@ app.post('/suppliers/:id/update', requireAuth, requirePermission('manage_supplie
 app.post('/suppliers/:id/toggle', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.toggleActive));
 app.post('/suppliers/:id/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.remove));
 app.post('/suppliers/:id/details-link', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.sendDetailsLink));
+// D-294: verify / first check / reject a bank details change, or e-mail the confirmation link again.
+for (const [a, m] of [['verify', 'supplierVerify'], ['check', 'supplierCheck'], ['reject', 'supplierReject'], ['resend', 'supplierResend']]) {
+  app.post(`/suppliers/:id/bank-changes/:changeId/${a}`, requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(require('./controllers/vendorBankChangeController')[m]));
+}
 app.post('/suppliers/:id/factory-addresses', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.addFactoryAddress));
 app.post('/suppliers/:id/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.deleteFactoryAddress));
 
@@ -1165,6 +1178,10 @@ app.post('/associates/:id/bank', requireAuth, requirePermission('manage_associat
 app.post('/associates/:id/bank/:bankId/check', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.firstCheck));
 app.post('/associates/:id/bank/:bankId/verify', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.verifyBank));
 app.post('/associates/:id/bank/:bankId/reject', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.rejectBank));
+// Owner decisions 11 Nov 2026 (D-291, D-293): remind the associate to confirm new bank details; the MD sets the commission rule.
+app.post('/associates/:id/bank/:bankId/remind', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.remindBank));
+app.get('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), asyncHandler(associateAdminController.commissionRule));
+app.post('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.saveCommissionRule));
 app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
 // Owner decision D-252 (A3): accept / reject one KYC document.
@@ -1557,6 +1574,11 @@ app.post('/associate/profile', requireAssociateAuth, verifyCsrf, asyncHandler(as
 app.post('/associate/documents', requireAssociateAuth, uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associatePortalController.uploadDocument));
 app.get('/associate/documents/:id', requireAssociateAuth, asyncHandler(associatePortalController.downloadDocument));
 app.post('/associate/bank', requireAssociateAuth, uploadLarge.single('proof_file'), verifyCsrf, asyncHandler(associatePortalController.requestBank));
+// D-293: the associate confirms new bank details (last 4 digits + e-mailed code), or "This is not me — cancel it".
+app.get('/associate/bank/confirm', requireAssociateAuth, asyncHandler(associatePortalController.showBankConfirm));
+app.post('/associate/bank/confirm/code', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.sendBankCode));
+app.post('/associate/bank/confirm', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.confirmBank));
+app.post('/associate/bank/not-me', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.bankNotMe));
 app.get('/associate/agreement', requireAssociateAuth, asyncHandler(associatePortalController.downloadAgreement));
 app.get('/associate/messages', requireAssociateAuth, asyncHandler(associatePortalController.messages));
 app.post('/associate/messages', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.sendMessage));

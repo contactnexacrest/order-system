@@ -69,9 +69,12 @@ async function submit(req, res) {
       details[f] = String(body[f] || '').trim() || null;
     }
   }
+  const registered = String(vendor.email || '').trim(); // D-294: the e-mail on file before this submit
   await vendorDetailsRepository.saveDetailsFromVendor(kind, vendor.id, details);
+  let confirmTo = null;
   if (result.bank) {
-    await vendorDetailsRepository.saveBankDetails(kind, vendor.id, result.bank, 'vendor', null);
+    // D-294: their bank details wait for confirmation through a link e-mailed to the registered e-mail, then for staff verification.
+    confirmTo = (await require('../services/vendorBankChangeService').propose(kind, Number(vendor.id), result.bank, 'vendor', null, registered || null)).emailedTo;
   }
   await vendorDetailsRepository.markDetailsSubmitted(kind, vendor.id);
   const after = vendorDetailsRepository.bankDetails(await vendorDetailsRepository.find(kind, vendor.id));
@@ -85,7 +88,10 @@ async function submit(req, res) {
     vendorDetailsRepository.maskAccount(after.bank_account_number),
     `${vendor[meta.name]} filled in their details through the Vendor Details Link — verify the bank account before paying.`
   );
-  res.renderView('vendor_details/thanks', { vendor, meta }, 'layout/bare');
+  res.renderView('vendor_details/thanks', {
+    vendor, meta, bankChanged: !!result.bank, confirmTo: confirmTo ? require('../services/bankDetailsCheck').maskEmail(confirmTo) : null,
+    confirmDays: require('../services/bankDetailsCheck').CONFIRM_DAYS,
+  }, 'layout/bare');
 }
 
 module.exports = { show, submit };

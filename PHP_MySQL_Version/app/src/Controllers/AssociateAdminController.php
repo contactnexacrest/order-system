@@ -86,6 +86,8 @@ final class AssociateAdminController
         foreach ($rows as &$r) {
             $r['clients'] = AssociateRepository::clients((int) $r['id']);
             $r['pending_bank'] = (int) Database::connection()->query("SELECT COUNT(*) FROM associate_bank_accounts WHERE status = 'pending' AND associate_id = " . (int) $r['id'])->fetchColumn();
+            // D-293: new details still waiting for the associate's confirmation.
+            $r['awaiting_bank'] = (int) Database::connection()->query("SELECT COUNT(*) FROM associate_bank_accounts WHERE status = 'awaiting_confirmation' AND associate_id = " . (int) $r['id'])->fetchColumn();
         }
         unset($r);
         $data = [
@@ -95,6 +97,7 @@ final class AssociateAdminController
             'counts' => AssociateRepository::statusCounts(),
             'canManage' => self::can('manage_associates'),
             'canBank' => self::can('manage_associate_bank'),
+            'canRules' => self::can('view_associate_commission_rules'), // D-292
             'pendingBank' => AssociateBankRepository::pendingCount(),
             'kanbanUser' => UiTemplateService::resolve($user['ui_template_preference_id'] ?? null) === 'kanban',
         ];
@@ -138,7 +141,8 @@ final class AssociateAdminController
      */
     private static function readCommissionLevel(?array $existing): array
     {
-        if (!self::can('manage_pricing')) {
+        // D-291 (11 Nov 2026): an existing associate's rule is changed on their page (Commission rule), with a reason.
+        if (!self::can('manage_pricing') || $existing !== null) {
             return [null, null];
         }
         $mode = (string) ($_POST['commission_mode'] ?? '');
@@ -304,6 +308,9 @@ final class AssociateAdminController
             'canManage' => $canManage,
             'canBank' => $canBank,
             'canChangeLink' => AssociateService::canChangeLink(self::user()),
+            // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
+            'rule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateCommission::ruleProgress($a) : null,
+            'canPricing' => self::can('manage_pricing'),
             'clients' => AssociatePortalRepository::clients($id),
             'me' => self::user(),
         ];
@@ -338,6 +345,98 @@ final class AssociateAdminController
         View::render('associates/show', $data, 'layout/base');
     }
 
+    // ------------------------------------------------------------ D-291: commission rule (the MD)
+
+    /** The rule page: Standard ladder / Own ladder (a copy of the standard ladder to change) / Fixed %. */
+    public function commissionRule(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $chosen = (string) ($_GET['rule'] ?? $a['commission_mode'] ?? 'ladder');
+        $chosen = isset(\App\Services\AssociateCommission::RULE_LABELS[$chosen]) ? $chosen : 'ladder';
+        $own = \App\Repositories\PricingRepository::ownLadder((int) $a['id']);
+        $standard = \App\Repositories\PricingRepository::ladder();
+        $rows = $own !== [] ? $own : $standard; // "Add own ladder" opens a copy of the standard ladder
+        $blank = ['from_order' => '', 'to_order' => '', 'level_id' => ''];
+        View::render('associates/commission_rule', ['a' => $a, 'chosen' => $chosen, 'standard' => $standard, 'rows' => array_merge(array_map(static fn (array $s): array => $s, $rows), [$blank, $blank]),
+            'levels' => \App\Repositories\PricingRepository::levels()], 'layout/base');
+    }
+
+    public function saveCommissionRule(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $user = self::user();
+        $back = static function (string $error) use ($a): void {
+            Flash::set('error', $error);
+            header('Location: /associates/' . (int) $a['id'] . '/commission-rule?rule=' . urlencode((string) ($_POST['rule'] ?? '')));
+        };
+        $mode = (string) ($_POST['rule'] ?? '');
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!isset(\App\Services\AssociateCommission::RULE_LABELS[$mode])) {
+            $back('Choose the rule: Standard ladder, Own ladder or Fixed %.');
+            return;
+        }
+        if (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
+            $back('Give the reason for the change (10 to 300 characters) — it is kept in the Audit Log.');
+            return;
+        }
+        $levelsById = [];
+        foreach (\App\Repositories\PricingRepository::levels() as $l) {
+            $levelsById[(int) $l['id']] = $l;
+        }
+        $levelId = null;
+        $steps = [];
+        if ($mode === 'fixed') {
+            $l = $levelsById[(int) ($_POST['commission_level_id'] ?? 0)] ?? null;
+            if ($l === null || ((int) $l['is_active'] !== 1 && (int) ($a['commission_level_id'] ?? 0) !== (int) $l['id'])) {
+                $back('Choose an active commission level for the fixed %.');
+                return;
+            }
+            $levelId = (int) $l['id'];
+        } elseif ($mode === 'own_ladder') {
+            [$steps, $errors] = \App\Services\PricingService::readLadderForm($_POST, $levelsById);
+            if ($errors !== []) {
+                $back('Own ladder: ' . implode(' ', $errors));
+                return;
+            }
+        }
+        $describe = static function (string $m, ?int $lid, array $rows) use ($levelsById): string {
+            if ($m === 'fixed') {
+                $l = $levelsById[(int) $lid] ?? null;
+                return 'Fixed %: ' . ($l === null ? '?' : $l['name'] . ' — ' . \App\Services\PricingService::levelLabel($l));
+            }
+            if ($m === 'own_ladder') {
+                return 'Own ladder: ' . implode('; ', array_map(static fn (array $s): string => ($s['from'] ?? $s['from_order']) . '–' . ((($s['to'] ?? $s['to_order'] ?? null) === null) ? 'onward' : ($s['to'] ?? $s['to_order']))
+                    . ': ' . ($levelsById[(int) $s['level_id']]['name'] ?? '?'), $rows));
+            }
+            return 'Standard ladder';
+        };
+        $oldMode = (string) ($a['commission_mode'] ?? 'ladder');
+        $before = $describe($oldMode, isset($a['commission_level_id']) ? (int) $a['commission_level_id'] : null, $oldMode === 'own_ladder' ? \App\Repositories\PricingRepository::ownLadder((int) $a['id']) : []);
+        $after = $describe($mode, $levelId, $steps);
+        if ($before === $after) {
+            Flash::set('success', 'Nothing changed.');
+            header('Location: /associates/' . (int) $a['id'] . '#commission-rule');
+            return;
+        }
+        $rateBefore = \App\Services\AssociateCommission::rateLabel(\App\Services\AssociateCommission::levelForAssociate($a, null)[0]);
+        \App\Repositories\PricingRepository::setAssociateRule((int) $a['id'], $mode, $levelId, $steps, $reason, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_COMMISSION_RULE_CHANGED', 'associates', (int) $a['id'], 'commission_rule', $before, $after, $reason);
+        $fresh = AssociateRepository::find((int) $a['id']) ?? $a;
+        $rateAfter = \App\Services\AssociateCommission::rateLabel(\App\Services\AssociateCommission::levelForAssociate($fresh, null)[0]);
+        if ($rateAfter !== $rateBefore) {
+            // D-292: the associate sees only their current % — never the rule, levels or ladder.
+            AssociateEventRepository::add((int) $a['id'], 'rates_changed', "Your commission for new orders is now {$rateAfter} of the FOB value of each order from the clients you introduced. Orders whose Proforma Invoice was already sent keep their %.", null, null, null, (int) $user['id'], true);
+        }
+        Flash::set('success', 'Commission rule saved: ' . $after . '. It applies to new orders only.');
+        header('Location: /associates/' . (int) $a['id'] . '#commission-rule');
+    }
+
     // ------------------------------------------------------------ status, portal, code
 
     public function changeStatus(array $params): void
@@ -355,8 +454,8 @@ final class AssociateAdminController
             Flash::set('error', 'The associate already has this status.');
         } elseif (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
             Flash::set('error', 'Give the reason for the change (10 to 300 characters).');
-        } elseif ($status === 'active' && AssociateBankRepository::usable((int) $a['id'], date('Y-m-d', strtotime('+' . AssociateService::bankWaitDays() . ' days'))) === null) {
-            Flash::set('error', 'An associate becomes Active once Accounts have verified their bank details (two people).');
+        } elseif ($status === 'active' && !AssociateBankRepository::hasVerified((int) $a['id'])) {
+            Flash::set('error', 'An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.');
         } else {
             AssociateRepository::setFields((int) $a['id'], ['status' => $status, 'status_reason' => $reason]);
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_STATUS_CHANGED', 'associates', (int) $a['id'], 'status', (string) $a['status'], $status);
@@ -574,7 +673,10 @@ final class AssociateAdminController
         };
     }
 
-    /** Accounts enter the bank details themselves (from the associate's signed form) — still checked by two people. */
+    /**
+     * Accounts enter the bank details themselves (from the associate's signed form). D-293: the associate
+     * confirms them first (portal + e-mailed code), then one person other than the enterer verifies them.
+     */
     public function addBank(array $params): void
     {
         $a = self::found($params);
@@ -595,13 +697,25 @@ final class AssociateAdminController
             return;
         }
         $id = AssociateBankRepository::request((int) $a['id'], $result, false, (int) self::user()['id']);
-        AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', $id, null, null, 'by staff');
-        AssociateService::notify($a, 'bank_changed', "NexaCrest recorded new bank details for you ({$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') on ' . date('j M Y') . '. They are used once checked. '
-            . AssociateService::bankPaymentsSentence((int) $a['id']) . ' If you did not send these details, contact NexaCrest at once.', null, null, null, (int) self::user()['id']);
-        Flash::set('success', 'Bank details recorded — two people must now check them.');
+        \App\Services\AssociateBankConfirmation::start($id, $a, false, (int) self::user()['id']);
+        Flash::set('success', 'Bank details recorded. The associate must now confirm them in their portal (they were e-mailed, ' . \App\Services\BankDetailsCheck::CONFIRM_DAYS . ' days to answer); then '
+            . (\App\Services\BankDetailsCheck::people() === 'two' ? 'two people other than you check them.' : 'one person other than you verifies them.'));
         self::back((int) $a['id'], 'bank');
     }
 
+    /** D-293: the checks every verifier must pass — confirmed by the associate, not the enterer (unless the self-approval rule allows, with a reason). */
+    private static function bankCheckRefusal(array $bank, int $uid): ?string
+    {
+        if ($bank['status'] === 'awaiting_confirmation') {
+            return 'Verify is available once the associate confirms the new details.';
+        }
+        if ($bank['status'] !== 'pending') {
+            return 'This request is no longer waiting to be checked.';
+        }
+        return \App\Services\BankDetailsCheck::selfCheckError(isset($bank['requested_by_user']) ? (int) $bank['requested_by_user'] : null, $uid, (string) ($_POST['self_reason'] ?? ''));
+    }
+
+    /** Two-people setting only: the first of the two checks (with the "how I checked" ticks). */
     public function firstCheck(array $params): void
     {
         $a = self::found($params);
@@ -609,22 +723,32 @@ final class AssociateAdminController
             return;
         }
         $bank = AssociateBankRepository::find((int) $params['bankId']);
-        $method = trim((string) ($_POST['check_method'] ?? ''));
+        $uid = (int) self::user()['id'];
+        [$checks, $checkError] = \App\Services\BankDetailsCheck::readChecks($_POST);
         if ($bank === null || (int) $bank['associate_id'] !== (int) $a['id']) {
             Flash::set('error', 'Bank request not found.');
-        } elseif (mb_strlen($method) < 10 || mb_strlen($method) > 300) {
-            Flash::set('error', 'Say how you checked it (e.g. "Called the associate on their known number; test credit of ₹1 confirmed") — 10 to 300 characters.');
-        } elseif ((int) ($bank['requested_by_user'] ?? 0) === (int) self::user()['id']) {
-            Flash::set('error', 'You entered these bank details, so two other people must check them.');
-        } elseif (!AssociateBankRepository::firstCheck((int) $bank['id'], (int) self::user()['id'], $method)) {
+        } elseif (\App\Services\BankDetailsCheck::people() !== 'two') {
+            Flash::set('error', 'One person verifies bank details — use Verify.');
+        } elseif (($refusal = self::bankCheckRefusal($bank, $uid)) !== null) {
+            Flash::set('error', $refusal);
+        } elseif ($checkError !== null) {
+            Flash::set('error', $checkError);
+        } elseif (!AssociateBankRepository::firstCheck((int) $bank['id'], $uid, \App\Services\BankDetailsCheck::checksText($checks))) {
             Flash::set('error', 'This request was already checked or is no longer pending.');
         } else {
-            AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_BANK_FIRST_CHECK', 'associate_bank_accounts', (int) $bank['id'], null, null, $method);
+            $selfReason = (int) ($bank['requested_by_user'] ?? 0) === $uid ? trim((string) ($_POST['self_reason'] ?? '')) : null;
+            AssociateBankRepository::saveChecks((int) $bank['id'], $checks, $selfReason);
+            AuditLogRepository::log($uid, 'ASSOCIATE_BANK_FIRST_CHECK', 'associate_bank_accounts', (int) $bank['id'], null, null, \App\Services\BankDetailsCheck::checksText($checks), $selfReason);
             Flash::set('success', 'First check recorded. A different person now verifies it.');
         }
         self::back((int) $a['id'], 'bank');
     }
 
+    /**
+     * D-293: Verify — one person (default), ticking at least 2 of the checks; with the "Two people"
+     * setting, the second person after the first check. Usable after the waiting days (first account /
+     * change of account). The associate is always e-mailed (the bank-changed alert, MUST).
+     */
     public function verifyBank(array $params): void
     {
         $a = self::found($params);
@@ -633,20 +757,49 @@ final class AssociateAdminController
         }
         $bank = AssociateBankRepository::find((int) $params['bankId']);
         $uid = (int) self::user()['id'];
+        $two = \App\Services\BankDetailsCheck::people() === 'two';
+        [$checks, $checkError] = $two ? [null, null] : \App\Services\BankDetailsCheck::readChecks($_POST);
+        $wait = $bank !== null ? \App\Services\BankDetailsCheck::waitDays(!AssociateBankRepository::hasVerified((int) $bank['associate_id'], (int) $bank['id'])) : 0;
         if ($bank === null || (int) $bank['associate_id'] !== (int) $a['id']) {
             Flash::set('error', 'Bank request not found.');
-        } elseif (empty($bank['first_checked_by'])) {
+        } elseif (($refusal = self::bankCheckRefusal($bank, $uid)) !== null) {
+            Flash::set('error', $refusal);
+        } elseif ($two && empty($bank['first_checked_by'])) {
             Flash::set('error', 'Record the first check before verifying.');
-        } elseif ((int) $bank['first_checked_by'] === $uid || (int) ($bank['requested_by_user'] ?? 0) === $uid) {
+        } elseif ($two && (int) $bank['first_checked_by'] === $uid) {
             Flash::set('error', 'A different person must verify — you already acted on this request.');
-        } elseif (!AssociateBankRepository::verify((int) $bank['id'], $uid, AssociateService::bankWaitDays())) {
+        } elseif ($checkError !== null) {
+            Flash::set('error', $checkError);
+        } elseif (!($two ? AssociateBankRepository::verify((int) $bank['id'], $uid, $wait) : AssociateBankRepository::verifyOne((int) $bank['id'], $uid, $wait))) {
             Flash::set('error', 'This request is no longer pending.');
         } else {
+            $selfReason = (int) ($bank['requested_by_user'] ?? 0) === $uid ? trim((string) ($_POST['self_reason'] ?? '')) : null;
+            if ($checks !== null) {
+                AssociateBankRepository::saveChecks((int) $bank['id'], $checks, $selfReason);
+            }
             $b = AssociateBankRepository::find((int) $bank['id']);
-            AuditLogRepository::log($uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', (int) $bank['id'], 'status', 'pending', 'verified');
+            AuditLogRepository::log($uid, 'ASSOCIATE_BANK_VERIFIED', 'associate_bank_accounts', (int) $bank['id'], 'status', 'pending', 'verified',
+                trim(($checks !== null ? 'Checked: ' . \App\Services\BankDetailsCheck::checksText($checks) . '. ' : '') . ($selfReason !== null ? 'Own entry — reason: ' . $selfReason : '')) ?: null);
+            // ACCESS / SECURITY-CRITICAL e-mail (MUST — the bank-changed alert, kept): always sent through the existing mail send.
             AssociateService::notify($a, 'bank_changed', 'Your bank account ' . AssociateBankRepository::masked($b) . ' was verified by NexaCrest. Payments go to it from '
                 . \App\Helpers\Dates::short((string) $b['usable_from']) . '. If you did not ask for this change, contact NexaCrest at once.', null, null, null, $uid);
             Flash::set('success', 'Verified. Usable from ' . \App\Helpers\Dates::short((string) $b['usable_from']) . '; the associate was e-mailed.');
+        }
+        self::back((int) $a['id'], 'bank');
+    }
+
+    /** D-293: "Remind associate" — the confirmation e-mail again while they have not answered. */
+    public function remindBank(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $bank = AssociateBankRepository::find((int) $params['bankId']);
+        if ($bank === null || (int) $bank['associate_id'] !== (int) $a['id'] || !\App\Services\AssociateBankConfirmation::remind((int) $bank['id'], (int) self::user()['id'])) {
+            Flash::set('error', 'These bank details are no longer waiting for the associate.');
+        } else {
+            Flash::set('success', 'Reminder e-mailed to the associate.');
         }
         self::back((int) $a['id'], 'bank');
     }
@@ -708,7 +861,8 @@ final class AssociateAdminController
             return;
         }
         // Owner decision D-251 (A4): checked per kind; an Aadhaar card keeps only its last 4 digits.
-        [$reference, $refError] = \App\Services\AssociateKyc::normaliseReference($kind, $reference);
+        // D-290: an ID document carries its type and number; ID and address proofs get app-set file names.
+        [$reference, $idDocType, $refError] = \App\Services\AssociateKyc::checkUpload($kind, $reference, (string) ($_POST['id_doc_type'] ?? ''));
         if ($refError !== null) {
             Flash::set('error', $refError);
             self::back((int) $a['id'], 'documents');
@@ -716,13 +870,14 @@ final class AssociateAdminController
         }
         $reference = (string) $reference;
         try {
-            $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, (int) self::user()['id'], null, (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
+            $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, (int) self::user()['id'],
+                \App\Services\AssociateKyc::appFileName($kind, (string) $a['name'], (string) ($_FILES['document_file']['name'] ?? '')), (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
             self::back((int) $a['id'], 'documents');
             return;
         }
-        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, $reference ?: null, false, (int) self::user()['id']);
+        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, $reference ?: null, false, (int) self::user()['id'], $idDocType);
         AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', (int) $a['id'], 'kind', null, $kind);
         if (in_array($kind, ['form_16a', 'form_15ca', 'form_15cb'], true)) {
             AssociateService::notify($a, 'document_added', AssociateDocumentRepository::KINDS[$kind] . ($reference !== '' ? " ({$reference})" : '') . ' is in your portal.', null, null, null, (int) self::user()['id']);
@@ -889,7 +1044,10 @@ final class AssociateAdminController
     {
         View::render('associates/ladder', [
             'tds' => AssociateService::tdsPct(),
-            'wait' => AssociateService::bankWaitDays(),
+            // D-293: two waits (first account / change of account) and one or two people check.
+            'waitFirst' => \App\Services\BankDetailsCheck::waitDays(true), 'waitChange' => \App\Services\BankDetailsCheck::waitDays(false),
+            'bankPeople' => \App\Services\BankDetailsCheck::people(),
+            'codeChanges' => AssociateCodeService::changesPerYear(), 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
             'commission' => \App\Services\AssociateCommission::settings(),
             'canPricing' => self::can('manage_pricing'),
         ], 'layout/base');
@@ -900,19 +1058,34 @@ final class AssociateAdminController
         $user = self::user();
         $values = [];
         $tds = filter_var($_POST['associate_tds_pct'] ?? '', FILTER_VALIDATE_FLOAT);
-        $wait = filter_var($_POST['associate_bank_wait_days'] ?? '', FILTER_VALIDATE_INT);
-        if ($tds === false || $tds < 0 || $tds > 30 || $wait === false || $wait < 0 || $wait > 60) {
-            Flash::set('error', 'Enter TDS as 0–30 % and the bank waiting days as 0–60.');
+        // D-293: two waits (0–90) and one or two people; left as they are when not on the form.
+        $waitFirst = filter_var($_POST['associate_bank_wait_first_days'] ?? \App\Services\BankDetailsCheck::waitDays(true), FILTER_VALIDATE_INT);
+        $waitChange = filter_var($_POST['associate_bank_wait_change_days'] ?? \App\Services\BankDetailsCheck::waitDays(false), FILTER_VALIDATE_INT);
+        $people = (string) ($_POST['bank_details_check_people'] ?? \App\Services\BankDetailsCheck::people());
+        if ($tds === false || $tds < 0 || $tds > 30 || $waitFirst === false || $waitFirst < 0 || $waitFirst > 90 || $waitChange === false || $waitChange < 0 || $waitChange > 90) {
+            Flash::set('error', 'Enter TDS as 0–30 % and each bank waiting time as 0–90 days.');
+            header('Location: /associates/ladder');
+            return;
+        }
+        if (!in_array($people, ['one', 'two'], true)) {
+            Flash::set('error', 'Choose who checks new bank details: one person or two people.');
             header('Location: /associates/ladder');
             return;
         }
         $values['associate_tds_pct'] = number_format($tds, 2, '.', '');
-        $values['associate_bank_wait_days'] = (string) $wait;
+        $values['associate_bank_wait_first_days'] = (string) $waitFirst;
+        $values['associate_bank_wait_change_days'] = (string) $waitChange;
+        $values['bank_details_check_people'] = $people;
         // The commission rules: the MD only (fields posted by others are ignored).
         if (self::can('manage_pricing')) {
             $days = filter_var($_POST['associate_commission_due_days'] ?? '', FILTER_VALIDATE_INT);
             $run = (string) ($_POST['associate_payout_run'] ?? '');
-            $day = filter_var($_POST['associate_payout_day'] ?? '', FILTER_VALIDATE_INT);
+            // D-292: monthly 1–28 or 'last'; weekly 1–7 (the weekday field, or the old single field).
+            $rawDay = trim((string) ($run === 'weekly' ? ($_POST['associate_payout_weekday'] ?? $_POST['associate_payout_day'] ?? '') : ($_POST['associate_payout_day'] ?? '')));
+            $day = $run === 'monthly' && $rawDay === 'last' ? 'last' : filter_var($rawDay, FILTER_VALIDATE_INT);
+            $holidayRule = (string) ($_POST['associate_payout_holiday_rule'] ?? \App\Services\AssociateCommission::settings()['holiday_rule']);
+            $codeChanges = filter_var($_POST['associate_code_changes_per_year'] ?? AssociateCodeService::changesPerYear(), FILTER_VALIDATE_INT);
+            $upgradeAfter = filter_var($_POST['associate_upgrade_after_orders'] ?? \App\Services\AssociateAccess::upgradeAfter(), FILTER_VALIDATE_INT);
             $threshold = filter_var($_POST['associate_counting_threshold_inr'] ?? '', FILTER_VALIDATE_FLOAT);
             $months = filter_var($_POST['associate_protection_months'] ?? '', FILTER_VALIDATE_INT);
             $gst = filter_var($_POST['associate_gst_pct'] ?? '', FILTER_VALIDATE_FLOAT);
@@ -924,7 +1097,10 @@ final class AssociateAdminController
             $error = match (true) {
                 $days === false || $days < 0 || $days > 365 => 'Enter the days after full payment as 0 to 365.',
                 !in_array($run, ['monthly', 'weekly'], true) => 'Choose a monthly or a weekly payout run.',
-                $day === false || ($run === 'monthly' && ($day < 1 || $day > 28)) || ($run === 'weekly' && ($day < 1 || $day > 7)) => 'Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.',
+                $day === false || ($day !== 'last' && (($run === 'monthly' && ($day < 1 || $day > 28)) || ($run === 'weekly' && ($day < 1 || $day > 7)))) => 'Choose the payout day: the 1st to the 28th or the last day of the month for a monthly run, a weekday for a weekly run.',
+                !in_array($holidayRule, ['before', 'after'], true) => 'Choose what happens when the payment day is a Sunday or holiday: the working day before or after.',
+                $codeChanges === false || $codeChanges < 0 || $codeChanges > 12 => 'Enter the personal code changes allowed per year as 0 to 12.',
+                $upgradeAfter === false || $upgradeAfter < 1 || $upgradeAfter > 50 => 'Enter after how many paid orders "Quoting" is suggested, 1 to 50.',
                 $threshold === false || $threshold < 0 || $threshold > 1000000000 => 'Enter the counting-order threshold in rupees (0 or more).',
                 $months === false || $months < 1 || $months > 60 => 'Enter the buyer registration period as 1 to 60 months.',
                 $gst === false || $gst < 0 || $gst > 28 => 'Enter the GST on commission as 0 to 28 %.',
@@ -942,6 +1118,19 @@ final class AssociateAdminController
             $values['associate_claim_hold'] = !empty($_POST['associate_claim_hold']) ? '1' : '0';
             $values['associate_payout_run'] = $run;
             $values['associate_payout_day'] = (string) $day;
+            $values['associate_payout_holiday_rule'] = $holidayRule;
+            $values['associate_code_changes_per_year'] = (string) $codeChanges;
+            $values['associate_upgrade_after_orders'] = (string) $upgradeAfter;
+            // D-292: a change of the payment run (run, day, Sunday/holiday rule) needs a reason, kept in the Audit Log.
+            $current = IncentiveRepository::settings();
+            $runChanged = (string) ($current['associate_payout_run'] ?? 'monthly') !== $run || (string) ($current['associate_payout_day'] ?? 'last') !== (string) $day
+                || (string) ($current['associate_payout_holiday_rule'] ?? 'before') !== $holidayRule;
+            $payoutReason = trim((string) ($_POST['payout_reason'] ?? ''));
+            if ($runChanged && (mb_strlen($payoutReason) < 10 || mb_strlen($payoutReason) > 300)) {
+                Flash::set('error', 'Give the reason for changing the payment run (10 to 300 characters) — it is kept in the Audit Log.');
+                header('Location: /associates/ladder');
+                return;
+            }
             $values['associate_counting_threshold_inr'] = number_format($threshold, 2, '.', '');
             $values['associate_protection_months'] = (string) $months;
             $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
@@ -969,7 +1158,8 @@ final class AssociateAdminController
         foreach ($values as $k => $v) {
             if ((string) ($before[$k] ?? '') !== $v) {
                 IncentiveRepository::setSetting($k, $v, (int) $user['id']);
-                AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, $k, $before[$k] ?? null, $v);
+                AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, $k, $before[$k] ?? null, $v,
+                    in_array($k, ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'], true) ? (trim((string) ($_POST['payout_reason'] ?? '')) ?: null) : null);
             }
         }
         Flash::set('success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');

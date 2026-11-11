@@ -29,6 +29,8 @@ final class SelfApprovalRules
         'short_payment' => 'Clear short a buyer payment whose receipts they recorded',
         // Owner decision 2 Nov 2026 (D-240): a price below the reference by the warning % or more.
         'price_discount' => 'Approve an order line price below the floor where they set that price themselves (D-245)',
+        // Owner decision 11 Nov 2026 (D-293): verify bank details (associates and suppliers) they entered themselves, with a reason.
+        'bank_details' => 'Verify bank details (associates and suppliers) they entered themselves — with a reason',
     ];
 
     /** @return list<int> */
