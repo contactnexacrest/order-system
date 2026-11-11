@@ -90,10 +90,11 @@ describe('QA batch 3 — documents and e-mail', () => {
     await db.execute('UPDATE order_products SET quantity = 777 WHERE order_id = :o AND line_no = 1', { o: orderId });
     await documentGenerationService.finalizeApproval(r.document_id);
     expect(lastHtml()).toContain('120');
-    expect(lastHtml()).not.toContain('777');
+    // The buyer inquiry ref is random hex (e.g. PHPUNIT-24c777): look for 777 as a number on its own.
+    expect(lastHtml()).not.toMatch(/(?<![0-9a-f])777(?![0-9a-f])/i);
 
     await documentGenerationService.markSuperseded(r.document_id);
-    expect(lastHtml()).not.toContain('777');
+    expect(lastHtml()).not.toMatch(/(?<![0-9a-f])777(?![0-9a-f])/i);
     expect(lastHtml()).toContain('INVALID DOCUMENT');
   });
 

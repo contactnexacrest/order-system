@@ -92,9 +92,9 @@ describe('11 Nov 2026 screenshot fixes', () => {
     expect(css).toContain('legend.legend-sentence{text-transform:none;}');
     // The global legend style (capitalised short titles) is left as it is.
     expect(css).toContain('legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capitalize;}');
-    for (const view of ['views/products/supplier_price_edit.njk', 'views/products/market_prices.njk']) {
-      expect(read(view)).toContain('<legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>');
-    }
+    // D-335: the supplier price page shows the thickness prices as the price card; the add form keeps a sentence-case legend.
+    expect(read('views/products/market_prices.njk')).toContain('<legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>');
+    expect(read('views/products/_price_add.njk')).toContain('<legend class="legend-sentence">Base for orders</legend>');
     expect(read('views/products/_cha_transport.njk')).toContain('<legend class="legend-sentence">CHA + transport (one price per container)</legend>');
   });
 

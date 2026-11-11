@@ -83,11 +83,12 @@ final class QaBatch3DocsMailTest extends DbTestCase
         DocumentGenerationService::finalizeApproval((int) $r['document_id']);
         $final = $this->pdfText((int) DocumentRepository::find((int) $r['document_id'])['pdf_file_id']);
         self::assertStringContainsString('120', $final);
-        self::assertStringNotContainsString('777', $final);
+        // The buyer inquiry ref is random hex (e.g. PHPUNIT-24c777): look for 777 as a number on its own.
+        self::assertDoesNotMatchRegularExpression('/(?<![0-9a-f])777(?![0-9a-f])/i', $final);
 
         DocumentGenerationService::markSuperseded((int) $r['document_id']);
         $superseded = $this->pdfText((int) DocumentRepository::find((int) $r['document_id'])['pdf_file_id']);
-        self::assertStringNotContainsString('777', $superseded, 'the superseded copy keeps the figures it really carried');
+        self::assertDoesNotMatchRegularExpression('/(?<![0-9a-f])777(?![0-9a-f])/i', $superseded, 'the superseded copy keeps the figures it really carried');
         self::assertStringContainsString('120', $superseded);
     }
 

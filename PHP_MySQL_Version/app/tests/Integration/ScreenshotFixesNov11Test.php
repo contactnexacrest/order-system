@@ -139,9 +139,9 @@ final class ScreenshotFixesNov11Test extends DbTestCase
         self::assertStringContainsString('legend.legend-sentence{text-transform:none;}', $css);
         // The global legend style (capitalised short titles) is left as it is.
         self::assertStringContainsString('legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capitalize;}', $css);
-        foreach (['app/views/products/supplier_price_edit.php', 'app/views/products/market_prices.php'] as $view) {
-            self::assertStringContainsString('<legend class="legend-sentence">Prices by thickness (₹) — enter any one; the others are worked out. Change any of them if the supplier quoted it.</legend>', self::read($view));
-        }
+        // D-335: the supplier price page shows the thickness prices as the price card; the add form keeps a sentence-case legend.
+        self::assertStringContainsString('<legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>', self::read('app/views/products/market_prices.php'));
+        self::assertStringContainsString('<legend class="legend-sentence">Base for orders</legend>', self::read('app/views/products/_price_add.php'));
         self::assertStringContainsString('<legend class="legend-sentence">CHA + transport (one price per container)</legend>', self::read('app/views/products/_cha_transport.php'));
     }
 
