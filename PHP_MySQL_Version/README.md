@@ -201,6 +201,73 @@ correctly once the password is changed.
    (with **Apply recommended**). Enter the real values on **Settings ›
    Company** (Unlock on the protected rows) until every item is Done; the
    placeholders print on the documents until then.
+
+   **Set the company's real details by SQL (alternative to Settings ›
+   Company, 11 Nov 2026).** If you prefer to enter everything at once, run
+   this block once, right after the founder block above, as the database
+   admin user. In parts A to D replace **every value between quotes**; keep
+   each `setting_key` exactly as it is. In part E replace only the
+   **second** value of each `REPLACE(...)` (the first one is the placeholder
+   being looked for), using the same numbers as in B and C. Lines for things
+   you don't have (ECGC) can stay commented out. Parts A to D are safe to run
+   again to correct a typo; part E finds nothing the second time, so correct
+   a checklist typo on the Reference library page. Part E
+   puts the same numbers into the staff checklists (Help & SOP › Reference
+   library: the PI, CI and stage-gate checklists), which quote the LUT and
+   bank details.
+   ```sql
+   -- A. Company identity (where it prints: the header of every document)
+   UPDATE company_settings SET setting_value = 'Real corporate office address, City – PIN, India' WHERE setting_key = 'corporate_office';   -- same as registered office if there is only one
+   UPDATE company_settings SET setting_value = 'REAL-GSTIN-15-CHARS'      WHERE setting_key = 'gstin';      -- 15 characters, starts with the state code (29 = Karnataka)
+   UPDATE company_settings SET setting_value = 'REAL-IEC-OR-PAN'          WHERE setting_key = 'iec_pan';    -- 10 characters
+   UPDATE company_settings SET setting_value = 'Real Director Name'       WHERE setting_key = 'director_name';  -- only if a director signs any document
+
+   -- B. Bank details (where they print: PI, OC and CI bank section; buyers wire money to these)
+   UPDATE company_settings SET setting_value = 'Real bank name'           WHERE setting_key = 'bank_name';
+   UPDATE company_settings SET setting_value = 'Real branch name'         WHERE setting_key = 'bank_branch';
+   UPDATE company_settings SET setting_value = 'REAL-ACCOUNT-NUMBER'      WHERE setting_key = 'bank_account_no';
+   UPDATE company_settings SET setting_value = 'REALSWIFTXXX'             WHERE setting_key = 'swift_bic';  -- 8 or 11 characters
+   UPDATE company_settings SET setting_value = 'REALIFSC000'              WHERE setting_key = 'ifsc';       -- 11 characters
+   UPDATE company_settings SET setting_value = 'Real bank branch address, City – PIN, India' WHERE setting_key = 'bank_address';
+   UPDATE company_settings SET setting_value = 'REAL-PIN'                 WHERE setting_key = 'bank_pincode';  -- 6 digits
+
+   -- C. LUT and RCMC (where they print: PI and CI GST declaration, COO prep sheet; alerts before expiry)
+   UPDATE company_settings SET setting_value = 'REAL-LUT-ARN'             WHERE setting_key = 'lut_number';
+   UPDATE company_settings SET setting_value = 'FY 2026-27'               WHERE setting_key = 'lut_valid_fy';
+   UPDATE company_settings SET setting_value = '2027-03-31'               WHERE setting_key = 'lut_expiry_date';   -- YYYY-MM-DD
+   UPDATE company_settings SET setting_value = 'REAL-RCMC-NUMBER'         WHERE setting_key = 'rcmc_number';
+   UPDATE company_settings SET setting_value = '2027-03-31'               WHERE setting_key = 'rcmc_valid_until';  -- YYYY-MM-DD
+
+   -- D. ECGC policy (optional; leave commented out if there is no policy)
+   -- UPDATE company_settings SET setting_value = 'REAL-ECGC-POLICY-NO' WHERE setting_key = 'ecgc_policy_no';
+   -- UPDATE company_settings SET setting_value = '2027-03-31'          WHERE setting_key = 'ecgc_policy_valid_to';   -- YYYY-MM-DD
+
+   -- E. The same LUT and bank numbers inside the staff checklists (Reference library)
+   UPDATE internal_reference_docs SET content = REPLACE(content, 'AD000000000000X', 'REAL-LUT-ARN')              WHERE content LIKE '%AD000000000000X%';
+   UPDATE internal_reference_docs SET content = REPLACE(content, 'Account No. 000000000000', 'Account No. REAL-ACCOUNT-NUMBER') WHERE content LIKE '%Account No. 000000000000%';
+   UPDATE internal_reference_docs SET content = REPLACE(content, 'SWIFT XXXXINXXXXX', 'SWIFT REALSWIFTXXX')       WHERE content LIKE '%SWIFT XXXXINXXXXX%';
+   UPDATE internal_reference_docs SET content = REPLACE(content, 'IFSC XXXX0000000', 'IFSC REALIFSC000')          WHERE content LIKE '%IFSC XXXX0000000%';
+   UPDATE internal_reference_docs SET content = REPLACE(content, 'Pincode 000000', 'Pincode REAL-PIN')            WHERE content LIKE '%Pincode 000000%';
+
+   -- Check: every line below must show your real value, and the last query must return 0.
+   SELECT setting_key, setting_value FROM company_settings
+    WHERE setting_key IN ('legal_name','registered_office','corporate_office','gstin','iec_pan','md_name','director_name','phone','email',
+                          'bank_name','bank_branch','bank_account_no','swift_bic','ifsc','bank_address','bank_pincode',
+                          'lut_number','lut_valid_fy','lut_expiry_date','rcmc_number','rcmc_valid_until','ecgc_policy_no','ecgc_policy_valid_to');
+   SELECT COUNT(*) AS placeholders_left FROM internal_reference_docs
+    WHERE content LIKE '%AD000000000000X%' OR content LIKE '%Account No. 000000000000%' OR content LIKE '%XXXXINXXXXX%'
+       OR content LIKE '%XXXX0000000%' OR content LIKE '%Pincode 000000%';
+   ```
+   Then open **Settings › Setup checklist**: *Company identity*, *Bank
+   details, GSTIN and IEC / PAN* and *LUT and RCMC* should now show
+   **Done**. Generate one draft PI and check the header, the bank section
+   and the LUT line before any document goes to a buyer. The real values are
+   typed only on the live server, never into a file in the repository
+   (no-PII rule). **Order of the install SQL:** (1) `schema.sql`, (2)
+   `seed.sql`, (3) the three storage-path `UPDATE`s, (4) the founder block
+   (real logins, names, phone, e-mail, registered office), (5) this block.
+   An existing live database already has its real values: the 11 Nov
+   upgrade files keep them, so do **not** run this block there.
 3. **Environment file.** Copy `app/.env.example` to `app/.env` and fill in:
    DB credentials, `STORAGE_BASE_PATH` (absolute path to the `storage/`
    folder in this project), and SMTP details when you have them. Leave the
@@ -935,6 +1002,10 @@ names, phone, e-mail and registered office. Enter the real values at installatio
 checklist** (`/admin/setup-checklist`) shows each group as **Needed** with a link to **Settings › Company**
 (Unlock on the protected rows) until it is done. Still to do on the live install (also in
 `docs/guides/GO_LIVE_CHECKLIST.md`):
+
+**Where to enter them:** on **Settings › Company**, or all at once with the "Set the company's real details by
+SQL" block in "First-time setup" above (right after the founder block). It also puts the real LUT and bank numbers
+into the staff checklists and ends with a check query. Not for the existing live database.
 
 - **Logins:** the two seeded Super Admin accounts share the password `ChangeMe#2026`; each must set a new one
   at first login (forced). Deactivate the second one if it is not needed.
