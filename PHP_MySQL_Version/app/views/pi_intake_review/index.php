@@ -11,7 +11,7 @@
       <?php foreach ($pending as $s): ?>
       <tr>
         <td><a href="/orders/<?= (int) $s['order_id'] ?>"><?= htmlspecialchars($s['order_reference']) ?></a></td>
-        <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars($s['contact_person']) ?> · <?= htmlspecialchars($s['email']) ?></span></td>
+        <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars((string) ($s['contact_person'] ?? '')) ?> · <?= htmlspecialchars((string) ($s['email'] ?? '')) ?></span></td>
         <td><?= htmlspecialchars((string) $s['consignee_name']) ?><br><span class="muted small">Notify: <?= htmlspecialchars((string) ($s['notify_party'] ?: '—')) ?></span></td>
         <td>
           <span class="muted small">Incoterm: <?= htmlspecialchars((string) $s['incoterm_confirmed']) ?></span><br>
