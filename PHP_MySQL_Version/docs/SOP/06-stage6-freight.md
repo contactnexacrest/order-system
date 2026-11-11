@@ -82,7 +82,7 @@ is internal record-keeping only and doesn't pass any gate. **Generate
 Debit Note** (9b) then produces the FDN — the actual invoice sent to the
 buyer for these charges. Take it through [Document Review &
 Approval](./13-document-review-approval.md): 9d is refused until the Debit
-Note is approved (email sending off) or sent (email sending on).
+Note is approved (buyer e-mails held) or sent (buyer e-mails sent).
 
 The Debit Note itself states payment is due within **3 Calendar Days**
 of its own date (previously "3 working days" — every buyer payment

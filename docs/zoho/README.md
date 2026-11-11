@@ -6,7 +6,7 @@
 - **API call limits (owner decision 2 Nov 2026, D-239).** Zoho limits API
   calls per organisation (about 100 a minute and a daily number by plan),
   shared by every Zoho app and integration of the company. This app keeps to
-  its own share — Admin → Settings → Zoho Books: `zoho_api_daily_limit`
+  its own share — Settings › Zoho: `zoho_api_daily_limit`
   (800) and `zoho_api_minute_limit` (30) — counts every call it makes, stops
   a sync at once when Zoho answers "too many requests", and shares one
   access token between all its processes. Usage is on the app's Zoho Books
@@ -50,8 +50,15 @@
   abroad says "SWIFT ref" (not "UTR"), and the journal uses the buyer inquiry ref
   like the bill and payment. All test records deleted.
   Before go-live the CA
-  creates the expense account and its id is entered in Associates › Commission
-  settings.
+  creates the expense account and its id is entered in Associates › Commission › Commission settings and ladder.
+- **Failure e-mails and menus (11 Nov 2026, D-280, D-320).** The e-mail sent when a
+  sync run has failures is the "Zoho sync failures" row of Settings › E-mail (on by
+  default; Testing mode does not hold it, as it goes to staff). The Zoho pages are
+  Finance & accounts › Zoho sync (with the "waiting for Zoho" count beside Finance &
+  accounts in the left menu) and Settings › Zoho. A supplier's bank details change
+  on the supplier record only after the supplier confirmed them and staff verified
+  them (D-294). Nothing was changed in Zoho for the 11 Nov build, so the change log
+  has no new rows.
 - **Before go-live: remove the TEST records (checked 6 Nov 2026).** 48 rows of
   `zoho-change-log.csv` are marked "must be removed before go-live" and have no
   "removed on" date yet: Z-629–Z-641 (owner test matrix, 31 Oct), Z-648–Z-654,

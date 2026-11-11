@@ -45,7 +45,7 @@ reference number. This chapter covers the CA-module screen.
 
 **CA / Accounting → Government Export Benefits → Record a Claim.** Choose
 the scheme (RODTEP is the default; Admin can add more schemes under
-Settings → Dropdown Options → `export_benefit_scheme`), optionally the
+Settings › Lists › Dropdown lists → `export_benefit_scheme`), optionally the
 order it relates to (type the order reference — a claim doesn't have to
 be tied to one order), the shipping bill/scroll number if you have it,
 the amount claimed and the claim date. **Benefits are always in INR**

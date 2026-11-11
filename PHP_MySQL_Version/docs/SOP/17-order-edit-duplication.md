@@ -84,7 +84,7 @@ on a locked order has always worked.
 
 ## Editing Order Details
 
-**Edit Order Details**, linked from the order page, opens a form with
+**Edit Order Details** — the **Edit order** button in the action bar at the top of the order page (D-321) — opens a form with
 every core field pre-filled. Before Stage 4 it saves immediately; from
 Stage 4 on, the same form appears with a warning banner and a required
 Reason field, and the button relabels to "Override & Save" so it's never

@@ -6514,6 +6514,8 @@ CREATE TABLE fx_rates (
   decision_reason VARCHAR(255) NULL,
   UNIQUE KEY uq_fx_rates_date (rate_date),
   CONSTRAINT fk_fx_rates_decided_by FOREIGN KEY (decided_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ================================================================
 -- Owner decision D-310 (point 27, 11 Nov 2026): a payment that came in short
 -- waits for a manager with "Approve short payment" — filed when the person

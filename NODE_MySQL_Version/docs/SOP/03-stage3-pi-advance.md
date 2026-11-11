@@ -97,9 +97,9 @@ parts behind the scenes.
 
 This step is **entirely optional and never blocks anything** — staff can
 generate the PI without it ever being sent or completed. When a submission
-does come back, it lands in **Operations → PI Intake Review**
+does come back, it lands in **Orders › PI-stage details**
 (`/pi-intake-review`), separate from the Quotation-stage queue — each has
-its own live count badge on its own sidebar link, so the two never get
+its own live count on its own Orders menu-bar item (PI-stage details), so the two never get
 confused with each other — where staff either:
 
 - **Accept** — this is the authoritative correction point for the client's
@@ -130,8 +130,7 @@ confused with each other — where staff either:
 In **Step 5c**, click **Generate Proforma Invoice** (PDF always; tick DOCX
 for an editable copy). Generating the PI **does not pass Stage 3's gate** —
 the gating action here is a payment event (5e). But 5e is refused until the
-PI is **approved** (email sending off) or **sent** to the buyer (email
-sending on), so take it through
+PI is **approved** (buyer e-mails held) or **sent** to the buyer (buyer e-mails sent), so take it through
 [Document Review & Approval](./13-document-review-approval.md) first.
 
 ### Price check before the PI (owner decision D-245 P2, 4 Nov 2026)
@@ -206,8 +205,7 @@ with money that's actually landed:
    can't flow into the Order Confirmation. The reason is a **drop-down of
    the usual reasons** (e.g. *Intermediary / correspondent bank charges
    deducted*, *Buyer deducted an agreed discount*, *Buyer paid extra —
-   adjust against balance*), kept by Admin under **Settings → Remittance
-   difference reasons** (Stage 15 SOP). Only the reasons that fit the
+   adjust against balance*), kept by Admin under **Settings › Lists › Remittance difference reasons** (Stage 15 SOP). Only the reasons that fit the
    amount typed are offered — less than due: bank-charges and
    buyer-paid-less reasons; more than due: buyer-paid-more reasons — and
    the server checks the same. When none fits, choose **"Other — type the
@@ -318,8 +316,7 @@ with money that's actually landed:
    Director) can clear it short, writing the reason (10–500 characters).
    A manager who recorded the receipts themselves is refused ("You recorded
    this payment's receipts, so a different manager with "Approve short
-   payment" must clear it short.") unless their role is ticked in Admin →
-   Self-approval rules (default MD and ED; QA Round 8, R8-N09).
+   payment" must clear it short.") unless their role is ticked in Users & roles › Self-approval rules (default MD and ED; QA Round 8, R8-N09).
    The shortfall is recorded and shown on the order with the reason and
    who approved it: on the advance it is **carried into the balance** (the
    balance is always the order value less the advance actually received);

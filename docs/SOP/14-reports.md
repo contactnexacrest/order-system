@@ -97,7 +97,7 @@ Everything starts from the **Reports** hub:
 - **Freight Cost Report** — confirmed freight/insurance terms and
   invoiced freight, by forwarder, filtered by order creation date. It needs
   only **See logistics costs**, so Logistics opens it from
-  **Insights → Freight Cost Report** without the Reports page (owner
+  **Reports › Freight cost** without the Reports page (owner
   decision 1 Nov 2026).
 - **Product Sales Report** — which products / HS codes drive FOB value,
   highest first, filtered by order creation date.
@@ -106,7 +106,7 @@ Everything starts from the **Reports** hub:
   the PO's required delivery date). Supplier identity is buying-side
   information: the report needs **See purchase prices** (Procurement,
   Accounts & Finance, MD/ED) and is hidden from Sales (owner decision
-  1 Nov 2026). Procurement opens it from **Insights → Supplier Report**.
+  1 Nov 2026). Procurement opens it from **Reports › Supplier report**.
 - **Order Profitability** — revenue, total cost, profit and margin % per
   order for any date range, with a totals row. Visible only to Super
   Admin and roles granted **Manage order financials**; see [Order
@@ -119,7 +119,7 @@ Everything starts from the **Reports** hub:
   per financial year: performance per associate (clients, orders, FOB
   value, commission paid, TDS, waiting), commission waiting (ageing, with
   holds) and the TDS register; each as CSV. Needs **Manage associates**;
-  opened from **Associates → Report**. See [Chapter 24](./24-associates.md).
+  opened from **Associates › Report**. See [Chapter 24](./24-associates.md).
 - **Associate TDS register** (`/associates/tds`, D-235, 2 Nov 2026) — TDS
   deducted on associate commission by financial year and quarter (gross,
   TDS, section and rate, net, challan no. and date, Form 16A uploaded);

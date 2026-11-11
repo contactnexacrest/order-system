@@ -64,7 +64,7 @@ which must be on before the "Log in as this client" button even appears:
 2. **A per-client toggle**, set on that client's own staff-side page
    ("Client Portal Access" section) — whether *this specific client* may
    ever be impersonated. Off by default for every client.
-3. **A global kill switch** (Settings → `client_impersonation_enabled`) —
+3. **A global kill switch** (Settings › Company → `client_impersonation_enabled`) —
    off by default. With this off, the feature is unavailable for every
    client, no matter what permission a staff member holds or what any
    individual client's own toggle says.
@@ -90,7 +90,7 @@ changing a client's own toggle is logged as
 `CLIENT_IMPERSONATION_ALLOWED_CHANGED`. While impersonating, a staff member
 can do anything the client themselves could do in the portal — download
 documents, acknowledge the OC, upload the signed Buyer PO, self-report a
-payment, raise a dispute, request a reorder — with one exception: changing
+payment, ask to cancel the order (a dispute, when switched on), request a reorder — with one exception: changing
 the client's own portal password still requires their current password
 (see below), so impersonation on its own cannot be used to take over or
 lock out a real client login.
@@ -135,7 +135,7 @@ has always shown the full history. This is configurable with the same
 two-level pattern as "Log in as this client" above, just without a
 permission gate, since it isn't a security-sensitive action:
 
-1. **A global default** (Settings → `client_portal_show_order_history`)
+1. **A global default** (Settings › Company → `client_portal_show_order_history`)
    — on by default. Off = every client's dashboard shows active/disputed
    orders only, unless overridden per client (below).
 2. **A per-client override**, set on that client's own staff-side page
@@ -155,7 +155,7 @@ override is logged (`CLIENT_ORDER_HISTORY_VISIBILITY_CHANGED`).
 Whether the client sees the **Documents** section (and can download their
 order's PDFs) in the portal works the same two-level way:
 
-1. **A global default** (Settings → `client_portal_show_document_downloads`)
+1. **A global default** (Settings › Company → `client_portal_show_document_downloads`)
    — on by default.
 2. **A per-client override** on the client's staff-side page ("Client
    Portal Access" section, **Document downloads visible to this client in

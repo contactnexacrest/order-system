@@ -72,6 +72,59 @@ About 24 roles, one part per role or close pair, 8–12 minutes each; listed in 
 | E02 | `E02-Divisions-Import-And-Distribution.mp4` | IMP: import, customs duty, landed cost, stock, local sale | not started |
 | E03 | `E03-Divisions-Merchant-Trade.mp4` | MTT: buy abroad, sell abroad, both legs in foreign currency; plus Admin › Divisions activation checklist | not started |
 
+## Out of date after the 11 Nov 2026 build — waiting for the owner's decision
+
+Written 11 Nov 2026, after the owner-approved build of D-268, D-269 and D-270 – D-330 (register rows of
+11 Nov 2026). **No video and no script was changed or re-recorded.** Videos stay stopped (owner, 11 Nov
+2026) until all the discussed work is done; then, as the video rule requires, the owner decides per
+video whether to re-record. The recorded videos below still play, but each shows screens, words or
+steps that the app no longer has. Checked against the app's views of 11 Nov 2026 (PHP; the Node views
+say the same).
+
+**Changes that touch many videos**
+
+- **Menus (D-320 – D-322):** the left menu went from about 60 entries to 13 (Dashboard, Approvals (n),
+  My tasks (n) · Orders, Clients, Associates, Products, Procurement & suppliers, Finance & accounts ·
+  Reports · Help & SOP · Users & roles, Settings); every section has a menu bar; the order page has a
+  sticky action bar (Edit order · Documents · Full report · Duplicate order · More). "Admin › …" paths
+  said in narration are now "Users & roles › …" or "Settings › …".
+- **Approvals (D-310):** one Approvals page (tabs Prices · Payment terms · Documents · E-mails · Bank
+  details · Other) replaces the separate sidebar items My Reviews and Email Approvals; approvers see
+  "Waiting for your approval …" on the order page.
+- **E-mail (D-280):** "e-mail sending on / off" is now Testing mode and one switch per e-mail on
+  Settings › E-mail; screens never say "e-mailed" when nothing was sent and show a Copy link.
+- **Plain language (D-330):** 190 rewrites of what buyers, associates and suppliers read, buyer stage
+  names, e-mail texts.
+- **Login code screen (D-283):** the tick is now "This is my own office computer"; a "Stay logged in"
+  popup comes 2 minutes before an idle logout.
+
+| Video | What no longer matches (screens, wording, numbers, steps) | Script labels / selectors that changed |
+|---|---|---|
+| A01 Everyone in ten minutes | The left-menu tour (13 entries now, section menu bars), Help links (Getting Started and SOP are now under **Help & SOP**), "Admin › SOP access" (now Users & roles › SOP access), the login-code screen tick, the Approvals entry and counts. | `header.sidebar a[href=…]` for the Help links (the left menu now links the section's first page); narration "Admin › SOP access". |
+| A02-1 One order, enquiry to confirmation | Old menus; order page without the action bar and with the old products section (now a compact table with a side panel, D-273); quoting in any unit with piece size (D-270); My Reviews (now Approvals › Documents); the price check now waits on the Approvals page; buyer's portal: "Order Confirmation — Your Acknowledgement Needed" is now **"Please confirm your order"** and the button **"Yes, this is correct — please go ahead"**; buyer stage names. | `name: 'I acknowledge and confirm to proceed'` (narration "I acknowledge"); `#step-products input[name*=…]` (products section rebuilt); caption "My Reviews". |
+| A02-2 One order, factory to closure | The associate's commission card: payout now on the last day of the month (not the 5th); associate order wording "Fixed — due …, paid in the … payout run" changed with the new statuses ("Earned — will be paid on <date>" …); menus. | — (no changed label found) |
+| B01-1 / B01-2 Export Executive | Old menus (Quotation Intake Review is Orders › Quotation requests; sidebar badges), Dashboard tiles (Approvals), order action bar, compact products table and side panel, units and piece size on New Order and the order page, "sent (mail off)" wording (now "document e-mails to the buyer are held"), Order Communication note (D-268 now gives the true reason), Recent Activity (D-268: only the person's own orders), "Pick from Products" now a button above the options (D-268), My Tasks for staff without a department (D-268). | `select.product-picker` and `#step-products …` (New Order / products section rebuilt); captions "My Approvals", "My Reviews · Approve". |
+| B02 Sales Manager and Director | My Reviews and Email Approvals "in the sidebar" (now Approvals › Documents / E-mails, with counts on Approvals); "Admin › Self-approval rules" (Users & roles); the MD's line-price approval now listed on Approvals › Prices with the order-page bar and the requester's "Sent to the MD … waiting"; "mail sending on" wording; D-269 fixes (payment-terms approver wording, Buyer PO note on cancelled or lost orders, Staff Productivity, cockpit shows every department, reason hint only on error); catalogue columns "Staff lowest" / "Your lowest" (D-305). | `locator('nav, aside').getByRole('link', { name: /Email Approvals/ })`; caption/narration "My Reviews … in the sidebar", "Admin › Self-approval rules". |
+| C01 Associate welcome | Home and Commission pages: associates now see only their current % ("x% of the FOB value of each order from the clients you introduced"), the 4-step "How it works" and the new statuses — never levels or the ladder (D-292); payout on the last day of the month; the login page has "Forgot password?" (D-282); the bank-confirmation bar when a change waits (D-293); 70 associate wording rewrites (D-330). | — (narration) |
+| C02 Becoming an associate | Accepting a registration sends the set-password e-mail and shows the link with Copy (D-282); the associate page has three blocks; KYC: document type first, number 5–30 characters, **ID proof and Address proof are separate items** (D-290); bank: the associate confirms new details (last 4 digits + e-mailed code), then **one** staff member who did not enter them verifies with at least 2 "how I checked" ticks — no longer "bank check (MD) + verify (ED)" (D-293). | `name: 'Send portal login link'` (now **"Send set-password link"**); `name: 'Send for checking'` (now **"Send — then confirm with the e-mailed code"**); `name: 'First check'` and `'Verify (second person)'` appear only with the setting "Two people" (default is one person). |
+| C03 Starter level and first client | Commission states now read "Not earned yet — buyer still paying" / "Earned — will be paid on <date>" / "Paid on <date> (ref)" / "On hold — a buyer claim on this order is open"; associate wording (D-330); quotation requests on Orders › Quotation requests. | — (narration; on-screen text) |
+| C04 Prices, requests and levels | Associates see no prices in the catalogue; Get price gives their own quote and lowest (7 days) (D-305); the MD's screens for levels moved (Associates › Commission ▾); Products menu bar. | — |
+| C05 Commission, statements and tax | "Basis = invoiced FOB of goods" is now worded "FOB value"; payout day "last day of the month" (Sunday / holiday → the working day before) instead of the 5th; the new commission statuses; associates no longer see level or ladder; MD's commission rule (standard ladder / own ladder / fixed, with a reason) (D-291). | — |
+| C06 Messages, changes, privacy, FAQ | Notices and e-mails reworded (D-330) and now sent according to Settings › E-mail (D-280); bank change confirmation and "This is not me" (D-293); address-proof grace (60 days) (D-290); FAQ answers on payout day and what associates see. | — |
+| D01 From enquiry to proforma | Quotation request form, Buyer Action Link page and PI details form reworded (D-330); e-mail cards show the old texts ("Buyer Inquiry Ref" is now "your enquiry reference"; buyer action link and PI form link subjects changed). | `name: 'Submit PI Details'` (now **"Send my details"**). |
+| D02 Paying and your login | Payment Action Link and portal: "UTR" is now **"Bank reference number (transaction ID, UTR or SWIFT reference)"**; the portal invite e-mail (works once, gives the permanent login page) and the password-reset e-mail are reworded; the login-code e-mail has its own buyer wording; a buyer is signed out after 2 hours idle with a "Stay logged in" warning (D-283). | — (labels clicked still exist) |
+| D03 Inside your order | My Orders: "View documents" is now **"Open order"**, the group "Lost" is now **"Did not go ahead"**; the acknowledgement box and button reworded (as in A02-1); "Buyer PO" is now **"Your purchase order"**; buyer stage names (Quotation / Order confirmed / In production / Shipping / Shipped). | `name: 'View documents'`; `hasText: 'Your Acknowledgement Needed'`; `name: 'I acknowledge and confirm to proceed'`; `hasText: 'Buyer PO'`; `group(d, 'Lost')`. |
+| D04 Balance, shipping and closing | E-mail cards: the freight Debit Note subject is now "Freight bill (debit note) … — please pay before we ship", BL copy, balance received and shipment-readiness texts reworded; Report a Payment field "UTR" → bank reference wording; buyer stage names. | — (labels clicked still exist) |
+| D05 When something goes wrong | "Raise a Dispute" is now **"Ask to cancel this order"** (portal heading and button; the staff tick reads "Show 'Ask to cancel this order' (dispute) button"); "Report a Process Issue" is now **"Tell us what we could do better"** (button "Report This Issue" unchanged); "Lost" → "Did not go ahead"; "Buyer PO" → "Your purchase order"; "View documents" → "Open order"; on the staff client page "Log in as" and the portal login moved into the new **Client portal login** block (D-282). | `section(d, 'Raise a Dispute')` and `name: 'Raise a Dispute'`; `section(d, 'Report a Process Issue')`; `section(d, 'Lost')`; `section(d, 'Buyer PO')`; `name: 'View documents'`; `section(d, 'Client Portal Access')` (the Log-in-as part moved). |
+
+Not affected as far as checked: none of the recorded videos is fully unaffected — every one shows the old
+left menu or reworded text somewhere. B03 – B11 and Group E were not started; their scripts are to be
+written against the new menus.
+
+**Decision needed from the owner:** which of the 17 recorded videos (A01, A02-1, A02-2, B01-1, B01-2, B02,
+C01 – C06, D01 – D05) to re-record, and in what order, once the videos may restart. Re-recorded videos are
+sent as replacements and marked here.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

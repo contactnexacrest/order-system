@@ -65,8 +65,8 @@ Step 4 on the order page has four sub-steps, done in order:
    While a copy is required (see the wet-signature gate below) this
    sub-step shows "Attach the buyer's signed PO copy in Step 4c first"
    instead of the form until one is on file. It is also refused until the
-   Buyer PO document from 4a is **approved** (email sending off) or
-   **sent** to the buyer (email sending on) — the message names it if not.
+   Buyer PO document from 4a is **approved** (buyer e-mails held) or
+   **sent** to the buyer (buyer e-mails sent) — the message names it if not.
 
 > **Common confusion this causes:** if staff attach the buyer's PO copy but
 > never separately type the reference number into "Confirm Buyer PO
@@ -77,7 +77,7 @@ Step 4 on the order page has four sub-steps, done in order:
 > in that situation, precisely so this half-done state is visible rather
 > than looking like nothing happened at all.
 
-> **Wet-signature gate:** by default (**Admin & Settings → the
+> **Wet-signature gate:** by default (**Settings › Company → the
 > `wet_signature_required_buyer_po` toggle**, on unless an Admin has
 > turned it off), typing the reference number alone is **not** enough —
 > "Confirm Buyer PO Received" (4d) is refused until at least one file is

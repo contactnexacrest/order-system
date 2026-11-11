@@ -6,7 +6,7 @@ A Super Admin (or a role granted the `data_export_run` permission — by
 default Admin, Managing Director and Executive Director; **not** the System
 Administrator, which handles no business money, owner decision 1 Nov 2026)
 can download a real, live snapshot of the entire application database from
-**Admin → Data Export / Migration** — as two separate `.sql` files — so a
+**Settings › Data export** — as two separate `.sql` files — so a
 fresh reinstall never loses years of historical records.
 
 ## Why this exists

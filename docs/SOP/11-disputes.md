@@ -53,7 +53,7 @@ screen at all; what's shown on it (the Log Dispute form, Status/Attach
 Document controls) depends on which of the two permissions you actually
 have.
 
-Either permission also opens the **Disputes** list in the sidebar (owner
+Either permission also opens the **Disputes** list (Orders menu bar) (owner
 decision 2026-10-30, QA Round 6 Q-R6-3). The list, like every dispute
 page, shows only disputes on orders you may open: orders assigned to you,
 or every order if you hold **View all orders** — archived orders only with

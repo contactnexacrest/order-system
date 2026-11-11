@@ -11,13 +11,13 @@ and bring the certificates back onto the order. (Owner decision D-226,
 ## 1. Roles
 
 Like Procurement, Logistics and Finance, the department has a ladder of
-three designations, each with its own role. Admin → Departments assigns
+three designations, each with its own role. Users & roles › Departments assigns
 people to them; **Log in as** switches into the department like any other.
 
 | Designation | What it adds |
 |---|---|
 | **Export Compliance Executive** | Works the orders assigned to them: the compliance checklist, the COO Prep Sheet, export benefit eligibility and claims, government documents on the order, their own task list. |
-| **Export Compliance Manager** | Everything above on **every** order; picks the department's owner for an order; reviews and approves the department's documents; edits the list of compliance tasks (Admin → Compliance task types). |
+| **Export Compliance Manager** | Everything above on **every** order; picks the department's owner for an order; reviews and approves the department's documents; edits the list of compliance tasks (Settings › Lists › Compliance task types). |
 | **Export Compliance Director** | Everything the Manager has, plus the management cockpit. |
 
 ## 2. What they see — and what they never see
@@ -44,7 +44,7 @@ themselves — nothing to hand over by hand:
 | File the export benefit claim | The order is complete, the balance remittance has landed and an eligible scheme has no claim yet | Order page → **Step 13g** → *File a claim* |
 | Get the eBRC / FIRC from the bank | An advance or balance payment has cleared and its FIRC / eBRC reference is not recorded yet | Ask the bank; give the reference to Accounts, who record it in the CA module |
 
-Each task has standard days and escalation days (Admin → Task due days),
+Each task has standard days and escalation days (Users & roles › Task due days),
 like every other department's.
 
 ## 4. On the order page
@@ -64,7 +64,7 @@ like every other department's.
   certificates, the eBRC … with a clear title. Removing an attached file
   stays with *Manage orders*.
 
-## 5. Permissions (Admin → Roles & Permissions)
+## 5. Permissions (Users & roles › Roles and permissions)
 
 | Permission | Meaning |
 |---|---|
@@ -89,7 +89,7 @@ prices* only.
 **ECGC credit limit (buyer page → "ECGC credit limit").** Record the limit ECGC
 approved for the buyer: amount and currency, approved on, valid until, the ECGC
 reference and the approval letter. The company's own ECGC policy (number, cover
-%, valid until, the declaration day) is in **Admin → Company Settings →
+%, valid until, the declaration day) is in **Settings › Company →
 compliance**. The buyer page and the order page compare the limit with the
 buyer's open orders (order value not yet received) and warn when:
 
@@ -117,7 +117,7 @@ Accounts, who record it.
 **Incentive claims (order page → "Incentive claims — tracking").** Each claim
 shows claimed, **sanctioned** and received amounts, the **claim deadline** and
 a **status** (Filed / Sanctioned / Received / Rejected). The deadline defaults
-from Admin → Company Settings per scheme, counted from the shipping bill date
+from Settings › Company per scheme, counted from the shipping bill date
 (RoDTEP and RoSCTL 365 days; Duty Drawback none, as it is paid through the
 shipping bill) — **to be confirmed with the CA**; change it on the claim when
 the scheme says otherwise. Reminders go out 30 and 7 days before the deadline.

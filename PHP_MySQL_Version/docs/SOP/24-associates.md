@@ -51,14 +51,14 @@ the same links, filters and actions, and switch to each other.
    signed agreement (PDF, with its signing date).
 2. **Commission** (owner decision D-245 P3). Choose **Ladder** (the
    level follows the associate's counting orders) or **Fixed level** (one
-   of the levels in Admin → Pricing → Commission levels, e.g. 5 %). There
+   of the levels in Associates › Commission › Commission levels, e.g. 5 %). There
    are no per-associate rates any more. Tick **No commission** for an
    associate who introduces without commission.
 3. The associate starts as **Invited**. Upload their KYC (PAN card, ID,
    address proof, GST certificate; abroad: passport / company registration,
    tax residency certificate, Form 10F, no-PE declaration) under
    **Documents**, or the associate uploads it in the portal.
-4. Bank details are checked by two people (below). Only then can the
+4. Bank details are confirmed by the associate in the portal and checked by one staff member who did not enter them (below; two people if Associates › Commission settings says so). Only then can the
    associate be set **Active** (Change status, with a reason).
 5. **Send portal access**: the associate gets an e-mail with a link to set
    their password (valid 72 hours) and their personal code is made.
@@ -84,7 +84,7 @@ the same links, filters and actions, and switch to each other.
 
 ### Commission settings (Admin)
 
-**Associates → Commission settings** (`/associates/ladder`). The MD
+**Associates › Commission › Commission settings and ladder** (`/associates/ladder`). The MD
 (permission `manage_pricing`) sets, and every change is in the audit log:
 - **Days after full payment** before commission is due (default 30).
 - **Payment run** (D-292, 11 Nov 2026): monthly on the 1st–28th or the
@@ -125,7 +125,7 @@ One person (default; not the one who entered them) or Two people; the wait
 before a **first** bank account is used (default 0 days) and before a
 **changed** account is used (default 15 days), each 0–90. The other fields
 are shown to them read-only. The levels themselves and the standard ladder
-are in **Admin → Pricing → Commission levels**.
+are in **Associates › Commission › Commission levels**.
 
 ### Commission rule per associate (owner decisions 11 Nov 2026, D-291 / D-292)
 
@@ -347,15 +347,14 @@ sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer
 charges ₹1,850.00". It is a company cost of the month: the order keeps the
 fixed commission. It goes to Zoho Books at the next sync as one journal
 (*Associate payout costs* debited, the bank credited; a saving the other way
-round), once the MD has entered the Zoho account under Associates › Commission
-settings → *Zoho account for associate payout costs*; until then the payouts
+round), once the MD has entered the Zoho account under Associates › Commission › Commission settings and ladder → *Zoho account for associate payout costs*; until then the payouts
 page and the Sync Log say it is waiting. **Mark all paid** skips
 payouts to associates abroad — record each with its rupees debited.
 
 ### TDS on associate commission (owner decision 2 Nov 2026, D-235)
 
 The app works out the TDS on each associate payment, so Accounts never has
-to guess. Every value is in **Settings → Associate TDS** (Manage company
+to guess. Every value is in **Settings › Lists › Associate TDS rules** (Manage company
 settings; every change needs a reason and is audited) and can be changed on
 the CA's advice — payments already recorded keep the TDS they were paid with.
 
@@ -387,7 +386,7 @@ the CA's advice — payments already recorded keep the TDS they were paid with.
   more than the commission.
 - **The order's cost** is the gross commission (TDS included).
 - **Deposit and returns.** Deposit each month's TDS by the **7th of the next
-  month** (challan 281) and enter the challan no. and date in **Associates →
+  month** (challan 281) and enter the challan no. and date in **Associates ›
   TDS register** (`/associates/tds`, by financial-year quarter, CSV). File
   **Form 26Q** after each quarter (by 31 Jul, 31 Oct, 31 Jan, 31 May) and
   upload each associate's **Form 16A** on their Documents tab — they see it
@@ -409,7 +408,7 @@ applied to it. Wording (rule D-212):
   gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR
   <UTR> · against bill <no.>"
 
-With a **Zoho Books TDS tax id** in Settings → Associate TDS, the bill
+With a **Zoho Books TDS tax id** in Settings › Lists › Associate TDS rules, the bill
 carries the TDS through Zoho's TDS feature and the payment is the net. Left
 blank (the default), the bill is the gross, the payment the net, and the
 TDS stays open on the bill for the CA to book against TDS payable — the
@@ -449,7 +448,7 @@ confirms → staff verify → wait**.
   reference). A note is optional. With the setting **Two people**: a first
   check (with the ticks), then Verify by a different person.
 - **MD and ED may verify details they entered themselves**, with a reason
-  (Admin › Self-approval rules › Bank details). Everyone else sees "Someone
+  (Users & roles › Self-approval rules › Bank details). Everyone else sees "Someone
   else must verify details you entered."
 - Then the account is used after the waiting days: a **first** account at
   once (0 days), a **changed** account after 15 days (both settings 0–90).
@@ -476,7 +475,7 @@ e-mailed) · History (nobody can edit it).
 
 ## Report
 
-**Associates → Report** (`/reports/associates`), per financial year:
+**Associates › Report** (`/reports/associates`), per financial year:
 performance per associate (clients, orders, FOB value, paid, TDS, waiting),
 commission waiting (ageing, with holds) and the **TDS register** (paid on,
 PAN, order, paid, TDS, bank reference); each as CSV. **By quarter, with
@@ -606,7 +605,7 @@ Activation of the associate stays as before.
 
 ## Associate self-registration (owner decision 4 Nov 2026, D-253)
 
-1. **Associates → Registrations → Create link** (Manage associates). The
+1. **Associates › Registrations → Create link** (Manage associates). The
    associate registration link is valid for 7 days (setting on the same
    page) and for one registration. Copy it and send it.
 2. The person fills in a short form: name, e-mail (their future login),

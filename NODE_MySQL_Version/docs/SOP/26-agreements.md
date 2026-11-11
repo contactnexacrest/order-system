@@ -10,7 +10,7 @@ signed copy, when it was signed, when it starts and when it expires. Nobody has 
 remember an expiry date: a reminder goes out **30 days** and **7 days** before an
 agreement expires, and **on the expiry day** (owner decision, 2 Nov 2026).
 
-Menu: **Operations → Agreements** (or open a client, supplier, logistics partner,
+Menu: **Clients › Agreements** (or open a client, supplier, logistics partner,
 associate or user — each has an **Agreements** card at the bottom).
 
 ## Who can do what
@@ -65,11 +65,11 @@ exactly as it did.
 
 ## Add an agreement
 
-1. **Operations → Agreements → Add an agreement**, or **Add agreement** on the party's
+1. **Clients › Agreements → Add an agreement**, or **Add agreement** on the party's
    own page (the party is then already chosen).
 2. **Agreement with** — client, supplier, logistics partner, associate or staff member,
    then choose who.
-3. **Type of agreement** — from the list (Admin can add types under **Admin → Dropdown
+3. **Type of agreement** — from the list (Admin can add types under **Settings › Lists › Dropdown
    Option Lists**, list "agreement_type").
 4. **Title** (optional) — e.g. "Granite supply 2026–2028".
 5. **Signed on** — required; cannot be in the future.

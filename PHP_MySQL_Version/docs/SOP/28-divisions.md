@@ -12,9 +12,9 @@
 
 ## While only one division is active (today)
 
-Nothing looks different. There is **no division switcher, no "All divisions", no Division filter or column on reports and no Division field** on users or departments. Everyone is placed in Export automatically. **Admin › Divisions** (MD and Admin) is the only place divisions appear.
+Nothing looks different. There is **no division switcher, no "All divisions", no Division filter or column on reports and no Division field** on users or departments. Everyone is placed in Export automatically. **Settings › Divisions** (MD and Admin) is the only place divisions appear.
 
-## Admin › Divisions
+## Settings › Divisions
 
 - The list shows each division, its status and its numbers of orders, staff and departments. Planned divisions are greyed out.
 - Open a division to see its **name, code and order number format** (read-only), its **modules** and its **own settings**.
@@ -24,9 +24,9 @@ Nothing looks different. There is **no division switcher, no "All divisions", no
 
 ## Setting up and activating a new division (later)
 
-1. In **Admin › Departments**, set the Division of the departments that will work in it.
-2. In **Admin › Users**, set the Division of its staff. Company-level people stay "Company level".
-3. In **Admin › Divisions › (the division)**: tick its modules, then add its own settings. At least `order_ref_format` and every value that differs from Export (currency, GST, pricing, incentive).
+1. In **Users & roles › Departments**, set the Division of the departments that will work in it.
+2. In **Users & roles › Users**, set the Division of its staff. Company-level people stay "Company level".
+3. In **Settings › Divisions › (the division)**: tick its modules, then add its own settings. At least `order_ref_format` and every value that differs from Export (currency, GST, pricing, incentive).
 4. Work through **Before activating**: departments, staff, number format, modules and settings must all be ticked.
 5. Tick the confirmation box and press **Activate**. From then on, company-level people see the **division switcher** (with "All divisions"), the reports show a **Division filter**, and users and departments show a **Division field**.
 

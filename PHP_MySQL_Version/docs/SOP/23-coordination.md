@@ -6,7 +6,7 @@ When the step is done there, it disappears.
 
 ## My tasks
 
-Sidebar: **My Tasks**. It lists what the department you are working as
+Left menu: **My tasks**. It lists what the department you are working as
 has to do next, earliest due first:
 
 | Department | Task | Appears when |
@@ -46,7 +46,7 @@ requests still arrive at once as before; the digest only repeats them
 (owner decision 1 Nov 2026).
 
 A digest counts as sent only when the e-mail really left. While the daily
-summary e-mail is switched off (Admin → E-mail settings, D-280) the job
+summary e-mail is switched off (Settings › E-mail, D-280) the job
 reports **"Daily digest: the daily summary e-mail is switched off in Admin ›
 E-mail settings — nothing sent."** and nobody's day is used up, so the
 digest goes out once it is switched on. A digest that fails to send
@@ -68,7 +68,7 @@ department. The owner is told by a notification and can open the order.
 
 ## Management cockpit
 
-Insights → **Management Cockpit** (MD/ED, Admin, the department
+Reports › **Management cockpit** (MD/ED, Admin, the department
 Directors, the Order Coordinator): open, overdue and escalated tasks per
 department, orders without an owner, orders by status, everything
 escalated, and suppliers that are late. Counts and status only — no
@@ -78,12 +78,12 @@ than missing.
 
 ## Task due days (Admin)
 
-Admin → **Task Due Days** sets, for each kind of task, the days until it
+Users & roles › **Task due days** sets, for each kind of task, the days until it
 is due and the further days until it is escalated (0 to 90).
 
 ## The Order Coordinator (optional)
 
 The **Order Desk** department is switched off. When order volume grows,
-switch it on in Admin → Departments and add the coordinator: they see
+switch it on in Users & roles › Departments and add the coordinator: they see
 every order's status, tasks and due dates and can set owners, but see no
 prices and no money.

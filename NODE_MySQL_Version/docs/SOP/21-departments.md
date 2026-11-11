@@ -26,9 +26,9 @@ a department. To take it away, end that membership.
 Every change a person makes is recorded in the Audit Log with the
 department they were working as at the time.
 
-## Admin → Departments
+## Users & roles › Departments
 
-**Admin → Departments** shows every department with its Executive,
+**Users & roles › Departments** shows every department with its Executive,
 Manager and Director, how many people hold each designation today, and
 the role behind it. From this page Admin can:
 
@@ -61,7 +61,7 @@ the role behind it. From this page Admin can:
 A department or designation switched off can no longer be chosen at
 "Log in as"; people in it fall back to their other departments.
 
-## A person's departments (Admin → Users → Edit)
+## A person's departments (Users & roles › Users › Edit)
 
 The **Departments** section on the user page lists the person's
 memberships, current and past.
@@ -93,7 +93,7 @@ Manager, like the Order Coordinator, sees no money (confirmed 1 Nov 2026).
 ## Personal exceptions
 
 Rarely, one person needs one extra right outside their department (for
-example, covering for a colleague). **Admin → Permissions → Grant an extra
+example, covering for a colleague). **Users & roles › Roles and permissions → Grant an extra
 permission** takes a reason and, now, an optional **Until** date. From the
 day after that date the exception no longer applies; the list shows it as
 "ended".
@@ -101,7 +101,7 @@ day after that date the exception no longer applies; the list shows it as
 ## Who sees which money
 
 Each designation's role says which money its people may see. The default
-set-up (all editable in **Admin → Permissions**):
+set-up (all editable in **Users & roles › Roles and permissions**):
 
 | Money | Sales & Export | Procurement | Logistics | Accounts & Finance, MD/ED, auditors, CA |
 |---|---|---|---|---|

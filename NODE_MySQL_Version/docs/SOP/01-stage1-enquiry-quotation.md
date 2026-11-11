@@ -12,8 +12,7 @@ client record.
 - Nothing yet — Stage 1 is the one stage that always starts with a human
   action (either the buyer submitting the public form, or staff creating
   the client directly). There's no order to auto-progress until one exists.
-- Once the Quotation is **approved** (or, while email sending is turned on
-  in Company Settings, once it is **sent** to the buyer), the system marks
+- Once the Quotation is **approved** (or, while document e-mails to buyers are sent — Settings › E-mail — once it is **sent** to the buyer), the system marks
   Stage 1 as **gate passed** and unlocks Stage 2 by itself — there is no
   button for this. Generating the Quotation alone does not pass the gate
   (see the "one rule that applies to every stage" note in the
@@ -41,14 +40,12 @@ the Consignee section just below it on this same form, since documents
 need these as discrete fields rather than one free-text blob. The older
 single-field Billing Address column is composed automatically from these
 parts behind the scenes, so every existing report or screen that reads it
-keeps working unchanged. **Container Type** is a dropdown (Admin → Dropdown
-Option Lists, `container_type`), not free text, with a
+keeps working unchanged. **Container Type** is a dropdown (Settings › Lists › Dropdown lists, `container_type`), not free text, with a
 "Not sure yet" option for a buyer who genuinely doesn't
 know yet — same admin-managed-list mechanism as Certificate of Origin Type.
 
-That submission lands in **Operations → Quotation Intake Review**
-(`/client-intake`) as a pending row. The sidebar link itself carries a
-gold count badge (e.g. "Quotation Intake Review **2**") whenever
+That submission lands in **Orders › Quotation requests**
+(`/client-intake`) as a pending row. The **Quotation requests** item on the Orders menu bar carries a count (e.g. "Quotation requests **2**") whenever
 something is waiting — a live count, not cached, so it appears the
 moment a buyer submits and disappears the moment staff accept or reject
 it. No badge means the queue is empty; staff don't need to open the
@@ -231,7 +228,7 @@ without waiting on anything else.
 
 #### Whether the Consignee/Notify Party sections print when identical to the Buyer
 
-Two Admin Settings rows (**Settings → Documents**) — **Always show
+Two Admin Settings rows (**Settings › Company**, Documents group) — **Always show
 Consignee Details section** (`always_show_consignee_section`) and
 **Always show Notify Party section** (`always_show_notify_party_section`)
 — control whether a buyer-facing document (Quotation, Proforma Invoice,
@@ -338,8 +335,7 @@ approved and when, and the Quotation can be generated and sent as usual.
 Sending a Quotation is refused too while the terms wait for approval.
 A second person approves the terms of an order: whoever created the order
 cannot approve its terms, whatever their permissions. The only exception
-is a person whose role is ticked for this rule in **Admin → Self-approval
-rules** (default: Managing Director and Executive Director; see
+is a person whose role is ticked for this rule in **Users & roles › Self-approval rules** (default: Managing Director and Executive Director; see
 [Chapter 15](./15-admin-settings.md)); the audit log then records it as
 PAYMENT_TERMS_SELF_APPROVED (owner decisions 1 Nov 2026, D-216 and D-221;
 replaces D-117). Terms of a cancelled or lost order
@@ -375,9 +371,9 @@ that's appropriate.
 happens in **Document Review & Approval**: assign a reviewer, get it
 approved, then:
 
-- **Email sending on:** use **Send to Buyer (deferred, 2-level approval)**
+- **Buyer e-mails sent (the default):** use **Send to Buyer (deferred, 2-level approval)**
   on the approved Quotation. Stage 1 passes once it is actually sent.
-- **Email sending off:** the Quotation counts as sent the moment it is
+- **Buyer e-mails held (Testing mode on, or the buyer *Documents* switch off in Settings › E-mail):** the Quotation counts as sent the moment it is
   approved, and Stage 1 passes then. Send the PDF to the client yourself.
 
 Either way, the stage tracker then shows Stage 1 passed:
@@ -411,7 +407,7 @@ mode** dropdown decides what Annexure A actually shows:
   uploaded at either point. Above the product table, a fixed amber "Note:"
   banner (default wording: product images/drawings are for reference only
   and may show optional accessories not included in the quoted price) is
-  admin-editable — Admin → Company Settings → `annexure_product_note` — same
+  admin-editable — Settings › Company → `annexure_product_note` — same
   governed-text pattern as the BL type/consignee instructions.
 - **Additional Terms** — a free-form rich-text block, entered through a
   small on-screen WYSIWYG editor (bold/italic/underline/strikethrough,
@@ -455,8 +451,7 @@ to Buyer screen — a warning and a second confirmation, not a block.
   provisioned).
 - **If they came through Path B**, they've done nothing in the system yet
   — the whole stage is staff-only until the Quotation reaches them (by
-  **Send to Buyer**, or by staff emailing the PDF themselves while email
-  sending is off).
+  **Send to Buyer**, or by staff emailing the PDF themselves while buyer e-mails are held).
 - Either way, the client cannot see or act on anything inside this system
   at Stage 1 — there's no client-portal screen for the Quotation stage, and
   no portal login exists for them yet at all (unless they are a returning
@@ -468,7 +463,7 @@ to Buyer screen — a warning and a second confirmation, not a block.
 ## What happens next
 
 Stage 2 (Buyer Purchase Order) is unlocked the moment the Quotation is
-approved (email sending off) or sent (email sending on). See
+approved (buyer e-mails held) or sent (buyer e-mails sent). See
 [Chapter 2](./02-stage2-buyer-po.md).
 
 ## Order lines: goods, services and charges (D-215)
@@ -510,8 +505,7 @@ offer it, existing lines keep it.
 ### "Pick from Products" and the price check (D-240; owner decision D-245 P2, 4 Nov 2026)
 
 The New Order form and the order page's add / edit line forms have **Pick from
-Products**. On a **USD order** a goods line must be picked from it while Admin →
-Pricing → "Goods lines must be picked from Products" is on (the default): a goods
+Products**. On a **USD order** a goods line must be picked from it while Products › Pricing › Pricing settings → "Goods lines must be picked from Products" is on (the default): a goods
 line typed by hand is refused ("Pick this goods line from Products — on a USD
 order goods lines cannot be typed by hand (service and charge lines can)."),
 beside the picker in the browser and again on saving. Service and charge lines,

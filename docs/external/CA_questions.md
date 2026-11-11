@@ -12,49 +12,49 @@ For each question: **Today** is what the system does now; **Where** is the setti
 
 **1. GST on commission paid to an associate based abroad.** Is this an import of services on which NexaCrest pays GST under reverse charge? At what rate, and are there any conditions (for example, the associate's place of supply)?
 - Today: the system pays no GST to an associate abroad and books none. Payouts to associates abroad are on hold until you confirm.
-- Where: Admin › Associates › Commission settings, and SOP 24.
+- Where: Associates › Commission › Commission settings and ladder, and SOP 24.
 - Answer: ____________________________________________
 
 **2. GST on commission to an associate in India.** Is 18% correct for a GST-registered associate who issues a tax invoice (GST paid on top, input credit taken)?
 - Today: 18% (`associate_gst_pct` = 18.00), added on top only when the associate is GST-registered.
-- Where: Admin › Associates › Commission settings › GST %.
+- Where: Associates › Commission › Commission settings and ladder › GST %.
 - Answer: ____________________________________________
 
 **3. TDS on commission in India.** Is section 194H at 2% with a ₹20,000 per-year threshold correct? If the associate has no PAN, is 20% correct?
 - Today: section 194H, 2% (`associate_tds_pct`), threshold ₹20,000 per financial year (`associate_tds_threshold_inr`), 20% without PAN (`associate_tds_no_pan_pct`). TDS is never more than the payout; any shortfall is carried to the next payout in the same year.
-- Where: Admin › Associates › TDS settings.
+- Where: Settings › Lists › Associate TDS rules.
 - Answer: ____________________________________________
 
 **4. TDS on commission to an associate abroad (section 195 and DTAA).** When the associate gives us a Tax Residency Certificate, Form 10F and a no-PE declaration, can we pay without TDS under the treaty? If not, what rate applies?
 - Today: no TDS for an associate abroad when TRC, 10F and no-PE are on file and accepted (`associate_tds_foreign` = 0); without them the payout is held.
-- Where: Admin › Associates › TDS settings › "Deduct TDS for associates abroad"; the papers are checked on the associate's page.
+- Where: Settings › Lists › Associate TDS rules › "Deduct TDS for associates abroad"; the papers are checked on the associate's page.
 - Answer: ____________________________________________
 
 **5. Form 15CA / 15CB.** Is a 15CA (and a CA's 15CB) needed for every commission payment abroad, or only above a limit? Will you issue the 15CB?
 - Today: 15CB required for every payment abroad (`associate_15cb_required` = 1); the payout cannot be marked paid without it.
-- Where: Admin › Associates › TDS settings.
+- Where: Settings › Lists › Associate TDS rules.
 - Answer: ____________________________________________
 
 **6. Zoho tax codes for commission bills.** Which Zoho Books tax should be used for (a) GST on an Indian associate's tax invoice, (b) reverse-charge GST for an associate abroad, (c) TDS?
 - Today: empty (`zoho_gst_commission_tax_id`, `zoho_tds_tax_id`); the Zoho sync refuses such a bill with a clear message until they are set.
-- Where: Admin › Associates › Commission settings and TDS settings.
+- Where: Associates › Commission › Commission settings and ladder and TDS settings.
 - Answer: ____________________________________________
 
 ## B. Domestic Trade (only before switching on Domestic Trade)
 
 **7. GST rate for our goods.** Is 18% correct for HSN 6802 (worked building and monumental stone) sold within India? Please list any other HSN codes and rates we should add.
 - Today: one rate, HSN 6802 at 18% (table `gst_rates`); the default for anything else is 18% (`dom_default_gst_rate`).
-- Where: Admin › GST rates.
+- Where: Settings › Lists › GST rates.
 - Answer: ____________________________________________
 
 **8. E-way bill.** Is ₹50,000 the right consignment value above which an e-way bill is needed, for our goods and states?
 - Today: ₹50,000 (`dom_eway_threshold_inr`); exactly ₹50,000 does not need one.
-- Where: Admin › Divisions › Domestic Trade.
+- Where: Settings › Divisions › Domestic Trade.
 - Answer: ____________________________________________
 
 **9. E-invoicing.** Does e-invoicing (IRN) apply to us, based on our turnover?
 - Today: off (`dom_e_invoice_applicable` = 0).
-- Where: Admin › Divisions › Domestic Trade.
+- Where: Settings › Divisions › Domestic Trade.
 - Answer: Yes / No  ____________________________________________
 
 **10. Tax invoice format and numbering.** Is the invoice content correct: CGST + SGST within the state, IGST between states, an HSN summary, amount in words, rounding to the rupee with a round-off line, "Reverse charge: No"? Is the numbering DOM/26-27/0001 (16 characters at most, a new series each financial year) acceptable?
@@ -70,7 +70,7 @@ For each question: **Today** is what the system does now; **Where** is the setti
 
 **12. Import duty rates for HSN 6802.** Are basic customs duty 20%, social welfare surcharge 10% (of the duty) and IGST 18% correct?
 - Today: HSN 6802 = BCD 20%, SWS 10%, IGST 18% (table `import_duty_rates`); defaults for other HSN codes BCD 10%, SWS 10%, IGST 18%.
-- Where: Admin › Import duty rates.
+- Where: Settings › Lists › Import duty.
 - Answer: ____________________________________________
 
 **13. Assessable value.** Is assessable value = goods value × customs exchange rate + freight + insurance correct (no landing charge)?

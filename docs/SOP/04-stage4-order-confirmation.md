@@ -11,8 +11,7 @@ even if the buyer never responds at all.
 ## The system does this automatically
 
 - The acknowledgment clock starts the moment the OC is actually **emailed**
-  to the buyer (not when it's generated). While email sending is turned
-  off in Company Settings, an approved OC counts as sent, but the clock
+  to the buyer (not when it's generated). While document e-mails to buyers are held (Settings › E-mail), an approved OC counts as sent, but the clock
   starts only when staff send it to the buyer themselves and press **Mark
   Order Confirmation Sent to Buyer** in Step 6c (gap list G-6, owner
   1 Nov 2026: the buyer's 48 hours never start before the buyer has the
@@ -20,7 +19,7 @@ even if the buyer never responds at all.
   [Document Review & Approval](./13-document-review-approval.md) for the
   full draft → review → approved → sent path every document goes through
   first. The window defaults to 48 hours and is admin-configurable
-  (`oc_ack_auto_confirm_hours` in Company Settings) — useful to shorten
+  (`oc_ack_auto_confirm_hours` in Settings › Company) — useful to shorten
   while testing.
 - If the buyer neither acknowledges in their portal nor replies by email
   within that window, a scheduled routine **auto-confirms** the OC
@@ -44,7 +43,7 @@ is approved, press **Generate OC Confirmation Link** in 6b. The page comes
 back to 6b with the new link already selected — copy it and send it to the
 buyer (it is the same Buyer Action Link they used for their PO at Step 4b;
 pressing the button issues a fresh one and, when the buyer has an e-mail on
-file and e-mail sending is on, e-mails it to them). **6b ticks green, and
+file and buyer e-mails are sent, e-mails it to them). **6b ticks green, and
 6c opens, only after this button has been pressed** — a link made earlier
 at Step 4b does not count, so nobody can move on to 6c without having sent
 the buyer their OC link. The buyer's auto-confirm window (below) also only
@@ -83,8 +82,7 @@ this requires typing in the evidence (quoting the buyer's reply is normal
 practice) before it's accepted; there's no way to record this without some
 note attached. Once submitted, this **passes Stage 4's gate** directly.
 
-Recording it needs the OC to be **issued**: **approved** while email
-sending is off, or **sent** to the buyer while email sending is on (owner
+Recording it needs the OC to be **issued**: **approved** while buyer e-mails are held, or **sent** to the buyer while they are sent (owner
 decision 2026-10-25). If it isn't, the button is refused with a message
 naming the Order Confirmation. Before the OC is emailed the card shows
 **Record Buyer's Acknowledgement** with a box to "describe how the buyer
@@ -95,7 +93,7 @@ note. Both buttons say "(unlocks Step 7)".
 
 By default any user who can manage the order can use this. An admin can
 restrict it to a specific permission instead — turn on
-`oc_ack_override_restricted` in Company Settings, then grant the **Override
+`oc_ack_override_restricted` in Settings › Company, then grant the **Override
 buyer Order Confirmation acknowledgment** permission only to the roles who
 should have it (Roles & Permissions). Turning the restriction on does not
 retroactively change anyone's access until permissions are also edited.

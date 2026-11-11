@@ -64,7 +64,7 @@ rendered pages, not a direct controller/HTTP call.
   dropdown option, a reference document cleared of its text, an order
   message with neither text nor a file).
 - `10-departments.spec.js` — departments (D-214): the menu shows the
-  department a person is logged in as, Admin → Departments shows every
+  department a person is logged in as, Users & roles › Departments shows every
   department's ladder, and "Preview the app as this" shows what a
   designation sees until "Exit preview".
 - `11-associates.spec.js` — one associate's journey (D-217): the MD adds

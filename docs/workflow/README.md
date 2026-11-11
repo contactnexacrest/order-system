@@ -17,7 +17,7 @@ together with the application.
   (10f), the balance due from the scanned BL (11b), part payments and
   short-pay sign-off, LC dates and amendments, and the OC "sent" clock (6c).
   Updated again 1 Nov 2026 for D-221/D-222: who may approve their own work
-  (Admin → Self-approval rules), original BL copies 1 to 10, and the "*"
+  (Users & roles › Self-approval rules), original BL copies 1 to 10, and the "*"
   on required fields.
   Updated 2 Nov 2026: 7c starts with the Supplier Link; 7e / 10a start from
   the Supplier PO; 9a pre-selects the forwarder; the "why is it different?"
@@ -27,6 +27,12 @@ together with the application.
   "Sync this order to Zoho now".
   Updated 6 Nov 2026 (D-258, ORD-14): Close Order (13f) needs the original
   BLs received (11a) and endorsed (13e).
+  Updated 11 Nov 2026 (D-280, D-320): menu names (Users & roles ›
+  Self-approval rules) and "Testing mode" in place of "e-mail sending off".
+  The order page itself also gained a sticky action bar (Edit order ·
+  Documents · Full report · Duplicate order · More), a compact products table
+  with a side panel (D-273) and, for approvers, a "Waiting for your approval"
+  bar (D-310); the step numbers are unchanged.
 
 The specification (v3) reflects the decisions up to 30 Oct 2026. The
 decisions taken since — D-212 (money descriptions) to D-241 (gap list, CFR

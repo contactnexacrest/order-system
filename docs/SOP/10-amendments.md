@@ -44,7 +44,7 @@ From **Amendments** on the order page, the full sequence is:
    permission is required before any amendment document exists at all;
    **Reject** is available instead if it shouldn't proceed. The person who
    requested the amendment cannot MD-approve it themselves unless their role
-   is ticked in Admin → Self-approval rules (default MD and ED; logged as
+   is ticked in Users & roles › Self-approval rules (default MD and ED; logged as
    AMENDMENT_SELF_APPROVED).
 3. **Generate Agreement Document** — produces the actual Payment Terms
    Amendment Agreement PDF, with a blank importer signature/designation/date

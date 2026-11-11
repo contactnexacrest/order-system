@@ -53,7 +53,7 @@ once it is. (An FOB order raises its CI before shipment, so no reminder.)
 actual shipped quantities and final figures rather than the estimates the
 PI was built on. Take it through [Document Review &
 Approval](./13-document-review-approval.md): 11d is refused until the CI is
-approved (email sending off) or sent (email sending on). When the Zoho
+approved (buyer e-mails held) or sent (buyer e-mails sent). When the Zoho
 Books integration is on, the approved CI goes to Zoho Books as an export
 invoice at the shipping bill's customs rate (see [Zoho Books
 Sync](./ca-03-zoho-sync.md)).
@@ -176,7 +176,7 @@ If the buyer pays in more than one wire, record each one at Step 11c
 received so far · still owed**. A payment cannot be cleared while money is
 still owed, except by a manager with **Approve short payment**, who writes
 the reason (not the person who recorded the receipts, unless their role is
-ticked in Admin → Self-approval rules); the shortfall is then recorded as written off and shown on the
+ticked in Users & roles › Self-approval rules); the shortfall is then recorded as written off and shown on the
 order. When it is written off, the manager also says **what the short is** — an agreed discount, a settled buyer claim, or not paid by the buyer (D-245 P3); this decides an associate's commission (chapter 24). See chapter 03, "Paid in parts", for the details.
 
 **The balance asked for is net of what was written off (6 Nov 2026, D-258, owner double-confirmed).** The Commercial Invoice, the buyer's payment page, the Buyer Action page and the staff checks all use one formula: total − money received − amounts written off on earlier legs and milestones. Example: FOB 10,000, advance 3,000 paid, a 3,000 milestone paid 2,900 with 100 written off as an agreed discount → the balance asked is 4,000. If the 100 is not written off, the balance stays 4,100.

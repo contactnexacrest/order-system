@@ -1,13 +1,13 @@
 # 31 — Merchant Trade (MTT)
 
-**Owner decision D-257 Phase 4 (5 Nov 2026).** The **Merchant Trade** division buys goods from a supplier abroad and sells them to a buyer abroad: the goods go straight from one to the other and **never enter India** (RBI "merchanting trade"). It is **built but still "planned"**: nobody sees any of it until the MD activates it in **Admin › Divisions**. Export, Domestic Trade and Import & Distribution work exactly as before.
+**Owner decision D-257 Phase 4 (5 Nov 2026).** The **Merchant Trade** division buys goods from a supplier abroad and sells them to a buyer abroad: the goods go straight from one to the other and **never enter India** (RBI "merchanting trade"). It is **built but still "planned"**: nobody sees any of it until the MD activates it in **Settings › Divisions**. Export, Domestic Trade and Import & Distribution work exactly as before.
 
 > **To be confirmed with the AD bank and the CA before the first deal:** the time allowed for the whole deal, the time allowed for an outlay, the advance limit without an LC or bank guarantee, the list of documents the bank wants, the ₹ per USD used for the advance check, and the Zoho Books accounts. Each is a setting you can change; none is fixed in the program. The AD bank's approval for merchanting must be recorded before activating.
 
 ## Before activating Merchant Trade (MD)
 
-1. **Admin › Divisions › Merchant Trade.**
-   - **Set it up:** *Create its departments* makes Merchant Trade Desk and Merchant Trade Documents (add their designations in Admin › Departments). *Move to Merchant Trade* places a staff member in the division.
+1. **Settings › Divisions › Merchant Trade.**
+   - **Set it up:** *Create its departments* makes Merchant Trade Desk and Merchant Trade Documents (add their designations in Users & roles › Departments). *Move to Merchant Trade* places a staff member in the division.
    - **Modules:** the **Merchant trade** module is on for Merchant Trade only, so nobody else reaches `/merchant`. Export shipping, LUT/IGST and export benefits stay off.
    - **Its own settings** (starting values, **to be confirmed with the AD bank and the CA**):
 
@@ -25,7 +25,7 @@
 
 ## A deal, step by step
 
-Menu **Operations › Merchant trade** (people who see purchase prices). *New deal*: the deal date; the **supplier** (abroad), its country and the **purchase currency**; the **buyer** (abroad), its country and the **sale currency**; the country the goods come from (not India — that would be an export); the ports. The deal number (MTT/26-27/0001) and the PO number (MTT/PO/26-27/0001) are given at once. The list can be shown as a list or, for Kanban users, as a board by stage — both have the same filter, links, figures and RBI status.
+Menu **Procurement & suppliers › Merchant trade** (people who see purchase prices). *New deal*: the deal date; the **supplier** (abroad), its country and the **purchase currency**; the **buyer** (abroad), its country and the **sale currency**; the country the goods come from (not India — that would be an export); the ports. The deal number (MTT/26-27/0001) and the PO number (MTT/PO/26-27/0001) are given at once. The list can be shown as a list or, for Kanban users, as a board by stage — both have the same filter, links, figures and RBI status.
 
 | Stage | What is done | To move on |
 |---|---|---|

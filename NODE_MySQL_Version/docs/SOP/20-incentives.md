@@ -9,7 +9,7 @@ NexaCrest rewards the team for orders that are won, delivered and paid for
 associate's commission (if the client came through an associate). That
 profit never counts below ₹0.
 
-- The **global rule** (Admin → Pricing settings) is a % of that profit
+- The **global rule** (Products › Pricing › Pricing settings) is a % of that profit
   (15% to start) or a fixed amount per unit; a product may have its own.
 - On one order, the MD may set **a % of this order's profit** or **a fixed
   amount** instead, with a written reason.
@@ -31,8 +31,7 @@ The dashboard shows the MD how many orders are ready to lock, and the MD is
 reminded a few days (setting, 3 to start) before each payout run.
 
 **When it is paid.** Staff are paid in the **payout run after the order was
-locked** — the same run as associate commission (Associates → Commission
-settings: monthly on a day, or weekly). The old 21st-to-20th cycle, the
+locked** — the same run as associate commission (Associates › Commission › Commission settings and ladder: monthly on a day — by default the last day of the month, D-292 — or weekly). The old 21st-to-20th cycle, the
 reward table, the minimum profit and the new-client bonus are gone.
 
 Every change — amount, who gets it, shares, lock, unlock — is kept in the
@@ -71,11 +70,11 @@ People sharing a role on an order share that role's amount equally.
 ## Who is eligible, and caps (owner decision 6 Nov 2026, D-259)
 
 - **Eligible for team incentive.** Every person is eligible unless switched
-  off. Each **designation** (Admin › Departments & designations, column
+  off. Each **designation** (Users & roles › Departments, column
   "Incentive eligible") says whether its people share in the team incentive;
   a person's own switch (**Edit User → Team incentive**, also on **Add user**)
   overrides the designation for that person only. Only the **MD** changes
-  either; everyone else sees them greyed out. Admin › Departments lists the
+  either; everyone else sees them greyed out. Users & roles › Departments lists the
   people whose own switch differs from their designation.
 - **Not eligible** means the person gets **no share** of any order's team
   incentive. Their share **stays with the company** — it is **not** shared

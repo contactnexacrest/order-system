@@ -51,7 +51,7 @@ The MD decides each move (the system suggests it after 3 completed, fully paid o
 **5f. Traceability & Test Certificates** (supplier purchase order)
 > Each item must be traceable by its heat or serial number to the quality documents supplied with it (for example a Mill Test Certificate EN 10204 3.1). Goods without the required documents will not be accepted.
 
-- Where: Admin › Overrides (the wording can be changed without a code change).
+- Where: Settings › Admin overrides (the wording can be changed without a code change).
 - Answer (approved / changes): ____________________________________________
 
 **6. Missing clauses.** For engineering goods, should we add clauses we do not have yet (for example warranty period, inspection and acceptance at the buyer's site, liability for consequential loss, intellectual property in drawings)?

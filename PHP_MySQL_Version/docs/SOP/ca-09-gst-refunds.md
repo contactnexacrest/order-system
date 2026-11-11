@@ -22,7 +22,7 @@ The figure is the GST on the order's **tax invoices**. A proforma is left out, b
 
 The order's **CAFIN** shows the same figure, for information only, as one line under MARGIN in section E (the owner confirmed this line twice on 31 Oct). None of the CAFIN figures change.
 
-## CA → GST refunds (LUT)
+## CA / Accounting → GST refunds (LUT)
 
 Anyone with the CA module can view the page. Recording on it needs the same permission as recording export benefits: Accounts Executive, Admin, MD or ED.
 
@@ -52,7 +52,7 @@ A claim cannot receive more than it claimed: credited plus refused is never more
 
 ### 3. What goes to Zoho Books
 
-**The sync turns each credit into one journal.** At the next sync (hourly, or **Sync Now** on CA → Zoho Books sync), each credit becomes one journal:
+**The sync turns each credit into one journal.** At the next sync (hourly, or **Sync Now** on CA / Accounting → Zoho Books sync), each credit becomes one journal:
 
 - **Debit:** the bank account (the deposit account the other payments use).
 - **Credit:** **GST Refund Receivable**.
@@ -76,4 +76,4 @@ Every claim, credit and removal is written to the audit log.
 
 ## Company figures
 
-The **Revenue Report** (CA → Revenue Reports) shows **GST Refunds Credited (LUT)** for the period, as company-level income.
+The **Revenue Report** (CA / Accounting → Revenue Reports) shows **GST Refunds Credited (LUT)** for the period, as company-level income.

@@ -101,7 +101,7 @@ the order page (Step 12a) instead — see
 [Order Financials](./ca-08-order-financials.md#4-letter-of-credit--bank-loan).
 
 If a cleared leg's FIRC/eBRC reference is still missing after the number
-of days configured in **Admin → Company Settings** as `fema_realization_alert_days`
+of days configured in **Settings › Company** as `fema_realization_alert_days`
 (seeded at 270 days, i.e. roughly the RBI/FEMA export-proceeds realization
 window), the CA module's Settlement Register flags that leg with a
 **"Pending — flag for follow-up"** badge, so nothing silently falls
@@ -122,7 +122,7 @@ that:
    years that actually have cleared settlement legs appear in the picker.
 2. Shows a **GST / LUT Export Declaration** block — your company's GSTIN,
    LUT number, and the financial year the LUT is valid for (pulled
-   directly from Admin → Company Settings), with a plain statement that every
+   directly from Settings › Company), with a plain statement that every
    revenue entry below is a zero-rated LUT export, not a domestic sale.
 3. Shows a **summary**: total settlement legs, total INR actually
    realized, net forex gain/(loss) for the period, and how many legs are
