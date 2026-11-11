@@ -82,7 +82,7 @@ final class ViewOnlyTierTest extends DbTestCase
         $html = ob_get_clean();
 
         self::assertStringNotContainsString('/edit">Edit order</a>', $html); // D-320: the action bar's Edit order button
-        self::assertStringNotContainsString('+ Add product', $html, 'the editable product form must not render for a view-only user (D-273: "+ Add product" opens the side panel)');
+        self::assertStringNotContainsString('data-open-panel="line-panel-new">+ Add product', $html, /* D-273: the button (the side-panel script's comment also names it) */ 'the editable product form must not render for a view-only user (D-273: "+ Add product" opens the side panel)');
     }
 
     public function testOrderShowPageShowsMutatingButtonsForAManageOrdersUser(): void

@@ -95,7 +95,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
         return Database::connection()->query('SELECT * FROM orders WHERE id = ' . $this->createTestOrder($this->client, 'FOB', 'Standard — New Buyer', 'USD'))->fetch();
     }
 
-    private function size(?string $l, ?string $w, ?string $t): array
+    private function lineSize(?string $l, ?string $w, ?string $t): array
     {
         return ['piece_length_cm' => $l, 'piece_width_cm' => $w, 'piece_thickness_cm' => $t];
     }
@@ -141,7 +141,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
         $sel = $this->thick13();
         $f = OrderLinePricing::liveFigures(ProductRepository::find($this->product), OrderLinePricing::context($order), $sel, 130.0);
         $perPieceMin = (float) $f['minimum'] * 0.1872;
-        $size = $this->size('180.00', '80.00', '13.00');
+        $size = $this->lineSize('180.00', '80.00', '13.00');
         self::assertNull(OrderLinePricing::saveRefusal($order, $this->product, 'goods', number_format($perPieceMin + 1, 2, '.', ''), true, $sel, 'PCS', null, $size));
         $refusal = (string) OrderLinePricing::saveRefusal($order, $this->product, 'goods', number_format($perPieceMin - 1, 2, '.', ''), true, $sel, 'PCS', null, $size);
         self::assertStringContainsString('below what NexaCrest can accept', $refusal);
@@ -151,14 +151,14 @@ final class D270OrderLineUnitsTest extends DbTestCase
 
     public function testAMissingSizeIsAskedForNeverTooLow(): void
     {
-        $refusal = (string) OrderLinePricing::saveRefusal($this->order(), $this->product, 'goods', '1.00', true, $this->thick13(), 'PCS', null, $this->size(null, '80.00', '13.00'));
+        $refusal = (string) OrderLinePricing::saveRefusal($this->order(), $this->product, 'goods', '1.00', true, $this->thick13(), 'PCS', null, $this->lineSize(null, '80.00', '13.00'));
         self::assertSame('Enter the length (cm) — needed to compare a price per piece with the product\'s price per CBM.', $refusal);
     }
 
     public function testASavedLineWithoutItsSizeHoldsTheQuotationButIsNotSentToTheMd(): void
     {
         $orderId = (int) $this->order()['id'];
-        $line = $this->line($orderId, $this->thick13(), 'PCS', $this->size(null, null, '13.00'), '495.00');
+        $line = $this->line($orderId, $this->thick13(), 'PCS', $this->lineSize(null, null, '13.00'), '495.00');
         OrderLinePricing::afterSave($line, null, $this->admin);
         $check = OrderLinePricing::forOrder($orderId)['lines'][$line];
         self::assertSame(OrderLinePricing::NEEDS_SIZE, $check['status']);
@@ -169,7 +169,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
     public function testASetCannotBeConvertedAndGoesToTheMd(): void
     {
         $orderId = (int) $this->order()['id'];
-        $line = $this->line($orderId, $this->thick13(), 'SET', $this->size(null, null, '13.00'), '495.00');
+        $line = $this->line($orderId, $this->thick13(), 'SET', $this->lineSize(null, null, '13.00'), '495.00');
         OrderLinePricing::afterSave($line, null, $this->admin);
         $check = OrderLinePricing::forOrder($orderId)['lines'][$line];
         self::assertSame(OrderLinePricing::NO_PRICE, $check['status']);
@@ -182,7 +182,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
         $orderId = (int) $this->order()['id'];
         $sel = $this->thick13();
         $ref = OrderLinePricing::liveFigures(ProductRepository::find($this->product), OrderLinePricing::context($this->order()), $sel, 130.0);
-        $line = $this->line($orderId, $sel, 'PCS', $this->size('180.00', '80.00', '13.00'), number_format((float) $ref['quote'] * 0.1872, 2, '.', ''));
+        $line = $this->line($orderId, $sel, 'PCS', $this->lineSize('180.00', '80.00', '13.00'), number_format((float) $ref['quote'] * 0.1872, 2, '.', ''));
         $check = OrderLinePricing::forOrder($orderId)['lines'][$line];
         self::assertSame(OrderLinePricing::OK, $check['status']);
         self::assertSame('CBM', $check['reference']['unit']);
@@ -203,8 +203,8 @@ final class D270OrderLineUnitsTest extends DbTestCase
     {
         $orderId = (int) $this->order()['id'];
         $sel = $this->thick13();
-        $first = $this->line($orderId, $sel, 'PCS', $this->size('180.00', '80.00', '13.00'), '495.00');
-        $second = $this->line($orderId, null, 'SQM', $this->size(null, null, null), '58.00');
+        $first = $this->line($orderId, $sel, 'PCS', $this->lineSize('180.00', '80.00', '13.00'), '495.00');
+        $second = $this->line($orderId, null, 'SQM', $this->lineSize(null, null, null), '58.00');
         [$prId] = PriceRequestService::create(AssociateRepository::find($this->associate), ProductRepository::find($this->product),
             $this->sel(['Grade / quality' => 'Standard', 'Thickness' => '30 mm', 'Surface finish' => 'Leather']), false, null);
         self::assertNotNull($prId);
@@ -232,7 +232,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
         $sel = $this->thick13();
         $ref = OrderLinePricing::liveFigures(ProductRepository::find($this->product), OrderLinePricing::context($this->order()), $sel, 130.0);
         $belowLowest = number_format(((float) $ref['floor'] + (float) $ref['minimum']) / 2 * 0.1872, 2, '.', '');
-        $first = $this->line($orderId, $sel, 'PCS', $this->size('180.00', '80.00', '13.00'), $belowLowest);
+        $first = $this->line($orderId, $sel, 'PCS', $this->lineSize('180.00', '80.00', '13.00'), $belowLowest);
         $line = OrderProductRepository::find($first);
         Database::connection()->prepare('UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approved_unit_price = :p, price_approved_selection = :k, price_approval_reason = :r WHERE id = :id')
             ->execute(['u' => $this->admin, 'p' => $belowLowest, 'k' => OrderLinePricing::approvalSelectionKey($line), 'r' => 'Test approval reason', 'id' => $first]);
@@ -247,7 +247,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
     public function testWholeOrderDuplicateCarriesTheOptionsAndSizes(): void
     {
         $orderId = (int) $this->order()['id'];
-        $first = $this->line($orderId, $this->thick13(), 'PCS', $this->size('180.00', '80.00', '13.00'), '495.00');
+        $first = $this->line($orderId, $this->thick13(), 'PCS', $this->lineSize('180.00', '80.00', '13.00'), '495.00');
         $newOrder = OrderDuplicationService::duplicate($orderId, $this->admin);
         $copy = OrderProductRepository::forOrder($newOrder)[0];
         $src = OrderProductRepository::find($first);
@@ -260,7 +260,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
     {
         $orderId = (int) $this->order()['id'];
         $sel = $this->sel(['Grade / quality' => 'Standard', 'Thickness' => '30 mm', 'Surface finish' => 'Honed']);
-        $line = $this->line($orderId, $sel, 'SQM', $this->size(null, null, null), '58.00');
+        $line = $this->line($orderId, $sel, 'SQM', $this->lineSize(null, null, null), '58.00');
         $chips = OrderLinePricing::optionChips(OrderProductRepository::find($line));
         self::assertSame(['Standard', '30 mm', 'Honed'], array_column($chips, 'name'));
         $honed = $sel[array_search('Honed', array_map(static fn (int $o): string => (string) SpecRepository::findOption($o)['name'], $sel), true)];

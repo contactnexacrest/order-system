@@ -123,7 +123,15 @@ final class DivisionIsolationTest extends DbTestCase
         $page = $this->render(fn () => (new DashboardController())->index([]));
         self::assertStringNotContainsString('division-switcher', $page);
         self::assertStringNotContainsString('All divisions', $page);
-        self::assertStringContainsString('/admin/divisions', $page, 'Admin › Divisions is the only visible place');
+        // D-320: the left menu is short; Divisions sits in the Settings section's menu bar, shown on the Settings pages.
+        self::assertStringNotContainsString('href="/admin/divisions"', $page);
+        $_SERVER['REQUEST_URI'] = '/settings';
+        try {
+            $settingsPage = $this->render(fn () => (new \App\Controllers\SettingsController())->index([]));
+        } finally {
+            unset($_SERVER['REQUEST_URI']);
+        }
+        self::assertStringContainsString('href="/admin/divisions"', $settingsPage, 'Admin › Divisions is the only visible place');
 
         $this->actAs($this->expStaff);
         self::assertSame([1], DivisionService::currentIds());

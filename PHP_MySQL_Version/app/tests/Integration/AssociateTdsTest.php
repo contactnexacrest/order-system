@@ -162,7 +162,7 @@ final class AssociateTdsTest extends DbTestCase
         self::assertSame(['Tax Residency Certificate (TRC)', 'Form 10F', 'No-PE declaration (no fixed place of business in India)'], $c['missing_foreign']);
         self::assertSame(['Form 15CA', 'Form 15CB'], $c['missing_payout']);
         $f = $this->pay($p);
-        self::assertSame('Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration, Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate\'s Documents tab; Form 15CA and 15CB are attached to this payment.', $f['message']);
+        self::assertSame('Before paying an associate based abroad, these must be on file: Tax Residency Certificate (TRC), Form 10F, No-PE declaration (no fixed place of business in India), Form 15CA, Form 15CB. The TRC, Form 10F and no-PE declaration are accepted on the associate\'s Documents tab; Form 15CA and 15CB are attached to this payment.', $f['message']);
         foreach (['tax_residency', 'form_10f', 'no_pe'] as $kind) {
             $this->doc((int) $a['id'], $kind, null);
         }

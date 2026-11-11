@@ -163,7 +163,7 @@ final class AssociateAccessLevelsTest extends DbTestCase
         $this->asAssociate($a);
         $list = $this->call('GET', '/associate/orders')['body'];
         self::assertStringNotContainsString('12,345.67', $list, 'no FOB value at Starter');
-        self::assertStringContainsString('The order value (FOB) is not shown', $list);
+        self::assertStringContainsString('Order values are not shown for your account.', $list); // D-330 plain wording
         self::assertStringNotContainsString('12,345.67', $this->call('GET', "/associate/orders/{$order}")['body']);
         $filtered = AssociateAccess::filterOrder($a, ['fob_value' => 12345.67, 'commission' => ['level' => 'Level 2 — 5%', 'rate' => 5.0, 'detail' => null]]);
         self::assertNull($filtered['fob_value']);

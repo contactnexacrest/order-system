@@ -125,7 +125,7 @@ final class MoneySeparationTest extends DbTestCase
 
     public function testTheOrderPageShowsEachDepartmentOnlyItsMoney(): void
     {
-        $markers = ['selling' => '<th>Unit Price</th>', 'fob' => '>FOB Value<'];
+        $markers = ['selling' => '<th class="num">Price USD</th>' /* D-273 compact products table: price column headed with its currency */, 'fob' => '>FOB Value<'];
         foreach (['Logistics Executive' => false, 'Viewer / Auditor' => true] as $role => $sees) {
             $user = $this->createTestUser($role);
             $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $user);

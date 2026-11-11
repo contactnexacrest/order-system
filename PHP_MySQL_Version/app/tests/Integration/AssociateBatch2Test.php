@@ -132,6 +132,7 @@ final class AssociateBatch2Test extends DbTestCase
 
         $pan = $this->doc((int) $a['id'], 'pan', 'ABCDE1234F');
         $aad = $this->doc((int) $a['id'], 'aadhaar', 'XXXX XXXX 1234');
+        $addr = $this->doc((int) $a['id'], 'address', 'Electricity bill 0042'); // D-290: the address proof is its own item
         $bank = $this->doc((int) $a['id'], 'bank_proof');
         $agr = $this->doc((int) $a['id'], 'agreement');
         $gst = $this->doc((int) $a['id'], 'gst', '29ABCDE1234F1Z5');
@@ -157,7 +158,7 @@ final class AssociateBatch2Test extends DbTestCase
         self::assertStringContainsString("KYC is not complete", $block);
         self::assertStringContainsString('Bank proof', $block);
 
-        foreach ([$pan, $aad, $agr, $gst] as $d) {
+        foreach ([$pan, $aad, $addr, $agr, $gst] as $d) {
             $_POST = ['decision' => 'accept', 'reason' => ''];
             (new AssociateAdminController())->reviewDocument(['id' => (string) $a['id'], 'docId' => (string) $d]);
             self::assertSame('success', $this->flash()['type']);

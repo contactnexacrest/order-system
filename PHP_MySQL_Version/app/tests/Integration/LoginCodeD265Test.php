@@ -25,6 +25,8 @@ final class LoginCodeD265Test extends DbTestCase
 {
     private const PASSWORD = 'Known-Password-123!';
 
+    private ?string $rememberDaysBefore = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -34,12 +36,14 @@ final class LoginCodeD265Test extends DbTestCase
         }
         $_SESSION = [];
         $_COOKIE = [];
+        $this->rememberDaysBefore = CompanySettingsRepository::get('login_remember_browser_days');
         CompanySettingsRepository::set('login_remember_browser_days', '0');
     }
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('login_remember_browser_days', '0');
+        // Put back what was there (seed: 30 days) — forcing '0' here broke SessionTimeoutsD283Test's seed check later in the run.
+        CompanySettingsRepository::set('login_remember_browser_days', (string) ($this->rememberDaysBefore ?? '30'));
         $_COOKIE = [];
         parent::tearDown();
     }
@@ -239,6 +243,7 @@ final class LoginCodeD265Test extends DbTestCase
         $body = (string) Database::connection()->query("SELECT body FROM email_templates WHERE template_key = 'two_factor_code'")->fetchColumn();
         self::assertStringContainsString('This code expires in 10 minutes.', $body);
         $src = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Services/TwoFactorService.php');
-        self::assertStringContainsString("EmailService::sendPlainText(\$destination, \$rendered['subject'], \$rendered['body'], true);", $src, 'sent even when business e-mail is switched off');
+        // D-280: still security mail (never held), now also tagged with its MUST kind and audience for Admin › E-mail settings.
+        self::assertStringContainsString("EmailService::sendPlainText(\$destination, \$rendered['subject'], \$rendered['body'], true, 'login_code', \$scope === 'client' ? 'buyer' : 'staff');", $src, 'sent even when business e-mail is switched off');
     }
 }

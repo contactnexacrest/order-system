@@ -55,7 +55,7 @@ final class PaymentActionLinkTest extends DbTestCase
         self::assertStringNotContainsString('name="transaction_ref"', $waiting);
         self::assertStringNotContainsString('buyers_po_ref', $waiting, 'payment only — never the Buyer PO');
 
-        $this->createTestDocument($this->orderId, 'PI', 'approved', $this->createTestFile($this->orderId));
+        $this->createTestDocument($this->orderId, 'PI', 'sent', $this->createTestFile($this->orderId)); // issued (D-280: Testing mode is off when installed)
         $due = $this->page();
         self::assertStringContainsString('Advance Payment', $due);
         // QA Round 7, R7-N09 (Node had it empty): the current payment's heading carries its number.
@@ -77,7 +77,7 @@ final class PaymentActionLinkTest extends DbTestCase
 
     public function testAReportNeedsTheDetailsAndAScreenshot(): void
     {
-        $this->createTestDocument($this->orderId, 'PI', 'approved', $this->createTestFile($this->orderId));
+        $this->createTestDocument($this->orderId, 'PI', 'sent', $this->createTestFile($this->orderId)); // issued (D-280: Testing mode is off when installed)
         $order = OrderRepository::find($this->orderId);
         $_POST = ['transaction_ref' => 'UTR-1', 'amount' => '3000', 'payment_date' => '2026-10-27'];
         $result = PaymentActionService::report($order);
@@ -96,9 +96,9 @@ final class PaymentActionLinkTest extends DbTestCase
 
     public function testThePiEmailCarriesThePaymentLink(): void
     {
-        $docId = $this->createTestDocument($this->orderId, 'PI', 'approved', $this->createTestFile($this->orderId));
+        $docId = $this->createTestDocument($this->orderId, 'PI', 'sent', $this->createTestFile($this->orderId)); // issued (D-280: Testing mode is off when installed)
         $preview = EmailDispatchService::buildPreview($this->orderId, $docId, 'send_pi', $this->createTestUser('Admin'));
-        self::assertStringContainsString('upload the payment screenshot', $preview['body']);
+        self::assertStringContainsString('please send us a screenshot of the payment and its details', $preview['body']); // D-330 plain wording
         self::assertStringContainsString('/payment-action/' . $this->token, $preview['body'], 'the same live link, not a new one');
     }
 
@@ -115,7 +115,8 @@ final class PaymentActionLinkTest extends DbTestCase
         (new OrderController())->generatePaymentActionLink(['id' => (string) $this->orderId]);
         ob_end_clean();
         $flash = Flash::pull();
-        self::assertStringContainsString('/payment-action/', end($flash)['message']);
+        // D-280: the link comes with the message as a link to copy ("e-mailed" only when it was).
+        self::assertStringContainsString('/payment-action/', end($flash)['copy_link'] ?? '');
         self::assertNull(OrderRepository::findByValidPaymentActionToken($this->token), 'regenerating replaces the old link');
     }
 }

@@ -127,7 +127,9 @@ final class OrderPageT4Test extends DbTestCase
         (new OrderController())->generateSupplierActionLink(['id' => (string) $orderId]);
         $flash = Flash::pull();
         self::assertSame('success', $flash[0]['type']);
-        self::assertStringContainsString('/supplier-action/', $flash[0]['message']);
+        // D-280: the link is no longer pasted into the message text; it comes with the message as a link to copy.
+        self::assertStringContainsString('Copy the link and send it yourself', $flash[0]['message']);
+        self::assertStringContainsString('/supplier-action/', $flash[0]['copy_link'] ?? '');
         self::assertNotNull(OrderSupplierPoRepository::findLatestForOrder($orderId)['supplier_action_token_hash']);
     }
 }

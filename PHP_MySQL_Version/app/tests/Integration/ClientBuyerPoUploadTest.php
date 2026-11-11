@@ -84,6 +84,6 @@ final class ClientBuyerPoUploadTest extends DbTestCase
         $this->controller->showOrder(['id' => $this->orderId]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Buyer PO', $html);
+        self::assertStringContainsString('<h2>Your purchase order</h2>', $html); // D-330 plain wording
     }
 }

@@ -455,7 +455,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(44, $checked); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers
+        self::assertSame(45, $checked); // D-265: + POST /account/backup-codes; D-283: + /keep-alive, /account/forget-computers; D-310: + GET /approvals
         self::assertSame([], $wrong);
     }
 
@@ -500,7 +500,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(25, $checked); // D-283: + /associate/keep-alive
+        self::assertSame(29, $checked); // D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
         self::assertSame([], $wrong);
     }
 
@@ -568,7 +568,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(74, $checked); // D-265: + 5 login-code POSTs; D-282/D-283: + 5
+        self::assertSame(79, $checked); // D-265: + 5 login-code POSTs; D-282/D-283: + 5; D-293: + 3 associate bank-confirm POSTs; D-294: + 2 vendor-bank-confirm POSTs
         self::assertSame([], $wrong);
     }
 
@@ -592,7 +592,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(59, $checked);
+        self::assertSame(62, $checked); // D-294: + GET/POST /vendor-bank-confirm/{token}, POST /vendor-bank-confirm/{token}/not-us
         self::assertSame([], $failed);
     }
 
@@ -609,7 +609,7 @@ final class UngatedRoutesTest extends DbTestCase
                 [$code, $body] = $this->dispatch('GET', $route['pattern']);
                 // /associate/login/code and /associate/logout go to the login, /associate/agreement is 404 until an agreement is on file;
                 // D-255: /associate/prices now goes to the catalogue, /pricing/line-quote is 404 (JSON) without a product.
-                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement', '/associate/prices', '/pricing/line-quote'], true);
+                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement', '/associate/prices', '/pricing/line-quote', '/associate/bank/confirm' /* D-293: to the profile when nothing waits for confirmation */], true);
                 if ($code >= 500 || ($code !== 200 && !$redirectsOnPurpose) || ($code === 200 && trim($body) === '')) {
                     $failed[] = self::label($route) . " → {$code}";
                 }
@@ -619,7 +619,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(40, $checked); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password
+        self::assertSame(42, $checked); // D-265: + GET /client/login/code; D-282: + GET /associate/forgot-password; D-310: + GET /approvals; D-293: + GET /associate/bank/confirm
         self::assertSame([], $failed);
     }
 

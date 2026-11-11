@@ -245,7 +245,7 @@ final class QaBatch3DocsMailTest extends DbTestCase
             self::assertNotNull($tpl('send_' . strtolower((string) $code)), "send_{$code}");
         }
         self::assertStringNotContainsString('attached', (string) $tpl('shipment_readiness')['body']);
-        self::assertStringContainsString('download your Purchase Order', (string) $tpl('buyer_action_link')['body']);
+        self::assertStringContainsString('download your purchase order', /* D-330 plain wording */ (string) $tpl('buyer_action_link')['body']);
     }
 
     public function testMail9ResendOfASentDocumentAndFailureIsReported(): void

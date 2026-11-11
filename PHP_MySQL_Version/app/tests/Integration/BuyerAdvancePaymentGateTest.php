@@ -80,7 +80,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
 
         $flash = Flash::pull();
         self::assertSame('error', $flash[0]['type']);
-        self::assertStringContainsString('already cleared', $flash[0]['message']);
+        self::assertStringContainsString('We have received your advance payment, so you can no longer upload here', $flash[0]['message']); // D-330 plain wording
         self::assertSame([], OrderBuyerPoDocumentRepository::forOrder($orderId), 'no document row must be attached once refused');
     }
 
@@ -97,7 +97,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
 
         $flash = Flash::pull();
         self::assertSame('error', $flash[0]['type']);
-        self::assertStringContainsString('already cleared', $flash[0]['message']);
+        self::assertStringContainsString('We have received your advance payment, so you can no longer upload here', $flash[0]['message']); // D-330 plain wording
     }
 
     // ---------------------------------------------------------------
@@ -149,7 +149,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
 
         $flash = Flash::pull();
         self::assertSame('error', $flash[0]['type']);
-        self::assertStringContainsString('already been marked cleared', $flash[0]['message']);
+        self::assertStringContainsString('We have already received your advance payment for this order', $flash[0]['message']); // D-330 plain wording
         self::assertSame([], ClientPaymentReportRepository::forOrder($orderId));
     }
 
@@ -198,7 +198,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
         };
 
         $waiting = $render();
-        self::assertStringContainsString("We're preparing your Proforma Invoice", $waiting);
+        self::assertStringContainsString('We are now preparing your proforma invoice', $waiting); // D-330 plain wording
         self::assertStringNotContainsString('Submit Payment Details', $waiting);
 
         $this->createTestDocument($orderId, 'PI', 'sent', $this->createTestFile($orderId));
@@ -220,7 +220,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
 
         self::assertStringNotContainsString('Submit Payment Details', $html);
         self::assertStringNotContainsString('name="document"', $html);
-        self::assertStringContainsString('already cleared', $html);
+        self::assertStringContainsString('We have received your advance payment, so you can no longer upload here', $html); // D-330 plain wording
     }
 
     // ---------------------------------------------------------------

@@ -57,18 +57,21 @@ final class StageOneGateTest extends DbTestCase
 
     public function testStageOnePassesOnlyOnceTheQtIsFullyApproved(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
-        $reviewer = $this->createTestUser('Export Executive');
+        // Written for buyer document e-mails held (approved = issued); D-280 made Testing mode off the default.
+        $this->withDocumentMailsHeld(function (): void {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            $documentId = $this->createTestDocument($orderId, 'QT', 'draft');
+            $reviewer = $this->createTestUser('Export Executive');
 
-        ReviewWorkflowService::assignReviewers($documentId, [$reviewer], 1);
-        $review = DocumentReviewRepository::forDocument($documentId)[0];
-        self::assertSame('in_progress', $this->stageStatus($orderId, 1), 'assigning a reviewer alone must not pass Stage 1 either');
+            ReviewWorkflowService::assignReviewers($documentId, [$reviewer], 1);
+            $review = DocumentReviewRepository::forDocument($documentId)[0];
+            self::assertSame('in_progress', $this->stageStatus($orderId, 1), 'assigning a reviewer alone must not pass Stage 1 either');
 
-        ReviewWorkflowService::approve((int) $review['id'], $reviewer, null);
+            ReviewWorkflowService::approve((int) $review['id'], $reviewer, null);
 
-        self::assertSame('gate_passed', $this->stageStatus($orderId, 1));
-        self::assertTrue(StageGateService::isUnlocked($orderId, 2), 'Stage 2 must unlock once the QT is genuinely approved');
+            self::assertSame('gate_passed', $this->stageStatus($orderId, 1));
+            self::assertTrue(StageGateService::isUnlocked($orderId, 2), 'Stage 2 must unlock once the QT is genuinely approved');
+        });
     }
 
     public function testStageOneRemainsLockedWhenOneOfTwoRequiredReviewersIsStillPending(): void

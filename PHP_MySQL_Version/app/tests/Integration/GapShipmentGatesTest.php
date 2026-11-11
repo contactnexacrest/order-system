@@ -29,10 +29,15 @@ use App\Tests\Support\DbTestCase;
 final class GapShipmentGatesTest extends DbTestCase
 {
     private int $admin;
+    private ?string $testingModeBefore = null;
 
     protected function setUp(): void
     {
         parent::setUp();
+        // These gates are written for document e-mails held (Testing mode on, as the Node twin's beforeAll sets);
+        // the value found is put back in tearDown.
+        $this->testingModeBefore = CompanySettingsRepository::get('email_testing_mode');
+        CompanySettingsRepository::set('email_testing_mode', '1');
         $_POST = [];
         $_FILES = [];
         $this->admin = $this->createTestUser('Admin');
@@ -45,7 +50,9 @@ final class GapShipmentGatesTest extends DbTestCase
         $_FILES = [];
         $_SESSION = [];
         Flash::pull();
-        CompanySettingsRepository::set('email_testing_mode', '1');
+        // Put back what was there (D-280: Testing mode is off when installed) — forcing '1' here
+        // leaked into later tests that rely on the seed default.
+        CompanySettingsRepository::set('email_testing_mode', (string) ($this->testingModeBefore ?? '0'));
         parent::tearDown();
     }
 

@@ -156,7 +156,7 @@ final class QaRound6SmallFixesTest extends DbTestCase
         };
 
         $report();
-        self::assertStringContainsString('once we have sent you the Proforma Invoice', (string) $this->flash()['message']);
+        self::assertStringContainsString('after we send you the proforma invoice', /* D-330 plain wording */ (string) $this->flash()['message']);
         $this->createTestDocument($orderId, 'PI', 'sent');
         $report();
         self::assertSame('success', $this->flash()['type']);
@@ -181,7 +181,7 @@ final class QaRound6SmallFixesTest extends DbTestCase
         $_POST = ['body' => 'Please confirm the crate count.'];
         $_FILES = ['unexpected_field' => ['name' => 'x.pdf', 'type' => 'application/pdf', 'tmp_name' => '/tmp/none', 'error' => UPLOAD_ERR_OK, 'size' => 10]];
         (new ClientPortalController())->postComment(['id' => (string) $orderId]);
-        self::assertStringContainsString('could not be accepted', (string) $this->flash()['message']);
+        self::assertStringContainsString('We could not accept that file, so nothing was saved', /* D-330 plain wording */ (string) $this->flash()['message']);
         self::assertSame('Please confirm the crate count.', Flash::pullOld()['body'] ?? null, 'what was typed is kept');
         self::assertSame(0, (int) Database::connection()->query("SELECT COUNT(*) FROM order_comments WHERE order_id = {$orderId}")->fetchColumn());
     }

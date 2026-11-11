@@ -35,9 +35,14 @@ final class D257ProductNeutralTest extends DbTestCase
     private int $userId;
     private int $orderId;
 
+    /** Natural Stone's seeded settings, put back in tearDown (two tests here save other values). */
+    private const STONE_SETTINGS = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set', 'weight_t_per_cbm'];
+    private array $stoneSeeded = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->stoneSeeded = (array) Database::connection()->query('SELECT id, ' . implode(', ', self::STONE_SETTINGS) . ' FROM product_categories WHERE is_system = 1 ORDER BY id LIMIT 1')->fetch(\PDO::FETCH_ASSOC);
         $this->allowHandTypedGoodsLines();
         $this->userId = $this->createTestUser('Admin');
         $_SESSION = ['_auth_user_id' => $this->userId];
@@ -51,6 +56,12 @@ final class D257ProductNeutralTest extends DbTestCase
 
     protected function tearDown(): void
     {
+        // Saving Natural Stone's settings here left its units and weight per CBM changed for later files
+        // (D270OrderLineUnitsTest, OrderLinePricingTest rely on the seed) — put the seeded values back.
+        if ($this->stoneSeeded !== []) {
+            Database::connection()->prepare('UPDATE product_categories SET ' . implode(', ', array_map(static fn (string $k): string => "{$k} = :{$k}", self::STONE_SETTINGS)) . ' WHERE id = :id')
+                ->execute($this->stoneSeeded);
+        }
         Flash::pull();
         $_SESSION = [];
         $_POST = [];
@@ -124,7 +135,7 @@ final class D257ProductNeutralTest extends DbTestCase
         self::assertSame(['PCS', 'PCS,NOS,SET', '730791', 'Wooden Crates', "Mill test certificate 3.1\nDrawing approval", 'engineering'],
             [$cat['default_unit'], $cat['allowed_units'], $cat['default_hs_code'], $cat['packing_type'], $cat['quality_documents'], $cat['tc_clause_set']], 'a refused save changes nothing');
         $audit = Database::connection()->query("SELECT new_value FROM audit_log WHERE action_type = 'PRODUCT_CATEGORY_SETTINGS_UPDATED' AND entity_id = {$id} ORDER BY id DESC LIMIT 1")->fetchColumn();
-        self::assertSame('unit PCS (allowed: PCS,NOS,SET); HS 730791; packing Wooden Crates; quality documents: Mill test certificate 3.1, Drawing approval; T&C engineering', $audit);
+        self::assertSame('unit PCS (allowed: PCS,NOS,SET); HS 730791; packing Wooden Crates; quality documents: Mill test certificate 3.1, Drawing approval; T&C engineering; weight per CBM -', $audit); // D-270 (point 25): the category's weight per CBM (left empty here)
         self::assertSame(' data-fills="{&quot;hs_code&quot;:&quot;730791&quot;,&quot;unit&quot;:&quot;PCS&quot;}" data-allowed-units="PCS,NOS,SET"', ProductCategoryRepository::lineOptionAttributes($cat));
 
         // Natural Stone's settings can be saved (its attributes stay locked).

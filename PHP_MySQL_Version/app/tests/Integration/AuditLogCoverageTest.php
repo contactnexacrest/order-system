@@ -144,7 +144,7 @@ final class AuditLogCoverageTest extends DbTestCase
         self::assertSame($orderId, (int) $recordedLog['entity_id']);
         self::assertSame('1000', $recordedLog['new_value']);
 
-        $this->createTestDocument($orderId, 'PI', 'approved');
+        $this->createTestDocument($orderId, 'PI', 'sent'); // D-280: Testing mode is off when installed, so a stage document counts once it is sent (as on Node)
         $_POST = ['advance_cleared_at' => '2026-01-15'];
         ob_start();
         (new OrderController())->clearAdvancePayment(['id' => (string) $orderId]);
@@ -164,7 +164,7 @@ final class AuditLogCoverageTest extends DbTestCase
         for ($stage = 1; $stage <= 7; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
-        $this->createTestDocument($orderId, 'CI', 'approved');
+        $this->createTestDocument($orderId, 'CI', 'sent'); // D-280: Testing mode is off when installed, so a stage document counts once it is sent (as on Node)
 
         $_POST = ['balance_amount' => '1500.00', 'balance_received_at' => '2026-03-01', 'balance_inr_unknown' => '1', 'balance_exchange_rate' => '84', 'balance_bank_reference' => 'UTR-TEST-0001'];
         ob_start();
@@ -235,8 +235,8 @@ final class AuditLogCoverageTest extends DbTestCase
         for ($stage = 1; $stage <= 6; $stage++) {
             StageGateService::passAndUnlockNext($orderId, $stage, null);
         }
-        $this->createTestDocument($orderId, 'PL', 'approved');
-        $this->createTestDocument($orderId, 'BLI', 'approved');
+        $this->createTestDocument($orderId, 'PL', 'sent'); // D-280: Testing mode is off when installed, so a stage document counts once it is sent (as on Node)
+        $this->createTestDocument($orderId, 'BLI', 'sent'); // D-280: Testing mode is off when installed, so a stage document counts once it is sent (as on Node)
         // Gap list G-3: this order has no pre-shipment inspection.
         foreach (\App\Repositories\OrderComplianceTaskRepository::forOrder($orderId) as $t) {
             if ($t['task_type_name'] === 'Pre-Shipment Inspection') {

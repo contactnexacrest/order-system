@@ -96,7 +96,7 @@ final class OrderStepFlowTest extends DbTestCase
     {
         $orderId = $this->orderAtStep5();
         // PI generated without the client ever using the PI form link.
-        $this->createTestDocument($orderId, 'PI', 'approved');
+        $this->createTestDocument($orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
 
         $output = $this->render($orderId);
 

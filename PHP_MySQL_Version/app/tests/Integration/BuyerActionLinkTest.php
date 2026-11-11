@@ -134,7 +134,7 @@ final class BuyerActionLinkTest extends DbTestCase
         (new BuyerActionController())->show(['token' => $token]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Your Acknowledgement Needed', $html);
+        self::assertStringContainsString('Please confirm your order', $html); // D-330 plain wording
         // Owner request (2026-10-26): one step at a time — the PO upload is long done here.
         self::assertStringNotContainsString('name="buyers_po_ref"', $html);
     }
@@ -148,7 +148,7 @@ final class BuyerActionLinkTest extends DbTestCase
         (new BuyerActionController())->show(['token' => $token]);
         $html = (string) ob_get_clean();
 
-        self::assertStringNotContainsString('Your Acknowledgement Needed', $html);
+        self::assertStringNotContainsString('Please confirm your order', $html); // D-330 plain wording
         self::assertStringContainsString('Your Purchase Order', $html);
     }
 
@@ -166,53 +166,59 @@ final class BuyerActionLinkTest extends DbTestCase
      */
     public function testShowRendersOcAckBannerWhenOcIsApprovedButNeverEmailed(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->unlockThroughStage3($orderId);
-        $this->createTestDocument($orderId, 'OC', 'approved');
-        $token = OrderRepository::generateBuyerActionToken($orderId);
+        $this->withDocumentMailsHeld(function (): void {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            $this->unlockThroughStage3($orderId);
+            $this->createTestDocument($orderId, 'OC', 'approved');
+            $token = OrderRepository::generateBuyerActionToken($orderId);
 
-        ob_start();
-        (new BuyerActionController())->show(['token' => $token]);
-        $html = (string) ob_get_clean();
+            ob_start();
+            (new BuyerActionController())->show(['token' => $token]);
+            $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Your Acknowledgement Needed', $html);
-        $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        self::assertNotNull($ack, 'visiting the page must lazily create the acknowledgment row so there is something real to acknowledge');
-        self::assertNull($ack['acknowledged_at']);
+            self::assertStringContainsString('Please confirm your order', $html); // D-330 plain wording
+            $ack = OrderOcAcknowledgmentRepository::find($orderId);
+            self::assertNotNull($ack, 'visiting the page must lazily create the acknowledgment row so there is something real to acknowledge');
+            self::assertNull($ack['acknowledged_at']);
+        });
     }
 
     /** Owner decision (2026-10-27): the buyer can download the exact Order Confirmation they acknowledge. */
     public function testTheOcStepOffersTheIssuedOrderConfirmationForDownload(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->unlockThroughStage3($orderId);
-        $docId = $this->createTestDocument($orderId, 'OC', 'approved', $this->createTestFile($orderId));
-        $reference = (string) \App\Repositories\DocumentRepository::find($docId)['document_reference'];
-        $token = OrderRepository::generateBuyerActionToken($orderId);
+        $this->withDocumentMailsHeld(function (): void {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            $this->unlockThroughStage3($orderId);
+            $docId = $this->createTestDocument($orderId, 'OC', 'approved', $this->createTestFile($orderId));
+            $reference = (string) \App\Repositories\DocumentRepository::find($docId)['document_reference'];
+            $token = OrderRepository::generateBuyerActionToken($orderId);
 
-        ob_start();
-        (new BuyerActionController())->show(['token' => $token]);
-        $html = (string) ob_get_clean();
+            ob_start();
+            (new BuyerActionController())->show(['token' => $token]);
+            $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('/buyer-action/' . $token . '/order-confirmation', $html);
-        self::assertStringContainsString('Download Order Confirmation (' . htmlspecialchars($reference) . ')', $html);
-        self::assertStringContainsString('I have read Order Confirmation ' . htmlspecialchars($reference), $html);
+            self::assertStringContainsString('/buyer-action/' . $token . '/order-confirmation', $html);
+            self::assertStringContainsString('Download Order Confirmation (' . htmlspecialchars($reference) . ')', $html);
+            self::assertStringContainsString('I have read order confirmation ' . htmlspecialchars($reference) . '. It is correct', $html); // D-330 plain wording
+        });
     }
 
     public function testAcknowledgeOcSucceedsWhenOcWasApprovedButNeverEmailed(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        $this->unlockThroughStage3($orderId);
-        $this->createTestDocument($orderId, 'OC', 'approved');
-        $token = OrderRepository::generateBuyerActionToken($orderId);
+        $this->withDocumentMailsHeld(function (): void {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            $this->unlockThroughStage3($orderId);
+            $this->createTestDocument($orderId, 'OC', 'approved');
+            $token = OrderRepository::generateBuyerActionToken($orderId);
 
-        (new BuyerActionController())->acknowledgeOc(['token' => $token]);
+            (new BuyerActionController())->acknowledgeOc(['token' => $token]);
 
-        $flash = Flash::pull();
-        self::assertSame('success', $flash[0]['type']);
-        $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        self::assertNotNull($ack['acknowledged_at']);
-        self::assertTrue(StageGateService::isUnlocked($orderId, 5));
+            $flash = Flash::pull();
+            self::assertSame('success', $flash[0]['type']);
+            $ack = OrderOcAcknowledgmentRepository::find($orderId);
+            self::assertNotNull($ack['acknowledged_at']);
+            self::assertTrue(StageGateService::isUnlocked($orderId, 5));
+        });
     }
 
     // ---------------------------------------------------------------
@@ -359,20 +365,22 @@ final class BuyerActionLinkTest extends DbTestCase
      */
     public function testClientPortalShowOrderRendersOcAckBannerWhenOcIsApprovedButNeverEmailed(): void
     {
-        $clientId = $this->createTestClient();
-        $orderId = $this->createTestOrder($clientId);
-        $this->unlockThroughStage3($orderId);
-        $this->createTestDocument($orderId, 'OC', 'approved');
-        $_SESSION['_client_portal_client_id'] = $clientId;
+        $this->withDocumentMailsHeld(function (): void {
+            $clientId = $this->createTestClient();
+            $orderId = $this->createTestOrder($clientId);
+            $this->unlockThroughStage3($orderId);
+            $this->createTestDocument($orderId, 'OC', 'approved');
+            $_SESSION['_client_portal_client_id'] = $clientId;
 
-        ob_start();
-        (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
-        $html = (string) ob_get_clean();
+            ob_start();
+            (new ClientPortalController())->showOrder(['id' => (string) $orderId]);
+            $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Your Acknowledgement Needed', $html);
-        $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        self::assertNotNull($ack);
-        self::assertNull($ack['acknowledged_at']);
+            self::assertStringContainsString('Please confirm your order', $html); // D-330 plain wording
+            $ack = OrderOcAcknowledgmentRepository::find($orderId);
+            self::assertNotNull($ack);
+            self::assertNull($ack['acknowledged_at']);
+        });
     }
 
     public function testClientPortalAcknowledgeOcStillWorksAfterTheRefactor(): void
@@ -407,7 +415,8 @@ final class BuyerActionLinkTest extends DbTestCase
 
         $flash = Flash::pull();
         self::assertSame('success', $flash[0]['type']);
-        self::assertStringContainsString('/buyer-action/', $flash[0]['message']);
+        // D-280: the link comes with the message as a link to copy ("e-mailed" only when it was).
+        self::assertStringContainsString('/buyer-action/', $flash[0]['copy_link'] ?? '');
 
         $order = OrderRepository::find($orderId);
         self::assertNotEmpty($order['buyer_action_token_plain']);

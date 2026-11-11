@@ -26,28 +26,31 @@ final class OrderStep6bStatusTest extends DbTestCase
 
     public function testStep6bWaitsForTheOcToBeIssued(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
-        for ($stage = 1; $stage <= 3; $stage++) {
-            StageGateService::passAndUnlockNext($orderId, $stage, null);
-        }
-        Database::connection()->prepare("UPDATE orders SET buyer_action_token_hash = 'x' WHERE id = :id")->execute(['id' => $orderId]);
-        $docId = $this->createTestDocument($orderId, 'OC', 'in_review');
-        $_SESSION = ['_auth_user_id' => $this->createTestUser('Admin')];
-        $render = function () use ($orderId): string {
-            ob_start();
-            (new OrderController())->show(['id' => (string) $orderId]);
-            return (string) ob_get_clean();
-        };
+        // Written for buyer document e-mails held (approved = issued); D-280 made Testing mode off the default.
+        $this->withDocumentMailsHeld(function (): void {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            for ($stage = 1; $stage <= 3; $stage++) {
+                StageGateService::passAndUnlockNext($orderId, $stage, null);
+            }
+            Database::connection()->prepare("UPDATE orders SET buyer_action_token_hash = 'x' WHERE id = :id")->execute(['id' => $orderId]);
+            $docId = $this->createTestDocument($orderId, 'OC', 'in_review');
+            $_SESSION = ['_auth_user_id' => $this->createTestUser('Admin')];
+            $render = function () use ($orderId): string {
+                ob_start();
+                (new OrderController())->show(['id' => (string) $orderId]);
+                return (string) ob_get_clean();
+            };
 
-        $html = $render();
-        self::assertNotSame('done', $this->icon($html, 'step-6b-buyer-action-link'), 'OC not approved yet');
+            $html = $render();
+            self::assertNotSame('done', $this->icon($html, 'step-6b-buyer-action-link'), 'OC not approved yet');
 
-        Database::connection()->prepare("UPDATE documents SET status = 'approved' WHERE id = :id")->execute(['id' => $docId]);
-        // Owner request (3 Nov 2026): approving the OC no longer makes 6b green on its own —
-        // the OC confirmation link must be generated with the 6b button first.
-        self::assertNotSame('done', $this->icon($render(), 'step-6b-buyer-action-link'), 'OC approved but no OC link generated yet');
+            Database::connection()->prepare("UPDATE documents SET status = 'approved' WHERE id = :id")->execute(['id' => $docId]);
+            // Owner request (3 Nov 2026): approving the OC no longer makes 6b green on its own —
+            // the OC confirmation link must be generated with the 6b button first.
+            self::assertNotSame('done', $this->icon($render(), 'step-6b-buyer-action-link'), 'OC approved but no OC link generated yet');
 
-        Database::connection()->prepare('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id')->execute(['id' => $orderId]);
-        self::assertSame('done', $this->icon($render(), 'step-6b-buyer-action-link'));
+            Database::connection()->prepare('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id')->execute(['id' => $orderId]);
+            self::assertSame('done', $this->icon($render(), 'step-6b-buyer-action-link'));
+        });
     }
 }

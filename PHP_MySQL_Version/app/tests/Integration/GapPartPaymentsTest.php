@@ -62,7 +62,7 @@ final class GapPartPaymentsTest extends DbTestCase
         return Flash::pull()[0] ?? ['type' => '', 'message' => ''];
     }
 
-    /** A USD order at Stage 3 with its PI approved: products USD 4,500, advance 40% = USD 1,800 due. */
+    /** A USD order at Stage 3 with its PI issued: products USD 4,500, advance 40% = USD 1,800 due. */
     private function orderAtAdvance(): int
     {
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
@@ -70,7 +70,8 @@ final class GapPartPaymentsTest extends DbTestCase
         Database::connection()->prepare('UPDATE orders SET advance_pct = 40 WHERE id = :o')->execute(['o' => $orderId]);
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
-        $this->createTestDocument($orderId, 'PI', 'approved');
+        // D-280: Testing mode is off when installed, so the stage needs its PI sent to the buyer (not only approved).
+        $this->createTestDocument($orderId, 'PI', 'sent');
         Database::connection()->prepare('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)')->execute(['o' => $orderId]);
         return $orderId;
     }

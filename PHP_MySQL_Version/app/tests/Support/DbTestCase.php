@@ -336,6 +336,23 @@ abstract class DbTestCase extends TestCase
         return (int) $pdo->lastInsertId();
     }
 
+    /**
+     * Runs $fn with buyer document e-mails held (Testing mode on), then puts back the value found.
+     * "Approved but never e-mailed" counts as issued only while those e-mails are held. Before D-280
+     * that was the seed default (mail sending off); now Testing mode is off when installed, so a test
+     * written for the held case switches it on itself (Node twin: withDocumentMailsHeld).
+     */
+    protected function withDocumentMailsHeld(callable $fn): void
+    {
+        $before = \App\Repositories\CompanySettingsRepository::get('email_testing_mode');
+        \App\Repositories\CompanySettingsRepository::set('email_testing_mode', '1', null);
+        try {
+            $fn();
+        } finally {
+            \App\Repositories\CompanySettingsRepository::set('email_testing_mode', (string) ($before ?? '0'), null);
+        }
+    }
+
     /** A minimal real document row for the given order + document type code, returns its id. */
     protected function createTestDocument(int $orderId, string $typeCode = 'QT', string $status = 'draft', ?int $pdfFileId = null): int
     {

@@ -70,7 +70,8 @@ final class SettingsCollapsibleSectionsTest extends DbTestCase
     {
         $html = $this->renderSettingsPage();
 
-        self::assertMatchesRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+">/', $html);
-        self::assertDoesNotMatchRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+"\s+open>/', $html);
+        // D-320: each section also carries an id (#settings-security, #settings-zoho) for the Settings menu bar.
+        self::assertMatchesRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+" id="settings-[^"]+">/', $html);
+        self::assertDoesNotMatchRegularExpression('/<details class="collapsible-section settings-section" data-category="[^"]+"[^>]*\sopen[\s>]/', $html);
     }
 }

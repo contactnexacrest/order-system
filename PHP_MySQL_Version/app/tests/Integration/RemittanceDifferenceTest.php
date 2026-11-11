@@ -70,7 +70,7 @@ final class RemittanceDifferenceTest extends DbTestCase
         Database::connection()->prepare('UPDATE orders SET advance_pct = 40 WHERE id = :o')->execute(['o' => $orderId]);
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
-        $this->createTestDocument($orderId, 'PI', 'approved');
+        $this->createTestDocument($orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
         Database::connection()->prepare('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)')->execute(['o' => $orderId]);
         return $orderId;
     }

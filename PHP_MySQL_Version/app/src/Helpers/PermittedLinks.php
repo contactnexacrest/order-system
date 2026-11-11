@@ -52,7 +52,7 @@ final class PermittedLinks
         '#^/associates/tds(?:[/?\#]|$)#'                           => ['manage_incentives', 'pay_incentives', 'ca_module_view'],
         // Owner decision D-255 (5 Nov 2026): associate price requests and an associate's price access.
         '#^/associates/price-requests(?:[/?\#]|$)#'                => ['manage_pricing', 'view_price_buildup'],
-        '#^/associates/\d+/price-access(?:[/?\#]|$)#'              => ['manage_pricing'],
+        '#^/associates/\d+/(?:price-access|commission-rule)(?:[/?\#]|$)#' => ['manage_pricing'], // D-291: the commission rule page is the MD's (manage_pricing)
         '#^/associates/\d+/bank/\d+/number(?:[/?\#]|$)#'           => ['manage_associate_bank'],
         '#^/associates/\d+/documents/\d+(?:[/?\#]|$)#'             => ['manage_associates', 'manage_associate_bank'],
         '#^/associates/access-levels(?:[/?\#]|$)#'                 => ['view_associates', 'manage_associates'], // D-261

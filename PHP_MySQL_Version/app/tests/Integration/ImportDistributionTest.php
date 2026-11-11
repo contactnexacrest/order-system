@@ -330,7 +330,13 @@ final class ImportDistributionTest extends DbTestCase
         $this->actAs($this->md);
         self::assertTrue(DivisionService::allowsOrderId($exportOrder));
         self::assertStringContainsString('TEST-Xiamen Stone Industries', $this->render(fn () => (new ImportController())->show(['id' => (string) $id])));
-        self::assertStringContainsString('Imports &amp; stock', $this->render(fn () => \App\Helpers\View::render('import/create', ['active' => true, 'old' => []], 'layout/base')));
+        // D-320: "Imports & stock" is in the Procurement & suppliers menu bar, shown on that section's pages (as Node checks on /import/:id).
+        $_SERVER['REQUEST_URI'] = '/import/create';
+        try {
+            self::assertStringContainsString('Imports &amp; stock', $this->render(fn () => \App\Helpers\View::render('import/create', ['active' => true, 'old' => []], 'layout/base')));
+        } finally {
+            unset($_SERVER['REQUEST_URI']);
+        }
     }
 
     public function testZohoPayloadsForAnImport(): void

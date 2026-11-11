@@ -372,7 +372,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         self::assertSame('Tick at least two of the ways you checked the bank details.', $this->call('POST', "/associates/{$a['id']}/bank/{$id}/verify", ['check_bank_proof' => '1'])['flash']);
         self::assertSame('Enter the bank reference (UTR / SWIFT) of the test payment.', $this->call('POST', "/associates/{$a['id']}/bank/{$id}/verify", ['check_bank_proof' => '1', 'check_test_payment' => '1'])['flash']);
         $r = $this->call('POST', "/associates/{$a['id']}/bank/{$id}/verify", ['check_bank_proof' => '1', 'check_test_payment' => '1', 'test_payment_ref' => 'UTR 412345678901', 'verify_note' => 'Spoke to them at 3 pm']);
-        self::assertSame('Verified. Usable from ' . Dates::short(date('Y-m-d')) . '; the associate was e-mailed.', $r['flash'], 'a first account: 0 days');
+        self::assertSame('Verified. Usable from ' . Dates::short(date('Y-m-d')) . '; the associate sees it in their portal (the e-mail could not be sent).' /* D-280: "e-mailed" only when it was; the test run has no mail server */, $r['flash'], 'a first account: 0 days');
         $row = AssociateBankRepository::find($id);
         self::assertSame([1, 0, 1, 'UTR 412345678901', 'Spoke to them at 3 pm'], [(int) $row['check_bank_proof'], (int) $row['check_phone'], (int) $row['check_test_payment'], $row['test_payment_ref'], $row['verify_note']]);
         self::assertSame('bank proof, test payment (ref UTR 412345678901)', BankDetailsCheck::checksText($row));
@@ -394,7 +394,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         self::assertSame('You entered these details yourself — give the reason you verify them (at least 10 characters).',
             $this->call('POST', "/associates/{$a['id']}/bank/{$third}/verify", ['check_bank_proof' => '1', 'check_phone' => '1'])['flash']);
         $r = $this->call('POST', "/associates/{$a['id']}/bank/{$third}/verify", ['check_bank_proof' => '1', 'check_phone' => '1', 'self_reason' => 'Only finance person is on leave until 20 Nov']);
-        self::assertSame('Verified. Usable from ' . Dates::short(date('Y-m-d', strtotime('+15 days'))) . '; the associate was e-mailed.', $r['flash'], 'a change of account: 15 days');
+        self::assertSame('Verified. Usable from ' . Dates::short(date('Y-m-d', strtotime('+15 days'))) . '; the associate sees it in their portal (the e-mail could not be sent).' /* D-280: "e-mailed" only when it was; the test run has no mail server */, $r['flash'], 'a change of account: 15 days');
         self::assertSame('Only finance person is on leave until 20 Nov', AssociateBankRepository::find($third)['self_verify_reason']);
         self::assertSame($id, (int) AssociateBankRepository::usable((int) $a['id'])['id'], 'the old account stays in use during the 15 days');
 

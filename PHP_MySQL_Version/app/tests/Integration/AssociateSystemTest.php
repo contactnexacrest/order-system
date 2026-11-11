@@ -61,7 +61,8 @@ final class AssociateSystemTest extends DbTestCase
         $this->finance1 = $this->createTestUser('Finance Manager');
         $this->finance2 = $this->createTestUser('Finance Director');
         $this->as($this->admin);
-        foreach (['associate_bank_wait_days' => '7', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20',
+        // D-293: the old single wait setting became first-account / change-of-account waits; one checker by default.
+        foreach (['associate_bank_wait_first_days' => '0', 'associate_bank_wait_change_days' => '7', 'bank_details_check_people' => 'one', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20',
             'associate_commission_due_days' => '30', 'associate_claim_hold' => '1', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '5'] as $k => $v) {
             IncentiveRepository::setSetting($k, $v, $this->admin);
         }
@@ -263,7 +264,11 @@ final class AssociateSystemTest extends DbTestCase
         self::assertSame('999988887777', AssociateBankRepository::fullNumber($id));
 
         $this->as($this->finance1);
-        $_POST = ['check_method' => 'Called back on the known number; ₹1 test credit confirmed.'];
+        // D-293: one person verifies by default; "two people" stays available as a setting and still needs two different people.
+        $_POST = ['check_bank_proof' => '1', 'check_phone' => '1'];
+        (new AssociateAdminController())->firstCheck(['id' => (string) $a['id'], 'bankId' => (string) $id]);
+        self::assertSame('One person verifies bank details — use Verify.', $this->flash()['message']);
+        IncentiveRepository::setSetting('bank_details_check_people', 'two', $this->admin);
         (new AssociateAdminController())->firstCheck(['id' => (string) $a['id'], 'bankId' => (string) $id]);
         self::assertSame('success', $this->flash()['type']);
         (new AssociateAdminController())->verifyBank(['id' => (string) $a['id'], 'bankId' => (string) $id]);
@@ -616,7 +621,7 @@ final class AssociateSystemTest extends DbTestCase
         $this->as($this->md);
         $_POST = ['status' => 'active', 'reason' => 'KYC and agreement done.'];
         (new AssociateAdminController())->changeStatus(['id' => (string) $a['id']]);
-        self::assertSame('An associate becomes Active once Accounts have verified their bank details (two people).', $this->flash()['message']);
+        self::assertSame('An associate becomes Active once they have confirmed their bank details and NexaCrest has verified them.', $this->flash()['message']); // D-293
     }
 
     // ---------------------------------------------------------------- staff pages, permissions, Zoho wording
@@ -640,7 +645,9 @@ final class AssociateSystemTest extends DbTestCase
         }
         $this->as($this->ed);
         $show = $this->render(fn () => (new AssociateAdminController())->show(['id' => (string) $a['id']]));
-        self::assertStringContainsString('Fixed level: <b>Level 3</b>', $show);
+        // D-291 / D-292: the commission rule section (rule "Fixed %", the level of the next order) for those who may see commission rules.
+        self::assertStringContainsString('<th>Rule</th><td><b>Fixed %</b>', $show);
+        self::assertMatchesRegularExpression('#<th>Next order earns</th><td><b class="stat-value">[^<]+</b> — Level 3</td>#u', $show);
         self::assertStringNotContainsString('Show full number', $show, 'the full bank number is Finance / MD only');
         $role = static fn (string $name): int => (int) Database::connection()->query('SELECT id FROM roles WHERE name = ' . Database::connection()->quote($name))->fetchColumn();
         self::assertFalse(\App\Services\PermissionService::can($sales, $role('Export Executive'), 'manage_associates'));

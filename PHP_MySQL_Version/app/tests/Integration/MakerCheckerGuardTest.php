@@ -60,7 +60,7 @@ final class MakerCheckerGuardTest extends DbTestCase
     public function testEveryRuleDefaultsToMdAndEdWithNoBlanketExemption(): void
     {
         // D-240 (2 Nov 2026) added 'price_discount'.
-        $rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment', 'price_discount'];
+        $rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment', 'price_discount', 'bank_details' /* D-293 */];
         self::assertSame($rules, array_keys(\App\Services\SelfApprovalRules::RULES));
         $md = $this->createTestUser('Managing Director');
         $ed = $this->createTestUser('Executive Director');

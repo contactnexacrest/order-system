@@ -99,7 +99,8 @@ final class MigrationFileConventionsTest extends TestCase
             // nothing left to match and is a clean no-op — the same
             // property these explicit guards exist to provide for
             // INSERT/CREATE/ALTER. (SET NAMES is not a statement that
-            // can conflict.)
+            // can conflict, and neither is a read-only SELECT left at the
+            // end as a "Check:" query, e.g. 2026-11-11h.)
             if (!$hasGuard) {
                 // Strip every comment line BEFORE splitting on ';' — a
                 // header comment's own prose can easily contain a
@@ -111,7 +112,7 @@ final class MigrationFileConventionsTest extends TestCase
                 ));
                 $statements = array_filter(
                     array_map('trim', explode(';', $withoutComments)),
-                    static fn (string $s): bool => $s !== '' && !preg_match('/^SET NAMES/i', $s)
+                    static fn (string $s): bool => $s !== '' && !preg_match('/^(SET NAMES|SELECT)\b/i', $s)
                 );
                 $hasGuard = $statements !== [] && array_reduce(
                     $statements,

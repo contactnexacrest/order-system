@@ -98,7 +98,10 @@ final class VendorBankDetailsTest extends DbTestCase
         $id = $this->createSupplier([]);
         $_POST = [];
         (new SupplierController())->sendDetailsLink(['id' => (string) $id]);
-        self::assertStringContainsString('emailed to accounts@heera.test', $this->lastFlash()['message']);
+        $sent = $this->lastFlash();
+        // D-280: "e-mailed" only when it was (no mail server in tests); the address and the link to copy are shown (as on Node).
+        self::assertStringContainsString('accounts@heera.test', $sent['message']);
+        self::assertStringContainsString('/vendor-details/', $sent['copy_link'] ?? '');
         $token = VendorDetailsRepository::liveDetailsToken(SupplierRepository::find($id));
         self::assertNotNull($token);
 

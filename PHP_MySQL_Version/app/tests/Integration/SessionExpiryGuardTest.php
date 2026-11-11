@@ -85,16 +85,21 @@ final class SessionExpiryGuardTest extends DbTestCase
 
     public function testTheClientPortalEnforcesTheSameIdleTimeoutAsStaff(): void
     {
+        // The seeded value is put back afterwards — leaving '5' broke SessionTimeoutsD283Test's seed check later in the run.
+        $before = CompanySettingsRepository::get('session_timeout_client_minutes');
         CompanySettingsRepository::set('session_timeout_client_minutes', '5');
+        try {
+            $clientId = $this->createTestClient();
+            $this->provisionClientLogin($clientId);
+            $_SESSION['_client_portal_client_id'] = $clientId;
+            $_SESSION['_client_last_activity_ts'] = time() - (10 * 60); // 10 minutes idle
 
-        $clientId = $this->createTestClient();
-        $this->provisionClientLogin($clientId);
-        $_SESSION['_client_portal_client_id'] = $clientId;
-        $_SESSION['_client_last_activity_ts'] = time() - (10 * 60); // 10 minutes idle
-
-        $middleware = ClientAuth::required();
-        self::assertFalse($middleware([]), 'an idle client-portal session must expire, matching the staff-side timeout');
-        self::assertNull(ClientPortalService::currentClientId());
+            $middleware = ClientAuth::required();
+            self::assertFalse($middleware([]), 'an idle client-portal session must expire, matching the staff-side timeout');
+            self::assertNull(ClientPortalService::currentClientId());
+        } finally {
+            CompanySettingsRepository::set('session_timeout_client_minutes', (string) ($before ?? '120'));
+        }
     }
 
     private function provisionClientLogin(int $clientId): void

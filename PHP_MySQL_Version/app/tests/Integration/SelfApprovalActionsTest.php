@@ -240,7 +240,7 @@ final class SelfApprovalActionsTest extends DbTestCase
         $pdo->prepare('UPDATE orders SET advance_pct = 40 WHERE id = :o')->execute(['o' => $orderId]);
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
-        $this->createTestDocument($orderId, 'PI', 'approved');
+        $this->createTestDocument($orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
         $pdo->prepare('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)')->execute(['o' => $orderId]);
         PartPaymentService::addLegReceipt($orderId, 'advance', 1500.0, '2026-10-20', 84.0, 'UTR' . random_int(10000, 99999), $recordedBy);
         return $orderId;

@@ -36,8 +36,14 @@ final class NavigationMenuD320Test extends DbTestCase
         '/associates/new', '/reports/associates', '/products/categories', '/products/price-rules', '/pricing/commission-levels',
         '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
         '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
-        '/products/create', '/suppliers/create',
+        '/products/create',
     ];
+
+    /**
+     * Decided bar (D-320 register): Procurement & suppliers has no "+ Add" entry; + Add supplier stays a button on the
+     * Suppliers page, which shows the section's bar.
+     */
+    private const PAGE_BUTTON_ONLY = ['/suppliers/create'];
 
     private const ALL_FLAGS = [
         'superAdmin' => true, 'sopOpen' => true, 'approver' => true, 'mod_supplier_purchase' => true, 'mod_import_stock' => true,
@@ -116,10 +122,16 @@ final class NavigationMenuD320Test extends DbTestCase
 
     public function testEveryOldMenuPageIsStillReachableFromAMenuAndShowsItsSectionBar(): void
     {
-        $linked = array_unique(array_map(static fn (array $l): string => self::pathOf((string) $l['href']), self::leaves()));
+        // A section without a menu bar of its own (Dashboard, My tasks) is reached from its left-menu entry.
+        $sectionEntries = array_map(static fn (array $s): string => self::pathOf((string) $s['href']), array_filter(Navigation::config()['sections'], static fn (array $s): bool => !empty($s['href'])));
+        $linked = array_unique(array_merge(array_map(static fn (array $l): string => self::pathOf((string) $l['href']), self::leaves()), $sectionEntries));
         foreach (self::OLD_MENU_PAGES as $page) {
             self::assertContains($page, $linked, "{$page} is in a section menu bar");
             self::assertNotNull(Navigation::sectionKeyFor($page), "{$page} belongs to a section, so its pages show the bar");
+        }
+        foreach (self::PAGE_BUTTON_ONLY as $page) {
+            self::assertNotContains($page, $linked, "{$page} is a button on its section's page, not a menu link");
+            self::assertSame('procurement', Navigation::sectionKeyFor($page), "{$page} shows the Procurement & suppliers bar");
         }
         self::assertSame('dashboard', Navigation::build(static fn (): bool => true, self::ALL_FLAGS, [], '/', [])['currentKey']);
     }

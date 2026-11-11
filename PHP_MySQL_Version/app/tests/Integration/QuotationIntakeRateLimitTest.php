@@ -44,7 +44,7 @@ final class QuotationIntakeRateLimitTest extends DbTestCase
         self::assertSame($before, $this->submissionCount(), 'a blocked request must not create a submission row');
         $flash = $_SESSION['_flash'] ?? [];
         self::assertNotEmpty($flash);
-        self::assertStringContainsString('Too many submissions', $flash[0]['message']);
+        self::assertStringContainsString('We have received too many forms from your network in a short time', $flash[0]['message']); // D-330 plain wording
     }
 
     public function testSubmissionSucceedsWhenUnderTheLimit(): void

@@ -85,7 +85,7 @@ final class OcAckButtonVisibilityTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Order Confirmation sent to the buyer on', $output, 'e-mail sending is off in the test database');
+        self::assertStringContainsString('Order Confirmation emailed to the buyer on', $output, 'D-280: Testing mode is off in the test database (as installed), so the OC went out by e-mail');
         self::assertStringContainsString("Record Buyer's Email Acknowledgement (unlocks Step 7)", $output);
     }
 }

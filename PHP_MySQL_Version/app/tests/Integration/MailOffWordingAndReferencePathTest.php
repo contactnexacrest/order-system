@@ -48,7 +48,8 @@ final class MailOffWordingAndReferencePathTest extends DbTestCase
 
     public function testPostingWithEmailSendingOffSaysTheClientWasNotEmailed(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // The buyer has an e-mail address (as the Node fixture gives every test client), so the only reason not to e-mail is Testing mode.
+        $orderId = $this->createTestOrder($this->createTestClient('mail-off-' . bin2hex(random_bytes(4)) . '@example.test'));
         $original = (string) (CompanySettingsRepository::get('email_testing_mode') ?? '0');
         $this->setMail('1') /* D-280: testing mode on */;
         try {

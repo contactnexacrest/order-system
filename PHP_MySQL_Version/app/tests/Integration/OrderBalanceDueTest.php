@@ -71,7 +71,7 @@ final class OrderBalanceDueTest extends DbTestCase
     public function testBalanceDueIsTheOrderValueMinusTheAdvanceActuallyReceived(): void
     {
         $this->recordAdvance(['advance_amount' => '3500', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('excess')]);
-        $this->createTestDocument($this->orderId, 'PI', 'approved');
+        $this->createTestDocument($this->orderId, 'PI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
         $_POST = ['advance_cleared_at' => '2026-10-27'];
         ob_start();
         (new OrderController())->clearAdvancePayment(['id' => (string) $this->orderId]);

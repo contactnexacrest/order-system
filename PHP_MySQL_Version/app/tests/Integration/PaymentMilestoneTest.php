@@ -184,7 +184,7 @@ final class PaymentMilestoneTest extends DbTestCase
             StageGateService::passAndUnlockNext($this->orderId, $stage, null);
         }
         OrderPaymentStatusRepository::recordBalanceReceived($this->orderId, 900.00, date('Y-m-d'));
-        $this->createTestDocument($this->orderId, 'CI', 'approved');
+        $this->createTestDocument($this->orderId, 'CI', 'sent'); // issued (D-280: Testing mode is off when installed, so a buyer document counts once sent)
         ob_start();
         (new OrderController())->clearBalancePayment(['id' => (string) $this->orderId]);
         ob_end_clean();

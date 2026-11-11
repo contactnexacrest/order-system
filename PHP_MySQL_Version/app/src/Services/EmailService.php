@@ -269,7 +269,8 @@ final class EmailService
         }
 
         $names = implode(', ', array_column($attachments, 'name'));
-        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Attachments: {$names}");
+        // D-280: the log keeps the full text (as sendPlainText's own fallback does), so a link can be sent by hand.
+        error_log("[EMAIL NOT SENT — no SMTP configured or PHPMailer not installed] To: {$to} | Subject: {$subject} | Attachments: {$names} | Body: {$body}");
         return false;
     }
 }

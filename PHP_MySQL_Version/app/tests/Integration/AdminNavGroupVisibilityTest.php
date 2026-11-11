@@ -62,7 +62,15 @@ final class AdminNavGroupVisibilityTest extends DbTestCase
         $userId = $this->createTestUser('Export Executive');
         $this->grantOnlyPermission($userId, 'manage_hs_codes');
 
-        $output = $this->renderDashboardAs($userId);
+        // D-320: HS codes moved to the Products section; the role already opens Products, so the
+        // left-menu entry goes to /products and the HS codes link is in that section's menu bar.
+        self::assertStringContainsString('href="/products" class="" data-nav="products"', $this->renderDashboardAs($userId));
+        $_SERVER['REQUEST_URI'] = '/products';
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new \App\Controllers\ProductController())->index([]);
+        $output = (string) ob_get_clean();
+        unset($_SERVER['REQUEST_URI']);
 
         self::assertStringContainsString('href="/hs-codes"', $output);
     }

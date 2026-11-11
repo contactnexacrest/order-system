@@ -262,7 +262,7 @@ final class OrderFeedbackTest extends DbTestCase
         $output = ob_get_clean();
 
         self::assertStringNotContainsString('action="/client/orders/' . $orderId . '/feedback"', $output);
-        self::assertStringContainsString('Feedback will be available once', $output);
+        self::assertStringContainsString('You can leave a review after we send you the shipping documents', $output); // D-330 plain wording
     }
 
     // ---------------------------------------------------------------

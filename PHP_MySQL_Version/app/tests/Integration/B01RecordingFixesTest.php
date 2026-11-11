@@ -169,7 +169,7 @@ final class B01RecordingFixesTest extends DbTestCase
         self::assertStringContainsString('.product-row > label.full,.product-row > .spec-options{grid-column:1 / -1;}', $css);
         self::assertMatchesRegularExpression('/\.spec-options\{display:grid;grid-template-columns:repeat\(auto-fill, minmax\(\d+px, 1fr\)\)/', $css);
         $picker = (string) file_get_contents(__DIR__ . '/../../views/orders/_product_picker.php');
-        self::assertMatchesRegularExpression('/<label class="full">Pick from Products.*<\/label>\s*<div class="full spec-options"/s', $picker, 'the options come after the picker');
+        self::assertMatchesRegularExpression('/<label class="full">Pick from Products.*<\/label>\s*(<\?php if \(empty\(\$__pickerNoSpecBox\)\):[^\n]*\?>\s*)?<div class="full spec-options"/s' /* D-273: the side panel shows the options in its own step, hence the optional condition */, $picker, 'the options come after the picker');
     }
 
     // ---- 4. My Tasks without a department membership ------------------------------------------
