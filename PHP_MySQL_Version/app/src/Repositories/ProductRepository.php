@@ -7,12 +7,16 @@ namespace App\Repositories;
 use App\Config\Database;
 
 /**
- * The Product Interface / internal product catalog (see docs/schema.sql
- * Section U). Deliberately standalone — no foreign keys to orders/
- * order_products anywhere in this repository or the tables it reads.
+ * The product catalogue (see docs/schema.sql Section U). Products are picked
+ * on order lines (order_products.catalog_product_id) and priced through
+ * associate price requests (price_requests.product_id); usage() counts those
+ * links so a used product is never deleted, only deactivated.
  */
 final class ProductRepository
 {
+    /** The list filter values (owner, 12 Nov 2026): active is the default. */
+    public const STATUSES = ['active', 'inactive', 'all'];
+
     /** @return array<int, array<string,mixed>> */
     public static function all(bool $activeOnly = true): array
     {
@@ -24,22 +28,127 @@ final class ProductRepository
         return Database::connection()->query($sql)->fetchAll();
     }
 
-    /** @return array<int, array<string,mixed>> */
-    public static function search(string $term): array
+    /** A status filter value from the query string — anything unknown is "active". */
+    public static function statusFilter(mixed $value): string
     {
+        return in_array($value, self::STATUSES, true) ? (string) $value : 'active';
+    }
+
+    /**
+     * The Products list: active, inactive or all products, optionally narrowed by a search term
+     * (name, HS code or specification).
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function listing(string $status = 'active', ?string $term = null): array
+    {
+        [$where, $params] = self::listingWhere($term);
+        if ($status === 'active') {
+            $where[] = 'is_active = 1';
+        } elseif ($status === 'inactive') {
+            $where[] = 'is_active = 0';
+        }
+        $stmt = Database::connection()->prepare('SELECT * FROM catalog_products' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)) . ' ORDER BY name');
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * The numbers on the "Active (n) · Inactive (n) · All (n)" chips — the same rows listing() returns.
+     *
+     * @return array{active:int, inactive:int, all:int}
+     */
+    public static function statusCounts(?string $term = null): array
+    {
+        [$where, $params] = self::listingWhere($term);
+        $stmt = Database::connection()->prepare(
+            'SELECT COALESCE(SUM(is_active = 1), 0) AS active, COALESCE(SUM(is_active = 0), 0) AS inactive, COUNT(*) AS total
+             FROM catalog_products' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where))
+        );
+        $stmt->execute($params);
+        $r = $stmt->fetch() ?: [];
+        return ['active' => (int) ($r['active'] ?? 0), 'inactive' => (int) ($r['inactive'] ?? 0), 'all' => (int) ($r['total'] ?? 0)];
+    }
+
+    /** @return array{0: list<string>, 1: array<string,string>} */
+    private static function listingWhere(?string $term): array
+    {
+        $term = trim((string) $term);
+        if ($term === '') {
+            return [[], []];
+        }
         // Three distinct placeholders, not :term reused three times —
         // PDO::ATTR_EMULATE_PREPARES is off (native prepares), which
         // doesn't allow binding one named parameter to multiple positions
         // in the same query (throws "Invalid parameter number").
-        $stmt = Database::connection()->prepare(
-            'SELECT * FROM catalog_products
-             WHERE is_active = 1
-               AND (name LIKE :term1 OR hs_code LIKE :term2 OR specifications LIKE :term3)
-             ORDER BY name'
-        );
         $needle = '%' . $term . '%';
-        $stmt->execute(['term1' => $needle, 'term2' => $needle, 'term3' => $needle]);
-        return $stmt->fetchAll();
+        return [['(name LIKE :term1 OR hs_code LIKE :term2 OR specifications LIKE :term3)'], ['term1' => $needle, 'term2' => $needle, 'term3' => $needle]];
+    }
+
+    /** @return array<int, array<string,mixed>> products matching the term (active ones unless a status is given) */
+    public static function search(string $term, string $status = 'active'): array
+    {
+        return self::listing($status, $term);
+    }
+
+    /**
+     * Where a product is used (owner, 12 Nov 2026): the orders whose lines were picked from it
+     * (removed lines included — the order history keeps them), the associate price requests for
+     * it, and the procurement lines (purchase requirements) bought for those order lines.
+     * Its own supplier prices, images, misc charges and specifications are not "use" — they
+     * belong to the product and are deleted with it.
+     *
+     * @return array{orders:int, order_lines:int, price_requests:int, procurement:int, total:int}
+     */
+    public static function usage(int $id): array
+    {
+        $pdo = Database::connection();
+        $one = static function (string $sql) use ($pdo, $id): int {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['id' => $id]);
+            return (int) $stmt->fetchColumn();
+        };
+        $u = [
+            'orders'         => $one('SELECT COUNT(DISTINCT order_id) FROM order_products WHERE catalog_product_id = :id'),
+            'order_lines'    => $one('SELECT COUNT(*) FROM order_products WHERE catalog_product_id = :id'),
+            'price_requests' => $one('SELECT COUNT(*) FROM price_requests WHERE product_id = :id'),
+            'procurement'    => $one('SELECT COUNT(*) FROM purchase_requirements pr JOIN order_products op ON op.id = pr.order_product_id WHERE op.catalog_product_id = :id'),
+        ];
+        $u['total'] = $u['orders'] + $u['price_requests'] + $u['procurement'];
+        return $u;
+    }
+
+    /** "3 orders · 1 price request" — or "not used anywhere". */
+    public static function usageText(array $usage): string
+    {
+        $parts = [];
+        foreach (['orders' => ['order', 'orders'], 'price_requests' => ['price request', 'price requests'], 'procurement' => ['procurement line', 'procurement lines']] as $k => [$one, $many]) {
+            $n = (int) ($usage[$k] ?? 0);
+            if ($n > 0) {
+                $parts[] = $n . ' ' . ($n === 1 ? $one : $many);
+            }
+        }
+        return $parts === [] ? 'not used anywhere' : implode(' · ', $parts);
+    }
+
+    /** Why this product may not be deleted, or null when it may (inactive and not used anywhere). */
+    public static function deleteRefusal(array $product, array $usage): ?string
+    {
+        if (!empty($product['is_active'])) {
+            return 'This product is active. Deactivate it first — only an inactive product that is not used anywhere can be deleted.';
+        }
+        if ((int) ($usage['total'] ?? 0) > 0) {
+            $what = (int) ($usage['orders'] ?? 0) > 0 ? 'those orders' : ((int) ($usage['price_requests'] ?? 0) > 0 ? 'those price requests' : 'those procurement lines');
+            return 'Used on ' . self::usageText($usage) . ' — kept so ' . $what . ' stay complete.';
+        }
+        return null;
+    }
+
+    /** Deactivate or reactivate a product. */
+    public static function setActive(int $id, bool $active, int $userId): void
+    {
+        Database::connection()->prepare('UPDATE catalog_products SET is_active = :a, updated_by = :u WHERE id = :id')
+            ->execute(['a' => $active ? 1 : 0, 'u' => $userId, 'id' => $id]);
     }
 
     /** @return array<int, array{id:int,name:string,hs_code:string,specifications:string,reference_unit:?string}> active products for the "Pick from Products" list */
@@ -145,11 +254,10 @@ final class ProductRepository
     }
 
     /**
-     * Hard delete. ON DELETE CASCADE on catalog_product_images/
-     * catalog_product_suppliers/catalog_product_misc_charges removes their
-     * rows for this product too — there is nothing else in the schema that
-     * references catalog_products.id (it is deliberately never linked into
-     * the order pipeline).
+     * Hard delete. ON DELETE CASCADE removes the product's own rows (images,
+     * supplier prices and their price history, misc charges, specifications).
+     * Callers must check deleteRefusal() first: an active or used product is
+     * never deleted (owner, 12 Nov 2026).
      */
     public static function delete(int $id): void
     {

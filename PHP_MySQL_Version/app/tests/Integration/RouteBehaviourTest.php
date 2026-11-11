@@ -471,6 +471,9 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertDone($this->call('POST', "/products/images/{$image}/delete"), 'POST /products/images/{id}/delete');
         self::assertNull($this->value("SELECT id FROM catalog_product_images WHERE id = {$image}"));
 
+        // Owner (12 Nov 2026): an active product is deactivated before it can be deleted.
+        $this->assertDone($this->call('POST', "/products/{$product}/deactivate"), 'POST /products/{id}/deactivate');
+        self::assertSame(1, $this->audits('PRODUCT_DEACTIVATED', $product));
         $this->assertDone($this->call('POST', "/products/{$product}/delete"), 'POST /products/{id}/delete');
         self::assertSame(1, $this->audits('PRODUCT_DELETED', $product));
     }
