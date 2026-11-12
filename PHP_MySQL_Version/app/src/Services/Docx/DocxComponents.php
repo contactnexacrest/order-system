@@ -636,6 +636,46 @@ final class DocxComponents
      * merged into every run (size/color etc.); bold/italic/underline on
      * it are always overridden per-segment.
      */
+    /**
+     * Owner decision D-343 (12 Nov 2026): the "LEGAL TERMS & DEFINITIONS" section the PDF prints
+     * (templates/_layout.html.twig, block legal_terms_definitions) — same number, heading, boxes and
+     * clauses — so the Word copy's sections match the PDF's. Nothing when the PDF has no such section.
+     */
+    public static function addLegalTermsSection(Section $section, array $context): void
+    {
+        $number = $context['legal_terms_section_number'] ?? null;
+        if ($number === null || $number === '' || $number === 0) {
+            return;
+        }
+        self::addSectionTitle($section, $number . '.  LEGAL TERMS & DEFINITIONS');
+        $boxes = [
+            [$context['legal_terms_clauses'] ?? [], 'FFF0F0', 'C0392B', 'LEGAL TERMS', 'These terms govern all commercial obligations under this document.'],
+            [$context['definition_clauses'] ?? [], 'F0F4FF', '1A5276', 'DEFINITIONS', 'The following terms have the meanings given below wherever they appear in this document.'],
+        ];
+        foreach ($boxes as [$clauses, $bg, $border, $header, $intro]) {
+            if (empty($clauses)) {
+                continue;
+            }
+            self::addColorBox($section, $bg, $border, function (AbstractContainer $cell) use ($clauses, $header, $intro): void {
+                $cell->addText($header, ['bold' => true, 'size' => 10, 'color' => self::NAVY]);
+                $cell->addText($intro, ['italic' => true, 'size' => 8.5, 'color' => self::MUTED]);
+                foreach ($clauses as $clause) {
+                    $run = $cell->addTextRun(['spaceAfter' => 60]);
+                    $run->addText("\u{2022} ", ['size' => 9]);
+                    $run->addText((string) ($clause['title'] ?? '') . ':', ['bold' => true, 'size' => 9, 'color' => self::NAVY]);
+                    $run->addText(' ', ['size' => 9]);
+                    foreach (MarkdownLite::tokenize((string) ($clause['text'] ?? '')) as $segment) {
+                        $style = ['size' => 9, 'bold' => $segment['bold'], 'italic' => $segment['italic']];
+                        if ($segment['underline']) {
+                            $style['underline'] = 'single';
+                        }
+                        $run->addText($segment['text'], $style);
+                    }
+                }
+            }, 4);
+        }
+    }
+
     public static function addMarkdownLiteListItem(AbstractContainer $container, string $text, array $baseStyle = [], ?array $paragraphStyle = null): void
     {
         $run = $container->addListItemRun(0, null, $paragraphStyle);

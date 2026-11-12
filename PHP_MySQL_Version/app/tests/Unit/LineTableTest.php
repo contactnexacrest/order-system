@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\Helpers\MoneyFormat;
 use App\Services\LineTable;
 use App\Services\UnitPrices;
 use PHPUnit\Framework\TestCase;
@@ -29,19 +30,20 @@ final class LineTableTest extends TestCase
         ];
     }
 
-    private static function formatted(array $lines): array
+    /** D-343: money as DocumentDataAssembler prints it — Indian grouping on an INR order. */
+    private static function formatted(array $lines, string $currency = 'USD'): array
     {
         return array_map(static fn (array $l): array => [
             'description' => $l['description'], 'quantity' => (string) $l['quantity'], 'unit' => $l['unit'],
-            'unit_price' => $l['unit_price'] !== null ? number_format((float) $l['unit_price'], 2) : 'To Be Confirmed',
-            'amount' => $l['fob_value'] !== null ? number_format((float) $l['fob_value'], 2) : 'To Be Confirmed',
+            'unit_price' => $l['unit_price'] !== null ? MoneyFormat::amount($l['unit_price'], $currency) : 'To Be Confirmed',
+            'amount' => $l['fob_value'] !== null ? MoneyFormat::amount($l['fob_value'], $currency) : 'To Be Confirmed',
             'line_type' => $l['line_type'], 'attributes' => [], 'sac_code' => null, 'dimensions' => $l['dimensions'], 'finish' => $l['finish'], 'hs_code' => $l['hs_code'],
         ], $lines);
     }
 
     private static function build(array $lines, string $currency = 'USD', ?string $letter = null, bool $prices = true): array
     {
-        return LineTable::build($lines, self::formatted($lines), $currency, $letter, $prices);
+        return LineTable::build($lines, self::formatted($lines, $currency), $currency, $letter, $prices);
     }
 
     public function testMeasuresAndRounding(): void
@@ -81,9 +83,10 @@ final class LineTableTest extends TestCase
         self::assertSame(['Material', 'Surface', 'Dimensions (cm)', 'CBM', 'Qty', 'CBM', 'Price (INR)', 'Price (INR)', 'Total Price'], array_column($t['heads']['top'], 'text'));
         self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per CBM', 'per piece', '(INR)'], $t['heads']['bottom']);
         $r = $t['rows'][0];
-        self::assertSame(['180', '80', '13', '0.1872', '25', '4.680', '175,000.00', '32,760.00', '819,000.00'],
+        // D-343: an INR order's money in Indian grouping.
+        self::assertSame(['180', '80', '13', '0.1872', '25', '4.680', '1,75,000.00', '32,760.00', '8,19,000.00'],
             [$r['l'], $r['w'], $r['h'], $r['per_piece'], $r['pcs'], $r['all_pcs'], $r['price_unit'], $r['price_piece'], $r['total']]);
-        self::assertSame(['60', '8.801', '1,540,175.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
+        self::assertSame(['60', '8.801', '15,40,175.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
         self::assertNull($t['totals_by_unit']);
         self::assertSame([['label' => 'HS Code:', 'text' => '68022310'], ['label' => 'Country of Origin:', 'text' => 'India']], $r['detail']);
     }
@@ -154,9 +157,9 @@ final class LineTableTest extends TestCase
         $t = self::build($lines, 'INR', 'A');
         $r = $t['rows'][1];
         self::assertSame('As per Annexure A', $r['annexure']);
-        self::assertSame(['—', '—', '2.400', '175,000.00', '—', '420,000.00'], [$r['per_piece'], $r['pcs'], $r['all_pcs'], $r['price_unit'], $r['price_piece'], $r['total']]);
+        self::assertSame(['—', '—', '2.400', '1,75,000.00', '—', '4,20,000.00'], [$r['per_piece'], $r['pcs'], $r['all_pcs'], $r['price_unit'], $r['price_piece'], $r['total']]);
         self::assertSame(['label' => null, 'text' => 'Qty as per Annexure A'], $r['detail'][0]);
-        self::assertSame(['25', '7.080', '1,239,000.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
+        self::assertSame(['25', '7.080', '12,39,000.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
         // Annexure B on the CI / PL when chosen (D-336).
         self::assertSame('As per Annexure B', self::build($lines, 'INR', 'B')['rows'][1]['annexure']);
     }

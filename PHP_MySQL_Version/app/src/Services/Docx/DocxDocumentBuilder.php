@@ -109,6 +109,80 @@ final class DocxDocumentBuilder
     }
 
     /**
+     * Owner decision D-343 (12 Nov 2026): the Word copy numbers its sections exactly as the PDF —
+     * the number DocumentGenerationService::sectionNumbers() gave the PDF for this slot.
+     */
+    private static function sn(array $context, string $slot, int $fallback): int
+    {
+        $n = $context['section_numbers'][$slot] ?? null;
+        return $n !== null ? (int) $n : $fallback;
+    }
+
+    /**
+     * Owner decision D-343: the Buyer Details, Consignee Details and Notify Party sections as the PDF prints them
+     * (templates/_buyer_details, _consignee_details, _notify_party): same titles, numbers, rows, and shown only when
+     * the PDF shows them (show_consignee_section / show_notify_party_section).
+     */
+    private static function partiesSections(Section $section, array $context, bool $showBuyerPo = false): void
+    {
+        $buyerRows = self::buyerDetailsRows($context['buyer'] ?? []);
+        if ($showBuyerPo) {
+            $buyerRows = array_merge($buyerRows, self::buyerPoRow($context['order'] ?? []));
+        }
+        DocxComponents::addSectionTitle($section, self::sn($context, 'buyer', 2) . '. BUYER DETAILS');
+        DocxComponents::addKvTable($section, $buyerRows);
+        if (!empty($context['show_consignee_section']) && isset($context['section_numbers']['consignee'])) {
+            DocxComponents::addSectionTitle($section, self::sn($context, 'consignee', 3) . '. CONSIGNEE DETAILS');
+            DocxComponents::addKvTable($section, self::consigneeRows($context['consignee'] ?? []));
+        }
+        if (!empty($context['show_notify_party_section']) && isset($context['section_numbers']['notify_party'])) {
+            DocxComponents::addSectionTitle($section, self::sn($context, 'notify_party', 4) . '. NOTIFY PARTY');
+            DocxComponents::addKvTable($section, self::notifyPartyRows($context['notify_party_block'] ?? []));
+        }
+    }
+
+    /** @return array<int,array{label:string,value:string}> the rows of templates/_consignee_details */
+    private static function consigneeRows(array $c): array
+    {
+        $v = static fn (string $k): string => trim((string) ($c[$k] ?? ''));
+        $rows = [
+            ['label' => 'Company Legal Name *', 'value' => $v('company_legal_name')],
+            ['label' => 'Address Line 1 *', 'value' => $v('address_line1')],
+        ];
+        if ($v('address_line2') !== '') {
+            $rows[] = ['label' => 'Address Line 2', 'value' => $v('address_line2')];
+        }
+        if ($v('city') !== '') {
+            $rows[] = ['label' => 'City / Town *', 'value' => $v('city')];
+        }
+        if ($v('postcode') !== '') {
+            $rows[] = ['label' => 'Postcode *', 'value' => $v('postcode')];
+        }
+        $rows[] = ['label' => 'Country *', 'value' => $v('country') !== '' ? $v('country') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'VAT / EORI / Tax Reg. *', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Contact Person *', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Phone *', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
+        $rows[] = ['label' => 'Email *', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
+        return $rows;
+    }
+
+    /** @return array<int,array{label:string,value:string}> the rows of templates/_notify_party */
+    private static function notifyPartyRows(array $n): array
+    {
+        $v = static fn (string $k): string => trim((string) ($n[$k] ?? ''));
+        $rows = [['label' => 'Notify Party Name', 'value' => $v('name') !== '' ? $v('name') : 'To Be Confirmed']];
+        foreach ([['address_line1', 'Address Line 1'], ['address_line2', 'Address Line 2'], ['city', 'City / Town'], ['postcode', 'Postcode'], ['country', 'Country']] as [$k, $label]) {
+            if ($v($k) !== '') {
+                $rows[] = ['label' => $label, 'value' => $v($k)];
+            }
+        }
+        $rows[] = ['label' => 'Contact Person', 'value' => $v('contact_person') !== '' ? $v('contact_person') : '—'];
+        $rows[] = ['label' => 'Phone', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
+        $rows[] = ['label' => 'Email', 'value' => $v('email') !== '' ? $v('email') : '—'];
+        return $rows;
+    }
+
+    /**
      * Owner (1 Nov 2026, confirmed twice): the PI prints Buyer's PO / Ref No.
      * only once one has been entered — no empty or "NIL" row.
      *
@@ -296,7 +370,8 @@ final class DocxDocumentBuilder
     {
         DocxComponents::addPlainParagraph($section, 'Weight & Volume (Estimated — actuals confirmed on Packing List after production)', ['bold' => true, 'size' => 10.5, 'color' => DocxComponents::NAVY]);
         $rows = [
-            ['Total CBM (m³)', self::g($order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
+            // D-343: a detailed order's QT / PI print the CBM worked out from the lines (as the PDF).
+            ['Total CBM (m³)', !empty($order['line_table_total_cbm']) ? (string) $order['line_table_total_cbm'] : self::g($order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
             ['Gross Weight (incl. packing)', self::g($order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
             [self::cd($context)['net_weight_label'], self::g($order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
             [self::cd($context)['package_count_label'], self::g($order, 'estimated_package_count', 'To Be Confirmed'), self::cd($context)['package_nouns']],
@@ -400,20 +475,10 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
 
-        DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE DETAILS');
-        DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
-            ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Country of Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
-            ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
-        ]);
+        // D-343: buyer, consignee (when the PDF shows it) and numbers exactly as the PDF.
+        self::partiesSections($section, $context);
 
-        DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'product', 3) . '. PRODUCT / ORDER DETAILS');
         self::productsTable($section, $context, $currency, $context['products'] ?? []);
 
         $freightText = !empty($order['is_fob'])
@@ -429,7 +494,7 @@ final class DocxDocumentBuilder
 
         self::weightTable($section, $order, $context);
 
-        DocxComponents::addSectionTitle($section, '4. SHIPPING / COMMERCIAL TERMS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'shipping', 4) . '. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
             ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
@@ -439,11 +504,11 @@ final class DocxDocumentBuilder
             ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
         ]);
 
-        DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
         // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
         self::paymentTermsBlock($section, $context, true, true);
 
-        DocxComponents::addSectionTitle($section, '6. DOCUMENTS TO BE PROVIDED');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 6) . '. DOCUMENTS TO BE PROVIDED');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
             '1.  Commercial Invoice (signed and stamped)',
             '2.  Packing List (signed and stamped)',
@@ -465,6 +530,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 7), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
         DocxComponents::addClientAgreementFooter($section, $context);
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }
@@ -509,21 +575,10 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
 
-        DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE DETAILS');
-        DocxComponents::addKvTable($section, array_merge([
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
-            ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Country of Final Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
-            ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
-            ['label' => 'Notify Party', 'value' => self::g($buyer, 'notify_party', 'SAME as buyer')],
-        ], self::buyerPoRow($order)));
+        // D-343: buyer (with the Buyer's PO), consignee and notify party as the PDF, same numbers.
+        self::partiesSections($section, $context, true);
 
-        DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'product', 3) . '. PRODUCT / ORDER DETAILS');
         $products = $context['products'] ?? [];
         self::productsTable($section, $context, $currency, $products);
 
@@ -572,7 +627,7 @@ final class DocxDocumentBuilder
 
         self::weightTable($section, $order, $context);
 
-        DocxComponents::addSectionTitle($section, '4. SHIPPING / COMMERCIAL TERMS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'shipping', 4) . '. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
             ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
@@ -582,13 +637,13 @@ final class DocxDocumentBuilder
             ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
         ]);
 
-        DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
         self::paymentTermsBlock($section, $context, true, true, 'this document');
         if (!empty($financial['has_advance'])) {
             DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
         }
 
-        DocxComponents::addSectionTitle($section, '6. PRODUCTION & ESTIMATED SHIPMENT');
+        // D-343: as on the PDF, the production box carries no numbered heading.
         DocxComponents::addKvTable($section, [[
             'full' => true,
             'bg' => DocxComponents::GRAY_LIGHT,
@@ -605,14 +660,14 @@ final class DocxDocumentBuilder
             },
         ]]);
 
-        DocxComponents::addSectionTitle($section, '7. BANK DETAILS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'bank', 7) . '. BANK DETAILS');
         DocxComponents::addKvTable($section, self::bankDetailsRows(
             $context,
             'Please quote PI No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.',
             self::g($company, 'rbi_purpose_code_advance') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
         ));
 
-        DocxComponents::addSectionTitle($section, '8. EXPORT DOCUMENTATION');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'export_doc', 8) . '. EXPORT DOCUMENTATION');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
             '1.  Commercial Invoice (signed and stamped)',
             '2.  Packing List (signed and stamped)',
@@ -624,6 +679,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
         DocxComponents::addClientAgreementFooter($section, $context);
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }
@@ -662,19 +718,11 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
 
-        DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE DETAILS');
-        DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
-            ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Phone *', 'value' => self::g($consignee, 'phone', '—')],
-            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
-        ]);
+        // D-343: buyer and consignee as the PDF, same numbers.
+        self::partiesSections($section, $context);
 
         $productList = array_map(static fn(array $p) => ($p['description'] ?? '') . ' (Qty: ' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ')', $context['products'] ?? []);
-        DocxComponents::addSectionTitle($section, '3. ORDER SUMMARY');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'order_summary', 3) . '. ORDER SUMMARY');
         if (!empty($context['line_table'])) {
             self::productsTable($section, $context, $currency, $context['products'] ?? []); // D-339
         }
@@ -692,7 +740,7 @@ final class DocxDocumentBuilder
             ['label' => 'Certificate of Origin', 'value' => self::g($order, 'coo_type')],
         ]);
 
-        DocxComponents::addSectionTitle($section, '4. PAYMENT STATUS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'payment_status', 4) . '. PAYMENT STATUS');
         $hasAdvance = !empty($financial['has_advance']);
         $paymentRows = array_merge($hasAdvance ? [
             ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ') *', 'value' => self::g($financial, 'advance_amount')],
@@ -717,7 +765,7 @@ final class DocxDocumentBuilder
         }
         DocxComponents::addKvTable($section, $paymentRows);
 
-        DocxComponents::addSectionTitle($section, '5. PRODUCTION & ESTIMATED SHIPMENT');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'production', 5) . '. PRODUCTION & ESTIMATED SHIPMENT');
         DocxComponents::addKvTable($section, [[
             'full' => true,
             'bg' => DocxComponents::GRAY_LIGHT,
@@ -734,7 +782,7 @@ final class DocxDocumentBuilder
             },
         ]]);
 
-        DocxComponents::addSectionTitle($section, '6. DOCUMENTS TO BE PROVIDED');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 6) . '. DOCUMENTS TO BE PROVIDED');
         DocxComponents::addKvTable($section, [[
             'full' => true,
             'value' => function (AbstractContainer $cell) use ($context) {
@@ -747,6 +795,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 7), (string) ($context['terms_section_title'] ?? 'ORDER CONDITIONS'));
         DocxComponents::addClientAgreementFooter($section, $context);
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }
@@ -775,6 +824,7 @@ final class DocxDocumentBuilder
         self::addAnnexureBody($section, $context);
 
         // terms_section suppressed in the source template
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         DocxComponents::addSignatureBlock($section, $context);
     }
 
@@ -1039,6 +1089,7 @@ final class DocxDocumentBuilder
         ]]);
 
         // terms_section and signature_block are both suppressed in the source template — Section 4 above covers acceptance/signature.
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
     }
 
@@ -1268,6 +1319,7 @@ final class DocxDocumentBuilder
             self::g($company, 'rbi_purpose_code_freight') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
         ));
 
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         DocxComponents::addSignatureBlock($section, $context);
     }
 
@@ -1297,33 +1349,17 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'EXPORTER');
 
-        DocxComponents::addSectionTitle($section, '2. CONSIGNEE / BUYER');
-        $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
-        $leftCell = $table->addCell(2500, ['valign' => 'top', 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
-        foreach ([['Company Legal Name *', $buyer, 'company_legal_name'], ['Consignee Name *', $buyer, 'consignee_name'], ['Consignee Address *', $buyer, 'consignee_address'], ['VAT / EORI / Tax Reg. No. *', $consignee, 'vat_eori_tax_no']] as [$label, $src, $key]) {
-            $run = $leftCell->addTextRun();
-            $run->addText($label . "\n", ['bold' => true, 'color' => DocxComponents::NAVY]);
-            $run->addText((string) self::g($src, $key, 'To Be Confirmed'));
-        }
-        $rightCell = $table->addCell(2500, ['valign' => 'top', 'bgColor' => DocxComponents::GRAY_LIGHT, 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
-        $rightVals = [
-            ['Incoterm *', self::g($order, 'incoterm_label')],
-            ['Port of Loading *', self::g($order, 'port_of_loading')],
-            ['Port of Discharge *', self::g($order, 'port_of_discharge')],
-            ['Country of Final Destination *', self::g($consignee, 'country', 'To Be Confirmed')],
-            ['Notify Party', self::g($buyer, 'notify_party', 'Same as consignee')],
-        ];
-        foreach ($rightVals as [$label, $val]) {
-            $run = $rightCell->addTextRun();
-            $run->addText($label . "\n", ['bold' => true, 'color' => DocxComponents::NAVY]);
-            $run->addText((string) $val);
-        }
-        $section->addTextBreak(1, 6);
+        // D-343: buyer, consignee and notify party as the PDF, same numbers, then the incoterm and ports.
+        self::partiesSections($section, $context);
+        DocxComponents::addKvTable($section, [
+            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
+            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+        ]);
 
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . (!empty($p['finish']) ? ' — ' . $p['finish'] : ''), $products));
         $hsCodeList = implode(', ', array_map(static fn(array $p) => $p['hs_code'] ?? '', $products));
-        DocxComponents::addSectionTitle($section, '3. PRODUCT SUMMARY');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'product_summary', 3) . '. PRODUCT SUMMARY');
         if (!empty($context['line_table'])) {
             self::productsTable($section, $context, '', $products); // D-339: the detailed table, no prices
         }
@@ -1338,7 +1374,7 @@ final class DocxDocumentBuilder
             ['label' => 'Total CBM *', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
         ]);
 
-        DocxComponents::addSectionTitle($section, '4. ' . self::cd($context)['package_upper'] . '-LEVEL BREAKDOWN  (from factory packing data)');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'crate_breakdown', 4) . '. ' . self::cd($context)['package_upper'] . '-LEVEL BREAKDOWN  (from factory packing data)');
         DocxComponents::addPlainParagraph($section, "Filled from the factory packing supervisor's actual measurements. Each row = one physical " . self::cd($context)['package_lower'] . '.', ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
         DocxComponents::addRichParagraph($section, [
             ['Marks & Numbers format: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
@@ -1372,13 +1408,14 @@ final class DocxDocumentBuilder
             DocxComponents::addPlainParagraph($section, self::cd($context)['package_noun'] . '-level breakdown not yet recorded.', ['italic' => true, 'size' => 8.7, 'color' => '5b6774']);
         }
 
-        DocxComponents::addSectionTitle($section, '5. DECLARATION');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'declaration', 5) . '. DECLARATION');
         DocxComponents::addKvTable($section, [[
             'full' => true,
             'value' => "We hereby declare that the particulars given above are true and correct to the best of our knowledge and belief, and that the goods described herein are of Indian origin.\nFumigation Certificate: A Fumigation Certificate is provided as standard with every NexaCrest shipment and will be included in the final document set couriered to the buyer.",
         ]]);
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }
@@ -1552,20 +1589,10 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'EXPORTER / SELLER');
 
-        DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE');
-        DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
-            ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
-            ['label' => 'Notify Party', 'value' => self::g($buyer, 'notify_party', 'SAME as consignee')],
-            ['label' => 'Country of Final Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-        ]);
+        // D-343: buyer, consignee and notify party as the PDF, same numbers.
+        self::partiesSections($section, $context);
 
-        DocxComponents::addSectionTitle($section, '3. SHIPPING DETAILS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'shipping_details', 3) . '. SHIPPING DETAILS');
         DocxComponents::addKvTable($section, [
             ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
@@ -1578,7 +1605,7 @@ final class DocxDocumentBuilder
             ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List'],
         ]);
 
-        DocxComponents::addSectionTitle($section, '4. PRODUCT / ORDER DETAILS');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'product', 4) . '. PRODUCT / ORDER DETAILS');
         DocxComponents::addPlainParagraph($section, 'Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.', ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
         self::productsTable($section, $context, $currency, $products);
         $plRefLine = 'PL Reference: ' . self::g($order, 'pl_ref', 'To Be Confirmed');
@@ -1589,7 +1616,7 @@ final class DocxDocumentBuilder
         }
         DocxComponents::addPlainParagraph($section, $plRefLine . '.', ['size' => 9, 'color' => DocxComponents::MUTED]);
 
-        DocxComponents::addSectionTitle($section, '5. INVOICE VALUE & PAYMENT SETTLEMENT');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'invoice_value', 5) . '. INVOICE VALUE & PAYMENT SETTLEMENT');
         $isFob = !empty($order['is_fob']);
         $isCif = !empty($order['is_cif']);
         DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($isFob, $isCif) {
@@ -1645,14 +1672,14 @@ final class DocxDocumentBuilder
             [' *', ['bold' => true, 'color' => 'C0392B']],
         ]);
 
-        DocxComponents::addSectionTitle($section, '6. BANK DETAILS  (for balance T/T payment)');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'bank', 6) . '. BANK DETAILS  (for balance T/T payment)');
         DocxComponents::addKvTable($section, array_merge(self::bankDetailsRows(
             $context,
             'Please quote CI No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.',
             self::g($company, 'rbi_purpose_code_balance') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
         ), [['label' => 'Bank Charges', 'value' => self::g($financial, 'bank_charges_text', '')]]));
 
-        DocxComponents::addSectionTitle($section, '7. DOCUMENTS PROVIDED WITH THIS SHIPMENT');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 7) . '. DOCUMENTS PROVIDED WITH THIS SHIPMENT');
         self::documentsProvidedParagraphs($section, 'The following documents are provided with this shipment:', [
             '1.  Commercial Invoice (this document — signed and stamped)',
             '2.  Packing List (signed and stamped)',
@@ -1662,12 +1689,13 @@ final class DocxDocumentBuilder
             ...self::qualityLines($context, 5),
         ]);
 
-        DocxComponents::addSectionTitle($section, '8. DECLARATION');
+        DocxComponents::addSectionTitle($section, self::sn($context, 'declaration', 8) . '. DECLARATION');
         DocxComponents::addPlainParagraph($section, 'We hereby declare that the goods described in this Commercial Invoice are of Indian origin and that the particulars given are true and correct.', ['italic' => true, 'color' => DocxComponents::MUTED]);
         DocxComponents::addPlainParagraph($section, 'This invoice is issued under Letter of Undertaking (LUT Order No. ' . self::g($company, 'lut_number') . ') for export of goods without payment of IGST under the provisions of the IGST Act, 2017.', ['italic' => true, 'color' => DocxComponents::MUTED]);
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
         DocxComponents::addClientAgreementFooter($section, $context);
+        DocxComponents::addLegalTermsSection($section, $context); // D-343: as the PDF
         self::addAnnexureAppendixIfAny($section, $context);
         DocxComponents::addSignatureBlock($section, $context);
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\MoneyFormat;
+
 /**
  * Owner decision D-339 (12 Nov 2026, owner confirmed twice — "confirm 1" and
  * "confirm 2 with option a"; mockups approved): the detailed product table of
@@ -215,6 +217,51 @@ final class LineTable
     }
 
     /**
+     * Owner decision D-343: the total CBM of the goods lines, for the "Weight & Volume" box of a detailed order —
+     *   a line with a piece size (L, W, H) and pieces: pieces × L × W × H / 1,000,000 (per piece rounded to 4 decimals, as the table);
+     *   a CBM line without a size: its quantity;
+     *   a SQM / SQFT line with a thickness: its area × the thickness;
+     * null when there is no goods line or any goods line cannot be turned into CBM (SQM / SQFT without a thickness,
+     * PCS without a size, any other unit, a quantity still to be confirmed). Services and charges are not counted.
+     *
+     * @param list<array<string,mixed>> $lines order_products rows
+     */
+    public static function totalCbm(array $lines): ?float
+    {
+        $total = 0.0;
+        $any = false;
+        foreach ($lines as $line) {
+            if (($line['line_type'] ?? 'goods') !== 'goods') {
+                continue;
+            }
+            $any = true;
+            $l = self::size($line['piece_length_cm'] ?? null);
+            $w = self::size($line['piece_width_cm'] ?? null);
+            $h = self::size($line['piece_thickness_cm'] ?? null);
+            $pieces = isset($line['pieces_count']) && $line['pieces_count'] !== null && $line['pieces_count'] !== '' ? (int) $line['pieces_count'] : 0;
+            if ($l !== null && $w !== null && $h !== null && $pieces > 0) {
+                $total += (float) self::perPiece('CBM', $l, $w, $h) * $pieces;
+                continue;
+            }
+            $tbc = !empty($line['quantity_is_tbc']) || ($line['quantity'] ?? null) === null || $line['quantity'] === '';
+            $u = self::docUnit($line['unit'] ?? null);
+            if ($tbc || $u === null || $u === 'PCS') {
+                return null;
+            }
+            $qty = (float) $line['quantity'];
+            if ($u === 'CBM') {
+                $total += $qty;
+            } elseif ($h !== null) {
+                $sqm = $u === 'SQM' ? $qty : $qty / LineUnits::SQFT_PER_M2;
+                $total += $sqm * $h / 100;
+            } else {
+                return null;
+            }
+        }
+        return $any ? round(round($total, 6), 3) : null;
+    }
+
+    /**
      * The detailed table of a document.
      *
      * @param list<array<string,mixed>> $lines     the order_products rows on the document (in order)
@@ -306,8 +353,9 @@ final class LineTable
                 'all_pcs' => $qty !== null ? $suffix(self::formatQuantity($qty, $u)) : 'To Be Confirmed',
                 // The short table's "Qty" (every unit, PCS included).
                 'qty' => $qty !== null ? $suffix(self::formatQuantity($qty, $u)) : 'To Be Confirmed',
-                'price_unit' => $price !== null ? number_format($price, 2) . ($mixed ? ' /' . $u : '') : 'To Be Confirmed',
-                'price_piece' => $pricePiece !== null && !$perAnnexure && ($per !== null || $u === 'PCS') ? number_format($pricePiece, 2) : self::DASH,
+                // D-343: money in Indian grouping on an INR order (1,75,000.00), as before in every other currency.
+                'price_unit' => $price !== null ? MoneyFormat::amount($price, $currency) . ($mixed ? ' /' . $u : '') : 'To Be Confirmed',
+                'price_piece' => $pricePiece !== null && !$perAnnexure && ($per !== null || $u === 'PCS') ? MoneyFormat::amount($pricePiece, $currency) : self::DASH,
                 'total' => (string) ($f['amount'] ?? ''),
                 'crates' => self::crates($crateCounts, (string) $line['description']),
                 'detail' => self::detail($line, $f, $perAnnexure ? $annexureLetter : null, $hasSize),
@@ -329,7 +377,7 @@ final class LineTable
             'pcs' => $pcsAny ? number_format($pcsTotal) : '',
             // One unit: its total (a PCS-only full table counts the pieces instead). Mixed units are never added up.
             'measure' => !$mixed && isset($byUnit[$units[0]]) && ($units[0] !== 'PCS' || $out['variant'] === 'short') ? self::formatQuantity($byUnit[$units[0]], $units[0]) : '',
-            'amount' => number_format($amount, 2),
+            'amount' => MoneyFormat::amount($amount, $currency),
         ];
         $out['totals_by_unit'] = $mixed && $parts !== [] ? 'Totals by unit: ' . implode(' · ', $parts) : null;
         return $out;

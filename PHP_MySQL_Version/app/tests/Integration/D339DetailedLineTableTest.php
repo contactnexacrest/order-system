@@ -107,22 +107,23 @@ final class D339DetailedLineTableTest extends DbTestCase
         $this->ownersExample($orderId);
         $t = DocumentDataAssembler::assemble($orderId, 'QT')['line_table'];
         self::assertSame('full', $t['variant']);
-        self::assertSame(['60', '8.801', '1,540,175.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
+        // D-343: an INR order prints its money in Indian grouping.
+        self::assertSame(['60', '8.801', '15,40,175.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
         self::assertNull(DocumentDataAssembler::assemble($orderId, 'SUPPO')['line_table'], 'only QT, PI, OC, CI, Buyer PO and PL');
         self::assertFalse(DocumentDataAssembler::assemble($orderId, 'PL')['line_table']['with_prices']);
 
         $qt = DocumentGenerationService::generate($orderId, 'QT', $this->admin, null, true, true);
-        $row = '1 CHM Black P6 180 80 13 0.1872 25 4.680 175,000.00 32,760.00 819,000.00';
+        $row = '1 CHM Black P6 180 80 13 0.1872 25 4.680 1,75,000.00 32,760.00 8,19,000.00';
         self::assertStringContainsString($row, $this->docxText((int) $qt['docx_file_id']));
-        self::assertStringContainsString('TOTAL 60 8.801 1,540,175.00', $this->docxText((int) $qt['docx_file_id']));
+        self::assertStringContainsString('TOTAL 60 8.801 15,40,175.00', $this->docxText((int) $qt['docx_file_id']));
         $pdf = $this->pdfText((int) $qt['pdf_file_id']);
-        foreach (['0.1872', '32,760.00', '819,000.00', 'No. of', 'per piece', '1,540,175.00'] as $word) {
+        foreach (['0.1872', '32,760.00', '8,19,000.00', 'No. of', 'per piece', '15,40,175.00'] as $word) {
             self::assertStringContainsString($word, $pdf);
         }
         $pl = DocumentGenerationService::generate($orderId, 'PL', $this->admin, null, true, true);
         $plText = $this->docxText((int) $pl['docx_file_id']);
         self::assertStringContainsString('1 CHM Black P6 180 80 13 0.1872 25 4.680', $plText);
-        self::assertStringNotContainsString('175,000.00', $plText, 'the Packing List carries no prices');
+        self::assertStringNotContainsString('1,75,000.00', $plText, 'the Packing List carries no prices');
     }
 
     public function testTheServerWorksOutTheQuantityFromThePieces(): void

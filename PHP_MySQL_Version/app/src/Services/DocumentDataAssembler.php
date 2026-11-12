@@ -65,6 +65,9 @@ final class DocumentDataAssembler
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
         }
+        // Owner decision D-343: money on the documents of an INR order in Indian grouping (1,75,000.00), others as before.
+        $moneyCurrency = (string) ($order['currency_code'] ?? '');
+        $money = static fn (string|int|float|null $v): string => self::formatMoney($v, $moneyCurrency);
         // Owner decision D-215: the selling documents list every line; the goods
         // documents (CI, Packing List, COO, Supplier PO, BL…) goods and charges only —
         // a service line is invoiced on its own Export Service Invoice.
@@ -94,10 +97,10 @@ final class DocumentDataAssembler
             // The CI's milestone row names the step by its first words ("on shipment"), the full wording below it.
             'due_short' => trim(explode(' — ', (string) $m['due_text'])[0]),
             'amount_raw' => round($fobValue * (float) $m['pct'] / 100, 2),
-            'amount' => self::formatMoney(round($fobValue * (float) $m['pct'] / 100, 2)),
+            'amount' => $money(round($fobValue * (float) $m['pct'] / 100, 2)),
             'received' => $m['received_amount'] !== null,
             'received_amount_raw' => $m['received_amount'] !== null ? (float) $m['received_amount'] : 0.0,
-            'received_amount' => $m['received_amount'] !== null ? self::formatMoney((float) $m['received_amount']) : null,
+            'received_amount' => $m['received_amount'] !== null ? $money((float) $m['received_amount']) : null,
             'received_on' => $m['received_on'] !== null ? self::formatDate((string) $m['received_on']) : null,
             'bank_reference' => $m['bank_reference'],
         ], \App\Repositories\PaymentMilestoneRepository::forOrder($orderId));
@@ -235,12 +238,15 @@ final class DocumentDataAssembler
                 'pl_ref'               => $plDoc['document_reference'] ?? null,
                 'special_requirements' => $order['special_requirements'],
                 'estimated_total_cbm'      => $order['estimated_total_cbm'],
+                // Owner decision D-343: the Weight & Volume box of a detailed order's QT / PI prints the CBM worked out from the lines.
+                'line_table_total_cbm'     => self::lineTableTotalCbm($order, $products, $documentTypeCode),
                 'estimated_gross_weight_kg' => $order['estimated_gross_weight_kg'],
                 'estimated_net_weight_kg'  => $order['estimated_net_weight_kg'],
                 'estimated_package_count'  => $order['estimated_package_count'],
                 'estimated_package_type'   => $order['estimated_package_type'],
-                'indicative_freight_amount' => $order['indicative_freight_amount'],
-                'indicative_insurance_amount' => $order['indicative_insurance_amount'],
+                // D-343: an INR order prints these in Indian grouping; every other currency exactly as stored (as before).
+                'indicative_freight_amount' => self::indicativeMoney($order['indicative_freight_amount'], $moneyCurrency),
+                'indicative_insurance_amount' => self::indicativeMoney($order['indicative_insurance_amount'], $moneyCurrency),
             ],
             'buyer' => [
                 'company_legal_name'     => $order['company_legal_name'],
@@ -277,7 +283,7 @@ final class DocumentDataAssembler
             'show_notify_party_section' => $showNotifyPartySection,
             // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
             'category_documents' => CategoryDocumentProfile::forOrder($orderId),
-            'products' => $formattedProducts = array_map(static function (array $p) use ($annexureLineLetter): array {
+            'products' => $formattedProducts = array_map(static function (array $p) use ($annexureLineLetter, $money): array {
                 // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
                 $perAnnexure = $annexureLineLetter !== null && !empty($p['as_per_annexure']);
                 $quantity = $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']);
@@ -288,8 +294,8 @@ final class DocumentDataAssembler
                     'hs_code'        => $p['hs_code'],
                     'quantity'       => $perAnnexure && !$p['quantity_is_tbc'] ? AnnexureChoice::quantityText($quantity, $annexureLineLetter) : $quantity,
                     'unit'           => $p['unit'],
-                    'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'To Be Confirmed',
-                    'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'To Be Confirmed',
+                    'unit_price'     => $p['unit_price'] !== null ? $money($p['unit_price']) : 'To Be Confirmed',
+                    'amount'         => $p['fob_value'] !== null ? $money($p['fob_value']) : 'To Be Confirmed',
                     'line_type'      => $p['line_type'] ?? 'goods',
                     // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
                     'attributes'     => \App\Repositories\ProductCategoryRepository::documentAttributes($p),
@@ -300,20 +306,20 @@ final class DocumentDataAssembler
             // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
             'line_table' => self::lineTableBlock($order, $products, $formattedProducts, $documentTypeCode, $annexureLineLetter, $orderId),
             'financial' => [
-                'fob_value'        => self::formatMoney($fobValue),
+                'fob_value'        => $money($fobValue),
                 'fob_value_raw'    => $fobValue,
                 // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
                 'has_services'        => $serviceValue > 0,
-                'service_value'       => self::formatMoney($serviceValue),
-                'total_with_services' => self::formatMoney($fobValue + $serviceValue),
+                'service_value'       => $money($serviceValue),
+                'total_with_services' => $money($fobValue + $serviceValue),
                 'advance_pct'      => rtrim(rtrim(number_format($advancePct, 2), '0'), '.'),
-                'advance_amount'   => self::formatMoney($advanceAmount),
+                'advance_amount'   => $money($advanceAmount),
                 'advance_trigger_text' => $order['advance_trigger_text'],
                 'milestones'       => $milestones,
                 // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
-                'subtotal_paid_with_milestones' => self::formatMoney(round(($payment !== null && $payment['advance_amount'] !== null ? (float) $payment['advance_amount'] : $advanceAmount) + $milestonesReceived, 2)),
+                'subtotal_paid_with_milestones' => $money(round(($payment !== null && $payment['advance_amount'] !== null ? (float) $payment['advance_amount'] : $advanceAmount) + $milestonesReceived, 2)),
                 'balance_pct'      => rtrim(rtrim(number_format($balancePct, 2), '0'), '.'),
-                'balance_amount'   => self::formatMoney($balanceAmount),
+                'balance_amount'   => $money($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],
                 'balance_days'     => $order['balance_days'],
                 // External QA report L-06: the Commercial Invoice's own
@@ -336,41 +342,41 @@ final class DocumentDataAssembler
                 // "ADVANCE PAYABLE NOW: 0.00", without the advance sentences.
                 'has_advance'      => $advancePct > 0,
                 'payment_method'   => $order['payment_method'] ?? null,
-                'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
+                'total_value'      => $money($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
                 // 90-item backlog item #18 (BLOCKER) — see this
                 // function's own freightForTotal/totalCommercialInvoiceValue
                 // computation above for the full rationale. CI-only;
                 // every other document keeps using total_value above.
-                'total_commercial_invoice_value' => self::formatMoney($totalCommercialInvoiceValue),
+                'total_commercial_invoice_value' => $money($totalCommercialInvoiceValue),
                 // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
                 // "Total Invoice Value in Words" line prints the same figure as
                 // Total Commercial Invoice Value, in words — never a blank line.
                 'total_invoice_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $totalCommercialInvoiceValue, 2), $order['currency_code'] ?? null),
                 'fob_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $fobValue, 2), $order['currency_code'] ?? null),
-                'freight_insurance_amount' => $freightForTotal !== null ? self::formatMoney($freightForTotal) : null,
+                'freight_insurance_amount' => $freightForTotal !== null ? $money($freightForTotal) : null,
                 'preset_name'      => $order['preset_name'],
             ],
             'payment_status' => $payment ? [
-                'advance_amount'                  => $payment['advance_amount'] !== null ? self::formatMoney($payment['advance_amount']) : null,
+                'advance_amount'                  => $payment['advance_amount'] !== null ? $money($payment['advance_amount']) : null,
                 'advance_remittance_received_at'  => self::formatDate($payment['advance_remittance_received_at']),
                 'advance_cleared_at'              => self::formatDate($payment['advance_cleared_at']),
-                'freight_amount'                  => $payment['freight_amount'] !== null ? self::formatMoney($payment['freight_amount']) : null,
+                'freight_amount'                  => $payment['freight_amount'] !== null ? $money($payment['freight_amount']) : null,
                 'freight_remittance_received_at'  => self::formatDate($payment['freight_remittance_received_at']),
                 'freight_cleared_at'              => self::formatDate($payment['freight_cleared_at']),
                 // Owner report (2026-10-27, blocker): until the balance itself
                 // is received, the balance due is FOB minus the advance
                 // actually received (OrderPaymentStatusRepository::balanceDue).
                 'balance_amount'                  => $payment['balance_remittance_received_at'] !== null && $payment['balance_amount'] !== null
-                    ? self::formatMoney($payment['balance_amount'])
-                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment, \App\Repositories\PaymentMilestoneRepository::balanceDeduction((int) $order['id'], (float) $fobValue, false))), // QA batch 4, ORD-09 (owner double-confirmed): net of milestone write-offs
+                    ? $money($payment['balance_amount'])
+                    : $money(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment, \App\Repositories\PaymentMilestoneRepository::balanceDeduction((int) $order['id'], (float) $fobValue, false))), // QA batch 4, ORD-09 (owner double-confirmed): net of milestone write-offs
                 'balance_remittance_received_at'  => self::formatDate($payment['balance_remittance_received_at']),
                 'balance_cleared_at'              => self::formatDate($payment['balance_cleared_at']),
                 'balance_due_date'                => self::formatDate($payment['balance_due_date']),
             ] : null,
             'supplier_po' => ($documentTypeCode === null || in_array($documentTypeCode, self::SUPPLIER_COST_VISIBLE_TO, true))
-                ? self::supplierPoBlock($orderId)
+                ? self::supplierPoBlock($orderId, $moneyCurrency)
                 : null,
-            'freight'     => self::freightBlock($orderId, $isCif),
+            'freight'     => self::freightBlock($orderId, $isCif, $moneyCurrency),
             'packing'     => self::packingBlock($orderId),
             'crates'      => self::cratesBlock($orderId),
             'shipping'    => self::shippingBlock($orderId),
@@ -378,6 +384,30 @@ final class DocumentDataAssembler
             'annexure_products' => $annexureProducts,
             'bl'          => self::blBlock($company['legal_name'], (bool) ($order['show_bl_instructions'] ?? true)),
         ] + $annexureFlags;
+    }
+
+    /**
+     * Owner decision D-343: "Total CBM (m³)" in the Weight & Volume box of the QT / PI (and OC) of an order with the
+     * detailed product table — worked out from the goods lines (LineTable::totalCbm), 3 decimals; null ("To Be Confirmed",
+     * or the estimate typed on the order) when a goods line cannot be turned into CBM, and on every other order and document.
+     */
+    private static function lineTableTotalCbm(array $order, array $products, ?string $documentTypeCode): ?string
+    {
+        if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) !== LineTable::LAYOUT_DETAILED
+            || !in_array(strtoupper((string) $documentTypeCode), ['QT', 'PI', 'OC'], true)) {
+            return null;
+        }
+        $cbm = LineTable::totalCbm($products);
+        return $cbm === null ? null : number_format($cbm, 3);
+    }
+
+    /** D-343: an indicative freight / insurance figure — Indian grouping on an INR order, otherwise exactly as stored. */
+    private static function indicativeMoney(mixed $value, string $currency): mixed
+    {
+        if (!\App\Helpers\MoneyFormat::usesIndianGrouping($currency) || $value === null || $value === '' || !is_numeric($value)) {
+            return $value;
+        }
+        return \App\Helpers\MoneyFormat::amount($value, $currency);
     }
 
     /**
@@ -554,7 +584,7 @@ final class DocumentDataAssembler
      * a null block via Twig's null-safe access, exactly like the Phase B
      * fields do for an order that hasn't reached that stage yet.
      */
-    private static function supplierPoBlock(int $orderId): ?array
+    private static function supplierPoBlock(int $orderId, string $currency = ''): ?array
     {
         $row = OrderSupplierPoRepository::findLatestForOrder($orderId);
         if (!$row) {
@@ -578,14 +608,14 @@ final class DocumentDataAssembler
             'unit'                  => $row['unit'],
             'colour_reference'      => $row['colour_reference'] ?: 'NIL',
             'special_requirements'  => $row['special_requirements'] ?: 'NIL',
-            'unit_price_inr'        => self::formatMoney($row['unit_price_inr']),
-            'basic_value_inr'       => self::formatMoney($row['basic_value_inr']),
+            'unit_price_inr'        => self::formatMoney($row['unit_price_inr'], $currency),
+            'basic_value_inr'       => self::formatMoney($row['basic_value_inr'], $currency),
             'gst_rate_pct'          => $row['gst_rate_pct'],
-            'gst_amount_inr'        => self::formatMoney($row['gst_amount_inr']),
-            'total_payable_inr'     => self::formatMoney($row['total_payable_inr']),
+            'gst_amount_inr'        => self::formatMoney($row['gst_amount_inr'], $currency),
+            'total_payable_inr'     => self::formatMoney($row['total_payable_inr'], $currency),
             'advance_pct'           => $row['advance_pct'],
-            'advance_amount_inr'    => self::formatMoney($row['advance_amount_inr']),
-            'balance_amount_inr'    => self::formatMoney($row['balance_amount_inr']),
+            'advance_amount_inr'    => self::formatMoney($row['advance_amount_inr'], $currency),
+            'balance_amount_inr'    => self::formatMoney($row['balance_amount_inr'], $currency),
             'delivery_location'     => $row['delivery_location'],
             'required_delivery_date' => self::formatDate($row['required_delivery_date']),
             'packing_requirement'   => $row['packing_requirement'] ?: 'NIL',
@@ -593,7 +623,7 @@ final class DocumentDataAssembler
         ];
     }
 
-    private static function freightBlock(int $orderId, bool $isCif): ?array
+    private static function freightBlock(int $orderId, bool $isCif, string $currency = ''): ?array
     {
         $row = OrderFreightRepository::find($orderId);
         if (!$row) {
@@ -602,14 +632,14 @@ final class DocumentDataAssembler
         $freightRaw = $row['confirmed_freight_rate'] !== null ? (float) $row['confirmed_freight_rate'] : null;
         $insuranceRaw = $isCif && $row['insurance_amount'] !== null ? (float) $row['insurance_amount'] : 0.0;
         return [
-            'confirmed_freight_rate'    => $freightRaw !== null ? self::formatMoney($freightRaw) : null,
-            'insurance_amount'          => $isCif && $row['insurance_amount'] !== null ? self::formatMoney($row['insurance_amount']) : 'NIL',
+            'confirmed_freight_rate'    => $freightRaw !== null ? self::formatMoney($freightRaw, $currency) : null,
+            'insurance_amount'          => $isCif && $row['insurance_amount'] !== null ? self::formatMoney($row['insurance_amount'], $currency) : 'NIL',
             // FDN's "TOTAL AMOUNT DUE" needs one number to wire, not a
             // formula string — computed here (not in Twig) because
             // confirmed_freight_rate/insurance_amount above are already
             // comma-formatted display strings by the time a template sees
             // them.
-            'total_freight_and_insurance' => $freightRaw !== null ? self::formatMoney($freightRaw + $insuranceRaw) : null,
+            'total_freight_and_insurance' => $freightRaw !== null ? self::formatMoney($freightRaw + $insuranceRaw, $currency) : null,
             'freight_forwarder_name'    => $row['freight_forwarder_name'],
             'freight_forwarder_contact' => $row['freight_forwarder_contact'],
             'freight_cleared_at'        => self::formatDate($row['freight_cleared_at']),
@@ -963,12 +993,16 @@ final class DocumentDataAssembler
         return DocumentImageOptimizer::dataUriForEmbed($asset['server_path'], $asset['mime_type'] ?: 'image/png');
     }
 
-    public static function formatMoney(string|int|float|null $value): string
+    /**
+     * A money amount on a document. Owner decision D-343: pass the order's currency — an INR
+     * order prints Indian grouping (1,75,000.00), every other currency (and no currency) as before.
+     */
+    public static function formatMoney(string|int|float|null $value, ?string $currency = null): string
     {
         if ($value === null || $value === '') {
             return 'To Be Confirmed';
         }
-        return number_format((float) $value, 2);
+        return \App\Helpers\MoneyFormat::amount($value, $currency);
     }
 
     /**

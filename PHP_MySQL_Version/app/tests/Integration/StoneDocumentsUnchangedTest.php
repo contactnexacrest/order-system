@@ -21,6 +21,9 @@ use App\Tests\Support\DbTestCase;
  * Set CAPTURE_STONE_DOCS=1 to rewrite the fixtures (only ever from
  * pre-change code). The fixtures were captured on a fresh schema + seed
  * database, which is what the test renders against. Node twin: stoneDocumentsUnchanged.test.js (same fixtures).
+ * Owner decision D-343 (12 Nov 2026): the Word fixtures of the QT, PI, OC, CI and PL were captured again once,
+ * deliberately — the Word copy now numbers its sections as the PDF (Buyer / Consignee / Notify Party sections,
+ * Legal Terms & Definitions); the PDF fixtures did not change.
  */
 final class StoneDocumentsUnchangedTest extends DbTestCase
 {
