@@ -2787,3 +2787,18 @@ SELECT h.d, h.n FROM (
   UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()) + 1, '-08-15') AS DATE), 'Independence Day'
   UNION ALL SELECT CAST(CONCAT(YEAR(CURDATE()) + 1, '-10-02') AS DATE), 'Gandhi Jayanti'
 ) h WHERE NOT EXISTS (SELECT 1 FROM company_holidays c WHERE c.holiday_date = h.d);
+
+-- Owner decision D-337 (12 Nov 2026; migration 2026-11-12d): who approves copying the
+-- client's current details onto an order that already has an issued document
+-- (MD and ED), and Admin › Self-approval rules "buyer_details_change" (default MD only).
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'approve_buyer_details_change', 'Approve buyer details change', 'Approve or refuse a request to copy the client''s current details onto an order that already has an issued document (D-337). Issued documents never change; documents generated afterwards show the new details.', 'orders'
+ WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'approve_buyer_details_change');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_buyer_details_change'
+ WHERE r.name IN ('Managing Director', 'Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+INSERT INTO self_approval_rules (rule_key, role_id)
+SELECT 'buyer_details_change', r.id FROM roles r
+ WHERE r.name = 'Managing Director'
+   AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'buyer_details_change');

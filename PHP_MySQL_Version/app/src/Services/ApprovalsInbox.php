@@ -37,6 +37,7 @@ final class ApprovalsInbox
     public const APPROVER_PERMISSIONS = [
         'manage_pricing', 'approve_payment_terms', 'approve_email_send', 'approve_documents', 'edit_locked_data', 'approve_purchases',
         'approve_short_payment', 'manage_associate_bank', 'manage_associates', 'manage_field_protection',
+        'approve_buyer_details_change', // D-337
     ];
 
     /** Payment legs: where on the order page each one is cleared. */
@@ -145,6 +146,7 @@ final class ApprovalsInbox
             'amendment' => ["SELECT id, created_at AS at FROM amendments WHERE order_id = :o AND status = 'pending' AND created_by = :u", 'Amendment'],
             'email' => ["SELECT id, created_at AS at FROM email_log WHERE order_id = :o AND status = 'pending_approval' AND requested_by = :u", 'E-mail'],
             'short' => ['SELECT id, requested_at AS at FROM short_payment_requests WHERE order_id = :o AND requested_by = :u', 'Short payment'],
+            'buyer_details' => ["SELECT id, created_at AS at FROM order_buyer_detail_requests WHERE order_id = :o AND status = 'PENDING' AND requested_by = :u", 'Buyer details update'], // D-337
         ];
         foreach ($queries as $kind => [$sql, $label]) {
             $stmt = $pdo->prepare($sql . ' ORDER BY id');
@@ -505,6 +507,24 @@ final class ApprovalsInbox
                 $out[] = self::row('protection:' . $f['id'], $f['requested_action'] === 'lock' ? 'Protect a field' : 'Unprotect a field', (string) $f['created_at'], null, '',
                     !empty($f['requested_by_name']) ? 'asked by ' . $f['requested_by_name'] : '', $f['record_label'] . ' · ' . self::short((string) $f['reason']),
                     '/admin/field-protection', 'Review request', '');
+            }
+        }
+
+        // Owner decision D-337 (12 Nov 2026): copy the client's current details onto an order with an issued document.
+        if ($can('approve_buyer_details_change')) {
+            $stmt = $pdo->prepare("SELECT r.id, r.order_id, r.reason, r.changes_json, r.requested_by, r.created_at, o.order_reference, u.name AS requested_by_name
+                                     FROM order_buyer_detail_requests r JOIN orders o ON o.id = r.order_id LEFT JOIN users u ON u.id = r.requested_by
+                                    WHERE r.status = 'PENDING'{$vis} ORDER BY r.created_at, r.id");
+            $stmt->execute($params);
+            foreach ($stmt->fetchAll() as $r) {
+                if (BuyerDetailsRefreshService::selfDecisionRefused($r, $userId)) {
+                    continue;
+                }
+                $changes = json_decode((string) $r['changes_json'], true) ?: [];
+                $out[] = self::row('buyer_details:' . $r['id'], 'Buyer details update', (string) $r['created_at'], (int) $r['order_id'], (string) $r['order_reference'],
+                    !empty($r['requested_by_name']) ? 'asked by ' . $r['requested_by_name'] : '',
+                    self::short(BuyerDetailsRefreshService::changesText($changes) . ' · ' . $r['reason']),
+                    '/orders/' . (int) $r['order_id'] . '#buyer-details-change', 'Review buyer details', 'a request to update the buyer details from the client.');
             }
         }
 

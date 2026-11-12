@@ -164,7 +164,11 @@ final class PiIntakeReviewController
             null, null, null, "PI-stage details confirmed by client and applied to client #{$order['client_id']}"
         );
 
-        Flash::set('success', "Client details updated from the PI-stage confirmation. Review the confirmed Incoterm/port/COO/payment-terms on this page before generating the PI.");
+        // Owner decision D-337 (12 Nov 2026): the client's other running orders with
+        // nothing issued yet take the confirmed details too; a waiting request lapses.
+        $refresh = \App\Services\BuyerDetailsRefreshService::afterClientSaved((int) $order['client_id'], (int) $user['id'], 'PI-stage confirmation accepted');
+
+        Flash::set('success', "Client details updated from the PI-stage confirmation. Review the confirmed Incoterm/port/COO/payment-terms on this page before generating the PI." . \App\Services\BuyerDetailsRefreshService::flashText($refresh));
         header("Location: /orders/{$order['id']}");
     }
 

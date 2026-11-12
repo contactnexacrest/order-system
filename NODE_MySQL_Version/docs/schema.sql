@@ -6578,3 +6578,30 @@ ALTER TABLE order_annexure_terms DROP INDEX order_id;
 ALTER TABLE orders ADD COLUMN include_annexure_b TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN annexure_b_mode ENUM('SPEC','TERMS','BOTH') NOT NULL DEFAULT 'SPEC';
 ALTER TABLE orders ADD COLUMN ci_annexure ENUM('A','B','NONE') NULL;
+
+-- ================================================================
+-- Owner decision D-337 (12 Nov 2026; migration 2026-11-12d): an order keeps its own
+-- copy of the buyer's details (R25). Saving a client copies them at once onto its
+-- running orders with nothing issued yet (only drafts / documents in review). An
+-- order that already has an issued document (approved, sent, or superseded after
+-- that) changes only through a request here, approved by a holder of
+-- approve_buyer_details_change (Admin › Self-approval rules: buyer_details_change).
+-- client_snapshot_hash = the client's details when the request was made; if they
+-- change again before the decision the request LAPSES and nothing is applied.
+CREATE TABLE IF NOT EXISTS order_buyer_detail_requests (
+  id                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id             BIGINT UNSIGNED NOT NULL,
+  requested_by         BIGINT UNSIGNED NULL,
+  reason               VARCHAR(500) NOT NULL,
+  changes_json         TEXT NOT NULL,          -- [{field, label, old, new}] at request time
+  client_snapshot_hash CHAR(64) NOT NULL,
+  status               ENUM('PENDING','APPROVED','REFUSED','LAPSED') NOT NULL DEFAULT 'PENDING',
+  decided_by           BIGINT UNSIGNED NULL,
+  decided_at           DATETIME NULL,
+  decision_note        VARCHAR(500) NULL,
+  created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_order_buyer_detail_requests_status (order_id, status),
+  CONSTRAINT fk_order_buyer_detail_requests_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_buyer_detail_requests_req FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_order_buyer_detail_requests_dec FOREIGN KEY (decided_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

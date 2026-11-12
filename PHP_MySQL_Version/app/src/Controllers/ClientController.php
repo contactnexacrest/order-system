@@ -344,7 +344,12 @@ final class ClientController
             AuditLogRepository::log((int) $user['id'], 'CLIENT_LOCK_OVERRIDDEN', 'clients', $clientId, null, null, null, trim((string) ($_POST['override_reason'] ?? '')));
         }
 
-        Flash::set('success', "{$companyLegalName} updated.");
+        // Owner decision D-337 (12 Nov 2026): running orders of this client with nothing
+        // issued yet take the new details at once; a waiting request whose details
+        // changed again lapses.
+        $refresh = \App\Services\BuyerDetailsRefreshService::afterClientSaved($clientId, (int) $user['id'], 'client edit');
+
+        Flash::set('success', "{$companyLegalName} updated." . \App\Services\BuyerDetailsRefreshService::flashText($refresh));
         header("Location: /clients/{$clientId}");
     }
 

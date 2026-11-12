@@ -394,12 +394,29 @@ final class OrderRepository
     }
 
     /**
+     * Owner decision D-337 (12 Nov 2026): the client's current details in the
+     * order's own column names — what applyClientSnapshot() would write. Used
+     * by BuyerDetailsRefreshService to compare an order with its client.
+     *
+     * @return array<string,mixed>
+     */
+    public static function clientSnapshot(int $clientId): array
+    {
+        return self::resolveClientSnapshot($clientId);
+    }
+
+    /**
      * 90-item backlog "standalone order" follow-on: called by
      * PiIntakeReviewController::accept() right after it corrects the
      * `clients` master row — applies that SAME correction onto this one
      * order's own snapshot columns, since the buyer's confirmation is
      * this order's own current truth. Every other existing order for
      * this client is untouched.
+     *
+     * Owner decision D-337 (12 Nov 2026): also used by
+     * BuyerDetailsRefreshService — automatically for a running order with
+     * nothing issued yet, and for an order with an issued document once a
+     * request to update its buyer details is approved.
      */
     public static function applyClientSnapshot(int $orderId, int $clientId): void
     {

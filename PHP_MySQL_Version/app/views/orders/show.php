@@ -1472,6 +1472,8 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
     </script>
   <?php endif; ?>
 
+  <?php if ($sees['client']) { require __DIR__ . '/_buyer_details_change.php'; } // D-337: buyer details vs the client ?>
+
   <?php
     // Point 2 (2026-10-01): a quick-glance horizontal line-with-dots
     // indicator of where this order stands in the 9-stage pipeline. This

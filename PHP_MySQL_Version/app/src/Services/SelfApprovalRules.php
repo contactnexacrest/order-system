@@ -31,6 +31,8 @@ final class SelfApprovalRules
         'price_discount' => 'Approve an order line price below the floor where they set that price themselves (D-245)',
         // Owner decision 11 Nov 2026 (D-293): verify bank details (associates and suppliers) they entered themselves, with a reason.
         'bank_details' => 'Verify bank details (associates and suppliers) they entered themselves — with a reason',
+        // Owner decision 12 Nov 2026 (D-337): default Managing Director only.
+        'buyer_details_change' => 'Approve copying the client\'s current details onto an order with an issued document, where they asked for it themselves',
     ];
 
     /** @return list<int> */

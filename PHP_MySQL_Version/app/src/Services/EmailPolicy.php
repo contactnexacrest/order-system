@@ -88,6 +88,7 @@ final class EmailPolicy
         'line_price_approval' => 'staff_approvals', 'price_request' => 'staff_approvals', 'associate_bank_change' => 'staff_approvals',
         'document_review_assigned' => 'staff_approvals', 'review_assigned' => 'staff_approvals',
         'short_payment_approval' => 'staff_approvals', // D-310
+        'buyer_details_change_requested' => 'staff_approvals', // D-337
         // the buyer / supplier / associate did something
         'buyer_oc_acknowledged' => 'staff_counterparty', 'buyer_po_uploaded_by_client' => 'staff_counterparty',
         'client_payment_reported' => 'staff_counterparty', 'supplier_po_ack_uploaded_by_supplier' => 'staff_counterparty',
@@ -110,6 +111,8 @@ final class EmailPolicy
         // Zoho, digest, assignment
         'zoho_sync_failed' => 'staff_zoho',
         'order_department_owner' => 'staff_assigned', 'order_assigned' => 'staff_assigned',
+        // D-337: FYI that a draft order took the client's new details; the decision on a request
+        'buyer_details_refreshed' => 'staff_other', 'buyer_details_change_decided' => 'staff_other',
         // security (MUST)
         'backup_code_used' => 'backup_code_alert',
     ];
