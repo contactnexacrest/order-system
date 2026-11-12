@@ -544,6 +544,30 @@ Set, Lot, Ton or RMT stay in the small table below. The line total is always
 quantity × unit price, exactly as before. The Packing List shows the same table
 without prices.
 
+### Rupee amounts, Total CBM and the Word copy (owner decision D-343, 12 Nov 2026)
+
+**Orders in INR.** On the documents of an order in Indian Rupees every amount
+uses Indian grouping: **1,75,000.00** per CBM, total **15,40,175.00**, advance
+**6,16,070.00**. Orders in USD, EUR and other currencies print as before
+(1,540,175.00). The amount in words, quantities, CBM and weights do not change.
+The internal CA financial annexure (CAFIN) is not affected.
+
+**Total CBM.** On a new order (detailed product table) the Weight & Volume box
+of the Quotation and PI shows the **Total CBM** worked out from the lines — for
+CHM Black P6 180 × 80 × 13 × 25, 140 × 70 × 13 × 25 and 120 × 60 × 13 × 10 it
+prints **8.801**. Lines with a size and pieces count their pieces × size; a CBM
+line without a size counts its quantity; a SQM / SQFT line with a thickness
+counts area × thickness. If one goods line cannot be turned into CBM (a SQM
+line without a thickness, PCS without a size, Ton, Set …) the box keeps
+"To Be Confirmed" (or the estimate typed on the order). Older orders print as
+before.
+
+**Word copy.** The Word copy (DOCX) of every document now has the same
+section headings and numbers as the PDF — Buyer Details, Consignee Details and
+Notify Party as separate sections, and the Legal Terms & Definitions section —
+so the Quotation's Word copy reads "5. SHIPPING / COMMERCIAL TERMS", like the
+PDF.
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's

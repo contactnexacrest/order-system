@@ -8,6 +8,9 @@
 // stone document still matches them. CAPTURE_STONE_DOCS=1 rewrites the fixtures
 // (only ever from pre-change code); they were captured on a fresh schema + seed
 // database, which is what the test renders against. PHP twin: StoneDocumentsUnchangedTest.php.
+// Owner decision D-343 (12 Nov 2026): the Word fixtures of the QT, PI, OC, CI and PL were captured again once,
+// deliberately — the Word copy now numbers its sections as the PDF (Buyer / Consignee / Notify Party sections,
+// Legal Terms & Definitions); the PDF fixtures did not change.
 jest.mock('../../src/services/pdfRenderService', () => ({
   renderPdfFromHtml: jest.fn().mockResolvedValue(Buffer.from('%PDF-fake')),
   closeBrowser: jest.fn(),

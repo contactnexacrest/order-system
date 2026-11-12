@@ -818,6 +818,34 @@ function termsSection(context, number, title) {
   return out;
 }
 
+// Owner decision D-343 (12 Nov 2026): the "LEGAL TERMS & DEFINITIONS" section the PDF prints
+// (templates/_layout.njk, block legal_terms_definitions) — same number, heading, boxes and
+// clauses — so the Word copy's sections match the PDF's. Nothing when the PDF has no such section.
+function legalTermsSection(context) {
+  const number = context.legal_terms_section_number;
+  if (number === null || number === undefined || number === '' || number === 0) return [];
+  const out = [...sectionTitle(`${number}.  LEGAL TERMS & DEFINITIONS`)];
+  const boxes = [
+    [context.legal_terms_clauses || [], 'FFF0F0', 'C0392B', 'LEGAL TERMS', 'These terms govern all commercial obligations under this document.'],
+    [context.definition_clauses || [], 'F0F4FF', '1A5276', 'DEFINITIONS', 'The following terms have the meanings given below wherever they appear in this document.'],
+  ];
+  for (const [clauses, bg, border, head, intro] of boxes) {
+    if (!clauses.length) continue;
+    const paras = [
+      plain(head, { bold: true, size: 20, color: NAVY }),
+      plain(intro, { italics: true, size: 17, color: MUTED }),
+      ...clauses.map((clause) => rich([
+        ['\u2022 ', { size: 18 }],
+        [`${clause.title || ''}:`, { bold: true, size: 18, color: NAVY }],
+        [' ', { size: 18 }],
+        ...markdownLiteSegments(String(clause.text || ''), { size: 18 }),
+      ], { spacing: { after: 60 } })),
+    ];
+    out.push(...colorBox(bg, border, paras, 4));
+  }
+  return out;
+}
+
 // Batch 3 #12 — a client-level custom clause (clients.agreement_footer_text),
 // separate from the standard numbered T&C list since it's agreed with this
 // one buyer specifically, not part of the company's general terms.
@@ -960,5 +988,6 @@ module.exports = {
   signatureDocRefLine,
   termsSection,
   clientAgreementFooter,
+  legalTermsSection,
   watermarkHeader,
 };

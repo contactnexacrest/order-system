@@ -66,6 +66,65 @@ function buyerPoRow(order) {
   return po === '' || po === 'NIL' ? [] : [{ label: "Buyer's PO / Ref No.", value: po }];
 }
 
+// Owner decision D-343 (12 Nov 2026): the Word copy numbers its sections exactly as the PDF —
+// the number documentGenerationService.sectionNumbers() gave the PDF for this slot.
+function sn(context, slot, fallback) {
+  const n = context.section_numbers ? context.section_numbers[slot] : undefined;
+  return n !== null && n !== undefined ? Number(n) : fallback;
+}
+
+// The rows of templates/_consignee_details (D-343).
+function consigneeRows(c) {
+  const v = (k) => String((c && c[k]) ?? '').trim();
+  const rows = [
+    { label: 'Company Legal Name *', value: v('company_legal_name') },
+    { label: 'Address Line 1 *', value: v('address_line1') },
+  ];
+  if (v('address_line2') !== '') rows.push({ label: 'Address Line 2', value: v('address_line2') });
+  if (v('city') !== '') rows.push({ label: 'City / Town *', value: v('city') });
+  if (v('postcode') !== '') rows.push({ label: 'Postcode *', value: v('postcode') });
+  rows.push({ label: 'Country *', value: v('country') !== '' ? v('country') : 'To Be Confirmed' });
+  rows.push({ label: 'VAT / EORI / Tax Reg. *', value: v('vat_eori_tax_no') !== '' ? v('vat_eori_tax_no') : 'To Be Confirmed' });
+  rows.push({ label: 'Contact Person *', value: v('contact_person') !== '' ? v('contact_person') : 'To Be Confirmed' });
+  rows.push({ label: 'Phone *', value: v('phone') !== '' ? v('phone') : '—' });
+  rows.push({ label: 'Email *', value: v('email') !== '' ? v('email') : 'To Be Confirmed' });
+  return rows;
+}
+
+// The rows of templates/_notify_party (D-343).
+function notifyPartyRows(n) {
+  const v = (k) => String((n && n[k]) ?? '').trim();
+  const rows = [{ label: 'Notify Party Name', value: v('name') !== '' ? v('name') : 'To Be Confirmed' }];
+  for (const [k, label] of [['address_line1', 'Address Line 1'], ['address_line2', 'Address Line 2'], ['city', 'City / Town'], ['postcode', 'Postcode'], ['country', 'Country']]) {
+    if (v(k) !== '') rows.push({ label, value: v(k) });
+  }
+  rows.push({ label: 'Contact Person', value: v('contact_person') !== '' ? v('contact_person') : '—' });
+  rows.push({ label: 'Phone', value: v('phone') !== '' ? v('phone') : '—' });
+  rows.push({ label: 'Email', value: v('email') !== '' ? v('email') : '—' });
+  return rows;
+}
+
+// Owner decision D-343: the Buyer Details, Consignee Details and Notify Party sections as the PDF prints them
+// (templates/_buyer_details, _consignee_details, _notify_party): same titles, numbers, rows, and shown only when
+// the PDF shows them (show_consignee_section / show_notify_party_section).
+function partiesSections(context, showBuyerPo = false) {
+  const out = [];
+  const buyerRows = buyerDetailsRows(context.buyer || {});
+  if (showBuyerPo) buyerRows.push(...buyerPoRow(context.order || {}));
+  out.push(...C.sectionTitle(`${sn(context, 'buyer', 2)}. BUYER DETAILS`));
+  out.push(...C.kvTable(buyerRows));
+  const numbers = context.section_numbers || {};
+  if (context.show_consignee_section && numbers.consignee !== undefined && numbers.consignee !== null) {
+    out.push(...C.sectionTitle(`${sn(context, 'consignee', 3)}. CONSIGNEE DETAILS`));
+    out.push(...C.kvTable(consigneeRows(context.consignee || {})));
+  }
+  if (context.show_notify_party_section && numbers.notify_party !== undefined && numbers.notify_party !== null) {
+    out.push(...C.sectionTitle(`${sn(context, 'notify_party', 4)}. NOTIFY PARTY`));
+    out.push(...C.kvTable(notifyPartyRows(context.notify_party_block || {})));
+  }
+  return out;
+}
+
 function g(obj, path, fallback = '—') {
   let cur = obj;
   for (const key of path.split('.')) {
@@ -217,7 +276,8 @@ function productsTable(context, currency, products) {
 function weightTable(order, context = {}) {
   const out = [C.plain('Weight & Volume (Estimated — actuals confirmed on Packing List after production)', { bold: true, size: 21, color: C.NAVY })];
   const rows = [
-    ['Total CBM (m³)', g(order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
+    // D-343: a detailed order's QT / PI print the CBM worked out from the lines (as the PDF).
+    ['Total CBM (m³)', order.line_table_total_cbm ? String(order.line_table_total_cbm) : g(order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
     ['Gross Weight (incl. packing)', g(order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
     [cd(context).net_weight_label, g(order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
     [cd(context).package_count_label, g(order, 'estimated_package_count', 'To Be Confirmed'), cd(context).package_nouns],
@@ -309,22 +369,10 @@ function renderQt(context) {
 
   children.push(...defaultSection1(context, 'SELLER / EXPORTER'));
 
-  children.push(...C.sectionTitle('2. BUYER / CONSIGNEE DETAILS'));
-  children.push(
-    ...C.kvTable([
-      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
-      { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Country of Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
-      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
-      { label: 'Phone', value: g(consignee, 'phone', '—') },
-    ])
-  );
+  // D-343: buyer, consignee (when the PDF shows it), notify party and numbers exactly as the PDF.
+  children.push(...partiesSections(context));
 
-  children.push(...C.sectionTitle('3. PRODUCT / ORDER DETAILS'));
+  children.push(...C.sectionTitle(`${sn(context, 'product', 3)}. PRODUCT / ORDER DETAILS`));
   children.push(...productsTable(context, currency, context.products));
 
   const freightText = order.is_fob
@@ -342,7 +390,7 @@ function renderQt(context) {
 
   children.push(...weightTable(order, context));
 
-  children.push(...C.sectionTitle('4. SHIPPING / COMMERCIAL TERMS'));
+  children.push(...C.sectionTitle(`${sn(context, 'shipping', 4)}. SHIPPING / COMMERCIAL TERMS`));
   children.push(
     ...C.kvTable([
       { label: 'Incoterm *', value: g(order, 'incoterm_label') },
@@ -354,11 +402,11 @@ function renderQt(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('5. PAYMENT TERMS'));
+  children.push(...C.sectionTitle(`${sn(context, 'payment', 5)}. PAYMENT TERMS`));
   // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
   children.push(...paymentTermsBlock(context, true, true));
 
-  children.push(...C.sectionTitle('6. DOCUMENTS TO BE PROVIDED'));
+  children.push(...C.sectionTitle(`${sn(context, 'documents_provided', 6)}. DOCUMENTS TO BE PROVIDED`));
   children.push(
     ...documentsProvidedParagraphs('Upon shipment, the following documents will be provided:', [
       '1.  Commercial Invoice (signed and stamped)',
@@ -380,6 +428,7 @@ function renderQt(context) {
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 7, context.terms_section_title || 'TERMS & CONDITIONS'));
   children.push(...C.clientAgreementFooter(context));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -432,24 +481,10 @@ function renderPi(context) {
 
   children.push(...defaultSection1(context, 'SELLER / EXPORTER'));
 
-  children.push(...C.sectionTitle('2. BUYER / CONSIGNEE DETAILS'));
-  children.push(
-    ...C.kvTable([
-      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
-      { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Country of Final Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
-      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
-      { label: 'Phone', value: g(consignee, 'phone', '—') },
-      { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as buyer') },
-      ...buyerPoRow(order),
-    ])
-  );
+  // D-343: buyer, consignee (when the PDF shows it), notify party and numbers exactly as the PDF.
+  children.push(...partiesSections(context, true));
 
-  children.push(...C.sectionTitle('3. PRODUCT / ORDER DETAILS'));
+  children.push(...C.sectionTitle(`${sn(context, 'product', 3)}. PRODUCT / ORDER DETAILS`));
   const products = context.products || [];
   children.push(...productsTable(context, currency, products));
 
@@ -512,7 +547,7 @@ function renderPi(context) {
 
   children.push(...weightTable(order, context));
 
-  children.push(...C.sectionTitle('4. SHIPPING / COMMERCIAL TERMS'));
+  children.push(...C.sectionTitle(`${sn(context, 'shipping', 4)}. SHIPPING / COMMERCIAL TERMS`));
   children.push(
     ...C.kvTable([
       { label: 'Incoterm *', value: g(order, 'incoterm_label') },
@@ -524,11 +559,11 @@ function renderPi(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('5. PAYMENT TERMS'));
+  children.push(...C.sectionTitle(`${sn(context, 'payment', 5)}. PAYMENT TERMS`));
   children.push(...paymentTermsBlock(context, true, true, 'this document'));
   if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
-  children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
+  // D-343: as on the PDF, the production box carries no numbered heading.
   children.push(
     ...C.kvTable([
       {
@@ -551,7 +586,7 @@ function renderPi(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('7. BANK DETAILS'));
+  children.push(...C.sectionTitle(`${sn(context, 'bank', 7)}. BANK DETAILS`));
   children.push(
     ...C.kvTable(
       bankDetailsRows(
@@ -562,7 +597,7 @@ function renderPi(context) {
     )
   );
 
-  children.push(...C.sectionTitle('8. EXPORT DOCUMENTATION'));
+  children.push(...C.sectionTitle(`${sn(context, 'export_doc', 8)}. EXPORT DOCUMENTATION`));
   children.push(
     ...documentsProvidedParagraphs('Upon shipment, the following documents will be provided:', [
       '1.  Commercial Invoice (signed and stamped)',
@@ -576,6 +611,7 @@ function renderPi(context) {
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
   children.push(...C.clientAgreementFooter(context));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -620,21 +656,11 @@ function renderOc(context) {
 
   children.push(...defaultSection1(context, 'SELLER / EXPORTER'));
 
-  children.push(...C.sectionTitle('2. BUYER / CONSIGNEE DETAILS'));
-  children.push(
-    ...C.kvTable([
-      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
-      { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
-      { label: 'Phone *', value: g(consignee, 'phone', '—') },
-      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
-    ])
-  );
+  // D-343: buyer, consignee (when the PDF shows it), notify party and numbers exactly as the PDF.
+  children.push(...partiesSections(context));
 
   const productList = (context.products || []).map((p) => `${p.description || ''} (Qty: ${p.quantity ?? ''} ${p.unit || ''})`);
-  children.push(...C.sectionTitle('3. ORDER SUMMARY'));
+  children.push(...C.sectionTitle(`${sn(context, 'order_summary', 3)}. ORDER SUMMARY`));
   if (context.line_table) children.push(...productsTable(context, currency, context.products)); // D-339
   children.push(
     ...C.kvTable([
@@ -652,7 +678,7 @@ function renderOc(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('4. PAYMENT STATUS'));
+  children.push(...C.sectionTitle(`${sn(context, 'payment_status', 4)}. PAYMENT STATUS`));
   const paymentRows = [
     ...(financial.has_advance ? [
       { label: `${g(financial, 'advance_pct')}% Advance Due (${currency}) *`, value: g(financial, 'advance_amount') },
@@ -675,7 +701,7 @@ function renderOc(context) {
   }
   children.push(...C.kvTable(paymentRows));
 
-  children.push(...C.sectionTitle('5. PRODUCTION & ESTIMATED SHIPMENT'));
+  children.push(...C.sectionTitle(`${sn(context, 'production', 5)}. PRODUCTION & ESTIMATED SHIPMENT`));
   children.push(
     ...C.kvTable([
       {
@@ -698,7 +724,7 @@ function renderOc(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('6. DOCUMENTS TO BE PROVIDED'));
+  children.push(...C.sectionTitle(`${sn(context, 'documents_provided', 6)}. DOCUMENTS TO BE PROVIDED`));
   children.push(
     ...C.kvTable([
       {
@@ -716,6 +742,7 @@ function renderOc(context) {
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 7, context.terms_section_title || 'ORDER CONDITIONS'));
   children.push(...C.clientAgreementFooter(context));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
 
@@ -873,6 +900,7 @@ function renderAnnexa(context) {
     ])
   );
   children.push(...annexureBody(context));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...C.signatureBlock(context));
   return children;
 }
@@ -1021,6 +1049,7 @@ function renderBuyerPo(context) {
     ])
   );
 
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
 
   return children;
@@ -1258,6 +1287,7 @@ function renderFdn(context) {
     )
   );
 
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...C.signatureBlock(context));
   return children;
 }
@@ -1288,39 +1318,19 @@ function renderPl(context) {
 
   children.push(...defaultSection1(context, 'EXPORTER'));
 
-  children.push(...C.sectionTitle('2. CONSIGNEE / BUYER'));
-  const leftPara = [
-    ['Company Legal Name *', buyer, 'company_legal_name'],
-    ['Consignee Name *', buyer, 'consignee_name'],
-    ['Consignee Address *', buyer, 'consignee_address'],
-    ['VAT / EORI / Tax Reg. No. *', consignee, 'vat_eori_tax_no'],
-  ].map(([label, src, key]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(g(src, key, 'To Be Confirmed')), {}]]));
-  const rightPara = [
-    ['Incoterm *', g(order, 'incoterm_label')],
-    ['Port of Loading *', g(order, 'port_of_loading')],
-    ['Port of Discharge *', g(order, 'port_of_discharge')],
-    ['Country of Final Destination *', g(consignee, 'country', 'To Be Confirmed')],
-    ['Notify Party', g(buyer, 'notify_party', 'Same as consignee')],
-  ].map(([label, val]) => C.rich([[`${label}\n`, { bold: true, color: C.NAVY }], [String(val), {}]]));
+  // D-343: buyer, consignee and notify party as the PDF, same numbers, then the incoterm and ports.
+  children.push(...partiesSections(context));
   children.push(
-    new Table({
-      width: C.FULL_WIDTH,
-      margins: C.TABLE_MARGINS,
-      rows: [
-        new TableRow({
-          children: [
-            C.cell(leftPara, { width: C.pctWidth(50), borders: C.thinBorders() }),
-            C.cell(rightPara, { width: C.pctWidth(50), shading: C.shade(C.GRAY_LIGHT), borders: C.thinBorders() }),
-          ],
-        }),
-      ],
-    })
+    ...C.kvTable([
+      { label: 'Incoterm *', value: g(order, 'incoterm_label') },
+      { label: 'Port of Loading *', value: g(order, 'port_of_loading') },
+      { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
+    ])
   );
-  children.push(C.spacer(120));
 
   const productList = products.map((p) => `${p.description || ''}${p.finish ? ` — ${p.finish}` : ''}`).join('; ');
   const hsCodeList = products.map((p) => p.hs_code || '').join(', ');
-  children.push(...C.sectionTitle('3. PRODUCT SUMMARY'));
+  children.push(...C.sectionTitle(`${sn(context, 'product_summary', 3)}. PRODUCT SUMMARY`));
   if (context.line_table) children.push(...productsTable(context, '', products)); // D-339: the detailed table, no prices
   children.push(
     ...C.kvTable([
@@ -1335,7 +1345,7 @@ function renderPl(context) {
     ])
   );
 
-  children.push(...C.sectionTitle(`4. ${cd(context).package_upper}-LEVEL BREAKDOWN  (from factory packing data)`));
+  children.push(...C.sectionTitle(`${sn(context, 'crate_breakdown', 4)}. ${cd(context).package_upper}-LEVEL BREAKDOWN  (from factory packing data)`));
   children.push(C.plain(`Filled from the factory packing supervisor's actual measurements. Each row = one physical ${cd(context).package_lower}.`, { italics: true, size: 17, color: C.MUTED }));
   children.push(
     C.rich([
@@ -1373,7 +1383,7 @@ function renderPl(context) {
     children.push(C.plain(`${cd(context).package_noun}-level breakdown not yet recorded.`, { italics: true, size: 17, color: '5b6774' }));
   }
 
-  children.push(...C.sectionTitle('5. DECLARATION'));
+  children.push(...C.sectionTitle(`${sn(context, 'declaration', 5)}. DECLARATION`));
   children.push(
     ...C.kvTable([
       {
@@ -1385,6 +1395,7 @@ function renderPl(context) {
   );
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
   return children;
@@ -1605,22 +1616,10 @@ function renderCi(context) {
 
   children.push(...defaultSection1(context, 'EXPORTER / SELLER'));
 
-  children.push(...C.sectionTitle('2. BUYER / CONSIGNEE'));
-  children.push(
-    ...C.kvTable([
-      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Consignee Name *', value: g(buyer, 'consignee_name') },
-      { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
-      { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
-      { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
-      { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as consignee') },
-      { label: 'Country of Final Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
-    ])
-  );
+  // D-343: buyer, consignee (when the PDF shows it), notify party and numbers exactly as the PDF.
+  children.push(...partiesSections(context));
 
-  children.push(...C.sectionTitle('3. SHIPPING DETAILS'));
+  children.push(...C.sectionTitle(`${sn(context, 'shipping_details', 3)}. SHIPPING DETAILS`));
   children.push(
     ...C.kvTable([
       { label: 'Incoterm *', value: g(order, 'incoterm_label') },
@@ -1635,7 +1634,7 @@ function renderCi(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('4. PRODUCT / ORDER DETAILS'));
+  children.push(...C.sectionTitle(`${sn(context, 'product', 4)}. PRODUCT / ORDER DETAILS`));
   children.push(C.plain('Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.', { italics: true, size: 17, color: C.MUTED }));
   children.push(...productsTable(context, currency, products));
   let plRefLine = `PL Reference: ${g(order, 'pl_ref', 'To Be Confirmed')}`;
@@ -1644,7 +1643,7 @@ function renderCi(context) {
   }
   children.push(C.plain(`${plRefLine}.`, { size: 17, color: C.MUTED }));
 
-  children.push(...C.sectionTitle('5. INVOICE VALUE & PAYMENT SETTLEMENT'));
+  children.push(...C.sectionTitle(`${sn(context, 'invoice_value', 5)}. INVOICE VALUE & PAYMENT SETTLEMENT`));
   const isFob = !!order.is_fob;
   const isCif = !!order.is_cif;
   // 90-item backlog item #18 (BLOCKER) — see documentDataAssembler's
@@ -1721,7 +1720,7 @@ function renderCi(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('6. BANK DETAILS  (for balance T/T payment)'));
+  children.push(...C.sectionTitle(`${sn(context, 'bank', 6)}. BANK DETAILS  (for balance T/T payment)`));
   children.push(
     ...C.kvTable(
       [
@@ -1735,7 +1734,7 @@ function renderCi(context) {
     )
   );
 
-  children.push(...C.sectionTitle('7. DOCUMENTS PROVIDED WITH THIS SHIPMENT'));
+  children.push(...C.sectionTitle(`${sn(context, 'documents_provided', 7)}. DOCUMENTS PROVIDED WITH THIS SHIPMENT`));
   children.push(
     ...documentsProvidedParagraphs('The following documents are provided with this shipment:', [
       '1.  Commercial Invoice (this document — signed and stamped)',
@@ -1747,12 +1746,13 @@ function renderCi(context) {
     ])
   );
 
-  children.push(...C.sectionTitle('8. DECLARATION'));
+  children.push(...C.sectionTitle(`${sn(context, 'declaration', 8)}. DECLARATION`));
   children.push(C.plain('We hereby declare that the goods described in this Commercial Invoice are of Indian origin and that the particulars given are true and correct.', { italics: true, color: C.MUTED }));
   children.push(C.plain(`This invoice is issued under Letter of Undertaking (LUT Order No. ${g(company, 'lut_number')}) for export of goods without payment of IGST under the provisions of the IGST Act, 2017.`, { italics: true, color: C.MUTED }));
 
   children.push(...C.termsSection(context, context.terms_section_number ?? 9, context.terms_section_title || 'TERMS & CONDITIONS'));
   children.push(...C.clientAgreementFooter(context));
+  children.push(...C.legalTermsSection(context)); // D-343: as the PDF
   children.push(...annexureAppendixIfAny(context));
   children.push(...C.signatureBlock(context));
   return children;

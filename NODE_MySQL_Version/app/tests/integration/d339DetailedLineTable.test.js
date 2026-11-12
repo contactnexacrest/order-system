@@ -96,21 +96,21 @@ describe('D-339 detailed product table, No. of pieces, prices in other units', (
     await ownersExample(orderId);
     const t = (await documentDataAssembler.assemble(orderId, 'QT')).line_table;
     expect(t.variant).toBe('full');
-    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['60', '8.801', '1,540,175.00']);
+    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['60', '8.801', '15,40,175.00']); // D-343: an INR order prints its money in Indian grouping
     expect((await documentDataAssembler.assemble(orderId, 'SUPPO')).line_table).toBeNull(); // only QT, PI, OC, CI, Buyer PO and PL
     expect((await documentDataAssembler.assemble(orderId, 'PL')).line_table.with_prices).toBe(false);
 
     const qt = await documentGenerationService.generate(orderId, 'QT', admin, null, true, true);
-    const row = '1 CHM Black P6 180 80 13 0.1872 25 4.680 175,000.00 32,760.00 819,000.00';
+    const row = '1 CHM Black P6 180 80 13 0.1872 25 4.680 1,75,000.00 32,760.00 8,19,000.00';
     expect(await docxText(qt.docx_file_id)).toContain(row);
-    expect(await docxText(qt.docx_file_id)).toContain('TOTAL 60 8.801 1,540,175.00');
+    expect(await docxText(qt.docx_file_id)).toContain('TOTAL 60 8.801 15,40,175.00');
     const calls = renderPdfFromHtml.mock.calls;
     const html = flat(calls[calls.length - 1][0].replace(/<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' '));
-    for (const word of ['0.1872', '32,760.00', '819,000.00', 'No. of', 'per piece', '1,540,175.00']) expect(html).toContain(word);
+    for (const word of ['0.1872', '32,760.00', '8,19,000.00', 'No. of', 'per piece', '15,40,175.00']) expect(html).toContain(word);
     const pl = await documentGenerationService.generate(orderId, 'PL', admin, null, true, true);
     const plText = await docxText(pl.docx_file_id);
     expect(plText).toContain('1 CHM Black P6 180 80 13 0.1872 25 4.680');
-    expect(plText).not.toContain('175,000.00'); // the Packing List carries no prices
+    expect(plText).not.toContain('1,75,000.00'); // the Packing List carries no prices
   });
 
   it('the server works out the quantity from the pieces', async () => {

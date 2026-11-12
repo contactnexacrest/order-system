@@ -1,6 +1,7 @@
 'use strict';
 
 const amountInWords = require('../helpers/amountInWords');
+const moneyFormat = require('../helpers/moneyFormat');
 const fs = require('fs');
 
 const { parseDbDateTime } = require('../helpers/dbDateTime');
@@ -61,6 +62,9 @@ async function assemble(orderId, documentTypeCode = null) {
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
   }
+  // Owner decision D-343: money on the documents of an INR order in Indian grouping (1,75,000.00), others as before.
+  const moneyCurrency = String(order.currency_code || '');
+  const money = (v) => formatMoney(v, moneyCurrency);
   // Owner decision D-215: the selling documents list every line; the goods
   // documents (CI, Packing List, COO, Supplier PO, BL…) goods and charges only —
   // a service line is invoiced on its own Export Service Invoice.
@@ -88,12 +92,12 @@ async function assemble(orderId, documentTypeCode = null) {
     pct: trimTrailingZeros(parseFloat(m.pct).toFixed(2)),
     due_text: String(m.due_text),
     amount_raw: round2(fobValue * parseFloat(m.pct) / 100),
-    amount: formatMoney(round2(fobValue * parseFloat(m.pct) / 100)),
+    amount: money(round2(fobValue * parseFloat(m.pct) / 100)),
     // The CI's milestone row names the step by its first words ("on shipment"), the full wording below it.
     due_short: String(m.due_text).split(' — ')[0].trim(),
     received: m.received_amount !== null,
     received_amount_raw: m.received_amount !== null ? parseFloat(m.received_amount) : 0,
-    received_amount: m.received_amount !== null ? formatMoney(parseFloat(m.received_amount)) : null,
+    received_amount: m.received_amount !== null ? money(parseFloat(m.received_amount)) : null,
     received_on: m.received_on !== null ? formatDate(String(m.received_on)) : null,
     bank_reference: m.bank_reference,
   }));
@@ -229,12 +233,15 @@ async function assemble(orderId, documentTypeCode = null) {
       pl_ref: plDoc ? plDoc.document_reference : null,
       special_requirements: order.special_requirements,
       estimated_total_cbm: order.estimated_total_cbm,
+      // Owner decision D-343: the Weight & Volume box of a detailed order's QT / PI prints the CBM worked out from the lines.
+      line_table_total_cbm: lineTableTotalCbm(order, products, documentTypeCode),
       estimated_gross_weight_kg: order.estimated_gross_weight_kg,
       estimated_net_weight_kg: order.estimated_net_weight_kg,
       estimated_package_count: order.estimated_package_count,
       estimated_package_type: order.estimated_package_type,
-      indicative_freight_amount: order.indicative_freight_amount,
-      indicative_insurance_amount: order.indicative_insurance_amount,
+      // D-343: an INR order prints these in Indian grouping; every other currency exactly as stored (as before).
+      indicative_freight_amount: indicativeMoney(order.indicative_freight_amount, moneyCurrency),
+      indicative_insurance_amount: indicativeMoney(order.indicative_insurance_amount, moneyCurrency),
     },
     buyer: {
       company_legal_name: order.company_legal_name,
@@ -279,8 +286,8 @@ async function assemble(orderId, documentTypeCode = null) {
       hs_code: p.hs_code,
       quantity: perAnnexure && !p.quantity_is_tbc ? annexureChoice.quantityText(quantity, annexureLineLetter) : quantity,
       unit: p.unit,
-      unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'To Be Confirmed',
-      amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'To Be Confirmed',
+      unit_price: p.unit_price !== null ? money(p.unit_price) : 'To Be Confirmed',
+      amount: p.fob_value !== null ? money(p.fob_value) : 'To Be Confirmed',
       line_type: p.line_type || 'goods',
       // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
       attributes: require('../repositories/productCategoryRepository').documentAttributes(p),
@@ -291,20 +298,20 @@ async function assemble(orderId, documentTypeCode = null) {
     // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
     line_table: await lineTableBlock(order, products, formattedProducts, documentTypeCode, annexureLineLetter, orderId),
     financial: {
-      fob_value: formatMoney(fobValue),
+      fob_value: money(fobValue),
       fob_value_raw: fobValue,
       // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
       has_services: serviceValue > 0,
-      service_value: formatMoney(serviceValue),
-      total_with_services: formatMoney(fobValue + serviceValue),
+      service_value: money(serviceValue),
+      total_with_services: money(fobValue + serviceValue),
       advance_pct: trimTrailingZeros(advancePct.toFixed(2)),
-      advance_amount: formatMoney(advanceAmount),
+      advance_amount: money(advanceAmount),
       advance_trigger_text: order.advance_trigger_text,
       milestones,
       // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
-      subtotal_paid_with_milestones: formatMoney(round2((payment && payment.advance_amount !== null && payment.advance_amount !== undefined ? parseFloat(payment.advance_amount) : advanceAmount) + milestonesReceived)),
+      subtotal_paid_with_milestones: money(round2((payment && payment.advance_amount !== null && payment.advance_amount !== undefined ? parseFloat(payment.advance_amount) : advanceAmount) + milestonesReceived)),
       balance_pct: trimTrailingZeros(balancePct.toFixed(2)),
-      balance_amount: formatMoney(balanceAmount),
+      balance_amount: money(balanceAmount),
       balance_trigger_option: order.balance_trigger_option,
       balance_days: order.balance_days,
       // External QA report L-06: the Commercial Invoice's own "BALANCE
@@ -327,43 +334,43 @@ async function assemble(orderId, documentTypeCode = null) {
       has_advance: advancePct > 0,
       payment_method: order.payment_method || null,
       // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
-      total_value: formatMoney(fobValue),
+      total_value: money(fobValue),
       // 90-item backlog item #18 (BLOCKER) — see this function's own
       // freightForTotal/totalCommercialInvoiceValue computation above
       // for the full rationale. CI-only; every other document keeps
       // using total_value above.
-      total_commercial_invoice_value: formatMoney(totalCommercialInvoiceValue),
+      total_commercial_invoice_value: money(totalCommercialInvoiceValue),
       // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
       // "Total Invoice Value in Words" line prints the same figure as Total
       // Commercial Invoice Value, in words — never a blank line.
       total_invoice_value_in_words: amountInWords.format(Math.round(Number(totalCommercialInvoiceValue) * 100) / 100, order.currency_code || null),
       fob_value_in_words: amountInWords.format(Math.round(Number(fobValue) * 100) / 100, order.currency_code || null),
-      freight_insurance_amount: freightForTotal !== null ? formatMoney(freightForTotal) : null,
+      freight_insurance_amount: freightForTotal !== null ? money(freightForTotal) : null,
       preset_name: order.preset_name,
     },
     payment_status: payment
       ? {
-          advance_amount: payment.advance_amount !== null ? formatMoney(payment.advance_amount) : null,
+          advance_amount: payment.advance_amount !== null ? money(payment.advance_amount) : null,
           advance_remittance_received_at: formatDate(payment.advance_remittance_received_at),
           advance_cleared_at: formatDate(payment.advance_cleared_at),
-          freight_amount: payment.freight_amount !== null ? formatMoney(payment.freight_amount) : null,
+          freight_amount: payment.freight_amount !== null ? money(payment.freight_amount) : null,
           freight_remittance_received_at: formatDate(payment.freight_remittance_received_at),
           freight_cleared_at: formatDate(payment.freight_cleared_at),
           // Owner report (2026-10-27, blocker): until the balance itself is
           // received, the balance due is FOB minus the advance actually
           // received (orderPaymentStatusRepository.balanceDue).
           balance_amount: payment.balance_remittance_received_at !== null && payment.balance_amount !== null
-            ? formatMoney(payment.balance_amount)
-            : formatMoney(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment, await require('../repositories/paymentMilestoneRepository').balanceDeduction(Number(order.id), Number(fobValue), false))), // QA batch 4, ORD-09 (owner double-confirmed)
+            ? money(payment.balance_amount)
+            : money(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment, await require('../repositories/paymentMilestoneRepository').balanceDeduction(Number(order.id), Number(fobValue), false))), // QA batch 4, ORD-09 (owner double-confirmed)
           balance_remittance_received_at: formatDate(payment.balance_remittance_received_at),
           balance_cleared_at: formatDate(payment.balance_cleared_at),
           balance_due_date: formatDate(payment.balance_due_date),
         }
       : null,
     supplier_po: (documentTypeCode === null || SUPPLIER_COST_VISIBLE_TO.includes(documentTypeCode))
-      ? await supplierPoBlock(orderId)
+      ? await supplierPoBlock(orderId, moneyCurrency)
       : null,
-    freight: await freightBlock(orderId, isCif),
+    freight: await freightBlock(orderId, isCif, moneyCurrency),
     packing: await packingBlock(orderId),
     crates: await cratesBlock(orderId),
     shipping: await shippingBlock(orderId),
@@ -520,7 +527,7 @@ async function annexureFlagsBlock(orderId, mode, annexureProducts, which = 'A') 
  * a null block via Nunjucks' default filter, exactly like the Phase B
  * fields do for an order that hasn't reached that stage yet.
  */
-async function supplierPoBlock(orderId) {
+async function supplierPoBlock(orderId, currency = '') {
   const row = await orderSupplierPoRepository.findLatestForOrder(orderId);
   if (!row) {
     return null;
@@ -543,14 +550,14 @@ async function supplierPoBlock(orderId) {
     unit: row.unit,
     colour_reference: row.colour_reference || 'NIL',
     special_requirements: row.special_requirements || 'NIL',
-    unit_price_inr: formatMoney(row.unit_price_inr),
-    basic_value_inr: formatMoney(row.basic_value_inr),
+    unit_price_inr: formatMoney(row.unit_price_inr, currency),
+    basic_value_inr: formatMoney(row.basic_value_inr, currency),
     gst_rate_pct: row.gst_rate_pct,
-    gst_amount_inr: formatMoney(row.gst_amount_inr),
-    total_payable_inr: formatMoney(row.total_payable_inr),
+    gst_amount_inr: formatMoney(row.gst_amount_inr, currency),
+    total_payable_inr: formatMoney(row.total_payable_inr, currency),
     advance_pct: row.advance_pct,
-    advance_amount_inr: formatMoney(row.advance_amount_inr),
-    balance_amount_inr: formatMoney(row.balance_amount_inr),
+    advance_amount_inr: formatMoney(row.advance_amount_inr, currency),
+    balance_amount_inr: formatMoney(row.balance_amount_inr, currency),
     delivery_location: row.delivery_location,
     required_delivery_date: formatDate(row.required_delivery_date),
     packing_requirement: row.packing_requirement || 'NIL',
@@ -558,7 +565,7 @@ async function supplierPoBlock(orderId) {
   };
 }
 
-async function freightBlock(orderId, isCif) {
+async function freightBlock(orderId, isCif, currency = '') {
   const row = await orderFreightRepository.find(orderId);
   if (!row) {
     return null;
@@ -566,14 +573,14 @@ async function freightBlock(orderId, isCif) {
   const freightRaw = row.confirmed_freight_rate !== null ? parseFloat(row.confirmed_freight_rate) : null;
   const insuranceRaw = isCif && row.insurance_amount !== null ? parseFloat(row.insurance_amount) : 0.0;
   return {
-    confirmed_freight_rate: freightRaw !== null ? formatMoney(freightRaw) : null,
-    insurance_amount: isCif && row.insurance_amount !== null ? formatMoney(row.insurance_amount) : 'NIL',
+    confirmed_freight_rate: freightRaw !== null ? formatMoney(freightRaw, currency) : null,
+    insurance_amount: isCif && row.insurance_amount !== null ? formatMoney(row.insurance_amount, currency) : 'NIL',
     // FDN's "TOTAL AMOUNT DUE" needs one number to wire, not a
     // formula string — computed here (not in the template) because
     // confirmed_freight_rate/insurance_amount above are already
     // comma-formatted display strings by the time a template sees
     // them.
-    total_freight_and_insurance: freightRaw !== null ? formatMoney(freightRaw + insuranceRaw) : null,
+    total_freight_and_insurance: freightRaw !== null ? formatMoney(freightRaw + insuranceRaw, currency) : null,
     freight_forwarder_name: row.freight_forwarder_name,
     freight_forwarder_contact: row.freight_forwarder_contact,
     freight_cleared_at: formatDate(row.freight_cleared_at),
@@ -909,11 +916,38 @@ async function assetDataUri(asset) {
   return documentImageOptimizer.dataUriForEmbed(asset.server_path, asset.mime_type || 'image/png');
 }
 
-function formatMoney(value) {
+/**
+ * A money amount on a document. Owner decision D-343: pass the order's currency — an INR
+ * order prints Indian grouping (1,75,000.00), every other currency (and no currency) as before.
+ */
+function formatMoney(value, currency = null) {
   if (value === null || value === undefined || value === '') {
     return 'To Be Confirmed';
   }
-  return Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return moneyFormat.amount(value, currency);
+}
+
+/**
+ * Owner decision D-343: "Total CBM (m³)" in the Weight & Volume box of the QT / PI (and OC) of an order with the
+ * detailed product table — worked out from the goods lines (lineTable.totalCbm), 3 decimals; null ("To Be Confirmed",
+ * or the estimate typed on the order) when a goods line cannot be turned into CBM, and on every other order and document.
+ */
+function lineTableTotalCbm(order, products, documentTypeCode) {
+  const lineTable = require('./lineTable');
+  if ((order.line_table_layout || lineTable.LAYOUT_CLASSIC) !== lineTable.LAYOUT_DETAILED
+    || !['QT', 'PI', 'OC'].includes(String(documentTypeCode || '').toUpperCase())) {
+    return null;
+  }
+  const cbm = lineTable.totalCbm(products);
+  return cbm === null ? null : cbm.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+
+/** D-343: an indicative freight / insurance figure — Indian grouping on an INR order, otherwise exactly as stored. */
+function indicativeMoney(value, currency) {
+  if (!moneyFormat.usesIndianGrouping(currency) || value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) {
+    return value;
+  }
+  return moneyFormat.amount(value, currency);
 }
 
 /**

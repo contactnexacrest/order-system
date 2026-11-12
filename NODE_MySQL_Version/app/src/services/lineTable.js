@@ -28,6 +28,7 @@
 
 const lineUnits = require('./lineUnits');
 const annexureChoice = require('./annexureChoice');
+const moneyFormat = require('../helpers/moneyFormat');
 
 const LAYOUT_CLASSIC = 'classic';
 const LAYOUT_DETAILED = 'detailed';
@@ -55,6 +56,11 @@ function roundTo(x, d) {
 /** PHP number_format($v, $d) (en-US grouping). */
 function fmt(v, d) {
   return roundTo(v, d).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+/** D-343: money in Indian grouping on an INR order (1,75,000.00), as before (fmt) in every other currency. */
+function money(v, currency) {
+  return moneyFormat.usesIndianGrouping(currency) ? moneyFormat.indian(v, 2) : fmt(v, 2);
 }
 
 /** PHP number_format($v, $d, '.', ''). */
@@ -188,6 +194,44 @@ function summary(unit, l, w, h, pieces, unitPrice, currency) {
 
 function size(v) {
   return v === null || v === undefined || v === '' || Number(v) <= 0 ? null : Number(v);
+}
+
+/**
+ * Owner decision D-343: the total CBM of the goods lines, for the "Weight & Volume" box of a detailed order —
+ *   a line with a piece size (L, W, H) and pieces: pieces × L × W × H / 1,000,000 (per piece rounded to 4 decimals, as the table);
+ *   a CBM line without a size: its quantity;
+ *   a SQM / SQFT line with a thickness: its area × the thickness;
+ * null when there is no goods line or any goods line cannot be turned into CBM (SQM / SQFT without a thickness,
+ * PCS without a size, any other unit, a quantity still to be confirmed). Services and charges are not counted.
+ */
+function totalCbm(lines) {
+  let total = 0;
+  let any = false;
+  for (const line of lines) {
+    if ((line.line_type || 'goods') !== 'goods') continue;
+    any = true;
+    const l = size(line.piece_length_cm);
+    const w = size(line.piece_width_cm);
+    const h = size(line.piece_thickness_cm);
+    const pieces = line.pieces_count !== null && line.pieces_count !== undefined && line.pieces_count !== '' ? parseInt(line.pieces_count, 10) : 0;
+    if (l !== null && w !== null && h !== null && pieces > 0) {
+      total += Number(perPiece('CBM', l, w, h)) * pieces;
+      continue;
+    }
+    const tbc = !!Number(line.quantity_is_tbc || 0) || line.quantity === null || line.quantity === undefined || line.quantity === '';
+    const u = docUnit(line.unit);
+    if (tbc || u === null || u === 'PCS') return null;
+    const qty = Number(line.quantity);
+    if (u === 'CBM') {
+      total += qty;
+    } else if (h !== null) {
+      const sqm = u === 'SQM' ? qty : qty / lineUnits.SQFT_PER_M2;
+      total += sqm * h / 100;
+    } else {
+      return null;
+    }
+  }
+  return any ? roundTo(roundTo(total, 6), 3) : null;
 }
 
 /**
@@ -336,8 +380,9 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
       all_pcs: qty !== null ? suffix(formatQuantity(qty, u)) : 'To Be Confirmed',
       // The short table's "Qty" (every unit, PCS included).
       qty: qty !== null ? suffix(formatQuantity(qty, u)) : 'To Be Confirmed',
-      price_unit: price !== null ? fmt(price, 2) + (mixed ? ` /${u}` : '') : 'To Be Confirmed',
-      price_piece: pricePiece !== null && !perAnnexure && (per !== null || u === 'PCS') ? fmt(pricePiece, 2) : DASH,
+      // D-343: money in Indian grouping on an INR order (1,75,000.00), as before in every other currency.
+      price_unit: price !== null ? money(price, currency) + (mixed ? ` /${u}` : '') : 'To Be Confirmed',
+      price_piece: pricePiece !== null && !perAnnexure && (per !== null || u === 'PCS') ? money(pricePiece, currency) : DASH,
       total: String(f.amount ?? ''),
       crates: crates(crateCounts, line.description),
       detail: detail(line, f, perAnnexure ? annexureLetter : null, hasSize),
@@ -356,7 +401,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
     pcs: pcsAny ? fmt(pcsTotal, 0) : '',
     // One unit: its total (a PCS-only full table counts the pieces instead). Mixed units are never added up.
     measure: !mixed && byUnit[units[0]] !== undefined && (units[0] !== 'PCS' || out.variant === 'short') ? formatQuantity(byUnit[units[0]], units[0]) : '',
-    amount: fmt(amount, 2),
+    amount: money(amount, currency),
   };
   out.totals_by_unit = mixed && parts.length > 0 ? `Totals by unit: ${parts.join(' · ')}` : null;
   return out;
@@ -365,5 +410,5 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
 module.exports = {
   LAYOUT_CLASSIC, LAYOUT_DETAILED, DOCUMENTS, DASH,
   roundTo, docUnit, isMeasureUnit, perPiece, quantityDecimals, needsPieces, quantityFromPieces, pricePerPiece,
-  readPieces, readSizeNote, serverQuantity, formatPerPiece, formatQuantity, summary, build,
+  readPieces, readSizeNote, serverQuantity, formatPerPiece, formatQuantity, summary, build, totalCbm,
 };

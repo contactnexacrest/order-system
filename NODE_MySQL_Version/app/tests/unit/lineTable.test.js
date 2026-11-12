@@ -6,6 +6,7 @@
 // the totals by unit, the line total never worked out again, and the No. of pieces.
 // PHP twin: tests/Unit/LineTableTest.php (same cases, same wording).
 const lineTable = require('../../src/services/lineTable');
+const moneyFormat = require('../../src/helpers/moneyFormat');
 const unitPrices = require('../../src/services/unitPrices');
 
 function line(id, desc, unit, l, w, h, pcs, qty, price, extra = {}) {
@@ -17,16 +18,17 @@ function line(id, desc, unit, l, w, h, pcs, qty, price, extra = {}) {
     as_per_annexure: extra.as_per_annexure ?? 0, size_note: extra.size_note ?? null, dimensions: extra.dimensions ?? null,
   };
 }
-const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-function formatted(lines) {
+// D-343: money as documentDataAssembler prints it — Indian grouping on an INR order.
+const money = (v, currency) => moneyFormat.amount(v, currency);
+function formatted(lines, currency = 'USD') {
   return lines.map((l) => ({
     description: l.description, quantity: String(l.quantity), unit: l.unit,
-    unit_price: l.unit_price !== null ? money(l.unit_price) : 'To Be Confirmed',
-    amount: l.fob_value !== null ? money(l.fob_value) : 'To Be Confirmed',
+    unit_price: l.unit_price !== null ? money(l.unit_price, currency) : 'To Be Confirmed',
+    amount: l.fob_value !== null ? money(l.fob_value, currency) : 'To Be Confirmed',
     line_type: l.line_type, attributes: [], sac_code: null, dimensions: l.dimensions, finish: l.finish, hs_code: l.hs_code,
   }));
 }
-const build = (lines, currency = 'USD', letter = null, prices = true) => lineTable.build(lines, formatted(lines), currency, letter, prices);
+const build = (lines, currency = 'USD', letter = null, prices = true) => lineTable.build(lines, formatted(lines, currency), currency, letter, prices);
 
 describe('D-339 detailed product table', () => {
   it('measures and rounding', () => {
@@ -62,8 +64,8 @@ describe('D-339 detailed product table', () => {
     expect(t.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per CBM', 'per piece', '(INR)']);
     const r = t.rows[0];
     expect([r.l, r.w, r.h, r.per_piece, r.pcs, r.all_pcs, r.price_unit, r.price_piece, r.total])
-      .toEqual(['180', '80', '13', '0.1872', '25', '4.680', '175,000.00', '32,760.00', '819,000.00']);
-    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['60', '8.801', '1,540,175.00']);
+      .toEqual(['180', '80', '13', '0.1872', '25', '4.680', '1,75,000.00', '32,760.00', '8,19,000.00']); // D-343: an INR order's money in Indian grouping
+    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['60', '8.801', '15,40,175.00']);
     expect(t.totals_by_unit).toBeNull();
     expect(r.detail).toEqual([{ label: 'HS Code:', text: '68022310' }, { label: 'Country of Origin:', text: 'India' }]);
   });
@@ -129,9 +131,9 @@ describe('D-339 detailed product table', () => {
     const t = build(lines, 'INR', 'A');
     const r = t.rows[1];
     expect(r.annexure).toBe('As per Annexure A');
-    expect([r.per_piece, r.pcs, r.all_pcs, r.price_unit, r.price_piece, r.total]).toEqual(['—', '—', '2.400', '175,000.00', '—', '420,000.00']);
+    expect([r.per_piece, r.pcs, r.all_pcs, r.price_unit, r.price_piece, r.total]).toEqual(['—', '—', '2.400', '1,75,000.00', '—', '4,20,000.00']);
     expect(r.detail[0]).toEqual({ label: null, text: 'Qty as per Annexure A' });
-    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['25', '7.080', '1,239,000.00']);
+    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['25', '7.080', '12,39,000.00']);
     // Annexure B on the CI / PL when chosen (D-336).
     expect(build(lines, 'INR', 'B').rows[1].annexure).toBe('As per Annexure B');
   });
