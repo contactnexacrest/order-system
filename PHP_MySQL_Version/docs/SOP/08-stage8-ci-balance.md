@@ -99,6 +99,12 @@ annexure has no product entry the CI / PL is refused: *Line 1 says "As per
 annexure" but Annexure B (as shipped) has no product yet — add it, or choose
 Annexure A, then generate again.*
 
+While Annexure B was never made, the step says under the choices *"Annexure B
+not made — Annexure A will be printed."* with a link **Make Annexure B (copy
+of A) ›**: it makes Annexure B as a copy of Annexure A and opens it, so you
+only change what was shipped differently and click **Save all changes**
+(owner decision D-341, 12 Nov 2026).
+
 The CI's own Section A keeps **FOB Value** as its own separate line
 regardless of Incoterm — required for the Indian Shipping Bill and IGST
 refund — but on a non-FOB order (CFR/CIF/etc.), **TOTAL COMMERCIAL

@@ -1313,6 +1313,8 @@ app.post('/orders/:id/annexure/mode', requireAuth, requirePermission('manage_ord
 app.post('/orders/:id/annexure/terms', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.updateTerms));
 // D-336: Annexure B (as shipped) — "Copy everything from Annexure A".
 app.post('/orders/:id/annexure/copy-from-a', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.copyFromA));
+// D-341: one "Save all changes" for the whole annexure page (mode, entries, new images images[<id>], Additional Terms).
+app.post('/orders/:id/annexure/save-all', requireAuth, requirePermission('manage_orders'), upload.any(), checkOrderLock, verifyCsrf, asyncHandler(annexureController.saveAll));
 app.post('/orders/:id/annexure/products', requireAuth, requirePermission('manage_orders'), upload.single('image'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.createProduct));
 app.post('/orders/:id/annexure/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.updateProduct));
 app.post('/orders/:id/annexure/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.deleteProduct));

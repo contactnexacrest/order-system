@@ -114,7 +114,9 @@ describe('Annexure lock warning + resend confirmation (90-item backlog #73/#74)'
     const source = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'annexure', 'index.njk'), 'utf8');
 
     expect(source).toContain('annexaIsLocked');
-    expect((source.match(/annexureConfirmAttr\(/g) || []).length).toBeGreaterThanOrEqual(6);
+    // D-341: one "Save all changes" form replaces the per-entry Save, Upload Image and
+    // Save Additional Terms forms — Save all, Remove Entry, remove image, Add Product Entry.
+    expect((source.match(/annexureConfirmAttr\(/g) || []).length).toBeGreaterThanOrEqual(4);
     expect(source).toContain('already been');
   });
 

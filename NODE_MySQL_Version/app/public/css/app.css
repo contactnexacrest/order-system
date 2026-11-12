@@ -1034,3 +1034,12 @@ input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
 .unit-prices-card table td.num,.unit-prices-card table th.num{text-align:right}
 .unit-prices-card .tag{font-size:11px;padding:1px 6px;border-radius:9px;background:#eef2ff;color:#3730a3;font-weight:600}
 .unit-prices-card .tag.typed{background:#e7f6ec;color:#166534}
+/* D-341: the annexure page — one "Save all changes", the Annexure B start, the new-revision banner. */
+.annexure-save-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0;}
+.annexure-b-start{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:12px 0;background:var(--surface);}
+.annexure-b-start form{margin:12px 0 6px;}
+.annexure-new-revision{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.annexure-new-revision form{margin:0;}
+.annexure-image-pick{display:block;margin-top:8px;}
+.annexure-entry > .btn-danger{margin-top:8px;}
+.ci-annexure-b-missing{margin:6px 0;}

@@ -48,8 +48,9 @@ describe('Fields without placeholders (External QA report U-03)', () => {
   it('annexure product fields have placeholders', () => {
     const html = view('annexure/index.njk');
 
+    // D-341: the edit rows are entries[<id>][<field>] in the page's one "Save all changes" form.
     for (const field of ['name', 'description', 'technical_notes']) {
-      const matches = html.match(new RegExp(`name="${field}"[^\\n]*?placeholder=`, 'g')) || [];
+      const matches = html.match(new RegExp(`name="(?:entries\\[[^"]*\\]\\[)?${field}\\]?"[^\\n]*?placeholder=`, 'g')) || [];
       expect(matches.length).toBe(2);
     }
   });

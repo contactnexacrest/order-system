@@ -131,6 +131,52 @@ async function handleMultipleUploads(
   return ids;
 }
 
+/**
+ * Owner decision D-341: checks one uploaded file (a multer file: buffer,
+ * originalname) against the upload context — empty, type, size and content —
+ * without storing it, so a page that saves many things at once can refuse
+ * before anything is saved. Throws with the same message the upload would give.
+ */
+async function checkUpload(file, contextKey) {
+  if (!file || !file.buffer) {
+    throw new Error('No file was uploaded, or the upload failed.');
+  }
+  const context = await findContext(contextKey);
+  if (!context) {
+    throw new Error(`Unknown upload context: ${contextKey}`);
+  }
+  const originalName = file.originalname;
+  if (file.buffer.length === 0) {
+    throw new Error(`File "${originalName}" is empty — please choose a valid file.`);
+  }
+  const extension = path.extname(originalName).replace(/^\./, '').toLowerCase();
+  const allowed = String(context.allowed_extensions).toLowerCase().split(',').map((s) => s.trim());
+  if (!allowed.includes(extension)) {
+    throw new Error(`File type .${extension} is not allowed for this upload (allowed: ${context.allowed_extensions}).`);
+  }
+  if (file.buffer.length > parseInt(context.max_size_bytes, 10)) {
+    const maxMb = Math.round((parseInt(context.max_size_bytes, 10) / 1048576) * 10) / 10;
+    throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
+  }
+  if (looksLikeDangerousContent(file.buffer)) {
+    throw new Error(`File "${originalName}" was rejected: its content does not match a safe file type for a .${extension} upload.`);
+  }
+}
+
+/** D-341: stores one multer file (checked again) and returns its file_store id. */
+async function storeUpload(file, contextKey, subPath, clientId, orderId, uploadedBy) {
+  if (!file || !file.buffer) {
+    throw new Error('No file was uploaded, or the upload failed.');
+  }
+  return storeOne(file.buffer, file.originalname, file.mimetype || 'application/octet-stream', contextKey, subPath, clientId, orderId, uploadedBy, null, null);
+}
+
+/** D-341: the largest file the upload context accepts, in bytes (null when the context is unknown). */
+async function maxBytes(contextKey) {
+  const context = await findContext(contextKey);
+  return context ? parseInt(context.max_size_bytes, 10) : null;
+}
+
 async function storeOne(buffer, originalName, mimeType, contextKey, subPath, clientId, orderId, uploadedBy, receivedFrom, documentTypeLabel) {
   const context = await findContext(contextKey);
   if (!context) {
@@ -188,4 +234,4 @@ function sanitizePathSegment(value) {
   return String(value).replace(/[^A-Za-z0-9_-]+/g, '-') || 'x';
 }
 
-module.exports = { handleUpload, handleMultipleUploads, sanitizePathSegment };
+module.exports = { handleUpload, handleMultipleUploads, sanitizePathSegment, checkUpload, storeUpload, maxBytes };

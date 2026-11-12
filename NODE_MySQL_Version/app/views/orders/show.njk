@@ -1595,14 +1595,15 @@
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'ANNEXA') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Annexure A</button>{{ docAlreadyNote(documents, 'ANNEXA') }}
+          {# D-341: like the Quotation — a new revision once an Annexure A document exists. #}
+          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'ANNEXA') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">{{ 'Regenerate Annexure A (new revision)' if docGenerated(documents, 'ANNEXA') else 'Generate Annexure A' }}</button>{{ docAlreadyNote(documents, 'ANNEXA') }}
         </form>
         {% endif %}
       {% endif %}
+      {% if permissions.manage_orders %}{# D-341: a clear button instead of the small grey link #}
+        <a class="btn-sm btn-secondary annexure-edit-btn" href="/orders/{{ order.id }}/annexure">Edit Annexure A &rsaquo;</a>
+      {% endif %}
     </div>
-    {% if permissions.manage_orders %}
-    <p class="muted small"><a href="/orders/{{ order.id }}/annexure">{% if order.include_annexure_a %}Manage Annexure A product entries &amp; images{% else %}Enable / manage Annexure A{% endif %}</a></p>
-    {% endif %}
     <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
   </details>
 
@@ -3085,12 +3086,20 @@
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="B" required{{ ' checked' if ciAnnexPick == 'B' }}{{ '' if ciAnnexOk.B else ' disabled' }}> Annexure B — as shipped <span class="muted small">({% if ciAnnexure.b.has %}{{ ciAnnexure.b.count }} product{{ '' if ciAnnexure.b.count == 1 else 's' }}{% if ciAnnexure.b.saved %} · saved {{ ciAnnexure.b.saved }}{% endif %}{% else %}not made yet{% endif %}) · <a href="/orders/{{ order.id }}/annexure?which=B">open</a></span></label>
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="A" required{{ ' checked' if ciAnnexPick == 'A' }}{{ '' if ciAnnexOk.A else ' disabled' }}> Annexure A — as quoted <span class="muted small">({{ 'same as on the PI and OC' if ciAnnexure.a.has else 'empty' }})</span></label>
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="NONE" required{{ ' checked' if ciAnnexPick == 'NONE' }}{{ '' if ciAnnexOk.NONE else ' disabled' }}> No annexure{% if not ciAnnexOk.NONE %} <span class="muted small">(line {{ ciAnnexure.lines | join(', ') }} says "As per annexure")</span>{% endif %}</label>
+          {% if not ciAnnexure.b.made %}{# D-341 #}
+          <p class="ci-annexure-b-missing">Annexure B not made — Annexure A will be printed.{% if permissions.manage_orders %} <button type="submit" form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button>{% endif %}</p>
+          {% endif %}
           <p class="muted small">Default: Annexure B when it has been made, otherwise Annexure A. A line ticked "As per annexure" says "as per Annexure B" or "as per Annexure A" to match. "No annexure" cannot be chosen while a line says "As per annexure". The choice is saved with the order; the Packing List uses the same annexure.</p>
         </fieldset>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         {{ stepBadge('11a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>{{ docAlreadyNote(documents, 'CI') }}
       </form>
+      {% if not ciAnnexure.b.made and permissions.manage_orders %}{# D-341: "Make Annexure B (copy of A)" — outside the CI form (no nested forms) #}
+      <form method="post" action="/orders/{{ order.id }}/annexure/copy-from-a" id="ci-annexure-b-copy" hidden>
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      </form>
+      {% endif %}
       {% endif %}
     {% endif %}
   </details>

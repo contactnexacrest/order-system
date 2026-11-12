@@ -388,7 +388,7 @@ satisfied they have accepted, move on to Step 4a (Buyer's PO, [Chapter
 ## Annexure A — Product Specification and/or Additional Terms
 
 Annexure A is an optional attachment staff can turn on for an order
-(**Enable / manage Annexure A** link on the order page). Once enabled, it's
+(**Edit Annexure A ›** button in Step 1 of the order page). Once enabled, it's
 appended to every buyer-facing document that supports it (QT, PI, OC, Buyer
 PO, Packing List, Commercial Invoice) as a guaranteed, never-skippable
 appendix, and can also be generated as its own standalone document, whose
@@ -402,8 +402,8 @@ mode** dropdown decides what Annexure A actually shows:
   table (dimensions, finish, components, technical notes, photos) staff fill
   in below the dropdown. This is the original, only mode Annexure A used to
   have. A photo can be attached right away on the "Add Product Entry" form
-  itself, or added afterward (and more added later) from the saved entry's
-  own Images section — either way works, and nothing is required to be
+  itself, or added afterward (and more added later) with the saved entry's
+  own **Add image** field — either way works, and nothing is required to be
   uploaded at either point. Above the product table, a fixed amber "Note:"
   banner (default wording: product images/drawings are for reference only
   and may show optional accessories not included in the quoted price) is
@@ -430,6 +430,24 @@ Content is sanitized on save (and again every time a document is generated)
 to a fixed set of safe formatting tags — scripts, event handlers, and
 remote/relative image sources are stripped automatically.
 
+**One save for the whole page** (owner decision D-341, 12 Nov 2026). Change
+whatever you need on the page — the content dropdown, any product entry's
+fields, a new image for an entry (jpg, png or webp, up to 5 MB) and the
+Additional Terms — and click **Save all changes** once (the button is at the
+top and at the bottom of the page). Everything is saved together. If
+something is wrong — a product entry without a name, or an image of the wrong
+type or too large — nothing is saved: the page comes back with the message
+beside the field and what you typed still there; correct it and click
+**Save all changes** again. **Remove Entry** and an image's **×** still act at
+once (after their confirmation), and **Add Product Entry** at the bottom
+still adds an entry by itself. If you changed something and try to leave the
+page without saving, the page asks *"You have unsaved changes on this page —
+leave without saving?"*.
+
+**Generate and Regenerate.** In Step 1 of the order page the button reads
+**Generate Annexure A** the first time and **Regenerate Annexure A (new
+revision)** once an Annexure A document exists.
+
 If the order's standalone Annexure A document has already been approved or
 sent to the buyer, this screen shows a warning banner saying so, and every
 Save/Add/Remove button on it asks for confirmation before going ahead —
@@ -440,6 +458,14 @@ reach them. This is a reminder only, never a hard block, the same
 [Chapter 9](./09-stage9-despatch-closure.md)'s Close Order hint). Resending
 an Annexure that was already sent once gets the same treatment on the Send
 to Buyer screen — a warning and a second confirmation, not a block.
+
+Once you have changed Annexure A after its approved (or sent) revision was
+generated, the banner says *"You changed Annexure A after Rev.1 was approved —
+generate the new revision, then approve and send it."* with a button
+**Generate the new revision ›** (for staff who may generate documents). It
+makes the new revision and takes you back to the order page; then take it
+through review, approval and sending as usual
+([Chapter 13](./13-document-review-approval.md)).
 
 ### Annexure B (as shipped) and lines "As per annexure" (owner decision D-336, 12 Nov 2026)
 
@@ -459,12 +485,16 @@ one product entry: *Line 1 says "As per annexure" but Annexure A has no product
 yet — add it in Annexure A (order page › Annexure A), then generate again.*
 
 **Annexure B — as shipped.** If what is shipped differs from what was quoted,
-open Annexure A and click **Annexure B (as shipped) ›** next to the title. It
-is the same screen: tick **Include Annexure B on this order's documents**,
-then either add the entries or click **Copy everything from Annexure A**
-(products, images, terms and content are copied; if Annexure B already has
-content you are asked "Replace Annexure B with a copy of Annexure A?") and
-change what is different. **‹ Annexure A (as quoted)** goes back. Annexure B is
+open Annexure A and click **Annexure B (as shipped) ›** next to the title. The
+button appears once the order has reached the Commercial Invoice step (Step 11)
+— before that the page says *"Annexure B can be made at the Commercial
+Invoice step."* (D-341). The first time, while Annexure B is empty, the page
+offers one button, **Start Annexure B from a copy of Annexure A** (products,
+images, terms and content are copied), and a small link **Start empty
+instead**. After that it is the same screen as Annexure A: tick **Include
+Annexure B on this order's documents**, change what is different and click
+**Save all changes**; **Copy everything from Annexure A** starts again from A
+(you are asked "Replace Annexure B with a copy of Annexure A?"). **‹ Annexure A (as quoted)** goes back. Annexure B is
 printed only with the Commercial Invoice and Packing List (see
 [Chapter 8](./08-stage8-ci-balance.md)); the Quotation, Buyer PO, PI and OC
 always keep Annexure A.

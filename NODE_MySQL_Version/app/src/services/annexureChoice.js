@@ -192,6 +192,65 @@ async function lastSaved(orderId, which) {
   return row && row.saved ? row.saved : null;
 }
 
+/** D-341: the note shown instead of Annexure B before the Commercial Invoice step. */
+const B_NOT_YET_NOTE = 'Annexure B can be made at the Commercial Invoice step.';
+
+/**
+ * Owner decision D-341: the order has reached the shipping-documents part of the
+ * workflow — the Commercial Invoice step (Stage 8) is open or passed. The order
+ * page shows the Commercial Invoice step on exactly this condition.
+ */
+async function ciStageReached(orderId) {
+  const stage = await require('../repositories/orderStageRepository').findByOrderAndStageNumber(orderId, 8);
+  return !!stage && stage.status !== 'locked';
+}
+
+/** D-341: Annexure B holds something (a product entry or Additional Terms), whatever its content mode. */
+async function bMade(orderId) {
+  return (await orderAnnexureRepository.countFor(orderId, 'B')) > 0 || (await termsHtml(orderId, 'B')) !== '';
+}
+
+/** D-341: Annexure B can be opened — from the Commercial Invoice step on, or whenever it already has content. */
+async function bAvailable(orderId) {
+  return (await bMade(orderId)) || ciStageReached(orderId);
+}
+
+/**
+ * D-341: when Annexure A's content (product entries, images, Additional Terms or
+ * content mode) was last changed, from the audit log — or null. A removed entry or
+ * image is found through its audit row, which names the order (field "order_id").
+ */
+async function lastChangeA(orderId) {
+  const productIds = [];
+  const imageIds = [];
+  for (const p of await orderAnnexureRepository.forOrder(orderId, 'A')) {
+    productIds.push(parseInt(p.id, 10));
+    for (const img of p.images) imageIds.push(parseInt(img.id, 10));
+  }
+  const row = await db.queryOne(
+    "SELECT MAX(created_at) AS changed FROM audit_log WHERE (reason IS NULL OR reason <> 'Annexure B') AND ("
+    + "(entity_type = 'order' AND entity_id = :o AND action_type IN ('ANNEXURE_MODE_UPDATED','ANNEXURE_TERMS_UPDATED'))"
+    + " OR (action_type IN ('ANNEXURE_PRODUCT_DELETED','ANNEXURE_IMAGE_REMOVED') AND field_name = 'order_id' AND old_value = :os)"
+    + (productIds.length ? ` OR (entity_type = 'order_annexure_products' AND entity_id IN (${productIds.join(',')}))` : '')
+    + (imageIds.length ? ` OR (entity_type = 'order_annexure_images' AND entity_id IN (${imageIds.join(',')}))` : '')
+    + ')',
+    { o: orderId, os: String(orderId) }
+  );
+  return row && row.changed ? String(row.changed) : null;
+}
+
+/**
+ * D-341: the latest Annexure A document is approved or sent and Annexure A was
+ * changed after that document was generated — the Annexure A page asks for a new
+ * revision. Returns that document, or null.
+ */
+async function staleApprovedAnnexA(orderId) {
+  const doc = await require('../repositories/documentRepository').findLatestForOrderAndTypeCode(orderId, 'ANNEXA');
+  if (!doc || !['approved', 'sent'].includes(doc.status)) return null;
+  const changed = await lastChangeA(orderId);
+  return changed !== null && changed > String(doc.generated_at) ? doc : null;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "18 Jan" — like PHP date('j M'). */
@@ -209,14 +268,19 @@ async function ciStep(order) {
     choice: await ciChoice(order),
     default: await ciDefault(order),
     a: { count: await orderAnnexureRepository.countFor(orderId, 'A'), has: await hasContent(order, 'A') },
-    b: { count: await orderAnnexureRepository.countFor(orderId, 'B'), has: await hasContent(order, 'B'), saved: savedB ? shortDate(savedB) : null },
+    b: {
+      count: await orderAnnexureRepository.countFor(orderId, 'B'), has: await hasContent(order, 'B'), saved: savedB ? shortDate(savedB) : null,
+      // D-341: "Annexure B not made — Annexure A will be printed." under the radios.
+      made: await bMade(orderId),
+    },
     lines: await annexureLineNumbers(orderId, true),
   };
 }
 
 module.exports = {
-  QUOTED_DOCUMENTS, SHIPPED_DOCUMENTS, CHOICES,
+  QUOTED_DOCUMENTS, SHIPPED_DOCUMENTS, CHOICES, B_NOT_YET_NOTE,
   mode, included, termsHtml, hasContent, ciDefault, ciChoice, forDocument, letterFor,
   quantityText, dimensionsText, annexureLineNumbers, blockReason, copyAToB, lastSaved, ciStep,
   reorderLineError, copyAnnexureAToOrder,
+  ciStageReached, bMade, bAvailable, lastChangeA, staleApprovedAnnexA,
 };
