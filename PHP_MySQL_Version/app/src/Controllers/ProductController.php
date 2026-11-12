@@ -556,7 +556,7 @@ final class ProductController
 
         $data = $this->readSupplierForm();
         $data['product_id'] = $productId;
-        $error = $this->validateSupplier($data);
+        $error = $this->validateSupplier($data, null);
         if ($error !== null) {
             Flash::set('error', $error);
             header("Location: /products/{$productId}");
@@ -584,9 +584,9 @@ final class ProductController
         }
         $productId = (int) $existing['product_id'];
 
-        $data = $this->readSupplierForm();
+        $data = $this->readSupplierForm($existing);
         $data['product_id'] = $productId;
-        $error = $this->validateSupplier($data);
+        $error = $this->validateSupplier($data, $existing);
         if ($error !== null) {
             Flash::set('error', $error);
             header("Location: /products/{$productId}");
@@ -771,13 +771,21 @@ final class ProductController
         return null;
     }
 
-    /** @return array<string,mixed> */
-    private function readSupplierForm(): array
+    /**
+     * Owner decision D-338 (2a): a new supplier price is always one typed price ("direct");
+     * "add up the cost parts" ("computed") is kept only for a price already saved that way.
+     * The cost parts are read only when the form sends them — a form without them (a typed
+     * price) keeps what the row holds, so nothing is lost.
+     *
+     * @return array<string,mixed>
+     */
+    private function readSupplierForm(?array $existing = null): array
     {
-        $fobSource = (string) ($_POST['fob_source'] ?? 'direct');
+        $fobSource = (string) ($_POST['fob_source'] ?? ($existing['fob_source'] ?? 'direct'));
         if (!in_array($fobSource, ['direct', 'computed'], true)) {
             $fobSource = 'direct';
         }
+        $part = fn (string $k): ?float => array_key_exists($k, $_POST) ? $this->nullableDecimal($_POST[$k]) : ($existing !== null && $existing[$k] !== null ? (float) $existing[$k] : null);
         return [
             'supplier_name'       => trim((string) ($_POST['supplier_name'] ?? '')),
             'location'            => $this->nullableString($_POST['location'] ?? ''),
@@ -786,23 +794,30 @@ final class ProductController
             'contact_email'       => $this->nullableString($_POST['contact_email'] ?? ''),
             'fob_source'          => $fobSource,
             'fob_value'           => $this->nullableDecimal($_POST['fob_value'] ?? ''),
-            'factory_cost'        => $this->nullableDecimal($_POST['factory_cost'] ?? ''),
-            'transportation_cost' => $this->nullableDecimal($_POST['transportation_cost'] ?? ''),
-            'packing_cost'        => $this->nullableDecimal($_POST['packing_cost'] ?? ''),
-            'loading_cost'        => $this->nullableDecimal($_POST['loading_cost'] ?? ''),
-            'cha_cost'            => $this->nullableDecimal($_POST['cha_cost'] ?? ''),
+            'factory_cost'        => $part('factory_cost'),
+            'transportation_cost' => $part('transportation_cost'),
+            'packing_cost'        => $part('packing_cost'),
+            'loading_cost'        => $part('loading_cost'),
+            'cha_cost'            => $part('cha_cost'),
             'is_primary'          => isset($_POST['is_primary']) ? 1 : 0,
             'notes'               => $this->nullableString($_POST['notes'] ?? ''),
         ];
     }
 
-    private function validateSupplier(array $data): ?string
+    private function validateSupplier(array $data, ?array $existing): ?string
     {
         if ($data['supplier_name'] === '') {
             return 'Supplier name is required.';
         }
+        // D-338 (2a): only a price already saved as "add up the cost parts" may stay so.
+        if ($data['fob_source'] === 'computed' && ($existing === null || ($existing['fob_source'] ?? 'direct') !== 'computed')) {
+            return self::COST_PARTS_REFUSAL;
+        }
         return null;
     }
+
+    /** D-338 (2a): the refusal for a new "add up the cost parts" price (the same wording on both stacks). */
+    public const COST_PARTS_REFUSAL = 'Adding up the cost parts is no longer offered for a new price — type the supplier\'s price in FOB Value (₹). Prices saved that way earlier keep working.';
 
     private function nullableString(mixed $value): ?string
     {

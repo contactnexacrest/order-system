@@ -18,7 +18,7 @@ $__ro = $canManage ? '' : ' disabled';
 
   <?php // D-301 / D-304: the rate in use, explained; source, date, warnings, the MD's OK for a big move, and the history. ?>
   <div class="section" id="exchange-rate">
-    <h2>Exchange rate</h2>
+    <h2>Exchange Rate</h2>
     <?php include __DIR__ . '/_fx_rate_line.php'; ?>
     <p class="small muted"><?= $fx['mode'] === 'auto' ? 'Automatic' : 'Manual' ?><?= $fx['source'] !== null ? ' · source ' . View::e((string) $fx['source']) . ' · rate of ' . View::e((string) $fx['date']) : '' ?>. Prices on Quotations and Proforma Invoices already issued never change.</p>
     <?php if ($fx['waiting'] !== null): $__w = $fx['waiting']; ?>
@@ -55,7 +55,7 @@ $__ro = $canManage ? '' : ' disabled';
 
   <form method="post" action="/pricing/settings">
     <?= Csrf::field() ?>
-    <fieldset><legend>Margin and costs</legend>
+    <fieldset><legend>Margin and Costs</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['margin_pct']) ?> *<small class="muted">Margin on the selling price, not markup: 20% on a cost of USD 1,000 gives USD 1,250. Nobody can quote below the minimum price.</small><span class="help-line">Example: cost USD 1,000 at 20% → minimum price USD 1,250 (1,000 ÷ 0.80). Nobody can sell below it.</span></span>
         <input type="number" name="margin_pct" min="0" max="90" step="0.01" required value="<?= View::e($settings['margin_pct']) ?>" placeholder="e.g. 20.00"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['other_cost_pct']) ?> *<small class="muted">Packing, inland transport to port, CHA, inspection, documents and bank charges not already in the supplier price. A product can set its own % or USD amount.</small><span class="help-line">Example: supplier price USD 975.61 + 2.5% = cost USD 1,000.00.</span></span>
@@ -65,7 +65,7 @@ $__ro = $canManage ? '' : ' disabled';
     </fieldset>
 
     <?php // D-301 (point 4, 11 Nov 2026): Automatic (fetched daily) or Manual; pricing rate = market × (1 − cushion %). ?>
-    <fieldset id="exchange-rate-settings"><legend>Exchange rate (USD → INR)</legend>
+    <fieldset id="exchange-rate-settings"><legend>Exchange Rate (USD → INR)</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['fx_mode']) ?> *<small class="muted">Automatic: the market rate is fetched every day (Frankfurter — European Central Bank; backup open.er-api.com) and the cushion below is taken off. Manual: the rate typed below is used.</small><span class="help-line">Example: Automatic, market ₹88.40, cushion 2% → pricing rate ₹86.63.</span></span>
         <select name="fx_mode" required<?= $__ro ?>>
           <option value="auto"<?= ($settings['fx_mode'] ?? 'auto') !== 'manual' ? ' selected' : '' ?>>Automatic — fetched every day</option>
@@ -77,7 +77,7 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="<?= View::e($settings['pricing_fx_rate']) ?>" placeholder="e.g. 82.0000"<?= $__ro ?>></label>
     </fieldset>
 
-    <fieldset><legend>Team incentive reserve</legend>
+    <fieldset><legend>Team Incentive Reserve</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['incentive_mode']) ?> *<small class="muted">Added to the minimum price while the team incentive program is on.</small><span class="help-line">Example: % of profit — minimum USD 1,250, cost USD 1,000, 15% of the USD 250 profit = USD 37.50 reserved for the team.</span></span>
         <select name="incentive_mode" required<?= $__ro ?>>
           <option value="pct"<?= $settings['incentive_mode'] === 'pct' ? ' selected' : '' ?>>% of profit (minimum price − cost)</option>
@@ -87,12 +87,12 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="incentive_value" min="0" step="0.0001" required value="<?= View::e($settings['incentive_value']) ?>" placeholder="e.g. 15"<?= $__ro ?>></label>
     </fieldset>
 
-    <fieldset><legend>Supplier prices</legend>
+    <fieldset><legend>Supplier Prices</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['stale_days']) ?> *<small class="muted">A supplier price older than this is marked "stale" on the product list; update it before quoting.</small><span class="help-line">Example: 60 → a price quoted on 1 Sep is stale from 31 Oct; "Pricing ready?" shows ✗ until it is renewed.</span></span>
         <input type="number" name="stale_days" min="1" max="3650" step="1" required value="<?= View::e($settings['stale_days']) ?>" placeholder="e.g. 60"<?= $__ro ?>></label>
     </fieldset>
 
-    <fieldset><legend>Order lines</legend>
+    <fieldset><legend>Order Lines</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['require_product_pick']) ?> <small class="muted">On: a goods line on a USD order must be picked from Products (so its price is checked against the floor); a goods line typed by hand is refused. Service and charge lines can still be typed. Off: goods lines may be typed by hand and are not price-checked.</small><span class="help-line">Example: on — typing "Granite slab" by hand on a USD order is refused; pick it from Products so its price is checked.</span></span>
         <select name="require_product_pick"<?= $__ro ?>>
           <option value="1"<?= (string) $settings['require_product_pick'] === '1' ? ' selected' : '' ?>>On — goods lines must come from Products</option>
@@ -100,7 +100,7 @@ $__ro = $canManage ? '' : ' disabled';
         </select></label>
     </fieldset>
 
-    <fieldset><legend>Specifications and associate prices (D-255)</legend>
+    <fieldset><legend>Specifications and Associate Prices (D-255)</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['cbm_from_mm']) ?> *<small class="muted">From this thickness the price is per CBM, from the product's per-CBM supplier price (Market prices). A product can set its own.</small><span class="help-line">Example: 50 → 20, 30 and 40 mm are priced per m²; 50, 60, 80 mm per CBM (12.5 m² in one CBM at 80 mm).</span></span>
         <input type="number" name="cbm_from_mm" min="1" max="2000" step="1" required value="<?= View::e($settings['cbm_from_mm']) ?>" placeholder="e.g. 50"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['price_request_daily_limit']) ?> *<small class="muted">Automatic price requests an associate may make in one day; non-standard requests to our team do not count. An associate can have their own limit.</small><span class="help-line">Example: 10 → the 11th automatic "Get price" that day is refused; a non-standard request still goes to staff.</span></span>
@@ -112,7 +112,7 @@ $__ro = $canManage ? '' : ' disabled';
     <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>
   </form>
 
-  <h2>Who can do what</h2>
+  <h2>Who Can Do What</h2>
   <table class="list">
     <tr><th>Permission</th><th>Default roles</th></tr>
     <tr><td>Record supplier / market prices and costs to FOB</td><td>Procurement (Executive, Manager, Director), MD</td></tr>

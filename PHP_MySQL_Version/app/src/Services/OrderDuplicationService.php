@@ -36,7 +36,7 @@ use App\Repositories\OrderSupplierPoRepository;
 final class OrderDuplicationService
 {
     /**
-     * @param array<int, array{description:string, dimensions:?string, finish:?string, quantity:?string, quantity_is_tbc:bool, unit:?string, unit_price:?string, hs_code:string}>|null $productLines
+     * @param array<int, array{description:string, dimensions:?string, finish:?string, quantity:?string, quantity_is_tbc:bool, unit:?string, unit_price:?string, hs_code:string, as_per_annexure?:bool}>|null $productLines
      *   When null, copies the source order's own current active product lines.
      */
     public static function duplicate(int $sourceOrderId, int $createdBy, ?array $productLines = null): int
@@ -114,7 +114,7 @@ final class OrderDuplicationService
         } else {
             $lineNo = 1;
             foreach ($productLines as $line) {
-                OrderProductRepository::add(
+                $newLineId = OrderProductRepository::add(
                     $newOrderId,
                     $lineNo++,
                     $line['description'],
@@ -126,10 +126,22 @@ final class OrderDuplicationService
                     $line['unit_price'],
                     $line['hs_code']
                 );
+                // D-338 (1a): a reorder line "As per annexure" stays so on the new order.
+                if (!empty($line['as_per_annexure'])) {
+                    OrderProductRepository::setAsPerAnnexure($newLineId, true);
+                }
             }
         }
 
         AuditLogRepository::log($createdBy, 'ORDER_DUPLICATED', 'orders', $newOrderId, 'source_order_id', null, (string) $sourceOrderId);
+
+        // D-338 (1b): Annexure A comes along (products with the same image files, terms,
+        // included, mode); Annexure B and the Commercial Invoice's annexure choice do not.
+        $annexureCopied = AnnexureChoice::copyAnnexureAToOrder($sourceOrderId, $newOrderId, $createdBy);
+        if ($annexureCopied > 0) {
+            AuditLogRepository::log($createdBy, 'ANNEXURE_A_COPIED', 'orders', $newOrderId, 'source_order_id', null, (string) $sourceOrderId,
+                "Annexure A copied from the duplicated order ({$annexureCopied} product " . ($annexureCopied === 1 ? 'entry' : 'entries') . ').');
+        }
 
         self::carrySupplierPoForward($sourceOrderId, $newOrderId, $createdBy);
 

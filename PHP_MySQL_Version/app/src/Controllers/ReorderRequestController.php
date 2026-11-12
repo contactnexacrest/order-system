@@ -105,9 +105,20 @@ final class ReorderRequestController
                 header("Location: /reorder-requests/{$id}");
                 return;
             }
+            // D-338 (1a): "As per annexure" — never with "Qty To Be Confirmed", the Qty stays
+            // required and the Dimensions are left empty (the size is in the annexure).
+            $perAnnexure = !empty($_POST['as_per_annexure'][$i]);
+            $annexureError = \App\Services\AnnexureChoice::reorderLineError(count($lines) + 1, $perAnnexure, !empty($_POST['quantity_is_tbc'][$i]),
+                (string) ($_POST['quantity'][$i] ?? ''), 'Qty To Be Confirmed');
+            if ($annexureError !== null) {
+                Flash::set('error', $annexureError);
+                header("Location: /reorder-requests/{$id}");
+                return;
+            }
             $lines[] = [
                 'description'     => $description,
-                'dimensions'      => trim((string) ($_POST['dimensions'][$i] ?? '')) ?: null,
+                'as_per_annexure' => $perAnnexure,
+                'dimensions'      => $perAnnexure ? null : (trim((string) ($_POST['dimensions'][$i] ?? '')) ?: null),
                 'finish'          => trim((string) ($_POST['finish'][$i] ?? '')) ?: null,
                 'quantity'        => trim((string) ($_POST['quantity'][$i] ?? '')) ?: null,
                 'quantity_is_tbc' => !empty($_POST['quantity_is_tbc'][$i]),

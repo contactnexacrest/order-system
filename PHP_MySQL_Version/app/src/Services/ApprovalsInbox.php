@@ -223,7 +223,12 @@ final class ApprovalsInbox
             $unit = trim((string) ($line['unit'] ?? ''));
             $price = $line['unit_price'] !== null ? $currency . ' ' . number_format((float) $line['unit_price'], 2) . ($unit !== '' ? ' / ' . $unit : '') : 'no price';
             $f = $check['figures'] ?? null;
-            if ($check['status'] === OrderLinePricing::NO_PRICE) {
+            if ($check['status'] === OrderLinePricing::CBM_CALCULATED) {
+                // Owner decision D-338 (2b): the CBM price was only worked out from a thinner base.
+                $what = 'Price — CBM worked out';
+                $details = $price . ' · ' . (string) $check['cbm_reason'];
+                $bar = "line {$no} — " . (string) $check['cbm_reason'] . '. The Quotation is held until it is approved.';
+            } elseif ($check['status'] === OrderLinePricing::NO_PRICE) {
                 $what = 'Price — no product price';
                 $details = 'Product has no price set' . ($line['unit_price'] !== null ? ' · asked ' . $price : '');
                 $bar = "line {$no} — its product has no price set" . ($line['unit_price'] !== null ? " (asked {$price})" : '') . '. The Quotation is held until it is approved.';

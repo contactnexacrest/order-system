@@ -46,8 +46,50 @@ final class OrderLinePricing
     /** D-270 (point 25): the line's unit needs a piece size to be compared — asked for, never "too low". */
     public const NEEDS_SIZE = 'needs_size';
 
+    /**
+     * Owner decision D-338 (2b): the price is otherwise fine, but it comes from a per-CBM
+     * (50 mm and above) price only CALCULATED from the supplier's thinner base (e.g. 20 mm)
+     * — no 50 mm+ price was quoted — so the MD approves it, like a line below the floor.
+     */
+    public const CBM_CALCULATED = 'cbm_calculated';
+
     /** Statuses that keep the Proforma Invoice back. */
-    public const BLOCKING = [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE, self::NEEDS_SIZE];
+    public const BLOCKING = [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE, self::NEEDS_SIZE, self::CBM_CALCULATED];
+
+    /** Statuses the MD can approve (D-245 P2; D-338: also a CBM price worked out from a thinner base). */
+    public const APPROVABLE = [self::BELOW, self::NO_PRICE, self::CBM_CALCULATED];
+
+    /**
+     * Owner decision D-338 (1c): a line "As per annexure" has no piece size, so a price that
+     * needs the size to be converted cannot be checked — the one wording everywhere (saving
+     * the line, the Quotation / PI gate, the price check, the MD's approval page).
+     */
+    public static function annexureSizeMessage(int $lineNo, ?string $unit): string
+    {
+        $word = trim((string) $unit) === '' ? 'CBM' : LineUnits::label($unit);
+        return "Line {$lineNo} says \"As per annexure\", so its size is not known — type the price per {$word} for this line.";
+    }
+
+    /** D-338 (1c): whether a conversion is missing a piece size (not the weight per CBM). */
+    private static function missingPieceSize(array $conv): bool
+    {
+        return $conv['factor'] === null && !$conv['unconvertible'] && isset($conv['missing'][0])
+            && array_key_exists((string) $conv['missing'][0], LineUnits::SIZE_FIELDS);
+    }
+
+    /**
+     * D-338 (2b): the MD-approval reason when the figures' per-CBM price was only worked out
+     * from the supplier's thinner base, else null.
+     */
+    public static function cbmCalculatedReason(?array $figures): ?string
+    {
+        if ($figures === null || empty($figures['cbm_calculated'])) {
+            return null;
+        }
+        $from = isset($figures['cbm_calc_from_mm']) && $figures['cbm_calc_from_mm'] !== null ? (int) $figures['cbm_calc_from_mm'] : 20;
+        $cbmFrom = isset($figures['cbm_from_mm']) && $figures['cbm_from_mm'] !== null ? (int) $figures['cbm_from_mm'] : 50;
+        return "CBM price worked out from the supplier's {$from} mm price — no {$cbmFrom} mm+ price quoted";
+    }
 
     /**
      * Who sells this order: the client's associate (when the order is one the
@@ -156,6 +198,10 @@ final class OrderLinePricing
             'unit' => $p['unit'], 'spec_text' => $p['spec']['text'] ?? null, 'spec_map' => $p['spec']['map'] ?? null,
             // D-270: what the conversion of a line in another unit needs.
             'thickness_mm' => $p['spec']['adj']['thickness_mm'] ?? null, 'weight_t_per_cbm' => self::weightPerCbm($product),
+            // D-338 (2b): a per-CBM (50 mm+) price only CALCULATED from a thinner supplier base.
+            'cbm_calculated' => ($p['inr_parts']['unit'] ?? null) === 'CBM' && ($p['inr_parts']['how'] ?? 'typed') === 'calculated',
+            'cbm_calc_from_mm' => isset($p['inr_parts']['calc_from_mm']) ? (int) $p['inr_parts']['calc_from_mm'] : null,
+            'cbm_from_mm' => isset($p['inr_parts']['cbm_from']) ? (int) $p['inr_parts']['cbm_from'] : null,
         ];
     }
 
@@ -519,6 +565,11 @@ final class OrderLinePricing
         $out['conversion'] = $conv;
         if ($conv['factor'] === null) {
             $out['note'] = $conv['message'];
+            // D-338 (1c): a line "As per annexure" has no size to convert with.
+            if (!empty($line['as_per_annexure']) && self::missingPieceSize($conv)) {
+                $out['note'] = self::annexureSizeMessage((int) ($line['line_no'] ?? 0), (string) ($line['unit'] ?? ''));
+                $out['annexure_size'] = true;
+            }
             $out['status'] = $out['approval'] !== null ? self::APPROVED : ($conv['unconvertible'] ? self::NO_PRICE : self::NEEDS_SIZE);
             return $out;
         }
@@ -532,9 +583,13 @@ final class OrderLinePricing
             $out['status'] = self::BELOW_MINIMUM;
         } elseif ($price < (float) $figures['floor'] - 0.0001) {
             $out['status'] = self::BELOW;
+        } elseif (self::cbmCalculatedReason($figures) !== null) {
+            // D-338 (2b): at or above the floor, but the CBM price is only worked out — the MD approves it.
+            $out['status'] = self::CBM_CALCULATED;
         } else {
             $out['status'] = self::OK;
         }
+        $out['cbm_reason'] = self::cbmCalculatedReason($figures);
         return $out;
     }
 
@@ -577,7 +632,7 @@ final class OrderLinePricing
             $no = (int) $c['line']['line_no'];
             match ($c['status']) {
                 self::OK, self::APPROVED => $groups['ok'][] = $no,
-                self::BELOW, self::NO_PRICE => $groups['md'][] = $no,
+                self::BELOW, self::NO_PRICE, self::CBM_CALCULATED => $groups['md'][] = $no,
                 self::NEEDS_SIZE => $groups['size'][] = $no,
                 self::BELOW_MINIMUM => $groups['minimum'][] = $no,
                 default => null,
@@ -661,10 +716,14 @@ final class OrderLinePricing
         }
         $doc = $typeCode === 'QT' ? 'the Quotation' : 'the Proforma Invoice';
         $no = (int) $first['line']['line_no'];
+        if ($first['status'] === self::NEEDS_SIZE && !empty($first['annexure_size'])) {
+            return (string) $first['note']; // D-338 (1c): the same wording as when the line is saved
+        }
         return match ($first['status']) {
             self::NEEDS_SIZE => "Line {$no} needs its piece size to check its price — " . lcfirst((string) $first['note']) . " Then generate {$doc} (order page → Products).",
             self::NO_PRICE => "Line {$no} has no price set for its product — the MD must approve it before {$doc} (order page → Products).",
             self::BELOW_MINIMUM => "Line {$no} is below the price NexaCrest can accept — raise it before {$doc} (order page → Products).",
+            self::CBM_CALCULATED => "Line {$no} needs MD approval: " . (string) $first['cbm_reason'] . " — the MD must approve it before {$doc} (order page → Products).",
             default => "Line {$no} is below the lowest price for this order — raise it, or ask the MD to approve it, before {$doc} (order page → Products).",
         };
     }
@@ -691,7 +750,7 @@ final class OrderLinePricing
      * (nobody, not even the MD, goes below it). Null when the price may be saved.
      */
     public static function saveRefusal(array $order, ?int $catalogProductId, string $lineType, ?string $unitPrice, bool $seesBuildup,
-        ?array $selection = null, ?string $unit = null, ?array $priceRequest = null, array $size = []): ?string
+        ?array $selection = null, ?string $unit = null, ?array $priceRequest = null, array $size = [], ?int $annexureLineNo = null): ?string
     {
         if ($catalogProductId === null || $lineType !== 'goods') {
             return null;
@@ -727,7 +786,10 @@ final class OrderLinePricing
             'spec_selection' => $selection !== null ? json_encode((object) $selection) : null] + $size, $f, $product);
         // A missing size is asked for beside the field — never called "too low", never sent to the MD.
         if ($conv['factor'] === null && !$conv['unconvertible']) {
-            return (string) $conv['message'];
+            // D-338 (1c): a line "As per annexure" ($annexureLineNo) has no size to give.
+            return $annexureLineNo !== null && self::missingPieceSize($conv)
+                ? self::annexureSizeMessage($annexureLineNo, $unit)
+                : (string) $conv['message'];
         }
         if ($unitPrice === null || $unitPrice === '' || $conv['factor'] === null) {
             return null; // no price yet, or a unit that cannot be converted (Set, Lot …): the MD approves it
@@ -775,7 +837,7 @@ final class OrderLinePricing
         $order = OrderRepository::find($orderId);
         $check = self::checkLine($line, self::context($order ?? []));
         // D-270: a line still missing its size is asked for it on the page — not sent to the MD.
-        if (in_array($check['status'], [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE], true)) {
+        if (in_array($check['status'], [self::BELOW, self::BELOW_MINIMUM, self::NO_PRICE, self::CBM_CALCULATED], true)) {
             self::requestApproval($orderId, $lineId, $userId, true);
         } elseif (!empty($line['price_approval_requested_at'])) {
             $pdo->prepare('UPDATE order_products SET price_approval_requested_at = NULL, price_approval_requested_by = NULL WHERE id = :id')->execute(['id' => $lineId]);
@@ -794,7 +856,7 @@ final class OrderLinePricing
             return 'Order line not found.';
         }
         $check = self::checkLine($line, self::context($order));
-        if (!in_array($check['status'], [self::BELOW, self::NO_PRICE], true)) {
+        if (!in_array($check['status'], self::APPROVABLE, true)) {
             return $check['status'] === self::BELOW_MINIMUM
                 ? 'This price is below what NexaCrest can accept — raise it; the MD cannot approve it either.'
                 : 'Line ' . (int) $line['line_no'] . ' does not need an approval.';
@@ -806,7 +868,8 @@ final class OrderLinePricing
             ->execute(['u' => $userId, 'id' => $lineId]);
         $ref = (string) ($order['order_reference'] ?? "#{$orderId}");
         $message = "Order {$ref}, line {$line['line_no']} ({$line['description']}) needs your price approval: "
-            . ($check['status'] === self::NO_PRICE ? 'its product has no price set.' : 'it is below the lowest price for this order.');
+            . ($check['status'] === self::NO_PRICE ? 'its product has no price set.'
+                : ($check['status'] === self::CBM_CALCULATED ? (string) $check['cbm_reason'] . '.' : 'it is below the lowest price for this order.'));
         foreach (PermissionRepository::usersWithPermission('manage_pricing') as $mdId) {
             NotificationRepository::create((int) $mdId, null, 'line_price_approval', $orderId, mb_substr($message, 0, 500)); // D-280: one e-mail per approval
         }
@@ -875,9 +938,11 @@ final class OrderLinePricing
                 . ' — nobody can approve it, not even the MD. To sell lower, change the product\'s margin (Products → pricing; logged).';
         }
         if ($status === self::NEEDS_SIZE) {
-            return "Line {$no} needs its piece size first — " . lcfirst((string) $view['check']['note']);
+            return !empty($view['check']['annexure_size'])
+                ? (string) $view['check']['note'] // D-338 (1c): the same wording everywhere
+                : "Line {$no} needs its piece size first — " . lcfirst((string) $view['check']['note']);
         }
-        if (!in_array($status, [self::BELOW, self::NO_PRICE], true)) {
+        if (!in_array($status, self::APPROVABLE, true)) {
             return "Line {$no} does not need an approval.";
         }
         if ((int) ($line['price_set_by'] ?? 0) === $userId && !MakerCheckerGuard::selfApprovalAllowed('price_discount', $userId)) {
@@ -894,7 +959,9 @@ final class OrderLinePricing
             'ic' => isset($effect['cut_line']) ? number_format((float) $effect['cut_line'], 2, '.', '') : null,
             'id' => $lineId,
         ]);
-        $what = $status === self::NO_PRICE ? 'no price set for its product' : 'USD ' . number_format((float) $line['unit_price'], 2) . ' below the floor USD ' . number_format((float) $view['check']['figures']['floor'], 2);
+        $what = $status === self::NO_PRICE ? 'no price set for its product'
+            : ($status === self::CBM_CALCULATED ? 'USD ' . number_format((float) $line['unit_price'], 2) . ' — ' . (string) $view['check']['cbm_reason']
+                : 'USD ' . number_format((float) $line['unit_price'], 2) . ' below the floor USD ' . number_format((float) $view['check']['figures']['floor'], 2));
         AuditLogRepository::log($userId, 'LINE_PRICE_APPROVED', 'order_products', $lineId, 'unit_price', null, (string) $line['unit_price'],
             "Order line {$no}: {$what} — reason: {$reason}");
         if ((int) ($line['price_set_by'] ?? 0) === $userId) {

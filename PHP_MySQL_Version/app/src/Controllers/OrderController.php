@@ -1041,6 +1041,16 @@ final class OrderController
         return [true, null];
     }
 
+    /**
+     * The refusal shown when a line cannot be saved: "Product line: …", except the D-338 (1c)
+     * "Line N says "As per annexure" …" wording, which already names the line and is shown
+     * exactly as it is (the same text as on the Quotation / PI gate).
+     */
+    private static function lineRefusalText(string $refusal): string
+    {
+        return preg_match('/^Line \d+ says "As per annexure"/u', $refusal) === 1 ? $refusal : 'Product line: ' . $refusal;
+    }
+
     /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
     private static function dimensionsFromSize(array $size): ?string
     {
@@ -1054,6 +1064,11 @@ final class OrderController
         $line = OrderProductRepository::find($lineId);
         if ($line === null || empty($line['price_approval_requested_at'])) {
             return $saved;
+        }
+        $check = \App\Services\OrderLinePricing::checkLine($line, \App\Services\OrderLinePricing::context(OrderRepository::find((int) $line['order_id']) ?? []));
+        if ($check['status'] === \App\Services\OrderLinePricing::CBM_CALCULATED) {
+            // D-338 (2b): the price is fine, but its CBM price was only worked out from a thinner base.
+            return $saved . ' Line ' . (int) $line['line_no'] . ' needs MD approval: ' . $check['cbm_reason'] . ' — it was sent to the MD for approval; the Quotation and Proforma Invoice wait for it.';
         }
         return $saved . ' Line ' . (int) $line['line_no'] . ' is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.';
     }
@@ -1137,9 +1152,11 @@ final class OrderController
             : [null, null];
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
             ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
-                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size);
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size,
+                // D-338 (1c): a line "As per annexure" has no size — its own wording.
+                $__perAnnexure ? OrderProductRepository::nextLineNo($orderId) : null);
         if ($__refusal !== null) {
-            Flash::set('error', 'Product line: ' . $__refusal);
+            Flash::set('error', self::lineRefusalText($__refusal));
             header("Location: /orders/{$orderId}#step-products");
             return;
         }
@@ -1253,9 +1270,11 @@ final class OrderController
             && strtoupper(trim((string) ($_POST['unit'] ?? ''))) === strtoupper(trim((string) ($product['unit'] ?? '')));
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
             ?? ($__priceUnchanged && $__specUnchanged && $__sizeUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
-                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null, $__size));
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null, $__size,
+                // D-338 (1c): a line "As per annexure" has no size — its own wording.
+                $__perAnnexure ? (int) $product['line_no'] : null));
         if ($__refusal !== null) {
-            Flash::set('error', 'Product line: ' . $__refusal);
+            Flash::set('error', self::lineRefusalText($__refusal));
             header("Location: /orders/{$orderId}#step-products");
             return;
         }

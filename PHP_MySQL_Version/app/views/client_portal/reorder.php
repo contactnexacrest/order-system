@@ -14,11 +14,11 @@
     <fieldset>
       <legend>Products</legend>
       <div id="product-rows">
-        <?php $rows = !empty($products) ? $products : [['description' => '', 'dimensions' => '', 'finish' => '', 'quantity' => '', 'quantity_is_tbc' => false, 'unit' => '']]; ?>
+        <?php $rows = !empty($products) ? $products : [['description' => '', 'dimensions' => '', 'finish' => '', 'quantity' => '', 'quantity_is_tbc' => false, 'as_per_annexure' => false, 'unit' => '']]; ?>
         <?php foreach ($rows as $idx => $p): ?>
-        <div class="product-row">
+        <div class="product-row" data-annexure-scope>
           <label>Description *<input type="text" name="product_description[<?= $idx ?>]" required value="<?= htmlspecialchars($p['description'] ?? '') ?>" placeholder="e.g. Granite Memorial Headstone"></label>
-          <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches"></label>
+          <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars(!empty($p['as_per_annexure']) ? '' : ($p['dimensions'] ?? '')) ?>" placeholder="e.g. 24x12x3 inches" data-annexure-size></label>
           <label>Finish
             <select name="product_finish[<?= $idx ?>]">
               <?php $__finishVal = (string) ($p['finish'] ?? ''); ?>
@@ -28,8 +28,10 @@
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Quantity<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
-          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Quantity not decided yet</label>
+          <label>Quantity<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100" data-annexure-qty></label>
+          <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" data-annexure-tbc <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Quantity not decided yet</label>
+          <?php // Owner decision D-338 (1a): the sizes are in the annexure of the earlier order — never with "Quantity not decided yet". ?>
+          <label><input type="checkbox" name="product_as_per_annexure[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" data-annexure-line <?= !empty($p['as_per_annexure']) ? 'checked' : '' ?>> As per annexure</label>
           <label>Unit
             <?php
               // Buyer-portal fixes (7 Nov 2026): the earlier order's unit is matched whatever its case or
@@ -93,6 +95,10 @@
     });
     nextIndex++;
     rows.appendChild(clone);
+    // D-338: the new row starts with "As per annexure" off (app.js frees its Dimensions again).
+    clone.querySelectorAll('input[type=checkbox][data-annexure-line]').forEach(function (el) {
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
   });
 })();
 </script>

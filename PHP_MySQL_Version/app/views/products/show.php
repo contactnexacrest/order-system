@@ -106,7 +106,7 @@
             <?php if ($s['contact_phone']): ?><br><small class="muted"><?= View::e($s['contact_phone']) ?></small><?php endif; ?>
             <?php if ($s['contact_email']): ?><br><small class="muted"><?= View::e($s['contact_email']) ?></small><?php endif; ?>
           </td>
-          <td><?= View::e(ucfirst($s['fob_source'])) ?></td>
+          <td><?= $s['fob_source'] === 'computed' ? 'Computed <small class="muted">(adds up the cost parts)</small>' : View::e(ucfirst($s['fob_source'])) ?></td>
           <td><?= $s['effective_fob'] === null ? 'To Be Confirmed' : number_format((float) $s['effective_fob'], 2) ?></td>
           <td><?= $s['is_primary'] ? '&#9733;' : '' ?></td>
           <td>
@@ -127,10 +127,12 @@
                     <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>" placeholder="e.g., Sales Manager"></label>
                     <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91-0000000000"></label>
                     <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>" placeholder="e.g. name@company.com"></label>
+                    <?php // Owner decision D-338 (2a): "add up the cost parts" (Computed) only for a price already saved that way — it can be turned into one typed price. ?>
+                    <?php if ($s['fob_source'] === 'computed'): ?>
                     <label>FOB Source
                       <select name="fob_source">
-                        <option value="direct" <?= $s['fob_source'] === 'direct' ? 'selected' : '' ?>>Direct</option>
-                        <option value="computed" <?= $s['fob_source'] === 'computed' ? 'selected' : '' ?>>Computed</option>
+                        <option value="computed" selected>Computed — adds up the cost parts (older price)</option>
+                        <option value="direct">Direct — change to one typed price (FOB Value)</option>
                       </select>
                     </label>
                     <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>" placeholder="e.g. 4500.00"></label>
@@ -139,6 +141,10 @@
                     <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" value="<?= View::e($s['packing_cost'] !== null ? (string) $s['packing_cost'] : '') ?>" placeholder="e.g. 12000"></label>
                     <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>" placeholder="e.g. 8000"></label>
                     <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>" placeholder="e.g. 15000"></label>
+                    <?php else: ?>
+                    <input type="hidden" name="fob_source" value="direct">
+                    <label>FOB Value (₹)<input type="number" step="0.01" min="0" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>" placeholder="e.g. 4500.00"></label>
+                    <?php endif; ?>
                     <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"><?= View::e($s['notes'] ?? '') ?></textarea></label>
                     <label><input type="checkbox" name="is_primary" value="1" <?= $s['is_primary'] ? 'checked' : '' ?>> Used for pricing</label>
                     <button type="submit" class="btn-sm">Save</button>
@@ -166,18 +172,9 @@
             <label>Contact Person<input type="text" name="contact_person" placeholder="e.g., Sales Manager"></label>
             <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91-0000000000"></label>
             <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com"></label>
-            <label>FOB Source
-              <select name="fob_source">
-                <option value="direct">Direct</option>
-                <option value="computed">Computed</option>
-              </select>
-            </label>
-            <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>
-            <label>Factory Cost override<input type="number" step="0.01" min="0" name="factory_cost" placeholder="e.g. 350000"></label>
-            <label>Transportation Cost override<input type="number" step="0.01" min="0" name="transportation_cost" placeholder="e.g. 9000"></label>
-            <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" placeholder="e.g. 12000"></label>
-            <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" placeholder="e.g. 8000"></label>
-            <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" placeholder="e.g. 15000"></label>
+            <?php // Owner decision D-338 (2a): a new price is one typed price — "add up the cost parts" is no longer offered. ?>
+            <input type="hidden" name="fob_source" value="direct">
+            <label>FOB Value (₹)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>
             <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
             <label><input type="checkbox" name="is_primary" value="1"> Used for pricing</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>

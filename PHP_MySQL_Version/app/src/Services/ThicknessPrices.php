@@ -284,8 +284,12 @@ final class ThicknessPrices
             }
             $chaU = $cha['per_cbm'] ?? 0.0;
             if ($basis === 'cbm') {
+                // D-338 (2b): a CALCULATED per-CBM price — from which thinner price it was worked out
+                // (the stored calc_from_mm, else the row's base) — needs the MD's approval on an order line.
                 return ['supplier' => $v['price'], 'cha' => $chaU, 'packing' => $packing, 'total' => $v['price'] + $chaU + $packing,
-                    'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => null];
+                    'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => null,
+                    'calc_from_mm' => $v['how'] === 'calculated' ? (int) ($v['calc_from_mm'] ?? self::baseOf($row, $rules)) : null,
+                    'cbm_from' => (int) $rules['cbm_from']];
             }
             // The base is the per-CBM price ("50 mm and above"): in the product's unit.
             $unit = $rules['unit'] !== '' ? $rules['unit'] : 'CBM';

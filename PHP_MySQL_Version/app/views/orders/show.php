@@ -1526,7 +1526,7 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
     <?php endif; ?>
 
   <?php // Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). ?>
-  <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::NEEDS_SIZE, \App\Services\OrderLinePricing::APPROVED], true))); ?>
+  <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::NEEDS_SIZE, \App\Services\OrderLinePricing::CBM_CALCULATED, \App\Services\OrderLinePricing::APPROVED], true))); ?>
   <?php if ($sees['selling'] && $__pcLines !== []): ?>
   <div class="price-check" id="price-check">
     <?php // D-305 (point 19): staff see "for this order" figures on an associate's client order; only price build-up viewers see who sells it and at what level. ?>
@@ -1553,13 +1553,17 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
               <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept — raise it</span>
             <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::NO_PRICE): ?>
               <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+            <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::CBM_CALCULATED): ?>
+              <?php // Owner decision D-338 (2b): the CBM price was only worked out from the supplier's thinner base. ?>
+              <span class="price-badge price-badge-bad">CBM price worked out — needs MD approval</span>
+              <div class="muted small"><?= htmlspecialchars((string) $__pc['cbm_reason']) ?></div>
             <?php else: ?>
               <span class="price-badge price-badge-bad">✗ <?= $__forOrder ? 'Below the lowest for this order' : 'Below your lowest price' ?></span>
             <?php endif; ?>
             <?php if ($__pc['requested'] && $__pc['status'] !== \App\Services\OrderLinePricing::APPROVED): ?><div class="muted small">Sent to the MD for approval.</div><?php endif; ?>
           </td>
           <td>
-            <?php if (in_array($__pc['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::NO_PRICE], true)): ?>
+            <?php if (in_array($__pc['status'], \App\Services\OrderLinePricing::APPROVABLE, true)): ?>
               <?php if ($canManagePricing): ?>
                 <a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $__pl['id'] ?>/price-approval">Review and approve line <?= (int) $__pl['line_no'] ?></a>
               <?php elseif ($canEditProducts && !$__pc['requested']): ?>

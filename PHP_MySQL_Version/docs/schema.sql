@@ -6607,3 +6607,8 @@ CREATE TABLE IF NOT EXISTS order_buyer_detail_requests (
   CONSTRAINT fk_order_buyer_detail_requests_req FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_order_buyer_detail_requests_dec FOREIGN KEY (decided_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Owner decision D-338 (12 Nov 2026; migration 2026-11-12e): a reorder request line
+-- can say "As per annexure" too (as_per_annexure = 1: no Dimensions, the quantity is
+-- required, never together with "Qty To Be Confirmed"); it is carried onto
+-- order_products.as_per_annexure when the request becomes an order.
+ALTER TABLE order_reorder_request_products ADD COLUMN as_per_annexure TINYINT(1) NOT NULL DEFAULT 0;

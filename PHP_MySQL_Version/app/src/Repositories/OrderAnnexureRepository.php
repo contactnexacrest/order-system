@@ -194,4 +194,38 @@ final class OrderAnnexureRepository
         }
         return $copied;
     }
+
+    /**
+     * Owner decision D-338 (1b): copies one annexure's product entries of an order onto
+     * another order (the same annexure), images pointing at the same stored files —
+     * exactly as replaceWithCopy() does between A and B. The target's entries of that
+     * annexure are replaced. Returns the number of entries copied.
+     */
+    public static function copyToOrder(int $sourceOrderId, int $targetOrderId, string $which = 'A'): int
+    {
+        $which = self::which($which);
+        $pdo = Database::connection();
+        foreach (self::forOrder($targetOrderId, $which) as $old) {
+            self::deleteProduct((int) $old['id']);
+        }
+        $copied = 0;
+        foreach (self::forOrder($sourceOrderId, $which) as $p) {
+            $pdo->prepare(
+                'INSERT INTO order_annexure_products
+                    (order_id, `which`, product_id, product_code, name, description, dimensions, finish, components, technical_notes, sort_order)
+                 VALUES (:o, :w, :pid, :pc, :n, :d, :dim, :f, :c, :t, :s)'
+            )->execute([
+                'o' => $targetOrderId, 'w' => $which, 'pid' => $p['product_id'] ?? null, 'pc' => $p['product_code'] ?? null,
+                'n' => $p['name'], 'd' => $p['description'], 'dim' => $p['dimensions'], 'f' => $p['finish'],
+                'c' => $p['components'], 't' => $p['technical_notes'], 's' => (int) $p['sort_order'],
+            ]);
+            $newId = (int) $pdo->lastInsertId();
+            foreach ($p['images'] as $img) {
+                $pdo->prepare('INSERT INTO order_annexure_images (order_annexure_product_id, file_id, sort_order) VALUES (:p, :f, :s)')
+                    ->execute(['p' => $newId, 'f' => (int) $img['file_id'], 's' => (int) $img['sort_order']]);
+            }
+            $copied++;
+        }
+        return $copied;
+    }
 }

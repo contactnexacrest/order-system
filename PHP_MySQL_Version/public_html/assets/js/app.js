@@ -774,37 +774,55 @@
   // in the annexure. The tick box (data-annexure-line) and "Qty To Be Confirmed" are
   // never both ticked; while it is ticked Length / Width / Thickness show "As per
   // annexure" and accept nothing, and the Qty is required. The server checks the same.
+  // D-338 (1a): the same on a reorder request line — one form holds several lines, so a
+  // line is the nearest [data-annexure-scope] (else the form); its quantity-not-decided
+  // box is [data-annexure-tbc], its quantity [data-annexure-qty] and its sizes
+  // [data-piece-size] / [data-annexure-size]. One listener on the page, so a line added
+  // later (reorder "+ Add product line") works too.
+  function annexureScope(el) {
+    return el.closest('[data-annexure-scope]') || el.form;
+  }
+  function annexureTbc(scope) {
+    return scope.querySelector('input[type="checkbox"][data-annexure-tbc]') || scope.querySelector('input[type="checkbox"][name="quantity_is_tbc"]');
+  }
+  function annexureApply(box) {
+    var scope = annexureScope(box);
+    if (!scope) return;
+    var qty = scope.querySelector('[data-annexure-qty]') || scope.querySelector('[name="quantity"]');
+    var on = box.checked;
+    scope.querySelectorAll('[data-piece-size], [data-annexure-size]').forEach(function (f) {
+      if (on) {
+        if (f.dataset.placeholderWas === undefined) f.dataset.placeholderWas = f.getAttribute('placeholder') || '';
+        f.value = '';
+        f.placeholder = 'As per annexure';
+      } else if (f.dataset.placeholderWas !== undefined) {
+        f.placeholder = f.dataset.placeholderWas;
+      }
+      f.disabled = on;
+    });
+    if (qty) {
+      if (qty.dataset.requiredWas === undefined) qty.dataset.requiredWas = qty.required ? '1' : '';
+      qty.required = on || qty.dataset.requiredWas === '1';
+    }
+  }
   function initAnnexureLine() {
-    document.querySelectorAll('input[type="checkbox"][data-annexure-line]').forEach(function (box) {
-      var form = box.form;
-      if (!form) return;
-      var tbc = form.querySelector('input[type="checkbox"][name="quantity_is_tbc"]');
-      var qty = form.querySelector('[name="quantity"]');
-      var sizes = form.querySelectorAll('[data-piece-size]');
-      function apply() {
-        var on = box.checked;
-        sizes.forEach(function (f) {
-          if (on) {
-            if (f.dataset.placeholderWas === undefined) f.dataset.placeholderWas = f.getAttribute('placeholder') || '';
-            f.value = '';
-            f.placeholder = 'As per annexure';
-          } else if (f.dataset.placeholderWas !== undefined) {
-            f.placeholder = f.dataset.placeholderWas;
-          }
-          f.disabled = on;
-        });
-        if (qty) qty.required = on;
+    document.querySelectorAll('input[type="checkbox"][data-annexure-line]').forEach(annexureApply);
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.type !== 'checkbox') return;
+      var scope = annexureScope(t);
+      if (!scope) return;
+      if (t.hasAttribute('data-annexure-line')) {
+        var tbc = annexureTbc(scope);
+        if (t.checked && tbc) tbc.checked = false;
+        annexureApply(t);
+        return;
       }
-      box.addEventListener('change', function () {
-        if (box.checked && tbc) tbc.checked = false;
-        apply();
-      });
-      if (tbc) {
-        tbc.addEventListener('change', function () {
-          if (tbc.checked && box.checked) { box.checked = false; apply(); }
-        });
+      var box = scope.querySelector('input[type="checkbox"][data-annexure-line]');
+      if (box && t === annexureTbc(scope) && t.checked && box.checked) {
+        box.checked = false;
+        annexureApply(box);
       }
-      apply();
     });
   }
 

@@ -167,6 +167,49 @@ final class AnnexureChoice
     }
 
     /**
+     * Owner decision D-338 (1a): a reorder request line's "As per annexure" tick box —
+     * never together with the quantity-not-decided tick box ($tbcLabel names it as the
+     * form shows it), and the quantity stays required. Null when the line is fine.
+     */
+    public static function reorderLineError(int $lineNo, bool $perAnnexure, bool $quantityIsTbc, string $quantity, string $tbcLabel): ?string
+    {
+        if (!$perAnnexure) {
+            return null;
+        }
+        if ($quantityIsTbc) {
+            return "Line {$lineNo}: tick either \"{$tbcLabel}\" or \"As per annexure\", not both.";
+        }
+        if (trim($quantity) === '') {
+            return "Line {$lineNo}: a line \"As per annexure\" still needs its quantity — enter the Qty.";
+        }
+        return null;
+    }
+
+    /**
+     * Owner decision D-338 (1b): a duplicated (or reordered) order gets a copy of the
+     * source order's Annexure A — its product entries (pointing at the same image
+     * files, exactly like "Copy everything from Annexure A"), its Additional Terms,
+     * whether it is included and its content mode. Annexure B and the choice for the
+     * Commercial Invoice are NOT copied (they describe what was shipped on the source
+     * order). Returns the number of product entries copied.
+     */
+    public static function copyAnnexureAToOrder(int $sourceOrderId, int $newOrderId, int $userId): int
+    {
+        $source = OrderRepository::find($sourceOrderId);
+        if ($source === null) {
+            return 0;
+        }
+        $count = OrderAnnexureRepository::copyToOrder($sourceOrderId, $newOrderId, 'A');
+        $termsA = OrderAnnexureTermsRepository::find($sourceOrderId, 'A');
+        if ($termsA !== null && trim((string) ($termsA['content_html'] ?? '')) !== '') {
+            OrderAnnexureTermsRepository::upsert($newOrderId, (string) $termsA['content_html'], $userId, 'A');
+        }
+        OrderRepository::setAnnexureMode($newOrderId, self::mode($source, 'A'));
+        OrderRepository::setIncludeAnnexureA($newOrderId, self::included($source, 'A'));
+        return $count;
+    }
+
+    /**
      * "Copy everything from Annexure A": Annexure B becomes a copy of A — product
      * entries (same image files), Additional Terms and content mode. Returns the
      * number of product entries copied.

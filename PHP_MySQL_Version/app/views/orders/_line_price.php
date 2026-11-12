@@ -35,6 +35,9 @@ $__ref = $__lc['reference'] ?? null;
     <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept</span>
   <?php elseif ($__lc['status'] === \App\Services\OrderLinePricing::NO_PRICE): ?>
     <span class="price-badge price-badge-bad">No price set — needs MD approval</span><?php if ($__lc['note'] !== null && $__conv !== null && $__conv['unconvertible']): ?> <span class="muted"><?= htmlspecialchars((string) $__lc['note']) ?></span><?php endif; ?>
+  <?php elseif ($__lc['status'] === \App\Services\OrderLinePricing::CBM_CALCULATED): ?>
+    <?php // Owner decision D-338 (2b). ?>
+    <span class="price-badge price-badge-bad">CBM price worked out — needs MD approval<?= $__lc['requested'] ? ' — sent to the MD' : '' ?></span> <span class="muted"><?= htmlspecialchars((string) $__lc['cbm_reason']) ?></span>
   <?php elseif ($__lc['status'] === \App\Services\OrderLinePricing::NEEDS_SIZE): ?>
     <span class="price-badge price-badge-size">Size needed</span> <span class="muted"><?= htmlspecialchars((string) $__lc['note']) ?></span>
   <?php elseif ($__lc['status'] === \App\Services\OrderLinePricing::APPROVED): ?>

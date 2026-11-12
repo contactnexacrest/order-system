@@ -40,13 +40,14 @@ final class OrderReorderRequestRepository
         bool $quantityIsTbc,
         ?string $unit,
         ?string $unitPrice,
-        ?string $hsCode
+        ?string $hsCode,
+        bool $asPerAnnexure = false
     ): void {
         Database::connection()->prepare(
             'INSERT INTO order_reorder_request_products
-                (reorder_request_id, line_no, description, dimensions, finish, quantity, quantity_is_tbc, unit, unit_price, hs_code)
+                (reorder_request_id, line_no, description, dimensions, finish, quantity, quantity_is_tbc, unit, unit_price, hs_code, as_per_annexure)
              VALUES
-                (:reorder_request_id, :line_no, :description, :dimensions, :finish, :quantity, :quantity_is_tbc, :unit, :unit_price, :hs_code)'
+                (:reorder_request_id, :line_no, :description, :dimensions, :finish, :quantity, :quantity_is_tbc, :unit, :unit_price, :hs_code, :as_per_annexure)'
         )->execute([
             'reorder_request_id' => $requestId,
             'line_no'            => $lineNo,
@@ -58,6 +59,8 @@ final class OrderReorderRequestRepository
             'unit'               => $unit,
             'unit_price'         => $unitPrice ?: null,
             'hs_code'            => $hsCode ?: null,
+            // D-338 (1a): the line's size is given in the annexure (no Dimensions).
+            'as_per_annexure'    => $asPerAnnexure ? 1 : 0,
         ]);
     }
 

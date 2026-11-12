@@ -458,6 +458,22 @@ final class ClientPortalController
             return;
         }
 
+        // D-338 (1a): "As per annexure" — never with "Quantity not decided yet", and the quantity stays required.
+        $lineCheck = 0;
+        foreach ($descriptions as $i => $description) {
+            if (trim((string) $description) === '') {
+                continue;
+            }
+            $lineCheck++;
+            $annexureError = \App\Services\AnnexureChoice::reorderLineError($lineCheck, !empty($_POST['product_as_per_annexure'][$i]),
+                !empty($_POST['product_quantity_tbc'][$i]), (string) ($_POST['product_quantity'][$i] ?? ''), 'Quantity not decided yet');
+            if ($annexureError !== null) {
+                Flash::set('error', $annexureError);
+                header("Location: /client/orders/{$orderId}/reorder");
+                return;
+            }
+        }
+
         $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
         $requestId = OrderReorderRequestRepository::create($clientId, $orderId, $notes);
 
@@ -467,17 +483,19 @@ final class ClientPortalController
             if ($description === '') {
                 continue;
             }
+            $perAnnexure = !empty($_POST['product_as_per_annexure'][$i]);
             OrderReorderRequestRepository::addProductLine(
                 $requestId,
                 $lineNo++,
                 $description,
-                trim((string) ($_POST['product_dimensions'][$i] ?? '')) ?: null,
+                $perAnnexure ? null : (trim((string) ($_POST['product_dimensions'][$i] ?? '')) ?: null),
                 trim((string) ($_POST['product_finish'][$i] ?? '')) ?: null,
                 trim((string) ($_POST['product_quantity'][$i] ?? '')) ?: null,
                 !empty($_POST['product_quantity_tbc'][$i]),
                 trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null,
                 null, // pricing is never client-set — staff fills it in when reviewing
-                null  // HS code likewise — staff confirms/assigns from the master list on review
+                null, // HS code likewise — staff confirms/assigns from the master list on review
+                $perAnnexure
             );
         }
 
