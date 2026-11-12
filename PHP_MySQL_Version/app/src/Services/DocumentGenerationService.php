@@ -96,6 +96,10 @@ final class DocumentGenerationService
         if (in_array($documentTypeCode, ['QT', 'PI'], true) && ($priceBlock = OrderLinePricing::documentBlockReason($orderId, $documentTypeCode)) !== null) {
             throw new \RuntimeException($priceBlock);
         }
+        // Owner decision D-336: a line "As per annexure" needs a product entry in the annexure that document prints.
+        if (($annexureBlock = AnnexureChoice::blockReason($orderId, $documentTypeCode)) !== null) {
+            throw new \RuntimeException($annexureBlock);
+        }
         if ($documentTypeCode === 'PI') {
             $piValidityDays = (int) (CompanySettingsRepository::get('pi_validity_days') ?? 15);
             OrderRepository::setPiDates(

@@ -1011,6 +1011,36 @@ final class OrderController
         return [$size, null];
     }
 
+    /**
+     * Owner decision D-336: the line form's "As per annexure" tick box. Never together
+     * with "Qty To Be Confirmed"; the quantity stays required (it is the line's
+     * quantity). When ticked, the piece size and the Dimensions text are cleared in
+     * $post (the documents print "Dimensions: As per Annexure A/B"). A form without
+     * the tick box (no as_per_annexure_field) keeps the line's current setting.
+     *
+     * @return array{0: bool, 1: ?string} [ticked, error]
+     */
+    private static function annexureLineInput(array &$post, mixed $current): array
+    {
+        $perAnnexure = array_key_exists('as_per_annexure_field', $post) || array_key_exists('as_per_annexure', $post)
+            ? !empty($post['as_per_annexure'])
+            : !empty($current);
+        if (!$perAnnexure) {
+            return [false, null];
+        }
+        if (!empty($post['quantity_is_tbc'])) {
+            return [true, 'tick either "Qty To Be Confirmed" or "As per annexure", not both.'];
+        }
+        if (trim((string) ($post['quantity'] ?? '')) === '') {
+            return [true, 'a line "As per annexure" still needs its quantity — enter the Qty.'];
+        }
+        foreach (array_keys(\App\Services\LineUnits::SIZE_FIELDS) as $f) {
+            $post[$f] = '';
+        }
+        $post['dimensions'] = '';
+        return [true, null];
+    }
+
     /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
     private static function dimensionsFromSize(array $size): ?string
     {
@@ -1084,6 +1114,14 @@ final class OrderController
             return;
         }
 
+        // Owner decision D-336: "As per annexure" — never with "Qty To Be Confirmed"; the size is in the annexure.
+        [$__perAnnexure, $__annexureError] = self::annexureLineInput($_POST, null);
+        if ($__annexureError !== null) {
+            Flash::set('error', 'Product line: ' . $__annexureError);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+
         // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
         if ($lineError = OrderLineValidator::checkLine((string) ($_POST['quantity'] ?? ''), !empty($_POST['quantity_is_tbc']), (string) ($_POST['unit_price'] ?? ''))) {
             Flash::set('error', 'Product line: ' . $lineError);
@@ -1137,6 +1175,7 @@ final class OrderController
         // D-255: the options chosen, and the price request the line came from (now "became an order").
         \App\Services\OrderLinePricing::saveSelection($newLineId, $__specSel, $__priceRequest !== null ? (int) $__priceRequest['id'] : null);
         OrderProductRepository::setPieceSize($newLineId, $__size);
+        OrderProductRepository::setAsPerAnnexure($newLineId, $__perAnnexure);
         if ($__priceRequest !== null) {
             \App\Services\PriceRequestService::markOrdered((int) $__priceRequest['id'], $orderId);
         }
@@ -1174,6 +1213,14 @@ final class OrderController
         if (($lineTypeError ?? $categoryError) !== null) {
             Flash::set('error', $lineTypeError ?? $categoryError);
             header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        // Owner decision D-336: "As per annexure" — never with "Qty To Be Confirmed"; the size is in the annexure.
+        [$__perAnnexure, $__annexureError] = self::annexureLineInput($_POST, $product['as_per_annexure'] ?? null);
+        if ($__annexureError !== null) {
+            Flash::set('error', 'Product line: ' . $__annexureError);
+            header("Location: /orders/{$orderId}#step-products");
             return;
         }
 
@@ -1244,6 +1291,7 @@ final class OrderController
             \App\Services\OrderLinePricing::saveSelection($productId, $__specSel, null);
         }
         OrderProductRepository::setPieceSize($productId, $__size);
+        OrderProductRepository::setAsPerAnnexure($productId, $__perAnnexure);
         $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
             OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);

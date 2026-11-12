@@ -1,6 +1,12 @@
 <?php
 use App\Helpers\Csrf;
-$annexureMode = $order['annexure_mode'] ?? 'SPEC';
+// Owner decision D-336: the same screen for Annexure A (as quoted) and Annexure B
+// (as shipped, ?which=B — printed with the Commercial Invoice and Packing List).
+$which = ($which ?? 'A') === 'B' ? 'B' : 'A';
+$annexLabel = 'Annexure ' . $which;
+$annexureMode = $which === 'B' ? ($order['annexure_b_mode'] ?? 'SPEC') : ($order['annexure_mode'] ?? 'SPEC');
+$annexIncluded = $which === 'B' ? !empty($order['include_annexure_b']) : !empty($order['include_annexure_a']);
+$whichField = '<input type="hidden" name="which" value="' . $which . '">';
 // 90-item backlog #73/#74: once the Annexure document itself has been
 // approved/sent, editing the content below silently drifts from what the
 // buyer already saw unless the next regeneration+re-approval catches up.
@@ -18,9 +24,27 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
 };
 ?>
 <div class="card page-wide">
-  <h1>Annexure A — <?= htmlspecialchars($order['order_reference'] ?? ('#' . $order['id'])) ?></h1>
+  <div class="page-header-row annexure-head">
+    <h1><?= $annexLabel ?> — <?= htmlspecialchars($order['order_reference'] ?? ('#' . $order['id'])) ?></h1>
+    <?php if ($which === 'A'): ?>
+      <a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/annexure?which=B">Annexure B (as shipped) &rsaquo;</a>
+    <?php else: ?>
+      <a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/annexure">&lsaquo; Annexure A (as quoted)</a>
+    <?php endif; ?>
+  </div>
+  <?php if ($which === 'B'): ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/copy-from-a" class="annexure-copy-form"<?= !empty($bHasContent) ? ' data-confirm="Replace Annexure B with a copy of Annexure A?"' : '' ?>>
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm">Copy everything from Annexure A</button>
+      <span class="muted small">Starts Annexure B from Annexure A — products, images and terms — then change what is different. Printed with the Commercial Invoice and Packing List.</span>
+    </form>
+  <?php endif; ?>
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
+  <?php if ($which === 'B'): ?>
+  <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, as shipped — printed with the Commercial Invoice and Packing List as an attached, integral document whenever "Include Annexure B" is on for this order (or Annexure B is chosen in the Commercial Invoice step).</p>
+  <?php else: ?>
   <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document whenever "Include Annexure A" is on for this order.</p>
+  <?php endif; ?>
 
   <?php if ($annexaIsLocked): ?>
     <div class="alert alert-warning">
@@ -30,15 +54,15 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
 
   <div class="section">
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/toggle">
-      <?= Csrf::field() ?>
-      <label><input type="checkbox" name="include_annexure_a" value="1" <?= $order['include_annexure_a'] ? 'checked' : '' ?> style="display:inline-block;width:auto;" onchange="this.form.submit()"> Include Annexure A on this order's documents</label>
+      <?= Csrf::field() ?><?= $whichField ?>
+      <label><input type="checkbox" name="include_annexure_<?= strtolower($which) ?>" value="1" <?= $annexIncluded ? 'checked' : '' ?> style="display:inline-block;width:auto;" onchange="this.form.submit()"> Include <?= $annexLabel ?> on this order's documents</label>
     </form>
   </div>
 
   <div class="section">
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/mode" id="annexure-mode-form">
-      <?= Csrf::field() ?>
-      <label>Annexure A content
+      <?= Csrf::field() ?><?= $whichField ?>
+      <label><?= $annexLabel ?> content
         <select name="mode" id="annexure-mode-select" onchange="annexureApplyMode(this.value); this.form.submit();">
           <option value="SPEC" <?= $annexureMode === 'SPEC' ? 'selected' : '' ?>>Product Specification (current view)</option>
           <option value="TERMS" <?= $annexureMode === 'TERMS' ? 'selected' : '' ?>>Additional Terms</option>
@@ -78,7 +102,7 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
               <div class="thumb-card">
                 <img src="/file-store/<?= (int) $img['file_id'] ?>/download" alt="<?= htmlspecialchars($img['original_filename']) ?>" class="asset-preview">
                 <span class="muted small"><?= htmlspecialchars($img['original_filename']) ?></span>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" <?= $annexureConfirmAttr('Remove this image from Annexure A?') ?>>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/images/<?= (int) $img['id'] ?>/remove" <?= $annexureConfirmAttr('Remove this image from ' . $annexLabel . '?') ?>>
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
@@ -102,7 +126,7 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
   <div class="section">
     <h2>Add Product Entry</h2>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/products" enctype="multipart/form-data" <?= $annexureConfirmAttr() ?>>
-      <?= Csrf::field() ?>
+      <?= Csrf::field() ?><?= $whichField ?>
       <div class="field-grid">
         <label>Name *<input type="text" name="name" placeholder="e.g. Granite Countertop Slab" required></label>
         <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 210 x 528 cm"></label>
@@ -121,7 +145,7 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
     <h2>Additional Terms</h2>
     <p class="muted small">Free-form text — special terms, clauses, or anything else agreed with the client that doesn't fit the Product Specification table. Supports basic formatting and pasted/inserted images. Video/audio can't be embedded here: a generated PDF or Word document can't play media, so only images are supported.</p>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/terms" id="annexure-terms-form" <?= $annexureConfirmAttr() ?>>
-      <?= Csrf::field() ?>
+      <?= Csrf::field() ?><?= $whichField ?>
       <div class="wysiwyg-toolbar" role="toolbar" aria-label="Text formatting">
         <button type="button" class="wysiwyg-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
         <button type="button" class="wysiwyg-btn" data-cmd="italic" title="Italic"><em>I</em></button>

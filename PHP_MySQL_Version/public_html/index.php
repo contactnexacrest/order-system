@@ -870,6 +870,8 @@ $router->get('/orders/{id}/annexure', [$annexure, 'index'], [SessionAuth::requir
 $router->post('/orders/{id}/annexure/toggle', [$annexure, 'toggleInclude'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/mode', [$annexure, 'updateMode'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/terms', [$annexure, 'updateTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// D-336: Annexure B (as shipped) — "Copy everything from Annexure A".
+$router->post('/orders/{id}/annexure/copy-from-a', [$annexure, 'copyFromA'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products', [$annexure, 'createProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products/{productId}', [$annexure, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/annexure/products/{productId}/delete', [$annexure, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);

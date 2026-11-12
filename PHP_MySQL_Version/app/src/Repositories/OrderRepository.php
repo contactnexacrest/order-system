@@ -929,6 +929,30 @@ final class OrderRepository
             ->execute(['mode' => $mode, 'id' => $orderId]);
     }
 
+    /** D-336: Annexure B (as shipped) — included on the Commercial Invoice and Packing List. */
+    public static function setIncludeAnnexureB(int $orderId, bool $include): void
+    {
+        Database::connection()
+            ->prepare('UPDATE orders SET include_annexure_b = :flag WHERE id = :id')
+            ->execute(['flag' => $include ? 1 : 0, 'id' => $orderId]);
+    }
+
+    /** D-336: Annexure B's content mode (SPEC / TERMS / BOTH), like annexure_mode for Annexure A. */
+    public static function setAnnexureBMode(int $orderId, string $mode): void
+    {
+        Database::connection()
+            ->prepare('UPDATE orders SET annexure_b_mode = :mode WHERE id = :id')
+            ->execute(['mode' => $mode, 'id' => $orderId]);
+    }
+
+    /** D-336: the annexure printed with the Commercial Invoice and Packing List (A / B / NONE; null = the default). */
+    public static function setCiAnnexure(int $orderId, ?string $choice): void
+    {
+        Database::connection()
+            ->prepare('UPDATE orders SET ci_annexure = :c WHERE id = :id')
+            ->execute(['c' => $choice, 'id' => $orderId]);
+    }
+
     /**
      * 90-item backlog #75 (docs/schema.sql Section BG): generates (or
      * regenerates, overwriting any prior link) the public, no-login token

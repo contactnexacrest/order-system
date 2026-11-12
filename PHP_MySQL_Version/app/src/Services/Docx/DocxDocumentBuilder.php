@@ -780,10 +780,14 @@ final class DocxDocumentBuilder
             $section->addTextBreak(1, 6);
         }
 
-        $refDoc = self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : 'the referenced document');
-        DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, DocxComponents::BLUE_BORDER2, function (AbstractContainer $cell) use ($refDoc, $meta, $showSpec) {
+        // D-336: Annexure B (printed with the CI / PL) is part of that document.
+        $letter = ($context['annexure_letter'] ?? 'A') === 'B' ? 'B' : 'A';
+        $refDoc = $letter === 'B'
+            ? ((string) ($meta['document_reference'] ?? '') !== '' ? (string) $meta['document_reference'] : 'the referenced document')
+            : (self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : 'the referenced document'));
+        DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, DocxComponents::BLUE_BORDER2, function (AbstractContainer $cell) use ($refDoc, $meta, $showSpec, $letter) {
             $run = $cell->addTextRun();
-            $run->addText('This Annexure A forms an integral part of ' . $refDoc . ' dated ' . self::g($meta, 'generated_date') . '. ', ['color' => DocxComponents::NAVY, 'size' => 9.5]);
+            $run->addText('This Annexure ' . $letter . ' forms an integral part of ' . $refDoc . ' dated ' . self::g($meta, 'generated_date') . '. ', ['color' => DocxComponents::NAVY, 'size' => 9.5]);
             $text = 'The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases.';
             if ($showSpec) {
                 $text .= ' Product images and technical drawings in this annexure are for reference and identification purposes only.';
@@ -876,7 +880,8 @@ final class DocxDocumentBuilder
             return;
         }
         $section->addPageBreak();
-        DocxComponents::addSectionTitle($section, 'ANNEXURE A');
+        // D-336: ANNEXURE B on the CI / PL when Annexure B (as shipped) is chosen.
+        DocxComponents::addSectionTitle($section, 'ANNEXURE ' . (($context['annexure_letter'] ?? 'A') === 'B' ? 'B' : 'A'));
         self::addAnnexureBody($section, $context);
     }
 

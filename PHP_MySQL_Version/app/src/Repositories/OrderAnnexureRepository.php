@@ -18,14 +18,26 @@ use App\Config\Database;
  */
 final class OrderAnnexureRepository
 {
-    /** @return array<int, array<string,mixed>> each product row with its images nested under 'images' */
-    public static function forOrder(int $orderId): array
+    /** Owner decision D-336: 'A' = Annexure A (as quoted), 'B' = Annexure B (as shipped). */
+    public const WHICH = ['A', 'B'];
+
+    /** 'B' for B, anything else 'A'. */
+    public static function which(mixed $value): string
+    {
+        return strtoupper(trim((string) $value)) === 'B' ? 'B' : 'A';
+    }
+
+    /**
+     * @return array<int, array<string,mixed>> each product row with its images nested under 'images'
+     * D-336: one annexure's entries — Annexure A unless $which is 'B'.
+     */
+    public static function forOrder(int $orderId, string $which = 'A'): array
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'SELECT * FROM order_annexure_products WHERE order_id = :order_id ORDER BY sort_order ASC, id ASC'
+            'SELECT * FROM order_annexure_products WHERE order_id = :order_id AND `which` = :which ORDER BY sort_order ASC, id ASC'
         );
-        $stmt->execute(['order_id' => $orderId]);
+        $stmt->execute(['order_id' => $orderId, 'which' => self::which($which)]);
         $products = $stmt->fetchAll();
 
         if (!$products) {
@@ -64,19 +76,29 @@ final class OrderAnnexureRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function createProduct(int $orderId, array $data): int
+    /** D-336: number of product entries in one annexure. */
+    public static function countFor(int $orderId, string $which = 'A'): int
+    {
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM order_annexure_products WHERE order_id = :o AND `which` = :w');
+        $stmt->execute(['o' => $orderId, 'w' => self::which($which)]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function createProduct(int $orderId, array $data, string $which = 'A'): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
             'INSERT INTO order_annexure_products
-                (order_id, name, description, dimensions, finish, components, technical_notes, sort_order)
+                (order_id, `which`, name, description, dimensions, finish, components, technical_notes, sort_order)
              VALUES
-                (:order_id, :name, :description, :dimensions, :finish, :components, :technical_notes,
-                 (SELECT next_sort FROM (SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort FROM order_annexure_products WHERE order_id = :order_id_2) t))'
+                (:order_id, :which, :name, :description, :dimensions, :finish, :components, :technical_notes,
+                 (SELECT next_sort FROM (SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort FROM order_annexure_products WHERE order_id = :order_id_2 AND `which` = :which_2) t))'
         );
         $stmt->execute([
             'order_id' => $orderId,
             'order_id_2' => $orderId,
+            'which' => self::which($which),
+            'which_2' => self::which($which),
             'name' => $data['name'],
             'description' => $data['description'] ?: null,
             'dimensions' => $data['dimensions'] ?: null,
@@ -135,5 +157,41 @@ final class OrderAnnexureRepository
     public static function removeImage(int $id): void
     {
         Database::connection()->prepare('DELETE FROM order_annexure_images WHERE id = :id')->execute(['id' => $id]);
+    }
+
+    /**
+     * D-336: "Copy everything from Annexure A" — replaces Annexure B's product
+     * entries with a copy of Annexure A's (same fields and order). The images
+     * point at the same stored files (file_store rows are never deleted —
+     * soft-delete only — so removing an image from one annexure never touches
+     * the other's). Returns the number of entries copied.
+     */
+    public static function replaceWithCopy(int $orderId, string $from = 'A', string $to = 'B'): int
+    {
+        $from = self::which($from);
+        $to = self::which($to);
+        $pdo = Database::connection();
+        foreach (self::forOrder($orderId, $to) as $old) {
+            self::deleteProduct((int) $old['id']);
+        }
+        $copied = 0;
+        foreach (self::forOrder($orderId, $from) as $p) {
+            $pdo->prepare(
+                'INSERT INTO order_annexure_products
+                    (order_id, `which`, product_id, product_code, name, description, dimensions, finish, components, technical_notes, sort_order)
+                 VALUES (:o, :w, :pid, :pc, :n, :d, :dim, :f, :c, :t, :s)'
+            )->execute([
+                'o' => $orderId, 'w' => $to, 'pid' => $p['product_id'] ?? null, 'pc' => $p['product_code'] ?? null,
+                'n' => $p['name'], 'd' => $p['description'], 'dim' => $p['dimensions'], 'f' => $p['finish'],
+                'c' => $p['components'], 't' => $p['technical_notes'], 's' => (int) $p['sort_order'],
+            ]);
+            $newId = (int) $pdo->lastInsertId();
+            foreach ($p['images'] as $img) {
+                $pdo->prepare('INSERT INTO order_annexure_images (order_annexure_product_id, file_id, sort_order) VALUES (:p, :f, :s)')
+                    ->execute(['p' => $newId, 'f' => (int) $img['file_id'], 's' => (int) $img['sort_order']]);
+            }
+            $copied++;
+        }
+        return $copied;
     }
 }

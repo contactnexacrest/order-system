@@ -108,6 +108,39 @@ final class DocumentController
             }
         }
 
+        // Owner decision D-336: the annexure printed with the Commercial Invoice and
+        // Packing List — Annexure B (as shipped), Annexure A (as quoted) or none —
+        // chosen in the CI step and saved with the order; and no QT / Buyer PO / PI /
+        // OC / CI / PL while a line says "As per annexure" and that annexure is empty.
+        if ($type === 'CI' && array_key_exists('ci_annexure', $_POST)) {
+            $ciChoice = strtoupper(trim((string) $_POST['ci_annexure']));
+            $ciOrder = \App\Repositories\OrderRepository::find($orderId);
+            if ($ciOrder === null || !in_array($ciChoice, \App\Services\AnnexureChoice::CHOICES, true)) {
+                Flash::set('error', 'Choose the annexure printed with the Commercial Invoice and Packing List.');
+                header("Location: /orders/{$orderId}#step-ci-generate");
+                return;
+            }
+            if ($ciChoice !== 'NONE' && !\App\Services\AnnexureChoice::hasContent($ciOrder, $ciChoice)) {
+                Flash::set('error', "Annexure {$ciChoice} has nothing in it yet — fill it in first (order page › Annexure {$ciChoice}), or choose another annexure.");
+                header("Location: /orders/{$orderId}#step-ci-generate");
+                return;
+            }
+            if (($ciBlock = \App\Services\AnnexureChoice::blockReason($orderId, 'CI', $ciChoice)) !== null) {
+                Flash::set('error', $ciBlock);
+                header("Location: /orders/{$orderId}#step-ci-generate");
+                return;
+            }
+            if ($ciChoice !== (string) ($ciOrder['ci_annexure'] ?? '')) {
+                \App\Repositories\OrderRepository::setCiAnnexure($orderId, $ciChoice);
+                AuditLogRepository::log((int) $user['id'], 'CI_ANNEXURE_CHOSEN', 'orders', $orderId, 'ci_annexure', $ciOrder['ci_annexure'] ?? null, $ciChoice);
+            }
+        }
+        if (($annexureBlock = \App\Services\AnnexureChoice::blockReason($orderId, $type)) !== null) {
+            Flash::set('error', $annexureBlock);
+            header("Location: /orders/{$orderId}" . ($type === 'CI' ? '#step-ci-generate' : ''));
+            return;
+        }
+
         // Narrow, audited escape hatch for generate()'s own locked-order /
         // out-of-sequence-stage guard (see that method's docblock) — never
         // trust the checkbox alone: re-check the permission server-side

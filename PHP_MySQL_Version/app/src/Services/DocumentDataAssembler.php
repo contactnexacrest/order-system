@@ -168,8 +168,20 @@ final class DocumentDataAssembler
             ? AmendmentRepository::find((int) $order['active_amendment_id'])
             : null;
 
-        $annexureProducts = self::annexureProductsBlock($orderId);
-        $annexureFlags = self::annexureFlagsBlock($orderId, (string) ($order['annexure_mode'] ?? 'SPEC'), $annexureProducts);
+        // Owner decision D-336: the Commercial Invoice and Packing List print the
+        // annexure chosen for them (orders.ci_annexure — Annexure B "as shipped" by
+        // default when it is filled in); every other document keeps Annexure A.
+        $annexureCode = strtoupper((string) $documentTypeCode);
+        $annexureShipped = in_array($annexureCode, AnnexureChoice::SHIPPED_DOCUMENTS, true);
+        $annexureWhich = $annexureShipped ? AnnexureChoice::forDocument($order, $annexureCode) : 'A';
+        $annexureLetter = $annexureWhich ?? 'A';
+        $annexureProducts = self::annexureProductsBlock($orderId, $annexureLetter);
+        $annexureFlags = self::annexureFlagsBlock($orderId, AnnexureChoice::mode($order, $annexureLetter), $annexureProducts, $annexureLetter);
+        $annexureIncluded = $annexureShipped ? $annexureWhich !== null : (bool) ($order['include_annexure_a'] ?? false);
+        // D-336: a line ticked "As per annexure" says so on the documents that carry an annexure.
+        $annexureLineLetter = in_array($annexureCode, array_merge(AnnexureChoice::QUOTED_DOCUMENTS, AnnexureChoice::SHIPPED_DOCUMENTS), true)
+            ? AnnexureChoice::letterFor($order, $annexureCode)
+            : null;
 
         $resolvedConsignee = self::resolveConsignee($order);
         $resolvedNotifyParty = self::resolveNotifyParty($order, $resolvedConsignee);
@@ -203,7 +215,8 @@ final class DocumentDataAssembler
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
                 'coo_type'             => $order['coo_type'] ?? 'To Be Confirmed',
-                'include_annexure_a'   => (bool) ($order['include_annexure_a'] ?? false),
+                // D-336: on the CI / PL "an annexure is printed" (the one chosen for them).
+                'include_annexure_a'   => $annexureIncluded,
                 'currency_code'        => $order['currency_code'],
                 'buyers_po_ref'        => $order['buyers_po_ref'] ?? 'NIL',
                 'has_active_amendment' => (bool) $activeAmendment,
@@ -264,13 +277,16 @@ final class DocumentDataAssembler
             'show_notify_party_section' => $showNotifyPartySection,
             // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
             'category_documents' => CategoryDocumentProfile::forOrder($orderId),
-            'products' => array_map(static function (array $p): array {
+            'products' => array_map(static function (array $p) use ($annexureLineLetter): array {
+                // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
+                $perAnnexure = $annexureLineLetter !== null && !empty($p['as_per_annexure']);
+                $quantity = $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']);
                 return [
                     'description'    => $p['description'],
-                    'dimensions'     => $p['dimensions'],
+                    'dimensions'     => $perAnnexure ? AnnexureChoice::dimensionsText($annexureLineLetter) : $p['dimensions'],
                     'finish'         => $p['finish'],
                     'hs_code'        => $p['hs_code'],
-                    'quantity'       => $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']),
+                    'quantity'       => $perAnnexure && !$p['quantity_is_tbc'] ? AnnexureChoice::quantityText($quantity, $annexureLineLetter) : $quantity,
                     'unit'           => $p['unit'],
                     'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'To Be Confirmed',
                     'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'To Be Confirmed',
@@ -397,9 +413,9 @@ final class DocumentDataAssembler
      * HTTP fetch of anything, including this app's own authenticated
      * routes.
      */
-    private static function annexureProductsBlock(int $orderId): array
+    private static function annexureProductsBlock(int $orderId, string $which = 'A'): array
     {
-        $products = OrderAnnexureRepository::forOrder($orderId);
+        $products = OrderAnnexureRepository::forOrder($orderId, $which);
         return array_map(static function (array $p): array {
             return [
                 'name' => $p['name'],
@@ -433,9 +449,9 @@ final class DocumentDataAssembler
      * DB) because it's emitted unescaped into every PDF/DOCX this method
      * feeds — see AnnexureTermsSanitizer's docblock.
      */
-    private static function annexureFlagsBlock(int $orderId, string $mode, array $annexureProducts): array
+    private static function annexureFlagsBlock(int $orderId, string $mode, array $annexureProducts, string $which = 'A'): array
     {
-        $termsRow = OrderAnnexureTermsRepository::find($orderId);
+        $termsRow = OrderAnnexureTermsRepository::find($orderId, $which);
         $termsHtml = $termsRow && $termsRow['content_html']
             ? AnnexureTermsSanitizer::sanitize((string) $termsRow['content_html'])
             : '';
@@ -444,6 +460,8 @@ final class DocumentDataAssembler
         $showTerms = $mode !== 'SPEC';
 
         return [
+            // D-336: "ANNEXURE A" / "ANNEXURE B" — B only on the CI / PL when chosen.
+            'annexure_letter' => $which,
             'annexure_mode' => $mode,
             'annexure_terms_html' => $termsHtml,
             'annexure_show_spec' => $showSpec,

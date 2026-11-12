@@ -6559,3 +6559,22 @@ ALTER TABLE catalog_supplier_thickness_prices ADD COLUMN calc_from_mm INT NULL; 
 ALTER TABLE catalog_supplier_thickness_prices ADD COLUMN quoted_on DATE NULL;     -- TYPED: the date the supplier quoted it
 ALTER TABLE catalog_product_suppliers ADD COLUMN base_thickness_mm INT NULL;      -- grid: the BASE price for orders (0 = 50 mm and above per CBM; NULL = category base)
 ALTER TABLE catalog_product_suppliers ADD COLUMN auto_fill TINYINT(1) NOT NULL DEFAULT 1;
+
+-- ================================================================
+-- Owner decision D-336 (12 Nov 2026, owner confirmed twice; migration 2026-11-12c):
+-- an order line can say "As per annexure" (as_per_annexure = 1: no Length / Width /
+-- Thickness; the documents print "Dimensions: As per Annexure A/B" and
+-- "<qty> (as per Annexure A/B)"). Annexure B (as shipped) is a second annexure with
+-- the same content as Annexure A (`which` = 'B' on order_annexure_products /
+-- order_annexure_terms; one Additional Terms block per annexure). It is printed only
+-- with the Commercial Invoice and Packing List: orders.ci_annexure chooses A, B or
+-- NONE (NULL = Annexure B when included and filled in, else Annexure A when included
+-- and filled in, else none). The Quotation, Buyer PO, PI and OC keep Annexure A.
+ALTER TABLE order_products ADD COLUMN as_per_annexure TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE order_annexure_products ADD COLUMN `which` CHAR(1) NOT NULL DEFAULT 'A';
+ALTER TABLE order_annexure_terms ADD COLUMN `which` CHAR(1) NOT NULL DEFAULT 'A';
+ALTER TABLE order_annexure_terms ADD UNIQUE KEY uq_order_annexure_terms_which (order_id, `which`);
+ALTER TABLE order_annexure_terms DROP INDEX order_id;
+ALTER TABLE orders ADD COLUMN include_annexure_b TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN annexure_b_mode ENUM('SPEC','TERMS','BOTH') NOT NULL DEFAULT 'SPEC';
+ALTER TABLE orders ADD COLUMN ci_annexure ENUM('A','B','NONE') NULL;

@@ -134,12 +134,12 @@ final class OrderProductRepository
         // D-272: and everything else that describes the line.
         Database::connection()->prepare(
             'UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
-                    piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf WHERE id = :id'
+                    piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf, as_per_annexure = :apa WHERE id = :id'
         )->execute([
             'p' => $source['product_id'] ?? null, 'm' => $source['material'] ?? null, 's' => $source['spec_selection'] ?? null,
             'pr' => $source['price_request_id'] ?? null, 'z' => $source['zoho_item_id'] ?? null,
             'l' => $source['piece_length_cm'] ?? null, 'w' => $source['piece_width_cm'] ?? null, 't' => $source['piece_thickness_cm'] ?? null,
-            'cf' => $sameOrder ? $id : null, 'id' => $newId,
+            'cf' => $sameOrder ? $id : null, 'apa' => (int) ($source['as_per_annexure'] ?? 0), 'id' => $newId,
         ]);
         return $newId;
     }
@@ -150,6 +150,13 @@ final class OrderProductRepository
      *
      * @param array{piece_length_cm?: ?string, piece_width_cm?: ?string, piece_thickness_cm?: ?string} $size
      */
+    /** Owner decision D-336: the line's size is given in the annexure ("As per annexure"). */
+    public static function setAsPerAnnexure(int $id, bool $perAnnexure): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET as_per_annexure = :a WHERE id = :id')
+            ->execute(['a' => $perAnnexure ? 1 : 0, 'id' => $id]);
+    }
+
     public static function setPieceSize(int $id, array $size): void
     {
         Database::connection()->prepare('UPDATE order_products SET piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t WHERE id = :id')

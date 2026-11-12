@@ -40,7 +40,7 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
         <?php endif; ?>
         <?php if (!empty($p['finish']) && $__chips === []): ?><div class="muted small"><?= htmlspecialchars((string) $p['finish']) ?></div><?php endif; ?>
       </td>
-      <td><?= htmlspecialchars((string) ($p['dimensions'] ?? '')) ?></td>
+      <td><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?></td>
       <td class="num"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) ($p['quantity'] ?? '')) ?></td>
       <td><?= htmlspecialchars((string) ($p['unit'] ?? '')) ?></td>
       <?php if ($sees['selling']): ?>
@@ -163,7 +163,11 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
             </label>
             <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($__p['quantity'] ?? '')) ?>" placeholder="e.g. 40"></label>
             <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" <?= !empty($__p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
+            <?php // Owner decision D-336: the size is given in the annexure; never with "Qty To Be Confirmed" (app.js and the server). ?>
+            <input type="hidden" name="as_per_annexure_field" value="1">
+            <label class="checkbox-row"><input type="checkbox" name="as_per_annexure" value="1" data-annexure-line <?= !empty($__p['as_per_annexure']) ? 'checked' : '' ?>> As per annexure</label>
           </div>
+          <p class="muted small annexure-line-hint">"Qty To Be Confirmed" or "As per annexure" — only one of the two. As per annexure: the sizes go in Annexure A (order page › Annexure A); the Qty is still needed.</p>
           <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>

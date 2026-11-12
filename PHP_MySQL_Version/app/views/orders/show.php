@@ -3802,6 +3802,19 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <input type="hidden" name="document_type" value="CI">
         <?php // Owner request (2026-10-27): the CI can be dated today or earlier, e.g. to match the BL. ?>
         <label class="ci-date-field">Invoice date (printed on the CI) *<input type="date" name="document_date" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>"><small class="muted">Today by default. To match the BL, pick the BL date here — today or any earlier date.</small></label>
+        <?php
+        // Owner decision D-336: the annexure printed with the CI and Packing List — saved with the order on Generate.
+        $__ciAnnex = \App\Services\AnnexureChoice::ciStep($order);
+        $__ciAnnexOk = ['B' => $__ciAnnex['b']['has'], 'A' => $__ciAnnex['a']['has'], 'NONE' => $__ciAnnex['lines'] === []];
+        $__ciAnnexPick = $__ciAnnexOk[$__ciAnnex['choice']] ? $__ciAnnex['choice'] : ($__ciAnnexOk[$__ciAnnex['default']] ? $__ciAnnex['default'] : null);
+        ?>
+        <fieldset class="ci-annexure-choice">
+          <legend>Annexure printed with the Commercial Invoice and Packing List *</legend>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="B" required<?= $__ciAnnexPick === 'B' ? ' checked' : '' ?><?= $__ciAnnexOk['B'] ? '' : ' disabled' ?>> Annexure B — as shipped <span class="muted small">(<?= $__ciAnnex['b']['has'] ? $__ciAnnex['b']['count'] . ' product' . ($__ciAnnex['b']['count'] === 1 ? '' : 's') . ($__ciAnnex['b']['saved'] !== null ? ' · saved ' . htmlspecialchars($__ciAnnex['b']['saved']) : '') : 'not made yet' ?>) · <a href="/orders/<?= (int) $order['id'] ?>/annexure?which=B">open</a></span></label>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="A" required<?= $__ciAnnexPick === 'A' ? ' checked' : '' ?><?= $__ciAnnexOk['A'] ? '' : ' disabled' ?>> Annexure A — as quoted <span class="muted small">(<?= $__ciAnnex['a']['has'] ? 'same as on the PI and OC' : 'empty' ?>)</span></label>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="NONE" required<?= $__ciAnnexPick === 'NONE' ? ' checked' : '' ?><?= $__ciAnnexOk['NONE'] ? '' : ' disabled' ?>> No annexure<?php if (!$__ciAnnexOk['NONE']): ?> <span class="muted small">(line <?= implode(', ', $__ciAnnex['lines']) ?> says "As per annexure")</span><?php endif; ?></label>
+          <p class="muted small">Default: Annexure B when it has been made, otherwise Annexure A. A line ticked "As per annexure" says "as per Annexure B" or "as per Annexure A" to match. "No annexure" cannot be chosen while a line says "As per annexure". The choice is saved with the order; the Packing List uses the same annexure.</p>
+        </fieldset>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button><?= $__docAlreadyNote('CI') ?>
