@@ -596,6 +596,7 @@ final class DocumentDataAssembler
      * a null block via Twig's null-safe access, exactly like the Phase B
      * fields do for an order that hasn't reached that stage yet.
      */
+    // Owner D-345 (12 Nov 2026): the supplier is paid in rupees — every Supplier PO uses Indian grouping, whatever the order's currency.
     private static function supplierPoBlock(int $orderId, string $currency = ''): ?array
     {
         $row = OrderSupplierPoRepository::findLatestForOrder($orderId);
@@ -620,14 +621,14 @@ final class DocumentDataAssembler
             'unit'                  => $row['unit'],
             'colour_reference'      => $row['colour_reference'] ?: 'NIL',
             'special_requirements'  => $row['special_requirements'] ?: 'NIL',
-            'unit_price_inr'        => self::formatMoney($row['unit_price_inr'], $currency),
-            'basic_value_inr'       => self::formatMoney($row['basic_value_inr'], $currency),
+            'unit_price_inr'        => self::formatMoney($row['unit_price_inr'], 'INR'),
+            'basic_value_inr'       => self::formatMoney($row['basic_value_inr'], 'INR'),
             'gst_rate_pct'          => $row['gst_rate_pct'],
-            'gst_amount_inr'        => self::formatMoney($row['gst_amount_inr'], $currency),
-            'total_payable_inr'     => self::formatMoney($row['total_payable_inr'], $currency),
+            'gst_amount_inr'        => self::formatMoney($row['gst_amount_inr'], 'INR'),
+            'total_payable_inr'     => self::formatMoney($row['total_payable_inr'], 'INR'),
             'advance_pct'           => $row['advance_pct'],
-            'advance_amount_inr'    => self::formatMoney($row['advance_amount_inr'], $currency),
-            'balance_amount_inr'    => self::formatMoney($row['balance_amount_inr'], $currency),
+            'advance_amount_inr'    => self::formatMoney($row['advance_amount_inr'], 'INR'),
+            'balance_amount_inr'    => self::formatMoney($row['balance_amount_inr'], 'INR'),
             'delivery_location'     => $row['delivery_location'],
             'required_delivery_date' => self::formatDate($row['required_delivery_date']),
             'packing_requirement'   => $row['packing_requirement'] ?: 'NIL',
