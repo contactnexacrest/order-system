@@ -214,10 +214,14 @@ final class FormLabelConventionsTest extends TestCase
         // per unit — typed amounts, never negative); the old default cost fields are gone from it.
         self::assertStringContainsString('name="packing_loading_cost" data-max-decimals="2"', $form);
         self::assertStringContainsString('name="cha_transport_per_container" data-max-decimals="2"', $form);
+        // D-338 (12 Nov 2026): a new supplier price is one typed FOB value; the cost parts appear only when an
+        // existing "Computed" price is edited. Every such number field still carries min="0".
         foreach (['factory', 'transportation', 'packing', 'loading', 'cha'] as $cost) {
             self::assertStringNotContainsString("name=\"default_{$cost}_cost\"", $form);
-            self::assertSame(2, substr_count($show, "<input type=\"number\" step=\"0.01\" min=\"0\" name=\"{$cost}_cost\""));
+            self::assertGreaterThanOrEqual(1, substr_count($show, "<input type=\"number\" step=\"0.01\" min=\"0\" name=\"{$cost}_cost\""));
+            self::assertSame(substr_count($show, "name=\"{$cost}_cost\""), substr_count($show, "<input type=\"number\" step=\"0.01\" min=\"0\" name=\"{$cost}_cost\""));
         }
-        self::assertSame(2, substr_count($show, '<input type="number" step="0.01" min="0" name="fob_value"'));
+        self::assertGreaterThanOrEqual(2, substr_count($show, '<input type="number" step="0.01" min="0" name="fob_value"'));
+        self::assertSame(substr_count($show, 'name="fob_value"'), substr_count($show, '<input type="number" step="0.01" min="0" name="fob_value"'));
     }
 }

@@ -122,7 +122,7 @@ test('1b: a duplicate copies Annexure A but not Annexure B', async () => {
   const admin = await user('Admin');
   const sourceId = await createTestOrder(await createTestClient());
   const a = await orderAnnexureRepository.createProduct(sourceId, { name: 'Slab A', description: 'Slab', dimensions: '180 x 120 x 15 cm', finish: 'Polished' }, 'A');
-  const fileId = await createTestFile(sourceId);
+  const fileId = await createTestFile(sourceId, null);
   await orderAnnexureRepository.addImage(a, fileId);
   await orderAnnexureRepository.createProduct(sourceId, { name: 'Slab B', description: 'Shipped', dimensions: '1 x 1 x 1 cm', finish: '' }, 'B');
   await orderAnnexureTermsRepository.upsert(sourceId, '<p>Terms A</p>', admin, 'A');

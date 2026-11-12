@@ -946,10 +946,10 @@ $router->post('/orders/{id}/cancellation/{cancellationId}/reject', [$orders, 're
 $router->post('/orders/{id}/cancellation/{cancellationId}/complete-refund', [$orders, 'completeCancellationRefund'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 // Owner decision D-337 (12 Nov 2026): the order's buyer details follow the client — at once while nothing is issued, by approved request after.
 $buyerDetails = new \App\Controllers\BuyerDetailsController();
-$router->post('/orders/{id}/buyer-details/refresh', [$buyerDetails, 'refresh'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-details/request', [$buyerDetails, 'request'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-details/{requestId}/approve', [$buyerDetails, 'approve'], [SessionAuth::required(), PermissionCheck::requires('approve_buyer_details_change'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/buyer-details/{requestId}/refuse', [$buyerDetails, 'refuse'], [SessionAuth::required(), PermissionCheck::requires('approve_buyer_details_change'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-details/refresh', [$buyerDetails, 'refresh'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-details/request', [$buyerDetails, 'request'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-details/{requestId}/approve', [$buyerDetails, 'approve'], [SessionAuth::required(), PermissionCheck::requires('approve_buyer_details_change'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-details/{requestId}/refuse', [$buyerDetails, 'refuse'], [SessionAuth::required(), PermissionCheck::requires('approve_buyer_details_change'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_checklist'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/compliance-tasks/mark-all-na', [$orders, 'markAllComplianceTasksNotApplicable'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_checklist'), OrderLockGuard::check(), CsrfCheck::verify()]);
 

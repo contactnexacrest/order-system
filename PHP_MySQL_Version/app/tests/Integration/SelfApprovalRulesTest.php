@@ -84,6 +84,11 @@ final class SelfApprovalRulesTest extends DbTestCase
     public function testTheDefaultsAreTheMdAndTheEdOnAllThreeRules(): void
     {
         foreach (array_keys(SelfApprovalRules::RULES) as $rule) {
+            if ($rule === 'buyer_details_change') {
+                // D-337 (12 Nov 2026): approving one's own request to change an order's buyer details — MD only by default.
+                self::assertSame(['Managing Director'], SelfApprovalRules::roleNames($rule), $rule);
+                continue;
+            }
             self::assertSame(['Executive Director', 'Managing Director'], (static function (array $n): array { sort($n); return $n; })(SelfApprovalRules::roleNames($rule)), $rule);
         }
     }
