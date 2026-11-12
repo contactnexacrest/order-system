@@ -2803,3 +2803,8 @@ INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT 'buyer_details_change', r.id FROM roles r
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'buyer_details_change');
+
+-- Owner decision D-342 (12 Nov 2026; migration 2026-11-12h): after a "Products & prices"
+-- amendment that changes quantities on an order with a Supplier PO, Procurement revises it.
+INSERT IGNORE INTO department_task_types (task_key, department_code, title, standard_days, escalate_after_days, sort_order) VALUES
+  ('revise_supplier_po', 'PROC', 'Revise the Supplier PO (products amendment)', 2, 3, 45);

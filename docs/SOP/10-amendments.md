@@ -14,6 +14,48 @@ Amendments can be raised on any order once a PI exists, regardless of what
 stage it's currently at — this module isn't part of the 9-stage pipeline
 and doesn't block or unlock any stage gate.
 
+## Products & prices amendment (owner decision D-342, 12 Nov 2026)
+
+Once the order's Quotation is approved, its products and prices are fixed
+(SOP 01). Any change the buyer agrees to — more or fewer pieces, another size,
+an extra line, a line dropped, a lower price — goes through a **Products &
+prices** amendment. The order does not go back to the Quotation stage: it
+carries on from where it is.
+
+1. Order page › **Amendments** › **New amendment — Products & prices**.
+2. Change only what the buyer agreed: L × W × H, No. of pieces (the quantity is
+   worked out from them when the size gives the unit), or the quantity, the
+   unit price, **Remove**; to add a line choose "Same product as line N" and
+   enter its size, pieces / quantity and price.
+3. **A price can only go DOWN.** A higher price is refused ("Line 1: USD
+   1,950.00 is the price the buyer accepted in the Quotation — a price can only
+   go down, with the MD's approval."). A lowered price shows "Price lowered
+   (MD)" and is approved with the amendment.
+4. **Check the changes** — the screen shows old → new for every line, the order
+   total and what happens to the advance (e.g. "advance already received USD
+   6,864.78; the extra USD 1,725.36 is added to the balance.").
+5. Write the reason (e.g. "Buyer asked for 5 more slabs of 180 × 80 on 14 Nov
+   (e-mail); discount on line 3 agreed by MD") and **Send to MD for approval**.
+6. The MD approves (not their own request unless the self-approval rule
+   allows) → **Generate Agreement Document** (the AMD PDF: 1. Products & prices
+   — as amended, 2. Effect on payment, 3. Acceptance) → send it to the buyer →
+   upload the **signed copy** → the amendment is **active**.
+
+On activation the order's lines become the amended lines, each with its new
+fixed price; the advance received stays credited and the difference goes to
+the balance (more than the new total shows as excess); commission, incentive
+and profit follow. The stage and the exchange rate do not change.
+
+**Re-issue checklist.** The order page then shows "Amendment AMD-… activated —
+re-issue checklist": generate the revised PI and OC if they were issued; ask
+the buyer for a revised PO or tick "The signed amendment amends the Buyer PO";
+Procurement gets a task in My tasks to revise the Supplier PO when quantities
+changed; an issued CI / PL needs a revised copy and a credit / debit note in
+Zoho Books for the difference. Documents not made yet use the amended figures.
+Each row disappears once done.
+
+Only one Products & prices amendment can be open on an order at a time.
+
 ## The system does this automatically
 
 - Generates the amendment reference (e.g. `SC/AMD/26/2609002`) the moment

@@ -100,7 +100,7 @@ async function captureCategories(orderId) {
 
 /** Freezes the order once, when its PI is first approved. Returns true when this call froze it. */
 async function freeze(orderId) {
-  const row = await db.queryOne('SELECT id, frozen_at, payment_preset_id FROM orders WHERE id = :id', { id: orderId });
+  const row = await db.queryOne('SELECT id, frozen_at, payment_preset_id, prices_fixed_at, pricing_fx_rate_at_qt FROM orders WHERE id = :id', { id: orderId });
   if (!row || row.frozen_at !== null) return false;
   const company = await liveCompany();
   const snap = {
@@ -116,7 +116,8 @@ async function freeze(orderId) {
   }
   // D-340 follow-up (owner, 12 Nov 2026): the rate prices were actually built with — the automatic
   // pricing rate when Automatic is on (market × (1 − cushion)), else the manual rate — not the raw setting.
-  const fx = await require('./fxRateService').rate(await pricingRepository.settings());
+  // D-342 (owner, 12 Nov 2026): once the Quotation is approved the PI keeps the rate fixed then.
+  const fx = require('./priceLock').fixedRate(row) ?? await require('./fxRateService').rate(await pricingRepository.settings());
   const tolerance = company.quantity_shortfall_tolerance_pct;
   await db.execute(
     `UPDATE orders SET frozen_at = NOW(), frozen_snapshot_json = :j, quantity_tolerance_pct = :t,

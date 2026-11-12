@@ -1,0 +1,60 @@
+{% extends "_layout.njk" %}
+{#
+  Owner decision D-342 (12 Nov 2026, owner "confirm 1" and "confirm 2"; mockup approved):
+  the "Products & prices" amendment. The payment-terms amendment keeps its own template
+  (payment_terms_amendment.njk), unchanged. PHP twin: app/templates/AMD/products_amendment.html.twig.
+#}
+
+{% block extra_style %}
+  .amd-refs { font-size: 9pt; color: #17233A; margin: 0 0 6pt; }
+  table.products td .was { color: #8A94A3; text-decoration: line-through; margin-left: 3pt; font-size: 8.5pt; }
+  table.products tr.removed td { color: #8A94A3; text-decoration: line-through; }
+  table.products tr.total td { font-weight: bold; }
+  .amd-text { font-size: 9.5pt; margin: 0 0 6pt; }
+{% endblock %}
+
+{% block header_incoterm %}{% endblock %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td><span class="label">AMENDMENT NO. *</span><span class="value">{{ meta.document_reference }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
+  </tr>
+</table>
+<p class="amd-refs">To Order {{ amendment.order_reference }}{% if amendment.original.quotation_ref %} · Quotation {{ amendment.original.quotation_ref }} dated {{ amendment.original.quotation_date }}{% endif %}{% if amendment.original.pi_ref %} · Proforma Invoice {{ amendment.original.pi_ref }} dated {{ amendment.original.pi_date }}{% endif %}</p>
+{% endblock %}
+
+{% block section1 %}
+<div class="section-title">1. PRODUCTS &amp; PRICES — AS AMENDED</div>
+<table class="products">
+  <tr><th>#</th><th>Product</th><th>Size (cm)</th><th>Pcs</th><th>{{ products_amendment.qty_header }}</th><th>{{ products_amendment.price_header }}</th><th>{{ products_amendment.total_header }}</th><th>Change</th></tr>
+  {% for r in products_amendment.rows %}
+  <tr{% if r.removed %} class="removed"{% endif %}>
+    <td class="line-no">{{ r.no }}</td>
+    <td>{{ r.product }}</td>
+    {% for c in [r.size, r.pieces, r.quantity, r.price, r.total] %}
+    <td class="num">{% if r.removed %}{{ c.old }}{% else %}{{ c.new }}{% if c.old %}<span class="was">{{ c.old }}</span>{% endif %}{% endif %}</td>
+    {% endfor %}
+    <td>{{ r.change }}</td>
+  </tr>
+  {% endfor %}
+  <tr class="total"><td colspan="6">{{ products_amendment.total_label }}</td><td class="num">{{ products_amendment.new_total }}</td><td></td></tr>
+</table>
+{% endblock %}
+
+{% block body %}
+<div class="section-title">2. EFFECT ON PAYMENT</div>
+<p class="amd-text">{{ products_amendment.payment_effect }}</p>
+
+<div class="section-title">3. ACCEPTANCE</div>
+<p class="amd-text">This amendment is valid only when signed by authorised representatives of both parties. It amends the products, quantities and prices of the Quotation and Proforma Invoice referenced above; everything else stays as agreed.</p>
+<table class="kv acceptance-table">
+  <tr><td class="k">The Importer — Company Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Authorised Signatory Name *</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">Date of Signing *</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">The Importer — Signature *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+  <tr><td class="k">Company Stamp / Seal *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+</table>
+{% endblock %}

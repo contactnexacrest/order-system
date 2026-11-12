@@ -309,6 +309,14 @@ async function orderLine(order, checks) {
     }
   }
   const now = await status();
+  // D-342: the approved Quotation fixed the rate (the PI keeps the same one).
+  const priceLock = require('./priceLock');
+  const qtRate = priceLock.fixedRate(order);
+  if (qtRate !== null) {
+    const r = `₹${nf(qtRate, 2)}`;
+    return `Prices worked out at ${r} per USD — fixed by the approved Quotation of ${priceLock.fixedDate(order)}`
+      + (Math.abs(qtRate - Number(now.rate)) >= 0.005 ? `; today's rate ₹${nf(now.rate, 2)} does not change them.` : '.');
+  }
   if (issued) {
     if (fixedRate === null && order.pricing_fx_rate_at_pi !== null && order.pricing_fx_rate_at_pi !== undefined && Number(order.pricing_fx_rate_at_pi) > 0) fixedRate = Number(order.pricing_fx_rate_at_pi);
     const row = await db.queryOne("SELECT MIN(d.generated_at) AS first_pi FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = :o AND dt.code = 'PI'", { o: Number(order.id) });

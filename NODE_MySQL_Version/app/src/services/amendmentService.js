@@ -51,6 +51,46 @@ async function createRequest(
     throw new Error('AMD document type has no ref_format configured — cannot mint an amendment reference.');
   }
 
+  const snapshot = await originalSnapshot(order);
+
+  const amendmentId = await amendmentRepository.create(
+    reference,
+    orderId,
+    reason,
+    requestedBy,
+    snapshot,
+    amendedAdvancePct,
+    amendedAdvanceAmount,
+    amendedBalanceTerms,
+    amendedBalanceTriggerOption,
+    amendedBalanceDays,
+    amendedBalanceAmount,
+    effectiveFrom,
+    requestedByUserId
+  );
+
+  await auditLogRepository.log(requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', amendmentId, 'reason', null, reason);
+
+  // Notify whoever can actually approve it (approve_documents — the same
+  // permission /amendments/:id/md-approve is gated on) so this isn't stuck
+  // waiting on someone stumbling across it — mirrors the
+  // reviewer-assignment pattern. Checked by permission, not a hardcoded
+  // role name, since roles can be renamed via /admin/roles.
+  const approverIds = await permissionRepository.usersWithPermission('approve_documents');
+  for (const userId of approverIds) {
+    await notificationRepository.create(userId, null, 'amendment_pending_md_approval', orderId, `Amendment ${reference} needs MD approval.`);
+  }
+
+  return amendmentId;
+}
+
+/**
+ * What the amendment changes FROM, frozen at request time: the original documents'
+ * references and dates, the order summary and the payment terms as the PI states them.
+ * Shared by both amendment types (payment terms; D-342 products & prices).
+ */
+async function originalSnapshot(order) {
+  const orderId = Number(order.id);
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const advancePct = parseFloat(order.advance_pct);
   const balancePct = parseFloat(order.balance_pct);
@@ -99,36 +139,7 @@ async function createRequest(
     gstin: await companySettingsRepository.get('gstin'),
     iec_pan: await companySettingsRepository.get('iec_pan'),
   };
-
-  const amendmentId = await amendmentRepository.create(
-    reference,
-    orderId,
-    reason,
-    requestedBy,
-    snapshot,
-    amendedAdvancePct,
-    amendedAdvanceAmount,
-    amendedBalanceTerms,
-    amendedBalanceTriggerOption,
-    amendedBalanceDays,
-    amendedBalanceAmount,
-    effectiveFrom,
-    requestedByUserId
-  );
-
-  await auditLogRepository.log(requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', amendmentId, 'reason', null, reason);
-
-  // Notify whoever can actually approve it (approve_documents — the same
-  // permission /amendments/:id/md-approve is gated on) so this isn't stuck
-  // waiting on someone stumbling across it — mirrors the
-  // reviewer-assignment pattern. Checked by permission, not a hardcoded
-  // role name, since roles can be renamed via /admin/roles.
-  const approverIds = await permissionRepository.usersWithPermission('approve_documents');
-  for (const userId of approverIds) {
-    await notificationRepository.create(userId, null, 'amendment_pending_md_approval', orderId, `Amendment ${reference} needs MD approval.`);
-  }
-
-  return amendmentId;
+  return snapshot;
 }
 
 async function approveByMd(amendmentId, mdUserId, sampleDataLoad = false) {
@@ -206,6 +217,12 @@ async function attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId
     throw new Error('Generate the Amendment Agreement document before uploading the signed copy.');
   }
 
+  // Owner decision D-342: a "Products & prices" amendment changes the order's lines, not its payment terms.
+  if ((amendment.amendment_type || 'payment_terms') === 'products') {
+    await require('./productsAmendmentService').activate(amendment, signedCopyFileId, userId);
+    return;
+  }
+
   // QA batch 2 (ORD-02): the schedule may have changed since the request — re-check before it takes effect.
   if (amendment.amended_advance_pct !== null && amendment.amended_advance_pct !== undefined) {
     const overflow = await milestoneOverflowError(Number(amendment.order_id), parseFloat(amendment.amended_advance_pct));
@@ -258,4 +275,4 @@ async function milestoneOverflowError(orderId, advancePct) {
 }
 
 module.exports = {
-  milestoneOverflowError, createRequest, approveByMd, rejectAmendment, generateDocument, attachSignedCopyAndActivate };
+  originalSnapshot, milestoneOverflowError, createRequest, approveByMd, rejectAmendment, generateDocument, attachSignedCopyAndActivate };

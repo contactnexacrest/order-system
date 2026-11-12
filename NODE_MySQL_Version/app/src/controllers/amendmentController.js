@@ -9,6 +9,7 @@ const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const orderRepository = require('../repositories/orderRepository');
 const amendmentService = require('../services/amendmentService');
+const productsAmendmentService = require('../services/productsAmendmentService');
 const paymentPresetRepository = require('../repositories/paymentPresetRepository');
 
 async function presetAllowsZero(orderId) {
@@ -30,7 +31,14 @@ async function index(req, res) {
     return;
   }
 
-  res.renderView('amendments/index', { order, amendments: await amendmentRepository.forOrder(orderId) }, 'layout/base');
+  // Owner decision D-342: once the Quotation is approved, products and prices change only through an amendment.
+  const priceLock = require('../services/priceLock');
+  const productsAmendment = {
+    fixed: priceLock.isFixed(order),
+    message: priceLock.isFixed(order) ? priceLock.message(order) : null,
+    why: priceLock.isFixed(order) ? await productsAmendmentService.cannotStart(order) : null,
+  };
+  res.renderView('amendments/index', { order, amendments: await amendmentRepository.forOrder(orderId), productsAmendment }, 'layout/base');
 }
 
 async function create(req, res) {
@@ -142,7 +150,7 @@ async function generateDocument(req, res) {
     // External QA report N-08: this action never reached the audit
     // log, so it never notified anyone either.
     await auditLogRepository.log(req.user.id, 'AMENDMENT_DOCUMENT_GENERATED', 'amendments', amendmentId, null, null, null);
-    flash.set(req, 'success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
+    flash.set(req, 'success', `${(amendment.amendment_type || '') === 'products' ? 'Amendment (Products & prices)' : 'Payment Terms Amendment Agreement'} generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.`);
   } catch (e) {
     flash.setErrorFromException(req, e);
   }
@@ -170,10 +178,12 @@ async function uploadSignedCopy(req, res) {
       req.user.id,
       null,
       'Buyer',
-      'Countersigned Payment Terms Amendment Agreement'
+      (amendment.amendment_type || '') === 'products' ? 'Countersigned Amendment (Products & prices)' : 'Countersigned Payment Terms Amendment Agreement'
     );
     await amendmentService.attachSignedCopyAndActivate(amendmentId, fileId, req.user.id);
-    flash.set(req, 'success', 'Signed copy uploaded — amendment is now active and payment terms are updated.');
+    flash.set(req, 'success', (amendment.amendment_type || '') === 'products'
+      ? 'Signed copy uploaded — the amendment is active: the order\'s products and prices are updated (its stage does not change). See the re-issue checklist on the order page.'
+      : 'Signed copy uploaded — amendment is now active and payment terms are updated.');
   } catch (e) {
     flash.setErrorFromException(req, e);
   }
@@ -217,4 +227,108 @@ async function overrideReference(req, res) {
   res.redirect(`/orders/${amendment.order_id}/amendments`);
 }
 
-module.exports = { index, create, mdApprove, reject, generateDocument, uploadSignedCopy, overrideReference };
+/** Owner decision D-342: New amendment — Products & prices (mockup screen 1). */
+async function newProducts(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const why = await productsAmendmentService.cannotStart(order);
+  if (why !== null) {
+    flash.set(req, 'error', why);
+    res.redirect(`/orders/${orderId}/amendments`);
+    return;
+  }
+  await renderProducts(req, res, order, null, [], '');
+}
+
+/** Owner decision D-342: "Check the changes" (shows old → new) or "Send to MD for approval". */
+async function createProducts(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const why = await productsAmendmentService.cannotStart(order);
+  if (why !== null) {
+    flash.set(req, 'error', why);
+    res.redirect(`/orders/${orderId}/amendments`);
+    return;
+  }
+  const reason = String(req.body.reason || '').trim();
+  // "Check the changes" posts with ?step=check (formaction): a disabled submit button sends no value.
+  if (String((req.query && req.query.step) || req.body.step || '') === 'check') {
+    const draft = await productsAmendmentService.draft(order, req.body);
+    await renderProducts(req, res, order, draft, draft.errors, reason);
+    return;
+  }
+  let result;
+  try {
+    result = await productsAmendmentService.create(orderId, req.body, reason, req.user.id);
+  } catch (e) {
+    flash.setErrorFromException(req, e);
+    res.redirect(`/orders/${orderId}/amendments`);
+    return;
+  }
+  const [id, errors, draft] = result;
+  if (id === null) {
+    await renderProducts(req, res, order, draft && Object.keys(draft).length ? draft : null, errors, reason);
+    return;
+  }
+  flash.set(req, 'success', 'Amendment request (Products & prices) created — awaiting MD approval. The order changes only when the buyer\'s signed copy is uploaded.');
+  res.redirect(`/orders/${orderId}/amendments`);
+}
+
+async function renderProducts(req, res, order, draft, errors, reason) {
+  const lines = await productsAmendmentService.currentLines(Number(order.id));
+  const byLine = {};
+  for (const d of ((draft && draft.lines) || [])) {
+    if (d.order_product_id !== null) byLine[Number(d.order_product_id)] = d;
+  }
+  const bySlot = {};
+  for (const d of ((draft && draft.lines) || [])) {
+    if (d.slot !== undefined) bySlot[d.slot] = d;
+  }
+  res.renderView('amendments/products_new', {
+    order, lines, draft, errors, reason, post: req.body || {}, byLine, bySlot,
+    slots: Array.from({ length: productsAmendmentService.NEW_LINE_SLOTS }, (_, k) => k),
+    seesRate: !!(req.permissions && req.permissions.view_price_buildup),
+    view: productsAmendmentView(order, draft),
+  }, 'layout/base');
+}
+
+/** The screen's texts worked out once (identical wording to the PHP view). */
+function productsAmendmentView(order, draft) {
+  const priceLock = require('../services/priceLock');
+  const lineTable = require('../services/lineTable');
+  const lineUnits = require('../services/lineUnits');
+  const t = draft && draft.errors.length === 0 ? draft.totals : null;
+  return {
+    fixedDate: priceLock.fixedDate(order),
+    fixedRate: priceLock.fixedRate(order),
+    totals: t,
+    signedDifference: t ? productsAmendmentService.signedDifference(t) : '',
+    advanceNote: t ? productsAmendmentService.advanceNote(t) : '',
+    money: productsAmendmentService.money,
+    priceUpMessage: productsAmendmentService.priceUpMessage,
+    changeLabels: productsAmendmentService.CHANGE_LABELS,
+    num: (v) => (v === null || v === undefined || v === '' ? '' : lineUnits.num(Number(v))),
+    qtyInput: (v) => String(Number(v)),
+    qty: (v, unit) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('en-US', { minimumFractionDigits: lineTable.quantityDecimals(unit) ?? 3, maximumFractionDigits: lineTable.quantityDecimals(unit) ?? 3 })),
+    byPieces: (l) => !Number(l.as_per_annexure || 0) && lineTable.needsPieces(l.unit, lineUnits.size(l.piece_length_cm), lineUnits.size(l.piece_width_cm), lineUnits.size(l.piece_thickness_cm)),
+    pct: (v) => Number(v).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''),
+  };
+}
+
+/** Owner decision D-342: the re-issue checklist's tick "The signed amendment amends the Buyer PO". */
+async function buyerPoAmended(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const error = await productsAmendmentService.tickBuyerPo(orderId, parseInt(req.params.amendmentId, 10), req.user.id);
+  flash.set(req, error === null ? 'success' : 'error', error ?? 'Noted: the signed amendment amends the Buyer PO.');
+  res.redirect(`/orders/${orderId}#reissue-checklist`);
+}
+
+module.exports = { index, create, mdApprove, reject, generateDocument, uploadSignedCopy, overrideReference, newProducts, createProducts, buyerPoAmended };

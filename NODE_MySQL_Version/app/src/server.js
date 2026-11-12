@@ -1517,6 +1517,10 @@ app.post('/email-log/:emailLogId/cancel', requireAuth, verifyCsrf, asyncHandler(
 
 app.get('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), asyncHandler(amendmentController.index));
 app.post('/orders/:id/amendments', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(amendmentController.create));
+// Owner decision D-342: the "Products & prices" amendment and the re-issue checklist's Buyer PO tick.
+app.get('/orders/:id/amendments/products/new', requireAuth, requirePermission('manage_orders'), asyncHandler(amendmentController.newProducts));
+app.post('/orders/:id/amendments/products', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(amendmentController.createProducts));
+app.post('/orders/:id/amendments/:amendmentId/buyer-po-amended', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(amendmentController.buyerPoAmended));
 app.post('/amendments/:amendmentId/md-approve', requireAuth, requirePermission('approve_documents'), verifyCsrf, asyncHandler(amendmentController.mdApprove));
 app.post('/amendments/:amendmentId/reject', requireAuth, requirePermission('approve_documents'), verifyCsrf, asyncHandler(amendmentController.reject));
 app.post('/amendments/:amendmentId/generate-document', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(amendmentController.generateDocument));

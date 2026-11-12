@@ -81,7 +81,7 @@ async function softDelete(id) {
  * figures fixed at PI and an open approval request are NOT copied: the caller runs
  * orderLinePricing.afterSave() so the copy is checked at once.
  */
-async function duplicate(id, targetOrderId = null) {
+async function duplicate(id, targetOrderId = null, atLineNo = null) {
   const source = await find(id);
   if (!source) {
     throw new Error(`Cannot duplicate order_products row ${id} — not found.`);
@@ -89,7 +89,10 @@ async function duplicate(id, targetOrderId = null) {
   const sameOrder = targetOrderId === null || Number(targetOrderId) === Number(source.order_id);
   const orderId = targetOrderId ?? source.order_id;
   let lineNo = await nextLineNo(orderId);
-  if (sameOrder) {
+  if (atLineNo !== null) {
+    // D-342: a line added by an amendment takes the number the amendment gave it (no other line moves).
+    lineNo = Number(atLineNo);
+  } else if (sameOrder) {
     // Right below the original: the lines after it move down by one.
     lineNo = Number(source.line_no) + 1;
     await db.execute('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC', { o: orderId, n: lineNo });

@@ -544,6 +544,22 @@ Set, Lot, Ton or RMT stay in the small table below. The line total is always
 quantity × unit price, exactly as before. The Packing List shows the same table
 without prices.
 
+### Prices and products are fixed once the Quotation is approved (owner decision D-342, 12 Nov 2026)
+
+The moment the order's **first Quotation is approved**, the order keeps the
+exchange rate its prices were worked out at and every line's price — "the
+same exchange rate and the same prices for all other documents, not a single
+change". The PI, OC, Buyer PO and CI use exactly these prices; a new rate
+later changes nothing on this order.
+
+From then on the products table on the order page is **read-only**: it shows
+"Prices and products are fixed by the approved Quotation of <date> — change
+them through an Amendment (Order page › Amendments › Products & prices)." No
+one can add, edit, copy or remove a line, or change the order's currency —
+not with an override, not the Super Admin. If the buyer wants more slabs,
+another size, a line less or a lower price, raise a **Products & prices
+amendment** (SOP 10). A price can never go up after the Quotation.
+
 ### Rupee amounts, Total CBM and the Word copy (owner decision D-343, 12 Nov 2026)
 
 **Orders in INR.** On the documents of an order in Indian Rupees every amount

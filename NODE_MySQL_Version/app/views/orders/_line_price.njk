@@ -11,7 +11,7 @@
 <span class="price-check-line small">
   {% if lcf %}
     {# D-305 (point 19): on an associate's client order the figures are this order's, shown without the associate's name, level or %. #}
-    <span class="price-range muted">Quote {{ lcf.quote | money }} · lowest {{ lcf.floor | money }}{% if (lcf.sold_by or 'staff') != 'staff' %} for this order{% endif %}{% if seesPriceBuildup %} · minimum {{ lcf.minimum | money }}{% endif %}{% if lconverted %} per {{ lconv.line_unit | unitLabel }}{% endif %}{% if lc.fixed %} <span title="Fixed when the Proforma Invoice was issued">(fixed at PI)</span>{% endif %}</span>
+    <span class="price-range muted">Quote {{ lcf.quote | money }} · lowest {{ lcf.floor | money }}{% if (lcf.sold_by or 'staff') != 'staff' %} for this order{% endif %}{% if seesPriceBuildup %} · minimum {{ lcf.minimum | money }}{% endif %}{% if lconverted %} per {{ lconv.line_unit | unitLabel }}{% endif %}{% if lc.fixed %} <span title="Fixed when the Quotation was approved (D-342), or when the Proforma Invoice was issued">(fixed)</span>{% endif %}</span>
     {% if lconverted and lref %}
       <span class="price-ref muted">Product reference per {{ lconv.ref_unit | unitLabel }}: quote {{ lref.quote | money }} · lowest {{ lref.floor | money }} · your price = USD {{ (lconv.price_ref or 0) | money }} / {{ lconv.ref_unit | unitLabel }} (1 {{ lconv.line_unit | unitLabel }} = {{ lconv.factor | factor4 }} {{ lconv.ref_unit | unitLabel }})</span>
     {% endif %}

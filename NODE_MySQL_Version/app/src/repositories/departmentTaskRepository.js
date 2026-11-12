@@ -31,6 +31,13 @@ const OPEN_WORK = `
           FROM purchase_requirements pr JOIN orders o ON o.id = pr.order_id
          WHERE o.status = 'active' AND pr.status = 'approved'
         UNION ALL
+        -- Owner decision D-342: a products amendment changed the quantities — Procurement revises the Supplier PO.
+        SELECT a.order_id, 'revise_supplier_po', CONCAT(a.amendment_reference, ' — quantities changed'), DATE(a.activated_at), CONCAT('/orders/', a.order_id, '#reissue-checklist')
+          FROM amendments a JOIN orders o ON o.id = a.order_id
+         WHERE o.status = 'active' AND a.amendment_type = 'products' AND a.status = 'active' AND a.supplier_po_revision_needed = 1
+           AND NOT EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+                            WHERE d.order_id = a.order_id AND dt.code = 'SUPPO' AND d.generated_at >= a.activated_at)
+        UNION ALL
         SELECT pr.order_id, 'book_freight', CONCAT('PR-', pr.id, ' · ', pr.description, ' received'), pr.received_on, CONCAT('/orders/', pr.order_id)
           FROM purchase_requirements pr JOIN orders o ON o.id = pr.order_id
          WHERE o.status = 'active' AND pr.status = 'received' AND pr.qc_result <> 'failed'

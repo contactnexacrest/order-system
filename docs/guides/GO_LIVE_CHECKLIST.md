@@ -164,6 +164,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    13. [ ] `docs/migrations/2026-11-12e-follow-ups-d338.sql` (D-338: reorder request lines can say "As per annexure" — one new column, no data change)
    14. [ ] `docs/migrations/2026-11-12f-buyer-details-self-approval-md-ed.sql` (D-337: the self-approval rule for buyer details changes ticks the Executive Director too — one row, no order data change)
    15. [ ] `docs/migrations/2026-11-12g-detailed-line-table.sql` (D-339: the detailed product table on the QT / PI / OC / CI / Buyer PO / Packing List, No. of pieces and Size note on an order line — every order that already exists is set to the classic table, so its documents print exactly as before; orders created after the upgrade get the detailed table)
+   16. [ ] `docs/migrations/2026-11-12h-price-lock-and-products-amendment.sql` (D-342: prices and products fixed by the approved Quotation, the "Products & prices" amendment — every order that already has an approved Quotation is fixed now (its rate: the PI's rate when past the PI, else today's pricing rate) and its lines change only through an amendment from then on)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

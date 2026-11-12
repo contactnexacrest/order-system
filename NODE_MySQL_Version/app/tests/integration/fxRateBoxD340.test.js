@@ -203,9 +203,10 @@ describe('D-340 exchange rate box and the order page rate line', () => {
   });
 
   it('the rate fixed at the PI is the rate in use, not the raw manual setting', () => {
-    // Owner, 12 Nov 2026 ("fix it"): orders.pricing_fx_rate_at_pi takes fxRateService.rate().
+    // Owner, 12 Nov 2026 ("fix it"): orders.pricing_fx_rate_at_pi takes fxRateService.rate();
+    // D-342 (same day): or, once the Quotation is approved, the rate fixed then.
     const src = fs.readFileSync(path.join(__dirname, '../../src/services/orderSnapshotService.js'), 'utf8');
-    expect(src).toContain("const fx = await require('./fxRateService').rate(await pricingRepository.settings());");
+    expect(src).toContain("const fx = require('./priceLock').fixedRate(row) ?? await require('./fxRateService').rate(await pricingRepository.settings());");
     expect(src).not.toContain('(await pricingRepository.settings()).pricing_fx_rate');
   });
 });

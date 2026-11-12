@@ -297,6 +297,17 @@ with a message naming the document and the image — it never prints a
 different or newer seal or signature. If you see that message, do not try
 again: tell the Admin (the original file of the document is still there).
 
+### Prices on the documents after the Quotation (owner decision D-342, 12 Nov 2026)
+
+The PI, Order Confirmation, Buyer PO and Commercial Invoice print the prices
+fixed by the approved Quotation (or by an activated Products & prices
+amendment). If a line's price is ever higher than that, the document is not
+generated: "Line 2: USD 2,000.00 is higher than USD 1,950.00, the price the
+buyer accepted in the approved Quotation — the Proforma Invoice cannot be
+generated. Prices change only through an Amendment (Order page › Amendments ›
+Products & prices)." After a Products & prices amendment the order page lists
+which documents to generate again (SOP 10).
+
 ## Additional Documents (free-form attachments)
 
 Separate from everything above — these are staff-uploaded extras that don't

@@ -1,0 +1,109 @@
+{#
+  Owner decision D-342 (12 Nov 2026, owner confirmed twice; mockup screen 1):
+  New amendment — Products & prices. The lines are edited inside the amendment
+  draft; the order itself changes only when the amendment is signed and activated.
+  PHP twin: app/views/amendments/products_new.php.
+#}
+{% set ccy = order.currency_code or '' %}
+{% macro was(a, b) %}{% if a != b %}<span class="amd-old">{{ a }}</span> <span class="amd-new">{{ b }}</span>{% else %}{{ b }}{% endif %}{% endmacro %}
+<div class="card page-wide amendment-products">
+  <p class="muted small"><a href="/orders/{{ order.id }}/amendments">&larr; Back to Amendments</a></p>
+  <h1>New amendment — Products &amp; prices · Order {{ order.order_reference }}</h1>
+  <p class="muted">Prices fixed by the approved Quotation of {{ view.fixedDate }}{% if seesRate and view.fixedRate !== none %} at ₹{{ view.money(view.fixedRate) }} per USD{% endif %}. Change only what the buyer agreed; the order itself changes only when this amendment is signed and activated.</p>
+
+  {% if errors.length %}
+    <div class="notice notice-error" role="alert">{% for e in errors %}<p>{{ e }}</p>{% endfor %}</div>
+  {% endif %}
+
+  <form method="post" action="/orders/{{ order.id }}/amendments/products" id="products-amendment-form">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="table-scroll">
+    <table class="list amd-lines">
+      <thead><tr><th>#</th><th>Product</th><th>L × W × H (cm)</th><th class="num">No. of pcs</th><th class="num">Qty</th><th class="num">Unit price ({{ ccy }})</th><th class="num">Line total ({{ ccy }})</th><th>Change</th><th>Remove</th></tr></thead>
+      <tbody>
+      {% for l in lines %}
+        {% set id = l.id %}{% set no = l.line_no %}{% set d = byLine[id] %}{% set unit = l.unit or '' %}
+        {% set pin = (post.line[id] if (post.line and post.line[id]) else {}) %}
+        {% set kind = d.change_kind if d else 'none' %}
+        <tr class="{{ 'amd-del' if kind == 'remove' else ('amd-chg' if kind == 'change' else '') }}">
+          <td>{{ no }}</td>
+          <td>{{ l.description }}</td>
+          <td class="amd-size">
+            {% if l.as_per_annexure and l.as_per_annexure != '0' %}
+              <span class="muted">As per annexure</span>
+            {% else %}
+              <input type="text" inputmode="decimal" name="line[{{ id }}][length_cm]" value="{{ pin.length_cm if pin.length_cm !== undefined else view.num(l.piece_length_cm) }}" placeholder="e.g. 180" data-max-decimals="2" aria-label="Line {{ no }} length (cm)"> ×
+              <input type="text" inputmode="decimal" name="line[{{ id }}][width_cm]" value="{{ pin.width_cm if pin.width_cm !== undefined else view.num(l.piece_width_cm) }}" placeholder="e.g. 80" data-max-decimals="2" aria-label="Line {{ no }} width (cm)"> ×
+              <input type="text" inputmode="decimal" name="line[{{ id }}][thickness_cm]" value="{{ pin.thickness_cm if pin.thickness_cm !== undefined else view.num(l.piece_thickness_cm) }}" placeholder="e.g. 13" data-max-decimals="2" aria-label="Line {{ no }} thickness (cm)">
+            {% endif %}
+          </td>
+          <td class="num"><input type="text" inputmode="numeric" name="line[{{ id }}][pieces]" value="{{ pin.pieces if pin.pieces !== undefined else (l.pieces_count if l.pieces_count !== none else '') }}" placeholder="e.g. 25" data-pieces-count maxlength="7" aria-label="Line {{ no }} No. of pieces"></td>
+          <td class="num">
+            {% if view.byPieces(l) %}
+              {% if d %}{{ was(view.qty(d.old_quantity, unit), view.qty(d.new_quantity, unit)) }}{% else %}{{ view.qty(none if (l.quantity_is_tbc and l.quantity_is_tbc != '0') else l.quantity, unit) }}{% endif %} <span class="muted small">{{ unit }}</span>
+              <br><small class="muted">worked out from the pieces</small>
+            {% else %}
+              <input type="text" inputmode="decimal" name="line[{{ id }}][quantity]" value="{{ pin.quantity if pin.quantity !== undefined else ('' if (l.quantity_is_tbc and l.quantity_is_tbc != '0') else (view.qtyInput(l.quantity) if l.quantity !== none else '')) }}" placeholder="e.g. 40" data-max-decimals="3" aria-label="Line {{ no }} quantity ({{ unit }})"> <span class="muted small">{{ unit }}</span>
+            {% endif %}
+          </td>
+          <td class="num">
+            {% if d and d.price_lowered %}<span class="amd-old">{{ view.money(d.old_unit_price) }}</span>{% endif %}
+            <input type="text" inputmode="decimal" name="line[{{ id }}][unit_price]" value="{{ pin.unit_price if pin.unit_price !== undefined else (l.unit_price if l.unit_price !== none else '') }}" placeholder="e.g. 1950.00" data-max-decimals="2" required
+              {% if l.fixed_price !== none %}data-max-price="{{ l.fixed_price.toFixed(2) }}" data-max-price-message="{{ view.priceUpMessage(no, ccy, l.fixed_price) }}"{% endif %}
+              aria-label="Line {{ no }} unit price ({{ ccy }} per {{ unit }})">
+          </td>
+          <td class="num">{% if d and kind != 'remove' %}{{ was(view.money(d.old_line_total), view.money(d.new_line_total)) }}{% else %}{{ view.money(l.fob_value) }}{% endif %}</td>
+          <td>{% if d %}{% for k in (d.changes if d.changes.length else ['none']) %}{{ view.changeLabels[k] }}{{ ', ' if not loop.last else '' }}{% endfor %}{% endif %}</td>
+          <td><label class="checkbox-row"><input type="checkbox" name="line[{{ id }}][remove]" value="1"{{ ' checked' if pin.remove else '' }}> Remove</label></td>
+        </tr>
+      {% endfor %}
+      {% for k in slots %}
+        {% set nin = (post.new[k] if (post.new and post.new[k]) else {}) %}{% set nd = bySlot[k] %}
+        <tr class="amd-add-row{{ ' amd-add' if nd else '' }}">
+          <td>{{ nd.line_no if nd else '+' }}</td>
+          <td>
+            <select name="new[{{ k }}][source_line_id]" aria-label="New line {{ k + 1 }}: product">
+              <option value="">Add a line — choose…</option>
+              {% for l in lines %}
+                <option value="{{ l.id }}"{{ ' selected' if ((nin.source_line_id or '') | string) == (l.id | string) else '' }}>Same product as line {{ l.line_no }} — {{ l.description | truncate(50, true, '…') }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="amd-size">
+            <input type="text" inputmode="decimal" name="new[{{ k }}][length_cm]" value="{{ nin.length_cm or '' }}" placeholder="e.g. 100" data-max-decimals="2" aria-label="New line {{ k + 1 }} length (cm)"> ×
+            <input type="text" inputmode="decimal" name="new[{{ k }}][width_cm]" value="{{ nin.width_cm or '' }}" placeholder="e.g. 50" data-max-decimals="2" aria-label="New line {{ k + 1 }} width (cm)"> ×
+            <input type="text" inputmode="decimal" name="new[{{ k }}][thickness_cm]" value="{{ nin.thickness_cm or '' }}" placeholder="e.g. 13" data-max-decimals="2" aria-label="New line {{ k + 1 }} thickness (cm)">
+          </td>
+          <td class="num"><input type="text" inputmode="numeric" name="new[{{ k }}][pieces]" value="{{ nin.pieces or '' }}" placeholder="e.g. 20" data-pieces-count maxlength="7" aria-label="New line {{ k + 1 }} No. of pieces"></td>
+          <td class="num"><input type="text" inputmode="decimal" name="new[{{ k }}][quantity]" value="{{ nin.quantity or '' }}" placeholder="e.g. 1.300" data-max-decimals="3" aria-label="New line {{ k + 1 }} quantity">{% if nd and nd.new_quantity !== none %}<br><small class="muted">= {{ view.qty(nd.new_quantity, nd.unit) }} {{ nd.unit }}</small>{% endif %}</td>
+          <td class="num"><input type="text" inputmode="decimal" name="new[{{ k }}][unit_price]" value="{{ nin.unit_price or '' }}" placeholder="e.g. 1950.00" data-max-decimals="2" aria-label="New line {{ k + 1 }} unit price ({{ ccy }})"></td>
+          <td class="num">{{ view.money(nd.new_line_total) if nd else '' }}</td>
+          <td>{{ view.changeLabels.add if nd else '' }}</td>
+          <td></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted small">With Length, Width (and Thickness for CBM) given, the quantity is worked out from the No. of pieces; otherwise type the quantity. A new line copies the product of the line you choose, with its own size, pieces, quantity and price.</p>
+
+    {% if view.totals %}{% set t = view.totals %}
+      <div class="notice notice-info amd-totals">
+        <strong>Order total:</strong> <span class="amd-old">{{ ccy }} {{ view.money(t.old_total) }}</span>
+        <span class="amd-new">{{ ccy }} {{ view.money(t.new_total) }}</span> ({{ view.signedDifference }})
+        · Advance {{ view.pct(t.advance_pct) }}%: <span class="amd-old">{{ view.money(t.old_advance) }}</span> <span class="amd-new">{{ view.money(t.new_advance) }}</span>
+        — {{ view.advanceNote }}
+      </div>
+    {% endif %}
+
+    <label class="full">Reason for the amendment *
+      <textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="e.g. Buyer asked for 5 more slabs of 180 × 80 on 14 Nov (e-mail); discount on line 3 agreed by MD" style="width:100%">{{ reason }}</textarea>
+    </label>
+    <p>
+      <button type="submit" formaction="/orders/{{ order.id }}/amendments/products?step=check" class="btn-secondary" data-step="check">Check the changes</button>
+      <button type="submit" class="btn-primary" data-step="send" data-loading-text="Sending…">Send to MD for approval</button>
+      <a class="btn-sm btn-secondary" href="/orders/{{ order.id }}/amendments">Cancel</a>
+    </p>
+    <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the Quotation at {{ ccy }} …"). New lines get their own price.</p>
+  </form>
+</div>

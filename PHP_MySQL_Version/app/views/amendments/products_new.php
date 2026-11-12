@@ -124,8 +124,8 @@ $__was = static fn (string $old, string $new): string => $old !== $new ? '<span 
       <textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="e.g. Buyer asked for 5 more slabs of 180 × 80 on 14 Nov (e-mail); discount on line 3 agreed by MD" style="width:100%"><?= htmlspecialchars($reason) ?></textarea>
     </label>
     <p>
-      <button type="submit" name="step" value="check" class="btn-secondary">Check the changes</button>
-      <button type="submit" name="step" value="send" class="btn-primary" data-loading-text="Sending…">Send to MD for approval</button>
+      <button type="submit" formaction="/orders/<?= (int) $order['id'] ?>/amendments/products?step=check" class="btn-secondary" data-step="check">Check the changes</button>
+      <button type="submit" class="btn-primary" data-step="send" data-loading-text="Sending…">Send to MD for approval</button>
       <a class="btn-sm btn-secondary" href="/orders/<?= (int) $order['id'] ?>/amendments">Cancel</a>
     </p>
     <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the Quotation at <?= htmlspecialchars($ccy) ?> …"). New lines get their own price.</p>

@@ -142,7 +142,8 @@ final class AmendmentController
             return;
         }
         $reason = trim((string) ($_POST['reason'] ?? ''));
-        if (($_POST['step'] ?? '') === 'check') {
+        // "Check the changes" posts with ?step=check (formaction): a disabled submit button sends no value.
+        if (($_GET['step'] ?? $_POST['step'] ?? '') === 'check') {
             $draft = ProductsAmendmentService::draft($order, $_POST);
             self::renderProducts($order, $draft, $draft['errors'], $reason);
             return;

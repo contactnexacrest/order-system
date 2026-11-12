@@ -861,6 +861,15 @@ async function updateDetails(req, res) {
     }
   }
 
+  // Owner decision D-342: the approved Quotation fixed the prices in its currency — a currency change would change them.
+  const lockRefusal = currencyId !== Number(order.currency_id) ? require('../services/priceLock').refusal(order) : null;
+  if (lockRefusal !== null) {
+    flash.set(req, 'error', `The currency can no longer change. ${lockRefusal}`);
+    flash.setOld(req, body);
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+
   const reason = str(body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'orders', orderId, 'order_details'))) {
     res.redirect(`/orders/${orderId}/edit`);
@@ -1194,6 +1203,19 @@ function annexureLineInput(body, current) {
   return [true, null];
 }
 
+/**
+ * Owner decision D-342 (12 Nov 2026, confirmed twice): once the order's first Quotation is
+ * approved its lines change only through a "Products & prices" amendment — refused here for
+ * everyone (no override, not the Super Admin). True when refused.
+ */
+function refuseLockedLines(req, res, order) {
+  const refusal = require('../services/priceLock').refusal(order);
+  if (refusal === null) return false;
+  flash.set(req, 'error', refusal);
+  res.redirect(`/orders/${Number(order.id)}#step-products`);
+  return true;
+}
+
 async function addProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1201,6 +1223,7 @@ async function addProduct(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
+  if (refuseLockedLines(req, res, order)) return;
   const body = req.body;
   // Owner decision D-255 (5 Nov 2026): a line may come from an associate's price request — it then
   // takes the request's product, options, price and unit (the price can still be changed).
@@ -1330,6 +1353,7 @@ async function updateProduct(req, res) {
     res.status(404).send('Product line not found.');
     return;
   }
+  if (refuseLockedLines(req, res, order)) return;
   const body = req.body;
   const description = str(body.description);
   if (description === '') {
@@ -1458,6 +1482,7 @@ async function deleteProduct(req, res) {
     res.status(404).send('Product line not found.');
     return;
   }
+  if (refuseLockedLines(req, res, order)) return;
 
   const reason = str(req.body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_removed'))) {
@@ -1480,6 +1505,7 @@ async function duplicateProduct(req, res) {
     res.status(404).send('Product line not found.');
     return;
   }
+  if (refuseLockedLines(req, res, order)) return;
 
   const reason = str(req.body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_duplicated'))) {
@@ -1945,6 +1971,10 @@ async function show(req, res) {
       supplierFactoryAddressesBySupplier,
       supplierFactoryAddressTextsBySupplier,
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
+      // Owner decision D-342: prices and products fixed by the approved Quotation; the re-issue checklist.
+      pricesFixed: require('../services/priceLock').isFixed(order),
+      priceLockMessage: require('../services/priceLock').isFixed(order) ? require('../services/priceLock').message(order) : null,
+      reissue: req.permissions && req.permissions.manage_orders ? await require('../services/productsAmendmentService').checklist(order) : null,
       complianceTasks: complianceTasksForOrder,
       complianceStatuses: orderComplianceTaskRepository.STATUSES,
       complianceNaReason: orderComplianceTaskRepository.NOT_APPLICABLE_REASON,

@@ -196,6 +196,9 @@ async function generateUnfrozen(orderId, documentTypeCode, generatedByUserId, si
     const priceBlock = await require('./orderLinePricing').documentBlockReason(orderId, documentTypeCode);
     if (priceBlock !== null) throw new Error(priceBlock);
   }
+  // Owner decision D-342: no PI, OC, Buyer PO or CI with a goods line above the price fixed by the approved Quotation.
+  const lockBlock = await require('./priceLock').documentGuard(orderId, documentTypeCode);
+  if (lockBlock !== null) throw new Error(lockBlock);
   // Owner decision D-336: a line "As per annexure" needs a product entry in the annexure that document prints.
   const annexureBlock = await require('./annexureChoice').blockReason(orderId, documentTypeCode);
   if (annexureBlock !== null) throw new Error(annexureBlock);
@@ -725,6 +728,8 @@ async function finalizeApproval(documentId) {
   await orderSnapshotService.within(orderId, () => finalizeApprovalUnfrozen(documentId));
   // D-262: the order keeps its own copy of what printed it from the moment its PI is first approved.
   if (document.document_type_code === 'PI') await orderSnapshotService.freeze(orderId);
+  // D-342 (owner, confirmed twice): the first approved Quotation fixes the rate, the prices and the products.
+  if (document.document_type_code === 'QT') await require('./priceLock').fixAtQtApproval(orderId, documentId);
 }
 
 async function finalizeApprovalUnfrozen(documentId) {
@@ -1081,6 +1086,7 @@ async function generateAmendmentUnfrozen(amendmentId, generatedByUserId) {
     amendment: {
       amendment_reference: amendment.amendment_reference,
       buyer_inquiry_ref: amendment.buyer_inquiry_ref,
+      order_reference: amendment.order_reference, // D-342: printed by the products amendment only
       effective_from: documentDataAssembler.formatDate(amendment.effective_from),
       reason: amendment.reason,
       requested_by: amendment.requested_by === 'importer' ? 'The Importer' : 'NexaCrest International Private Limited',
@@ -1136,7 +1142,16 @@ async function generateAmendmentUnfrozen(amendmentId, generatedByUserId) {
   };
 
   const twig = templatesEnvironment();
-  const html = twig.render('AMD/payment_terms_amendment.njk', context);
+  // Owner decision D-342: a "Products & prices" amendment prints its own sections (products, effect on
+  // payment, acceptance); the payment-terms amendment above prints exactly as before.
+  let html;
+  if ((amendment.amendment_type || 'payment_terms') === 'products') {
+    context.doc_title = 'AMENDMENT — PRODUCTS & PRICES';
+    context.products_amendment = await require('./productsAmendmentService').documentBlock(amendment);
+    html = twig.render('AMD/products_amendment.njk', context);
+  } else {
+    html = twig.render('AMD/payment_terms_amendment.njk', context);
+  }
   const pdfBytes = await renderPdfFromHtml(html, context.meta && context.meta.document_reference);
 
   const storageBase = (env.storageBasePath() || '').replace(/\/+$/, '');

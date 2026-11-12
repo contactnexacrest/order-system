@@ -108,7 +108,9 @@ async function levelForAssociate(associate, excludeOrderId) {
 /** Who sells this order: the client's associate at their level (when the order is one they earn on), else staff. */
 async function context(order) {
   const ctx = { associate: null, level: null, key: 'staff', label: 'Staff', ladder_count: null,
-    usd: String((order && order.currency_code) || '').toUpperCase() === 'USD' };
+    usd: String((order && order.currency_code) || '').toUpperCase() === 'USD',
+    // D-342: once the Quotation is approved, prices are worked out at the rate fixed then — never today's.
+    fixed_fx: require('./priceLock').fixedRate(order || {}) };
   const client = order && order.client_id ? await require('../repositories/clientRepository').find(Number(order.client_id)) : null;
   if (!client || !client.associate_id) return ctx;
   const associate = await require('../repositories/associateRepository').find(Number(client.associate_id));
@@ -128,7 +130,12 @@ async function context(order) {
 async function liveFigures(product, ctx, selection = null, lineThicknessMm = null) {
   // D-255: with the line's chosen specification options (null = the base product).
   // D-270: and the line's own thickness (a "50 mm and above" option priced per CBM).
-  const p = await pricingService.forProduct(product, [], null, null, selection, lineThicknessMm);
+  // D-342: an order whose Quotation is approved works its prices out at the rate fixed then.
+  let settings = null;
+  if (ctx.fixed_fx !== null && ctx.fixed_fx !== undefined) {
+    settings = { ...(await pricingService.settings()), pricing_fx_rate: Number(ctx.fixed_fx) };
+  }
+  const p = await pricingService.forProduct(product, [], settings, null, selection, lineThicknessMm);
   if (!p.build) return { missing: String(p.missing), manual: !!p.manual };
   const b = p.build;
   let floor = b.staff_floor;
@@ -738,6 +745,26 @@ async function approve(orderId, lineId, userId, reason) {
   return null;
 }
 
+/**
+ * Owner decision D-342: a price lowered (or a line added) by a "Products & prices" amendment
+ * was approved by the MD with the amendment — recorded on the line as the MD's approval.
+ */
+async function approveByAmendment(lineId, mdUserId, reason) {
+  const line = await require('../repositories/orderProductRepository').find(lineId);
+  if (!line) return;
+  // The same effect on commission and incentive as the MD's own line approval (approve()).
+  const view = await approvalView(Number(line.order_id), lineId);
+  const effect = (view && view.effect) || {};
+  await db.execute(
+    `UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p, price_approved_selection = :sel,
+            price_approval_commission_zero = :cz, price_approval_incentive_cut = :ic, price_approval_requested_at = NULL, price_approval_requested_by = NULL
+     WHERE id = :id`,
+    { u: mdUserId, r: String(reason).slice(0, 500), p: n2(line.unit_price), sel: approvalSelectionKey(line), cz: effect.commission_zero ? 1 : 0,
+      ic: effect.cut_line !== undefined && effect.cut_line !== null ? n2(effect.cut_line) : null, id: lineId }
+  );
+  await auditLog(mdUserId, 'LINE_PRICE_APPROVED', 'order_products', lineId, 'unit_price', null, String(line.unit_price), `Order line ${Number(line.line_no)}: ${reason}`);
+}
+
 /** The MD refuses a line's price: the request is closed and whoever asked is told why. Null on success. */
 async function refuse(orderId, lineId, userId, reason) {
   reason = String(reason ?? '').trim();
@@ -759,6 +786,15 @@ async function snapshotForPi(orderId) {
   // D-245 P3: the associate's commission level is fixed on the order with the PI, first,
   // so the line figures fixed below use that same level.
   await require('./associateCommission').fixLevelAtPi(orderId);
+  await snapshotLines(orderId);
+}
+
+/**
+ * Owner decision D-342: fixes the figures on every checked line that has none yet —
+ * when the first Quotation is approved (at the rate fixed then), again when the PI is
+ * issued, and for a line an activated amendment adds.
+ */
+async function snapshotLines(orderId) {
   const order = await require('../repositories/orderRepository').find(orderId);
   if (!order) return;
   const ctx = await context(order);
@@ -848,6 +884,6 @@ module.exports = {
   weightPerCbm, lineSize, optionThicknessMm, syncThickness, conversionFor, scaleFigures, optionChips, summary, totals,
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
-  saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, pickerSpecs, clientKeys,
+  saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, snapshotLines, approveByAmendment, pickerPrices, pickerSpecs, clientKeys,
   selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey,
 };

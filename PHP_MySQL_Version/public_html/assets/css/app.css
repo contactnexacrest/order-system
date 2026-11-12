@@ -1071,7 +1071,9 @@ input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
 .amd-lines tr.amd-chg td { background: #fffbeb; }
 .amd-lines tr.amd-add td { background: #ecfdf5; }
 .amd-lines tr.amd-del td { background: #fef2f2; }
-.amd-lines .amd-size input { width: 4.2em; }
-.amd-lines td.num input { width: 6.5em; text-align: right; }
+.amd-lines td.amd-size { white-space: nowrap; }
+.amd-lines td.amd-size input[type="text"] { display: inline-block; width: 4.2em; min-width: 0; }
+.amd-lines select { min-width: 16em; }
+.amd-lines td.num input[type="text"] { width: 6.5em; min-width: 0; text-align: right; }
 .reissue-checklist .todo { color: #9a3412; font-weight: 600; }
 .reissue-checklist .ok { color: #166534; font-weight: 600; }

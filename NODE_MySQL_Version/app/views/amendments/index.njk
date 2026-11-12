@@ -1,10 +1,25 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/orders/{{ order.id }}">&larr; Back to Order</a></p>
-  <h1>Payment Terms Amendments — {{ order.order_reference }}</h1>
+  <h1>Amendments — {{ order.order_reference }}</h1>
   <p class="muted">{{ order.company_legal_name }}</p>
 
+  {# Owner decision D-342: once the Quotation is approved, products and prices change only through an amendment. #}
+  <div class="section" id="products-amendment">
+    <h2>Products &amp; prices</h2>
+    {% if productsAmendment.fixed %}
+      <p class="muted">{{ productsAmendment.message }}</p>
+      {% if productsAmendment.why === null %}
+        <a class="btn-primary" href="/orders/{{ order.id }}/amendments/products/new">New amendment — Products &amp; prices</a>
+      {% else %}
+        <p class="notice notice-info">{{ productsAmendment.why }}</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">The Quotation is not approved yet — products and prices are changed on the order page (Products).</p>
+    {% endif %}
+  </div>
+
   <div class="section">
-    <h2>Raise a New Amendment Request</h2>
+    <h2>Raise a Payment Terms Amendment</h2>
     <form method="post" action="/orders/{{ order.id }}/amendments">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
@@ -51,10 +66,11 @@
   <div class="section">
     <h2>Amendment History</h2>
     <table class="list">
-      <tr><th>Reference</th><th>Reason</th><th>Status</th><th>MD Approved</th><th>Created</th><th>Actions</th></tr>
+      <tr><th>Reference</th><th>Type</th><th>Reason</th><th>Status</th><th>MD Approved</th><th>Created</th><th>Actions</th></tr>
       {% for a in amendments %}
       <tr>
         <td>{{ a.amendment_reference }}</td>
+        <td>{{ 'Products &amp; prices' | safe if a.amendment_type == 'products' else 'Payment terms' }}</td>
         <td>{{ a.reason }}</td>
         <td>{{ a.status }}</td>
         <td>{{ a.md_approved_at or '—' }}</td>
@@ -65,7 +81,7 @@
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-success">MD Approve</button>
             </form>
-            <form method="post" action="/amendments/{{ a.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this payment terms amendment?');">
+            <form method="post" action="/amendments/{{ a.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this amendment?');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>
@@ -84,7 +100,7 @@
               </form>
             {% endif %}
           {% elif a.status == 'active' %}
-            <span class="muted">Active — payment terms updated.</span>
+            <span class="muted">{{ 'Active — products and prices updated.' if a.amendment_type == 'products' else 'Active — payment terms updated.' }}</span>
             {% if a.document_id %} <a href="/documents/{{ a.document_id }}/download?format=pdf">Agreement PDF</a>{% endif %}
           {% else %}
             <span class="muted">{{ a.status }}</span>
@@ -104,7 +120,7 @@
       </tr>
       {% endfor %}
       {% if not amendments or amendments.length == 0 %}
-        <tr><td colspan="6" class="muted">No amendments on this order.</td></tr>
+        <tr><td colspan="7" class="muted">No amendments on this order.</td></tr>
       {% endif %}
     </table>
   </div>

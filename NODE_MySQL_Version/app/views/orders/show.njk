@@ -856,9 +856,52 @@
     <div class="step-sequence" id="order-panels">
 
   {# D-257 Phase 0B: the quality documents sit inside the Products card; it opens while one is still awaited. #}
+  {# Owner decision D-342 (mockup screen 2): after an activated "Products & prices" amendment, what to re-issue. #}
+  {% if reissue %}
+  <div class="card reissue-checklist" id="reissue-checklist">
+    <h2>{{ reissue.title }}</h2>
+    <p class="muted">{{ reissue.intro }}</p>
+    <table class="list">
+      <tr><th>Document</th><th>Status</th><th>What to do</th></tr>
+      {% for ri in reissue.items %}
+      <tr>
+        <td>{{ ri.document }}</td>
+        <td>{{ '⚠ ' if ri.state == 'todo' else '' }}{{ ri.status }}</td>
+        <td>
+          {% if ri.state == 'ok' %}
+            <span class="ok">✓ {{ ri.todo }}</span>
+          {% else %}
+            <span class="todo">{{ ri.todo }}</span>
+            {% for riCode in (ri.codes or []) %}
+              {% if permissions.generate_documents %}
+              <form method="post" action="/orders/{{ order.id }}/documents/generate" class="inline-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="document_type" value="{{ riCode }}">
+                <input type="hidden" name="generate_pdf" value="1">
+                <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate revised {{ {PI: 'Proforma Invoice', OC: 'Order Confirmation', CI: 'Commercial Invoice', PL: 'Packing List'}[riCode] }} ›</button>
+              </form>
+              {% endif %}
+            {% endfor %}
+            {% if ri.tick %}
+              <form method="post" action="/orders/{{ order.id }}/amendments/{{ ri.tick }}/buyer-po-amended" class="inline-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-secondary">✓ The signed amendment amends the Buyer PO</button>
+              </form>
+            {% endif %}
+            {% if ri.link %}<a href="{{ ri.link }}">Supplier PO ›</a>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="notice notice-info">{{ reissue.money }}{% if seesPriceBuildup and reissue.rate %} {{ reissue.rate }}{% endif %}</p>
+  </div>
+  {% endif %}
+
   <details class="step-card" id="step-products"{{ ' open' if ((sees.selling and linePricing.blocking.length) or qualityOpen) else '' }}>
     <summary><h2>Products</h2></summary>
-    {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
+    {# Owner decision D-342: once the approved Quotation fixed prices and products, the lines change only through an amendment (no override). #}
+    {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) and not pricesFixed %}
     {# Owner decision D-273 (point 17): one compact products table, summary bar, totals and side-panel editing. #}
     {% include "orders/_products_table.njk" %}
     {# Owner decision D-215 (5a-2): service lines are invoiced on their own Export Service Invoice. #}
@@ -4088,7 +4131,7 @@
   <details class="step-card step-card-reference" id="amendments">
     <summary><h2>Amendments <small class="muted">(reference — mutually-agreed term changes)</small></h2></summary>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
-    <p><a href="/orders/{{ order.id }}/amendments">Payment Terms Amendments ({{ amendmentCount }})</a></p>
+    <p><a href="/orders/{{ order.id }}/amendments">Amendments ({{ amendmentCount }}) — payment terms, products &amp; prices</a></p>
   </details>
   {% endif %}
 

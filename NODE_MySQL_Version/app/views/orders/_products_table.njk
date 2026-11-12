@@ -20,7 +20,9 @@
 {% if sees.selling and lineSummary %}
   <p class="line-summary {{ 'notice notice-warning' if lineSummary.blocking else 'notice notice-success' }}">{{ lineSummary.text }}{% if lineSummary.blocking %} <a href="#price-check">Show</a>{% endif %}</p>
 {% endif %}
-{% if isLockedOrder and canEditProducts %}
+{% if pricesFixed and permissions.manage_orders %}{# Owner decision D-342 #}
+  <p class="notice notice-info price-lock-note" id="price-lock-note">🔒 {{ priceLockMessage }} <a href="/orders/{{ order.id }}/amendments#products-amendment">Amendments ›</a></p>
+{% elif isLockedOrder and canEditProducts %}
   <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required.</p>
 {% elif isPostConfirmationOrder and canEditProducts %}
   <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required.</p>
