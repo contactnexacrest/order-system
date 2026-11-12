@@ -240,11 +240,79 @@ final class AnnexureChoice
         return $value ? (string) $value : null;
     }
 
+    /** D-341: the note shown instead of Annexure B before the Commercial Invoice step. */
+    public const B_NOT_YET_NOTE = 'Annexure B can be made at the Commercial Invoice step.';
+
+    /**
+     * Owner decision D-341: the order has reached the shipping-documents part of the
+     * workflow — the Commercial Invoice step (Stage 8) is open or passed. The order
+     * page shows the Commercial Invoice step on exactly this condition.
+     */
+    public static function ciStageReached(int $orderId): bool
+    {
+        $stage = \App\Repositories\OrderStageRepository::findByOrderAndStageNumber($orderId, 8);
+        return $stage !== null && $stage['status'] !== 'locked';
+    }
+
+    /** D-341: Annexure B holds something (a product entry or Additional Terms), whatever its content mode. */
+    public static function bMade(int $orderId): bool
+    {
+        return OrderAnnexureRepository::countFor($orderId, 'B') > 0 || self::termsHtml($orderId, 'B') !== '';
+    }
+
+    /** D-341: Annexure B can be opened — from the Commercial Invoice step on, or whenever it already has content. */
+    public static function bAvailable(int $orderId): bool
+    {
+        return self::bMade($orderId) || self::ciStageReached($orderId);
+    }
+
+    /**
+     * D-341: when Annexure A's content (product entries, images, Additional Terms or
+     * content mode) was last changed, from the audit log — or null. A removed entry or
+     * image is found through its audit row, which names the order (field "order_id").
+     */
+    public static function lastChangeA(int $orderId): ?string
+    {
+        $productIds = [];
+        $imageIds = [];
+        foreach (OrderAnnexureRepository::forOrder($orderId, 'A') as $p) {
+            $productIds[] = (int) $p['id'];
+            foreach ($p['images'] as $img) {
+                $imageIds[] = (int) $img['id'];
+            }
+        }
+        $sql = "SELECT MAX(created_at) FROM audit_log WHERE (reason IS NULL OR reason <> 'Annexure B') AND ("
+            . "(entity_type = 'order' AND entity_id = :o AND action_type IN ('ANNEXURE_MODE_UPDATED','ANNEXURE_TERMS_UPDATED'))"
+            . " OR (action_type IN ('ANNEXURE_PRODUCT_DELETED','ANNEXURE_IMAGE_REMOVED') AND field_name = 'order_id' AND old_value = :os)"
+            . ($productIds !== [] ? " OR (entity_type = 'order_annexure_products' AND entity_id IN (" . implode(',', $productIds) . '))' : '')
+            . ($imageIds !== [] ? " OR (entity_type = 'order_annexure_images' AND entity_id IN (" . implode(',', $imageIds) . '))' : '')
+            . ')';
+        $stmt = Database::connection()->prepare($sql);
+        $stmt->execute(['o' => $orderId, 'os' => (string) $orderId]);
+        $value = $stmt->fetchColumn();
+        return $value ? (string) $value : null;
+    }
+
+    /**
+     * D-341: the latest Annexure A document is approved or sent and Annexure A was
+     * changed after that document was generated — the Annexure A page asks for a new
+     * revision. Returns that document, or null.
+     */
+    public static function staleApprovedAnnexA(int $orderId): ?array
+    {
+        $doc = \App\Repositories\DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'ANNEXA');
+        if ($doc === null || !in_array($doc['status'], ['approved', 'sent'], true)) {
+            return null;
+        }
+        $changed = self::lastChangeA($orderId);
+        return $changed !== null && strtotime($changed) > strtotime((string) $doc['generated_at']) ? $doc : null;
+    }
+
     /**
      * The order page's Commercial Invoice step: the three choices, which is selected,
      * which can be chosen, and whether "No annexure" is refused.
      *
-     * @return array{choice:string, default:string, a:array{count:int, has:bool}, b:array{count:int, has:bool, saved:?string}, lines:array<int,int>}
+     * @return array{choice:string, default:string, a:array{count:int, has:bool}, b:array{count:int, has:bool, saved:?string, made:bool}, lines:array<int,int>}
      */
     public static function ciStep(array $order): array
     {
@@ -255,7 +323,9 @@ final class AnnexureChoice
             'default' => self::ciDefault($order),
             'a' => ['count' => OrderAnnexureRepository::countFor($orderId, 'A'), 'has' => self::hasContent($order, 'A')],
             'b' => ['count' => OrderAnnexureRepository::countFor($orderId, 'B'), 'has' => self::hasContent($order, 'B'),
-                'saved' => $savedB !== null ? date('j M', strtotime($savedB)) : null],
+                'saved' => $savedB !== null ? date('j M', strtotime($savedB)) : null,
+                // D-341: "Annexure B not made — Annexure A will be printed." under the radios.
+                'made' => self::bMade($orderId)],
             'lines' => self::annexureLineNumbers($orderId, true),
         ];
     }

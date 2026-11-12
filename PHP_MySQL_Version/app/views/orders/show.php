@@ -2288,14 +2288,15 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
           <input type="hidden" name="document_type" value="ANNEXA">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
-          <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…">Generate Annexure A</button><?= $__docAlreadyNote('ANNEXA') ?>
+          <?php // D-341: like the Quotation — a new revision once an Annexure A document exists. ?>
+          <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…"><?= isset($latestDocByCode['ANNEXA']) ? 'Regenerate Annexure A (new revision)' : 'Generate Annexure A' ?></button><?= $__docAlreadyNote('ANNEXA') ?>
         </form>
         <?php endif; ?>
       <?php endif; ?>
+      <?php if ($canManageOrders): // D-341: a clear button instead of the small grey link ?>
+        <a class="btn-sm btn-secondary annexure-edit-btn" href="/orders/<?= (int) $order['id'] ?>/annexure">Edit Annexure A &rsaquo;</a>
+      <?php endif; ?>
     </div>
-    <?php if ($canManageOrders): ?>
-    <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/annexure"><?= $order['include_annexure_a'] ? 'Manage Annexure A product entries &amp; images' : 'Enable / manage Annexure A' ?></a></p>
-    <?php endif; ?>
     <p class="muted small">Review, approval, and sending to the buyer happen in <a href="#document-review-approval">Document Review &amp; Approval</a> below, once generated.</p>
   </details>
 
@@ -3822,12 +3823,20 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="B" required<?= $__ciAnnexPick === 'B' ? ' checked' : '' ?><?= $__ciAnnexOk['B'] ? '' : ' disabled' ?>> Annexure B — as shipped <span class="muted small">(<?= $__ciAnnex['b']['has'] ? $__ciAnnex['b']['count'] . ' product' . ($__ciAnnex['b']['count'] === 1 ? '' : 's') . ($__ciAnnex['b']['saved'] !== null ? ' · saved ' . htmlspecialchars($__ciAnnex['b']['saved']) : '') : 'not made yet' ?>) · <a href="/orders/<?= (int) $order['id'] ?>/annexure?which=B">open</a></span></label>
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="A" required<?= $__ciAnnexPick === 'A' ? ' checked' : '' ?><?= $__ciAnnexOk['A'] ? '' : ' disabled' ?>> Annexure A — as quoted <span class="muted small">(<?= $__ciAnnex['a']['has'] ? 'same as on the PI and OC' : 'empty' ?>)</span></label>
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="NONE" required<?= $__ciAnnexPick === 'NONE' ? ' checked' : '' ?><?= $__ciAnnexOk['NONE'] ? '' : ' disabled' ?>> No annexure<?php if (!$__ciAnnexOk['NONE']): ?> <span class="muted small">(line <?= implode(', ', $__ciAnnex['lines']) ?> says "As per annexure")</span><?php endif; ?></label>
+          <?php if (!$__ciAnnex['b']['made']): // D-341 ?>
+          <p class="ci-annexure-b-missing">Annexure B not made — Annexure A will be printed.<?php if ($canManageOrders): ?> <button type="submit" form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button><?php endif; ?></p>
+          <?php endif; ?>
           <p class="muted small">Default: Annexure B when it has been made, otherwise Annexure A. A line ticked "As per annexure" says "as per Annexure B" or "as per Annexure A" to match. "No annexure" cannot be chosen while a line says "As per annexure". The choice is saved with the order; the Packing List uses the same annexure.</p>
         </fieldset>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button><?= $__docAlreadyNote('CI') ?>
       </form>
+      <?php if (!$__ciAnnex['b']['made'] && $canManageOrders): // D-341: "Make Annexure B (copy of A)" — outside the CI form (no nested forms) ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/annexure/copy-from-a" id="ci-annexure-b-copy" hidden>
+        <?= Csrf::field() ?>
+      </form>
+      <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
   </details>

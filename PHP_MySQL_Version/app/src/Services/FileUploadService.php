@@ -141,6 +141,61 @@ final class FileUploadService
         return $ids;
     }
 
+    /**
+     * Owner decision D-341: checks one uploaded file (a $_FILES-style entry with
+     * name / tmp_name / size / error) against the upload context — empty, type,
+     * size and content — without storing it, so a page that saves many things at
+     * once can refuse before anything is saved.
+     *
+     * @throws \RuntimeException with the same message the upload itself would give
+     */
+    public static function checkUpload(array $upload, string $contextKey): void
+    {
+        if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('No file was uploaded, or the upload failed.');
+        }
+        self::checkFile((string) $upload['tmp_name'], (int) $upload['size'], (string) $upload['name'], $contextKey);
+    }
+
+    /** D-341: the largest file the upload context accepts, in bytes (null when the context is unknown). */
+    public static function maxBytes(string $contextKey): ?int
+    {
+        $context = self::findContext($contextKey);
+        return $context ? (int) $context['max_size_bytes'] : null;
+    }
+
+    /** D-341: stores one $_FILES-style entry (checked again) and returns its file_store id. */
+    public static function storeUpload(array $upload, string $contextKey, string $subPath, ?int $clientId, ?int $orderId, ?int $uploadedBy): int
+    {
+        if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('No file was uploaded, or the upload failed.');
+        }
+        return self::storeOne((string) $upload['tmp_name'], (int) $upload['size'], (string) $upload['name'], (string) ($upload['type'] ?? 'application/octet-stream'), $contextKey, $subPath, $clientId, $orderId, $uploadedBy, null, null);
+    }
+
+    private static function checkFile(string $tmpName, int $size, string $originalName, string $contextKey): void
+    {
+        $context = self::findContext($contextKey);
+        if (!$context) {
+            throw new \RuntimeException("Unknown upload context: {$contextKey}");
+        }
+        if ($size === 0) {
+            throw new \RuntimeException("File \"{$originalName}\" is empty — please choose a valid file.");
+        }
+        $extension = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+        $allowed = array_map('trim', explode(',', strtolower($context['allowed_extensions'])));
+        if (!in_array($extension, $allowed, true)) {
+            throw new \RuntimeException("File type .{$extension} is not allowed for this upload (allowed: {$context['allowed_extensions']}).");
+        }
+        if ($size > (int) $context['max_size_bytes']) {
+            $maxMb = round(((int) $context['max_size_bytes']) / 1048576, 1);
+            throw new \RuntimeException("File \"{$originalName}\" is too large — maximum is {$maxMb} MB for this upload.");
+        }
+        if (self::looksLikeDangerousContent($tmpName)) {
+            throw new \RuntimeException("File \"{$originalName}\" was rejected: its content does not match a safe file type for a .{$extension} upload.");
+        }
+    }
+
     private static function storeOne(
         string $tmpName,
         int $size,

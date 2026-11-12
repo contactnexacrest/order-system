@@ -66,10 +66,11 @@ final class FieldPlaceholdersTest extends DbTestCase
     {
         $html = $this->view('annexure/index.php');
 
+        // D-341: the edit rows are entries[<id>][<field>] in the page's one "Save all changes" form.
         foreach (['name', 'description', 'technical_notes'] as $field) {
             self::assertSame(
                 2,
-                preg_match_all('/name="' . $field . '"[^\n]*?placeholder=/', $html),
+                preg_match_all('/name="(?:entries\[[^"]*\]\[)?' . $field . '\]?"[^\n]*?placeholder=/', $html),
                 "expected both the edit-row and add-form \"$field\" field to have a placeholder"
             );
         }

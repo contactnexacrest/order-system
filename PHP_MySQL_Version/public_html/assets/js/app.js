@@ -1067,6 +1067,63 @@
     });
   }
 
+  // Owner decision D-341: a form marked data-unsaved-guard (the annexure page's
+  // "Save all changes") asks before the page is left while something in it was
+  // changed and not saved — a link, another form on the page, or closing the tab.
+  // Saving the form itself never asks.
+  var UNSAVED_MESSAGE = 'You have unsaved changes on this page — leave without saving?';
+  function initUnsavedGuard() {
+    var guarded = document.querySelectorAll('form[data-unsaved-guard]');
+    if (!guarded.length) return;
+    var dirty = false;
+    var leaving = false;
+    function guardedFormOf(el) {
+      if (!el || el.nodeType !== 1) return null;
+      var form = el.form || (el.closest ? el.closest('form') : null);
+      return form && form.hasAttribute('data-unsaved-guard') ? form : null;
+    }
+    function markDirty(e) {
+      if (guardedFormOf(e.target)) dirty = true;
+    }
+    document.addEventListener('input', markDirty);
+    document.addEventListener('change', markDirty);
+    // Bubble phase, before the "Working…" listener: a form whose own confirm was cancelled is left alone.
+    document.addEventListener('submit', function (e) {
+      if (e.defaultPrevented) return;
+      var form = e.target;
+      if (form && form.hasAttribute && form.hasAttribute('data-unsaved-guard')) {
+        leaving = true;
+        return;
+      }
+      if (dirty && !leaving) {
+        if (!window.confirm(UNSAVED_MESSAGE)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return;
+        }
+        leaving = true;
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (!dirty || leaving || e.defaultPrevented) return;
+      var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      var href = link.getAttribute('href') || '';
+      if (href === '' || href.charAt(0) === '#' || /^(javascript|mailto|tel):/i.test(href)) return;
+      if (!window.confirm(UNSAVED_MESSAGE)) {
+        e.preventDefault();
+        return;
+      }
+      leaving = true;
+    });
+    window.addEventListener('beforeunload', function (e) {
+      if (!dirty || leaving) return;
+      e.preventDefault();
+      e.returnValue = UNSAVED_MESSAGE;
+      return UNSAVED_MESSAGE;
+    });
+  }
+
   // D-303 (owner point 15): the supplier of a product price is picked from the Suppliers
   // directory — the hidden id follows the name typed or picked, and the location list is
   // the supplier's factory / quarry addresses (the first is filled in while empty).
@@ -1171,6 +1228,22 @@
       if (lineTypeField && 'value' in lineTypeField && lineTypeField.value !== 'goods') allowed = [];
       if (allowed.length > 0 && allowed.indexOf(value.toUpperCase()) === -1) {
         return 'Choose one of the units for ' + opt.textContent.trim() + ': ' + allowed.join(', ') + '.';
+      }
+    }
+    // D-341: a chosen file must be one of the accept="" extensions (when the list
+    // is extensions only, e.g. ".jpg,.png") and no larger than data-max-bytes —
+    // the same rules the server applies to that upload.
+    if (type === 'file' && el.files && el.files.length) {
+      var chosen = el.files[0];
+      var acceptList = (el.getAttribute('accept') || '').split(',').map(function (a) { return a.trim().toLowerCase(); }).filter(Boolean);
+      if (acceptList.length && acceptList.every(function (a) { return a.charAt(0) === '.'; })) {
+        var lowerName = chosen.name.toLowerCase();
+        if (!acceptList.some(function (a) { return lowerName.slice(-a.length) === a; })) {
+          return 'Choose a file of type ' + acceptList.map(function (a) { return a.slice(1); }).join(', ') + '.';
+        }
+      }
+      if (el.dataset.maxBytes && chosen.size > parseInt(el.dataset.maxBytes, 10)) {
+        return 'This file is too large — the most is ' + Math.round(parseInt(el.dataset.maxBytes, 10) / 104857.6) / 10 + ' MB.';
       }
     }
     // data-in-list="<datalist id>" (D-302 / D-303, owner points 11 and 15): the value
@@ -2099,6 +2172,8 @@
     initConfirmDialogs();
     initKeepReportDivision();
     initSwitchViewKeepsFilters();
+    // D-341: before the "Working…" submit listener below, so a cancelled "leave without saving?" stops it.
+    initUnsavedGuard();
 
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —
