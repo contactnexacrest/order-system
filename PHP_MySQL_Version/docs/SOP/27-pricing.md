@@ -85,6 +85,26 @@ approval; the Proforma Invoice waits for it." The line can still be saved; it is
 to the MD (in-app notification), and the order's **Price check** (inside the Products card)
 lists it with **Ask MD to approve line N** (or "Sent to the MD for approval").
 
+**A per-CBM price that was only worked out (D-338).** A line priced per CBM (50 mm and above)
+also goes to the MD — even at or above the lowest price — when the supplier never quoted a
+50 mm+ price and the per-CBM price was only CALCULATED from a thinner one (e.g. the 20 mm
+price × 40). The Price check shows "CBM price worked out — needs MD approval" with the reason
+"CBM price worked out from the supplier's 20 mm price — no 50 mm+ price quoted"; the MD sees
+the same reason on the approval page and in Approvals › Prices; the Quotation and Proforma
+Invoice wait for the approval. Once a 50 mm+ price is typed for that supplier (Market prices ›
++ Add / update a price), new lines need no approval.
+
+**A line "As per annexure" (D-338).** Such a line has no piece size. If its unit needs the
+size to compare the price (e.g. a product priced per m² on a CBM line), the line is refused
+with "Line 3 says "As per annexure", so its size is not known — type the price per CBM for
+this line." — the same message on the Quotation and Proforma Invoice and on the MD's page.
+
+**Product page › Suppliers (D-338).** A new supplier price there is always one typed price
+(**FOB Value (₹)**). The old "add up the cost parts" way (FOB Source **Computed**: factory +
+transport + packing + loading + CHA) is no longer offered for a new price. A price saved that
+way earlier still shows as "Computed (adds up the cost parts)" and keeps working; its **Edit**
+keeps the cost parts and offers "Direct — change to one typed price".
+
 **Never below the minimum price.** A price below the product's minimum price is refused when
 the line is saved: "This price is below what NexaCrest can accept for … — raise it." (MD and
 ED also see the minimum price in the message.) Nobody can approve it, not even the MD; to
@@ -137,7 +157,7 @@ The installed values below are the owner's chosen starting values. Since 11 Nov 
 
 | Setting | Value | Where |
 |---|---|---|
-| Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Pricing › Pricing settings › Exchange rate |
+| Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Pricing › Pricing settings › Exchange Rate |
 | Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Pricing › Pricing settings, and per product |
 | Minimum margin | 20% of the price (raise per product where the market allows) | Products › Pricing › Pricing settings |
 | Negotiating buffer | 3% | Products › Pricing › Pricing settings |
@@ -433,7 +453,7 @@ the buyer pays. *Example:* we quote USD 1,000 at a market rate of ₹88.40. The 
 ₹86.63; USD 1,000 now brings ₹86,630, not ₹88,400 — because prices were worked out at ₹86.63, the cost is
 still covered.
 
-Products › Pricing › Pricing settings › **Exchange rate** shows the rate in use, its source and date, warnings and the
+Products › Pricing › Pricing settings › **Exchange Rate** shows the rate in use, its source and date, warnings and the
 history. The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate
 now**. If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
 day it waits: the MD reads the figures, gives a reason and chooses **Use this rate** or **Keep the rate in

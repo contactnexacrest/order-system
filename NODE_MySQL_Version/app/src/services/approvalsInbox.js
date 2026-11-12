@@ -130,7 +130,12 @@ async function prices(req) {
     const price = line.unit_price !== null && line.unit_price !== undefined ? `USD ${fmt2(line.unit_price)}${unit !== '' ? ` / ${unit}` : ''}` : 'no price';
     const f = check.figures || null;
     let what; let details; let bar;
-    if (check.status === linePricing.NO_PRICE) {
+    if (check.status === linePricing.CBM_CALCULATED) {
+      // Owner decision D-338 (2b): the CBM price was only worked out from a thinner base.
+      what = 'Price — CBM worked out';
+      details = `${price} · ${check.cbm_reason}`;
+      bar = `line ${no} — ${check.cbm_reason}. The Quotation is held until it is approved.`;
+    } else if (check.status === linePricing.NO_PRICE) {
       what = 'Price — no product price';
       details = `Product has no price set${line.unit_price !== null && line.unit_price !== undefined ? ` · asked ${price}` : ''}`;
       bar = `line ${no} — its product has no price set${line.unit_price !== null && line.unit_price !== undefined ? ` (asked ${price})` : ''}. The Quotation is held until it is approved.`;

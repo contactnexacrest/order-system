@@ -902,13 +902,17 @@
               <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept — raise it</span>
             {% elif pc.status == 'no_price' %}
               <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+            {% elif pc.status == 'cbm_calculated' %}
+              {# Owner decision D-338 (2b): the CBM price was only worked out from the supplier's thinner base. #}
+              <span class="price-badge price-badge-bad">CBM price worked out — needs MD approval</span>
+              <div class="muted small">{{ pc.cbm_reason }}</div>
             {% else %}
               <span class="price-badge price-badge-bad">✗ {{ 'Below the lowest for this order' if forOrder else 'Below your lowest price' }}</span>
             {% endif %}
             {% if pc.requested and pc.status != 'approved' %}<div class="muted small">Sent to the MD for approval.</div>{% endif %}
           </td>
           <td>
-            {% if pc.status == 'below' or pc.status == 'no_price' %}
+            {% if pc.status == 'below' or pc.status == 'no_price' or pc.status == 'cbm_calculated' %}
               {% if canManagePricing %}
                 <a class="btn-sm" href="/orders/{{ order.id }}/products/{{ pl.id }}/price-approval">Review and approve line {{ pl.line_no }}</a>
               {% elif canEditProducts and not pc.requested %}

@@ -2238,6 +2238,24 @@ reported as lost.
   price check is "no price" until a new option is chosen).
 - **Client reorder request**: the buyer's "Reorder This" lands in
   **Orders › Reorder requests** (`order_reorder_requests`).
+- **Reorder lines "As per annexure" (D-338, 1a)**: the buyer's reorder form
+  (client portal) and the staff review form (`/reorder-requests/{id}`) have an
+  **As per annexure** tick box next to "Quantity not decided yet" / "Qty To Be
+  Confirmed" — never both (browser: `app.js` `initAnnexureLine`, one handler
+  per line via `data-annexure-scope`; server: `AnnexureChoice::reorderLineError()`
+  / `reorderLineError()`, "Line N: tick either "…" or "As per annexure", not
+  both." / "Line N: a line "As per annexure" still needs its quantity — enter
+  the Qty."); the quantity stays required and the Dimensions are cleared.
+  Stored in `order_reorder_request_products.as_per_annexure` (pre-filled from
+  the earlier order's line) and carried onto `order_products.as_per_annexure`
+  when the request is approved.
+- **A duplicate keeps Annexure A (D-338, 1b)**: Duplicate Order (and approving
+  a reorder request, which duplicates) copies Annexure A — its product entries
+  with the same image files (as "Copy everything from Annexure A" does), the
+  Additional Terms, "include Annexure A" and the content mode
+  (`AnnexureChoice::copyAnnexureAToOrder()` / `copyAnnexureAToOrder()`, audit
+  `ANNEXURE_A_COPIED`). Annexure B and `ci_annexure` are not copied. The
+  shared image files keep their original `file_store` row (and its order).
 - **Archive** (`POST /orders/{id}/archive`, `manage_orders`): sets
   `is_archived = 1`, `ORDER_ARCHIVED` audit row. Visibility only — nothing is
   deleted. Archived orders are listed at `/orders/archived`
@@ -2484,7 +2502,9 @@ the same filters, counts, fields, actions and money rules on both templates
 
 - **Purpose.** Work out a safe selling price per unit (FOB, USD) from the
   supplier price, and stop anyone selling below it.
-- **Screens.** Products › Pricing › Pricing settings (`/pricing/settings`; MD edits, MD/ED view),
+- **Screens.** Products › Pricing › Pricing settings (`/pricing/settings`; MD edits, MD/ED view; section headings
+  and legends in Title Case — Exchange Rate, Margin and Costs, Team Incentive Reserve, Supplier Prices, Order
+  Lines, Specifications and Associate Prices, Who Can Do What — D-338),
   product page build-up, Procurement › Market prices
   (`/products/{id}/market-prices`), order Products card **Price check**,
   `/orders/{id}/products/{productId}/price-approval` (MD), Associates →
@@ -3533,6 +3553,12 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
   maximum t; off clears them). Default factory / transportation / CHA cost are no longer on the form (the
   columns stay, kept as they are). Migration 2026-11-12b turned every "add up the cost parts" row
   (`fob_source` 'computed') into a typed price (`direct`) with the same total.
+- **Product page › Suppliers (D-338, 2a):** a new supplier price is always one typed price (FOB Value (₹),
+  `fob_source` 'direct'); "add up the cost parts" (FOB Source "Computed") is no longer offered and the
+  server refuses it for a new price (`ProductController::COST_PARTS_REFUSAL` / `productsController.js`,
+  same wording). A row still saved as Computed stays readable ("Computed (adds up the cost parts)") and
+  keeps working; its Edit form keeps the cost parts and offers "Direct — change to one typed price". A
+  typed row's Edit form has no cost-part fields and keeps whatever is stored (nothing is cleared).
 
 **Exchange rate (D-301).** `FxRateService` / `fxRateService.js`; settings `fx_mode` ('auto' | 'manual'),
 `fx_cushion_pct` (0–5, one decimal), `pricing_fx_rate` (manual, and the fallback until a rate is fetched).
@@ -3584,7 +3610,10 @@ redirects to the Options tab; the specification actions redirect there too. A pr
 | Below floor | minimum ≤ price < floor | The line can be saved. It is sent to the MD (in-app notification, "Ask MD to approve line N"). QT and PI are blocked until approved. |
 | Below minimum | price < minimum | **Save refused** (`saveRefusal`). Nobody may approve it. To sell lower, the MD changes the product's margin (logged). |
 | No price | product has no build-up | Needs MD approval before QT/PI. |
+| CBM price worked out (`cbm_calculated`, D-338) | price ≥ floor, but the line is priced per CBM (50 mm and above) from a supplier row whose 50 mm+ price is only CALCULATED from a thinner base (no typed per-CBM price) | Sent to the MD exactly like a line below the floor ("Ask MD to approve line N", notification, Approvals › Prices "Price — CBM worked out", approval page "Reason: CBM price worked out from the supplier's 20 mm price — no 50 mm+ price quoted" — the base and 50 mm figures follow the row and the rules). QT and PI wait for it. A typed CBM price needs no approval. Worked out from the build-up (`ThicknessPrices::cost()` returns `how`, `calc_from_mm`, `cbm_from`; `liveFigures()` adds `cbm_calculated`); no new column. |
 | Approved | MD approved this exact price and options | Passes. |
+
+**A line "As per annexure" that needs its size (D-338, 1c).** When a line ticked "As per annexure" is priced in a unit that needs the piece size to be compared (e.g. a per-m² product on a CBM line), the refusal is exactly *Line N says "As per annexure", so its size is not known — type the price per CBM for this line.* (the unit word follows the line's unit: "per m²", "per piece" …; `OrderLinePricing::annexureSizeMessage()` / `annexureSizeMessage()`). The same text when the line is saved (`saveRefusal(…, $annexureLineNo)`; shown without the "Product line:" prefix), on the Quotation / PI gate (`documentBlockReason()`), in the price check and on the MD's approval page.
 
 Comparisons allow 0.0001 for floating noise.
 
@@ -4077,6 +4106,8 @@ Owner decision D-336 (12 Nov 2026, owner confirmed twice). Code: `AnnexureChoice
 **Safety check (generation refused with a message).** QT / Buyer PO / PI / OC while a line is ticked and Annexure A is not included or has no product entry: *Line N says "As per annexure" but Annexure A has no product yet — add it in Annexure A (order page › Annexure A), then generate again.* CI / PL with the chosen annexure empty: *Line N says "As per annexure" but Annexure B (as shipped) has no product yet — add it, or choose Annexure A, then generate again.* (A: "… Annexure A (as quoted) … or choose Annexure B …"); with "No annexure": *… "No annexure" is chosen for the Commercial Invoice and Packing List — choose Annexure B (as shipped) or Annexure A (as quoted), then generate again.*
 
 Migration `2026-11-12c-annexure-b-as-per-annexure.sql`. Tests: `AnnexureBAndAsPerAnnexureTest` / `annexureBAsPerAnnexure.test.js`.
+
+**Follow-ups (D-338, 12 Nov 2026).** Reorder request lines can say "As per annexure" too, and a duplicated (or reordered) order keeps a copy of Annexure A (not B) — see §5 (Order edit and duplication). A line "As per annexure" whose price needs the piece size gets one refusal wording everywhere — see §7 (Line statuses). Migration `2026-11-12e-follow-ups-d338.sql` (`order_reorder_request_products.as_per_annexure`). Tests: `FollowUpsD338Test` / `followUpsD338.test.js`.
 
 ---
 

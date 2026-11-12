@@ -24,6 +24,9 @@
     <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept</span>
   {% elif lc.status == 'no_price' %}
     <span class="price-badge price-badge-bad">No price set — needs MD approval</span>{% if lc.note and lconv and lconv.unconvertible %} <span class="muted">{{ lc.note }}</span>{% endif %}
+  {% elif lc.status == 'cbm_calculated' %}
+    {# Owner decision D-338 (2b). #}
+    <span class="price-badge price-badge-bad">CBM price worked out — needs MD approval{{ ' — sent to the MD' if lc.requested else '' }}</span> <span class="muted">{{ lc.cbm_reason }}</span>
   {% elif lc.status == 'needs_size' %}
     <span class="price-badge price-badge-size">Size needed</span> <span class="muted">{{ lc.note }}</span>
   {% elif lc.status == 'approved' %}

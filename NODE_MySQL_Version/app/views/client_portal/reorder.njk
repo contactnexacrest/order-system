@@ -15,9 +15,9 @@
       <div id="product-rows">
         {% if products and products.length > 0 %}
           {% for p in products %}
-          <div class="product-row">
+          <div class="product-row" data-annexure-scope>
             <label>Description *<input type="text" name="product_description[{{ loop.index0 }}]" required value="{{ p.description }}" placeholder="e.g. Granite Memorial Headstone"></label>
-            <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ p.dimensions or '' }}" placeholder="e.g. 24x12x3 inches"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[{{ loop.index0 }}]" value="{{ '' if p.as_per_annexure else (p.dimensions or '') }}" placeholder="e.g. 24x12x3 inches" data-annexure-size></label>
             <label>Finish
               <select name="product_finish[{{ loop.index0 }}]">
                 <option value="">—</option>
@@ -26,8 +26,10 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Quantity<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
-            <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Quantity not decided yet</label>
+            <label>Quantity<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100" data-annexure-qty></label>
+            <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" data-annexure-tbc {{ 'checked' if p.quantity_is_tbc }}> Quantity not decided yet</label>
+            {# Owner decision D-338 (1a): the sizes are in the annexure of the earlier order — never with "Quantity not decided yet". #}
+            <label><input type="checkbox" name="product_as_per_annexure[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" data-annexure-line {{ 'checked' if p.as_per_annexure }}> As per annexure</label>
             <label>Unit
               {# Buyer-portal fixes (7 Nov 2026): p.unitPick / p.unitUnknown come from the controller (unit matched whatever its case or spacing; an unknown unit asks the buyer to pick). #}
               <select name="product_unit[{{ loop.index0 }}]"{% if p.unitUnknown %} required{% endif %}>
@@ -41,9 +43,9 @@
           </div>
           {% endfor %}
         {% else %}
-          <div class="product-row">
+          <div class="product-row" data-annexure-scope>
             <label>Description *<input type="text" name="product_description[0]" required placeholder="e.g. Granite Memorial Headstone"></label>
-            <label>Dimensions<input type="text" name="product_dimensions[0]" placeholder="e.g. 24x12x3 inches"></label>
+            <label>Dimensions<input type="text" name="product_dimensions[0]" placeholder="e.g. 24x12x3 inches" data-annexure-size></label>
             <label>Finish
               <select name="product_finish[0]">
                 <option value="">—</option>
@@ -52,8 +54,10 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Quantity<input type="text" name="product_quantity[0]" placeholder="e.g. 100"></label>
-            <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;"> Quantity not decided yet</label>
+            <label>Quantity<input type="text" name="product_quantity[0]" placeholder="e.g. 100" data-annexure-qty></label>
+            <label><input type="checkbox" name="product_quantity_tbc[0]" value="1" style="display:inline-block;width:auto;" data-annexure-tbc> Quantity not decided yet</label>
+            {# Owner decision D-338 (1a). #}
+            <label><input type="checkbox" name="product_as_per_annexure[0]" value="1" style="display:inline-block;width:auto;" data-annexure-line> As per annexure</label>
             <label>Unit
               <select name="product_unit[0]">
                 {% for o in units %}
@@ -101,6 +105,10 @@
     });
     nextIndex++;
     rows.appendChild(clone);
+    // D-338: the new row starts with "As per annexure" off (app.js frees its Dimensions again).
+    clone.querySelectorAll('input[type=checkbox][data-annexure-line]').forEach(function (el) {
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
   });
 })();
 </script>

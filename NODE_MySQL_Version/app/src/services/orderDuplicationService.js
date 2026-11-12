@@ -35,7 +35,7 @@ const { todayIst } = require('../helpers/dbDateTime');
  *
  * @param {number} sourceOrderId
  * @param {number} createdBy
- * @param {Array<{description:string, dimensions:?string, finish:?string, quantity:?string, quantity_is_tbc:boolean, unit:?string, unit_price:?string, hs_code:string}>|null} productLines
+ * @param {Array<{description:string, dimensions:?string, finish:?string, quantity:?string, quantity_is_tbc:boolean, unit:?string, unit_price:?string, hs_code:string, as_per_annexure?:boolean}>|null} productLines
  *   When null, copies the source order's own current active product lines.
  * @returns {Promise<number>} the new order's id
  */
@@ -118,7 +118,7 @@ async function duplicateInDivision(source, sourceOrderId, createdBy, productLine
   } else {
     let lineNo = 1;
     for (const line of productLines) {
-      await orderProductRepository.add(
+      const newLineId = await orderProductRepository.add(
         newOrderId,
         lineNo++,
         line.description,
@@ -130,10 +130,22 @@ async function duplicateInDivision(source, sourceOrderId, createdBy, productLine
         line.unit_price,
         line.hs_code
       );
+      // D-338 (1a): a reorder line "As per annexure" stays so on the new order.
+      if (line.as_per_annexure) {
+        await orderProductRepository.setAsPerAnnexure(newLineId, true);
+      }
     }
   }
 
   await auditLogRepository.log(createdBy, 'ORDER_DUPLICATED', 'orders', newOrderId, 'source_order_id', null, String(sourceOrderId));
+
+  // D-338 (1b): Annexure A comes along (products with the same image files, terms,
+  // included, mode); Annexure B and the Commercial Invoice's annexure choice do not.
+  const annexureCopied = await require('./annexureChoice').copyAnnexureAToOrder(sourceOrderId, newOrderId, createdBy);
+  if (annexureCopied > 0) {
+    await auditLogRepository.log(createdBy, 'ANNEXURE_A_COPIED', 'orders', newOrderId, 'source_order_id', null, String(sourceOrderId),
+      `Annexure A copied from the duplicated order (${annexureCopied} product ${annexureCopied === 1 ? 'entry' : 'entries'}).`);
+  }
 
   await carrySupplierPoForward(sourceOrderId, newOrderId, createdBy);
 

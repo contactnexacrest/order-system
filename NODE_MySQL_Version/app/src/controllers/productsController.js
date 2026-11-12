@@ -592,7 +592,7 @@ async function addSupplier(req, res) {
 
   const data = readSupplierForm(req);
   data.product_id = productId;
-  const error = validateSupplier(data);
+  const error = validateSupplier(data, null);
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(`/products/${productId}`);
@@ -619,9 +619,9 @@ async function updateSupplier(req, res) {
   }
   const productId = existing.product_id;
 
-  const data = readSupplierForm(req);
+  const data = readSupplierForm(req, existing);
   data.product_id = productId;
-  const error = validateSupplier(data);
+  const error = validateSupplier(data, existing);
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(`/products/${productId}`);
@@ -761,11 +761,20 @@ function validateProduct(data) {
   return null;
 }
 
-function readSupplierForm(req) {
-  let fobSource = String(req.body.fob_source || 'direct');
+/**
+ * Owner decision D-338 (2a): a new supplier price is always one typed price ("direct");
+ * "add up the cost parts" ("computed") is kept only for a price already saved that way.
+ * The cost parts are read only when the form sends them — a form without them (a typed
+ * price) keeps what the row holds, so nothing is lost.
+ */
+function readSupplierForm(req, existing = null) {
+  let fobSource = String(req.body.fob_source || (existing && existing.fob_source) || 'direct');
   if (!['direct', 'computed'].includes(fobSource)) {
     fobSource = 'direct';
   }
+  const part = (k) => (Object.prototype.hasOwnProperty.call(req.body, k)
+    ? nullableDecimal(req.body[k])
+    : (existing && existing[k] !== null && existing[k] !== undefined ? Number(existing[k]) : null));
   return {
     supplier_name: String(req.body.supplier_name || '').trim(),
     location: nullableString(req.body.location),
@@ -774,19 +783,26 @@ function readSupplierForm(req) {
     contact_email: nullableString(req.body.contact_email),
     fob_source: fobSource,
     fob_value: nullableDecimal(req.body.fob_value),
-    factory_cost: nullableDecimal(req.body.factory_cost),
-    transportation_cost: nullableDecimal(req.body.transportation_cost),
-    packing_cost: nullableDecimal(req.body.packing_cost),
-    loading_cost: nullableDecimal(req.body.loading_cost),
-    cha_cost: nullableDecimal(req.body.cha_cost),
+    factory_cost: part('factory_cost'),
+    transportation_cost: part('transportation_cost'),
+    packing_cost: part('packing_cost'),
+    loading_cost: part('loading_cost'),
+    cha_cost: part('cha_cost'),
     is_primary: req.body.is_primary !== undefined ? 1 : 0,
     notes: nullableString(req.body.notes),
   };
 }
 
-function validateSupplier(data) {
+/** D-338 (2a): the refusal for a new "add up the cost parts" price (the same wording on both stacks). */
+const COST_PARTS_REFUSAL = 'Adding up the cost parts is no longer offered for a new price — type the supplier\'s price in FOB Value (₹). Prices saved that way earlier keep working.';
+
+function validateSupplier(data, existing) {
   if (data.supplier_name === '') {
     return 'Supplier name is required.';
+  }
+  // D-338 (2a): only a price already saved as "add up the cost parts" may stay so.
+  if (data.fob_source === 'computed' && (!existing || (existing.fob_source || 'direct') !== 'computed')) {
+    return COST_PARTS_REFUSAL;
   }
   return null;
 }
@@ -806,6 +822,8 @@ function isNumeric(value) {
 }
 
 module.exports = {
+  COST_PARTS_REFUSAL,
+  readSupplierForm, validateSupplier, // D-338 (exported for its test)
   index,
   create,
   store,

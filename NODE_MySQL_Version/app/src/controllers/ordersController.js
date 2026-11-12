@@ -973,7 +973,7 @@ async function linePricingViewData(req, orderId) {
       check.approval.approver_name = approver ? approver.name : '—';
     }
   }
-  const pcLines = Object.values(linePricing.lines).filter((c) => ['below', 'below_minimum', 'no_price', 'needs_size', 'approved'].includes(c.status));
+  const pcLines = Object.values(linePricing.lines).filter((c) => ['below', 'below_minimum', 'no_price', 'needs_size', 'cbm_calculated', 'approved'].includes(c.status));
   // Owner decisions of 11 Nov 2026 — D-271 (point 13): each line's options as labels and the line it
   // was copied from; D-273 (point 17): the summary bar and the totals row with CBM and containers.
   const olp = require('../services/orderLinePricing');
@@ -1052,10 +1052,25 @@ async function approveLinePrice(req, res) {
   res.redirect(`/orders/${orderId}#price-check`);
 }
 
+/**
+ * The refusal shown when a line cannot be saved: "Product line: …", except the D-338 (1c)
+ * "Line N says "As per annexure" …" wording, which already names the line and is shown
+ * exactly as it is (the same text as on the Quotation / PI gate).
+ */
+function lineRefusalText(refusal) {
+  return /^Line \d+ says "As per annexure"/.test(refusal) ? refusal : `Product line: ${refusal}`;
+}
+
 // The flash after saving a line, saying when it now waits for the MD.
 async function lineSavedMessage(lineId, saved) {
   const line = await orderProductRepository.find(lineId);
   if (!line || !line.price_approval_requested_at) return saved;
+  const olp = require('../services/orderLinePricing');
+  const check = await olp.checkLine(line, await olp.context((await orderRepository.find(Number(line.order_id))) || {}));
+  if (check.status === olp.CBM_CALCULATED) {
+    // D-338 (2b): the price is fine, but its CBM price was only worked out from a thinner base.
+    return `${saved} Line ${Number(line.line_no)} needs MD approval: ${check.cbm_reason} — it was sent to the MD for approval; the Quotation and Proforma Invoice wait for it.`;
+  }
   return `${saved} Line ${Number(line.line_no)} is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.`;
 }
 
@@ -1177,9 +1192,11 @@ async function addProduct(req, res) {
     : [null, null];
   const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
     ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
-      specSel, str(body.unit) || null, priceRequest, lineSize));
+      specSel, str(body.unit) || null, priceRequest, lineSize,
+      // D-338 (1c): a line "As per annexure" has no size — its own wording.
+      perAnnexure ? await orderProductRepository.nextLineNo(orderId) : null));
   if (refusal !== null) {
-    flash.set(req, 'error', `Product line: ${refusal}`);
+    flash.set(req, 'error', lineRefusalText(refusal));
     res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
@@ -1287,9 +1304,11 @@ async function updateProduct(req, res) {
     const orderLinePricing = require('../services/orderLinePricing');
     const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
       ?? (priceUnchanged && specUnchanged && sizeUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
-        specSel, str(body.unit) || null, null, lineSize));
+        specSel, str(body.unit) || null, null, lineSize,
+        // D-338 (1c): a line "As per annexure" has no size — its own wording.
+        perAnnexure ? Number(product.line_no) : null));
     if (refusal !== null) {
-      flash.set(req, 'error', `Product line: ${refusal}`);
+      flash.set(req, 'error', lineRefusalText(refusal));
       res.redirect(`/orders/${orderId}#step-products`);
       return;
     }
@@ -5362,6 +5381,7 @@ async function completeCancellationRefund(req, res) {
 module.exports = {
   markOcSentToBuyer,
   annexureLineInput, // D-336 (exported for its test)
+  lineRefusalText, // D-338 (exported for its test)
   recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, requestLinePriceApproval, linePriceApproval, approveLinePrice,

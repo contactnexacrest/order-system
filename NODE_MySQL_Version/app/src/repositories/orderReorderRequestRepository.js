@@ -16,16 +16,18 @@ async function create(clientId, sourceOrderId, notes) {
   return result.insertId;
 }
 
-async function addProductLine(requestId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode) {
+async function addProductLine(requestId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode, asPerAnnexure = false) {
   await db.execute(
     `INSERT INTO order_reorder_request_products
-        (reorder_request_id, line_no, description, dimensions, finish, quantity, quantity_is_tbc, unit, unit_price, hs_code)
+        (reorder_request_id, line_no, description, dimensions, finish, quantity, quantity_is_tbc, unit, unit_price, hs_code, as_per_annexure)
      VALUES
-        (:reorder_request_id, :line_no, :description, :dimensions, :finish, :quantity, :quantity_is_tbc, :unit, :unit_price, :hs_code)`,
+        (:reorder_request_id, :line_no, :description, :dimensions, :finish, :quantity, :quantity_is_tbc, :unit, :unit_price, :hs_code, :as_per_annexure)`,
     {
       reorder_request_id: requestId, line_no: lineNo, description, dimensions, finish,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
       unit_price: unitPrice || null, hs_code: hsCode || null,
+      // D-338 (1a): the line's size is given in the annexure (no Dimensions).
+      as_per_annexure: asPerAnnexure ? 1 : 0,
     }
   );
 }

@@ -7,11 +7,14 @@
 <div class="container">
   <p><a href="/orders/{{ order.id }}#price-check" data-focus-link>&larr; Back to order {{ ref }}</a></p>
   <div class="section">
-    <h1>Approve a price below the floor</h1>
+    <h1>{{ 'Approve a price from a worked-out CBM price' if check.status == 'cbm_calculated' else 'Approve a price below the floor' }}</h1>
     <p class="muted">Order {{ ref }} · line {{ line.line_no }} · sold by {{ ctx.label }}</p>
     <table class="list">
       <tr><td>Product line</td><td>{{ line.description }}{% if qtyText %} × {{ qtyText }} {{ line.unit or '' }}{% endif %}</td></tr>
       <tr><td>Asked price</td><td><strong>USD {{ line.unit_price | money }}</strong></td></tr>
+      {% if check.cbm_reason %}{# Owner decision D-338 (2b) #}
+        <tr><td>Reason</td><td><strong>{{ check.cbm_reason }}</strong></td></tr>
+      {% endif %}
       {% if f %}
         <tr><td>Lowest price for this order (floor)</td><td>USD {{ f.floor | money }}{% if effect.short_per_unit > 0 %} <span class="muted">(short by USD {{ effect.short_per_unit | money }} per unit)</span>{% endif %}</td></tr>
         <tr><td>Staff floor</td><td>USD {{ f.staff_floor | money }}</td></tr>
@@ -34,13 +37,15 @@
 
     {% if check.status == 'below_minimum' %}
       <p class="notice notice-error">⛔ USD {{ line.unit_price | money }} is below the minimum price of USD {{ f.minimum | money }}. Nobody can approve it, not even the MD. To sell lower, change the product's margin (Products → pricing) — that change is logged.</p>
-    {% elif check.status == 'below' or check.status == 'no_price' %}
+    {% elif check.status == 'below' or check.status == 'no_price' or check.status == 'cbm_calculated' %}
       <form method="post" action="/orders/{{ order.id }}/products/{{ line.id }}/price-approval">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Reason *<textarea name="reason" rows="2" required minlength="10" maxlength="500" placeholder="e.g. Second container for a repeat buyer; matched a competitor offer"></textarea></label>
         <p class="notice notice-warning">
           {% if check.status == 'no_price' %}
             This product has no price set, so there is no floor to check against. Approving lets the line go on the Proforma Invoice at USD {{ line.unit_price | money }}.
+          {% elif check.status == 'cbm_calculated' %}
+            The price is at or above the floor, but the supplier quoted no {{ f.cbm_from_mm or 50 }} mm+ price — the per-CBM price was worked out from a thinner one. Approving lets the line go on the Quotation and Proforma Invoice at USD {{ line.unit_price | money }}.
           {% else %}
             The USD {{ effect.short_per_unit | money }} per unit below the floor comes out of the team incentive first{% if effect.commission_zero %}; the associate's commission on this line becomes 0{% endif %}.
           {% endif %}

@@ -15,21 +15,23 @@
       <div class="section">
         <h2>Product Lines <small class="muted">(confirm HS code and unit price for each before approving)</small></h2>
         {% for l in lines %}
-          <div class="card-nested">
+          <div class="card-nested" data-annexure-scope>
             <div class="field-grid">
               <label class="full">Description *
                 <input type="text" name="description[{{ loop.index0 }}]" required value="{{ l.description }}" placeholder="e.g. Granite Memorial Headstone">
               </label>
               <label>Dimensions
-                <input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}" placeholder="e.g. 24x12x3 inches">
+                <input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}" placeholder="e.g. 24x12x3 inches" data-annexure-size>
               </label>
               <label>Finish
                 <input type="text" name="finish[{{ loop.index0 }}]" value="{{ l.finish or '' }}" placeholder="e.g. Polished">
               </label>
               <label>Qty
-                <input type="text" name="quantity[{{ loop.index0 }}]" value="{{ l.quantity or '' }}" placeholder="e.g. 100">
+                <input type="text" name="quantity[{{ loop.index0 }}]" value="{{ l.quantity or '' }}" placeholder="e.g. 100" data-annexure-qty>
               </label>
-              <label><input type="checkbox" name="quantity_is_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if l.quantity_is_tbc }}> Qty To Be Confirmed</label>
+              <label><input type="checkbox" name="quantity_is_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" data-annexure-tbc {{ 'checked' if l.quantity_is_tbc }}> Qty To Be Confirmed</label>
+              {# Owner decision D-338 (1a): the size is given in the annexure — never with "Qty To Be Confirmed". #}
+              <label><input type="checkbox" name="as_per_annexure[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" data-annexure-line {{ 'checked' if l.as_per_annexure }}> As per annexure</label>
               <label>Unit
                 <select name="unit[{{ loop.index0 }}]">
                   {% for o in units %}

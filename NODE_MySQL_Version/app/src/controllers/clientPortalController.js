@@ -458,6 +458,22 @@ async function submitReorder(req, res) {
     return;
   }
 
+  // D-338 (1a): "As per annexure" — never with "Quantity not decided yet", and the quantity stays required.
+  {
+    let lineCheck = 0;
+    for (const i of Object.keys(body.product_description || {})) {
+      if (String(body.product_description[i] || '').trim() === '') continue;
+      lineCheck++;
+      const annexureError = require('../services/annexureChoice').reorderLineError(lineCheck, !!(body.product_as_per_annexure || {})[i],
+        !!(body.product_quantity_tbc || {})[i], String((body.product_quantity || {})[i] || ''), 'Quantity not decided yet');
+      if (annexureError !== null) {
+        flash.set(req, 'error', annexureError);
+        res.redirect(`/client/orders/${orderId}/reorder`);
+        return;
+      }
+    }
+  }
+
   const notes = String(body.notes || '').trim() || null;
   const requestId = await orderReorderRequestRepository.create(clientId, orderId, notes);
 
@@ -465,17 +481,19 @@ async function submitReorder(req, res) {
   for (const i of Object.keys(body.product_description || {})) {
     const description = String(body.product_description[i] || '').trim();
     if (description === '') continue;
+    const perAnnexure = !!(body.product_as_per_annexure || {})[i];
     await orderReorderRequestRepository.addProductLine(
       requestId,
       lineNo++,
       description,
-      String((body.product_dimensions || {})[i] || '').trim() || null,
+      perAnnexure ? null : (String((body.product_dimensions || {})[i] || '').trim() || null),
       String((body.product_finish || {})[i] || '').trim() || null,
       String((body.product_quantity || {})[i] || '').trim() || null,
       !!(body.product_quantity_tbc || {})[i],
       String((body.product_unit || {})[i] || '').trim() || null,
       null, // pricing is never client-set — staff fills it in when reviewing
-      null  // HS code likewise — staff confirms/assigns from the master list on review
+      null, // HS code likewise — staff confirms/assigns from the master list on review
+      perAnnexure
     );
   }
 

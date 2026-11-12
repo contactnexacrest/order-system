@@ -212,7 +212,13 @@ function cost(r, typed, row, product, basis, mm) {
     const v = done.values[CBM];
     if (!v) return null;
     const chaU = cha.per_cbm ?? 0;
-    if (basis === 'cbm') return { supplier: v.price, cha: chaU, packing, total: v.price + chaU + packing, unit: 'CBM', mm, how: v.how, note: null };
+    // D-338 (2b): a CALCULATED per-CBM price — from which thinner price it was worked out
+    // (the stored calc_from_mm, else the row's base) — needs the MD's approval on an order line.
+    if (basis === 'cbm') {
+      return { supplier: v.price, cha: chaU, packing, total: v.price + chaU + packing, unit: 'CBM', mm, how: v.how, note: null,
+        calc_from_mm: v.how === 'calculated' ? Number(v.calc_from_mm ?? baseOf(row, r)) : null,
+        cbm_from: Number(r.cbm_from) };
+    }
     // The base is the per-CBM price ("50 mm and above"): in the product's unit.
     const unit = r.unit !== '' ? r.unit : 'CBM';
     const per = cbmPerUnit(unit, Number(r.cbm_from), r.t_per_cbm);

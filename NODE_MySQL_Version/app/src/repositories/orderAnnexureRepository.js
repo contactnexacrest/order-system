@@ -151,11 +151,42 @@ async function replaceWithCopy(orderId, from = 'A', to = 'B') {
   return copied;
 }
 
+/**
+ * Owner decision D-338 (1b): copies one annexure's product entries of an order onto
+ * another order (the same annexure), images pointing at the same stored files —
+ * exactly as replaceWithCopy() does between A and B. The target's entries of that
+ * annexure are replaced. Returns the number of entries copied.
+ */
+async function copyToOrder(sourceOrderId, targetOrderId, whichAnnexure = 'A') {
+  const w = which(whichAnnexure);
+  for (const old of await forOrder(targetOrderId, w)) {
+    await deleteProduct(old.id);
+  }
+  let copied = 0;
+  for (const p of await forOrder(sourceOrderId, w)) {
+    const result = await db.execute(
+      `INSERT INTO order_annexure_products
+          (order_id, \`which\`, product_id, product_code, name, description, dimensions, finish, components, technical_notes, sort_order)
+       VALUES (:o, :w, :pid, :pc, :n, :d, :dim, :f, :c, :t, :s)`,
+      {
+        o: targetOrderId, w, pid: p.product_id ?? null, pc: p.product_code ?? null,
+        n: p.name, d: p.description, dim: p.dimensions, f: p.finish, c: p.components, t: p.technical_notes, s: Number(p.sort_order) || 0,
+      }
+    );
+    for (const img of p.images) {
+      await db.execute('INSERT INTO order_annexure_images (order_annexure_product_id, file_id, sort_order) VALUES (:p, :f, :s)',
+        { p: result.insertId, f: img.file_id, s: Number(img.sort_order) || 0 });
+    }
+    copied++;
+  }
+  return copied;
+}
+
 /** @param {Array<number>} ids — always our own already-int-cast primary keys, never raw user input */
 function inQuery(template, ids) {
   return template.replace('%s', ids.join(','));
 }
 
 module.exports = {
-  which, countFor, replaceWithCopy, forOrder, findProduct, createProduct, updateProduct, deleteProduct, addImage, findImage, removeImage,
+  which, countFor, replaceWithCopy, copyToOrder, forOrder, findProduct, createProduct, updateProduct, deleteProduct, addImage, findImage, removeImage,
 };

@@ -131,6 +131,40 @@ async function blockReason(orderId, documentTypeCode, ciChoiceOverride = null) {
 }
 
 /**
+ * Owner decision D-338 (1a): a reorder request line's "As per annexure" tick box —
+ * never together with the quantity-not-decided tick box (tbcLabel names it as the
+ * form shows it), and the quantity stays required. Null when the line is fine.
+ */
+function reorderLineError(lineNo, perAnnexure, quantityIsTbc, quantity, tbcLabel) {
+  if (!perAnnexure) return null;
+  if (quantityIsTbc) return `Line ${lineNo}: tick either "${tbcLabel}" or "As per annexure", not both.`;
+  if (String(quantity == null ? '' : quantity).trim() === '') return `Line ${lineNo}: a line "As per annexure" still needs its quantity — enter the Qty.`;
+  return null;
+}
+
+/**
+ * Owner decision D-338 (1b): a duplicated (or reordered) order gets a copy of the
+ * source order's Annexure A — its product entries (pointing at the same image
+ * files, exactly like "Copy everything from Annexure A"), its Additional Terms,
+ * whether it is included and its content mode. Annexure B and the choice for the
+ * Commercial Invoice are NOT copied (they describe what was shipped on the source
+ * order). Returns the number of product entries copied.
+ */
+async function copyAnnexureAToOrder(sourceOrderId, newOrderId, userId) {
+  const orderRepository = require('../repositories/orderRepository');
+  const source = await orderRepository.find(sourceOrderId);
+  if (!source) return 0;
+  const count = await orderAnnexureRepository.copyToOrder(sourceOrderId, newOrderId, 'A');
+  const termsA = await orderAnnexureTermsRepository.find(sourceOrderId, 'A');
+  if (termsA && String(termsA.content_html || '').trim() !== '') {
+    await orderAnnexureTermsRepository.upsert(newOrderId, String(termsA.content_html), userId, 'A');
+  }
+  await orderRepository.setAnnexureMode(newOrderId, mode(source, 'A'));
+  await orderRepository.setIncludeAnnexureA(newOrderId, included(source, 'A'));
+  return count;
+}
+
+/**
  * "Copy everything from Annexure A": Annexure B becomes a copy of A — product
  * entries (same image files), Additional Terms and content mode. Returns the
  * number of product entries copied.
@@ -184,4 +218,5 @@ module.exports = {
   QUOTED_DOCUMENTS, SHIPPED_DOCUMENTS, CHOICES,
   mode, included, termsHtml, hasContent, ciDefault, ciChoice, forDocument, letterFor,
   quantityText, dimensionsText, annexureLineNumbers, blockReason, copyAToB, lastSaved, ciStep,
+  reorderLineError, copyAnnexureAToOrder,
 };

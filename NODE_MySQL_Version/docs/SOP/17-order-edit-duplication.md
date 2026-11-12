@@ -152,6 +152,12 @@ long since closed. It creates a brand-new order carrying over:
 - The same client, Incoterm, currency, ports, COO type, container type,
   special requirements, and every estimated weight/volume/freight field.
 - Every active product line, copied as-is.
+- **Annexure A** (since 12 Nov 2026, D-338): its product entries with the
+  same pictures, its Additional Terms, whether it is included and its
+  content (Product Specification / Additional Terms / Both). **Annexure B
+  (as shipped) is not copied**, and neither is the choice of annexure for
+  the Commercial Invoice — they describe what was shipped on the earlier
+  order.
 
 It deliberately does **not** copy anything specific to the original
 order's own history: no dates, no generated documents, no payment status,
@@ -184,8 +190,22 @@ now editable one more time: this is where HS code and unit price get set
 list, same rule as everywhere else an order gets one). **Approve & Create
 Order** runs the same duplication logic as staff-side Duplicate Order
 above, seeded from these lines rather than the order's own current ones,
-producing a real new order. **Reject** requires a reason, and the client
-can always submit a fresh reorder request afterward.
+producing a real new order (Annexure A comes along as described above).
+**Reject** requires a reason, and the client can always submit a fresh
+reorder request afterward.
+
+**"As per annexure" on a reorder line (D-338).** Each line on the buyer's
+reorder form and on the staff review screen has an **As per annexure** tick
+box next to "Quantity not decided yet" (buyer) / **Qty To Be Confirmed**
+(staff). It means the line's sizes are given in the annexure. Only one of
+the two boxes can be ticked — ticking one clears the other, and the server
+refuses both: "Line 2: tick either "Qty To Be Confirmed" or "As per
+annexure", not both." While it is ticked the **Dimensions** box shows "As
+per annexure" and takes nothing, and the quantity is required ("Line 2: a
+line "As per annexure" still needs its quantity — enter the Qty."). A line
+that was "As per annexure" on the earlier order starts ticked. When the
+request is approved the new order's line keeps the tick, so its documents
+print "Dimensions: As per Annexure A".
 
 ## Buyer details after the client is corrected (D-337)
 

@@ -103,7 +103,7 @@
             {% if s.contact_phone %}<br><small class="muted">{{ s.contact_phone }}</small>{% endif %}
             {% if s.contact_email %}<br><small class="muted">{{ s.contact_email }}</small>{% endif %}
           </td>
-          <td>{{ s.fob_source | capitalize }}</td>
+          <td>{% if s.fob_source == 'computed' %}Computed <small class="muted">(adds up the cost parts)</small>{% else %}{{ s.fob_source | capitalize }}{% endif %}</td>
           <td>{{ 'To Be Confirmed' if s.effective_fob == null else (s.effective_fob | money) }}</td>
           <td>{{ '&#9733;' | safe if s.is_primary else '' }}</td>
           <td>
@@ -124,10 +124,12 @@
                     <label>Contact Person<input type="text" name="contact_person" value="{{ s.contact_person or '' }}" placeholder="e.g., Sales Manager"></label>
                     <label>Contact Phone<input type="text" name="contact_phone" value="{{ s.contact_phone or '' }}" placeholder="e.g. +91-0000000000"></label>
                     <label>Contact Email<input type="text" name="contact_email" value="{{ s.contact_email or '' }}" placeholder="e.g. name@company.com"></label>
+                    {# Owner decision D-338 (2a): "add up the cost parts" (Computed) only for a price already saved that way — it can be turned into one typed price. #}
+                    {% if s.fob_source == 'computed' %}
                     <label>FOB Source
                       <select name="fob_source">
-                        <option value="direct" {{ 'selected' if s.fob_source == 'direct' }}>Direct</option>
-                        <option value="computed" {{ 'selected' if s.fob_source == 'computed' }}>Computed</option>
+                        <option value="computed" selected>Computed — adds up the cost parts (older price)</option>
+                        <option value="direct">Direct — change to one typed price (FOB Value)</option>
                       </select>
                     </label>
                     <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" value="{{ s.fob_value if s.fob_value != null else '' }}" placeholder="e.g. 4500.00"></label>
@@ -136,6 +138,10 @@
                     <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" value="{{ s.packing_cost if s.packing_cost != null else '' }}" placeholder="e.g. 12000"></label>
                     <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" value="{{ s.loading_cost if s.loading_cost != null else '' }}" placeholder="e.g. 8000"></label>
                     <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" value="{{ s.cha_cost if s.cha_cost != null else '' }}" placeholder="e.g. 15000"></label>
+                    {% else %}
+                    <input type="hidden" name="fob_source" value="direct">
+                    <label>FOB Value (₹)<input type="number" step="0.01" min="0" name="fob_value" value="{{ s.fob_value if s.fob_value != null else '' }}" placeholder="e.g. 4500.00"></label>
+                    {% endif %}
                     <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes">{{ s.notes or '' }}</textarea></label>
                     <label><input type="checkbox" name="is_primary" value="1" {{ 'checked' if s.is_primary }}> Used for pricing</label>
                     <button type="submit" class="btn-sm">Save</button>
@@ -163,18 +169,9 @@
             <label>Contact Person<input type="text" name="contact_person" placeholder="e.g., Sales Manager"></label>
             <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91-0000000000"></label>
             <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com"></label>
-            <label>FOB Source
-              <select name="fob_source">
-                <option value="direct">Direct</option>
-                <option value="computed">Computed</option>
-              </select>
-            </label>
-            <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>
-            <label>Factory Cost override<input type="number" step="0.01" min="0" name="factory_cost" placeholder="e.g. 350000"></label>
-            <label>Transportation Cost override<input type="number" step="0.01" min="0" name="transportation_cost" placeholder="e.g. 9000"></label>
-            <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" placeholder="e.g. 12000"></label>
-            <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" placeholder="e.g. 8000"></label>
-            <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" placeholder="e.g. 15000"></label>
+            {# Owner decision D-338 (2a): a new price is one typed price — "add up the cost parts" is no longer offered. #}
+            <input type="hidden" name="fob_source" value="direct">
+            <label>FOB Value (₹)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>
             <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
             <label><input type="checkbox" name="is_primary" value="1"> Used for pricing</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>

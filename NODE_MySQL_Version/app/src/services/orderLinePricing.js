@@ -33,7 +33,42 @@ const APPROVED = 'approved';
 const UNCHECKED = 'unchecked';
 /** D-270 (point 25): the line's unit needs a piece size to be compared — asked for, never "too low". */
 const NEEDS_SIZE = 'needs_size';
-const BLOCKING = [BELOW, BELOW_MINIMUM, NO_PRICE, NEEDS_SIZE];
+/**
+ * Owner decision D-338 (2b): the price is otherwise fine, but it comes from a per-CBM
+ * (50 mm and above) price only CALCULATED from the supplier's thinner base (e.g. 20 mm)
+ * — no 50 mm+ price was quoted — so the MD approves it, like a line below the floor.
+ */
+const CBM_CALCULATED = 'cbm_calculated';
+const BLOCKING = [BELOW, BELOW_MINIMUM, NO_PRICE, NEEDS_SIZE, CBM_CALCULATED];
+/** Statuses the MD can approve (D-245 P2; D-338: also a CBM price worked out from a thinner base). */
+const APPROVABLE = [BELOW, NO_PRICE, CBM_CALCULATED];
+
+/**
+ * Owner decision D-338 (1c): a line "As per annexure" has no piece size, so a price that
+ * needs the size to be converted cannot be checked — the one wording everywhere (saving
+ * the line, the Quotation / PI gate, the price check, the MD's approval page).
+ */
+function annexureSizeMessage(lineNo, unit) {
+  const word = String(unit ?? '').trim() === '' ? 'CBM' : lineUnits.label(unit);
+  return `Line ${lineNo} says "As per annexure", so its size is not known — type the price per ${word} for this line.`;
+}
+
+/** D-338 (1c): whether a conversion is missing a piece size (not the weight per CBM). */
+function missingPieceSize(conv) {
+  return conv.factor === null && !conv.unconvertible && conv.missing && conv.missing.length > 0
+    && Object.prototype.hasOwnProperty.call(lineUnits.SIZE_FIELDS, String(conv.missing[0]));
+}
+
+/**
+ * D-338 (2b): the MD-approval reason when the figures' per-CBM price was only worked out
+ * from the supplier's thinner base, else null.
+ */
+function cbmCalculatedReason(figures) {
+  if (!figures || !figures.cbm_calculated) return null;
+  const from = figures.cbm_calc_from_mm !== null && figures.cbm_calc_from_mm !== undefined ? Number(figures.cbm_calc_from_mm) : 20;
+  const cbmFrom = figures.cbm_from_mm !== null && figures.cbm_from_mm !== undefined ? Number(figures.cbm_from_mm) : 50;
+  return `CBM price worked out from the supplier's ${from} mm price — no ${cbmFrom} mm+ price quoted`;
+}
 
 const n2 = (v) => Number(v).toFixed(2);
 const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -122,6 +157,10 @@ async function liveFigures(product, ctx, selection = null, lineThicknessMm = nul
     unit: p.unit, spec_text: p.spec ? p.spec.text : null, spec_map: p.spec ? p.spec.map : null,
     // D-270: what the conversion of a line in another unit needs.
     thickness_mm: p.spec && p.spec.adj ? (p.spec.adj.thickness_mm ?? null) : null, weight_t_per_cbm: await weightPerCbm(product),
+    // D-338 (2b): a per-CBM (50 mm+) price only CALCULATED from a thinner supplier base.
+    cbm_calculated: !!p.inr_parts && p.inr_parts.unit === 'CBM' && (p.inr_parts.how || 'typed') === 'calculated',
+    cbm_calc_from_mm: p.inr_parts && p.inr_parts.calc_from_mm !== undefined && p.inr_parts.calc_from_mm !== null ? Number(p.inr_parts.calc_from_mm) : null,
+    cbm_from_mm: p.inr_parts && p.inr_parts.cbm_from !== undefined && p.inr_parts.cbm_from !== null ? Number(p.inr_parts.cbm_from) : null,
   };
 }
 
@@ -392,6 +431,11 @@ async function checkLine(line, ctx, product = null) {
   out.conversion = conv;
   if (conv.factor === null) {
     out.note = conv.message;
+    // D-338 (1c): a line "As per annexure" has no size to convert with.
+    if (Number(line.as_per_annexure || 0) === 1 && missingPieceSize(conv)) {
+      out.note = annexureSizeMessage(Number(line.line_no || 0), String(line.unit ?? ''));
+      out.annexure_size = true;
+    }
     out.status = out.approval ? APPROVED : (conv.unconvertible ? NO_PRICE : NEEDS_SIZE);
     return out;
   }
@@ -402,7 +446,10 @@ async function checkLine(line, ctx, product = null) {
   if (out.approval) out.status = APPROVED;
   else if (price < Number(figures.minimum) - 0.0001) out.status = BELOW_MINIMUM;
   else if (price < Number(figures.floor) - 0.0001) out.status = BELOW;
+  // D-338 (2b): at or above the floor, but the CBM price is only worked out — the MD approves it.
+  else if (cbmCalculatedReason(figures) !== null) out.status = CBM_CALCULATED;
   else out.status = OK;
+  out.cbm_reason = cbmCalculatedReason(figures);
   return out;
 }
 
@@ -431,6 +478,8 @@ async function documentBlockReason(orderId, typeCode) {
   if (!first) return null;
   const doc = typeCode === 'QT' ? 'the Quotation' : 'the Proforma Invoice';
   const no = Number(first.line.line_no);
+  if (first.status === NEEDS_SIZE && first.annexure_size) return String(first.note); // D-338 (1c): the same wording as when the line is saved
+  if (first.status === CBM_CALCULATED) return `Line ${no} needs MD approval: ${first.cbm_reason} — the MD must approve it before ${doc} (order page → Products).`;
   if (first.status === NEEDS_SIZE) {
     const note = String(first.note || '');
     return `Line ${no} needs its piece size to check its price — ${note.charAt(0).toLowerCase()}${note.slice(1)} Then generate ${doc} (order page → Products).`;
@@ -449,7 +498,7 @@ function summary(checks) {
   for (const c of Object.values(checks)) {
     const no = Number(c.line.line_no);
     if (c.status === OK || c.status === APPROVED) groups.ok.push(no);
-    else if (c.status === BELOW || c.status === NO_PRICE) groups.md.push(no);
+    else if (c.status === BELOW || c.status === NO_PRICE || c.status === CBM_CALCULATED) groups.md.push(no);
     else if (c.status === NEEDS_SIZE) groups.size.push(no);
     else if (c.status === BELOW_MINIMUM) groups.minimum.push(no);
   }
@@ -509,7 +558,7 @@ async function pickRefusal(currencyCode, catalogProductId, lineType) {
 }
 
 /** Refuses a price below the product's minimum price before it is saved. Null when the price may be saved. */
-async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null, size = {}) {
+async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null, size = {}, annexureLineNo = null) {
   if (!catalogProductId || lineType !== 'goods') return null;
   const ctx = await context(order);
   if (!ctx.usd) return null;
@@ -535,7 +584,12 @@ async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBui
   const conv = await conversionFor({ unit, catalog_product_id: catalogProductId,
     spec_selection: selection ? JSON.stringify(selection) : null, ...(size || {}) }, f, product);
   // A missing size is asked for beside the field — never called "too low", never sent to the MD.
-  if (conv.factor === null && !conv.unconvertible) return String(conv.message);
+  if (conv.factor === null && !conv.unconvertible) {
+    // D-338 (1c): a line "As per annexure" (annexureLineNo) has no size to give.
+    return annexureLineNo !== null && annexureLineNo !== undefined && missingPieceSize(conv)
+      ? annexureSizeMessage(annexureLineNo, unit)
+      : String(conv.message);
+  }
   if (unitPrice === null || unitPrice === undefined || unitPrice === '' || conv.factor === null) return null;
   const minimum = Number(f.minimum) * conv.factor;
   if (Number(unitPrice) >= minimum - 0.0001) return null;
@@ -554,7 +608,7 @@ async function requestApproval(orderId, lineId, userId, automatic = false) {
   const order = await require('../repositories/orderRepository').find(orderId);
   if (!line || !order || Number(line.order_id) !== Number(orderId)) return 'Order line not found.';
   const check = await checkLine(line, await context(order));
-  if (![BELOW, NO_PRICE].includes(check.status)) {
+  if (!APPROVABLE.includes(check.status)) {
     return check.status === BELOW_MINIMUM
       ? 'This price is below what NexaCrest can accept — raise it; the MD cannot approve it either.'
       : `Line ${Number(line.line_no)} does not need an approval.`;
@@ -563,7 +617,8 @@ async function requestApproval(orderId, lineId, userId, automatic = false) {
   await db.execute('UPDATE order_products SET price_approval_requested_at = NOW(), price_approval_requested_by = :u WHERE id = :id', { u: userId, id: lineId });
   const ref = order.order_reference || `#${orderId}`;
   const message = `Order ${ref}, line ${line.line_no} (${line.description}) needs your price approval: `
-    + (check.status === NO_PRICE ? 'its product has no price set.' : 'it is below the lowest price for this order.');
+    + (check.status === NO_PRICE ? 'its product has no price set.'
+      : (check.status === CBM_CALCULATED ? `${check.cbm_reason}.` : 'it is below the lowest price for this order.'));
   const notificationRepository = require('../repositories/notificationRepository');
   for (const mdId of await require('../repositories/permissionRepository').usersWithPermission('manage_pricing')) {
     await notificationRepository.create(Number(mdId), null, 'line_price_approval', orderId, message.slice(0, 500)); // D-280: one e-mail per approval
@@ -604,7 +659,7 @@ async function afterSave(lineId, before, userId) {
   const order = await require('../repositories/orderRepository').find(orderId);
   const check = await checkLine(line, await context(order || {}));
   // D-270: a line still missing its size is asked for it on the page — not sent to the MD.
-  if ([BELOW, BELOW_MINIMUM, NO_PRICE].includes(check.status)) {
+  if ([BELOW, BELOW_MINIMUM, NO_PRICE, CBM_CALCULATED].includes(check.status)) {
     await requestApproval(orderId, lineId, userId, true);
   } else if (line.price_approval_requested_at) {
     await db.execute('UPDATE order_products SET price_approval_requested_at = NULL, price_approval_requested_by = NULL WHERE id = :id', { id: lineId });
@@ -657,11 +712,12 @@ async function approve(orderId, lineId, userId, reason) {
       `Order line ${no}: USD ${money(line.unit_price)} is below the minimum price USD ${money(f.minimum)} — not approvable.`);
     return `Line ${no}: USD ${money(line.unit_price)} is below the minimum price USD ${money(f.minimum)} — nobody can approve it, not even the MD. To sell lower, change the product's margin (Products → pricing; logged).`;
   }
+  if (status === NEEDS_SIZE && view.check.annexure_size) return String(view.check.note); // D-338 (1c): the same wording everywhere
   if (status === NEEDS_SIZE) {
     const note = String(view.check.note || '');
     return `Line ${no} needs its piece size first — ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
   }
-  if (![BELOW, NO_PRICE].includes(status)) return `Line ${no} does not need an approval.`;
+  if (!APPROVABLE.includes(status)) return `Line ${no} does not need an approval.`;
   if (Number(line.price_set_by || 0) === Number(userId) && !(await require('./makerCheckerGuard').selfApprovalAllowed('price_discount', userId))) {
     return 'You set this price yourself — Admin → Self-approval rules do not let your role approve its own price.';
   }
@@ -672,7 +728,9 @@ async function approve(orderId, lineId, userId, reason) {
      WHERE id = :id`,
     { u: userId, r: reason, p: n2(line.unit_price), sel: approvalSelectionKey(line), cz: effect.commission_zero ? 1 : 0, ic: effect.cut_line !== undefined && effect.cut_line !== null ? n2(effect.cut_line) : null, id: lineId }
   );
-  const what = status === NO_PRICE ? 'no price set for its product' : `USD ${money(line.unit_price)} below the floor USD ${money(view.check.figures.floor)}`;
+  const what = status === NO_PRICE ? 'no price set for its product'
+    : (status === CBM_CALCULATED ? `USD ${money(line.unit_price)} — ${view.check.cbm_reason}`
+      : `USD ${money(line.unit_price)} below the floor USD ${money(view.check.figures.floor)}`);
   await auditLog(userId, 'LINE_PRICE_APPROVED', 'order_products', lineId, 'unit_price', null, String(line.unit_price), `Order line ${no}: ${what} — reason: ${reason}`);
   if (Number(line.price_set_by || 0) === Number(userId)) {
     await auditLog(userId, 'LINE_PRICE_SELF_APPROVED', 'order_products', lineId, null, null, 'Self-approval allowed by Admin → Self-approval rules (price_discount).');
@@ -786,6 +844,7 @@ async function clientKeys(clients) {
 
 module.exports = {
   OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, NEEDS_SIZE, BLOCKING,
+  CBM_CALCULATED, APPROVABLE, annexureSizeMessage, cbmCalculatedReason,
   weightPerCbm, lineSize, optionThicknessMm, syncThickness, conversionFor, scaleFigures, optionChips, summary, totals,
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,

@@ -82,9 +82,20 @@ async function approve(req, res) {
       res.redirect(`/reorder-requests/${id}`);
       return;
     }
+    // D-338 (1a): "As per annexure" — never with "Qty To Be Confirmed", the Qty stays
+    // required and the Dimensions are left empty (the size is in the annexure).
+    const perAnnexure = !!(body.as_per_annexure || {})[i];
+    const annexureError = require('../services/annexureChoice').reorderLineError(lines.length + 1, perAnnexure, !!(body.quantity_is_tbc || {})[i],
+      String((body.quantity || {})[i] || ''), 'Qty To Be Confirmed');
+    if (annexureError !== null) {
+      flash.set(req, 'error', annexureError);
+      res.redirect(`/reorder-requests/${id}`);
+      return;
+    }
     lines.push({
       description,
-      dimensions: String((body.dimensions || {})[i] || '').trim() || null,
+      as_per_annexure: perAnnexure,
+      dimensions: perAnnexure ? null : (String((body.dimensions || {})[i] || '').trim() || null),
       finish: String((body.finish || {})[i] || '').trim() || null,
       quantity: String((body.quantity || {})[i] || '').trim() || null,
       quantity_is_tbc: !!(body.quantity_is_tbc || {})[i],
