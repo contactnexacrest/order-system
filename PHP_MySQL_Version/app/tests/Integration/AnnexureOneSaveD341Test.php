@@ -212,6 +212,13 @@ final class AnnexureOneSaveD341Test extends DbTestCase
         self::reachCiStage($orderId);
         $this->login();
 
+        // Owner, 12 Nov 2026: with no Annexure A content nothing is printed — say so, and no copy link.
+        $html = $this->orderPage($orderId);
+        self::assertStringContainsString('Annexure B not made — no annexure will be printed.', $html);
+        self::assertStringNotContainsString('Make Annexure B (copy of A)', $html);
+
+        OrderRepository::setIncludeAnnexureA($orderId, true);
+        self::entry($orderId, 'A', 'Quoted slab');
         $html = $this->orderPage($orderId);
         self::assertStringContainsString('Annexure B not made — Annexure A will be printed.', $html);
         self::assertStringContainsString('form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button>', $html);

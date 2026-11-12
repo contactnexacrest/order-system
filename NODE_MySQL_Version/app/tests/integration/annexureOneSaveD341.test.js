@@ -196,7 +196,14 @@ describe('D-341 — one save for the annexure page, Annexure B from the CI step'
     const orderId = await createTestOrder(await createTestClient());
     await reachCiStage(orderId);
 
+    // Owner, 12 Nov 2026: with no Annexure A content nothing is printed — say so, and no copy link.
     let html = await page(`/orders/${orderId}`);
+    expect(html).toContain('Annexure B not made — no annexure will be printed.');
+    expect(html).not.toContain('Make Annexure B (copy of A)');
+
+    await orderRepository.setIncludeAnnexureA(orderId, true);
+    await entry(orderId, 'A', 'Quoted slab');
+    html = await page(`/orders/${orderId}`);
     expect(html).toContain('Annexure B not made — Annexure A will be printed.');
     expect(html).toContain('form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button>');
     expect(html).toMatch(new RegExp(`<form method="post" action="/orders/${orderId}/annexure/copy-from-a" id="ci-annexure-b-copy"`));

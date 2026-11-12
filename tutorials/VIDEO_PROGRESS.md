@@ -125,6 +125,18 @@ written against the new menus.
 C01 – C06, D01 – D05) to re-record, and in what order, once the videos may restart. Re-recorded videos are
 sent as replacements and marked here.
 
+## Also out of date after the 12 Nov 2026 build (noted only — owner, 12 Nov: "just a note it")
+
+No video or script was changed. Videos stay on hold until the owner lifts the hold.
+
+| Video | What now differs | Decision |
+|---|---|---|
+| B01 Part 1 (Export Executive) | Order page Step 1 shows the button **"Edit Annexure A ›"** instead of the grey link "Enable / manage Annexure A"; the narration "Enable Annexure A here" no longer matches. The Annexure page has one "Save all changes" (D-341). | Note only (owner) |
+| B01 Parts 1 and 2, A02-1, D01, D04 | New Order line form has "No. of pieces" / "Size note"; new orders print the detailed product table on QT/PI/OC/CI/Buyer PO/PL (D-339). | Owner to decide when videos restart |
+| B02 | Price check: the floor note in the line's unit (D-339) and the "Prices worked out at ₹… per USD" line (D-340). | Owner to decide when videos restart |
+| C04 | Get price shows "Your prices in other units" (D-339). | Owner to decide when videos restart |
+| D04 | Reorder This form has "As per annexure" on each line (D-338). | Owner to decide when videos restart |
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

@@ -3087,7 +3087,7 @@
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="A" required{{ ' checked' if ciAnnexPick == 'A' }}{{ '' if ciAnnexOk.A else ' disabled' }}> Annexure A — as quoted <span class="muted small">({{ 'same as on the PI and OC' if ciAnnexure.a.has else 'empty' }})</span></label>
           <label class="checkbox-row"><input type="radio" name="ci_annexure" value="NONE" required{{ ' checked' if ciAnnexPick == 'NONE' }}{{ '' if ciAnnexOk.NONE else ' disabled' }}> No annexure{% if not ciAnnexOk.NONE %} <span class="muted small">(line {{ ciAnnexure.lines | join(', ') }} says "As per annexure")</span>{% endif %}</label>
           {% if not ciAnnexure.b.made %}{# D-341 #}
-          <p class="ci-annexure-b-missing">Annexure B not made — Annexure A will be printed.{% if permissions.manage_orders %} <button type="submit" form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button>{% endif %}</p>
+          <p class="ci-annexure-b-missing">{{ 'Annexure B not made — Annexure A will be printed.' if ciAnnexure.a.has else 'Annexure B not made — no annexure will be printed.' }}{% if permissions.manage_orders and ciAnnexure.a.has %} <button type="submit" form="ci-annexure-b-copy" class="btn-link">Make Annexure B (copy of A) &rsaquo;</button>{% endif %}</p>
           {% endif %}
           <p class="muted small">Default: Annexure B when it has been made, otherwise Annexure A. A line ticked "As per annexure" says "as per Annexure B" or "as per Annexure A" to match. "No annexure" cannot be chosen while a line says "As per annexure". The choice is saved with the order; the Packing List uses the same annexure.</p>
         </fieldset>
