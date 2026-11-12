@@ -430,6 +430,42 @@ function colorBox(bg, borderColor, content, borderSize = 5) {
   return [table, spacer(120)];
 }
 
+/**
+ * Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the PAYMENT TERMS lines in one
+ * continuous box — a one-cell table with a light grey-blue fill (EEF2F8), a 3pt navy left edge
+ * (1F3A68) and no other border, padded about 6px x 12px like the PDF. The row cannot split across
+ * a page and every line but the last keeps with the next, so the box stays together and the
+ * heading above (D-354 keep-with-next) stays with its first line. A spacer follows so the box
+ * never merges with a table after it. `lines` is a list of paragraphs, each a list of
+ * [text, style] runs. PHP twin: DocxComponents::addPaymentTermsBox().
+ */
+const PAYMENT_TERMS_BG = 'EEF2F8';
+const PAYMENT_TERMS_EDGE = '1F3A68';
+
+function paymentTermsBox(lines) {
+  const last = lines.length - 1;
+  const paras = lines.map((segments, i) => rich(segments, i === last ? { spacing: { after: 0 } } : { spacing: { after: 60 }, ...KEEP_NEXT }));
+  const table = new Table({
+    width: FULL_WIDTH,
+    margins: { top: 90, bottom: 90, left: 180, right: 180 },
+    rows: [
+      new TableRow({
+        cantSplit: true,
+        children: [
+          cell(paras, {
+            width: pctWidth(100),
+            shading: shade(PAYMENT_TERMS_BG),
+            borders: { ...NO_BORDERS, left: borderSide(PAYMENT_TERMS_EDGE, 24) },
+            margins: { top: 90, bottom: 90, left: 180, right: 180 },
+            verticalAlign: VerticalAlign.TOP,
+          }),
+        ],
+      }),
+    ],
+  });
+  return [table, spacer(120)];
+}
+
 // --------------------------------------------------------------------
 // KV table: two-column, alternating-shade bold navy labels, thin borders.
 // rows: [{label, value, labelBg, valueBg, full, bg}]
@@ -978,6 +1014,9 @@ module.exports = {
   metaBar,
   sectionTitle,
   colorBox,
+  paymentTermsBox,
+  PAYMENT_TERMS_BG,
+  PAYMENT_TERMS_EDGE,
   kvTable,
   productsTable,
   lineTable,

@@ -4231,6 +4231,24 @@ Note now starts page 2 with "4. FREIGHT & CHARGES"; one Supplier PO grew from 2 
 Headings inside the WYSIWYG Additional Terms text are not marked keep-with-next in Word
 (PhpWord's HTML import offers no hook; Node matches).
 
+**Payment Terms highlight (D-355, 12 Nov 2026, owner confirm 1 + confirm 2).** On the Quotation
+(QT) and the Proforma Invoice (PI), PDF and Word, both stacks, the lines under the dark
+"PAYMENT TERMS" heading (advance, any milestones, balance, their amount sub-lines, the LC /
+no-advance wording, the CFR/CIF freight line, "Currency:" and, on the PI, the cleared-funds
+line) sit in one box with a light grey-blue background (#EEF2F8) and a 4px (3pt) navy left edge
+(#1F3A68), padded about 6px x 12px. Only the money figure is bold (the currency code and the
+amount, e.g. "30% Advance Amount:  **USD 7,450.17**"); the labels, wording, amounts and the order
+of the lines are unchanged. The heading itself is unchanged. PDF: `.payment-terms-box` and
+`.pt-amount` in `_layout.html.twig` / `_layout.njk` (`page-break-inside: avoid`, so the short box
+is never split; the heading keeps with it through D-354). Word: a one-cell table with that fill
+and left border and no other border (`DocxComponents::addPaymentTermsBox()` /
+`docxComponents.paymentTermsBox()`), its row "do not split" and every line but the last "keep
+with next"; the builders' `paymentTermsLines()` return the lines, with the amount as a separate
+bold run. The Order Confirmation has no Payment Terms section (its "PAYMENT STATUS" table is
+unchanged). Only where a page breaks can change (the PI's Payment Terms now start on the next
+page when the box would not fit below the heading); page counts are unchanged. Documents already
+issued are not touched.
+
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 
 **Quality documents card.** Per category, up to 10 documents. On the order page: Pending → Received → Approved, file required for Received/Approved. Internal; never shown to the client.

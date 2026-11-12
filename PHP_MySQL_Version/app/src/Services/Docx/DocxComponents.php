@@ -187,6 +187,42 @@ final class DocxComponents
         $section->addTextBreak(1, 6);
     }
 
+    public const PAYMENT_TERMS_BG = 'EEF2F8';
+    public const PAYMENT_TERMS_EDGE = '1F3A68';
+
+    /**
+     * Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the PAYMENT TERMS lines in
+     * one continuous box — a one-cell table with a light grey-blue fill (EEF2F8), a 3pt navy left
+     * edge (1F3A68) and no other border, padded about 6px x 12px like the PDF. The row cannot split
+     * across a page and every line but the last keeps with the next, so the box stays together and
+     * the heading above (D-354 keep-with-next) stays with its first line. A spacer follows so the
+     * box never merges with a table after it. Node twin: docxComponents.js paymentTermsBox().
+     *
+     * @param list<list<array{0:string,1?:array}>> $lines each paragraph's text runs
+     */
+    public static function addPaymentTermsBox(Section $section, array $lines): void
+    {
+        $table = $section->addTable([
+            'unit' => TblWidth::PERCENT, 'width' => 5000,
+            'cellMarginTop' => 90, 'cellMarginBottom' => 90, 'cellMarginLeft' => 180, 'cellMarginRight' => 180,
+        ]);
+        $table->addRow(null, ['cantSplit' => true]);
+        $cell = $table->addCell(5000, [
+            'bgColor' => self::PAYMENT_TERMS_BG,
+            'borderLeftSize' => 24,
+            'borderLeftColor' => self::PAYMENT_TERMS_EDGE,
+            'valign' => 'top',
+        ]);
+        $last = count($lines) - 1;
+        foreach (array_values($lines) as $i => $segments) {
+            $run = $cell->addTextRun(['spaceAfter' => $i === $last ? 0 : 60] + ($i === $last ? [] : self::KEEP_NEXT));
+            foreach ($segments as $seg) {
+                $run->addText($seg[0], array_merge(['size' => 9.5], $seg[1] ?? []));
+            }
+        }
+        $section->addTextBreak(1, 6);
+    }
+
     // ------------------------------------------------------------------
     // KV table: two-column, alternating-shade bold navy labels, thin
     // borders. $rows: list of ['label'=>string, 'value'=>string|callable,

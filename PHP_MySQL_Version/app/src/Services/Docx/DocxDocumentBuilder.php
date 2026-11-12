@@ -376,65 +376,68 @@ final class DocxDocumentBuilder
         ));
     }
 
-    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false, bool $withMilestones = false, string $advanceAgainst = 'Proforma Invoice'): void
+    /**
+     * Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the PAYMENT TERMS lines are
+     * returned as a list of paragraphs (each a list of [text, style] runs) and printed inside one
+     * light grey-blue box with a navy left edge (DocxComponents::addPaymentTermsBox) — the same box
+     * as the PDF. Only the money figure (currency code + amount) is bold; the wording and the order
+     * of the lines are unchanged.
+     *
+     * @return list<list<array{0:string,1:array}>>
+     */
+    private static function paymentTermsLines(array $context, bool $noAdvanceWording = false, bool $withMilestones = false, string $advanceAgainst = 'Proforma Invoice'): array
     {
         $financial = $context['financial'] ?? [];
         $order = $context['order'] ?? [];
         $currency = self::g($order, 'currency_code', '');
+        $lines = [];
+        $amount = static fn(string $label, $value): array => [['   ' . $label . ':  ', []], [$currency . ' ' . $value, ['bold' => true]]];
         // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
-        $milestoneLines = static function () use ($section, $financial, $currency, $withMilestones): void {
+        $milestoneLines = static function () use (&$lines, $financial, $withMilestones, $amount): void {
             if (!$withMilestones) {
                 return;
             }
             foreach ($financial['milestones'] ?? [] as $m) {
-                DocxComponents::addRichParagraph($section, [['• ', []], [$m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '. ', []]]);
-                DocxComponents::addRichParagraph($section, [['   ' . $m['pct'] . '% Amount:  ' . $currency . ' ' . $m['amount'], []]]);
+                $lines[] = [['• ', []], [$m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '. ', []]];
+                $lines[] = $amount($m['pct'] . '% Amount', $m['amount']);
             }
         };
         if ($noAdvanceWording && empty($financial['has_advance'])) {
             // Owner decision (2026-10-28): a QT / PI with no advance (e.g.
             // Letter of Credit) has no "0% Advance" lines — same as the PDF.
             $milestoneLines();
-            DocxComponents::addRichParagraph($section, [
-                ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []],
-            ]);
-            DocxComponents::addRichParagraph($section, [
-                ['   ' . self::g($financial, 'balance_pct', '') . '% Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []],
-            ]);
-            self::freightAndCurrencyLines($section, $order, $currency);
-            return;
+            $lines[] = [['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []]];
+            $lines[] = $amount(self::g($financial, 'balance_pct', '') . '% Amount', self::g($financial, 'balance_amount', ''));
+            return array_merge($lines, self::freightAndCurrencyLines($order, $currency));
         }
-        DocxComponents::addRichParagraph($section, [
-            // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
-            ['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []],
-        ]);
-        DocxComponents::addRichParagraph($section, [
-            ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []],
-        ]);
+        // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
+        $lines[] = [['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []]];
+        $lines[] = $amount(self::g($financial, 'advance_pct', '') . '% Advance Amount', self::g($financial, 'advance_amount', ''));
         // Owner decision (2026-10-28): the Word balance line now prints the
         // order's own balance terms — the same sentence as the PDF (Calendar
         // Days, and the preset's own wording when it has one).
         $balanceText = self::g($financial, 'balance_terms_text', '');
         $milestoneLines();
-        DocxComponents::addRichParagraph($section, [
-            ['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []],
-        ]);
-        DocxComponents::addRichParagraph($section, [
-            ['   ' . self::g($financial, 'balance_pct', '') . '% Balance Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []],
-        ]);
-        self::freightAndCurrencyLines($section, $order, $currency);
+        $lines[] = [['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []]];
+        $lines[] = $amount(self::g($financial, 'balance_pct', '') . '% Balance Amount', self::g($financial, 'balance_amount', ''));
+        return array_merge($lines, self::freightAndCurrencyLines($order, $currency));
     }
 
-    /** @param array<string,mixed> $order */
-    private static function freightAndCurrencyLines(Section $section, array $order, string $currency): void
+    /**
+     * @param array<string,mixed> $order
+     * @return list<list<array{0:string,1:array}>>
+     */
+    private static function freightAndCurrencyLines(array $order, string $currency): array
     {
+        $lines = [];
         if (empty($order['is_fob'])) {
-            DocxComponents::addRichParagraph($section, [
+            $lines[] = [
                 [!empty($order['is_cif']) ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', []],
                 ['Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.', ['color' => '333333']],
-            ]);
+            ];
         }
-        DocxComponents::addPlainParagraph($section, '   Currency: ' . $currency);
+        $lines[] = [['   Currency: ' . $currency, []]];
+        return $lines;
     }
 
     // ==================================================================
@@ -498,7 +501,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
         // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
-        self::paymentTermsBlock($section, $context, true, true);
+        DocxComponents::addPaymentTermsBox($section, self::paymentTermsLines($context, true, true));
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 6) . '. DOCUMENTS TO BE PROVIDED');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
@@ -629,10 +632,11 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context, true, true, 'this document');
+        $paymentLines = self::paymentTermsLines($context, true, true, 'this document');
         if (!empty($financial['has_advance'])) {
-            DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
+            $paymentLines[] = [['• ' . self::g($financial, 'cleared_funds_text', ''), []]];
         }
+        DocxComponents::addPaymentTermsBox($section, $paymentLines);
 
         // D-343: as on the PDF, the production box carries no numbered heading.
         DocxComponents::addKvTable($section, [[

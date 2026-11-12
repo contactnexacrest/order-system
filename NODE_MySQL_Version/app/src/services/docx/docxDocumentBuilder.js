@@ -291,52 +291,58 @@ function weightTable(order, context = {}) {
   return out;
 }
 
-function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = false, advanceAgainst = 'Proforma Invoice') {
+/**
+ * Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the PAYMENT TERMS lines are
+ * returned as a list of paragraphs (each a list of [text, style] runs) and printed inside one
+ * light grey-blue box with a navy left edge (C.paymentTermsBox) — the same box as the PDF. Only
+ * the money figure (currency code + amount) is bold; the wording and the order of the lines are
+ * unchanged. PHP twin: DocxDocumentBuilder::paymentTermsLines().
+ */
+function paymentTermsLines(context, noAdvanceWording = false, withMilestones = false, advanceAgainst = 'Proforma Invoice') {
   const financial = context.financial || {};
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
-  const out = [];
+  const lines = [];
+  const amount = (label, value) => [[`   ${label}:  `, {}], [`${currency} ${value}`, { bold: true }]];
   // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
   const milestoneLines = () => {
     if (!withMilestones) return;
     for (const m of financial.milestones || []) {
-      out.push(C.rich([['• ', {}], [`${m.pct}% Payment on FOB Value ${m.due_text}. `, {}]]));
-      out.push(C.rich([[`   ${m.pct}% Amount:  ${currency} ${m.amount}`, {}]]));
+      lines.push([['• ', {}], [`${m.pct}% Payment on FOB Value ${m.due_text}. `, {}]]);
+      lines.push(amount(`${m.pct}% Amount`, m.amount));
     }
   };
   if (noAdvanceWording && !financial.has_advance) {
     // Owner decision (2026-10-28): a QT / PI with no advance (e.g. Letter of
     // Credit) has no "0% Advance" lines — same as the PDF.
     milestoneLines();
-    out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}]]));
-    out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}]]));
-    return out.concat(freightAndCurrencyLines(order, currency));
+    lines.push([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}]]);
+    lines.push(amount(`${g(financial, 'balance_pct', '')}% Amount`, g(financial, 'balance_amount', '')));
+    return lines.concat(freightAndCurrencyLines(order, currency));
   }
   // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
-  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}]]));
-  out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}]]));
+  lines.push([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}]]);
+  lines.push(amount(`${g(financial, 'advance_pct', '')}% Advance Amount`, g(financial, 'advance_amount', '')));
   // Owner decision (2026-10-28): the Word balance line now prints the
   // order's own balance terms — the same sentence as the PDF (Calendar
   // Days, and the preset's own wording when it has one).
   const balanceText = g(financial, 'balance_terms_text', '');
   milestoneLines();
-  out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}]]));
-  out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}]]));
-  return out.concat(freightAndCurrencyLines(order, currency));
+  lines.push([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}]]);
+  lines.push(amount(`${g(financial, 'balance_pct', '')}% Balance Amount`, g(financial, 'balance_amount', '')));
+  return lines.concat(freightAndCurrencyLines(order, currency));
 }
 
 function freightAndCurrencyLines(order, currency) {
-  const out = [];
+  const lines = [];
   if (!order.is_fob) {
-    out.push(
-      C.rich([
-        [order.is_cif ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', {}],
-        ['Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.', { color: '333333' }],
-      ])
-    );
+    lines.push([
+      [order.is_cif ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', {}],
+      ['Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.', { color: '333333' }],
+    ]);
   }
-  out.push(C.plain(`   Currency: ${currency}`));
-  return out;
+  lines.push([[`   Currency: ${currency}`, {}]]);
+  return lines;
 }
 
 // ==================================================================
@@ -407,7 +413,7 @@ function renderQt(context) {
 
   children.push(...C.sectionTitle(`${sn(context, 'payment', 5)}. PAYMENT TERMS`));
   // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
-  children.push(...paymentTermsBlock(context, true, true));
+  children.push(...C.paymentTermsBox(paymentTermsLines(context, true, true)));
 
   children.push(...C.sectionTitle(`${sn(context, 'documents_provided', 6)}. DOCUMENTS TO BE PROVIDED`));
   children.push(
@@ -562,8 +568,9 @@ function renderPi(context) {
   );
 
   children.push(...C.sectionTitle(`${sn(context, 'payment', 5)}. PAYMENT TERMS`));
-  children.push(...paymentTermsBlock(context, true, true, 'this document'));
-  if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
+  const paymentLines = paymentTermsLines(context, true, true, 'this document');
+  if (financial.has_advance) paymentLines.push([[`• ${g(financial, 'cleared_funds_text', '')}`, {}]]);
+  children.push(...C.paymentTermsBox(paymentLines));
 
   // D-343: as on the PDF, the production box carries no numbered heading.
   children.push(

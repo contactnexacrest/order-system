@@ -133,26 +133,27 @@
 </table>
 
 <div class="section-title">{{ section_numbers.payment }}. PAYMENT TERMS</div>
-<div class="bullet-block">
+{# Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the payment-terms lines sit in a light grey-blue box with a navy left edge, and only the money figure (currency code + amount) is bold. Wording and order of lines unchanged. #}
+<div class="bullet-block payment-terms-box">
   {% if financial.has_advance %}
   <p>&#8226; {{ financial.advance_pct }}% Advance Payment on FOB Value against this document.</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }}</p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.advance_amount }}</strong></p>
   {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
   {% for m in financial.milestones %}
   <p>&#8226; {{ m.pct }}% Payment on FOB Value {{ m.due_text }}.</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ m.amount }}</p>
+  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ m.amount }}</strong></p>
   {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Balance Payment on FOB Value {{ financial.balance_terms_text }}</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }}</p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.balance_amount }}</strong></p>
   {% else %}
   {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no "0% Advance" lines. #}
   {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
   {% for m in financial.milestones %}
   <p>&#8226; {{ m.pct }}% Payment on FOB Value {{ m.due_text }}.</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ m.amount }}</p>
+  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ m.amount }}</strong></p>
   {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Payment on FOB Value{% if financial.payment_method == 'LC' %} by Letter of Credit{% endif %} — {{ financial.balance_terms_text }}</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }}</p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.balance_amount }}</strong></p>
   {% endif %}
   {% if not order.is_fob %}
   <p>&#8226; {% if order.is_cif %}Freight &amp; Insurance (CFR/CIF orders only){% else %}Freight (CFR order — buyer arranges insurance){% endif %}: <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>

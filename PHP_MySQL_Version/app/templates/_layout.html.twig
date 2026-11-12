@@ -129,6 +129,11 @@
   .bullet-block { font-size: 9.5pt; margin-bottom: 6pt; }
   .bullet-block p { margin: 0 0 4pt; }
   .bullet-block .sub-line { color: #333333; }
+  /* Owner decision D-355 (12 Nov 2026, owner confirm 1 + confirm 2): the PAYMENT TERMS lines of the
+     QT and PI sit in one light grey-blue box with a 4px navy left edge (approved mockup), kept on one
+     page where it fits; the heading above keeps with it (D-354 / R5-12). Only the money figure is bold. */
+  .payment-terms-box { background: #EEF2F8; border-left: 3pt solid #1F3A68; padding: 4.5pt 9pt; page-break-inside: avoid; break-inside: avoid; }
+  .payment-terms-box .pt-amount { font-weight: bold; color: #111111; }
   .numbered-block { font-size: 9.5pt; margin-bottom: 6pt; }
   .numbered-block p { margin: 0 0 3pt; }
   ul.terms { margin: 0 0 6pt; padding-left: 14pt; }
