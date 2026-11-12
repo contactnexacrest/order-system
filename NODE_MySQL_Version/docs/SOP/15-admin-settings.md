@@ -60,9 +60,11 @@ yet. A page opens: *"The Managing Director's name changed from "…" to "…". A
 
 - ☑ **N open orders** whose kept company details still show the old name
   (orders whose PI is approved keep their own copy — closed, lost and cancelled
-  orders are never touched). Their order numbers are listed.
+  orders are never touched). Click **Show the orders** beside the count to see
+  their order numbers.
 - ☑ **N documents still in Draft / In review** that print the company's
-  fallback signatory with the old name. Their numbers are listed.
+  fallback signatory with the old name. Click **Show the documents** beside the
+  count to see their numbers.
 - If the person who signs is a founder login, a note says the name under the
   signature comes from that login, which the app cannot change on purpose —
   change it with the founder SQL block in the README (First-time setup).

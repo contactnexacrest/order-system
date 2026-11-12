@@ -691,6 +691,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
 | `initRemittanceDifference()`, `initRemittanceInr()`, `initRemittanceStatements()` | Live remittance-difference reasons, bank charges and INR credited. |
 | `initFormDraftRestore()` | Keeps typed input after a refused submit. |
+| `markSubmitting()` / `keepSubmitterChoice()` | Every POST form: on submit the form's buttons are disabled and the pressed one reads "Working…". D-350 (12 Nov 2026): first the pressed button's `name`/`value` is copied into a hidden input (`data-submitter-choice`, from `event.submitter`, or the last clicked submit button in older browsers), so a form with two choice buttons (Approve / Refuse, Save / Restore) sends the right choice; a button outside its form (`form="…"`) is not disabled and sends its own value. |
 | `initConfirmDialogs()`, `initLockedSteps()`, `initDatePickers()`, `initSlowDownloadLinks()`, `initTableScrollShadows()` | UI helpers. |
 
 Tests that enforce the conventions: `FormValidationConventionsTest` / `formValidationConventions.test.js` (confirm fields), `FormPlaceholderTest` / `formPlaceholder.test.js` (a placeholder on every typed input and textarea except date, file, checkbox, radio, hidden), `FormLabelConventionsTest` / `formLabelConventions.test.js` (labels, "*", "Choose…" on required drop-downs; on every drop-down the empty first option reads "Choose…" or "Choose a …" — never "Select…", "— Select —" or "— choose —", 11 Nov 2026).
@@ -2153,7 +2154,7 @@ value, protected, Super Admin) does not save straight away: the submission is ke
 session (30 minutes) and `GET /settings/md-change` shows "The Managing Director's name changed
 from "<old>" to "<new>". Apply it to:" with two ticked boxes — **N open orders** (status not
 `complete` / `lost` / `cancelled`, frozen, whose `frozen_snapshot_json.company.md_name` /
-`md_title` still equals the old value; their references are listed) and **N documents still in
+`md_title` still equals the old value; only the count shows, and "Show the orders" — a `<details>`, closed — opens their references (D-350)) and **N documents still in
 Draft / In review** whose kept signatory is the company fallback (`signatory_user_id IS NULL`,
 `signatory_name_snapshot` / `signatory_designation_snapshot` equal to the old value). When the
 default signatory (`company_default_signatory`) is a protected founder login whose `users.name`
@@ -2162,8 +2163,9 @@ the founder login, which the app cannot change on purpose. Change it with the fo
 in the README (First-time setup)." (the app never renames a founder; the DB trigger would refuse
 it). Then "Not changed: N documents already approved or sent; N closed and cancelled orders."
 and two buttons: **Save and apply** and **Save setting only** (`POST /settings/md-change?choice=
-apply|setting_only`, `manage_company_settings`; the choice travels in the button's `formaction`
-because app.js disables the pressed button). Both replay the kept submission through the same
+apply|setting_only`, `manage_company_settings`; the choice travels in the button's `formaction`,
+kept after D-350 made app.js send a pressed button's name/value too). "Show the documents" opens
+the document numbers the same way (D-350). Both replay the kept submission through the same
 checks and save the setting; "Save and apply" then runs `MdNameSyncService::apply`
 (`mdNameSyncService.apply`) in one transaction: the ticked orders' snapshot keys, the ticked
 documents' signatory snapshots and, on those documents, `company_snapshot_json` and the stored

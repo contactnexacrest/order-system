@@ -24,22 +24,23 @@ $nDocs = count($preview['documents']);
   <p><strong>Apply it to:</strong></p>
 
   <form method="post" action="/settings/md-change">
-    <?php /* The choice travels in the button's own address: app.js disables the pressed button while the form is sent, so a name/value on it would not arrive. */ ?>
+    <?php /* The choice travels in the button's own address (kept since D-350 made app.js carry a pressed button's name/value too). */ ?>
     <?= Csrf::field() ?>
-    <p>
+    <div class="md-change-line">
       <label><input type="checkbox" name="apply_orders" value="1"<?= $nOrders > 0 ? ' checked' : ' disabled' ?>>
-        <strong><?= $nOrders ?></strong> open order(s) whose kept company details still show the old value</label>
+        <strong><?= $nOrders ?></strong> open order<?= $nOrders === 1 ? '' : 's' ?> whose kept company details still show the old value</label>
       <?php if ($nOrders > 0): ?>
-        <br><span class="muted small"><?= htmlspecialchars(implode(', ', array_map(static fn (array $o): string => $o['ref'], $preview['orders']))) ?></span>
+        <?php /* D-350: only the count shows; the list of numbers opens on request. */ ?>
+        <details class="md-change-list" id="md-change-orders-list"><summary>Show the orders</summary><span class="muted small"><?= htmlspecialchars(implode(', ', array_map(static fn (array $o): string => $o['ref'], $preview['orders']))) ?></span></details>
       <?php endif; ?>
-    </p>
-    <p>
+    </div>
+    <div class="md-change-line">
       <label><input type="checkbox" name="apply_documents" value="1"<?= $nDocs > 0 ? ' checked' : ' disabled' ?>>
-        <strong><?= $nDocs ?></strong> document(s) still in Draft / In review whose kept signatory is the company fallback and still shows the old value</label>
+        <strong><?= $nDocs ?></strong> document<?= $nDocs === 1 ? '' : 's' ?> in Draft / In review whose kept signatory is the company fallback and still shows the old value</label>
       <?php if ($nDocs > 0): ?>
-        <br><span class="muted small"><?= htmlspecialchars(implode(', ', array_map(static fn (array $d): string => $d['ref'], $preview['documents']))) ?></span>
+        <details class="md-change-list" id="md-change-documents-list"><summary>Show the documents</summary><span class="muted small"><?= htmlspecialchars(implode(', ', array_map(static fn (array $d): string => $d['ref'], $preview['documents']))) ?></span></details>
       <?php endif; ?>
-    </p>
+    </div>
 
     <?php if ($preview['founder_note'] !== null): ?>
       <div class="alert alert-info" id="md-change-founder-note">&#8505; <?= htmlspecialchars($preview['founder_note']) ?></div>

@@ -1,11 +1,29 @@
 (function () {
   'use strict';
 
+  // D-350: a disabled button's name/value is left out of the submitted form,
+  // so the pressed button's choice (Approve / Refuse, save / restore …) is
+  // copied into a hidden input once markSubmitting() has disabled it. A button
+  // outside the form (form="…") is not disabled and still sends its own value,
+  // so it gets no copy (a copy would send the choice twice).
+  function keepSubmitterChoice(form, submitter) {
+    var old = form.querySelector('input[type="hidden"][data-submitter-choice]');
+    if (old) old.parentNode.removeChild(old);
+    if (!submitter || !submitter.name || !submitter.disabled || submitter.type === 'image') return;
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = submitter.name;
+    hidden.value = submitter.value || '';
+    hidden.setAttribute('data-submitter-choice', '');
+    form.appendChild(hidden);
+  }
+
   function markSubmitting(form, submitter) {
     var controls = form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])');
     controls.forEach(function (btn) {
       btn.disabled = true;
     });
+    keepSubmitterChoice(form, submitter);
     if (!submitter) return;
     var label = submitter.dataset.loadingText || 'Working…';
     if (submitter.tagName === 'INPUT') {
@@ -2185,6 +2203,14 @@
     // D-341: before the "Working…" submit listener below, so a cancelled "leave without saving?" stops it.
     initUnsavedGuard();
 
+    // D-350: older browsers have no event.submitter; remember the submit
+    // button that was last clicked so its choice is still kept.
+    var lastSubmitButton = null;
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('button, input[type="submit"]') : null;
+      if (btn && btn.form && (btn.type === 'submit')) lastSubmitButton = btn;
+    }, true);
+
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —
     // no per-page wiring needed. Runs after any data-confirm dialog
@@ -2198,7 +2224,7 @@
       if (!(form instanceof HTMLFormElement)) return;
       var method = (form.getAttribute('method') || 'get').toLowerCase();
       if (method !== 'post') return;
-      markSubmitting(form, e.submitter);
+      markSubmitting(form, e.submitter || (lastSubmitButton && lastSubmitButton.form === form ? lastSubmitButton : null));
       saveFormDraft(form);
     });
 
