@@ -196,9 +196,9 @@ describe('D-341 — one save for the annexure page, Annexure B from the CI step'
     const orderId = await createTestOrder(await createTestClient());
     await reachCiStage(orderId);
 
-    // Owner, 12 Nov 2026: with no Annexure A content nothing is printed — say so, and no copy link.
+    // Owner, 12 Nov 2026: an order that never had an Annexure A shows no annexure note at all.
     let html = await page(`/orders/${orderId}`);
-    expect(html).toContain('Annexure B not made — no annexure will be printed.');
+    expect(html).not.toContain('Annexure B not made');
     expect(html).not.toContain('Make Annexure B (copy of A)');
 
     await orderRepository.setIncludeAnnexureA(orderId, true);
