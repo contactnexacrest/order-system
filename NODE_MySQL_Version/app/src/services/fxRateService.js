@@ -235,7 +235,96 @@ function readForm(post) {
   return [values, errors];
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const nf = (v, d = 2) => Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/** "12 Nov 2026" from "2026-11-12" (or a DATETIME); "" when empty. */
+function dayLabel(v) {
+  if (v === null || v === undefined || v === '') return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr(v));
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : String(v);
+}
+
+/**
+ * Owner decision D-340 (12 Nov 2026): the "Rate used for prices right now" box on Pricing
+ * settings — current() plus what the box and the field badges say (same as PHP status()).
+ * state: auto / fallback / manual; tone: green / orange / blue.
+ */
+async function status(raw = null) {
+  if (raw === null) raw = await require('./pricingService').settingsRaw();
+  const fx = await current(raw);
+  const cfg = config(raw);
+  const last = await latestInUse();
+  fx.manual = cfg.manual;
+  fx.has_market = !!last;
+  fx.state = fx.mode === 'manual' ? 'manual' : (fx.market !== null ? 'auto' : 'fallback');
+  fx.tone = fx.state === 'manual' ? 'blue' : (fx.state === 'auto' && fx.warnings.length === 0 ? 'green' : 'orange');
+  if (fx.state === 'manual') fx.badge = 'Manual';
+  else if (fx.state === 'fallback') fx.badge = 'Manual fall-back';
+  else fx.badge = fx.date === ymd(new Date()) ? 'Automatic · fetched today' : `Automatic · rate of ${dayLabel(fx.date)}`;
+  fx.fetched = null;
+  fx.cushion_line = null;
+  if (fx.state === 'auto' && last) {
+    const t = /\d{2}:\d{2}/.exec(String(last.fetched_at || '').slice(11));
+    fx.fetched = dayLabel(fx.date) + (t ? `, ${t[0]}` : '');
+    fx.cushion_line = `${nf(fx.cushion, 1)}% → ₹${nf(fx.market, 2)} × ${(1 - fx.cushion / 100).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`;
+  }
+  fx.manual_note = fx.state === 'auto' ? `Manual rate ₹${nf(cfg.manual, 2)} is not used — it is only the fall-back if no rate has ever been fetched.` : null;
+  fx.fallback_hint = fx.state === 'fallback' ? 'Check that the daily job runs (README › Scheduled jobs), or press "Fetch today\'s rate now".' : null;
+  fx.compare = null;
+  fx.above_note = null;
+  if (fx.state === 'manual') {
+    if (!last) {
+      fx.compare = 'No market rate has been fetched yet to compare with.';
+    } else {
+      const pct = (cfg.manual / Number(last.market_rate) - 1) * 100;
+      fx.compare = `For comparison, last market rate fetched: ₹${nf(last.market_rate, 2)} (${dayLabel(last.rate_date)}) — your rate is `
+        + (Math.abs(pct) < 0.05 ? 'the same as the market.' : `${nf(Math.abs(pct), 1)}% ${pct > 0 ? 'above' : 'below'} the market.`);
+      if (pct >= 0.05) fx.above_note = 'Above the market means prices in USD come out lower than intended.';
+    }
+  }
+  return fx;
+}
+
+/**
+ * Owner decision D-340 (12 Nov 2026): the order page's one line about the rate its prices were
+ * worked out at — price build-up viewers only (MD, ED); never on documents (D-304). Before the PI
+ * the prices follow today's rate; once the PI is issued the rate fixed on the lines
+ * (price_snapshot, D-245), else the order's pricing_fx_rate_at_pi. Null when no line is checked.
+ * Port of FxRateService::orderLine().
+ */
+async function orderLine(order, checks) {
+  const all = Object.values(checks || {});
+  if (!all.some((c) => (c.status || 'unchecked') !== 'unchecked')) return null;
+  let fixedRate = null;
+  let issued = false;
+  for (const c of all) {
+    let snap = null;
+    if (c.line && c.line.price_snapshot) {
+      try { snap = JSON.parse(c.line.price_snapshot); } catch (e) { snap = null; }
+    }
+    if (snap && typeof snap === 'object') {
+      issued = true;
+      if (fixedRate === null && snap.fx_rate !== undefined && snap.fx_rate !== null && Number(snap.fx_rate) > 0) fixedRate = Number(snap.fx_rate);
+    }
+  }
+  const now = await status();
+  if (issued) {
+    if (fixedRate === null && order.pricing_fx_rate_at_pi !== null && order.pricing_fx_rate_at_pi !== undefined && Number(order.pricing_fx_rate_at_pi) > 0) fixedRate = Number(order.pricing_fx_rate_at_pi);
+    const row = await db.queryOne("SELECT MIN(d.generated_at) AS first_pi FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = :o AND dt.code = 'PI'", { o: Number(order.id) });
+    const piDate = dayLabel(row ? row.first_pi : null);
+    const of = piDate !== '' ? ` of ${piDate}` : '';
+    if (fixedRate === null) return `Prices fixed on the Proforma Invoice${of}.`;
+    const r = `₹${nf(fixedRate, 2)}`;
+    return `Prices worked out at ${r} per USD — fixed on the Proforma Invoice${of} at ${r} per USD`
+      + (Math.abs(fixedRate - Number(now.rate)) >= 0.005 ? `; today's rate ₹${nf(now.rate, 2)} does not change them.` : '.');
+  }
+  const how = now.state === 'manual' ? 'Manual' : (now.state === 'fallback' ? 'Manual fall-back' : `Automatic, ${dayLabel(now.date)}`);
+  return `Prices worked out at ₹${nf(now.rate, 2)} per USD (${how}) — live: follows today's rate.`;
+}
+
 module.exports = {
   SOURCES, JUMP_PCT, CUSHION_MIN, CUSHION_MAX,
   setHttp, parse, config, pricingRateFor, latestInUse, rate, signed, current, forDate, fetchDaily, decide, history, readForm,
+  dayLabel, status, orderLine,
 };

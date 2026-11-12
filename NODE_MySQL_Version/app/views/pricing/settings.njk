@@ -11,43 +11,11 @@
     Team incentive program is <strong>{{ 'on' if programOn else 'off' }}</strong>{{ '' if programOn else ' — no reserve is added to prices' }}.
   </div>
 
-  {# D-301 / D-304: the rate in use, explained; source, date, warnings, the MD's OK for a big move, and the history. #}
-  <div class="section" id="exchange-rate">
-    <h2>Exchange Rate</h2>
-    {% include "pricing/_fx_rate_line.njk" %}
-    <p class="small muted">{{ 'Automatic' if fx.mode == 'auto' else 'Manual' }}{% if fx.source %} · source {{ fx.source }} · rate of {{ fx.date }}{% endif %}. Prices on Quotations and Proforma Invoices already issued never change.</p>
-    {% if fx.waiting %}{% set w = fx.waiting %}
-      <div class="alert alert-warning">
-        <p><b>Waiting for the MD:</b> today's market rate ₹{{ w.market_rate | fixed4 }} ({{ w.source }}, {{ w.rate_date }}) moved {{ pricingFmt.signed(w.change_pct) }} — more than {{ pricingFmt.trim3(fxJumpPct) }}% in a day. It is not used for prices until approved.</p>
-        {% if canManage %}
-          <form method="post" action="/pricing/fx-rates/{{ w.id }}/decide" class="field-grid">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Reason *<input type="text" name="reason" required minlength="10" maxlength="255" placeholder="e.g. Checked with the bank — the move is real"></label>
-            <div><button type="submit" name="decision" value="approve" class="btn-sm btn-success">Use this rate</button>
-              <button type="submit" name="decision" value="reject" class="btn-sm btn-secondary">Keep the rate in use</button></div>
-          </form>
-        {% endif %}
-      </div>
-    {% endif %}
-    {% if canManage %}
-      <form method="post" action="/pricing/fx-rates/fetch" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Fetch today's rate now</button></form>
-    {% endif %}
-    <details><summary>History (last 30 fetches)</summary>
-      <table class="list">
-        <tr><th>Date</th><th class="num">Market rate (₹ per USD)</th><th>Source</th><th class="num">Change</th><th>Status</th><th>Note</th></tr>
-        {% set statusLabels = { 'in_use': 'In use', 'waiting_md': 'Waiting for the MD', 'rejected': 'Not used (MD)', 'failed': 'Fetch failed — last rate kept' } %}
-        {% for h in fxHistory %}
-          <tr><td>{{ h.rate_date }}</td>
-            <td class="num">{{ (h.market_rate | fixed4) if h.market_rate != null else '—' }}</td>
-            <td>{{ h.source or '—' }}</td>
-            <td class="num">{{ pricingFmt.signed(h.change_pct) if h.change_pct != null else '—' }}</td>
-            <td>{{ statusLabels[h.status] or h.status }}</td>
-            <td>{{ ((h.note or '') + ((' ' + (h.decided_by_name or '') + ': ' + h.decision_reason) if h.decision_reason else '')) | trim }}</td></tr>
-        {% endfor %}
-        {% if not fxHistory.length %}<tr><td colspan="6" class="muted">No rate fetched yet — the daily job fetches one every morning (see the README).</td></tr>{% endif %}
-      </table>
-    </details>
-  </div>
+  {# D-340: the fetch and the MD's decision are their own forms; their buttons sit in the box inside the settings form (form="…"). #}
+  {% if canManage %}
+    <form method="post" action="/pricing/fx-rates/fetch" id="fx-fetch-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"></form>
+    {% if fx.waiting %}<form method="post" action="/pricing/fx-rates/{{ fx.waiting.id }}/decide" id="fx-decide-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"></form>{% endif %}
+  {% endif %}
 
   <form method="post" action="/pricing/settings">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -61,16 +29,67 @@
     </fieldset>
 
     {# D-301 (point 4, 11 Nov 2026): Automatic (fetched daily) or Manual; pricing rate = market × (1 − cushion %). #}
-    <fieldset id="exchange-rate-settings"><legend>Exchange Rate (USD → INR)</legend>
+    {# D-340 (12 Nov 2026): the rate used right now, at the top; the field badges show which field is in use (app.js follows the mode drop-down). #}
+    {% set fxKey = 'manual' if fx.mode == 'manual' else ('auto-market' if fx.has_market else 'auto-none') %}
+    <fieldset id="exchange-rate-settings" data-fx-has-market="{{ '1' if fx.has_market else '0' }}"><legend>Exchange Rate (USD → INR)</legend>
+      <div class="fx-now fx-now-{{ fx.tone }}" id="exchange-rate">
+        <div class="fx-now-title">RATE USED FOR PRICES RIGHT NOW</div>
+        <div class="fx-now-rate">₹{{ fx.rate | money }} per USD <span class="fx-now-badge">{{ fx.badge }}</span></div>
+        {% if fx.state == 'auto' %}
+          <div class="fx-now-facts">
+            <div><span>Market rate</span><b>₹{{ fx.market | money }}</b></div>
+            <div><span>Fetched</span><b>{{ fx.fetched }}</b></div>
+            <div><span>Source</span><b>{{ fx.source }}</b></div>
+            <div><span>Cushion</span><b>{{ fx.cushion_line }}</b></div>
+          </div>
+        {% endif %}
+        {% for w in fx.warnings %}<p class="fx-now-warning">⚠ {{ w }}</p>{% endfor %}
+        {% if fx.fallback_hint %}<p class="fx-now-warning">{{ fx.fallback_hint }}</p>{% endif %}
+        {% if fx.compare %}<p class="fx-now-note">{{ fx.compare }}{% if fx.above_note %} <b>⚠ {{ fx.above_note }}</b>{% endif %}</p>{% endif %}
+        {% if fx.manual_note %}<p class="fx-now-note">{{ fx.manual_note }}</p>{% endif %}
+        {% set fxBox = fx %}{% set fx = { rate: fxBox.rate, mode: fxBox.mode, market: fxBox.market, cushion: fxBox.cushion, warnings: [] } %}{% include "pricing/_fx_rate_line.njk" %}{% set fx = fxBox %}
+        <p class="fx-now-note">Prices on Quotations and Proforma Invoices already issued never change.</p>
+        {% if fx.waiting %}{% set w = fx.waiting %}
+          <div class="fx-now-waiting">
+            <p><b>Waiting for the MD:</b> today's market rate ₹{{ w.market_rate | fixed4 }} ({{ w.source }}, {{ w.rate_date }}) moved {{ pricingFmt.signed(w.change_pct) }} — more than {{ pricingFmt.trim3(fxJumpPct) }}% in a day. It is not used for prices until approved.</p>
+            {% if canManage %}
+              <div class="field-grid">
+                <label>Reason *<input type="text" name="reason" form="fx-decide-form" required minlength="10" maxlength="255" placeholder="e.g. Checked with the bank — the move is real"></label>
+                <div><button type="submit" form="fx-decide-form" name="decision" value="approve" class="btn-sm btn-success">Use this rate</button>
+                  <button type="submit" form="fx-decide-form" name="decision" value="reject" class="btn-sm btn-secondary">Keep the rate in use</button></div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+        <div class="fx-now-actions">
+          {% if canManage %}<button type="submit" form="fx-fetch-form" class="btn-sm">Fetch today's rate now</button>{% endif %}
+          <a class="btn-sm" href="#fx-history">History (last 30 fetches)</a>
+        </div>
+      </div>
       <label class="setting-row"><span class="setting-label">{{ labels.fx_mode }} *<small class="muted">Automatic: the market rate is fetched every day (Frankfurter — European Central Bank; backup open.er-api.com) and the cushion below is taken off. Manual: the rate typed below is used.</small><span class="help-line">Example: Automatic, market ₹88.40, cushion 2% → pricing rate ₹86.63.</span></span>
-        <select name="fx_mode" required{{ ro }}>
+        <select name="fx_mode" required data-fx-mode{{ ro }}>
           <option value="auto"{% if settings.fx_mode != 'manual' %} selected{% endif %}>Automatic — fetched every day</option>
           <option value="manual"{% if settings.fx_mode == 'manual' %} selected{% endif %}>Manual — the rate typed below</option>
         </select></label>
-      <label class="setting-row"><span class="setting-label">{{ labels.fx_cushion_pct }} *<small class="muted">0 to 5 %, one decimal. Pricing rate = market rate × (1 − cushion %).</small><span class="help-line">Example: 2 → ₹88.40 × 0.98 = ₹86.63; 2.5 → ₹86.19.</span></span>
-        <input type="number" name="fx_cushion_pct" min="0" max="5" step="0.1" required value="{{ settings.fx_cushion_pct or '2.0' }}" placeholder="e.g. 2.0"{{ ro }}></label>
-      <label class="setting-row"><span class="setting-label">Manual exchange rate (₹ per USD) *<small class="muted">Used in Manual mode, and in Automatic mode until the first rate has been fetched. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
-        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="{{ settings.pricing_fx_rate }}" placeholder="e.g. 82.0000"{{ ro }}></label>
+      <label class="setting-row"><span class="setting-label">{{ labels.fx_cushion_pct }} * <span class="fx-field-badge fx-field-badge-off" data-fx-when="manual"{% if fxKey != 'manual' %} hidden{% endif %}>not used in Manual</span><small class="muted">0 to 5 %, one decimal. Pricing rate = market rate × (1 − cushion %).</small><span class="help-line">Example: 2 → ₹88.40 × 0.98 = ₹86.63; 2.5 → ₹86.19.</span></span>
+        <input type="number" name="fx_cushion_pct" min="0" max="5" step="0.1" required value="{{ settings.fx_cushion_pct or '2.0' }}" placeholder="e.g. 2.0" data-fx-muted-when="manual"{% if fxKey == 'manual' %} class="fx-unused"{% endif %}{{ ro }}></label>
+      <label class="setting-row"><span class="setting-label">Manual exchange rate (₹ per USD) * <span class="fx-field-badge fx-field-badge-off" data-fx-when="auto-market"{% if fxKey != 'auto-market' %} hidden{% endif %}>not used now — fall-back only</span><span class="fx-field-badge fx-field-badge-warn" data-fx-when="auto-none"{% if fxKey != 'auto-none' %} hidden{% endif %}>in use now</span><span class="fx-field-badge fx-field-badge-on" data-fx-when="manual"{% if fxKey != 'manual' %} hidden{% endif %}>in use now</span><small class="muted">Used in Manual mode, and in Automatic mode until the first rate has been fetched. Keep it a little below the market rate as a cushion.</small><span class="help-line">Example: market rate ₹83.25 → enter ₹82.00 (about 1.5% lower); ₹80,000 ÷ 82 = USD 975.61.</span></span>
+        <input type="number" name="pricing_fx_rate" min="0.0001" step="0.0001" required value="{{ settings.pricing_fx_rate }}" placeholder="e.g. 82.0000" data-fx-muted-when="auto-market"{% if fxKey == 'auto-market' %} class="fx-unused"{% endif %}{{ ro }}></label>
+      <details id="fx-history"><summary>History (last 30 fetches)</summary>
+        <table class="list">
+          <tr><th>Date</th><th class="num">Market rate (₹ per USD)</th><th>Source</th><th class="num">Change</th><th>Status</th><th>Note</th></tr>
+          {% set statusLabels = { 'in_use': 'In use', 'waiting_md': 'Waiting for the MD', 'rejected': 'Not used (MD)', 'failed': 'Fetch failed — last rate kept' } %}
+          {% for h in fxHistory %}
+            <tr><td>{{ h.rate_date }}</td>
+              <td class="num">{{ (h.market_rate | fixed4) if h.market_rate != null else '—' }}</td>
+              <td>{{ h.source or '—' }}</td>
+              <td class="num">{{ pricingFmt.signed(h.change_pct) if h.change_pct != null else '—' }}</td>
+              <td>{{ statusLabels[h.status] or h.status }}</td>
+              <td>{{ ((h.note or '') + ((' ' + (h.decided_by_name or '') + ': ' + h.decision_reason) if h.decision_reason else '')) | trim }}</td></tr>
+          {% endfor %}
+          {% if not fxHistory.length %}<tr><td colspan="6" class="muted">No rate fetched yet — the daily job fetches one every morning (see the README).</td></tr>{% endif %}
+        </table>
+      </details>
     </fieldset>
 
     <fieldset><legend>Team Incentive Reserve</legend>

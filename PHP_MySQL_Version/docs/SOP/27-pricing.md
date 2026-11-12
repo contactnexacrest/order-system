@@ -453,11 +453,28 @@ the buyer pays. *Example:* we quote USD 1,000 at a market rate of ₹88.40. The 
 ₹86.63; USD 1,000 now brings ₹86,630, not ₹88,400 — because prices were worked out at ₹86.63, the cost is
 still covered.
 
-Products › Pricing › Pricing settings › **Exchange Rate** shows the rate in use, its source and date, warnings and the
-history. The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate
-now**. If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
-day it waits: the MD reads the figures, gives a reason and chooses **Use this rate** or **Keep the rate in
-use**. Quotations and Proforma Invoices already issued never change.
+Products › Pricing › Pricing settings › **Exchange Rate (USD → INR)** starts with the box **RATE USED FOR
+PRICES RIGHT NOW** (D-340, 12 Nov 2026): the rate in big type and a badge — *Automatic · fetched today*,
+*Automatic · rate of <date>*, *Manual fall-back* (nothing fetched yet) or *Manual* — then the market rate,
+when it was fetched, the source and the cushion ("2.0% → ₹88.40 × 0.98"), and any warning. **Green** = the
+fetched rate is in use and all is well; **orange** = something needs a look (no rate fetched yet, today's fetch
+failed, a big move waiting); **blue** = Manual. In Manual the box compares your rate with the last market rate
+("your rate is 5.2% above the market" — above the market means prices in USD come out lower than intended).
+Beside the fields a badge says which one is in use: the manual rate shows **not used now — fall-back only**
+while a fetched rate is in use, **in use now** otherwise; the cushion shows **not used in Manual**. The badges
+change as soon as you change the Automatic / Manual drop-down (save to apply). **History (last 30 fetches)**
+opens the list of fetches below the fields.
+
+The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate now**
+(in the box). If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
+day it waits: the MD reads the figures in the box, gives a reason and chooses **Use this rate** or **Keep the
+rate in use**. Quotations and Proforma Invoices already issued never change.
+
+On an order (MD and ED only), the Products card shows above Price check which rate the prices were worked out
+at: before the Proforma Invoice "Prices worked out at ₹86.63 per USD (Automatic, 12 Nov 2026) — live: follows
+today's rate."; after it "… — fixed on the Proforma Invoice of 12 Nov 2026 at ₹86.63 per USD." (and, if
+today's rate is different, "today's rate ₹86.40 does not change them"). Nobody else sees this line, and it is
+never on a document.
 
 ## One master for HS codes and suppliers (D-302, D-303)
 

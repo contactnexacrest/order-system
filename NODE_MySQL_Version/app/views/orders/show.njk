@@ -875,6 +875,8 @@
       </div>
     {% endif %}
 
+  {# Owner decision D-340 (12 Nov 2026): the rate this order's prices were worked out at — price build-up viewers (MD, ED) only; never on documents (D-304). #}
+  {% if sees.selling and seesPriceBuildup and fxOrderLine %}<p class="price-rate-line small muted" id="price-rate">ⓘ {{ fxOrderLine }}</p>{% endif %}
   {# Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). #}
   {% if sees.selling and pcLines.length %}
   <div class="price-check" id="price-check">

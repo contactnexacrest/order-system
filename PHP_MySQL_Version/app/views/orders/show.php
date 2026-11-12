@@ -1525,6 +1525,9 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
       </div>
     <?php endif; ?>
 
+  <?php // Owner decision D-340 (12 Nov 2026): the rate this order's prices were worked out at — price build-up viewers (MD, ED) only; never on documents (D-304). ?>
+  <?php $__fxOrderLine = $sees['selling'] && !empty($seesPriceBuildup) ? \App\Services\FxRateService::orderLine($order, $linePricing['lines']) : null; ?>
+  <?php if ($__fxOrderLine !== null): ?><p class="price-rate-line small muted" id="price-rate">ⓘ <?= htmlspecialchars($__fxOrderLine) ?></p><?php endif; ?>
   <?php // Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). ?>
   <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::NEEDS_SIZE, \App\Services\OrderLinePricing::CBM_CALCULATED, \App\Services\OrderLinePricing::APPROVED], true))); ?>
   <?php if ($sees['selling'] && $__pcLines !== []): ?>

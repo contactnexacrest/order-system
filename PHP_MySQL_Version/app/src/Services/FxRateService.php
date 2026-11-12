@@ -257,6 +257,115 @@ final class FxRateService
         return $st->fetchAll();
     }
 
+    /** "12 Nov 2026" from "2026-11-12" (or a DATETIME); "" when empty. */
+    public static function dayLabel(?string $ymd): string
+    {
+        if ($ymd === null || $ymd === '') {
+            return '';
+        }
+        $t = strtotime(substr($ymd, 0, 10));
+        return $t === false ? $ymd : date('j M Y', $t);
+    }
+
+    /**
+     * Owner decision D-340 (12 Nov 2026): the "Rate used for prices right now" box on
+     * Pricing settings — current() plus what the box and the field badges say.
+     *
+     * state: auto (a fetched rate in use) / fallback (Automatic, nothing fetched yet) / manual.
+     * tone: green (Automatic, fetched rate, no warning) / orange (fall-back or any warning) / blue (Manual).
+     *
+     * @return array<string,mixed>
+     */
+    public static function status(?array $raw = null): array
+    {
+        $fx = self::current($raw);
+        $cfg = self::config($raw);
+        $last = self::latestInUse();
+        $fx['manual'] = $cfg['manual'];
+        $fx['has_market'] = $last !== null;
+        $fx['state'] = $fx['mode'] === 'manual' ? 'manual' : ($fx['market'] !== null ? 'auto' : 'fallback');
+        $fx['tone'] = $fx['state'] === 'manual' ? 'blue' : ($fx['state'] === 'auto' && $fx['warnings'] === [] ? 'green' : 'orange');
+        $fx['badge'] = match ($fx['state']) {
+            'manual' => 'Manual',
+            'fallback' => 'Manual fall-back',
+            default => $fx['date'] === date('Y-m-d') ? 'Automatic · fetched today' : 'Automatic · rate of ' . self::dayLabel($fx['date']),
+        };
+        $fx['fetched'] = null;
+        $fx['cushion_line'] = null;
+        if ($fx['state'] === 'auto' && $last !== null) {
+            $at = strtotime((string) $last['fetched_at']);
+            $fx['fetched'] = self::dayLabel($fx['date']) . ($at !== false ? ', ' . date('H:i', $at) : '');
+            $fx['cushion_line'] = number_format($fx['cushion'], 1) . '% → ₹' . number_format((float) $fx['market'], 2) . ' × '
+                . rtrim(rtrim(number_format(1 - $fx['cushion'] / 100, 3, '.', ''), '0'), '.');
+        }
+        $fx['manual_note'] = $fx['state'] === 'auto'
+            ? 'Manual rate ₹' . number_format($cfg['manual'], 2) . ' is not used — it is only the fall-back if no rate has ever been fetched.' : null;
+        $fx['fallback_hint'] = $fx['state'] === 'fallback'
+            ? 'Check that the daily job runs (README › Scheduled jobs), or press "Fetch today\'s rate now".' : null;
+        $fx['compare'] = null;
+        $fx['above_note'] = null;
+        if ($fx['state'] === 'manual') {
+            if ($last === null) {
+                $fx['compare'] = 'No market rate has been fetched yet to compare with.';
+            } else {
+                $pct = ($cfg['manual'] / (float) $last['market_rate'] - 1) * 100;
+                $fx['compare'] = 'For comparison, last market rate fetched: ₹' . number_format((float) $last['market_rate'], 2) . ' (' . self::dayLabel((string) $last['rate_date']) . ') — your rate is '
+                    . (abs($pct) < 0.05 ? 'the same as the market.' : number_format(abs($pct), 1) . '% ' . ($pct > 0 ? 'above' : 'below') . ' the market.');
+                if ($pct >= 0.05) {
+                    $fx['above_note'] = 'Above the market means prices in USD come out lower than intended.';
+                }
+            }
+        }
+        return $fx;
+    }
+
+    /**
+     * Owner decision D-340 (12 Nov 2026): the order page's one line about the rate its prices
+     * were worked out at — price build-up viewers only (MD, ED); never on documents (D-304).
+     * Before the PI the prices follow today's rate; once the PI is issued the rate is the one
+     * fixed on the lines (price_snapshot, D-245), else the order's pricing_fx_rate_at_pi.
+     * Null when no line of the order is price-checked.
+     *
+     * @param array<int, array> $checks OrderLinePricing::forOrder()['lines']
+     */
+    public static function orderLine(array $order, array $checks): ?string
+    {
+        $checked = array_filter($checks, static fn (array $c): bool => ($c['status'] ?? 'unchecked') !== 'unchecked');
+        if ($checked === []) {
+            return null;
+        }
+        $fixedRate = null;
+        $issued = false;
+        foreach ($checks as $c) {
+            $snap = !empty($c['line']['price_snapshot']) ? json_decode((string) $c['line']['price_snapshot'], true) : null;
+            if (is_array($snap)) {
+                $issued = true;
+                if ($fixedRate === null && isset($snap['fx_rate']) && is_numeric($snap['fx_rate']) && (float) $snap['fx_rate'] > 0) {
+                    $fixedRate = (float) $snap['fx_rate'];
+                }
+            }
+        }
+        $now = self::status();
+        if ($issued) {
+            $fixedRate ??= isset($order['pricing_fx_rate_at_pi']) && is_numeric($order['pricing_fx_rate_at_pi']) && (float) $order['pricing_fx_rate_at_pi'] > 0 ? (float) $order['pricing_fx_rate_at_pi'] : null;
+            $st = Database::connection()->prepare("SELECT MIN(d.generated_at) FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = :o AND dt.code = 'PI'");
+            $st->execute(['o' => (int) $order['id']]);
+            $piDate = self::dayLabel((string) ($st->fetchColumn() ?: ''));
+            if ($fixedRate === null) {
+                return 'Prices fixed on the Proforma Invoice' . ($piDate !== '' ? ' of ' . $piDate : '') . '.';
+            }
+            $r = '₹' . number_format($fixedRate, 2);
+            return 'Prices worked out at ' . $r . ' per USD — fixed on the Proforma Invoice' . ($piDate !== '' ? ' of ' . $piDate : '') . ' at ' . $r . ' per USD'
+                . (abs($fixedRate - (float) $now['rate']) >= 0.005 ? '; today\'s rate ₹' . number_format((float) $now['rate'], 2) . ' does not change them.' : '.');
+        }
+        $how = match ($now['state']) {
+            'manual' => 'Manual',
+            'fallback' => 'Manual fall-back',
+            default => 'Automatic, ' . self::dayLabel($now['date']),
+        };
+        return 'Prices worked out at ₹' . number_format((float) $now['rate'], 2) . ' per USD (' . $how . ') — live: follows today\'s rate.';
+    }
+
     /**
      * Reads the exchange-rate part of the Pricing settings form.
      *

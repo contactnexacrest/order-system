@@ -1001,6 +1001,8 @@ async function linePricingViewData(req, orderId) {
     pickRequiredWhen: (await require('../services/orderLinePricing').productPickRequired((await orderRepository.find(orderId) || {}).currency_code)) ? 'line_type=goods' : '',
     canManagePricing: !!(req.permissions && req.permissions.manage_pricing),
     seesPriceBuildup: seesPriceBuildup(req),
+    // D-340: the rate this order's prices were worked out at (price build-up viewers only).
+    fxOrderLine: seesPriceBuildup(req) ? await require('../services/fxRateService').orderLine(await orderRepository.find(orderId) || { id: orderId }, linePricing.lines) : null,
   };
 }
 

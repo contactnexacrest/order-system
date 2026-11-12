@@ -37,7 +37,8 @@ async function settings(req, res) {
     canManage: can(req, 'manage_pricing'),
     programOn: await pricingService.programOn(),
     // D-301 (point 4): the exchange rate in use, its source and date, and the history.
-    fx: await fxRateService.current(),
+    // D-340: with what the "Rate used for prices right now" box and the field badges say.
+    fx: await fxRateService.status(),
     fxHistory: await fxRateService.history(30),
     fxJumpPct: fxRateService.JUMP_PCT,
   }, 'layout/base');

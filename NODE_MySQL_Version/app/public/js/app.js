@@ -1675,6 +1675,25 @@
     });
   }
 
+  // Owner decision D-340 (12 Nov 2026): on Pricing settings the badges beside the
+  // exchange-rate fields ("in use now", "not used now — fall-back only", "not used in
+  // Manual") and the muted look of the unused field follow the mode drop-down as it is
+  // changed. The page renders them right on load; this only keeps them in step.
+  function applyFxModeBadges(select) {
+    var box = select.closest('[data-fx-has-market]');
+    if (!box) return;
+    var key = select.value === 'manual' ? 'manual' : (box.getAttribute('data-fx-has-market') === '1' ? 'auto-market' : 'auto-none');
+    box.querySelectorAll('[data-fx-when]').forEach(function (b) {
+      b.hidden = b.getAttribute('data-fx-when').split(' ').indexOf(key) === -1;
+    });
+    box.querySelectorAll('[data-fx-muted-when]').forEach(function (f) {
+      f.classList.toggle('fx-unused', f.getAttribute('data-fx-muted-when').split(' ').indexOf(key) !== -1);
+    });
+  }
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.matches && e.target.matches('select[data-fx-mode]')) applyFxModeBadges(e.target);
+  });
+
   // Owner decision D-320 (point 26): the section menu bar's drop-downs (and
   // the order page's "More" menu) close when another opens or on a click
   // elsewhere; a menu link to a part of a page (#exchange-rate,

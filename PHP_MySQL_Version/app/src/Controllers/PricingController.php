@@ -45,7 +45,8 @@ final class PricingController
             'canManage' => self::can('manage_pricing'),
             'programOn' => PricingService::programOn(),
             // D-301 (point 4): the exchange rate in use, its source and date, and the history.
-            'fx' => \App\Services\FxRateService::current(),
+            // D-340: with what the "Rate used for prices right now" box and the field badges say.
+            'fx' => \App\Services\FxRateService::status(),
             'fxHistory' => \App\Services\FxRateService::history(30),
             'fxSources' => \App\Services\FxRateService::SOURCES,
         ], 'layout/base');

@@ -254,7 +254,7 @@ test('2b: the approval screens know the new status', () => {
 
 test('2d: Pricing settings headings and legends are in Title Case', () => {
   const view = read('views/pricing/settings.njk');
-  for (const h of ['<h2>Exchange Rate</h2>', '<legend>Margin and Costs</legend>', '<legend>Exchange Rate (USD → INR)</legend>', '<legend>Team Incentive Reserve</legend>',
+  for (const h of ['<legend>Margin and Costs</legend>', '<legend>Exchange Rate (USD → INR)</legend>', '<legend>Team Incentive Reserve</legend>',
     '<legend>Supplier Prices</legend>', '<legend>Order Lines</legend>', '<legend>Specifications and Associate Prices (D-255)</legend>', '<h2>Who Can Do What</h2>']) {
     expect(view).toContain(h);
   }

@@ -279,7 +279,7 @@ final class FollowUpsD338Test extends DbTestCase
     public function testPricingSettingsHeadingsAreInTitleCase(): void
     {
         $view = (string) file_get_contents(self::APP . '/views/pricing/settings.php');
-        foreach (['<h2>Exchange Rate</h2>', '<legend>Margin and Costs</legend>', '<legend>Exchange Rate (USD → INR)</legend>', '<legend>Team Incentive Reserve</legend>',
+        foreach (['<legend>Margin and Costs</legend>', '<legend>Exchange Rate (USD → INR)</legend>', '<legend>Team Incentive Reserve</legend>',
             '<legend>Supplier Prices</legend>', '<legend>Order Lines</legend>', '<legend>Specifications and Associate Prices (D-255)</legend>', '<h2>Who Can Do What</h2>'] as $heading) {
             self::assertStringContainsString($heading, $view);
         }

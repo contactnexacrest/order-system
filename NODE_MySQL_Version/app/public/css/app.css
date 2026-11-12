@@ -341,6 +341,31 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge-success{background:var(--success-soft);color:var(--success);}
 .badge-warning{background:var(--gold-soft);color:var(--gold-strong);}
 .badge-danger{background:var(--danger-soft);color:var(--danger);}
+/* Owner decision D-340 (12 Nov 2026): Pricing settings — "Rate used for prices right now" and the exchange-rate field badges; the order page's rate line. */
+.fx-now{border:2px solid var(--success);background:var(--success-soft);border-radius:10px;padding:0.75rem 1rem;margin:0.25rem 0 0.9rem;}
+.fx-now-orange{border-color:#c77700;background:#fff8ec;}
+.fx-now-blue{border-color:#3b5bdb;background:var(--navy-soft);}
+.fx-now-title{font-size:0.75rem;letter-spacing:0.04em;color:var(--muted,#6b7280);}
+.fx-now-rate{font-size:1.4rem;font-weight:700;color:var(--success);}
+.fx-now-orange .fx-now-rate{color:#8a4b00;}
+.fx-now-blue .fx-now-rate{color:var(--navy-strong);}
+.fx-now-badge{display:inline-block;font-size:0.72rem;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle;background:#dcfce7;color:#166534;}
+.fx-now-orange .fx-now-badge{background:#ffedd5;color:#9a3412;}
+.fx-now-blue .fx-now-badge{background:#e5e7eb;color:#374151;}
+.fx-now-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.25rem 1.25rem;margin-top:0.4rem;font-size:0.85rem;}
+.fx-now-facts span{display:block;color:var(--muted,#6b7280);}
+.fx-now-warning{color:#9a3412;margin:0.35rem 0 0;font-size:0.92rem;}
+.fx-now-note{color:var(--muted,#6b7280);font-size:0.85rem;margin:0.35rem 0 0;}
+.fx-now .fx-rate-line{margin:0.35rem 0 0;font-size:0.85rem;}
+.fx-now-waiting{border-top:1px dashed #c77700;margin-top:0.5rem;padding-top:0.4rem;}
+.fx-now-actions{margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:0.5rem;}
+.fx-field-badge{display:inline-block;font-size:0.72rem;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:4px;}
+.fx-field-badge[hidden]{display:none;}
+.fx-field-badge-off{background:#e5e7eb;color:#374151;}
+.fx-field-badge-warn{background:#ffedd5;color:#9a3412;}
+.fx-field-badge-on{background:#dcfce7;color:#166534;}
+input.fx-unused{background:#f3f3f3;color:#9aa0aa;}
+.price-rate-line{margin:0.4rem 0;}
 .protected-row{background:var(--gold-soft);border-left:3px solid var(--gold);padding-left:0.6rem;}
 .lock-icon{margin-right:0.3rem;}
 .unlock-btn{margin-left:0.5rem;}

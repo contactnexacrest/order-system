@@ -3570,6 +3570,36 @@ open.er-api.com; failure → a `failed` row, the last rate stays (warning); a mo
 (price snapshot on the line). The rate line with [Why?] (`pricing/_fx_rate_line`) appears only on the
 catalogue header and Pricing settings, for build-up viewers.
 
+**Rate used for prices right now (D-340).** On Pricing settings the separate "Exchange Rate" block above the
+form is gone; the **Exchange Rate (USD → INR)** fieldset starts with a box titled "RATE USED FOR PRICES RIGHT
+NOW" (`FxRateService::status()` / `fxRateService.status()`, which adds to `current()`): the rate in big type
+with a badge — **Automatic · fetched today**, **Automatic · rate of 11 Nov 2026**, **Manual fall-back**
+(Automatic, nothing fetched yet) or **Manual**; for Automatic with a fetched rate the facts Market rate ·
+Fetched (date and time from `fx_rates.fetched_at`) · Source · Cushion ("2.0% → ₹88.40 × 0.98") and "Manual rate
+₹82.00 is not used — it is only the fall-back if no rate has ever been fetched."; the warnings (orange); for
+Manual "For comparison, last market rate fetched: ₹88.40 (12 Nov 2026) — your rate is 5.2% above the market."
+and, when above, "Above the market means prices in USD come out lower than intended."; the D-304 rate line with
+[Why?]; the MD's approve / keep form for a move over 2 %; "Fetch today's rate now" (MD) and "History (last 30
+fetches)" (link to the history, `#fx-history`, now at the end of the fieldset). Colour: green = Automatic with
+a fetched rate and no warning; orange = fall-back or any warning; blue = Manual. The fetch and decide forms are
+empty forms before the settings form; their buttons and the reason field sit in the box with `form="…"`
+(`#fx-fetch-form`, `#fx-decide-form`). The box keeps `id="exchange-rate"` (menu link, approvals, redirects).
+Field badges: the cushion "not used in Manual" (and the field muted, `fx-unused`) in Manual; the manual rate
+"not used now — fall-back only" (muted, still editable) in Automatic with a fetched rate, "in use now" in
+Automatic without one and in Manual. They are right on load and follow the mode drop-down live
+(`select[data-fx-mode]`, delegated handler `applyFxModeBadges` in the sitewide app.js; `data-fx-when`,
+`data-fx-muted-when`, `data-fx-has-market` on the fieldset).
+
+**Order page: the rate the prices were worked out at (D-340).** In the order's Products card, above Price
+check, price build-up viewers (`view_price_buildup`: MD, ED) see one line (`FxRateService::orderLine()` /
+`fxRateService.orderLine()`; `#price-rate`), only when a line is price-checked: before the PI "Prices worked
+out at ₹86.63 per USD (Automatic, 12 Nov 2026) — live: follows today's rate." ("(Manual)", "(Manual
+fall-back)"); after the PI the rate fixed with the line figures (`order_products.price_snapshot` → `fx_rate`,
+else `orders.pricing_fx_rate_at_pi`) and the date of the first PI: "Prices worked out at ₹86.63 per USD — fixed
+on the Proforma Invoice of 12 Nov 2026 at ₹86.63 per USD.", adding "; today's rate ₹86.40 does not change
+them." when today's rate differs. Before the PI no per-line rate is stored, so there is nothing to compare
+with. Never shown to other roles, associates, buyers or on documents (D-304). No database change.
+
 **One master for HS code and supplier (D-302, D-303).** Product HS code must be an active `hs_codes` code
 (form datalist + `data-in-list`, server check); "+ Add a new HS code" posts to `/hs-codes` with `return_to`.
 Order-line HS fields carry `data-in-list` too. `/products/fix-hs-codes` lists products whose code is not on the
