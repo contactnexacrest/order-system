@@ -49,6 +49,8 @@
 
   <?php include __DIR__ . '/_pricing.php'; ?>
 
+  <?php include __DIR__ . '/_unit_prices.php'; // D-339 ?>
+
   <?php if ($canViewPricing): ?>
   <div class="section">
     <?php // Owner decision D-335 (12 Nov 2026): "Costs to FOB" replaces the old default cost components. ?>

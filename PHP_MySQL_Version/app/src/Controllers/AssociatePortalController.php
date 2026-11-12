@@ -509,9 +509,19 @@ final class AssociatePortalController
             return;
         }
         unset($r['figures']); // never the full figures (cost) — D-255
+        $__product = \App\Repositories\ProductRepository::find((int) $r['product_id']);
+        // Owner decision D-339: the associate's own two prices (their level only) per CBM / SQM / SQFT
+        // at the requested thickness — the same prices, nothing new is priced.
+        $__mm = $__product !== null ? \App\Services\UnitPrices::selectionThicknessMm($__product, (string) ($r['selection'] ?? '')) : null;
+        $otherUnits = $r['quote'] !== null ? [
+            'quote' => \App\Services\UnitPrices::convert((float) $r['quote'], (string) ($r['unit'] ?? ''), $__mm),
+            'lowest' => \App\Services\UnitPrices::convert((float) $r['lowest'], (string) ($r['unit'] ?? ''), $__mm),
+            'mm' => $__mm,
+        ] : null;
         self::render('price_request', [
             'r' => $r,
-            'product' => \App\Repositories\ProductRepository::find((int) $r['product_id']),
+            'otherUnits' => $otherUnits,
+            'product' => $__product,
             'status' => \App\Services\PriceRequestService::displayStatus($r),
             'breakdown' => $r['breakdown'] !== null ? (json_decode((string) $r['breakdown'], true) ?: []) : [],
             'left' => \App\Services\PriceRequestService::leftToday($me),

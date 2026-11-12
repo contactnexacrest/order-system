@@ -294,6 +294,146 @@ final class DocxComponents
         $section->addTextBreak(1, 6);
     }
 
+    /**
+     * Owner decision D-339 (12 Nov 2026, owner confirmed twice): the detailed product table
+     * (LineTable::build()) — 8 pt, two header rows repeated on every page, a grey detail row
+     * under each line (documents with prices), the TOTAL row and, with mixed units, the
+     * "Totals by unit" row. The lines not sold by size follow in today's simple table
+     * ($simpleHeaders / $simpleRows, built by the caller as today); the Packing List's
+     * simple rows carry no prices. Node twin: docxComponents.addLineTable().
+     *
+     * @param array<string,mixed> $lt
+     */
+    public static function addLineTable(Section $section, array $lt, array $simpleHeaders = [], array $simpleWidths = [], array $simpleRows = []): void
+    {
+        if (($lt['variant'] ?? 'none') !== 'none') {
+            $widths = array_map(static fn ($p) => (int) round($p * 50), $lt['heads']['widths']);
+            $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000, 'layout' => \PhpOffice\PhpWord\Style\Table::LAYOUT_FIXED]);
+            $head = static function ($cell, string $text): void {
+                $cell->addText($text, ['bold' => true, 'size' => 8, 'color' => self::WHITE], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+            };
+            $hStyle = ['bgColor' => self::NAVY_MID, 'valign' => 'center', 'borderSize' => 4, 'borderColor' => 'C9D1E3'];
+            // Header row 1: "#" spans both rows; "Dimensions (cm)" spans L W H.
+            $table->addRow(null, ['tblHeader' => true, 'cantSplit' => true]);
+            $head($table->addCell($widths[0], $hStyle + ['vMerge' => 'restart']), '#');
+            $wi = 1;
+            foreach ($lt['heads']['top'] as $t) {
+                if ($t['span'] > 1) {
+                    $w = $widths[$wi] + $widths[$wi + 1] + $widths[$wi + 2];
+                    $head($table->addCell($w, $hStyle + ['gridSpan' => 3]), $t['text']);
+                    $wi += 3;
+                } else {
+                    $head($table->addCell($widths[$wi], $hStyle), $t['text']);
+                    $wi++;
+                }
+            }
+            $table->addRow(null, ['tblHeader' => true, 'cantSplit' => true]);
+            $table->addCell($widths[0], $hStyle + ['vMerge' => 'continue']);
+            foreach ($lt['heads']['bottom'] as $i => $b) {
+                $head($table->addCell($widths[$i + 1], $hStyle), $b);
+            }
+            $cStyle = ['borderSize' => 4, 'borderColor' => self::BORDER_GRAY, 'valign' => 'top'];
+            $cell = static function ($table, int $w, string $text, string $align = 'right', array $font = [], array $extra = []) use ($cStyle): void {
+                $c = $table->addCell($w, $cStyle + $extra);
+                $dash = $text === '—';
+                $c->addText($text, array_merge(['size' => 8], $dash ? ['color' => self::MUTED] : [], $font),
+                    ['alignment' => $dash || $align === 'center' ? Jc::CENTER : ($align === 'left' ? Jc::START : Jc::END), 'spaceAfter' => 0]);
+            };
+            $full = $lt['variant'] === 'full';
+            $prices = !empty($lt['with_prices']);
+            $cols = count($widths);
+            foreach ($lt['rows'] as $r) {
+                $table->addRow(null, ['cantSplit' => true]);
+                $cell($table, $widths[0], (string) $r['no'], 'center');
+                $cell($table, $widths[1], (string) $r['material'], 'left');
+                $cell($table, $widths[2], (string) $r['finish'], 'center');
+                if ($full) {
+                    if ($r['annexure'] !== null) {
+                        $cell($table, $widths[3] + $widths[4] + $widths[5], (string) $r['annexure'], 'center', ['italic' => true, 'color' => '8A5A00'], ['gridSpan' => 3]);
+                    } else {
+                        $cell($table, $widths[3], (string) $r['l']);
+                        $cell($table, $widths[4], (string) $r['w']);
+                        $cell($table, $widths[5], (string) $r['h']);
+                    }
+                    $cell($table, $widths[6], (string) $r['per_piece']);
+                    $cell($table, $widths[7], (string) $r['pcs']);
+                    $cell($table, $widths[8], (string) $r['all_pcs']);
+                    if ($prices) {
+                        $cell($table, $widths[9], (string) $r['price_unit']);
+                        $cell($table, $widths[10], (string) $r['price_piece']);
+                        $cell($table, $widths[11], (string) $r['total']);
+                    } else {
+                        $cell($table, $widths[9], (string) $r['crates']);
+                    }
+                } else {
+                    if ($r['annexure'] !== null) {
+                        $cell($table, $widths[3], (string) $r['annexure'], 'center', ['italic' => true, 'color' => '8A5A00']);
+                    } else {
+                        $cell($table, $widths[3], (string) $r['thickness']);
+                    }
+                    $cell($table, $widths[4], (string) $r['qty']);
+                    if ($prices) {
+                        $cell($table, $widths[5], (string) $r['price_unit']);
+                        $cell($table, $widths[6], (string) $r['total']);
+                    } else {
+                        $cell($table, $widths[5], (string) $r['crates']);
+                    }
+                }
+                if ($prices) {
+                    $table->addRow(null, ['cantSplit' => true]);
+                    $table->addCell($widths[0], ['borderSize' => 4, 'borderColor' => self::BORDER_GRAY, 'bgColor' => self::SPEC_BG]);
+                    $det = $table->addCell(5000 - $widths[0], ['gridSpan' => $cols - 1, 'bgColor' => self::SPEC_BG, 'borderSize' => 4, 'borderColor' => self::BORDER_GRAY]);
+                    $run = $det->addTextRun(['spaceAfter' => 0]);
+                    foreach ($r['detail'] as $k => $d) {
+                        if ($k > 0) {
+                            $run->addText('   ·   ', ['size' => 7, 'color' => self::MUTED]);
+                        }
+                        if ($d['label'] !== null) {
+                            $run->addText($d['label'] . ' ', ['size' => 7, 'bold' => true, 'color' => self::NAVY]);
+                        }
+                        $run->addText((string) $d['text'], ['size' => 7, 'color' => '3B4560']);
+                    }
+                }
+            }
+            $tot = ['bgColor' => self::NAVY, 'borderSize' => 4, 'borderColor' => self::BORDER_GRAY, 'valign' => 'center'];
+            $totText = static function ($table, int $w, string $text, array $extra = []) use ($tot): void {
+                $table->addCell($w, $tot + $extra)->addText($text, ['size' => 8, 'bold' => true, 'color' => self::WHITE], ['alignment' => Jc::END, 'spaceAfter' => 0]);
+            };
+            $table->addRow(null, ['cantSplit' => true]);
+            $lead = $full ? 7 : 4;
+            $table->addCell(array_sum(array_slice($widths, 0, $lead)), $tot + ['gridSpan' => $lead])
+                ->addText('TOTAL', ['size' => 8, 'bold' => true, 'color' => self::WHITE], ['spaceAfter' => 0]);
+            if ($full) {
+                $totText($table, $widths[7], (string) $lt['total']['pcs']);
+                $totText($table, $widths[8], (string) $lt['total']['measure']);
+                if ($prices) {
+                    $totText($table, $widths[9], '');
+                    $totText($table, $widths[10], '');
+                    $totText($table, $widths[11], (string) $lt['total']['amount']);
+                } else {
+                    $totText($table, $widths[9], '');
+                }
+            } else {
+                $totText($table, $widths[4], (string) $lt['total']['measure']);
+                if ($prices) {
+                    $totText($table, $widths[5], '');
+                    $totText($table, $widths[6], (string) $lt['total']['amount']);
+                } else {
+                    $totText($table, $widths[5], '');
+                }
+            }
+            if (!empty($lt['totals_by_unit'])) {
+                $table->addRow(null, ['cantSplit' => true]);
+                $table->addCell(5000, ['gridSpan' => $cols, 'bgColor' => self::SPEC_BG, 'borderSize' => 4, 'borderColor' => self::BORDER_GRAY])
+                    ->addText((string) $lt['totals_by_unit'], ['size' => 8, 'bold' => true, 'color' => self::NAVY], ['spaceAfter' => 0]);
+            }
+            $section->addTextBreak(1, 6);
+        }
+        if ($simpleRows !== []) {
+            self::addProductsTable($section, $simpleHeaders, $simpleWidths, $simpleRows);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Totals table: last row (highlight) uses navy-mid, white bold italic.
     // @param array<int, array{label:string, value:string, highlight?:bool}> $rows

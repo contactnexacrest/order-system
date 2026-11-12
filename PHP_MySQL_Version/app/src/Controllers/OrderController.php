@@ -490,6 +490,21 @@ final class OrderController
         // payment-status rows were already committed, and a negative
         // quantity was never rejected at all. Checked here, same "before
         // anything is written" placement as the HS-code check above.
+        // Owner decision D-339: a new order prints the detailed product table — each row's No. of
+        // pieces works out its quantity here (the browser's figure is never trusted).
+        $__rowPieces = [];
+        foreach ($descriptions as $i => $description) {
+            if (trim((string) $description) === '') {
+                continue;
+            }
+            $__rowPieces[$i] = self::piecesInput($_POST, (int) $i, false);
+            if ($__rowPieces[$i][2] !== null) {
+                Flash::set('error', 'Product line ' . ($i + 1) . ': ' . $__rowPieces[$i][2]);
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
+        }
         foreach ($descriptions as $i => $description) {
             if (trim((string) $description) === '') {
                 continue;
@@ -591,7 +606,7 @@ final class OrderController
         $testModeEnabled = TestModeService::isEnabled();
         ['orderId' => $orderId, 'orderReference' => $orderReference] = DeadlockRetry::run(function () use (
             $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
-            $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user
+            $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user, $__rowPieces
         ): array {
             // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
             $orderReferenceNew = \App\Services\ReferenceNumberService::generateOrderReference();
@@ -675,6 +690,7 @@ final class OrderController
                 }
                 \App\Services\OrderLinePricing::saveSelection($__lineId, $__rowSel, null);
                 OrderProductRepository::setPieceSize($__lineId, $__size);
+                OrderProductRepository::setPieces($__lineId, $__rowPieces[$i][0] ?? null, $__rowPieces[$i][1] ?? null);
                 // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
                 \App\Services\OrderLinePricing::afterSave($__lineId, null, (int) $user['id']);
             }
@@ -1012,6 +1028,64 @@ final class OrderController
     }
 
     /**
+     * Owner decision D-339: a line's "No. of pieces" and "Size note" — the order page's
+     * pieces_count / size_note, or row $row of the New Order form's product_pieces_count[] /
+     * product_size_note[]. With the size its unit is worked out from (CBM / SQM / SQFT with
+     * Length and Width, and Thickness for CBM) the pieces are required and the quantity is
+     * worked out here from them, whatever the browser sent (PCS: the quantity is the pieces).
+     * $post's quantity (and "Qty To Be Confirmed") are set to it. A line "As per annexure"
+     * keeps D-336 (no pieces). Only on an order with the detailed product table.
+     *
+     * @return array{0: ?int, 1: ?string, 2: ?string} [pieces, size note, error]
+     */
+    private static function piecesInput(array &$post, ?int $row, bool $perAnnexure): array
+    {
+        $get = static fn (string $f): mixed => $row === null ? ($post[$f] ?? '') : ($post['product_' . $f][$row] ?? '');
+        [$pieces, $error] = \App\Services\LineTable::readPieces($get('pieces_count'));
+        [$note, $noteError] = \App\Services\LineTable::readSizeNote($get('size_note'));
+        if (($error ?? $noteError) !== null) {
+            return [null, null, $error ?? $noteError];
+        }
+        if ($perAnnexure) {
+            return [null, $note, null];
+        }
+        [$size, $sizeError] = self::lineSizeInput($post, $row);
+        if ($sizeError !== null) {
+            return [$pieces, $note, null]; // the size's own message follows
+        }
+        $unit = trim((string) $get('unit'));
+        $tbcKey = $row === null ? 'quantity_is_tbc' : 'product_quantity_tbc';
+        [$quantity, $qtyError] = \App\Services\LineTable::serverQuantity(
+            $unit !== '' ? $unit : null,
+            \App\Services\LineUnits::size($size['piece_length_cm']),
+            \App\Services\LineUnits::size($size['piece_width_cm']),
+            \App\Services\LineUnits::size($size['piece_thickness_cm']),
+            $pieces,
+            false,
+            $row === null ? !empty($post[$tbcKey]) : !empty($post[$tbcKey][$row])
+        );
+        if ($qtyError !== null) {
+            return [$pieces, $note, $qtyError];
+        }
+        if ($quantity !== null) {
+            if ($row === null) {
+                $post['quantity'] = $quantity;
+                unset($post['quantity_is_tbc']);
+            } else {
+                $post['product_quantity'][$row] = $quantity;
+                unset($post['product_quantity_tbc'][$row]);
+            }
+        }
+        return [$pieces, $note, null];
+    }
+
+    /** D-339: the order prints the detailed product table (new orders); 'classic' orders keep the line form as before. */
+    private static function detailedLines(array $order): bool
+    {
+        return ($order['line_table_layout'] ?? \App\Services\LineTable::LAYOUT_CLASSIC) === \App\Services\LineTable::LAYOUT_DETAILED;
+    }
+
+    /**
      * Owner decision D-336: the line form's "As per annexure" tick box. Never together
      * with "Qty To Be Confirmed"; the quantity stays required (it is the line's
      * quantity). When ticked, the piece size and the Dimensions text are cleared in
@@ -1136,6 +1210,13 @@ final class OrderController
             header("Location: /orders/{$orderId}#step-products");
             return;
         }
+        // Owner decision D-339: No. of pieces → the quantity is worked out on the server.
+        [$__pieces, $__sizeNote, $__piecesError] = self::detailedLines($order) ? self::piecesInput($_POST, null, $__perAnnexure) : [null, null, null];
+        if ($__piecesError !== null) {
+            Flash::set('error', 'Product line: ' . $__piecesError);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
 
         // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
         if ($lineError = OrderLineValidator::checkLine((string) ($_POST['quantity'] ?? ''), !empty($_POST['quantity_is_tbc']), (string) ($_POST['unit_price'] ?? ''))) {
@@ -1193,6 +1274,9 @@ final class OrderController
         \App\Services\OrderLinePricing::saveSelection($newLineId, $__specSel, $__priceRequest !== null ? (int) $__priceRequest['id'] : null);
         OrderProductRepository::setPieceSize($newLineId, $__size);
         OrderProductRepository::setAsPerAnnexure($newLineId, $__perAnnexure);
+        if (self::detailedLines($order)) {
+            OrderProductRepository::setPieces($newLineId, $__pieces, $__sizeNote);
+        }
         if ($__priceRequest !== null) {
             \App\Services\PriceRequestService::markOrdered((int) $__priceRequest['id'], $orderId);
         }
@@ -1237,6 +1321,15 @@ final class OrderController
         [$__perAnnexure, $__annexureError] = self::annexureLineInput($_POST, $product['as_per_annexure'] ?? null);
         if ($__annexureError !== null) {
             Flash::set('error', 'Product line: ' . $__annexureError);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+        // Owner decision D-339: No. of pieces → the quantity is worked out on the server
+        // (a form without the field keeps the line's pieces and size note).
+        $__piecesForm = self::detailedLines($order) && array_key_exists('pieces_count', $_POST);
+        [$__pieces, $__sizeNote, $__piecesError] = $__piecesForm ? self::piecesInput($_POST, null, $__perAnnexure) : [null, null, null];
+        if ($__piecesError !== null) {
+            Flash::set('error', 'Product line: ' . $__piecesError);
             header("Location: /orders/{$orderId}#step-products");
             return;
         }
@@ -1311,6 +1404,9 @@ final class OrderController
         }
         OrderProductRepository::setPieceSize($productId, $__size);
         OrderProductRepository::setAsPerAnnexure($productId, $__perAnnexure);
+        if ($__piecesForm) {
+            OrderProductRepository::setPieces($productId, $__pieces, $__sizeNote);
+        }
         $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
             OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);

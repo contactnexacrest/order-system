@@ -826,6 +826,108 @@
     });
   }
 
+  // Owner decision D-339 (12 Nov 2026): "No. of pieces" on an order line. With Length and
+  // Width (and Thickness for CBM) in CBM, SQM or SQFT the pieces are required and the Qty is
+  // worked out from them (read-only): CBM per piece = L × W × H / 1,000,000 (4 decimals),
+  // SQM = L × W / 10,000 (4 decimals), SQFT = SQM × 10.7639 (2 decimals); the Qty = per piece
+  // × pieces (CBM 3 decimals, SQM / SQFT 2). PCS: the Qty is the pieces. Without a size the
+  // Qty is typed as before. The server works the Qty out again and never trusts this figure.
+  // The same rounding as LineTable.php / lineTable.js.
+  var PIECE_UNITS = { CBM: 'CBM', M2: 'SQM', SQFT: 'SQFT', PCS: 'PCS' };
+  var PIECE_ALL_DECIMALS = { CBM: 3, SQM: 2, SQFT: 2, PCS: 0 };
+  var PIECE_ONE_DECIMALS = { CBM: 4, SQM: 2, SQFT: 2 };
+  function roundHalfUp(v, d) { return Number(Math.round(Number(Number(v).toFixed(6) + 'e' + d)) + 'e-' + d); }
+  function groupNum(v, d) { return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function piecesField(scope, base) {
+    return scope.querySelector('[name="' + base + '"]') || scope.querySelector('[name="product_' + base + '[]"]');
+  }
+  function piecesNumber(scope, base) {
+    var f = piecesField(scope, base);
+    var v = f && !f.disabled ? f.value.trim() : '';
+    return v !== '' && !isNaN(Number(v)) && Number(v) > 0 ? Number(v) : null;
+  }
+  function piecesPerPiece(code, l, w, h) {
+    if (!code || code === 'PCS' || l === null || w === null) return null;
+    if (code === 'CBM') return h === null ? null : roundHalfUp(l * w * h / 1000000, 4);
+    var sqm = roundHalfUp(l * w / 10000, 4);
+    return code === 'SQM' ? sqm : roundHalfUp(sqm * 10.7639, 2);
+  }
+  function piecesScope(el) { return el.closest('.product-row') || el.form; }
+  function piecesNeeded(scope) {
+    var annex = scope.querySelector('input[type="checkbox"][data-annexure-line]');
+    if (annex && annex.checked) return null;
+    var unit = piecesField(scope, 'unit');
+    var code = PIECE_UNITS[unitKind(unit ? unit.value : '')] || null;
+    var per = piecesPerPiece(code, piecesNumber(scope, 'piece_length_cm'), piecesNumber(scope, 'piece_width_cm'), piecesNumber(scope, 'piece_thickness_cm'));
+    return per !== null ? { code: code, per: per } : null;
+  }
+  function piecesApply(scope) {
+    var pcsField = scope.querySelector('[data-pieces-count]');
+    if (!pcsField) return;
+    var qty = piecesField(scope, 'quantity');
+    var tbc = scope.querySelector('input[type="checkbox"][name="quantity_is_tbc"]') || scope.querySelector('input[type="checkbox"][name^="product_quantity_tbc"]');
+    var hint = scope.querySelector('.qty-worked-out');
+    var summary = scope.querySelector('.line-pieces-summary');
+    var annex = scope.querySelector('input[type="checkbox"][data-annexure-line]');
+    var unit = piecesField(scope, 'unit');
+    var code = PIECE_UNITS[unitKind(unit ? unit.value : '')] || null;
+    var raw = pcsField.value.trim();
+    var n = /^\d{1,7}$/.test(raw) && Number(raw) > 0 ? Number(raw) : null;
+    var need = piecesNeeded(scope);
+    var priceField = piecesField(scope, 'unit_price');
+    var price = priceField && priceField.value.trim() !== '' && !isNaN(Number(priceField.value)) ? Number(priceField.value) : null;
+    var curSelect = document.getElementById('order-currency-select');
+    var curOption = curSelect && curSelect.options[curSelect.selectedIndex];
+    var cur = (summary && summary.getAttribute('data-currency')) || (curOption ? (curOption.getAttribute('data-code') || '') : '');
+    var text = '';
+    pcsField.disabled = !!(annex && annex.checked);
+    if (pcsField.disabled) pcsField.value = '';
+    var auto = false;
+    if (qty && need) {
+      auto = true;
+      qty.value = n !== null ? roundHalfUp(need.per * n, PIECE_ALL_DECIMALS[need.code]).toFixed(PIECE_ALL_DECIMALS[need.code]) : '';
+      if (hint) hint.textContent = 'worked out: ' + (n !== null ? groupNum(n, 0) : '…') + ' × ' + groupNum(need.per, PIECE_ONE_DECIMALS[need.code]) + ' ' + need.code;
+      if (n !== null) {
+        text = 'This line: ' + groupNum(need.per, PIECE_ONE_DECIMALS[need.code]) + ' ' + need.code + ' per piece · ' + groupNum(n, 0) + ' pcs = '
+          + groupNum(Number(qty.value), PIECE_ALL_DECIMALS[need.code]) + ' ' + need.code;
+        if (price !== null) {
+          text += ' · ' + cur + ' ' + groupNum(roundHalfUp(price * need.per, 2), 2) + ' per piece · total ' + cur + ' ' + groupNum(roundHalfUp(Number(qty.value) * price, 2), 2);
+        }
+      }
+    } else if (qty && code === 'PCS' && n !== null && !(annex && annex.checked)) {
+      auto = true;
+      qty.value = String(n);
+      if (hint) hint.textContent = 'worked out: the No. of pieces';
+      text = 'This line: ' + groupNum(n, 0) + ' pcs' + (price !== null ? ' · ' + cur + ' ' + groupNum(price, 2) + ' per piece · total ' + cur + ' ' + groupNum(roundHalfUp(n * price, 2), 2) : '');
+    } else if (hint) {
+      hint.textContent = '';
+    }
+    if (qty) {
+      if (auto) {
+        qty.readOnly = true;
+        qty.classList.add('qty-auto');
+        if (tbc) tbc.checked = false;
+        qty.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (qty.classList.contains('qty-auto')) {
+        qty.readOnly = false;
+        qty.classList.remove('qty-auto');
+      }
+    }
+    if (summary) { summary.textContent = text; summary.hidden = text === ''; }
+  }
+  function initLinePieces() {
+    document.querySelectorAll('[data-pieces-count]').forEach(function (f) { var sc = piecesScope(f); if (sc) piecesApply(sc); });
+    var names = /^(product_)?(pieces_count|piece_length_cm|piece_width_cm|piece_thickness_cm|unit|unit_price|as_per_annexure)(\[\])?$/;
+    var handler = function (e) {
+      var t = e.target;
+      if (!t || !t.name || !names.test(t.name)) return;
+      var sc = piecesScope(t);
+      if (sc && sc.querySelector('[data-pieces-count]')) piecesApply(sc);
+    };
+    document.addEventListener('input', handler);
+    document.addEventListener('change', handler);
+  }
+
   // D-300 (owner point 12, 11 Nov 2026): a supplier price for every thickness. Typing a
   // box makes it TYPED; every CALCULATED box follows at once from the category's rules
   // (30 mm = 20 mm + 35 %, 50 mm+ per CBM = 20 mm per m² × K — in every direction);
@@ -1102,6 +1204,13 @@
     if (el.dataset.pieceSize && value === '') {
       var sizeNeed = pieceSizeNeed(el);
       if (sizeNeed) return sizeNeed;
+    }
+    // data-pieces-count (D-339): an order line's No. of pieces — a whole number; required
+    // when the size works out the Qty (CBM / SQM / SQFT with Length and Width, and Thickness for CBM).
+    if (el.dataset.piecesCount !== undefined && !el.disabled) {
+      if (value !== '' && (!/^\d{1,7}$/.test(value) || Number(value) < 1)) return 'Enter the No. of pieces as a whole number from 1 to 9999999 (e.g. 25).';
+      var pcsScope = piecesScope(el);
+      if (value === '' && pcsScope && piecesNeeded(pcsScope)) return 'Enter the No. of pieces — with the size given, the Qty is worked out from the pieces.';
     }
     // data-required-if="<name>=<value>": required while that field has that value
     // (e.g. the staff member's name when an expense was paid by staff);
@@ -1760,10 +1869,29 @@
     var value = parseFloat(el.value);
     var below = el.dataset.floor !== undefined && el.dataset.floor !== '' && !isNaN(floor) && el.value.trim() !== '' && !isNaN(value) && value < floor - 0.0001;
     if (!below) {
-      if (note) note.remove();
       el.classList.remove('below-floor');
+      // D-339: on an order line, the floor in the line's unit beside the price ("Your floor: USD 37.20 per SQM — this price is 4.8% above").
+      if (el.hasAttribute('data-floor-show') && el.dataset.floor !== undefined && el.dataset.floor !== '' && !isNaN(floor) && floor > 0 && el.value.trim() !== '' && !isNaN(value)) {
+        if (!note) {
+          note = document.createElement('span');
+          note.setAttribute('aria-live', 'polite');
+          el.insertAdjacentElement('afterend', note);
+        }
+        note.className = 'floor-note floor-ok small';
+        var sc = el.closest('.product-row') || el.form;
+        var u = sc ? (sc.querySelector('[name="unit"]') || sc.querySelector('[name="product_unit[]"]')) : null;
+        var pct = Math.round((value - floor) / floor * 1000) / 10;
+        var curSel = document.getElementById('order-currency-select');
+        var curOpt = curSel && curSel.options[curSel.selectedIndex];
+        var floorCur = el.getAttribute('data-floor-currency') || (curOpt ? (curOpt.getAttribute('data-code') || '') : '');
+        note.textContent = 'Your floor: ' + (floorCur ? floorCur + ' ' : '') + groupNum(floor, 2) + (u && u.value ? ' per ' + u.value : '')
+          + (pct > 0 ? ' — this price is ' + pct.toFixed(1) + '% above' : ' — this price is at your floor');
+        return;
+      }
+      if (note) note.remove();
       return;
     }
+    if (note) note.className = 'floor-note small';
     if (!note) {
       note = document.createElement('span');
       note.className = 'floor-note small';
@@ -2016,6 +2144,7 @@
     initIdleWarning(); // D-283
     initThicknessGrid();
     initAnnexureLine(); // D-336
+    initLinePieces(); // D-339
     initThicknessCalc(); // D-335
     initSupplierPick();
     initRulesExample();

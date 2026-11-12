@@ -20,6 +20,16 @@ $__unit = (string) ($r['unit'] ?? '');
       <div><div class="muted small">Quote price</div><div style="font-size:1.5em;font-weight:700">USD <?= number_format((float) $r['quote'], 2) ?><?= $__unit === 'CBM' ? ' / CBM' : '' ?></div></div>
       <div><div class="muted small">Lowest price you may agree with the buyer</div><div style="font-size:1.5em;font-weight:700">USD <?= number_format((float) $r['lowest'], 2) ?><?= $__unit === 'CBM' ? ' / CBM' : '' ?></div></div>
     </div>
+    <?php if (!empty($otherUnits)): // Owner decision D-339: your two prices in the other units (worked out, nothing saved) ?>
+      <?php $__u = static fn (?float $v): string => $v !== null ? number_format($v, 2) : '—'; ?>
+      <h2>Your prices in other units<?= $otherUnits['mm'] !== null ? ' — ' . View::e(\App\Services\LineUnits::num($otherUnits['mm'] / 10)) . ' cm thick' : '' ?></h2>
+      <table class="list">
+        <tr><th></th><th class="r">per CBM</th><th class="r">per SQM</th><th class="r">per SQFT</th></tr>
+        <tr><td>Quote price (USD)</td><td class="r"><?= $__u($otherUnits['quote']['CBM']) ?></td><td class="r"><?= $__u($otherUnits['quote']['SQM']) ?></td><td class="r"><?= $__u($otherUnits['quote']['SQFT']) ?></td></tr>
+        <tr><td>Lowest you may agree (USD)</td><td class="r"><?= $__u($otherUnits['lowest']['CBM']) ?></td><td class="r"><?= $__u($otherUnits['lowest']['SQM']) ?></td><td class="r"><?= $__u($otherUnits['lowest']['SQFT']) ?></td></tr>
+      </table>
+      <p class="muted small">1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
+    <?php endif; ?>
     <?php if (!empty($breakdown['per_m2'])): ?><p class="muted small">About USD <?= number_format((float) $breakdown['per_m2'], 2) ?> per square metre (one cubic metre gives <?= View::e((string) $breakdown['m2_per_cbm']) ?> m²). This is only to compare; the order is priced per cubic metre.</p><?php endif; ?>
     <table class="list">
       <?php foreach ($breakdown['lines'] ?? [] as $l): ?><tr><td><?= View::e($l['label']) ?></td><td class="r"><?= View::e($l['change']) ?></td></tr><?php endforeach; ?>

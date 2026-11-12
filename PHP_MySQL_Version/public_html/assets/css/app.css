@@ -1044,3 +1044,13 @@ legend.legend-sentence{text-transform:none;}
 .suppliers-table td:first-child{overflow-wrap:anywhere;min-width:9rem;}
 .suppliers-table .row-actions{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
 .suppliers-table .row-actions form{margin:0;}
+
+/* Owner decision D-339 (12 Nov 2026): No. of pieces on an order line — the worked-out Qty,
+   the line's summary, the floor in the line's unit, and the "Prices in other units" card. */
+.qty-worked-out{display:block;margin-top:3px;font-weight:400}
+input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
+.line-pieces-summary{background:#eef4ff;border:1px solid #c7d7f5;border-radius:6px;padding:6px 10px;margin:8px 0}
+.floor-note.floor-ok{color:#166534;font-weight:500}
+.unit-prices-card table td.num,.unit-prices-card table th.num{text-align:right}
+.unit-prices-card .tag{font-size:11px;padding:1px 6px;border-radius:9px;background:#eef2ff;color:#3730a3;font-weight:600}
+.unit-prices-card .tag.typed{background:#e7f6ec;color:#166534}

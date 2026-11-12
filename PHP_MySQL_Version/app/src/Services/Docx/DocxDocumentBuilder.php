@@ -232,8 +232,9 @@ final class DocxDocumentBuilder
     {
         $rows = [];
         foreach ($products as $i => $p) {
-            $lineColor = ($i % 2 === 0) ? '1D6FA8' : '2D7D56';
-            $n = $i + 1;
+            // D-339: a line below the detailed table keeps its own number on the document.
+            $n = (int) ($p['no'] ?? $i + 1);
+            $lineColor = ($n % 2 === 1) ? '1D6FA8' : '2D7D56';
             $rows[] = [
                 'cells' => [(string) $n, $p['description'] ?? '', $p['quantity'] ?? '', $p['unit'] ?? '', $p['unit_price'] ?? '', $p['amount'] ?? ''],
                 'lineColor' => $lineColor,
@@ -265,6 +266,30 @@ final class DocxDocumentBuilder
             ];
         }
         return $rows;
+    }
+
+    /**
+     * Owner decision D-339: the product table — the detailed table on an order with the detailed
+     * layout (context line_table), else today's table. The lines not sold by size follow in
+     * today's rows (on the Packing List without prices).
+     */
+    private static function productsTable(Section $section, array $context, string $currency, array $products): void
+    {
+        $lt = $context['line_table'] ?? null;
+        if (!is_array($lt)) {
+            DocxComponents::addProductsTable($section, self::productTableHeaders($currency), [6, 34, 10, 10, 20, 20], self::buildProductRows($products));
+            return;
+        }
+        if (!empty($lt['with_prices'])) {
+            DocxComponents::addLineTable($section, $lt, self::productTableHeaders($currency), [6, 34, 10, 10, 20, 20], self::buildProductRows($lt['simple']));
+            return;
+        }
+        $rows = array_map(static fn (array $p): array => [
+            'cells' => [(string) $p['no'], ($p['description'] ?? '') . (!empty($p['finish']) ? ' — ' . $p['finish'] : ''), (string) ($p['quantity'] ?? ''), (string) ($p['unit'] ?? '')],
+            'lineColor' => ((int) $p['no'] % 2 === 1) ? '1D6FA8' : '2D7D56',
+            'align' => [null, null, 'right', null],
+        ], $lt['simple']);
+        DocxComponents::addLineTable($section, $lt, ['#', 'Product Description *', 'Qty *', 'Unit *'], [8, 62, 15, 15], $rows);
     }
 
     private static function weightTable(Section $section, array $order, array $context = []): void
@@ -389,7 +414,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
-        DocxComponents::addProductsTable($section, self::productTableHeaders($currency), [6, 34, 10, 10, 20, 20], self::buildProductRows($context['products'] ?? []));
+        self::productsTable($section, $context, $currency, $context['products'] ?? []);
 
         $freightText = !empty($order['is_fob'])
             ? 'NIL'
@@ -500,7 +525,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
         $products = $context['products'] ?? [];
-        DocxComponents::addProductsTable($section, self::productTableHeaders($currency), [6, 34, 10, 10, 20, 20], self::buildProductRows($products));
+        self::productsTable($section, $context, $currency, $products);
 
         $piTotalsRows = [];
         foreach ($products as $p) {
@@ -650,13 +675,16 @@ final class DocxDocumentBuilder
 
         $productList = array_map(static fn(array $p) => ($p['description'] ?? '') . ' (Qty: ' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ')', $context['products'] ?? []);
         DocxComponents::addSectionTitle($section, '3. ORDER SUMMARY');
+        if (!empty($context['line_table'])) {
+            self::productsTable($section, $context, $currency, $context['products'] ?? []); // D-339
+        }
         DocxComponents::addKvTable($section, [
             ['label' => 'Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—')],
             ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—')],
             ['label' => 'Proforma Invoice No. *', 'value' => self::g($order, 'pi_ref', '—')],
             // Owner decision D-224 (D1, 2 Nov 2026, confirmed twice): the buyer's PO number, when entered.
             ...self::buyerPoRow($order),
-            ['label' => 'Product(s) *', 'value' => implode('; ', $productList)],
+            ...(!empty($context['line_table']) ? [] : [['label' => 'Product(s) *', 'value' => implode('; ', $productList)]]),
             ['label' => 'Total Order Value (FOB) *', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
@@ -935,14 +963,20 @@ final class DocxDocumentBuilder
 
         $productList = implode('; ', array_map(static fn(array $p) => $p['description'] ?? '', $products));
         DocxComponents::addSectionTitle($section, '3. ORDER DETAILS  (Pre-filled from Quotation — buyer to confirm)');
+        if (!empty($context['line_table'])) {
+            self::productsTable($section, $context, $currency, $products); // D-339
+        }
         DocxComponents::addKvTable($section, [
             ['label' => 'Against Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—') . ' (fixed)'],
             ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—') . ' (fixed)'],
-            ['label' => 'Product Description *', 'value' => $productList],
-            // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
-            ['label' => 'Quantity *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['quantity'] ?? ''), $products)) : 'To Be Confirmed'],
-            ['label' => 'Unit *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit'] ?? ''), $products)) : 'To Be Confirmed'],
-            ['label' => "Unit Price ({$currency}) *", 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit_price'] ?? ''), $products)) : 'To Be Confirmed'],
+            // D-339: on an order with the detailed product table, the table above lists the lines.
+            ...(!empty($context['line_table']) ? [] : [
+                ['label' => 'Product Description *', 'value' => $productList],
+                // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
+                ['label' => 'Quantity *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['quantity'] ?? ''), $products)) : 'To Be Confirmed'],
+                ['label' => 'Unit *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit'] ?? ''), $products)) : 'To Be Confirmed'],
+                ['label' => "Unit Price ({$currency}) *", 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit_price'] ?? ''), $products)) : 'To Be Confirmed'],
+            ]),
             ['label' => "Total FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
@@ -1290,8 +1324,11 @@ final class DocxDocumentBuilder
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . (!empty($p['finish']) ? ' — ' . $p['finish'] : ''), $products));
         $hsCodeList = implode(', ', array_map(static fn(array $p) => $p['hs_code'] ?? '', $products));
         DocxComponents::addSectionTitle($section, '3. PRODUCT SUMMARY');
+        if (!empty($context['line_table'])) {
+            self::productsTable($section, $context, '', $products); // D-339: the detailed table, no prices
+        }
         DocxComponents::addKvTable($section, [
-            ['label' => 'Product Description *', 'value' => $productList],
+            ...(!empty($context['line_table']) ? [] : [['label' => 'Product Description *', 'value' => $productList]]),
             ['label' => 'HS Code *', 'value' => $hsCodeList],
             ['label' => 'Country of Origin *', 'value' => 'India'],
             ['label' => 'Total Quantity *', 'value' => self::g($packing, 'actual_quantity_packed') !== '—' ? self::g($packing, 'actual_quantity_packed') . (self::g($packing, 'actual_quantity_unit') !== '—' ? ' ' . self::g($packing, 'actual_quantity_unit') : '') : 'To Be Confirmed'],
@@ -1543,7 +1580,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '4. PRODUCT / ORDER DETAILS');
         DocxComponents::addPlainParagraph($section, 'Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.', ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
-        DocxComponents::addProductsTable($section, self::productTableHeaders($currency), [6, 34, 10, 10, 20, 20], self::buildProductRows($products));
+        self::productsTable($section, $context, $currency, $products);
         $plRefLine = 'PL Reference: ' . self::g($order, 'pl_ref', 'To Be Confirmed');
         if (!empty($crates)) {
             $plRefLine .= count($crates) > 1

@@ -169,7 +169,10 @@
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"></label>
+          <?php // Owner decision D-339: No. of pieces — with the size given in CBM / SQM / SQFT the Qty is worked out from it (PCS: the Qty is the pieces). ?>
+          <label>No. of pieces<input type="text" inputmode="numeric" name="product_pieces_count[]" data-pieces-count maxlength="7" value="<?= htmlspecialchars((string) ($old['product_pieces_count'][$__i] ?? '')) ?>" placeholder="e.g. 25"></label>
+          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          <label>Size note <small class="muted">(only when no size is given)</small><input type="text" name="product_size_note[]" maxlength="200" value="<?= htmlspecialchars((string) ($old['product_size_note'][$__i] ?? '')) ?>" placeholder="e.g. Random sizes, as available"></label>
           <label>Unit
             <select name="product_unit[]">
               <?php $__unitVal = (string) ($old['product_unit'][$__i] ?? ''); ?>
@@ -178,7 +181,8 @@
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Unit Price<input type="text" name="product_unit_price[]" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>" placeholder="e.g. 45.00"></label>
+          <label>Unit Price<input type="text" name="product_unit_price[]" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>" placeholder="e.g. 45.00" data-floor-show></label>
+          <p class="line-pieces-summary small" aria-live="polite" hidden></p>
           <label>HS Code<input type="text" name="product_hs_code[]" value="<?= htmlspecialchars((string) ($old['product_hs_code'][$__i] ?? '')) ?>" list="hs_code_list" data-in-list="hs_code_list" data-in-list-message="Pick an HS code from the HS Code Master List." placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
@@ -305,6 +309,10 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   // D-271 (point 13): a new row starts without the first row's options.
   clone.querySelectorAll('.spec-options').forEach(function (el) { el.innerHTML = ''; });
   clone.querySelectorAll('[data-dims-auto]').forEach(function (el) { el.removeAttribute('data-dims-auto'); });
+  // D-339: a new row starts with a typed Qty and no pieces summary.
+  clone.querySelectorAll('.qty-auto').forEach(function (el) { el.readOnly = false; el.classList.remove('qty-auto'); });
+  clone.querySelectorAll('.qty-worked-out, .line-pieces-summary, .floor-note').forEach(function (el) { el.textContent = ''; });
+  clone.querySelectorAll('.line-pieces-summary').forEach(function (el) { el.hidden = true; });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

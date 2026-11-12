@@ -6612,3 +6612,17 @@ CREATE TABLE IF NOT EXISTS order_buyer_detail_requests (
 -- required, never together with "Qty To Be Confirmed"); it is carried onto
 -- order_products.as_per_annexure when the request becomes an order.
 ALTER TABLE order_reorder_request_products ADD COLUMN as_per_annexure TINYINT(1) NOT NULL DEFAULT 0;
+
+-- ================================================================
+-- Owner decision D-339 (12 Nov 2026, owner confirmed twice; migration 2026-11-12g):
+-- the detailed product table on the Quotation, PI, OC, CI, Buyer PO and Packing List
+-- (# | Material / Colour | Surface / Finish | Dimensions L W H | measure per piece |
+-- No. of pcs | measure of all pieces | price per unit | price per piece | total).
+-- orders.line_table_layout: 'detailed' for new orders; the migration sets every order
+-- that existed before it to 'classic' (its documents print exactly as before).
+-- order_products.pieces_count: No. of pieces (with the size given in CBM / SQM / SQFT
+-- the quantity is worked out from it; PCS: the quantity is the pieces).
+-- order_products.size_note: e.g. "Random sizes, as available" (printed under the line).
+ALTER TABLE orders ADD COLUMN line_table_layout ENUM('classic','detailed') NOT NULL DEFAULT 'detailed';
+ALTER TABLE order_products ADD COLUMN pieces_count INT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN size_note VARCHAR(200) NULL;

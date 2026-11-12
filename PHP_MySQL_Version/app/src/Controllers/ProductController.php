@@ -322,8 +322,15 @@ final class ProductController
                 'p' => $__offered !== [] ? \App\Services\PricingService::forProduct($details['product'], null, null, null, $__sel) : null];
         }
 
+        // Owner decision D-339: "Prices in other units" (read-only, nothing stored) — the supplier price for
+        // people who may see purchase prices, the staff quote and floor for people who see selling prices,
+        // every associate level for people who see the price build-up (MD / ED).
+        $__unitMay = ['supplier' => $canSeeSuppliers, 'staff' => $canBuildup || $canStaffPrice, 'levels' => $canBuildup];
+        $unitPrices = in_array(true, $__unitMay, true) ? \App\Services\UnitPrices::card($details['product'], $__unitMay) : null;
+
         $usage = ProductRepository::usage($id);
         View::render('products/show', [
+            'unitPrices'     => $unitPrices,
             'usage'          => $usage,
             'usageText'      => ProductRepository::usageText($usage),
             'deleteRefusal'  => ProductRepository::deleteRefusal($details['product'], $usage),

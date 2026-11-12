@@ -30,5 +30,5 @@ $__old = \App\Helpers\Flash::pullOld();
       <textarea name="note" rows="2" maxlength="500" data-required-when="other=1" data-required-when-message="Tell our team what the buyer needs (at least 10 characters)." minlength="10" placeholder="e.g. Buyer needs 25 mm for a hotel lobby, 1 container"><?= View::e((string) ($__old['note'] ?? '')) ?></textarea></label>
     <div><button type="submit" class="btn-sm btn-accent">Get price</button></div>
   </form>
-  <p class="small muted">Prices are FOB: goods loaded on the ship at the Indian port, without sea freight. Prices are per unit; for stone 50 mm or thicker they are per cubic metre (CBM). The final price is on the proforma invoice. These prices are only for you — please do not share this page.</p>
+  <p class="small muted">Prices are FOB: goods loaded on the ship at the Indian port, without sea freight. Prices are per unit; for stone 50 mm or thicker they are per cubic metre (CBM). Your price is also shown per CBM, per SQM and per SQFT for the thickness you choose. The final price is on the proforma invoice. These prices are only for you — please do not share this page.</p>
 </div>

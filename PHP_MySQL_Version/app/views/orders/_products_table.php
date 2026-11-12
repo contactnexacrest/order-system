@@ -23,6 +23,8 @@ $__summary = $sees['selling'] ? OrderLinePricing::summary($linePricing['lines'])
 $__totals = OrderLinePricing::totals($products, $linePricing['lines']);
 $__productReasonRequired = $isLockedOrder || $isPostConfirmationOrder;
 $__money = static fn ($v): string => $v !== null ? number_format((float) $v, 2) : 'To Be Confirmed';
+// Owner decision D-339: an order with the detailed product table (new orders) asks for the No. of pieces.
+$__detailed = ($order['line_table_layout'] ?? 'classic') === 'detailed';
 
 // One table row (goods, or a charge / service line).
 $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPriceBuildup, $canEditProducts, $order, $__copiedId, $__money, $__productReasonRequired): void {
@@ -40,7 +42,7 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
         <?php endif; ?>
         <?php if (!empty($p['finish']) && $__chips === []): ?><div class="muted small"><?= htmlspecialchars((string) $p['finish']) ?></div><?php endif; ?>
       </td>
-      <td><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?></td>
+      <td><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?><?= !empty($p['pieces_count']) ? '<div class="muted small">' . number_format((int) $p['pieces_count']) . ' pcs</div>' : '' ?><?= !empty($p['size_note']) ? '<div class="muted small">' . htmlspecialchars((string) $p['size_note']) . '</div>' : '' ?></td>
       <td class="num"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) ($p['quantity'] ?? '')) ?></td>
       <td><?= htmlspecialchars((string) ($p['unit'] ?? '')) ?></td>
       <?php if ($sees['selling']): ?>
@@ -129,6 +131,10 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
     $__lc = $__isNew ? null : ($linePricing['lines'][(int) $__p['id']] ?? null);
     $__lcFloor = (!$__isNew && $sees['selling'] && $__lc !== null && $__lc['figures'] !== null && $__lc['status'] !== OrderLinePricing::APPROVED) ? number_format((float) $__lc['figures']['floor'], 2, '.', '') : null;
     $__size = static fn (string $k): string => !$__isNew && ($__p[$k] ?? null) !== null ? LineUnits::num((float) $__p[$k]) : '';
+    // Owner decision D-339: the line's pieces summary ("This line: 0.1872 CBM per piece · 25 pcs = 4.680 CBM · …").
+    $__pieceSummary = !$__isNew && $__detailed ? \App\Services\LineTable::summary($__p['unit'] ?? null, LineUnits::size($__p['piece_length_cm'] ?? null), LineUnits::size($__p['piece_width_cm'] ?? null),
+        LineUnits::size($__p['piece_thickness_cm'] ?? null), isset($__p['pieces_count']) ? (int) $__p['pieces_count'] : null,
+        $__p['unit_price'] !== null ? (float) $__p['unit_price'] : null, (string) ($order['currency_code'] ?? '')) : null;
     ?>
     <aside class="line-panel" id="<?= $__panelId ?>" hidden aria-label="<?= $__isNew ? 'Add product' : 'Line ' . (int) $__p['line_no'] . ' — edit' ?>">
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/products<?= $__isNew ? '' : '/' . (int) $__p['id'] ?>" class="line-form">
@@ -161,7 +167,10 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($__p['quantity'] ?? '')) ?>" placeholder="e.g. 40"></label>
+            <?php if ($__detailed): // Owner decision D-339: No. of pieces — with the size given, the Qty is worked out from it (app.js and the server). ?>
+            <label>No. of pieces<input type="text" inputmode="numeric" name="pieces_count" data-pieces-count maxlength="7" value="<?= htmlspecialchars((string) ($__p['pieces_count'] ?? '')) ?>" placeholder="e.g. 25"></label>
+            <?php endif; ?>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($__p['quantity'] ?? '')) ?>" placeholder="e.g. 40"><?php if ($__detailed): ?><small class="muted qty-worked-out" aria-live="polite"></small><?php endif; ?></label>
             <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" <?= !empty($__p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
             <?php // Owner decision D-336: the size is given in the annexure; never with "Qty To Be Confirmed" (app.js and the server). ?>
             <input type="hidden" name="as_per_annexure_field" value="1">
@@ -169,10 +178,15 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
           </div>
           <p class="muted small annexure-line-hint">"Qty To Be Confirmed" or "As per annexure" — only one of the two. As per annexure: the sizes go in Annexure A (order page › Annexure A); the Qty is still needed.</p>
           <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
+          <?php if ($__detailed): ?>
+          <p class="muted small">With Length and Width (and Thickness for CBM) in CBM, SQM or SQFT, type the No. of pieces — the Qty is worked out from it. PCS: the Qty is the pieces. Without a size, type the Qty as before.</p>
+          <p class="line-pieces-summary notice notice-info small" aria-live="polite" data-currency="<?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?>"<?= $__pieceSummary === null ? ' hidden' : '' ?>><?= htmlspecialchars((string) $__pieceSummary) ?></p>
+          <label>Size note <small class="muted">(only when no size is given — printed under the line on the documents)</small><input type="text" name="size_note" maxlength="200" value="<?= htmlspecialchars((string) ($__p['size_note'] ?? '')) ?>" placeholder="e.g. Random sizes, as available"></label>
+          <?php endif; ?>
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>
           <div class="size-grid">
-            <label>Unit price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?><input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($__p['unit_price'] ?? '')) ?>" placeholder="e.g. 495.00" data-floor-message="<?= !empty($linePricing['ctx']['associate']) ? 'Below the lowest for this order' : 'Below your lowest price' ?>"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '"' : '' ?>></label>
+            <label>Unit price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?><input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($__p['unit_price'] ?? '')) ?>" placeholder="e.g. 495.00"<?= $__detailed ? ' data-floor-show data-floor-currency="' . htmlspecialchars((string) ($order['currency_code'] ?? '')) . '"' : '' ?> data-floor-message="<?= !empty($linePricing['ctx']['associate']) ? 'Below the lowest for this order' : 'Below your lowest price' ?>"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '"' : '' ?>></label>
             <div class="line-total-box"><span class="muted small">Line total</span><output class="line-total"><?= !$__isNew && $__p['fob_value'] !== null ? number_format((float) $__p['fob_value'], 2) : '—' ?></output></div>
           </div>
           <div class="price-ref-box" aria-live="polite"><?php if ($__lc !== null && $sees['selling']): include __DIR__ . '/_line_price.php'; endif; ?></div>

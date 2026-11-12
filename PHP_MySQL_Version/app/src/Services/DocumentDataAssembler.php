@@ -277,7 +277,7 @@ final class DocumentDataAssembler
             'show_notify_party_section' => $showNotifyPartySection,
             // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
             'category_documents' => CategoryDocumentProfile::forOrder($orderId),
-            'products' => array_map(static function (array $p) use ($annexureLineLetter): array {
+            'products' => $formattedProducts = array_map(static function (array $p) use ($annexureLineLetter): array {
                 // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
                 $perAnnexure = $annexureLineLetter !== null && !empty($p['as_per_annexure']);
                 $quantity = $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']);
@@ -296,6 +296,9 @@ final class DocumentDataAssembler
                     'sac_code'       => $p['sac_code'] ?? null,
                 ];
             }, $products),
+            // Owner decision D-339: the detailed product table on an order with the 'detailed' layout (new orders);
+            // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
+            'line_table' => self::lineTableBlock($order, $products, $formattedProducts, $documentTypeCode, $annexureLineLetter, $orderId),
             'financial' => [
                 'fob_value'        => self::formatMoney($fobValue),
                 'fob_value_raw'    => $fobValue,
@@ -394,6 +397,72 @@ final class DocumentDataAssembler
      * template/DOCX builder omit each row entirely when its value is
      * null, rather than printing an empty "BL Type *" row.
      */
+    /**
+     * Owner decision D-339 (12 Nov 2026, confirmed twice): the detailed product table (LineTable)
+     * of the QT / PI / OC / CI / Buyer PO (with prices) and Packing List (without), on an order
+     * whose line_table_layout is 'detailed'. Null on a 'classic' order and on every other document.
+     */
+    private static function lineTableBlock(array $order, array $products, array $formatted, ?string $documentTypeCode, ?string $annexureLetter, int $orderId): ?array
+    {
+        $code = strtoupper((string) $documentTypeCode);
+        if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) !== LineTable::LAYOUT_DETAILED || !in_array($code, LineTable::DOCUMENTS, true)) {
+            return null;
+        }
+        $crateCounts = [];
+        if ($code === 'PL') {
+            foreach (OrderCrateRepository::forOrder($orderId) as $c) {
+                $key = mb_strtolower(trim((string) ($c['product_description'] ?? '')));
+                if ($key !== '') {
+                    $crateCounts[$key] = ($crateCounts[$key] ?? 0) + 1;
+                }
+            }
+        }
+        $names = [];
+        foreach ($products as $p) {
+            $names[(int) $p['id']] = self::lineNames($p);
+        }
+        return LineTable::build(array_values($products), array_values($formatted), (string) ($order['currency_code'] ?? ''), $annexureLetter, $code !== 'PL', $crateCounts, $names);
+    }
+
+    /**
+     * D-339: "Material / Colour" = the line's description, with the colour / variety option
+     * chosen on the line when its product offers one (and the description does not name it yet);
+     * "Surface / Finish" = the line's finish, else its chosen surface-finish option.
+     *
+     * @return array{material: string, finish: string}
+     */
+    private static function lineNames(array $line): array
+    {
+        $material = (string) $line['description'];
+        $finish = trim((string) ($line['finish'] ?? ''));
+        $selection = OrderLinePricing::lineSelection($line);
+        $product = $selection !== null && !empty($line['catalog_product_id']) ? \App\Repositories\ProductRepository::find((int) $line['catalog_product_id']) : null;
+        if ($product !== null) {
+            foreach (ProductSpecs::offered($product) as $s) {
+                if (!array_key_exists($s['id'], $selection)) {
+                    continue;
+                }
+                $chosen = null;
+                foreach ($s['options'] as $o) {
+                    if ((int) $o['id'] === (int) $selection[$s['id']]) {
+                        $chosen = (string) $o['name'];
+                    }
+                }
+                if ($chosen === null) {
+                    continue;
+                }
+                $name = (string) $s['name'];
+                if (preg_match('/colou?r|variety|shade/i', $name) === 1 && mb_stripos($material, $chosen) === false) {
+                    $material .= ' — ' . $chosen;
+                }
+                if ($finish === '' && preg_match('/finish|surface/i', $name) === 1) {
+                    $finish = $chosen;
+                }
+            }
+        }
+        return ['material' => $material, 'finish' => $finish];
+    }
+
     private static function blBlock(string $companyLegalName, bool $showBlInstructions): array
     {
         if (!$showBlInstructions) {

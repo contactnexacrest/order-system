@@ -29,6 +29,10 @@
 </table>
 
 <div class="section-title">{{ section_numbers.product_summary }}. PRODUCT SUMMARY</div>
+{# Owner decision D-339: the detailed product table (no prices) on an order with the detailed layout (new orders). #}
+{% if line_table %}
+{% include '_line_table.html.twig' %}
+{% endif %}
 {% set productList = [] %}
 {% set hsCodeList = [] %}
 {% for p in products %}
@@ -36,7 +40,7 @@
   {% set hsCodeList = hsCodeList|merge([p.hs_code]) %}
 {% endfor %}
 <table class="kv">
-  <tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  {% if not line_table %}<tr><td class="k">Product Description *</td><td class="v">{{ productList|join('; ') }}</td></tr>{% endif %}
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
   <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'To Be Confirmed' }}{{ packing.actual_quantity_unit ? ' ' ~ packing.actual_quantity_unit : '' }}</td></tr>

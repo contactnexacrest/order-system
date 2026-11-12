@@ -311,6 +311,9 @@ abstract class DbTestCase extends TestCase
             'notify_party_email'      => $client['notify_party_email'] ?? null,
         ]);
         $orderId = (int) $pdo->lastInsertId();
+        // Owner decision D-339: the tests written before it pin the classic product table (as every
+        // order that existed before migration 2026-11-12g); a test of the detailed table sets 'detailed'.
+        $pdo->prepare("UPDATE orders SET line_table_layout = 'classic' WHERE id = :id")->execute(['id' => $orderId]);
 
         \App\Repositories\OrderStageRepository::initializeForOrder($orderId);
         \App\Repositories\OrderComplianceTaskRepository::initializeForOrder($orderId);
