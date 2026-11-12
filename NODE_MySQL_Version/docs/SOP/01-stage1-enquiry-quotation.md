@@ -688,7 +688,12 @@ SQFT (sq ft), PCS, TON and RMT** (Set or Lot only if the MD adds them in Product
 Categories). The product's prices are per its own unit (per CBM from 50 mm), so the
 app converts your price before checking it — you never have to switch to CBM.
 
-1. Pick the product and its options.
+1. Pick the product and its options. **Thickness** and **Size / format** start on
+   **"Choose…"** and must be chosen — the price depends on them (owner decision D-348,
+   12 Nov 2026). Until both are chosen no price is filled and the line says "Choose the
+   Thickness and Size / format to see the price."; saving without them is refused ("Line 1:
+   choose the Thickness and the Size / format — the price depends on them."). The other
+   options start on their usual first choice.
 2. Enter the **piece size in cm** — Length, Width, Thickness (decimals allowed):
    - **PCS** needs all three (e.g. 180 × 80 × 13);
    - **RMT** needs width and thickness;
@@ -696,8 +701,10 @@ app converts your price before checking it — you never have to switch to CBM.
    - **CBM** and **TON** need nothing extra (Ton uses the weight per CBM of the
      category — stone 2.7 t — or the product's own figure).
 3. The **Thickness** box and the **Thickness option** follow each other: type 3 and
-   "30 mm" is chosen; type 13 and the per-CBM thick-stone option is chosen (no manual
-   price needed).
+   "30 mm" is chosen; type 13 and "Other, 50 mm or more" (the per-CBM thick-stone option)
+   is chosen (no manual price needed) — a small green note says "set from Thickness (cm)
+   13". A Thickness option you chose yourself is never changed by the typed thickness.
+   Below 5 cm with no matching option, choose the Thickness yourself.
 4. The **Dimensions** text fills itself ("180 × 80 × 13 cm"); you may still change it.
    It prints on the documents as before.
 5. Enter the price per your unit. The box under the price shows the quote and your

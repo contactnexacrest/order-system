@@ -1215,6 +1215,11 @@
     if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url' || type === 'password' || type === 'number')) {
       return 'This field is required.';
     }
+    // D-348: a required drop-down still on its empty "Choose…" option says what to choose
+    // (data-required-message) — e.g. an order line's Thickness and Size / format.
+    if (el.required && el.tagName === 'SELECT' && value === '' && el.dataset.requiredMessage) {
+      return el.dataset.requiredMessage;
+    }
     var mismatch = matchError(el);
     if (mismatch) return mismatch;
     // data-allowed-from="<select name>": the value must be one of the units

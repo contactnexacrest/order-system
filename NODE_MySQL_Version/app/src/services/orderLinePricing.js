@@ -564,6 +564,35 @@ async function pickRefusal(currencyCode, catalogProductId, lineType) {
   return PICK_MESSAGE;
 }
 
+/**
+ * D-348 (12 Nov 2026, owner "go"): the specifications a goods line picked from Products
+ * must have chosen — they change the price most, so the order form starts them on
+ * "Choose…" instead of the base option. Matched by EXACT name ("Thickness",
+ * "Size / format"); every other specification keeps its base option.
+ * PHP twin: OrderLinePricing::REQUIRED_SPEC_NAMES.
+ */
+const REQUIRED_SPEC_NAMES = ['Thickness', 'Size / format'];
+
+/**
+ * D-348: the refusal for a goods line picked from Products whose product offers a
+ * "Thickness" and/or "Size / format" specification that is not chosen in its
+ * selection, else null. Lines typed by hand and products without those specs pass.
+ */
+async function requiredSpecsRefusal(lineNo, catalogProductId, lineType, selection) {
+  if (!catalogProductId || lineType !== 'goods') return null;
+  const product = await require('../repositories/productRepository').find(Number(catalogProductId));
+  if (!product) return null;
+  const missing = [];
+  for (const s of await require('./productSpecs').offered(product)) {
+    if (!REQUIRED_SPEC_NAMES.includes(String(s.name))) continue;
+    const chosen = selection ? selection[Number(s.id)] : undefined;
+    const ids = s.options.map((o) => Number(o.id));
+    if (chosen === undefined || chosen === null || !ids.includes(Number(chosen))) missing.push(`the ${s.name}`);
+  }
+  if (!missing.length) return null;
+  return `Line ${lineNo}: choose ${missing.join(' and ')} — the price depends on ${missing.length > 1 ? 'them' : 'it'}.`;
+}
+
 /** Refuses a price below the product's minimum price before it is saved. Null when the price may be saved. */
 async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null, size = {}, annexureLineNo = null) {
   if (!catalogProductId || lineType !== 'goods') return null;
@@ -882,7 +911,7 @@ module.exports = {
   OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, NEEDS_SIZE, BLOCKING,
   CBM_CALCULATED, APPROVABLE, annexureSizeMessage, cbmCalculatedReason,
   weightPerCbm, lineSize, optionThicknessMm, syncThickness, conversionFor, scaleFigures, optionChips, summary, totals,
-  PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
+  PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason, REQUIRED_SPEC_NAMES, requiredSpecsRefusal,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, snapshotLines, approveByAmendment, pickerPrices, pickerSpecs, clientKeys,
   selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey,

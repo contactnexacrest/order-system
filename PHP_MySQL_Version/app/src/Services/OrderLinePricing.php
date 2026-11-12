@@ -754,6 +754,46 @@ final class OrderLinePricing
     public const PICK_MESSAGE = 'Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can). The MD can change this in Admin → Pricing.';
 
     /**
+     * D-348 (12 Nov 2026, owner "go"): the specifications a goods line picked from Products
+     * must have chosen — they change the price most, so the order form starts them on
+     * "Choose…" instead of the base option. Matched by EXACT name ("Thickness",
+     * "Size / format"); every other specification keeps its base option.
+     * Node twin: REQUIRED_SPEC_NAMES in services/orderLinePricing.js.
+     */
+    public const REQUIRED_SPEC_NAMES = ['Thickness', 'Size / format'];
+
+    /**
+     * D-348: the refusal for a goods line picked from Products whose product offers a
+     * "Thickness" and/or "Size / format" specification that is not chosen in its
+     * selection, else null. Lines typed by hand and products without those specs pass.
+     */
+    public static function requiredSpecsRefusal(int $lineNo, ?int $catalogProductId, string $lineType, ?array $selection): ?string
+    {
+        if ($catalogProductId === null || $lineType !== 'goods') {
+            return null;
+        }
+        $product = ProductRepository::find($catalogProductId);
+        if ($product === null) {
+            return null;
+        }
+        $missing = [];
+        foreach (ProductSpecs::offered($product) as $s) {
+            if (!in_array((string) $s['name'], self::REQUIRED_SPEC_NAMES, true)) {
+                continue;
+            }
+            $chosen = $selection[(int) $s['id']] ?? null;
+            $ids = array_map(static fn (array $o): int => (int) $o['id'], $s['options']);
+            if ($chosen === null || !in_array((int) $chosen, $ids, true)) {
+                $missing[] = 'the ' . $s['name'];
+            }
+        }
+        if ($missing === []) {
+            return null;
+        }
+        return 'Line ' . $lineNo . ': choose ' . implode(' and ', $missing) . ' — the price depends on ' . (count($missing) > 1 ? 'them' : 'it') . '.';
+    }
+
+    /**
      * Refuses a price below the product's minimum price before it is saved
      * (nobody, not even the MD, goes below it). Null when the price may be saved.
      */

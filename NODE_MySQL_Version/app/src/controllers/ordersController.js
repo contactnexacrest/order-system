@@ -600,6 +600,14 @@ async function store(req, res) {
         : [null, null];
       rowSizes[i] = rowSize;
       rowSels[i] = rowSel;
+      // D-348: a line picked from Products has its Thickness and Size / format chosen.
+      const specRefusal = sizeError === null && syncError === null ? await olpRow.requiredSpecsRefusal(i + 1, rowCatalogId, 'goods', rowSel) : null;
+      if (specRefusal !== null) {
+        flash.set(req, 'error', specRefusal);
+        flash.setOld(req, body);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
       const refusal = sizeError ?? syncError ?? await olpRow.saveRefusal(
         { client_id: clientId, currency_code: currency ? currency.code : '' },
         rowCatalogId,
@@ -1101,7 +1109,8 @@ async function approveLinePrice(req, res) {
  * exactly as it is (the same text as on the Quotation / PI gate).
  */
 function lineRefusalText(refusal) {
-  return /^Line \d+ says "As per annexure"/.test(refusal) ? refusal : `Product line: ${refusal}`;
+  // D-348: "Line N: choose the Thickness …" already names its line.
+  return /^Line \d+(?: says "As per annexure"|: choose the )/.test(refusal) ? refusal : `Product line: ${refusal}`;
 }
 
 // The flash after saving a line, saying when it now waits for the MD.
@@ -1299,6 +1308,8 @@ async function addProduct(req, res) {
     ? await orderLinePricing.syncThickness(pickedId, orderLinePricing.selectionInput(body.spec_json ?? ''), lineSize.piece_thickness_cm)
     : [null, null];
   const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
+    // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
+    ?? (priceRequest ? null : await orderLinePricing.requiredSpecsRefusal(await orderProductRepository.nextLineNo(orderId), pickedId, lineType, specSel))
     ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
       specSel, str(body.unit) || null, priceRequest, lineSize,
       // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1422,6 +1433,9 @@ async function updateProduct(req, res) {
   {
     const orderLinePricing = require('../services/orderLinePricing');
     const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
+      // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
+      ?? (specUnchanged && Number(product.catalog_product_id || 0) === Number(catalogId || 0) ? null
+        : await orderLinePricing.requiredSpecsRefusal(Number(product.line_no), catalogId, lineType, specSel))
       ?? (priceUnchanged && specUnchanged && sizeUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
         specSel, str(body.unit) || null, null, lineSize,
         // D-338 (1c): a line "As per annexure" has no size — its own wording.

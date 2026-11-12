@@ -546,6 +546,16 @@ final class OrderController
             [$__rowSel, $__syncError] = $__sizeError === null
                 ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), $__size['piece_thickness_cm'])
                 : [null, null];
+            // D-348: a line picked from Products has its Thickness and Size / format chosen.
+            $__specRefusal = $__sizeError === null && $__syncError === null
+                ? \App\Services\OrderLinePricing::requiredSpecsRefusal($i + 1, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods', $__rowSel)
+                : null;
+            if ($__specRefusal !== null) {
+                Flash::set('error', $__specRefusal);
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
             $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::saveRefusal(
                 ['client_id' => $clientId, 'currency_code' => $__currencyCode],
                 self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
@@ -1130,7 +1140,8 @@ final class OrderController
      */
     private static function lineRefusalText(string $refusal): string
     {
-        return preg_match('/^Line \d+ says "As per annexure"/u', $refusal) === 1 ? $refusal : 'Product line: ' . $refusal;
+        // D-348: "Line N: choose the Thickness …" already names its line.
+        return preg_match('/^Line \d+(?: says "As per annexure"|: choose the )/u', $refusal) === 1 ? $refusal : 'Product line: ' . $refusal;
     }
 
     /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
@@ -1259,6 +1270,8 @@ final class OrderController
             ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['catalog_product_id'] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'] ?? ''), $__size['piece_thickness_cm'])
             : [null, null];
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
+            // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
+            ?? ($__priceRequest !== null ? null : \App\Services\OrderLinePricing::requiredSpecsRefusal(OrderProductRepository::nextLineNo($orderId), self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $__specSel))
             ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
                 $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size,
                 // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1392,6 +1405,9 @@ final class OrderController
         $__sizeUnchanged = \App\Services\OrderLinePricing::lineSize($__size) === \App\Services\OrderLinePricing::lineSize($product)
             && strtoupper(trim((string) ($_POST['unit'] ?? ''))) === strtoupper(trim((string) ($product['unit'] ?? '')));
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
+            // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
+            ?? ($__specUnchanged && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0) ? null
+                : \App\Services\OrderLinePricing::requiredSpecsRefusal((int) $product['line_no'], $__catalogId, $lineType, $__specSel))
             ?? ($__priceUnchanged && $__specUnchanged && $__sizeUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
                 $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null, $__size,
                 // D-338 (1c): a line "As per annexure" has no size — its own wording.

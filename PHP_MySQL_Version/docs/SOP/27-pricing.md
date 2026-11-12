@@ -243,6 +243,10 @@ deactivated. Every change is in the audit log; prices already issued do not chan
 the floor follow them (fetched from the server — cost never reaches the browser),
 per the line's own unit and piece size (D-270). The options go into the line's
 existing fields (description, dimensions, finish, unit); documents are unchanged.
+**Thickness** and **Size / format** start on "Choose…" and must be chosen before the
+price is filled or the line can be saved (D-348, 12 Nov 2026) — they change the price
+most; typing the Thickness (cm) chooses the Thickness option for you (13 cm → "Other,
+50 mm or more") unless you chose it yourself. The other options start on their base.
 
 | Setting | Default | Where |
 |---|---|---|

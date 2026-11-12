@@ -685,7 +685,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | Function | What it does |
 |---|---|
 | `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
-| `fieldError(el)` | D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; m² / sq ft thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
+| `fieldError(el)` | D-348: a `required` drop-down still on its empty "Choose…" option with `data-required-message` shows that message (an order line's Thickness and Size / format). D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; m² / sq ft thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
 | `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
 | `initReasonFieldValidation()` | Reason fields need meaningful text (10 characters, or the field's own `minlength`). By default a grey "Must be at least 10 characters." hint shows under the field from the start; a field with `data-reason-hint="on-error"` (compact inline boxes, e.g. Reject / Cancel Send on Email Send Approvals, D-269) shows no hint and only the red error ("Reason must be at least 10 characters (n so far).") on blur or submit. |
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
@@ -1859,6 +1859,28 @@ follow each other, in the browser and on save (`OrderLinePricing::syncThickness`
 chooses "30 mm"; from the product's per-CBM thickness (50 mm) up, the "priced per CBM"
 option ("Other, 50 mm or more"), whose thickness is then the line's own — so 13 cm needs
 no manual price; a thickness with no option below 50 mm is refused beside the field.
+
+**Thickness and Size / format are chosen, never preselected (D-348, 12 Nov 2026, owner
+"go").** When a product is picked on a line (New Order form, order page line panel), the
+specification drop-downs named exactly "Thickness" and "Size / format" (`REQUIRED_SPEC_NAMES`
+in `OrderLinePricing` / `orderLinePricing.js`; exact name match) start on "Choose…" —
+`required`, label "*", `data-required-message` "Choose the Thickness — the price depends on
+it." shown beside the field by app.js. Every other specification keeps its base option. A
+saved or sent-back selection keeps its options; a selection that lacks one of the two shows
+"Choose…"; a line saved with no options at all shows the base options as before. While either
+is on "Choose…" no quote price is filled (an automatically filled one is taken back, a typed
+one stays — D-339), no floor note shows, and the hint reads "Choose the Thickness and Size /
+format to see the price."; the spec-json carries only the chosen options. Typing Thickness
+(cm) sets the Thickness option only while it is on "Choose…" or was set that way before —
+never over a choice made by hand: exact match (2 → 20 mm, 1.5 → 15 mm), otherwise from the
+per-CBM thickness (5 cm) up "Other, 50 mm or more", below that none; a green note "set from
+Thickness (cm) 13" shows under it, and the price is fetched as if the option had been picked.
+On save (New Order, order page add and edit, both stacks) `requiredSpecsRefusal()` refuses a
+goods line picked from Products whose product offers either specification without it chosen:
+"Line N: choose the Thickness and the Size / format — the price depends on them." (only the
+missing one named, "… depends on it."). Not affected: lines typed by hand, products without
+those specifications, a line from an associate's price request, and an edit that leaves the
+product and options of a saved line unchanged.
 The old "50 mm and above: set the unit to CBM" refusal is gone. A missing size is
 refused beside the field on save ("Enter the length (cm) — needed to compare a price
 per piece with the product's price per CBM."); a saved line without it gets the status
