@@ -115,6 +115,8 @@ describe('D-343 Indian grouping, Total CBM, Word copy section numbers', () => {
   it('Total CBM in the Weight & Volume box', async () => {
     const orderId = await order('detailed', 'INR');
     await ownersExample(orderId);
+    // Owner, 12 Nov 2026: an old typed estimate (8.2) never wins over the lines (8.801).
+    await db.execute('UPDATE orders SET estimated_total_cbm = 8.2 WHERE id = :id', { id: orderId });
     for (const code of ['QT', 'PI']) {
       expect([code, (await documentDataAssembler.assemble(orderId, code)).order.line_table_total_cbm]).toEqual([code, '8.801']);
     }

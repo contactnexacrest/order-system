@@ -122,6 +122,8 @@ final class D343DocumentNumbersTest extends DbTestCase
     {
         $orderId = $this->order('detailed', 'INR');
         $this->ownersExample($orderId);
+        // Owner, 12 Nov 2026: an old typed estimate (8.2) never wins over the lines (8.801).
+        \App\Config\Database::connection()->prepare('UPDATE orders SET estimated_total_cbm = 8.2 WHERE id = :id')->execute(['id' => $orderId]);
         foreach (['QT', 'PI'] as $code) {
             self::assertSame('8.801', DocumentDataAssembler::assemble($orderId, $code)['order']['line_table_total_cbm'], $code);
         }

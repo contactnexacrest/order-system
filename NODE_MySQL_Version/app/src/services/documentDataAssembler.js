@@ -235,6 +235,9 @@ async function assemble(orderId, documentTypeCode = null) {
       estimated_total_cbm: order.estimated_total_cbm,
       // Owner decision D-343: the Weight & Volume box of a detailed order's QT / PI prints the CBM worked out from the lines.
       line_table_total_cbm: lineTableTotalCbm(order, products, documentTypeCode),
+      // Owner, 12 Nov 2026: on a detailed order the box never shows an old typed estimate that disagrees
+      // with the lines — the lines' CBM, else "To Be Confirmed". Classic orders print as before.
+      weight_total_cbm: weightTotalCbm(order, products, documentTypeCode),
       estimated_gross_weight_kg: order.estimated_gross_weight_kg,
       estimated_net_weight_kg: order.estimated_net_weight_kg,
       estimated_package_count: order.estimated_package_count,
@@ -932,6 +935,15 @@ function formatMoney(value, currency = null) {
  * detailed product table — worked out from the goods lines (lineTable.totalCbm), 3 decimals; null ("To Be Confirmed",
  * or the estimate typed on the order) when a goods line cannot be turned into CBM, and on every other order and document.
  */
+function weightTotalCbm(order, products, documentTypeCode) {
+  const lineTable = require('./lineTable');
+  if ((order.line_table_layout || lineTable.LAYOUT_CLASSIC) === lineTable.LAYOUT_DETAILED) {
+    return lineTableTotalCbm(order, products, documentTypeCode) || 'To Be Confirmed';
+  }
+  const typed = order.estimated_total_cbm;
+  return typed !== null && typed !== undefined && typed !== '' ? String(typed) : 'To Be Confirmed';
+}
+
 function lineTableTotalCbm(order, products, documentTypeCode) {
   const lineTable = require('./lineTable');
   if ((order.line_table_layout || lineTable.LAYOUT_CLASSIC) !== lineTable.LAYOUT_DETAILED

@@ -575,8 +575,9 @@ prints **8.801**. Lines with a size and pieces count their pieces × size; a CBM
 line without a size counts its quantity; a SQM / SQFT line with a thickness
 counts area × thickness. If one goods line cannot be turned into CBM (a SQM
 line without a thickness, PCS without a size, Ton, Set …) the box keeps
-"To Be Confirmed" (or the estimate typed on the order). Older orders print as
-before.
+"To Be Confirmed" — an estimate typed on the order is never printed on a new
+order, so the box can never disagree with the product table. Older orders
+print as before.
 
 **Word copy.** The Word copy (DOCX) of every document now has the same
 section headings and numbers as the PDF — Buyer Details, Consignee Details and

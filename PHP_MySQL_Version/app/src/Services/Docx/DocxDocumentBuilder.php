@@ -371,7 +371,7 @@ final class DocxDocumentBuilder
         DocxComponents::addPlainParagraph($section, 'Weight & Volume (Estimated — actuals confirmed on Packing List after production)', ['bold' => true, 'size' => 10.5, 'color' => DocxComponents::NAVY]);
         $rows = [
             // D-343: a detailed order's QT / PI print the CBM worked out from the lines (as the PDF).
-            ['Total CBM (m³)', !empty($order['line_table_total_cbm']) ? (string) $order['line_table_total_cbm'] : self::g($order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
+            ['Total CBM (m³)', (string) ($order['weight_total_cbm'] ?? self::g($order, 'estimated_total_cbm', 'To Be Confirmed')), 'm³'],
             ['Gross Weight (incl. packing)', self::g($order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
             [self::cd($context)['net_weight_label'], self::g($order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
             [self::cd($context)['package_count_label'], self::g($order, 'estimated_package_count', 'To Be Confirmed'), self::cd($context)['package_nouns']],

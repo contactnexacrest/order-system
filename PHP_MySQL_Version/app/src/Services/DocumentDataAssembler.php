@@ -240,6 +240,9 @@ final class DocumentDataAssembler
                 'estimated_total_cbm'      => $order['estimated_total_cbm'],
                 // Owner decision D-343: the Weight & Volume box of a detailed order's QT / PI prints the CBM worked out from the lines.
                 'line_table_total_cbm'     => self::lineTableTotalCbm($order, $products, $documentTypeCode),
+                // Owner, 12 Nov 2026: on a detailed order the box never shows an old typed estimate that disagrees
+                // with the lines — the lines' CBM, else "To Be Confirmed". Classic orders print as before.
+                'weight_total_cbm'         => self::weightTotalCbm($order, $products, $documentTypeCode),
                 'estimated_gross_weight_kg' => $order['estimated_gross_weight_kg'],
                 'estimated_net_weight_kg'  => $order['estimated_net_weight_kg'],
                 'estimated_package_count'  => $order['estimated_package_count'],
@@ -391,6 +394,15 @@ final class DocumentDataAssembler
      * detailed product table — worked out from the goods lines (LineTable::totalCbm), 3 decimals; null ("To Be Confirmed",
      * or the estimate typed on the order) when a goods line cannot be turned into CBM, and on every other order and document.
      */
+    private static function weightTotalCbm(array $order, array $products, ?string $documentTypeCode): string
+    {
+        if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) === LineTable::LAYOUT_DETAILED) {
+            return self::lineTableTotalCbm($order, $products, $documentTypeCode) ?? 'To Be Confirmed';
+        }
+        $typed = $order['estimated_total_cbm'] ?? null;
+        return $typed !== null && $typed !== '' ? (string) $typed : 'To Be Confirmed';
+    }
+
     private static function lineTableTotalCbm(array $order, array $products, ?string $documentTypeCode): ?string
     {
         if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) !== LineTable::LAYOUT_DETAILED

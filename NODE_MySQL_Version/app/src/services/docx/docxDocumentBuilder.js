@@ -277,7 +277,7 @@ function weightTable(order, context = {}) {
   const out = [C.plain('Weight & Volume (Estimated — actuals confirmed on Packing List after production)', { bold: true, size: 21, color: C.NAVY })];
   const rows = [
     // D-343: a detailed order's QT / PI print the CBM worked out from the lines (as the PDF).
-    ['Total CBM (m³)', order.line_table_total_cbm ? String(order.line_table_total_cbm) : g(order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
+    ['Total CBM (m³)', String(order.weight_total_cbm ?? g(order, 'estimated_total_cbm', 'To Be Confirmed')), 'm³'],
     ['Gross Weight (incl. packing)', g(order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
     [cd(context).net_weight_label, g(order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
     [cd(context).package_count_label, g(order, 'estimated_package_count', 'To Be Confirmed'), cd(context).package_nouns],
