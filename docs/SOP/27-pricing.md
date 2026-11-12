@@ -243,6 +243,11 @@ It shows the supplier price used, the options, the cost, minimum price, staff fl
 quote and every associate level's floor and quote — worked out on the server by the same
 engine as an associate's **Get price** and the order page, so the figures always agree.
 
+The **Thickness** choice starts on **"Supplier's base price (…)"** — the thickness the supplier's
+base price is for (e.g. 50 mm and above, per CBM) — so the first figure equals the product list and
+the build-up (D-335). Pick a thickness to price that thickness instead; the option shown is always
+the one priced.
+
 Example (₹3,200 per m², ₹82 = USD 1, other costs 2.5%, margin 20%, incentive 15% on,
 buffer 3%): ₹3,200 ÷ 82 + 2.5% = **USD 40.00**; Standard · 30 mm · Leather · 2–4 containers →
 staff quote **USD 69.76**; associate Level 2 (5%) floor **USD 71.30**, quote **USD 73.43**.
