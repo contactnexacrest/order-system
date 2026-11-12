@@ -116,14 +116,6 @@ final class DocxComponents
         $section->addTextBreak(1, 6);
     }
 
-    public static function addMandatoryNote(Section $section): void
-    {
-        $run = $section->addTextRun(['spaceAfter' => 80]);
-        $run->addText('Fields marked ', ['italic' => true, 'size' => 9, 'color' => self::MUTED]);
-        $run->addText('*', ['bold' => true, 'italic' => false, 'size' => 9, 'color' => 'C0392B']);
-        $run->addText(' are mandatory and must be completed before this document is issued.', ['italic' => true, 'size' => 9, 'color' => self::MUTED]);
-    }
-
     /**
      * The N-column shaded meta strip (QUOTATION NO. / DATE / BUYER INQUIRY
      * REF etc.) — one row, one cell per item, each with a small gray label

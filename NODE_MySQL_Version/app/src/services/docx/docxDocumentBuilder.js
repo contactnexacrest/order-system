@@ -160,10 +160,6 @@ function titleFor(code) {
   return map[code] || code;
 }
 
-function starRun() {
-  return ['*', { bold: true, color: 'C0392B' }];
-}
-
 /** Bank Details kv rows — reused verbatim by PI/FDN/CI Section "BANK DETAILS". */
 function bankDetailsRows(context, paymentRefLabel, rbiCode) {
   const company = context.company || {};
@@ -304,28 +300,28 @@ function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = f
   const milestoneLines = () => {
     if (!withMilestones) return;
     for (const m of financial.milestones || []) {
-      out.push(C.rich([['• ', {}], [`${m.pct}% Payment on FOB Value ${m.due_text}. `, {}], starRun()]));
-      out.push(C.rich([[`   ${m.pct}% Amount:  ${currency} ${m.amount}`, {}], starRun()]));
+      out.push(C.rich([['• ', {}], [`${m.pct}% Payment on FOB Value ${m.due_text}. `, {}]]));
+      out.push(C.rich([[`   ${m.pct}% Amount:  ${currency} ${m.amount}`, {}]]));
     }
   };
   if (noAdvanceWording && !financial.has_advance) {
     // Owner decision (2026-10-28): a QT / PI with no advance (e.g. Letter of
     // Credit) has no "0% Advance" lines — same as the PDF.
     milestoneLines();
-    out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}], starRun()]));
-    out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
+    out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}]]));
+    out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}]]));
     return out.concat(freightAndCurrencyLines(order, currency));
   }
   // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
-  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}], starRun()]));
-  out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}], starRun()]));
+  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}]]));
+  out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}]]));
   // Owner decision (2026-10-28): the Word balance line now prints the
   // order's own balance terms — the same sentence as the PDF (Calendar
   // Days, and the preset's own wording when it has one).
   const balanceText = g(financial, 'balance_terms_text', '');
   milestoneLines();
-  out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}], starRun()]));
-  out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
+  out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}]]));
+  out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}]]));
   return out.concat(freightAndCurrencyLines(order, currency));
 }
 
@@ -356,7 +352,6 @@ function renderQt(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('QT'), g(order, 'incoterm_code', null) ? `${g(order, 'incoterm_code')} ${String(g(order, 'port_of_loading', '')).toUpperCase()}` : null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'QUOTATION NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -457,7 +452,6 @@ function renderPi(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('PI'), g(order, 'incoterm_code', null) ? `${g(order, 'incoterm_code')} ${String(g(order, 'port_of_loading', '')).toUpperCase()}` : null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'PI NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -583,7 +577,6 @@ function renderPi(context) {
             [`${g(order, 'production_status_text')}   `, {}],
             ['Estimated shipment: ', { bold: true, color: C.NAVY }],
             [g(order, 'est_shipment_date_text'), { italics: true, color: C.MUTED }],
-            [' *', { bold: true, color: 'C0392B' }],
           ]),
           C.rich([
             ['Note: ', { bold: true, color: C.NAVY, size: 18 }],
@@ -640,7 +633,6 @@ function renderOc(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('OC'), null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'OC NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -721,7 +713,6 @@ function renderOc(context) {
             [`${g(order, 'production_status_text')}   `, {}],
             ['Estimated shipment: ', { bold: true, color: C.NAVY }],
             [g(order, 'est_shipment_date_text'), { italics: true, color: C.MUTED }],
-            [' *', { bold: true, color: 'C0392B' }],
           ]),
           C.rich([
             ['Note: ', { bold: true, color: C.NAVY, size: 18 }],
@@ -897,7 +888,6 @@ function renderAnnexa(context) {
   const meta = context.meta || {};
   const children = [];
   children.push(...C.header(context, titleFor('ANNEXA'), null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'ANNEXURE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -1216,7 +1206,6 @@ function renderFdn(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('FDN'), 'FREIGHT COST RECOVERY'));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'DEBIT NOTE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -1314,7 +1303,6 @@ function renderPl(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('PL'), null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'PL NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -1602,7 +1590,6 @@ function renderCi(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('CI'), g(order, 'incoterm_code', null) ? `${g(order, 'incoterm_code')} ${String(g(order, 'port_of_loading', '')).toUpperCase()}` : null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -1672,23 +1659,23 @@ function renderCi(context) {
 
   const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
   const sectionARows = [
-    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
-    [isCif || isFob ? 'Freight & Insurance' : 'Freight', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`} *`, freightRemark],
-    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')} *`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight'} · Currency: ${currency}`],
+    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')}`, 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
+    [isCif || isFob ? 'Freight & Insurance' : 'Freight', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`}`, freightRemark],
+    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')}`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight'} · Currency: ${currency}`],
   ];
   children.push(...C.threeColFinanceTable('SECTION A — INVOICE VALUE', sectionARows, C.NAVY_MID));
 
   const advanceAmt = g(payment, 'advance_amount') !== '—' ? g(payment, 'advance_amount') : g(financial, 'advance_amount');
   const balanceAmt = g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount');
   const freightStatus = isFob ? 'NIL (FOB)' : g(payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING';
-  const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'To Be Confirmed')} *`;
+  const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'To Be Confirmed')}`;
   const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against FDN No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}`;
   const freightAmtVal = g(payment, 'freight_amount', null);
   // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
   const milestones = financial.milestones || [];
   const milestoneRows = milestones.map((m) => [
     `√  Milestone ${m.seq} (${m.pct}% ${m.due_short}) — ${m.received ? 'RECEIVED' : 'PENDING'}`,
-    `${currency} ${m.received ? m.received_amount : m.amount} *`,
+    `${currency} ${m.received ? m.received_amount : m.amount}`,
     `Received: ${m.received ? `${m.received_on} · bank ref ${m.bank_reference}` : 'To Be Confirmed'}\nDue: ${m.due_text}`,
   ]);
   const receivedParts = milestones.map((m) => (m.received ? ` + ${m.received_amount}` : '')).join('');
@@ -1696,7 +1683,7 @@ function renderCi(context) {
   const sectionBRows = [
     [
       `√  Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
-      `${currency} ${advanceAmt} *`,
+      `${currency} ${advanceAmt}`,
       `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
     ...milestoneRows,
@@ -1704,7 +1691,7 @@ function renderCi(context) {
     ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${milestones.length ? ' + milestones' : ''}${!isFob ? ' + FDN (if applicable)' : ''}`],
     [
       '→  BALANCE DUE NOW',
-      `${currency} ${balanceAmt} *`,
+      `${currency} ${balanceAmt}`,
       `= FOB Value minus advance${milestones.length ? ' and milestones' : ''} received\nPayable by T/T (Telegraphic Transfer). ${g(financial, 'balance_terms_text')}\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
       true,
     ],
@@ -1724,7 +1711,6 @@ function renderCi(context) {
     C.rich([
       [`Total Invoice Value in Words (${currency}): `, { bold: true }],
       [g(financial, 'total_invoice_value_in_words', '_________________________________________________________'), { bold: true }],
-      [' *', { bold: true, color: 'C0392B' }],
     ])
   );
 
@@ -1782,7 +1768,6 @@ function renderEsi(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('ESI'), null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
@@ -1855,7 +1840,6 @@ function renderCooprep(context) {
   const children = [];
 
   children.push(...C.header(context, titleFor('COOPREP'), null));
-  children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
       { label: 'SHIPMENT REF *', value: g(order, 'pi_ref', '—') },

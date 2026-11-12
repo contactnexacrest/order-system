@@ -367,17 +367,6 @@ function header(context, docTitle, incotermText) {
   return [table, spacer(120)];
 }
 
-function mandatoryNote() {
-  return rich(
-    [
-      ['Fields marked ', { italics: true, size: 18, color: MUTED }],
-      ['*', { bold: true, size: 18, color: 'C0392B' }],
-      [' are mandatory and must be completed before this document is issued.', { italics: true, size: 18, color: MUTED }],
-    ],
-    { spacing: { after: 160 } }
-  );
-}
-
 /**
  * The N-column shaded meta strip (QUOTATION NO. / DATE / BUYER INQUIRY
  * REF etc.) — one row, one cell per item, each with a small gray label
@@ -970,7 +959,6 @@ module.exports = {
   imageInBox,
   documentDefaultStyles,
   header,
-  mandatoryNote,
   metaBar,
   sectionTitle,
   colorBox,

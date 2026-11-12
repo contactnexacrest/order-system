@@ -137,6 +137,11 @@ No video or script was changed. Videos stay on hold until the owner lifts the ho
 | C04 | Get price shows "Your prices in other units" (D-339). | Owner to decide when videos restart |
 | D04 | Reorder This form has "As per annexure" on each line (D-338). | Owner to decide when videos restart |
 
+D-352 (12 Nov 2026: the "Fields marked * are mandatory …" note and the red stars removed from generated
+documents) — checked against every script: no recorded video opens a generated QT, PI or CI (they show the
+app pages and e-mail cards with the PDF's file name only), and no narration mentions the note or the stars.
+No video is affected.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

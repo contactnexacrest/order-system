@@ -37,7 +37,6 @@
   table.doc-header .incoterm { display: block; font-size: 10pt; font-weight: bold; color: #5B6573; }
 
   .mandatory-note { font-size: 9pt; font-style: italic; color: #5B6573; margin-bottom: 6pt; }
-  .mandatory-note .star { font-weight: bold; font-style: normal; color: #C0392B; }
 
   /* --- Meta bar: N-column shaded strip, small gray label over bold navy value --- */
   table.meta { width: 100%; margin-bottom: 6pt; }
@@ -130,7 +129,6 @@
   .bullet-block { font-size: 9.5pt; margin-bottom: 6pt; }
   .bullet-block p { margin: 0 0 4pt; }
   .bullet-block .sub-line { color: #333333; }
-  .bullet-block .mand-star { font-weight: bold; color: #C0392B; }
   .numbered-block { font-size: 9.5pt; margin-bottom: 6pt; }
   .numbered-block p { margin: 0 0 3pt; }
   ul.terms { margin: 0 0 6pt; padding-left: 14pt; }
@@ -239,8 +237,6 @@
     {% block header_incoterm %}{% if order.incoterm_code %}<span class="incoterm">{{ order.incoterm_code }} {{ order.port_of_loading|upper }}</span>{% endif %}{% endblock %}
   </td>
 </tr></table>
-
-<div class="mandatory-note">Fields marked <span class="star">*</span> are mandatory and must be completed before this document is issued.</div>
 
 {% if legal_terms_section_number is defined and legal_terms_section_number %}
 <div class="terms-reference-line">Terms used in this document are defined in Section {{ legal_terms_section_number }} — Legal Terms &amp; Definitions at the end of this document.</div>

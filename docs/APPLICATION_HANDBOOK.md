@@ -4189,6 +4189,17 @@ Certificate of Origin — <type> — Issued by CAPEXIL" as before. The Word buil
 value (falling back to the same helper), so the PDF and Word wording never differ. Other
 documents that show the COO type (Buyer PO, OC, COOPREP) are unchanged.
 
+**No mandatory-fields note, no red stars (D-352, 12 Nov 2026, owner confirm 1 + confirm 2).**
+Generated documents, PDF and Word, both stacks, no longer print the line "Fields marked * are
+mandatory and must be completed before this document is issued." (it was in the shared PDF
+layout `_layout.html.twig` / `_layout.njk` and in the Word builders) nor the red "*" that
+followed the payment-terms lines (QT, PI), the production / estimated-shipment line (PI, OC), the
+money rows and the amount in words (CI) and the payment-due line (FDN). Amounts, wording and
+layout are otherwise unchanged. The `.mandatory-note` style stays (the CI "Total Invoice Value in
+Words" line uses it); `.mand-star`, `addMandatoryNote()` / `mandatoryNote()` and the Word
+`starRun()` helper are gone. The grey "*" printed after field labels (e.g. "QUOTATION NO. *")
+is not part of D-352 and still prints.
+
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 
 **Quality documents card.** Per category, up to 10 documents. On the order page: Pending → Received → Approved, file required for Received/Approved. Internal; never shown to the client.

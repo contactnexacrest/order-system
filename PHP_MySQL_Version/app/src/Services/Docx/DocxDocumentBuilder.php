@@ -231,19 +231,6 @@ final class DocxDocumentBuilder
         };
     }
 
-    /**
-     * The kv-table checkbox-row look (BLI Sections 5/7). Uses plain ASCII
-     * brackets rather than the Unicode ballot-box glyphs (☑/☐) — those
-     * glyphs are missing from Carlito and render as tofu boxes in
-     * LibreOffice/Word for the (very common) unchecked state, so "[X]" /
-     * "[ ]" is the more reliable real-Word-formatting equivalent of the
-     * CSS .cbx checkbox square.
-     */
-    private static function starRun(): array
-    {
-        return ['*', ['bold' => true, 'color' => 'C0392B']];
-    }
-
     /** Bank Details kv rows — reused verbatim by PI/FDN/CI Section "BANK DETAILS". */
     private static function bankDetailsRows(array $context, string $paymentRefLabel, string $rbiCode): array
     {
@@ -400,8 +387,8 @@ final class DocxDocumentBuilder
                 return;
             }
             foreach ($financial['milestones'] ?? [] as $m) {
-                DocxComponents::addRichParagraph($section, [['• ', []], [$m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '. ', []], self::starRun()]);
-                DocxComponents::addRichParagraph($section, [['   ' . $m['pct'] . '% Amount:  ' . $currency . ' ' . $m['amount'], []], self::starRun()]);
+                DocxComponents::addRichParagraph($section, [['• ', []], [$m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '. ', []]]);
+                DocxComponents::addRichParagraph($section, [['   ' . $m['pct'] . '% Amount:  ' . $currency . ' ' . $m['amount'], []]]);
             }
         };
         if ($noAdvanceWording && empty($financial['has_advance'])) {
@@ -409,20 +396,20 @@ final class DocxDocumentBuilder
             // Letter of Credit) has no "0% Advance" lines — same as the PDF.
             $milestoneLines();
             DocxComponents::addRichParagraph($section, [
-                ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []], self::starRun(),
+                ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []],
             ]);
             DocxComponents::addRichParagraph($section, [
-                ['   ' . self::g($financial, 'balance_pct', '') . '% Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []], self::starRun(),
+                ['   ' . self::g($financial, 'balance_pct', '') . '% Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []],
             ]);
             self::freightAndCurrencyLines($section, $order, $currency);
             return;
         }
         DocxComponents::addRichParagraph($section, [
             // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
-            ['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []], self::starRun(),
+            ['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []],
         ]);
         DocxComponents::addRichParagraph($section, [
-            ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []], self::starRun(),
+            ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []],
         ]);
         // Owner decision (2026-10-28): the Word balance line now prints the
         // order's own balance terms — the same sentence as the PDF (Calendar
@@ -430,10 +417,10 @@ final class DocxDocumentBuilder
         $balanceText = self::g($financial, 'balance_terms_text', '');
         $milestoneLines();
         DocxComponents::addRichParagraph($section, [
-            ['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []], self::starRun(),
+            ['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []],
         ]);
         DocxComponents::addRichParagraph($section, [
-            ['   ' . self::g($financial, 'balance_pct', '') . '% Balance Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []], self::starRun(),
+            ['   ' . self::g($financial, 'balance_pct', '') . '% Balance Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []],
         ]);
         self::freightAndCurrencyLines($section, $order, $currency);
     }
@@ -465,7 +452,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('QT'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'QUOTATION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($order, 'quotation_date') !== '—' ? self::g($order, 'quotation_date') : self::g($meta, 'generated_date', '')],
@@ -557,7 +543,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('PI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'PI NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'PI DATE *', 'value' => self::g($order, 'pi_date') !== '—' ? self::g($order, 'pi_date') : self::g($meta, 'generated_date', '')],
@@ -659,7 +644,6 @@ final class DocxDocumentBuilder
                 $run->addText(self::g($order, 'production_status_text') . '   ', []);
                 $run->addText('Estimated shipment: ', ['bold' => true, 'color' => DocxComponents::NAVY]);
                 $run->addText(self::g($order, 'est_shipment_date_text'), ['italic' => true, 'color' => DocxComponents::MUTED]);
-                $run->addText(' *', ['bold' => true, 'color' => 'C0392B']);
                 $run2 = $cell->addTextRun();
                 $run2->addText('Note: ', ['bold' => true, 'color' => DocxComponents::NAVY, 'size' => 9]);
                 $run2->addText('Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
@@ -706,7 +690,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('OC'), null); // OC's header carries no incoterm chip
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'OC NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
@@ -781,7 +764,6 @@ final class DocxDocumentBuilder
                 $run->addText(self::g($order, 'production_status_text') . '   ', []);
                 $run->addText('Estimated shipment: ', ['bold' => true, 'color' => DocxComponents::NAVY]);
                 $run->addText(self::g($order, 'est_shipment_date_text'), ['italic' => true, 'color' => DocxComponents::MUTED]);
-                $run->addText(' *', ['bold' => true, 'color' => 'C0392B']);
                 $run2 = $cell->addTextRun();
                 $run2->addText('Note: ', ['bold' => true, 'color' => DocxComponents::NAVY, 'size' => 9]);
                 $run2->addText('Estimated shipment date is indicative and subject to production completion, packing, and port scheduling. A confirmed Bill of Lading date will be communicated once the shipment is booked.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
@@ -817,7 +799,6 @@ final class DocxDocumentBuilder
         $meta = $context['meta'] ?? [];
 
         DocxComponents::addHeader($section, $context, self::titleFor('ANNEXA'), null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'ANNEXURE TO', 'value' => self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'buyer_inquiry_ref'))],
@@ -1257,7 +1238,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('FDN'), 'FREIGHT COST RECOVERY');
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'DEBIT NOTE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
@@ -1345,7 +1325,6 @@ final class DocxDocumentBuilder
         $products = $context['products'] ?? [];
 
         DocxComponents::addHeader($section, $context, self::titleFor('PL'), null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'PL NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
@@ -1578,7 +1557,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('CI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
@@ -1642,32 +1620,32 @@ final class DocxDocumentBuilder
             ? 'FOB: buyer arranges — write NIL'
             : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
         $sectionARows = [
-            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
-            [$isCif || $isFob ? 'Freight & Insurance' : 'Freight', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))) . ' *', $freightRemark],
-            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value') . ' *', ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : ($isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight')) . ' · Currency: ' . $currency],
+            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value'), 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
+            [$isCif || $isFob ? 'Freight & Insurance' : 'Freight', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))), $freightRemark],
+            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value'), ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : ($isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight')) . ' · Currency: ' . $currency],
         ];
         self::threeColFinanceTable($section, 'SECTION A — INVOICE VALUE', $sectionARows, DocxComponents::NAVY_MID);
 
         $advanceAmt = self::g($payment, 'advance_amount') !== '—' ? self::g($payment, 'advance_amount') : self::g($financial, 'advance_amount');
         $balanceAmt = self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount');
         $freightStatus = $isFob ? 'NIL (FOB)' : (self::g($payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING');
-        $freightAmtCell = $isFob ? 'NIL — FOB' : ($currency . ' ' . self::g($payment, 'freight_amount', 'To Be Confirmed') . ' *');
+        $freightAmtCell = $isFob ? 'NIL — FOB' : ($currency . ' ' . self::g($payment, 'freight_amount', 'To Be Confirmed'));
         $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against FDN No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
         // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
         $milestones = $financial['milestones'] ?? [];
         $milestoneRows = array_map(static fn (array $m): array => [
             "\u{221A}  Milestone {$m['seq']} ({$m['pct']}% {$m['due_short']}) — " . ($m['received'] ? 'RECEIVED' : 'PENDING'),
-            $currency . ' ' . ($m['received'] ? $m['received_amount'] : $m['amount']) . ' *',
+            $currency . ' ' . ($m['received'] ? $m['received_amount'] : $m['amount']),
             'Received: ' . ($m['received'] ? $m['received_on'] . ' · bank ref ' . $m['bank_reference'] : 'To Be Confirmed') . "\nDue: {$m['due_text']}",
         ], $milestones);
         $receivedParts = implode('', array_map(static fn (array $m): string => $m['received'] ? ' + ' . $m['received_amount'] : '', $milestones));
         $subtotalPaid = $currency . ' ' . ($milestones !== [] ? self::g($financial, 'subtotal_paid_with_milestones') : $advanceAmt) . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
         $sectionBRows = [
-            ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
+            ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt, 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
             ...$milestoneRows,
             ["\u{221A}  " . ($isCif || $isFob ? 'Freight & Insurance' : 'Freight') . " — {$freightStatus}", $freightAmtCell, $freightRemark2],
             ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . ($milestones !== [] ? ' + milestones' : '') . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus advance' . ($milestones !== [] ? ' and milestones' : '') . " received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt, '= FOB Value minus advance' . ($milestones !== [] ? ' and milestones' : '') . " received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
             ['VERIFICATION', ($milestones !== [] ? "Advance + Milestones + Balance = FOB Value\n{$advanceAmt}{$receivedParts} + {$balanceAmt} = " : "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = ") . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
@@ -1675,7 +1653,6 @@ final class DocxDocumentBuilder
         DocxComponents::addRichParagraph($section, [
             ['Total Invoice Value in Words (' . $currency . '): ', ['bold' => true]],
             [self::g($financial, 'total_invoice_value_in_words', '_________________________________________________________'), ['bold' => true]],
-            [' *', ['bold' => true, 'color' => 'C0392B']],
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'bank', 6) . '. BANK DETAILS  (for balance T/T payment)');
@@ -1724,7 +1701,6 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
 
         DocxComponents::addHeader($section, $context, self::titleFor('ESI'), null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
@@ -1793,7 +1769,6 @@ final class DocxDocumentBuilder
         $products = $context['products'] ?? [];
 
         DocxComponents::addHeader($section, $context, self::titleFor('COOPREP'), null);
-        DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
             ['label' => 'SHIPMENT REF *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'DATE PREPARED *', 'value' => self::g($meta, 'generated_date', '')],
