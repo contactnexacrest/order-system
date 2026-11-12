@@ -45,6 +45,48 @@ final class AmendmentService
             throw new \RuntimeException('AMD document type has no ref_format configured — cannot mint an amendment reference.');
         }
 
+        $snapshot = self::originalSnapshot($order);
+
+        $amendmentId = AmendmentRepository::create(
+            $reference,
+            $orderId,
+            $reason,
+            $requestedBy,
+            $snapshot,
+            $amendedAdvancePct,
+            $amendedAdvanceAmount,
+            $amendedBalanceTerms,
+            $amendedBalanceTriggerOption,
+            $amendedBalanceDays,
+            $amendedBalanceAmount,
+            $effectiveFrom,
+            $requestedByUserId
+        );
+
+        AuditLogRepository::log($requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', $amendmentId, 'reason', null, $reason);
+
+        // Notify whoever can actually approve it (approve_documents — the
+        // same permission /amendments/{id}/md-approve is gated on) so this
+        // isn't stuck waiting on someone stumbling across it — mirrors the
+        // reviewer-assignment pattern. Checked by permission, not a
+        // hardcoded role name, since roles can be renamed via /admin/roles.
+        foreach (PermissionRepository::usersWithPermission('approve_documents') as $userId) {
+            NotificationRepository::create($userId, null, 'amendment_pending_md_approval', $orderId, "Amendment {$reference} needs MD approval.");
+        }
+
+        return $amendmentId;
+    }
+
+    /**
+     * What the amendment changes FROM, frozen at request time: the original documents'
+     * references and dates, the order summary and the payment terms as the PI states them.
+     * Shared by both amendment types (payment terms; D-342 products & prices).
+     *
+     * @return array<string,mixed>
+     */
+    public static function originalSnapshot(array $order): array
+    {
+        $orderId = (int) $order['id'];
         $fobValue = OrderProductRepository::totalFobValue($orderId);
         $advancePct = (float) $order['advance_pct'];
         $balancePct = (float) $order['balance_pct'];
@@ -95,35 +137,7 @@ final class AmendmentService
             'gstin'               => CompanySettingsRepository::get('gstin'),
             'iec_pan'             => CompanySettingsRepository::get('iec_pan'),
         ];
-
-        $amendmentId = AmendmentRepository::create(
-            $reference,
-            $orderId,
-            $reason,
-            $requestedBy,
-            $snapshot,
-            $amendedAdvancePct,
-            $amendedAdvanceAmount,
-            $amendedBalanceTerms,
-            $amendedBalanceTriggerOption,
-            $amendedBalanceDays,
-            $amendedBalanceAmount,
-            $effectiveFrom,
-            $requestedByUserId
-        );
-
-        AuditLogRepository::log($requestedByUserId, 'AMENDMENT_REQUESTED', 'amendments', $amendmentId, 'reason', null, $reason);
-
-        // Notify whoever can actually approve it (approve_documents — the
-        // same permission /amendments/{id}/md-approve is gated on) so this
-        // isn't stuck waiting on someone stumbling across it — mirrors the
-        // reviewer-assignment pattern. Checked by permission, not a
-        // hardcoded role name, since roles can be renamed via /admin/roles.
-        foreach (PermissionRepository::usersWithPermission('approve_documents') as $userId) {
-            NotificationRepository::create($userId, null, 'amendment_pending_md_approval', $orderId, "Amendment {$reference} needs MD approval.");
-        }
-
-        return $amendmentId;
+        return $snapshot;
     }
 
     public static function approveByMd(int $amendmentId, int $mdUserId, bool $sampleDataLoad = false): void
@@ -203,6 +217,12 @@ final class AmendmentService
         }
         if ($amendment['document_id'] === null) {
             throw new \RuntimeException('Generate the Amendment Agreement document before uploading the signed copy.');
+        }
+
+        // Owner decision D-342: a "Products & prices" amendment changes the order's lines, not its payment terms.
+        if (($amendment['amendment_type'] ?? 'payment_terms') === 'products') {
+            ProductsAmendmentService::activate($amendment, $signedCopyFileId, $userId);
+            return;
         }
 
         // QA batch 2 (ORD-02): the schedule may have changed since the request — re-check before it takes effect.

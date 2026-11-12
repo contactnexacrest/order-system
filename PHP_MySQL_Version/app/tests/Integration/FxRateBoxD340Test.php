@@ -217,9 +217,10 @@ final class FxRateBoxD340Test extends DbTestCase
 
     public function testTheRateFixedAtThePiIsTheRateInUseNotTheRawManualSetting(): void
     {
-        // Owner, 12 Nov 2026 ("fix it"): orders.pricing_fx_rate_at_pi takes FxRateService::rate().
+        // Owner, 12 Nov 2026 ("fix it"): orders.pricing_fx_rate_at_pi takes FxRateService::rate();
+        // D-342 (same day): or, once the Quotation is approved, the rate fixed then.
         $src = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Services/OrderSnapshotService.php');
-        self::assertStringContainsString('$fx = \\App\\Services\\FxRateService::rate();', $src);
+        self::assertStringContainsString('$fx = \\App\\Services\\PriceLock::fixedRate($row) ?? \\App\\Services\\FxRateService::rate();', $src);
         self::assertStringNotContainsString("PricingRepository::settings()['pricing_fx_rate']", $src);
     }
 }

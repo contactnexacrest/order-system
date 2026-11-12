@@ -7,11 +7,27 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>">&larr; Back to Order</a></p>
-  <h1>Payment Terms Amendments — <?= htmlspecialchars($order['order_reference']) ?></h1>
+  <h1>Amendments — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?></p>
 
+  <?php // Owner decision D-342: once the Quotation is approved, products and prices change only through an amendment. ?>
+  <div class="section" id="products-amendment">
+    <h2>Products &amp; prices</h2>
+    <?php if (\App\Services\PriceLock::isFixed($order)): ?>
+      <p class="muted"><?= htmlspecialchars(\App\Services\PriceLock::message($order)) ?></p>
+      <?php $__why = \App\Services\ProductsAmendmentService::cannotStart($order); ?>
+      <?php if ($__why === null): ?>
+        <a class="btn-primary" href="/orders/<?= (int) $order['id'] ?>/amendments/products/new">New amendment — Products &amp; prices</a>
+      <?php else: ?>
+        <p class="notice notice-info"><?= htmlspecialchars($__why) ?></p>
+      <?php endif; ?>
+    <?php else: ?>
+      <p class="muted">The Quotation is not approved yet — products and prices are changed on the order page (Products).</p>
+    <?php endif; ?>
+  </div>
+
   <div class="section">
-    <h2>Raise a New Amendment Request</h2>
+    <h2>Raise a Payment Terms Amendment</h2>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/amendments">
       <?= Csrf::field() ?>
       <div class="field-grid">
@@ -58,10 +74,11 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
   <div class="section">
     <h2>Amendment History</h2>
     <table class="list">
-      <tr><th>Reference</th><th>Reason</th><th>Status</th><th>MD Approved</th><th>Created</th><th>Actions</th></tr>
+      <tr><th>Reference</th><th>Type</th><th>Reason</th><th>Status</th><th>MD Approved</th><th>Created</th><th>Actions</th></tr>
       <?php foreach ($amendments as $a): ?>
       <tr>
         <td><?= htmlspecialchars($a['amendment_reference']) ?></td>
+        <td><?= ($a['amendment_type'] ?? '') === 'products' ? 'Products &amp; prices' : 'Payment terms' ?></td>
         <td><?= htmlspecialchars($a['reason']) ?></td>
         <td><?= htmlspecialchars($a['status']) ?></td>
         <td><?= htmlspecialchars($a['md_approved_at'] ?? '—') ?></td>
@@ -72,7 +89,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-success">MD Approve</button>
             </form>
-            <form method="post" action="/amendments/<?= (int) $a['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this payment terms amendment?');">
+            <form method="post" action="/amendments/<?= (int) $a['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this amendment?');">
               <?= Csrf::field() ?>
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>
@@ -91,7 +108,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               </form>
             <?php endif; ?>
           <?php elseif ($a['status'] === 'active'): ?>
-            <span class="muted">Active — payment terms updated.</span>
+            <span class="muted"><?= ($a['amendment_type'] ?? '') === 'products' ? 'Active — products and prices updated.' : 'Active — payment terms updated.' ?></span>
             <?php if ($a['document_id']): ?> <a href="/documents/<?= (int) $a['document_id'] ?>/download?format=pdf">Agreement PDF</a><?php endif; ?>
           <?php else: ?>
             <span class="muted"><?= htmlspecialchars($a['status']) ?></span>
@@ -111,7 +128,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
       </tr>
       <?php endforeach; ?>
       <?php if (empty($amendments)): ?>
-        <tr><td colspan="6" class="muted">No amendments on this order.</td></tr>
+        <tr><td colspan="7" class="muted">No amendments on this order.</td></tr>
       <?php endif; ?>
     </table>
   </div>

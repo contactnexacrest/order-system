@@ -215,6 +215,11 @@ $isLockedOrder = (bool) $order['is_locked'];
 $canOverrideLockEdit = OrderEditGuard::canOverrideLock((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
 $__productCategories = \App\Repositories\ProductCategoryRepository::all();
 $canEditProducts = $canManageOrders && $sees['selling'] && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
+// Owner decision D-342: once the approved Quotation fixed prices and products, the lines change only through an amendment (no override).
+$pricesFixed = \App\Services\PriceLock::isFixed($order);
+if ($pricesFixed) {
+    $canEditProducts = false;
+}
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
 // rendered inline in the Payment Status section rather than a separate
@@ -1506,6 +1511,50 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
 
   <?php // D-257 Phase 0B: the quality documents sit inside the Products card; it opens while one is still awaited. ?>
   <?php $__qualityDocs = \App\Repositories\OrderQualityDocumentRepository::forOrder((int) $order['id']); $__qualityOpen = array_filter($__qualityDocs, static fn ($qd) => $qd['status'] !== 'approved') !== []; ?>
+  <?php // Owner decision D-342 (mockup screen 2): after an activated "Products & prices" amendment, what to re-issue. ?>
+  <?php $__reissue = $canManageOrders ? \App\Services\ProductsAmendmentService::checklist($order) : null; ?>
+  <?php if ($__reissue !== null): ?>
+  <div class="card reissue-checklist" id="reissue-checklist">
+    <h2><?= htmlspecialchars($__reissue['title']) ?></h2>
+    <p class="muted"><?= htmlspecialchars($__reissue['intro']) ?></p>
+    <table class="list">
+      <tr><th>Document</th><th>Status</th><th>What to do</th></tr>
+      <?php foreach ($__reissue['items'] as $__ri): ?>
+      <tr>
+        <td><?= htmlspecialchars($__ri['document']) ?></td>
+        <td><?= $__ri['state'] === 'todo' ? '⚠ ' : '' ?><?= htmlspecialchars($__ri['status']) ?></td>
+        <td>
+          <?php if ($__ri['state'] === 'ok'): ?>
+            <span class="ok">✓ <?= htmlspecialchars($__ri['todo']) ?></span>
+          <?php else: ?>
+            <span class="todo"><?= htmlspecialchars($__ri['todo']) ?></span>
+            <?php $__codes = array_values(array_filter([$__ri['generate'] ?? null, !empty($__ri['generate_ci']) ? 'CI' : null, !empty($__ri['generate_pl']) ? 'PL' : null])); ?>
+            <?php foreach ($__codes as $__code): ?>
+              <?php if ($canGenerateDocuments): ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" class="inline-form">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="document_type" value="<?= $__code ?>">
+                <input type="hidden" name="generate_pdf" value="1">
+                <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate revised <?= ['PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'CI' => 'Commercial Invoice', 'PL' => 'Packing List'][$__code] ?> ›</button>
+              </form>
+              <?php endif; ?>
+            <?php endforeach; ?>
+            <?php if (isset($__ri['tick'])): ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/amendments/<?= (int) $__ri['tick'] ?>/buyer-po-amended" class="inline-form">
+                <?= Csrf::field() ?>
+                <button type="submit" class="btn-sm btn-secondary">✓ The signed amendment amends the Buyer PO</button>
+              </form>
+            <?php endif; ?>
+            <?php if (isset($__ri['link'])): ?><a href="<?= htmlspecialchars($__ri['link']) ?>">Supplier PO ›</a><?php endif; ?>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <p class="notice notice-info"><?= htmlspecialchars($__reissue['money']) ?><?= !empty($seesPriceBuildup) && $__reissue['rate'] !== null ? ' ' . htmlspecialchars($__reissue['rate']) : '' ?></p>
+  </div>
+  <?php endif; ?>
+
   <details class="step-card" id="step-products"<?= (($sees['selling'] && $linePricing['blocking'] !== []) || $__qualityOpen) ? ' open' : '' ?>>
     <summary><h2>Products</h2></summary>
     <?php // Owner decision D-273 (point 17): one compact products table, summary bar, totals and side-panel editing. ?>
@@ -4867,7 +4916,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-card step-card-reference" id="amendments">
     <summary><h2>Amendments <small class="muted">(reference — mutually-agreed term changes)</small></h2></summary>
     <p class="muted">Mutually-agreed changes to this order's terms (payment terms, pricing, quantity, etc), each going through its own maker-checker approval — a different process from a buyer complaint or claim, which belongs under Disputes.</p>
-    <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Payment Terms Amendments (<?= (int) $amendmentCount ?>)</a></p>
+    <p><a href="/orders/<?= (int) $order['id'] ?>/amendments">Amendments (<?= (int) $amendmentCount ?>) — payment terms, products &amp; prices</a></p>
   </details>
   <?php endif; ?>
 

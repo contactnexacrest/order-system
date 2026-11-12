@@ -6626,3 +6626,58 @@ ALTER TABLE order_reorder_request_products ADD COLUMN as_per_annexure TINYINT(1)
 ALTER TABLE orders ADD COLUMN line_table_layout ENUM('classic','detailed') NOT NULL DEFAULT 'detailed';
 ALTER TABLE order_products ADD COLUMN pieces_count INT UNSIGNED NULL;
 ALTER TABLE order_products ADD COLUMN size_note VARCHAR(200) NULL;
+
+-- ================================================================
+-- Owner decision D-342 (12 Nov 2026, owner confirmed twice; migration 2026-11-12h):
+-- prices and products are fixed by the approved Quotation and change only through a
+-- "Products & prices" amendment.
+-- orders.prices_fixed_at / prices_fixed_by_document_id / pricing_fx_rate_at_qt: when the
+-- first Quotation was approved, which one, and the pricing rate (₹ per USD) fixed then
+-- (the PI keeps the same rate in pricing_fx_rate_at_pi).
+-- orders.buyer_po_amended_by_amendment_id / _at / _by: the tick "The signed amendment
+-- amends the Buyer PO" on the re-issue checklist.
+-- order_products.qt_fixed_unit_price: the price the buyer accepted (the approved
+-- Quotation, or the activated amendment that changed it).
+-- amendments.amendment_type: 'payment_terms' (Section 8) or 'products' (D-342);
+-- products_totals_json: old / new totals and the payment effect; activated_at; and
+-- supplier_po_revision_needed (quantities changed on an order with a Supplier PO).
+-- amendment_product_lines: the old and new figures of every line of a products amendment.
+ALTER TABLE orders ADD COLUMN prices_fixed_at DATETIME NULL;
+ALTER TABLE orders ADD COLUMN prices_fixed_by_document_id BIGINT UNSIGNED NULL;
+ALTER TABLE orders ADD COLUMN pricing_fx_rate_at_qt DECIMAL(12,4) NULL;
+ALTER TABLE orders ADD COLUMN buyer_po_amended_by_amendment_id BIGINT UNSIGNED NULL;
+ALTER TABLE orders ADD COLUMN buyer_po_amended_at DATETIME NULL;
+ALTER TABLE orders ADD COLUMN buyer_po_amended_by BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN qt_fixed_unit_price DECIMAL(14,2) NULL;
+ALTER TABLE amendments ADD COLUMN amendment_type ENUM('payment_terms','products') NOT NULL DEFAULT 'payment_terms';
+ALTER TABLE amendments ADD COLUMN products_totals_json TEXT NULL;
+ALTER TABLE amendments ADD COLUMN activated_at DATETIME NULL;
+ALTER TABLE amendments ADD COLUMN supplier_po_revision_needed TINYINT(1) NOT NULL DEFAULT 0;
+CREATE TABLE amendment_product_lines (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  amendment_id        BIGINT UNSIGNED NOT NULL,
+  line_no             INT NOT NULL,
+  order_product_id    BIGINT UNSIGNED NULL,
+  source_line_id      BIGINT UNSIGNED NULL,
+  change_kind         ENUM('none','change','add','remove') NOT NULL,
+  description         VARCHAR(500) NOT NULL,
+  unit                VARCHAR(20) NULL,
+  old_length_cm       DECIMAL(7,2) NULL,
+  old_width_cm        DECIMAL(7,2) NULL,
+  old_thickness_cm    DECIMAL(7,2) NULL,
+  old_pieces          INT UNSIGNED NULL,
+  old_quantity        DECIMAL(14,3) NULL,
+  old_unit_price      DECIMAL(14,2) NULL,
+  old_line_total      DECIMAL(14,2) NULL,
+  new_length_cm       DECIMAL(7,2) NULL,
+  new_width_cm        DECIMAL(7,2) NULL,
+  new_thickness_cm    DECIMAL(7,2) NULL,
+  new_pieces          INT UNSIGNED NULL,
+  new_quantity        DECIMAL(14,3) NULL,
+  new_unit_price      DECIMAL(14,2) NULL,
+  new_line_total      DECIMAL(14,2) NULL,
+  price_lowered       TINYINT(1) NOT NULL DEFAULT 0,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_amendment_product_lines_amendment (amendment_id, line_no),
+  CONSTRAINT fk_amendment_product_lines_amendment FOREIGN KEY (amendment_id) REFERENCES amendments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

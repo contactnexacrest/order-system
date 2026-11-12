@@ -13,6 +13,7 @@ use App\Repositories\AmendmentRepository;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\OrderRepository;
 use App\Services\AmendmentService;
+use App\Services\ProductsAmendmentService;
 use App\Services\AuthService;
 use App\Services\FileUploadService;
 
@@ -107,6 +108,83 @@ final class AmendmentController
         header("Location: /orders/{$orderId}/amendments");
     }
 
+    /** Owner decision D-342: New amendment — Products & prices (mockup screen 1). */
+    public function newProducts(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if (($why = ProductsAmendmentService::cannotStart($order)) !== null) {
+            Flash::set('error', $why);
+            header("Location: /orders/{$orderId}/amendments");
+            return;
+        }
+        self::renderProducts($order, null, [], '');
+    }
+
+    /** Owner decision D-342: "Check the changes" (shows old → new) or "Send to MD for approval". */
+    public function createProducts(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if (($why = ProductsAmendmentService::cannotStart($order)) !== null) {
+            Flash::set('error', $why);
+            header("Location: /orders/{$orderId}/amendments");
+            return;
+        }
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (($_POST['step'] ?? '') === 'check') {
+            $draft = ProductsAmendmentService::draft($order, $_POST);
+            self::renderProducts($order, $draft, $draft['errors'], $reason);
+            return;
+        }
+        try {
+            [$id, $errors, $draft] = ProductsAmendmentService::create($orderId, $_POST, $reason, (int) AuthService::currentUser()['id']);
+        } catch (\Throwable $e) {
+            Flash::setErrorFromException($e);
+            header("Location: /orders/{$orderId}/amendments");
+            return;
+        }
+        if ($id === null) {
+            self::renderProducts($order, $draft !== [] ? $draft : null, $errors, $reason);
+            return;
+        }
+        Flash::set('success', 'Amendment request (Products & prices) created — awaiting MD approval. The order changes only when the buyer\'s signed copy is uploaded.');
+        header("Location: /orders/{$orderId}/amendments");
+    }
+
+    private static function renderProducts(array $order, ?array $draft, array $errors, string $reason): void
+    {
+        $user = AuthService::currentUser();
+        View::render('amendments/products_new', [
+            'order'   => $order,
+            'lines'   => ProductsAmendmentService::currentLines((int) $order['id']),
+            'draft'   => $draft,
+            'errors'  => $errors,
+            'reason'  => $reason,
+            'post'    => $_POST,
+            'seesRate' => \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'view_price_buildup'),
+        ], 'layout/base');
+    }
+
+    /** Owner decision D-342: the re-issue checklist's tick "The signed amendment amends the Buyer PO". */
+    public function buyerPoAmended(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $error = ProductsAmendmentService::tickBuyerPo($orderId, (int) $params['amendmentId'], (int) AuthService::currentUser()['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? 'Noted: the signed amendment amends the Buyer PO.');
+        header("Location: /orders/{$orderId}#reissue-checklist");
+    }
+
     public function mdApprove(array $params): void
     {
         $amendmentId = (int) $params['amendmentId'];
@@ -162,7 +240,7 @@ final class AmendmentController
             // External QA report N-08: this action never reached the
             // audit log, so it never notified anyone either.
             AuditLogRepository::log((int) AuthService::currentUser()['id'], 'AMENDMENT_DOCUMENT_GENERATED', 'amendments', $amendmentId, null, null, null);
-            Flash::set('success', 'Payment Terms Amendment Agreement generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
+            Flash::set('success', (($amendment['amendment_type'] ?? '') === 'products' ? 'Amendment (Products & prices)' : 'Payment Terms Amendment Agreement') . ' generated. Print, obtain wet signature + company stamp from the Importer, then upload the signed copy.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
         }
@@ -191,10 +269,12 @@ final class AmendmentController
                 (int) AuthService::currentUser()['id'],
                 null,
                 'Buyer',
-                'Countersigned Payment Terms Amendment Agreement'
+                ($amendment['amendment_type'] ?? '') === 'products' ? 'Countersigned Amendment (Products & prices)' : 'Countersigned Payment Terms Amendment Agreement'
             );
             AmendmentService::attachSignedCopyAndActivate($amendmentId, $fileId, (int) AuthService::currentUser()['id']);
-            Flash::set('success', 'Signed copy uploaded — amendment is now active and payment terms are updated.');
+            Flash::set('success', ($amendment['amendment_type'] ?? '') === 'products'
+                ? 'Signed copy uploaded — the amendment is active: the order\'s products and prices are updated (its stage does not change). See the re-issue checklist on the order page.'
+                : 'Signed copy uploaded — amendment is now active and payment terms are updated.');
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
         }

@@ -116,7 +116,7 @@ final class OrderSnapshotService
     public static function freeze(int $orderId): bool
     {
         $pdo = Database::connection();
-        $order = $pdo->prepare('SELECT id, frozen_at, payment_preset_id FROM orders WHERE id = :id');
+        $order = $pdo->prepare('SELECT id, frozen_at, payment_preset_id, prices_fixed_at, pricing_fx_rate_at_qt FROM orders WHERE id = :id');
         $order->execute(['id' => $orderId]);
         $row = $order->fetch(\PDO::FETCH_ASSOC);
         if (!$row || $row['frozen_at'] !== null) {
@@ -140,7 +140,8 @@ final class OrderSnapshotService
         }
         // D-340 follow-up (owner, 12 Nov 2026): the rate prices were actually built with — the automatic
         // pricing rate when Automatic is on (market × (1 − cushion)), else the manual rate — not the raw setting.
-        $fx = \App\Services\FxRateService::rate();
+        // D-342 (owner, 12 Nov 2026): once the Quotation is approved the PI keeps the rate fixed then.
+        $fx = \App\Services\PriceLock::fixedRate($row) ?? \App\Services\FxRateService::rate();
         $tolerance = $company['quantity_shortfall_tolerance_pct'] ?? null;
 
         $pdo->prepare(

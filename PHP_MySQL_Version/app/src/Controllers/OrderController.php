@@ -825,6 +825,14 @@ final class OrderController
             }
         }
 
+        // Owner decision D-342: the approved Quotation fixed the prices in its currency — a currency change would change them.
+        if ($currencyId !== (int) $order['currency_id'] && ($lockRefusal = \App\Services\PriceLock::refusal($order)) !== null) {
+            Flash::set('error', 'The currency can no longer change. ' . $lockRefusal);
+            Flash::setOld($_POST);
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
         if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'orders', $orderId, 'order_details')) {
@@ -1126,6 +1134,22 @@ final class OrderController
     }
 
     /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
+    /**
+     * Owner decision D-342 (12 Nov 2026, confirmed twice): once the order's first Quotation is
+     * approved its lines change only through a "Products & prices" amendment — refused here for
+     * everyone (no override, not the Super Admin). True when refused.
+     */
+    private static function refuseLockedLines(array $order): bool
+    {
+        $refusal = \App\Services\PriceLock::refusal($order);
+        if ($refusal === null) {
+            return false;
+        }
+        Flash::set('error', $refusal);
+        header('Location: /orders/' . (int) $order['id'] . '#step-products');
+        return true;
+    }
+
     private static function dimensionsFromSize(array $size): ?string
     {
         $text = \App\Services\LineUnits::dimensionsText(\App\Services\LineUnits::size($size['piece_length_cm'] ?? null),
@@ -1154,6 +1178,9 @@ final class OrderController
         if (!$order) {
             http_response_code(404);
             echo 'Order not found.';
+            return;
+        }
+        if (self::refuseLockedLines($order)) {
             return;
         }
         // Owner decision D-255 (5 Nov 2026): a line may come from an associate's price request — it then
@@ -1297,6 +1324,9 @@ final class OrderController
             echo 'Product line not found.';
             return;
         }
+        if (self::refuseLockedLines($order)) {
+            return;
+        }
         $description = trim((string) ($_POST['description'] ?? ''));
         if ($description === '') {
             Flash::set('error', 'Description is required.');
@@ -1428,6 +1458,9 @@ final class OrderController
             echo 'Product line not found.';
             return;
         }
+        if (self::refuseLockedLines($order)) {
+            return;
+        }
 
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
@@ -1453,6 +1486,9 @@ final class OrderController
         if (!$order || !$product || (int) $product['order_id'] !== $orderId) {
             http_response_code(404);
             echo 'Product line not found.';
+            return;
+        }
+        if (self::refuseLockedLines($order)) {
             return;
         }
 

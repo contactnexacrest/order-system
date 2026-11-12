@@ -109,7 +109,71 @@ final class AmendmentRepository
     public static function activate(int $id, int $signedCopyFileId): void
     {
         Database::connection()->prepare(
-            "UPDATE amendments SET status = 'active', signed_copy_file_id = :file_id WHERE id = :id"
+            "UPDATE amendments SET status = 'active', signed_copy_file_id = :file_id, activated_at = NOW() WHERE id = :id"
         )->execute(['file_id' => $signedCopyFileId, 'id' => $id]);
+    }
+
+    // ---- Owner decision D-342: "Products & prices" amendments ----
+
+    /** Marks a just-created amendment as a products amendment, with its totals. */
+    public static function setProducts(int $id, array $totals): void
+    {
+        Database::connection()->prepare(
+            "UPDATE amendments SET amendment_type = 'products', products_totals_json = :t WHERE id = :id"
+        )->execute(['t' => json_encode($totals, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION), 'id' => $id]);
+    }
+
+    public const PRODUCT_LINE_COLUMNS = ['line_no', 'order_product_id', 'source_line_id', 'change_kind', 'description', 'unit',
+        'old_length_cm', 'old_width_cm', 'old_thickness_cm', 'old_pieces', 'old_quantity', 'old_unit_price', 'old_line_total',
+        'new_length_cm', 'new_width_cm', 'new_thickness_cm', 'new_pieces', 'new_quantity', 'new_unit_price', 'new_line_total', 'price_lowered'];
+
+    /** @param array<string,mixed> $line one line of ProductsAmendmentService::draft() */
+    public static function addProductLine(int $amendmentId, array $line): void
+    {
+        $values = ['amendment_id' => $amendmentId];
+        foreach (self::PRODUCT_LINE_COLUMNS as $c) {
+            $v = $line[$c] ?? null;
+            $values[$c] = is_bool($v) ? (int) $v : $v;
+        }
+        $values['price_lowered'] = (int) ($values['price_lowered'] ?? 0);
+        Database::connection()->prepare(
+            'INSERT INTO amendment_product_lines (amendment_id, ' . implode(', ', self::PRODUCT_LINE_COLUMNS) . ') VALUES (:amendment_id, :' . implode(', :', self::PRODUCT_LINE_COLUMNS) . ')'
+        )->execute($values);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function productLines(int $amendmentId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM amendment_product_lines WHERE amendment_id = :a ORDER BY line_no, id');
+        $stmt->execute(['a' => $amendmentId]);
+        return $stmt->fetchAll();
+    }
+
+    /** The products amendment of this order still on its way (pending, MD-approved or signed), or null. */
+    public static function openProductsAmendment(int $orderId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM amendments WHERE order_id = :o AND amendment_type = 'products' AND status IN ('pending', 'md_approved', 'signed')
+              ORDER BY id DESC LIMIT 1"
+        );
+        $stmt->execute(['o' => $orderId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** The order's latest activated products amendment, or null. */
+    public static function latestActiveProducts(int $orderId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM amendments WHERE order_id = :o AND amendment_type = 'products' AND status = 'active'
+              ORDER BY activated_at DESC, id DESC LIMIT 1"
+        );
+        $stmt->execute(['o' => $orderId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function setSupplierPoRevisionNeeded(int $id, bool $needed): void
+    {
+        Database::connection()->prepare('UPDATE amendments SET supplier_po_revision_needed = :n WHERE id = :id')
+            ->execute(['n' => $needed ? 1 : 0, 'id' => $id]);
     }
 }

@@ -346,6 +346,12 @@ final class FxRateService
             }
         }
         $now = self::status();
+        // D-342: the approved Quotation fixed the rate (the PI keeps the same one).
+        if (($qtRate = PriceLock::fixedRate($order)) !== null) {
+            $r = '₹' . number_format($qtRate, 2);
+            return 'Prices worked out at ' . $r . ' per USD — fixed by the approved Quotation of ' . PriceLock::fixedDate($order)
+                . (abs($qtRate - (float) $now['rate']) >= 0.005 ? '; today\'s rate ₹' . number_format((float) $now['rate'], 2) . ' does not change them.' : '.');
+        }
         if ($issued) {
             $fixedRate ??= isset($order['pricing_fx_rate_at_pi']) && is_numeric($order['pricing_fx_rate_at_pi']) && (float) $order['pricing_fx_rate_at_pi'] > 0 ? (float) $order['pricing_fx_rate_at_pi'] : null;
             $st = Database::connection()->prepare("SELECT MIN(d.generated_at) FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = :o AND dt.code = 'PI'");

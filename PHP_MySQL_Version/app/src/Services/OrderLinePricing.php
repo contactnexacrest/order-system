@@ -100,7 +100,9 @@ final class OrderLinePricing
     public static function context(array $order): array
     {
         $ctx = ['associate' => null, 'level' => null, 'key' => 'staff', 'label' => 'Staff', 'ladder_count' => null,
-            'usd' => strtoupper((string) ($order['currency_code'] ?? '')) === 'USD'];
+            'usd' => strtoupper((string) ($order['currency_code'] ?? '')) === 'USD',
+            // D-342: once the Quotation is approved, prices are worked out at the rate fixed then — never today's.
+            'fixed_fx' => PriceLock::fixedRate($order)];
         $client = !empty($order['client_id']) ? ClientRepository::find((int) $order['client_id']) : null;
         if ($client === null || empty($client['associate_id'])) {
             return $ctx;
@@ -167,7 +169,13 @@ final class OrderLinePricing
     {
         // D-255: with the line's chosen specification options (null = the base product).
         // D-270: and the line's own thickness (a "50 mm and above" option priced per CBM).
-        $p = PricingService::forProduct($product, [], null, null, $selection, $lineThicknessMm);
+        // D-342: an order whose Quotation is approved works its prices out at the rate fixed then.
+        $settings = null;
+        if (($ctx['fixed_fx'] ?? null) !== null) {
+            $settings = PricingService::settings();
+            $settings['pricing_fx_rate'] = (float) $ctx['fixed_fx'];
+        }
+        $p = PricingService::forProduct($product, [], $settings, null, $selection, $lineThicknessMm);
         if ($p['build'] === null) {
             return ['missing' => (string) $p['missing'], 'manual' => (bool) $p['manual']];
         }
@@ -970,6 +978,33 @@ final class OrderLinePricing
         return null;
     }
 
+    /**
+     * Owner decision D-342: a price lowered (or a line added) by a "Products & prices" amendment
+     * was approved by the MD with the amendment — recorded on the line as the MD's approval.
+     */
+    public static function approveByAmendment(int $lineId, int $mdUserId, string $reason): void
+    {
+        $line = OrderProductRepository::find($lineId);
+        if ($line === null) {
+            return;
+        }
+        // The same effect on commission and incentive as the MD's own line approval (approve()).
+        $effect = self::approvalView((int) $line['order_id'], $lineId)['effect'] ?? null;
+        Database::connection()->prepare(
+            'UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p, price_approved_selection = :sel,
+                    price_approval_commission_zero = :cz, price_approval_incentive_cut = :ic, price_approval_requested_at = NULL, price_approval_requested_by = NULL
+             WHERE id = :id'
+        )->execute([
+            'u' => $mdUserId, 'r' => mb_substr($reason, 0, 500), 'p' => number_format((float) $line['unit_price'], 2, '.', ''),
+            'sel' => self::approvalSelectionKey($line),
+            'cz' => ($effect['commission_zero'] ?? false) ? 1 : 0,
+            'ic' => isset($effect['cut_line']) ? number_format((float) $effect['cut_line'], 2, '.', '') : null,
+            'id' => $lineId,
+        ]);
+        AuditLogRepository::log($mdUserId, 'LINE_PRICE_APPROVED', 'order_products', $lineId, 'unit_price', null, (string) $line['unit_price'],
+            'Order line ' . (int) $line['line_no'] . ': ' . $reason);
+    }
+
     /** The MD refuses a line's price: the request is closed and whoever asked is told why. Null on success. */
     public static function refuse(int $orderId, int $lineId, int $userId, string $reason): ?string
     {
@@ -1001,6 +1036,16 @@ final class OrderLinePricing
         // D-245 P3: the associate's commission level is fixed on the order with the PI, first,
         // so the line figures fixed below use that same level.
         AssociateCommission::fixLevelAtPi($orderId);
+        self::snapshotLines($orderId);
+    }
+
+    /**
+     * Owner decision D-342: fixes the figures on every checked line that has none yet —
+     * when the first Quotation is approved (at the rate fixed then), again when the PI is
+     * issued, and for a line an activated amendment adds.
+     */
+    public static function snapshotLines(int $orderId): void
+    {
         $order = OrderRepository::find($orderId);
         if ($order === null) {
             return;

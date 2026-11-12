@@ -85,7 +85,9 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
 <?php if ($__summary !== null): ?>
   <p class="line-summary <?= $__summary['blocking'] ? 'notice notice-warning' : 'notice notice-success' ?>"><?= htmlspecialchars($__summary['text']) ?><?= $__summary['blocking'] ? ' <a href="#price-check">Show</a>' : '' ?></p>
 <?php endif; ?>
-<?php if ($isLockedOrder && $canEditProducts): ?>
+<?php if (!empty($pricesFixed) && $canManageOrders): // Owner decision D-342 ?>
+  <p class="notice notice-info price-lock-note" id="price-lock-note">🔒 <?= htmlspecialchars(\App\Services\PriceLock::message($order)) ?> <a href="/orders/<?= (int) $order['id'] ?>/amendments#products-amendment">Amendments ›</a></p>
+<?php elseif ($isLockedOrder && $canEditProducts): ?>
   <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Adding, editing, duplicating, or removing a product line will be logged as a locked-order edit override — a reason is required.</p>
 <?php elseif ($isPostConfirmationOrder && $canEditProducts): ?>
   <p class="notice notice-warning">This order has already reached Order Confirmation. Adding, editing, duplicating, or removing a product line will be logged as a post-confirmation edit — a reason is required.</p>

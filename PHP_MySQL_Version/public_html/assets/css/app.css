@@ -1064,3 +1064,14 @@ input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
 .annexure-image-pick{display:block;margin-top:8px;}
 .annexure-entry > .btn-danger{margin-top:8px;}
 .ci-annexure-b-missing{margin:6px 0;}
+
+/* Owner decision D-342: the "Products & prices" amendment screen and the re-issue checklist. */
+.amd-old { color: #9ca3af; text-decoration: line-through; margin-right: 4px; }
+.amd-new { color: #0b6b2e; font-weight: 700; }
+.amd-lines tr.amd-chg td { background: #fffbeb; }
+.amd-lines tr.amd-add td { background: #ecfdf5; }
+.amd-lines tr.amd-del td { background: #fef2f2; }
+.amd-lines .amd-size input { width: 4.2em; }
+.amd-lines td.num input { width: 6.5em; text-align: right; }
+.reissue-checklist .todo { color: #9a3412; font-weight: 600; }
+.reissue-checklist .ok { color: #166534; font-weight: 600; }

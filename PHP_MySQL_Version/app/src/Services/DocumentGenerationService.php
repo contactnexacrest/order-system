@@ -96,6 +96,10 @@ final class DocumentGenerationService
         if (in_array($documentTypeCode, ['QT', 'PI'], true) && ($priceBlock = OrderLinePricing::documentBlockReason($orderId, $documentTypeCode)) !== null) {
             throw new \RuntimeException($priceBlock);
         }
+        // Owner decision D-342: no PI, OC, Buyer PO or CI with a goods line above the price fixed by the approved Quotation.
+        if (($lockBlock = PriceLock::documentGuard($orderId, $documentTypeCode)) !== null) {
+            throw new \RuntimeException($lockBlock);
+        }
         // Owner decision D-336: a line "As per annexure" needs a product entry in the annexure that document prints.
         if (($annexureBlock = AnnexureChoice::blockReason($orderId, $documentTypeCode)) !== null) {
             throw new \RuntimeException($annexureBlock);
@@ -678,6 +682,10 @@ final class DocumentGenerationService
         if (($document['document_type_code'] ?? null) === 'PI') {
             OrderSnapshotService::freeze($orderId);
         }
+        // D-342 (owner, confirmed twice): the first approved Quotation fixes the rate, the prices and the products.
+        if (($document['document_type_code'] ?? null) === 'QT') {
+            PriceLock::fixAtQtApproval($orderId, $documentId);
+        }
     }
 
     private static function finalizeApprovalUnfrozen(int $documentId): void
@@ -1077,6 +1085,7 @@ final class DocumentGenerationService
             'amendment' => [
                 'amendment_reference' => $amendment['amendment_reference'],
                 'buyer_inquiry_ref'    => $amendment['buyer_inquiry_ref'],
+                'order_reference'      => $amendment['order_reference'], // D-342: printed by the products amendment only
                 'effective_from'       => DocumentDataAssembler::formatDate($amendment['effective_from']),
                 'reason'               => $amendment['reason'],
                 'requested_by'         => $amendment['requested_by'] === 'importer' ? 'The Importer' : 'NexaCrest International Private Limited',
@@ -1132,7 +1141,15 @@ final class DocumentGenerationService
         ];
 
         $twig = self::twigEnvironment();
-        $html = $twig->render('AMD/payment_terms_amendment.html.twig', $context);
+        // Owner decision D-342: a "Products & prices" amendment prints its own sections (products, effect on
+        // payment, acceptance); the payment-terms amendment above prints exactly as before.
+        if (($amendment['amendment_type'] ?? 'payment_terms') === 'products') {
+            $context['doc_title'] = 'AMENDMENT — PRODUCTS & PRICES';
+            $context['products_amendment'] = ProductsAmendmentService::documentBlock($amendment);
+            $html = $twig->render('AMD/products_amendment.html.twig', $context);
+        } else {
+            $html = $twig->render('AMD/payment_terms_amendment.html.twig', $context);
+        }
         $pdfBytes = self::renderPdf($html, $context);
 
         $storageBase = rtrim(Env::storageBasePath(), '/');

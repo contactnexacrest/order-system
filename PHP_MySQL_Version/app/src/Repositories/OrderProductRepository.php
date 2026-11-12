@@ -100,7 +100,7 @@ final class OrderProductRepository
      * open approval request are NOT copied: the caller runs
      * OrderLinePricing::afterSave() so the copy is checked at once.
      */
-    public static function duplicate(int $id, ?int $targetOrderId = null): int
+    public static function duplicate(int $id, ?int $targetOrderId = null, ?int $atLineNo = null): int
     {
         $source = self::find($id);
         if ($source === null) {
@@ -109,7 +109,10 @@ final class OrderProductRepository
         $sameOrder = $targetOrderId === null || $targetOrderId === (int) $source['order_id'];
         $orderId = $targetOrderId ?? (int) $source['order_id'];
         $lineNo = self::nextLineNo($orderId);
-        if ($sameOrder) {
+        if ($atLineNo !== null) {
+            // D-342: a line added by an amendment takes the number the amendment gave it (no other line moves).
+            $lineNo = $atLineNo;
+        } elseif ($sameOrder) {
             // Right below the original: the lines after it move down by one.
             $lineNo = (int) $source['line_no'] + 1;
             Database::connection()->prepare('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC')

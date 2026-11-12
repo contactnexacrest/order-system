@@ -1348,6 +1348,11 @@
     if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
     }
+    // data-max-price="x" + data-max-price-message (D-342): a price fixed by the approved
+    // Quotation can only go down in a "Products & prices" amendment — never above it.
+    if (value !== '' && el.dataset.maxPrice !== undefined && parseFloat(value) > parseFloat(el.dataset.maxPrice) + 0.004) {
+      return el.dataset.maxPriceMessage || 'A price can only go down.';
+    }
     // data-unique-among="<name prefix>": no other field of the form whose
     // name starts with that prefix may hold the same number (e.g. the
     // reward table's "profit from" rows — QA Round 6, R6-N12).

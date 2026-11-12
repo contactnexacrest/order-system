@@ -992,6 +992,10 @@ $router->post('/email-log/{emailLogId}/cancel', [$emailDispatch, 'cancel'], [Ses
 // Payment Terms Amendments (Section 8).
 $router->get('/orders/{id}/amendments', [$amendments, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/amendments', [$amendments, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decision D-342: the "Products & prices" amendment and the re-issue checklist's Buyer PO tick.
+$router->get('/orders/{id}/amendments/products/new', [$amendments, 'newProducts'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/orders/{id}/amendments/products', [$amendments, 'createProducts'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/amendments/{amendmentId}/buyer-po-amended', [$amendments, 'buyerPoAmended'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/md-approve', [$amendments, 'mdApprove'], [SessionAuth::required(), PermissionCheck::requires('approve_documents'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/reject', [$amendments, 'reject'], [SessionAuth::required(), PermissionCheck::requires('approve_documents'), CsrfCheck::verify()]);
 $router->post('/amendments/{amendmentId}/generate-document', [$amendments, 'generateDocument'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
