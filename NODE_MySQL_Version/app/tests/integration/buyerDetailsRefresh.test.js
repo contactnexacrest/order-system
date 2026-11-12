@@ -15,7 +15,7 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
  * follow the client — at once while nothing is issued, by an approved request
  * after. Covers case 1 (automatic, flash wording, audit, FYI notice), the
  * "issued" rule, the request / approve / refuse / lapse paths, the one open
- * request rule and the self-approval rule (default MD only).
+ * request rule and the self-approval rule (default MD and ED).
  * Port of BuyerDetailsRefreshTest.php (same wording).
  */
 
@@ -224,21 +224,32 @@ describe('D-337 buyer details follow the client', () => {
     expect([after.status, after.decision_note]).toEqual(['LAPSED', 'Lapsed — the client was saved again (client edit)']);
   });
 
-  it('nobody decides their own request unless the rule allows it (default MD only)', async () => {
+  it('nobody decides their own request unless the rule allows it (default MD and ED)', async () => {
     expect(Object.keys(selfApprovalRules.RULES)).toContain('buyer_details_change');
     const ed = await createTestUser('Executive Director');
     const md = await createTestUser('Managing Director');
-    expect(await selfApprovalRules.allowed('buyer_details_change', ed)).toBe(false);
+    // Owner, 12 Nov 2026: the default is the MD and the ED, like every other rule.
+    expect(await selfApprovalRules.allowed('buyer_details_change', ed)).toBe(true);
     expect(await selfApprovalRules.allowed('buyer_details_change', md)).toBe(true);
 
-    const clientId = await newClient();
-    const orderId = await issuedOrderWithChangedEmail(clientId, `self${rnd()}@buyer.test`);
-    await svc.request(orderId, ed, 'The buyer changed their e-mail');
-    const req = await requests.pendingForOrder(orderId);
-    const msg = 'You asked for this change — someone else must approve it (Admin › Self-approval rules).';
-    expect(await svc.approve(Number(req.id), orderId, ed, '')).toBe(msg);
-    expect(await svc.refuse(Number(req.id), orderId, ed, 'Refusing my own request')).toBe(msg);
-    expect((await requests.find(Number(req.id))).status).toBe('PENDING');
+    // Admin unticks the ED: the ED can no longer decide their own request.
+    const [edRole] = await db.query("SELECT id FROM roles WHERE name = 'Executive Director'");
+    await db.execute("DELETE FROM self_approval_rules WHERE rule_key = 'buyer_details_change' AND role_id = :r", { r: edRole.id });
+    let clientId;
+    try {
+      expect(await selfApprovalRules.allowed('buyer_details_change', ed)).toBe(false);
+      clientId = await newClient();
+      const orderId = await issuedOrderWithChangedEmail(clientId, `self${rnd()}@buyer.test`);
+      await svc.request(orderId, ed, 'The buyer changed their e-mail');
+      const req = await requests.pendingForOrder(orderId);
+      const msg = 'You asked for this change — someone else must approve it (Admin › Self-approval rules).';
+      expect(await svc.approve(Number(req.id), orderId, ed, '')).toBe(msg);
+      expect(await svc.refuse(Number(req.id), orderId, ed, 'Refusing my own request')).toBe(msg);
+      expect((await requests.find(Number(req.id))).status).toBe('PENDING');
+    } finally {
+      await db.execute(`INSERT INTO self_approval_rules (rule_key, role_id) SELECT 'buyer_details_change', :r FROM DUAL
+        WHERE NOT EXISTS (SELECT 1 FROM self_approval_rules WHERE rule_key = 'buyer_details_change' AND role_id = :r2)`, { r: edRole.id, r2: edRole.id });
+    }
 
     const orderId2 = await issuedOrderWithChangedEmail(clientId, `self2${rnd()}@buyer.test`);
     await svc.request(orderId2, md, 'The buyer changed their e-mail');

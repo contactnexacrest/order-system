@@ -112,8 +112,7 @@ describe('Maker-checker guard (QA-5)', () => {
     // selfApprovalRules.test.js, which runs in parallel on the same database).
     for (const rule of rules.slice(3)) {
       expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, md)]).toEqual([rule, true]);
-      // D-337: buyer_details_change defaults to the Managing Director only.
-      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, ed)]).toEqual([rule, rule !== 'buyer_details_change']);
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, ed)]).toEqual([rule, true]);
     }
     for (const rule of rules) {
       expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, admin)]).toEqual([rule, false]);

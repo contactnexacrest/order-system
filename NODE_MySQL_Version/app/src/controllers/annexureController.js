@@ -45,7 +45,7 @@ async function index(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  const which = orderAnnexureRepository.which(req.query.which);
+  const which = orderAnnexureRepository.which((req.query || {}).which);
 
   res.renderView('annexure/index', {
     order,

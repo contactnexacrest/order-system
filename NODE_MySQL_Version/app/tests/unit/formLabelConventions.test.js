@@ -160,8 +160,11 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     expect(form).toContain('name="cha_transport_per_container" data-max-decimals="2"');
     for (const cost of ['factory', 'transportation', 'packing', 'loading', 'cha']) {
       expect(form).not.toContain(`name="default_${cost}_cost"`);
-      expect(count(show, `<input type="number" step="0.01" min="0" name="${cost}_cost"`)).toBe(2);
+      // D-338: the cost parts appear only when an existing "Computed" price is edited; every one carries min="0".
+      expect(count(show, `<input type="number" step="0.01" min="0" name="${cost}_cost"`)).toBeGreaterThanOrEqual(1);
+      expect(count(show, `<input type="number" step="0.01" min="0" name="${cost}_cost"`)).toBe(count(show, `name="${cost}_cost"`));
     }
-    expect(count(show, '<input type="number" step="0.01" min="0" name="fob_value"')).toBe(2);
+    expect(count(show, '<input type="number" step="0.01" min="0" name="fob_value"')).toBeGreaterThanOrEqual(2);
+    expect(count(show, '<input type="number" step="0.01" min="0" name="fob_value"')).toBe(count(show, 'name="fob_value"'));
   });
 });
