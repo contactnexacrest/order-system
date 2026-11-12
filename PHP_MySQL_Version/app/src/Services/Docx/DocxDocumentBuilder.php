@@ -510,8 +510,8 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 6) . '. DOCUMENTS TO BE PROVIDED');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
-            '1.  Commercial Invoice (signed and stamped)',
-            '2.  Packing List (signed and stamped)',
+            '1.  Commercial Invoice',
+            '2.  Packing List',
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
@@ -669,8 +669,8 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'export_doc', 8) . '. EXPORT DOCUMENTATION');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
-            '1.  Commercial Invoice (signed and stamped)',
-            '2.  Packing List (signed and stamped)',
+            '1.  Commercial Invoice',
+            '2.  Packing List',
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared in NexaCrest bank account',
             '5.  Fumigation Certificate — provided as standard with every shipment',
@@ -1681,8 +1681,8 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'documents_provided', 7) . '. DOCUMENTS PROVIDED WITH THIS SHIPMENT');
         self::documentsProvidedParagraphs($section, 'The following documents are provided with this shipment:', [
-            '1.  Commercial Invoice (this document — signed and stamped)',
-            '2.  Packing List (signed and stamped)',
+            '1.  Commercial Invoice (this document)',
+            '2.  Packing List',
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
