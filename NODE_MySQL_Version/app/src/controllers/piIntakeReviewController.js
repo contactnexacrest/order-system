@@ -149,7 +149,12 @@ async function accept(req, res) {
     null, null, null, `PI-stage details confirmed by client and applied to client #${order.client_id}`
   );
 
-  flash.set(req, 'success', 'Client details updated from the PI-stage confirmation. Review the confirmed Incoterm/port/COO/payment-terms on this page before generating the PI.');
+  // Owner decision D-337 (12 Nov 2026): the client's other running orders with
+  // nothing issued yet take the confirmed details too; a waiting request lapses.
+  const buyerDetails = require('../services/buyerDetailsRefreshService');
+  const refresh = await buyerDetails.afterClientSaved(Number(order.client_id), Number(user.id), 'PI-stage confirmation accepted');
+
+  flash.set(req, 'success', `Client details updated from the PI-stage confirmation. Review the confirmed Incoterm/port/COO/payment-terms on this page before generating the PI.${buyerDetails.flashText(refresh)}`);
   res.redirect(`/orders/${order.id}`);
 }
 

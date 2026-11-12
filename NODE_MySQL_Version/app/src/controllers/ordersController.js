@@ -1789,6 +1789,8 @@ async function show(req, res) {
       visibleDocuments,
       regenerationRisk,
       pendingCancellation,
+      // Owner decision D-337: the order's buyer details compared with the client's current details.
+      buyerDetails: await require('../services/buyerDetailsRefreshService').viewFor(order, req),
       canLogInAsClient, // D-320
       approvedCancellation,
       reviewsByDocument,

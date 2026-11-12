@@ -58,6 +58,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-12a-settings-plain-labels.sql` | D-332 | Settings › Company in plain words: 60 setting descriptions rewritten as one plain sentence (only rows still at the old seeded text; an empty protected setting is skipped — the database refuses changes to it, and the screen shows the plain sentence anyway). Keys and values unchanged |
 | `2026-11-12b-supplier-prices-base-and-calculated.sql` | D-335 | Supplier prices: `catalog_supplier_thickness_prices` gains `how` (typed / calculated), `calc_from_mm`, `quoted_on`; `catalog_product_suppliers` gains `base_thickness_mm` (the BASE for orders; 0 = 50 mm and above per CBM) and `auto_fill` (1 = older rows still work out missing thicknesses on the fly). One time: grid rows get their base (50 mm+ for a product sold per CBM with a typed per-CBM price, else 20 mm); "add up the cost parts" rows become typed prices with the same total. No price changes |
 | `2026-11-12c-annexure-b-as-per-annexure.sql` | D-336 | Order lines "As per annexure" (`order_products.as_per_annexure`); Annexure B (as shipped): `which` ('A' / 'B') on `order_annexure_products` and `order_annexure_terms` (UNIQUE(order_id) becomes UNIQUE(order_id, which) — new key added first, old one dropped); `orders.include_annexure_b`, `annexure_b_mode`, `ci_annexure` (A / B / NONE, NULL = default). No data change: existing rows stay Annexure A, documents print as before |
+| `2026-11-12d-buyer-details-refresh-approval.sql` | D-337 | Buyer details on orders follow the client: new table `order_buyer_detail_requests` (requests to update an order that already has an issued document; PENDING / APPROVED / REFUSED / LAPSED); permission `approve_buyer_details_change` (MD, ED); Admin › Self-approval rules `buyer_details_change` (MD only; not re-added if an Admin changed the rule). No data change |
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
@@ -80,6 +81,11 @@ fresh install (FreshInstallCompleteTest / freshInstallComplete.test.js).
 `2026-11-12c` was checked on 12 Nov 2026: applied twice without an error to both development
 databases and to a scratch database built from the previous `schema.sql` + `seed.sql`; its structure
 then equals a fresh install from the new `schema.sql` + `seed.sql` (mysqldump --no-data compared).
+
+`2026-11-12d` was checked on 12 Nov 2026: applied twice without an error to both development
+databases and to a scratch database built from the previous `schema.sql` + `seed.sql`; its structure
+then equals a fresh install from the new `schema.sql` + `seed.sql` (mysqldump --no-data compared), and
+so do the seeded permissions, role grants and self-approval rules.
 
 The live-site order of work (backup, files, cron job, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".

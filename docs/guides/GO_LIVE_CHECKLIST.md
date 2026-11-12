@@ -148,7 +148,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
 
 1. [ ] **Back up** the database and the `storage/` folder (Settings › Backups, or run the two backup scripts by hand) and keep the copy until the upgrade is checked.
 2. [ ] Put the new code in place (both stacks are built the same; PHP: upload the files; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
-3. [ ] Run the ten database files, **in this order** (each is safe to run twice; MySQL-compatible):
+3. [ ] Run the database files below, **in this order** (each is safe to run twice; MySQL-compatible):
    1. [ ] `docs/migrations/2026-11-11a-quote-any-unit-piece-size.sql` (D-270–D-273)
    2. [ ] `docs/migrations/2026-11-11b-email-settings-sessions.sql` (D-280–D-283)
    3. [ ] `docs/migrations/2026-11-11c-associates-kyc-commission-bank.sql` (D-290–D-294)
@@ -160,6 +160,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    9. [ ] `docs/migrations/2026-11-12a-settings-plain-labels.sql` (D-332: plain help sentences under the settings on Settings › Company; keys and values unchanged)
    10. [ ] `docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql` (D-335: supplier prices get a BASE for orders and TYPED / CALCULATED marks; "add up the cost parts" prices become typed prices with the same total — no price changes)
    11. [ ] `docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql` (D-336: order lines "As per annexure", Annexure B (as shipped), the annexure printed with the CI / PL — new columns only, existing orders print as before)
+   12. [ ] `docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql` (D-337: requests to update the buyer details of an order with an issued document, permission "Approve buyer details change" for MD and ED, self-approval rule MD only — new table and rows only, no order changes)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

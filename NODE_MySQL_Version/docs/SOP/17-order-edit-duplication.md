@@ -17,6 +17,8 @@ pipeline, because they can happen at almost any point in an order's life
   started by staff from any existing order.
 - **A client's own reorder request** — the buyer-facing equivalent,
   reviewed by staff before it becomes a real order.
+- **Buyer details after the client is corrected** — how an order picks
+  up a corrected client e-mail, address or consignee (D-337, 12 Nov 2026).
 
 ## Why this exists
 
@@ -184,6 +186,59 @@ Order** runs the same duplication logic as staff-side Duplicate Order
 above, seeded from these lines rather than the order's own current ones,
 producing a real new order. **Reject** requires a reason, and the client
 can always submit a fresh reorder request afterward.
+
+## Buyer details after the client is corrected (D-337)
+
+Every order keeps its own copy of the buyer's details — company name,
+billing address, VAT / EORI number, contact person, e-mail, phone,
+country of destination, consignee and notify party. That copy is what
+the order's documents print. When the client's details are corrected on
+the client page, the order follows in one of two ways.
+
+**An order with nothing issued yet** (no documents, or only drafts and
+documents still in review) is updated **at once** when you save the
+client. The client page then says *"Buyer details also updated on draft
+order(s): …"*. The MD and ED get a short notice saying what changed. No
+approval is needed.
+
+> Example: you created an order with the client e-mail a@b.com, generated
+> a draft quotation, deleted it, and corrected the e-mail on the client
+> page to x@y.com. On saving the client, the order now shows x@y.com, and
+> the next quotation you generate prints x@y.com.
+
+If an order still shows old details (for example because the client was
+corrected before this rule existed), the order page shows *"The client's
+details have changed since this order was created"* with each field
+(*On this order → Client now*) and the button **Update buyer details from
+the client**.
+
+**An order that already has an issued document** (a document that was
+approved or sent) is **not** changed automatically. The order page shows
+the same notice with the differences and the button **Ask to update buyer
+details from the client**:
+
+1. Type the reason (10 to 500 characters), e.g. *"The buyer's purchasing
+   e-mail changed; the BL and invoice must go to the new address."*
+2. Click the button. The request waits for approval; only one request per
+   order can wait at a time.
+3. The MD or ED sees it on the order page and in **Approvals › Other**
+   ("Buyer details update"). They click **Approve** (a note is optional) or
+   **Refuse** (a note of at least 10 characters is required). Nobody
+   approves their own request, unless **Users & roles › Self-approval
+   rules › buyer_details_change** allows it (by default only the Managing
+   Director).
+4. You get a notification with the decision.
+
+**If the client is changed again** before the request is decided, the
+request **lapses** and nothing is applied: *"The client's details changed
+again after this request — ask again so the approver sees the current
+details."* Ask again, so the approver approves exactly what will be
+copied.
+
+**Documents already issued never change.** They keep the details they
+were issued with. Only documents generated after the change show the new
+details. Every step (request, approval, refusal, lapse and each changed
+field) appears in the order's history (audit log).
 
 ## What doesn't change
 

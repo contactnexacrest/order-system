@@ -1379,6 +1379,12 @@ app.post('/orders/:id/cancellation/request', requireAuth, requirePermission('clo
 app.post('/orders/:id/cancellation/:cancellationId/approve', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.approveCancellation));
 app.post('/orders/:id/cancellation/:cancellationId/reject', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.rejectCancellation));
 app.post('/orders/:id/cancellation/:cancellationId/complete-refund', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.completeCancellationRefund));
+// Owner decision D-337 (12 Nov 2026): the order's buyer details follow the client — at once while nothing is issued, by approved request after.
+const buyerDetailsController = require('./controllers/buyerDetailsController');
+app.post('/orders/:id/buyer-details/refresh', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(buyerDetailsController.refresh));
+app.post('/orders/:id/buyer-details/request', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(buyerDetailsController.request));
+app.post('/orders/:id/buyer-details/:requestId/approve', requireAuth, requirePermission('approve_buyer_details_change'), verifyCsrf, asyncHandler(buyerDetailsController.approve));
+app.post('/orders/:id/buyer-details/:requestId/refuse', requireAuth, requirePermission('approve_buyer_details_change'), verifyCsrf, asyncHandler(buyerDetailsController.refuse));
 app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('manage_compliance_checklist'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
 app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermission('manage_compliance_checklist'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markAllComplianceTasksNotApplicable));
 

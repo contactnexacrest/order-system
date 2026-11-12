@@ -825,6 +825,8 @@
     </script>
   {% endif %}
 
+  {% if sees.client %}{% include "orders/_buyer_details_change.njk" %}{% endif %}{# D-337: buyer details vs the client #}
+
   {# Point 2 (2026-10-01): a quick-glance horizontal line-with-dots
      indicator of where this order stands in the 9-stage pipeline. This
      used to sit above a second, more detailed "Stage N" chip grid that

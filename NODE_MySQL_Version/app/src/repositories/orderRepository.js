@@ -359,12 +359,26 @@ async function resolveClientSnapshot(executor, clientId) {
 }
 
 /**
+ * Owner decision D-337 (12 Nov 2026): the client's current details in the
+ * order's own column names — what applyClientSnapshot() would write. Used by
+ * buyerDetailsRefreshService to compare an order with its client.
+ */
+async function clientSnapshot(clientId, executor = db) {
+  return resolveClientSnapshot(executor, clientId);
+}
+
+/**
  * 90-item backlog "standalone order" follow-on: called by
  * piIntakeReviewController.accept() right after it corrects the
  * `clients` master row — applies that SAME correction onto this one
  * order's own snapshot columns, since the buyer's confirmation is this
  * order's own current truth. Every other existing order for this client
  * is untouched.
+ *
+ * Owner decision D-337 (12 Nov 2026): also used by
+ * buyerDetailsRefreshService — automatically for a running order with
+ * nothing issued yet, and for an order with an issued document once a
+ * request to update its buyer details is approved.
  */
 async function applyClientSnapshot(orderId, clientId, executor = db) {
   const snapshot = await resolveClientSnapshot(executor, clientId);
@@ -1022,7 +1036,7 @@ module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setIncludeAnnexureB, setAnnexureBMode, setCiAnnexure, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
-  generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
+  generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, clientSnapshot, markPiFormSkipped,
   generatePaymentActionToken, ensurePaymentActionToken, findByValidPaymentActionToken,
   markFinancialsSkipped, clearFinancialsSkipped, setCooType, setFinancialsCostsConfirmed, setFinancialsCompleted,
 };

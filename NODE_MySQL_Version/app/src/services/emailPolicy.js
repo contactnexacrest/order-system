@@ -73,6 +73,7 @@ const NOTIFICATION_KINDS = {
   line_price_approval: 'staff_approvals', price_request: 'staff_approvals', associate_bank_change: 'staff_approvals',
   document_review_assigned: 'staff_approvals', review_assigned: 'staff_approvals',
   short_payment_approval: 'staff_approvals', // D-310
+  buyer_details_change_requested: 'staff_approvals', // D-337
   buyer_oc_acknowledged: 'staff_counterparty', buyer_po_uploaded_by_client: 'staff_counterparty',
   client_payment_reported: 'staff_counterparty', supplier_po_ack_uploaded_by_supplier: 'staff_counterparty',
   order_comment_from_client: 'staff_counterparty', dispute_raised: 'staff_counterparty',
@@ -92,6 +93,8 @@ const NOTIFICATION_KINDS = {
   lc_expiry_soon: 'staff_compliance', lc_last_shipment_soon: 'staff_compliance', lc_presentation_soon: 'staff_compliance',
   zoho_sync_failed: 'staff_zoho',
   order_department_owner: 'staff_assigned', order_assigned: 'staff_assigned',
+  // D-337: FYI that a draft order took the client's new details; the decision on a request
+  buyer_details_refreshed: 'staff_other', buyer_details_change_decided: 'staff_other',
   backup_code_used: 'backup_code_alert',
 };
 

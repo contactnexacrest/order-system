@@ -347,7 +347,13 @@ async function update(req, res) {
     );
   }
 
-  flash.set(req, 'success', `${companyLegalName} updated.`);
+  // Owner decision D-337 (12 Nov 2026): running orders of this client with nothing
+  // issued yet take the new details at once; a waiting request whose details
+  // changed again lapses.
+  const buyerDetails = require('../services/buyerDetailsRefreshService');
+  const refresh = await buyerDetails.afterClientSaved(clientId, Number(user.id), 'client edit');
+
+  flash.set(req, 'success', `${companyLegalName} updated.${buyerDetails.flashText(refresh)}`);
   res.redirect(`/clients/${clientId}`);
 }
 

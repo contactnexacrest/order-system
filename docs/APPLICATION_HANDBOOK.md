@@ -121,6 +121,7 @@ The complete description of the NexaCrest export order system: what it is for, h
 - [6. Modules](#6-modules)
   - [6.0 Menus: the left menu and the section menu bars (D-320–D-322, 11 Nov 2026)](#60-menus-the-left-menu-and-the-section-menu-bars-d-320d-322-11-nov-2026)
   - [6.1 Clients and intake](#61-clients-and-intake)
+  - [6.1b Buyer details on orders follow the client (D-337)](#61b-buyer-details-on-orders-follow-the-client-d-337-12-nov-2026)
   - [6.2 Products, categories and specifications](#62-products-categories-and-specifications)
   - [6.3 Pricing engine and price requests](#63-pricing-engine-and-price-requests)
   - [6.4 Associates and commission / TDS](#64-associates-and-commission--tds)
@@ -1162,6 +1163,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 |---|---|---|
 | `approve_payment_terms` | Approve an order's payment terms when its preset is marked "Requires MD approval" — needed before the Quotation can be generated or sent. | Admin, MD, ED, SalesMgr, SalesDir, FinDir |
 | `approve_short_payment` | Approve a short payment — clear a buyer payment that is less than due, with a written reason | Admin, MD, ED, FinDir |
+| `approve_buyer_details_change` | Approve or refuse a request to copy the client's current details onto an order that already has an issued document (D-337). | MD, ED |
 | `assign_department_owner` | Choose who in a department owns an order for that department (a manager for their own department; MD/ED and Admin for any). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OrdCoord, OpsMgr, ECMgr, ECDir |
 | `assign_order_owner` | Add or remove which staff are assigned to an order (order_assignees). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OpsMgr, ECMgr, ECDir |
 | `clear_payments` | Confirm a buyer payment actually landed in the bank, unlocking the next stage gate — split out of manage_payments so the person who records a payment is never also the one who confirms it. | Admin, MD, ED, AccEx, FinMgr, FinDir |
@@ -1328,10 +1330,11 @@ made directly in the database by the owner's instruction.
 `SelfApprovalRules`.
 
 **Users & roles › Self-approval rules** (`/admin/self-approval`, Super Admins only)
-lists eight rules. For each, tick the roles whose holders may approve their
+lists ten rules. For each, tick the roles whose holders may approve their
 **own** work. A person qualifies when any of their own roles (main role,
 acting department, any membership) is ticked. Seed default for every rule:
-**Managing Director and Executive Director**.
+**Managing Director and Executive Director** — except `buyer_details_change`
+(D-337): **Managing Director only**.
 
 | Rule key | Self-approval of… | Audit action when used |
 |---|---|---|
@@ -1343,6 +1346,8 @@ acting department, any membership) is ticked. Seed default for every rule:
 | `amendment` | MD-approve an amendment they requested | AMENDMENT_SELF_APPROVED |
 | `short_payment` | clear short a payment whose receipts they recorded | SHORT_PAYMENT_SELF_APPROVED |
 | `price_discount` | approve a line price below the floor that they set (D-240/D-245) | PRICE_DISCOUNT_SELF_APPROVED |
+| `bank_details` | verify bank details (associates and suppliers) they entered themselves, with a reason (D-293) | (reason kept on the bank change) |
+| `buyer_details_change` | approve or refuse their own request to copy the client's details onto an order with an issued document (D-337; **default Managing Director only**) | BUYER_DETAILS_CHANGE_APPROVED / _REFUSED (decided by the requester) |
 
 There is **no other exception**: Admin, System Administrator and Super
 Admin self-approve only if one of their roles is ticked. A rule change is
@@ -2350,6 +2355,11 @@ the same filters, counts, fields, actions and money rules on both templates
   - Associate-introduced buyers: hidden code, e-mail verification, first
     completed registration wins, 12-month protection (D-217, D-246).
   - Consignee/notify party used on Buyer PO, BLI, COOPREP (D-061).
+  - **Buyer details on orders follow the client (D-337, 12 Nov 2026).** Each
+    order keeps its own copy of the buyer's details (company name, billing
+    address and lines, VAT/EORI, contact, e-mail, phone, country of
+    destination, consignee and notify party — the columns
+    `OrderRepository::applyClientSnapshot` writes). See 6.1b.
 - **Tables.** `clients`, `client_divisions`, `client_intake_submissions`,
   `pi_intake_submissions`, `client_logins`, `client_password_reset_tokens`,
   `associate_registrations`.
@@ -2358,7 +2368,70 @@ the same filters, counts, fields, actions and money rules on both templates
   `PiIntakeReviewController`, `ClientRepository`, `ClientIntakeRepository`,
   `PiIntakeRepository`, `AssociateIntakeService`, `AssociateMatchService`.
 - **SOP / decisions.** SOP 01, 03 (PI form), 12; D-122, D-129, D-130,
-  D-147, D-217, D-246, D-253.
+  D-147, D-217, D-246, D-253, D-337.
+
+### 6.1b Buyer details on orders follow the client (D-337, 12 Nov 2026)
+
+- **Why.** Staff corrected a buyer's e-mail on the client page, regenerated
+  a draft quotation, and it still printed the old e-mail: the order's own
+  copy (R25) never changed and nothing could refresh it.
+- **"Issued".** An order has an issued document when any of its documents
+  (any type, buyer-facing or internal) is *approved* or *sent*, or
+  *superseded* after having been approved or sent. Drafts, documents in
+  review, deleted drafts and documents superseded straight from draft /
+  review (audit `DOCUMENT_SUPERSEDED` with old value `draft` / `in_review`)
+  are not issued; a superseded document without that audit row counts as
+  issued (safe side). `BuyerDetailsRefreshService::hasIssuedDocument()`.
+- **Case 1 — automatic.** Saving a client (client edit form; accepting a
+  PI-stage confirmation) copies the client's details onto every running
+  order of that client (not cancelled, lost or complete) with nothing
+  issued, only when at least one field differs. The client page says
+  "Buyer details also updated on draft order(s): <refs>." Audit
+  `ORDER_BUYER_DETAILS_REFRESHED` per order and field (old → new, reason
+  "Source: client edit"). FYI notification `buyer_details_refreshed` to the
+  holders of `approve_buyer_details_change` (not the person who saved):
+  "Buyer details of <client> changed by <user> — also updated on draft order
+  <ref>: Email: a@b.com → x@y.com". No approval.
+- **Order page card** (`#buyer-details-change`, under the cancellation
+  banner, only for people who see the client): shown when the order's copy
+  differs from the client or a request waits. Table *Field · On this order ·
+  Client now*. With nothing issued: **Update buyer details from the client**
+  (Edit orders; applies at once, same audit with source "order page (nothing
+  issued yet)") — for orders whose copy went stale before this rule.
+- **Case 2 — with approval.** With an issued document the card says "The
+  client's details have changed since this order was created" and offers
+  **Ask to update buyer details from the client** (Edit orders; Reason *,
+  10–500 characters, browser + server). One PENDING request per order
+  ("A request to update the buyer details is already waiting for
+  approval."). Table `order_buyer_detail_requests` (order, requester,
+  reason, `changes_json` old/new per field at request time,
+  `client_snapshot_hash` = SHA-256 of the client's details then, status
+  PENDING / APPROVED / REFUSED / LAPSED, decided by / at, note). Holders of
+  `approve_buyer_details_change` (MD, ED) are notified
+  (`buyer_details_change_requested`, e-mail kind Staff approvals) and see it
+  on the card and in Approvals › Other ("Buyer details update"). Approve
+  (optional note) or Refuse (note 10–500 characters). Nobody decides their
+  own request unless Self-approval rules › `buyer_details_change` allows
+  it (default MD only): "You asked for this change — someone else must
+  approve it (Admin › Self-approval rules)."
+- **Lapse.** On approval, if the client's details changed since the request
+  (hash differs), the request becomes LAPSED and nothing is applied: "The
+  client's details changed again after this request — ask again so the
+  approver sees the current details." Saving the client while a request
+  waits lapses it too (the client page says so). The requester is told of
+  every decision (`buyer_details_change_decided`).
+- **Issued documents never change** — they keep their stored render context
+  and files; only documents generated after the change show the new
+  details. Order history (audit trail) shows BUYER_DETAILS_CHANGE_REQUESTED /
+  _APPROVED / _REFUSED / _LAPSED and ORDER_BUYER_DETAILS_REFRESHED.
+- **Code.** `BuyerDetailsRefreshService`, `OrderBuyerDetailRequestRepository`,
+  `BuyerDetailsController`, `views/orders/_buyer_details_change.php`; Node
+  `buyerDetailsRefreshService.js`, `orderBuyerDetailRequestRepository.js`,
+  `buyerDetailsController.js`, `_buyer_details_change.njk`. Routes
+  `POST /orders/{id}/buyer-details/refresh|request` (manage_orders),
+  `POST /orders/{id}/buyer-details/{requestId}/approve|refuse`
+  (approve_buyer_details_change). Migration `2026-11-12d`. Tests
+  `BuyerDetailsRefreshTest` / `buyerDetailsRefresh.test.js`.
 
 ### 6.2 Products, categories and specifications
 
@@ -2916,7 +2989,7 @@ the same filters, counts, fields, actions and money rules on both templates
   permission — `manage_pricing`, `approve_payment_terms`, `approve_email_send`,
   `approve_documents`, `edit_locked_data`, `approve_purchases`,
   `approve_short_payment`, `manage_associate_bank`, `manage_associates`,
-  `manage_field_protection` — and to anyone else once something waits for
+  `manage_field_protection`, `approve_buyer_details_change` — and to anyone else once something waits for
   them, e.g. an assigned document review). Route `GET /approvals`
   (signed-in staff; every row is checked per person).
 - **Tabs and counts.** All · Prices · Payment terms · Documents (= My
@@ -4243,7 +4316,7 @@ These rules come from `CLAUDE.md` (project instructions) and register §2 (R1–
 | **Secrets never in chat or git** (R17) | Keys only in the server's environment / masked Admin fields. | Security. |
 | **Everyone sees only what they can use** (R23) | Links, menus and buttons only for permitted users; the server refuses regardless. | Least privilege, and clean screens. |
 | **IST everywhere** (R24) | Server, DB session, timestamps, documents. | Indian business and legal dates. |
-| **Order is self-contained** (R25, D-262) | Every amount and snapshot is stored on the order; a later master change never alters it. | Agreed orders must not move. |
+| **Order is self-contained** (R25, D-262) | Every amount and snapshot is stored on the order; a later master change never alters it — except the buyer details, which follow the client automatically while nothing is issued and by approved request after (D-337, 6.1b). | Agreed orders must not move. |
 | **Reasons** (R26) | Every typed reason ≥ 10 characters; skips need a reason and are audited; nothing silently set to 0. | Audit trail. |
 
 ### 10.1 Other standing owner rules

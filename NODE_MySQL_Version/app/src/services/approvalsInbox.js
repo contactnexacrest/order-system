@@ -31,6 +31,7 @@ const TABS = {
 const APPROVER_PERMISSIONS = [
   'manage_pricing', 'approve_payment_terms', 'approve_email_send', 'approve_documents', 'edit_locked_data', 'approve_purchases',
   'approve_short_payment', 'manage_associate_bank', 'manage_associates', 'manage_field_protection',
+  'approve_buyer_details_change', // D-337
 ];
 
 /** Payment legs: where on the order page each one is cleared. */
@@ -361,6 +362,22 @@ async function other(req) {
     }
   }
 
+  // Owner decision D-337 (12 Nov 2026): copy the client's current details onto an order with an issued document.
+  if (p.approve_buyer_details_change) {
+    const buyerDetails = require('./buyerDetailsRefreshService');
+    const rows = await db.query(`SELECT r.id, r.order_id, r.reason, r.changes_json, r.requested_by, r.created_at, o.order_reference, u.name AS requested_by_name
+                                   FROM order_buyer_detail_requests r JOIN orders o ON o.id = r.order_id LEFT JOIN users u ON u.id = r.requested_by
+                                  WHERE r.status = 'PENDING'${vis} ORDER BY r.created_at, r.id`, params);
+    for (const r of rows) {
+      if (await buyerDetails.selfDecisionRefused(r, userId)) continue;
+      let changes = [];
+      try { changes = JSON.parse(String(r.changes_json)) || []; } catch (e) { changes = []; }
+      out.push(row(`buyer_details:${r.id}`, 'Buyer details update', String(r.created_at), Number(r.order_id), String(r.order_reference),
+        r.requested_by_name ? `asked by ${r.requested_by_name}` : '', shorten(`${buyerDetails.changesText(changes)} · ${r.reason}`),
+        `/orders/${r.order_id}#buyer-details-change`, 'Review buyer details', 'a request to update the buyer details from the client.'));
+    }
+  }
+
   if (p.manage_orders) {
     const rows = await db.query(`SELECT rr.id, rr.source_order_id, rr.submitted_at, rr.notes, o.order_reference
                                    FROM order_reorder_requests rr JOIN orders o ON o.id = rr.source_order_id
@@ -423,6 +440,7 @@ async function waitingOnOthers(req, orderId) {
     ['amendment', "SELECT id, created_at AS at FROM amendments WHERE order_id = :o AND status = 'pending' AND created_by = :u", 'Amendment'],
     ['email', "SELECT id, created_at AS at FROM email_log WHERE order_id = :o AND status = 'pending_approval' AND requested_by = :u", 'E-mail'],
     ['short', 'SELECT id, requested_at AS at FROM short_payment_requests WHERE order_id = :o AND requested_by = :u', 'Short payment'],
+    ['buyer_details', "SELECT id, created_at AS at FROM order_buyer_detail_requests WHERE order_id = :o AND status = 'PENDING' AND requested_by = :u", 'Buyer details update'], // D-337
   ];
   for (const [kind, sql, label] of queries) {
     for (const r of await db.query(`${sql} ORDER BY id`, { o: orderId, u: userId })) {
