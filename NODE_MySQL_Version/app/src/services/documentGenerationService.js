@@ -196,6 +196,9 @@ async function generateUnfrozen(orderId, documentTypeCode, generatedByUserId, si
     const priceBlock = await require('./orderLinePricing').documentBlockReason(orderId, documentTypeCode);
     if (priceBlock !== null) throw new Error(priceBlock);
   }
+  // Owner decision D-336: a line "As per annexure" needs a product entry in the annexure that document prints.
+  const annexureBlock = await require('./annexureChoice').blockReason(orderId, documentTypeCode);
+  if (annexureBlock !== null) throw new Error(annexureBlock);
   if (documentTypeCode === 'PI') {
     const piValidityDays = parseInt((await companySettingsRepository.get('pi_validity_days')) || '15', 10);
     const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

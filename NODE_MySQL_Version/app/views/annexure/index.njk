@@ -5,10 +5,34 @@
    other staff-trust gate documented in this codebase (see Stage 9's
    Close Order hint). #}
 {% set annexaIsLocked = annexaDocument and annexaDocument.status in ['approved', 'sent'] %}
+{# Owner decision D-336: the same screen for Annexure A (as quoted) and Annexure B
+   (as shipped, ?which=B — printed with the Commercial Invoice and Packing List). #}
+{% set which = 'B' if which == 'B' else 'A' %}
+{% set annexLabel = 'Annexure ' ~ which %}
+{% set annexureMode = (order.annexure_b_mode if which == 'B' else order.annexure_mode) or 'SPEC' %}
+{% set annexIncluded = order.include_annexure_b if which == 'B' else order.include_annexure_a %}
 <div class="card page-wide">
-  <h1>Annexure A — {{ order.order_reference or ('#' ~ order.id) }}</h1>
+  <div class="page-header-row annexure-head">
+    <h1>{{ annexLabel }} — {{ order.order_reference or ('#' ~ order.id) }}</h1>
+    {% if which == 'A' %}
+      <a class="btn-sm" href="/orders/{{ order.id }}/annexure?which=B">Annexure B (as shipped) &rsaquo;</a>
+    {% else %}
+      <a class="btn-sm" href="/orders/{{ order.id }}/annexure">&lsaquo; Annexure A (as quoted)</a>
+    {% endif %}
+  </div>
+  {% if which == 'B' %}
+    <form method="post" action="/orders/{{ order.id }}/annexure/copy-from-a" class="annexure-copy-form"{% if bHasContent %} data-confirm="Replace Annexure B with a copy of Annexure A?"{% endif %}>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm">Copy everything from Annexure A</button>
+      <span class="muted small">Starts Annexure B from Annexure A — products, images and terms — then change what is different. Printed with the Commercial Invoice and Packing List.</span>
+    </form>
+  {% endif %}
   <p class="muted small"><a href="/orders/{{ order.id }}">&larr; Back to Order</a></p>
+  {% if which == 'B' %}
+  <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, as shipped — printed with the Commercial Invoice and Packing List as an attached, integral document whenever "Include Annexure B" is on for this order (or Annexure B is chosen in the Commercial Invoice step).</p>
+  {% else %}
   <p class="muted">Product technical specifications (dimensions, finish, components, technical notes) and images, and/or free-form Additional Terms text, referenced from the Quotation/PI/OC/Buyer PO as an attached, integral document whenever "Include Annexure A" is on for this order.</p>
+  {% endif %}
 
   {% if annexaIsLocked %}
     <div class="alert alert-warning">
@@ -18,19 +42,19 @@
 
   <div class="section">
     <form method="post" action="/orders/{{ order.id }}/annexure/toggle">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label><input type="checkbox" name="include_annexure_a" value="1" {% if order.include_annexure_a %}checked{% endif %} style="display:inline-block;width:auto;" onchange="this.form.submit()"> Include Annexure A on this order's documents</label>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="which" value="{{ which }}">
+      <label><input type="checkbox" name="include_annexure_{{ which | lower }}" value="1" {% if annexIncluded %}checked{% endif %} style="display:inline-block;width:auto;" onchange="this.form.submit()"> Include {{ annexLabel }} on this order's documents</label>
     </form>
   </div>
 
   <div class="section">
     <form method="post" action="/orders/{{ order.id }}/annexure/mode" id="annexure-mode-form">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Annexure A content
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="which" value="{{ which }}">
+      <label>{{ annexLabel }} content
         <select name="mode" id="annexure-mode-select" onchange="annexureApplyMode(this.value); this.form.submit();">
-          <option value="SPEC" {% if order.annexure_mode == 'SPEC' or not order.annexure_mode %}selected{% endif %}>Product Specification (current view)</option>
-          <option value="TERMS" {% if order.annexure_mode == 'TERMS' %}selected{% endif %}>Additional Terms</option>
-          <option value="BOTH" {% if order.annexure_mode == 'BOTH' %}selected{% endif %}>Both</option>
+          <option value="SPEC" {% if annexureMode == 'SPEC' %}selected{% endif %}>Product Specification (current view)</option>
+          <option value="TERMS" {% if annexureMode == 'TERMS' %}selected{% endif %}>Additional Terms</option>
+          <option value="BOTH" {% if annexureMode == 'BOTH' %}selected{% endif %}>Both</option>
         </select>
       </label>
       <p class="muted small">Product Specification is the structured product/dimensions table below. Additional Terms is free-form text (clauses, notes, anything agreed with the client) entered as rich text, including pasted images. Both prints Product Specification first, then Additional Terms. Switching this does not delete either section's saved content.</p>
@@ -66,7 +90,7 @@
               <div class="thumb-card">
                 <img src="/file-store/{{ img.file_id }}/download" alt="{{ img.original_filename }}" class="asset-preview">
                 <span class="muted small">{{ img.original_filename }}</span>
-                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" {{ annexureConfirmAttr(annexaDocument, 'Remove this image from Annexure A?') | safe }}>
+                <form method="post" action="/orders/{{ order.id }}/annexure/images/{{ img.id }}/remove" {{ annexureConfirmAttr(annexaDocument, 'Remove this image from ' ~ annexLabel ~ '?') | safe }}>
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">&times;</button>
                 </form>
@@ -90,7 +114,7 @@
   <div class="section">
     <h2>Add Product Entry</h2>
     <form method="post" action="/orders/{{ order.id }}/annexure/products" enctype="multipart/form-data" {{ annexureConfirmAttr(annexaDocument) | safe }}>
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="which" value="{{ which }}">
       <div class="field-grid">
         <label>Name *<input type="text" name="name" placeholder="e.g. Granite Countertop Slab" required></label>
         <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 210 x 528 cm"></label>
@@ -109,7 +133,7 @@
     <h2>Additional Terms</h2>
     <p class="muted small">Free-form text — special terms, clauses, or anything else agreed with the client that doesn't fit the Product Specification table. Supports basic formatting and pasted/inserted images. Video/audio can't be embedded here: a generated PDF or Word document can't play media, so only images are supported.</p>
     <form method="post" action="/orders/{{ order.id }}/annexure/terms" id="annexure-terms-form" {{ annexureConfirmAttr(annexaDocument) | safe }}>
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="which" value="{{ which }}">
       <div class="wysiwyg-toolbar" role="toolbar" aria-label="Text formatting">
         <button type="button" class="wysiwyg-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
         <button type="button" class="wysiwyg-btn" data-cmd="italic" title="Italic"><em>I</em></button>
@@ -140,7 +164,7 @@
 
 <script>
 (function () {
-  var mode = {{ (order.annexure_mode or 'SPEC') | dump | safe }};
+  var mode = {{ annexureMode | dump | safe }};
   var specSection = document.getElementById('annexure-spec-section');
   var termsSection = document.getElementById('annexure-terms-section');
 

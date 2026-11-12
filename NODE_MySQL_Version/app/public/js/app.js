@@ -771,6 +771,44 @@
     return 'Enter the ' + size + ' — needed to compare a price per ' + UNIT_LABELS[lineKind] + '.';
   }
 
+  // Owner decision D-336 (12 Nov 2026): an order line "As per annexure" — the sizes go
+  // in the annexure. The tick box (data-annexure-line) and "Qty To Be Confirmed" are
+  // never both ticked; while it is ticked Length / Width / Thickness show "As per
+  // annexure" and accept nothing, and the Qty is required. The server checks the same.
+  function initAnnexureLine() {
+    document.querySelectorAll('input[type="checkbox"][data-annexure-line]').forEach(function (box) {
+      var form = box.form;
+      if (!form) return;
+      var tbc = form.querySelector('input[type="checkbox"][name="quantity_is_tbc"]');
+      var qty = form.querySelector('[name="quantity"]');
+      var sizes = form.querySelectorAll('[data-piece-size]');
+      function apply() {
+        var on = box.checked;
+        sizes.forEach(function (f) {
+          if (on) {
+            if (f.dataset.placeholderWas === undefined) f.dataset.placeholderWas = f.getAttribute('placeholder') || '';
+            f.value = '';
+            f.placeholder = 'As per annexure';
+          } else if (f.dataset.placeholderWas !== undefined) {
+            f.placeholder = f.dataset.placeholderWas;
+          }
+          f.disabled = on;
+        });
+        if (qty) qty.required = on;
+      }
+      box.addEventListener('change', function () {
+        if (box.checked && tbc) tbc.checked = false;
+        apply();
+      });
+      if (tbc) {
+        tbc.addEventListener('change', function () {
+          if (tbc.checked && box.checked) { box.checked = false; apply(); }
+        });
+      }
+      apply();
+    });
+  }
+
   // D-300 (owner point 12, 11 Nov 2026): a supplier price for every thickness. Typing a
   // box makes it TYPED; every CALCULATED box follows at once from the category's rules
   // (30 mm = 20 mm + 35 %, 50 mm+ per CBM = 20 mm per m² × K — in every direction);
@@ -1941,6 +1979,7 @@
     initCopyButtons(); // D-280
     initIdleWarning(); // D-283
     initThicknessGrid();
+    initAnnexureLine(); // D-336
     initThicknessCalc(); // D-335
     initSupplierPick();
     initRulesExample();

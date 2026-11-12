@@ -732,14 +732,18 @@ function annexureBody(context) {
     children.push(C.spacer(120));
   }
 
-  const refDoc = g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : 'the referenced document';
+  // D-336: Annexure B (printed with the CI / PL) is part of that document.
+  const letter = context.annexure_letter === 'B' ? 'B' : 'A';
+  const refDoc = letter === 'B'
+    ? (String((meta || {}).document_reference || '') !== '' ? String(meta.document_reference) : 'the referenced document')
+    : g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : 'the referenced document';
   children.push(
     ...C.colorBox(
       C.BLUE_BG,
       C.BLUE_BORDER2,
       [
         C.rich([
-          [`This Annexure A forms an integral part of ${refDoc} dated ${g(meta, 'generated_date')}. `, { color: C.NAVY, size: 19 }],
+          [`This Annexure ${letter} forms an integral part of ${refDoc} dated ${g(meta, 'generated_date')}. `, { color: C.NAVY, size: 19 }],
           [
             `The commercial terms, pricing, payment conditions, and quantities stated in the main document take precedence in all cases.${showSpec ? ' Product images and technical drawings in this annexure are for reference and identification purposes only.' : ''} This Annexure is not valid as a standalone document.`,
             { italics: true, color: C.BLUE_TEXT, size: 19 },
@@ -831,7 +835,7 @@ function annexureSpecBody(products, note) {
 
 function annexureAppendixIfAny(context) {
   if (!(context.order || {}).include_annexure_a || !context.annexure_has_content) return [];
-  return [new Paragraph({ children: [], pageBreakBefore: true }), ...C.sectionTitle('ANNEXURE A'), ...annexureBody(context)];
+  return [new Paragraph({ children: [], pageBreakBefore: true }), ...C.sectionTitle(`ANNEXURE ${context.annexure_letter === 'B' ? 'B' : 'A'}`), ...annexureBody(context)]; // D-336
 }
 
 function renderAnnexa(context) {

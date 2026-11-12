@@ -714,7 +714,7 @@ function termsSection(context, number, title) {
         RED_BORDER,
         [
           plain(
-            `‼ Annexure A is attached and forms an integral part of this ${docTitle}. Refer Annexure A for full details.`,
+            `‼ Annexure ${context.annexure_letter === 'B' ? 'B' : 'A'} is attached and forms an integral part of this ${docTitle}. Refer Annexure ${context.annexure_letter === 'B' ? 'B' : 'A'} for full details.`, // D-336
             { bold: true, size: 20, color: RED_TEXT }
           ),
         ]

@@ -96,7 +96,11 @@
             </label>
             <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ lp.quantity if (lp.quantity != null) else '' }}" placeholder="e.g. 40"></label>
             <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" {{ 'checked' if lp.quantity_is_tbc else '' }}> Qty To Be Confirmed</label>
+            {# Owner decision D-336: the size is given in the annexure; never with "Qty To Be Confirmed" (app.js and the server). #}
+            <input type="hidden" name="as_per_annexure_field" value="1">
+            <label class="checkbox-row"><input type="checkbox" name="as_per_annexure" value="1" data-annexure-line {{ 'checked' if (lp.as_per_annexure and lp.as_per_annexure != '0') else '' }}> As per annexure</label>
           </div>
+          <p class="muted small annexure-line-hint">"Qty To Be Confirmed" or "As per annexure" — only one of the two. As per annexure: the sizes go in Annexure A (order page › Annexure A); the Qty is still needed.</p>
           <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>

@@ -3069,6 +3069,16 @@
         <input type="hidden" name="document_type" value="CI">
         {# Owner request (2026-10-27): the CI can be dated today or earlier, e.g. to match the BL. #}
         <label class="ci-date-field">Invoice date (printed on the CI) *<input type="date" name="document_date" required value="{{ today() }}" max="{{ today() }}" min="{{ (order.created_at or '') | string | truncate(10, true, '') }}"><small class="muted">Today by default. To match the BL, pick the BL date here — today or any earlier date.</small></label>
+        {# Owner decision D-336: the annexure printed with the CI and Packing List — saved with the order on Generate. #}
+        {% set ciAnnexOk = { 'B': ciAnnexure.b.has, 'A': ciAnnexure.a.has, 'NONE': ciAnnexure.lines.length == 0 } %}
+        {% set ciAnnexPick = ciAnnexure.choice if ciAnnexOk[ciAnnexure.choice] else (ciAnnexure.default if ciAnnexOk[ciAnnexure.default] else null) %}
+        <fieldset class="ci-annexure-choice">
+          <legend>Annexure printed with the Commercial Invoice and Packing List *</legend>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="B" required{{ ' checked' if ciAnnexPick == 'B' }}{{ '' if ciAnnexOk.B else ' disabled' }}> Annexure B — as shipped <span class="muted small">({% if ciAnnexure.b.has %}{{ ciAnnexure.b.count }} product{{ '' if ciAnnexure.b.count == 1 else 's' }}{% if ciAnnexure.b.saved %} · saved {{ ciAnnexure.b.saved }}{% endif %}{% else %}not made yet{% endif %}) · <a href="/orders/{{ order.id }}/annexure?which=B">open</a></span></label>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="A" required{{ ' checked' if ciAnnexPick == 'A' }}{{ '' if ciAnnexOk.A else ' disabled' }}> Annexure A — as quoted <span class="muted small">({{ 'same as on the PI and OC' if ciAnnexure.a.has else 'empty' }})</span></label>
+          <label class="checkbox-row"><input type="radio" name="ci_annexure" value="NONE" required{{ ' checked' if ciAnnexPick == 'NONE' }}{{ '' if ciAnnexOk.NONE else ' disabled' }}> No annexure{% if not ciAnnexOk.NONE %} <span class="muted small">(line {{ ciAnnexure.lines | join(', ') }} says "As per annexure")</span>{% endif %}</label>
+          <p class="muted small">Default: Annexure B when it has been made, otherwise Annexure A. A line ticked "As per annexure" says "as per Annexure B" or "as per Annexure A" to match. "No annexure" cannot be chosen while a line says "As per annexure". The choice is saved with the order; the Packing List uses the same annexure.</p>
+        </fieldset>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         {{ stepBadge('11a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>{{ docAlreadyNote(documents, 'CI') }}

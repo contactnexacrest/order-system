@@ -77,6 +77,28 @@ and re-rendered. CIs generated before this change keep their own dates.
 The old warning comparing the recorded BL date with today is gone: the BL
 date on file is not a reliable record of the actual BL date.
 
+**Annexure printed with the CI and Packing List** (owner decision D-336, 12
+Nov 2026). Step 11a also asks **Annexure printed with the Commercial Invoice
+and Packing List \***:
+
+- **Annexure B — as shipped** (shows how many products and when it was saved,
+  and an *open* link) — the annexure made from the order's Annexure A page with
+  **Annexure B (as shipped) ›**;
+- **Annexure A — as quoted** (the same one as on the PI and OC);
+- **No annexure**.
+
+Pre-selected: Annexure B when it is included and filled in, otherwise
+Annexure A when it is included and filled in, otherwise No annexure. A choice
+whose annexure is empty is greyed out, and **No annexure** is greyed out while
+a product line says "As per annexure". The choice is saved with the order when
+you click **Generate Commercial Invoice**, and the Packing List uses the same
+annexure. The appendix at the end of the CI / PL is headed **ANNEXURE B** or
+**ANNEXURE A**, and a line ticked "As per annexure" prints "8.801 (as per
+Annexure B)" and "Dimensions: As per Annexure B" (or A) to match. If the chosen
+annexure has no product entry the CI / PL is refused: *Line 1 says "As per
+annexure" but Annexure B (as shipped) has no product yet — add it, or choose
+Annexure A, then generate again.*
+
 The CI's own Section A keeps **FOB Value** as its own separate line
 regardless of Incoterm — required for the Indian Shipping Bill and IGST
 refund — but on a non-FOB order (CFR/CIF/etc.), **TOTAL COMMERCIAL

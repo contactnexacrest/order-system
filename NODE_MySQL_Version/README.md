@@ -1685,6 +1685,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-11g-order-comment-email-
 mysql -u <user> -p <database> < docs/migrations/2026-11-11h-tt-clause-bank-name.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12a-settings-plain-labels.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql
 ```
 
 Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,

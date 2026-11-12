@@ -331,7 +331,7 @@ Full list with formats, PDF/DOCX and audience: §8.1. All reference formats come
 | Code | Name | Audience | Stage / step | Notes |
 |---|---|---|---|---|
 | **QT** | Quotation | Buyer | Stage 1 | Valid for `quotation_validity_days` (default 30). Needs payment-terms approval first if the preset "Requires MD approval". |
-| **ANNEXA** | Annexure A | Buyer | Stage 1 | Optional product annexure with images and terms (`include_annexure_a`). Reference `SC/ANX/…`. |
+| **ANNEXA** | Annexure A | Buyer | Stage 1 | Optional product annexure with images and terms (`include_annexure_a`). Reference `SC/ANX/…`. Annexure B (as shipped, D-336) is no separate type: it is printed inside the CI / PL — see §8.8. |
 | **BUYERPO** | Buyer PO — Order Acceptance | Buyer | Stage 2 | A PO the app prepares for the buyer to sign when the buyer has no PO of their own. |
 | **PI** | Proforma Invoice | Buyer | Stage 3 | Asks for the advance. Amber "ADVANCE PAYABLE NOW" box, or "NO ADVANCE PAYABLE — … by Letter of Credit". **The first PI approval freezes the order** (D-262). |
 | **OC** | Order Confirmation | Buyer | Stage 4 | Buyer acknowledges in the portal; auto-confirmed after 48 hours. |
@@ -1897,7 +1897,7 @@ e.g. `SC/PI/26/0511001`.
 
 | | |
 |---|---|
-| User does | 1a **Generate Quotation** (PDF; tick DOCX for an internal Word copy). Optional Annexure A (`/orders/{id}/annexure`: product specification, additional terms or both). Take the QT through review/approval (SOP 13). Step 2 has no button: send happens in Document Review (mail on) or approval counts as sent (mail off). Step 3 "Client accepts" is outside the system. |
+| User does | 1a **Generate Quotation** (PDF; tick DOCX for an internal Word copy). Optional Annexure A (`/orders/{id}/annexure`: product specification, additional terms or both; Annexure B as shipped via its button, §8.8). A line can say "As per annexure" (§8.8). Take the QT through review/approval (SOP 13). Step 2 has no button: send happens in Document Review (mail on) or approval counts as sent (mail off). Step 3 "Client accepts" is outside the system. |
 | Gate | Price check passes (no line below the seller's floor without MD approval; none below minimum; no product without a price). Payment terms approved if required. Stage 1 passes **automatically** when the QT is approved (mail off) or sent (mail on). |
 | Stored | `documents` (status draft → in_review → approved → sent), `document_reviews`, `file_store` (folder `01-quotation/generated/`), `orders.quotation_date`, `quotation_valid_until`. |
 | Document | **QT** Quotation `SC/QT/{YY}/{DDMM}{NNN}`; **ANNEXA** Annexure A. |
@@ -3983,6 +3983,27 @@ If one of these tests fails after your change, you changed a document. Stop and 
 Rule R6 (CLAUDE.md): before changing anything that ends up in a generated document — PDF or DOCX templates, `DocumentDataAssembler`, document builders, CAFIN content — show the owner **what the document shows now and what it will show after**, and get confirmation **twice**. Data may change; the format of client-facing documents must stay intact.
 
 Why: on 27 Oct 2026 a Supplier PO change was built and had to be reverted the same day ("revert immediately … all PDFs are correct", D-063). That mistake is also why pushes became ask-first (R3). Many decisions in register §3.3 record "confirmed twice" with before/after samples.
+
+### 8.8 Annexure A, Annexure B and lines "As per annexure" (D-336)
+
+Owner decision D-336 (12 Nov 2026, owner confirmed twice). Code: `AnnexureChoice` (PHP `app/src/Services/AnnexureChoice.php`, Node `src/services/annexureChoice.js`), `AnnexureController` / `annexureController.js`, `DocumentDataAssembler` / `documentDataAssembler.js`.
+
+**Two annexures, one screen.** `/orders/{id}/annexure` is **Annexure A — as quoted** (unchanged). One button next to the title, **Annexure B (as shipped) ›**, opens `/orders/{id}/annexure?which=B`: the same screen and features (include tick box "Include Annexure B on this order's documents", content Product Specification / Additional Terms / Both, product entries with name, dimensions, finish, images, description, components, technical notes, Additional Terms rich text), with **‹ Annexure A (as quoted)** and **Copy everything from Annexure A** (products, the same image files, terms and content mode; asks "Replace Annexure B with a copy of Annexure A?" when B already has content). Audit entries are the same as Annexure A's, with reason "Annexure B"; the copy logs `ANNEXURE_COPIED_FROM_A`.
+
+| Data | Meaning |
+|---|---|
+| `order_annexure_products.which`, `order_annexure_terms.which` | `A` (every row before D-336) or `B`. One Additional Terms block per annexure: `UNIQUE(order_id, which)`. |
+| `orders.include_annexure_b`, `orders.annexure_b_mode` | Annexure B's include tick box and content mode (like `include_annexure_a`, `annexure_mode`). |
+| `orders.ci_annexure` | `A` / `B` / `NONE`, chosen in Step 11a; NULL = the default. |
+| `order_products.as_per_annexure` | 1 = the line's size is given in the annexure. |
+
+**Which document prints which annexure.** Quotation (and the standalone ANNEXA), Buyer PO, PI and OC: Annexure A, exactly as before. Commercial Invoice and Packing List: the annexure chosen in **Step 11a · Generate Commercial Invoice** — radio "Annexure printed with the Commercial Invoice and Packing List *": Annexure B — as shipped (n products · saved date · open) / Annexure A — as quoted / No annexure. Default (nothing saved): Annexure B when it is included and has content, else Annexure A when it is included and has content, else none. An option without content is disabled; "No annexure" is disabled while a line says "As per annexure". The choice is saved with the order on Generate (audit `CI_ANNEXURE_CHOSEN`); the Packing List uses the same one. The appendix heading and the red notice read "ANNEXURE B" / "Annexure B" when B is printed; Annexure B's closing note names the CI / PL it is attached to. Annexure B is not a separate document type.
+
+**Order lines "As per annexure".** Order page › Products › Edit / + Add product › step 3 Size and quantity: tick box **As per annexure** next to **Qty To Be Confirmed** — only one of the two (browser `app.js` `initAnnexureLine`, and the server refuses both). While ticked, Length / Width / Thickness show "As per annexure" and accept nothing (the server clears the piece size and the Dimensions text); the Qty stays required. The products table shows "As per annexure" in the Size column. Duplicating a line keeps the tick. On the documents a ticked line prints the quantity as today followed by "(as per Annexure X)" — e.g. "8.801 (as per Annexure A)" — and "Dimensions: As per Annexure X" in its detail row (PDF and Word); X = A on QT, Buyer PO, PI, OC and the chosen annexure on CI / PL (the Packing List has no line quantities, so only its appendix changes). Lines without the tick print exactly as before (StoneDocumentsUnchanged fixtures unchanged).
+
+**Safety check (generation refused with a message).** QT / Buyer PO / PI / OC while a line is ticked and Annexure A is not included or has no product entry: *Line N says "As per annexure" but Annexure A has no product yet — add it in Annexure A (order page › Annexure A), then generate again.* CI / PL with the chosen annexure empty: *Line N says "As per annexure" but Annexure B (as shipped) has no product yet — add it, or choose Annexure A, then generate again.* (A: "… Annexure A (as quoted) … or choose Annexure B …"); with "No annexure": *… "No annexure" is chosen for the Commercial Invoice and Packing List — choose Annexure B (as shipped) or Annexure A (as quoted), then generate again.*
+
+Migration `2026-11-12c-annexure-b-as-per-annexure.sql`. Tests: `AnnexureBAndAsPerAnnexureTest` / `annexureBAsPerAnnexure.test.js`.
 
 ---
 

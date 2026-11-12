@@ -160,8 +160,21 @@ async function assemble(orderId, documentTypeCode = null) {
     ? await amendmentRepository.find(order.active_amendment_id)
     : null;
 
-  const annexureProducts = await annexureProductsBlock(orderId);
-  const annexureFlags = await annexureFlagsBlock(orderId, order.annexure_mode || 'SPEC', annexureProducts);
+  // Owner decision D-336: the Commercial Invoice and Packing List print the
+  // annexure chosen for them (orders.ci_annexure — Annexure B "as shipped" by
+  // default when it is filled in); every other document keeps Annexure A.
+  const annexureChoice = require('./annexureChoice');
+  const annexureCode = String(documentTypeCode || '').toUpperCase();
+  const annexureShipped = annexureChoice.SHIPPED_DOCUMENTS.includes(annexureCode);
+  const annexureWhich = annexureShipped ? await annexureChoice.forDocument(order, annexureCode) : 'A';
+  const annexureLetter = annexureWhich || 'A';
+  const annexureProducts = await annexureProductsBlock(orderId, annexureLetter);
+  const annexureFlags = await annexureFlagsBlock(orderId, annexureChoice.mode(order, annexureLetter), annexureProducts, annexureLetter);
+  const annexureIncluded = annexureShipped ? annexureWhich !== null : !!order.include_annexure_a;
+  // D-336: a line ticked "As per annexure" says so on the documents that carry an annexure.
+  const annexureLineLetter = annexureChoice.QUOTED_DOCUMENTS.concat(annexureChoice.SHIPPED_DOCUMENTS).includes(annexureCode)
+    ? await annexureChoice.letterFor(order, annexureCode)
+    : null;
 
   const resolvedConsignee = resolveConsignee(order);
   const resolvedNotifyParty = resolveNotifyParty(order, resolvedConsignee);
@@ -195,7 +208,8 @@ async function assemble(orderId, documentTypeCode = null) {
       est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
       coo_type: order.coo_type ?? 'To Be Confirmed',
-      include_annexure_a: !!order.include_annexure_a,
+      // D-336: on the CI / PL "an annexure is printed" (the one chosen for them).
+      include_annexure_a: annexureIncluded,
       currency_code: order.currency_code,
       buyers_po_ref: order.buyers_po_ref ?? 'NIL',
       has_active_amendment: !!activeAmendment,
@@ -253,12 +267,16 @@ async function assemble(orderId, documentTypeCode = null) {
     show_notify_party_section: showNotifyPartySection,
     // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
     category_documents: await require('./categoryDocumentProfile').forOrder(orderId),
-    products: products.map((p) => ({
+    products: products.map((p) => {
+      // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
+      const perAnnexure = annexureLineLetter !== null && !!Number(p.as_per_annexure || 0);
+      const quantity = p.quantity_is_tbc ? 'To Be Confirmed' : formatNumber(p.quantity);
+      return {
       description: p.description,
-      dimensions: p.dimensions,
+      dimensions: perAnnexure ? annexureChoice.dimensionsText(annexureLineLetter) : p.dimensions,
       finish: p.finish,
       hs_code: p.hs_code,
-      quantity: p.quantity_is_tbc ? 'To Be Confirmed' : formatNumber(p.quantity),
+      quantity: perAnnexure && !p.quantity_is_tbc ? annexureChoice.quantityText(quantity, annexureLineLetter) : quantity,
       unit: p.unit,
       unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'To Be Confirmed',
       amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'To Be Confirmed',
@@ -266,7 +284,8 @@ async function assemble(orderId, documentTypeCode = null) {
       // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
       attributes: require('../repositories/productCategoryRepository').documentAttributes(p),
       sac_code: p.sac_code || null,
-    })),
+      };
+    }),
     financial: {
       fob_value: formatMoney(fobValue),
       fob_value_raw: fobValue,
@@ -382,8 +401,8 @@ async function blBlock(companyLegalName, showBlInstructions) {
  * with no server backing it, so a generated PDF can never depend on a live
  * HTTP fetch of anything, including this app's own authenticated routes.
  */
-async function annexureProductsBlock(orderId) {
-  const products = await orderAnnexureRepository.forOrder(orderId);
+async function annexureProductsBlock(orderId, which = 'A') {
+  const products = await orderAnnexureRepository.forOrder(orderId, which);
   return Promise.all(products.map(async (p) => ({
     name: p.name,
     description: p.description,
@@ -415,8 +434,8 @@ async function annexureProductsBlock(orderId) {
  * because it's emitted unescaped into every PDF/DOCX this function feeds —
  * see annexureTermsSanitizer's docblock.
  */
-async function annexureFlagsBlock(orderId, mode, annexureProducts) {
-  const termsRow = await orderAnnexureTermsRepository.find(orderId);
+async function annexureFlagsBlock(orderId, mode, annexureProducts, which = 'A') {
+  const termsRow = await orderAnnexureTermsRepository.find(orderId, which);
   const termsHtml = termsRow && termsRow.content_html
     ? annexureTermsSanitizer.sanitize(termsRow.content_html)
     : '';
@@ -425,6 +444,8 @@ async function annexureFlagsBlock(orderId, mode, annexureProducts) {
   const showTerms = mode !== 'SPEC';
 
   return {
+    // D-336: "ANNEXURE A" / "ANNEXURE B" — B only on the CI / PL when chosen.
+    annexure_letter: which,
     annexure_mode: mode,
     annexure_terms_html: termsHtml,
     annexure_show_spec: showSpec,

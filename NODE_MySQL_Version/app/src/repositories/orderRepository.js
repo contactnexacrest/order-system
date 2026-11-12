@@ -848,6 +848,21 @@ async function setAnnexureMode(orderId, mode) {
   await db.execute('UPDATE orders SET annexure_mode = :mode WHERE id = :id', { mode, id: orderId });
 }
 
+/** D-336: Annexure B (as shipped) — included on the Commercial Invoice and Packing List. */
+async function setIncludeAnnexureB(orderId, include) {
+  await db.execute('UPDATE orders SET include_annexure_b = :flag WHERE id = :id', { flag: include ? 1 : 0, id: orderId });
+}
+
+/** D-336: Annexure B's content mode (SPEC / TERMS / BOTH), like annexure_mode for Annexure A. */
+async function setAnnexureBMode(orderId, mode) {
+  await db.execute('UPDATE orders SET annexure_b_mode = :mode WHERE id = :id', { mode, id: orderId });
+}
+
+/** D-336: the annexure printed with the Commercial Invoice and Packing List (A / B / NONE; null = the default). */
+async function setCiAnnexure(orderId, choice) {
+  await db.execute('UPDATE orders SET ci_annexure = :c WHERE id = :id', { c: choice, id: orderId });
+}
+
 /**
  * 90-item backlog #75 (docs/schema.sql Section BG): generates (or
  * regenerates, overwriting any prior link) the public, no-login token for
@@ -1006,7 +1021,7 @@ module.exports = {
   EDIT_DETAIL_FIELDS,
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
-  setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
+  setIncludeAnnexureA, setIncludeAnnexureB, setAnnexureBMode, setCiAnnexure, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
   generatePaymentActionToken, ensurePaymentActionToken, findByValidPaymentActionToken,
   markFinancialsSkipped, clearFinancialsSkipped, setCooType, setFinancialsCostsConfirmed, setFinancialsCompleted,

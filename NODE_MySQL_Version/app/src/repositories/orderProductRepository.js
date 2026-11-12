@@ -114,9 +114,9 @@ async function duplicate(id, targetOrderId = null) {
   // D-272: and everything else that describes the line.
   await db.execute(
     `UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
-            piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf WHERE id = :id`, {
+            piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf, as_per_annexure = :apa WHERE id = :id`, {
       p: source.product_id ?? null, m: source.material ?? null, s: source.spec_selection ?? null, pr: source.price_request_id ?? null, z: source.zoho_item_id ?? null,
-      l: source.piece_length_cm ?? null, w: source.piece_width_cm ?? null, t: source.piece_thickness_cm ?? null, cf: sameOrder ? id : null, id: newId,
+      l: source.piece_length_cm ?? null, w: source.piece_width_cm ?? null, t: source.piece_thickness_cm ?? null, cf: sameOrder ? id : null, apa: Number(source.as_per_annexure || 0), id: newId,
     }
   );
   return newId;
@@ -126,6 +126,11 @@ async function duplicate(id, targetOrderId = null) {
  * Owner decision D-270 (point 25): the piece size Length × Width × Thickness (cm) a line's price
  * is converted with. Used for the price check only — the Dimensions text prints.
  */
+/** Owner decision D-336: the line's size is given in the annexure ("As per annexure"). */
+async function setAsPerAnnexure(id, perAnnexure) {
+  await db.execute('UPDATE order_products SET as_per_annexure = :a WHERE id = :id', { a: perAnnexure ? 1 : 0, id });
+}
+
 async function setPieceSize(id, size) {
   await db.execute('UPDATE order_products SET piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t WHERE id = :id', {
     l: (size || {}).piece_length_cm ?? null, w: (size || {}).piece_width_cm ?? null, t: (size || {}).piece_thickness_cm ?? null, id,
@@ -200,4 +205,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setPieceSize, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setPieceSize, setAsPerAnnexure, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };

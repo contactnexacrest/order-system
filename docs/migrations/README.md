@@ -57,6 +57,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-11h-tt-clause-bank-name.sql` | D-331 | T/T definition clause: fixed "State Bank of India" → `{bank_name}`, filled from Settings › Company › Bank name (owner confirmed twice; prints as before with today's bank) |
 | `2026-11-12a-settings-plain-labels.sql` | D-332 | Settings › Company in plain words: 60 setting descriptions rewritten as one plain sentence (only rows still at the old seeded text; an empty protected setting is skipped — the database refuses changes to it, and the screen shows the plain sentence anyway). Keys and values unchanged |
 | `2026-11-12b-supplier-prices-base-and-calculated.sql` | D-335 | Supplier prices: `catalog_supplier_thickness_prices` gains `how` (typed / calculated), `calc_from_mm`, `quoted_on`; `catalog_product_suppliers` gains `base_thickness_mm` (the BASE for orders; 0 = 50 mm and above per CBM) and `auto_fill` (1 = older rows still work out missing thicknesses on the fly). One time: grid rows get their base (50 mm+ for a product sold per CBM with a typed per-CBM price, else 20 mm); "add up the cost parts" rows become typed prices with the same total. No price changes |
+| `2026-11-12c-annexure-b-as-per-annexure.sql` | D-336 | Order lines "As per annexure" (`order_products.as_per_annexure`); Annexure B (as shipped): `which` ('A' / 'B') on `order_annexure_products` and `order_annexure_terms` (UNIQUE(order_id) becomes UNIQUE(order_id, which) — new key added first, old one dropped); `orders.include_annexure_b`, `annexure_b_mode`, `ci_annexure` (A / B / NONE, NULL = default). No data change: existing rows stay Annexure A, documents print as before |
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
@@ -75,6 +76,10 @@ its descriptions then match the new `seed.sql` except the empty protected Zoho k
 `2026-11-12b` was checked on 12 Nov 2026: applied twice without an error to both development
 databases, and a scratch database from `schema.sql` + `seed.sql` plus every migration equals a
 fresh install (FreshInstallCompleteTest / freshInstallComplete.test.js).
+
+`2026-11-12c` was checked on 12 Nov 2026: applied twice without an error to both development
+databases and to a scratch database built from the previous `schema.sql` + `seed.sql`; its structure
+then equals a fresh install from the new `schema.sql` + `seed.sql` (mysqldump --no-data compared).
 
 The live-site order of work (backup, files, cron job, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".

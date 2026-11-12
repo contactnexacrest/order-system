@@ -138,6 +138,42 @@ async function generate(req, res) {
     }
   }
 
+  // Owner decision D-336: the annexure printed with the Commercial Invoice and
+  // Packing List — Annexure B (as shipped), Annexure A (as quoted) or none —
+  // chosen in the CI step and saved with the order; and no QT / Buyer PO / PI /
+  // OC / CI / PL while a line says "As per annexure" and that annexure is empty.
+  const annexureChoice = require('../services/annexureChoice');
+  if (type === 'CI' && Object.prototype.hasOwnProperty.call(req.body, 'ci_annexure')) {
+    const ciChoice = String(req.body.ci_annexure || '').trim().toUpperCase();
+    const ciOrder = await orderRepository.find(orderId);
+    if (!ciOrder || !annexureChoice.CHOICES.includes(ciChoice)) {
+      flash.set(req, 'error', 'Choose the annexure printed with the Commercial Invoice and Packing List.');
+      res.redirect(`/orders/${orderId}#step-ci-generate`);
+      return;
+    }
+    if (ciChoice !== 'NONE' && !(await annexureChoice.hasContent(ciOrder, ciChoice))) {
+      flash.set(req, 'error', `Annexure ${ciChoice} has nothing in it yet — fill it in first (order page › Annexure ${ciChoice}), or choose another annexure.`);
+      res.redirect(`/orders/${orderId}#step-ci-generate`);
+      return;
+    }
+    const ciBlock = await annexureChoice.blockReason(orderId, 'CI', ciChoice);
+    if (ciBlock !== null) {
+      flash.set(req, 'error', ciBlock);
+      res.redirect(`/orders/${orderId}#step-ci-generate`);
+      return;
+    }
+    if (ciChoice !== String(ciOrder.ci_annexure || '')) {
+      await orderRepository.setCiAnnexure(orderId, ciChoice);
+      await auditLogRepository.log(user.id, 'CI_ANNEXURE_CHOSEN', 'orders', orderId, 'ci_annexure', ciOrder.ci_annexure || null, ciChoice);
+    }
+  }
+  const annexureBlock = await annexureChoice.blockReason(orderId, type);
+  if (annexureBlock !== null) {
+    flash.set(req, 'error', annexureBlock);
+    res.redirect(`/orders/${orderId}${type === 'CI' ? '#step-ci-generate' : ''}`);
+    return;
+  }
+
   // Narrow, audited escape hatch for generate()'s own locked-order /
   // out-of-sequence-stage guard (see that method's docblock) — never trust
   // the checkbox alone: re-check the permission server-side (Super Admin

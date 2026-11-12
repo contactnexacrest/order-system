@@ -159,6 +159,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    8. [ ] `docs/migrations/2026-11-11h-tt-clause-bank-name.sql` (D-331: the T/T definition names the bank from Settings › Company › Bank name; documents print as before)
    9. [ ] `docs/migrations/2026-11-12a-settings-plain-labels.sql` (D-332: plain help sentences under the settings on Settings › Company; keys and values unchanged)
    10. [ ] `docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql` (D-335: supplier prices get a BASE for orders and TYPED / CALCULATED marks; "add up the cost parts" prices become typed prices with the same total — no price changes)
+   11. [ ] `docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql` (D-336: order lines "As per annexure", Annexure B (as shipped), the annexure printed with the CI / PL — new columns only, existing orders print as before)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

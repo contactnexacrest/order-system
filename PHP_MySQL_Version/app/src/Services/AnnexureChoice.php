@@ -166,6 +166,23 @@ final class AnnexureChoice
             : "Line {$line} says \"As per annexure\" but Annexure A (as quoted) has no product yet — add it, or choose Annexure B, then generate again.";
     }
 
+    /**
+     * "Copy everything from Annexure A": Annexure B becomes a copy of A — product
+     * entries (same image files), Additional Terms and content mode. Returns the
+     * number of product entries copied.
+     */
+    public static function copyAToB(array $order, int $userId): int
+    {
+        $orderId = (int) $order['id'];
+        $count = OrderAnnexureRepository::replaceWithCopy($orderId, 'A', 'B');
+        $termsA = OrderAnnexureTermsRepository::find($orderId, 'A');
+        if ($termsA !== null || OrderAnnexureTermsRepository::find($orderId, 'B') !== null) {
+            OrderAnnexureTermsRepository::upsert($orderId, (string) ($termsA['content_html'] ?? ''), $userId, 'B');
+        }
+        OrderRepository::setAnnexureBMode($orderId, self::mode($order, 'A'));
+        return $count;
+    }
+
     /** When Annexure B was last saved (from the audit log), or null. */
     public static function lastSaved(int $orderId, string $which): ?string
     {

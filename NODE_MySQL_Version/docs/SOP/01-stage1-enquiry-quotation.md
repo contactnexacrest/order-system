@@ -441,6 +441,34 @@ reach them. This is a reminder only, never a hard block, the same
 an Annexure that was already sent once gets the same treatment on the Send
 to Buyer screen — a warning and a second confirmation, not a block.
 
+### Annexure B (as shipped) and lines "As per annexure" (owner decision D-336, 12 Nov 2026)
+
+**A line whose sizes are in the annexure.** When the sizes of a product line
+are given piece by piece in Annexure A (for example 12 slabs of 180 × 120 × 15
+and 6 of 250 × 150 × 20), open the line (**Edit** or **+ Add product**) and
+in step 3 *Size and quantity* tick **As per annexure** instead of typing a
+Length / Width / Thickness. Those three fields then show "As per annexure"
+and stay empty; still enter the **Qty** — it is the line's total (e.g. 8.801
+CBM). "Qty To Be Confirmed" and "As per annexure" cannot both be ticked. The
+products table then shows "As per annexure" in the Size column.
+
+On the Quotation, Buyer PO, PI and OC the line prints **8.801 (as per Annexure
+A)** in the Qty column and **Dimensions: As per Annexure A** in its detail
+row. These documents are refused until Annexure A is included and has at least
+one product entry: *Line 1 says "As per annexure" but Annexure A has no product
+yet — add it in Annexure A (order page › Annexure A), then generate again.*
+
+**Annexure B — as shipped.** If what is shipped differs from what was quoted,
+open Annexure A and click **Annexure B (as shipped) ›** next to the title. It
+is the same screen: tick **Include Annexure B on this order's documents**,
+then either add the entries or click **Copy everything from Annexure A**
+(products, images, terms and content are copied; if Annexure B already has
+content you are asked "Replace Annexure B with a copy of Annexure A?") and
+change what is different. **‹ Annexure A (as quoted)** goes back. Annexure B is
+printed only with the Commercial Invoice and Packing List (see
+[Chapter 8](./08-stage8-ci-balance.md)); the Quotation, Buyer PO, PI and OC
+always keep Annexure A.
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's

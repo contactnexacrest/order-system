@@ -1082,6 +1082,25 @@ function dimensionsFromSize(size) {
   return text !== '' ? text : null;
 }
 
+/**
+ * Owner decision D-336: the line form's "As per annexure" tick box. Never together
+ * with "Qty To Be Confirmed"; the quantity stays required (it is the line's
+ * quantity). When ticked, the piece size and the Dimensions text are cleared in
+ * body (the documents print "Dimensions: As per Annexure A/B"). A form without the
+ * tick box (no as_per_annexure_field) keeps the line's current setting.
+ * Returns [ticked, error].
+ */
+function annexureLineInput(body, current) {
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+  const perAnnexure = has('as_per_annexure_field') || has('as_per_annexure') ? !!body.as_per_annexure : !!Number(current || 0);
+  if (!perAnnexure) return [false, null];
+  if (body.quantity_is_tbc) return [true, 'tick either "Qty To Be Confirmed" or "As per annexure", not both.'];
+  if (String(body.quantity == null ? '' : body.quantity).trim() === '') return [true, 'a line "As per annexure" still needs its quantity — enter the Qty.'];
+  for (const f of Object.keys(require('../services/lineUnits').SIZE_FIELDS)) body[f] = '';
+  body.dimensions = '';
+  return [true, null];
+}
+
 async function addProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1129,6 +1148,14 @@ async function addProduct(req, res) {
   if ((lineTypeError ?? categoryError) !== null) {
     flash.set(req, 'error', lineTypeError ?? categoryError);
     res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // Owner decision D-336: "As per annexure" — never with "Qty To Be Confirmed"; the size is in the annexure.
+  const [perAnnexure, annexureError] = annexureLineInput(body, null);
+  if (annexureError !== null) {
+    flash.set(req, 'error', `Product line: ${annexureError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
 
@@ -1183,6 +1210,7 @@ async function addProduct(req, res) {
   // D-255: the options chosen, and the price request the line came from (now "became an order").
   await require('../services/orderLinePricing').saveSelection(newLineId, specSel, priceRequest ? Number(priceRequest.id) : null);
   await orderProductRepository.setPieceSize(newLineId, lineSize);
+  await orderProductRepository.setAsPerAnnexure(newLineId, perAnnexure);
   if (priceRequest) await require('../services/priceRequestService').markOrdered(Number(priceRequest.id), orderId);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
@@ -1218,6 +1246,14 @@ async function updateProduct(req, res) {
   if ((lineTypeError ?? categoryError) !== null) {
     flash.set(req, 'error', lineTypeError ?? categoryError);
     res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // Owner decision D-336: "As per annexure" — never with "Qty To Be Confirmed"; the size is in the annexure.
+  const [perAnnexure, annexureError] = annexureLineInput(body, product.as_per_annexure);
+  if (annexureError !== null) {
+    flash.set(req, 'error', `Product line: ${annexureError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
 
@@ -1287,6 +1323,7 @@ async function updateProduct(req, res) {
     await olp.saveSelection(productId, specSel, null);
   }
   await orderProductRepository.setPieceSize(productId, lineSize);
+  await orderProductRepository.setAsPerAnnexure(productId, perAnnexure);
   const newPrice = str(body.unit_price);
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
     await orderProductRepository.setPriceSetBy(productId, req.user.id);
@@ -1646,6 +1683,7 @@ async function show(req, res) {
     {
       approvalBar, // D-310
       approvalWaiting, // D-310
+      ciAnnexure: await require('../services/annexureChoice').ciStep(order), // D-336
       associateLine: await require('../repositories/associateRepository').lineForClient(Number(order.client_id), req.permissions),
       // Owner decision (2 Nov 2026, gap-list Q-6): ECGC cover, incentive claim tracking, missing eBRC / FIRC.
       complianceTracking: await (async () => {
@@ -5321,6 +5359,7 @@ async function completeCancellationRefund(req, res) {
 
 module.exports = {
   markOcSentToBuyer,
+  annexureLineInput, // D-336 (exported for its test)
   recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, requestLinePriceApproval, linePriceApproval, approveLinePrice,

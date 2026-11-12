@@ -152,12 +152,7 @@ final class AnnexureController
             return;
         }
         $user = AuthService::currentUser();
-        $count = OrderAnnexureRepository::replaceWithCopy($orderId, 'A', 'B');
-        $termsA = OrderAnnexureTermsRepository::find($orderId, 'A');
-        if ($termsA !== null || OrderAnnexureTermsRepository::find($orderId, 'B') !== null) {
-            OrderAnnexureTermsRepository::upsert($orderId, (string) ($termsA['content_html'] ?? ''), (int) $user['id'], 'B');
-        }
-        OrderRepository::setAnnexureBMode($orderId, AnnexureChoice::mode($order, 'A'));
+        $count = AnnexureChoice::copyAToB($order, (int) $user['id']);
         $entries = $count . ' product entr' . ($count === 1 ? 'y' : 'ies');
         AuditLogRepository::log((int) $user['id'], 'ANNEXURE_COPIED_FROM_A', 'order', $orderId, null, null, $entries, 'Annexure B');
         Flash::set('success', "Annexure B is now a copy of Annexure A ({$entries}, images, Additional Terms and content). Change what is different.");
