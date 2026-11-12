@@ -159,8 +159,21 @@ UPDATE orders o
          (SELECT MAX(r.reviewed_at) FROM document_reviews r WHERE r.document_id = q.document_id AND r.status = 'approved'),
          qd.generated_at),
        o.prices_fixed_by_document_id = q.document_id,
-       o.pricing_fx_rate_at_qt = COALESCE(o.pricing_fx_rate_at_pi, @fx_now)
+       o.pricing_fx_rate_at_qt = o.pricing_fx_rate_at_pi
  WHERE o.prices_fixed_at IS NULL;
+
+-- Owner, 12 Nov 2026: an order not yet past its PI takes the pricing rate in use on the day its
+-- Quotation was approved (the daily rate history, minus the cushion); only when no rate was fetched
+-- on or before that day (or the rate is Manual) does it take the rate in use now.
+UPDATE orders o
+   SET o.pricing_fx_rate_at_qt = COALESCE(
+         IF(COALESCE(@fx_mode, 'auto') = 'manual', NULL,
+            (SELECT ROUND(f.market_rate * (1 - COALESCE(@fx_cushion, 2.0) / 100), 4)
+               FROM fx_rates f
+              WHERE f.status = 'in_use' AND f.market_rate IS NOT NULL AND f.rate_date <= DATE(o.prices_fixed_at)
+              ORDER BY f.rate_date DESC, f.id DESC LIMIT 1)),
+         @fx_now)
+ WHERE o.prices_fixed_at IS NOT NULL AND o.pricing_fx_rate_at_qt IS NULL;
 
 UPDATE order_products op JOIN orders o ON o.id = op.order_id
    SET op.qt_fixed_unit_price = op.unit_price

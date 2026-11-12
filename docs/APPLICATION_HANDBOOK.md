@@ -4222,7 +4222,7 @@ Owner decision D-342 (12 Nov 2026, owner "confirm 1" and "confirm 2"; mockup app
 
 **Order page rate line (D-340)** on a fixed order: "Prices worked out at ₹X per USD — fixed by the approved Quotation of <date>; today's rate ₹Y does not change them." The price check shows "(fixed)" for figures fixed at the Quotation or the PI.
 
-**Existing orders** (migration `2026-11-12h-price-lock-and-products-amendment.sql`): an order with an approved Quotation is fixed when the migration runs — time = the first approved Quotation's last reviewer approval (else its generation time), rate = `pricing_fx_rate_at_pi` when past the PI, else the pricing rate in use then; each active line's fixed price = its price then. Tests: `PriceLockProductsAmendmentD342Test` / `priceLockProductsAmendmentD342.test.js`.
+**Existing orders** (migration `2026-11-12h-price-lock-and-products-amendment.sql`): an order with an approved Quotation is fixed when the migration runs — time = the first approved Quotation's last reviewer approval (else its generation time), rate = `pricing_fx_rate_at_pi` when past the PI, else the pricing rate in use on the day the Quotation was approved (the newest daily rate on or before that day, minus the cushion — owner, 12 Nov 2026), and only when no such rate exists (or the mode is Manual) the pricing rate in use when the migration runs; a price lowered through a Products & prices amendment counts as MD-approved only when it ends below the floor (then the usual commission / incentive effect applies); each active line's fixed price = its price then. Tests: `PriceLockProductsAmendmentD342Test` / `priceLockProductsAmendmentD342.test.js`.
 
 ### 8.11 Indian grouping on INR documents, Total CBM from the lines, Word section numbers (D-343)
 
