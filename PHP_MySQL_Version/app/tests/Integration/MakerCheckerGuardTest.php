@@ -71,8 +71,7 @@ final class MakerCheckerGuardTest extends DbTestCase
         // The four rules added in QA Round 8 (the first three are covered by SelfApprovalRulesTest).
         foreach (array_slice($rules, 3) as $rule) {
             self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($rule, $md), "MD: {$rule}");
-            // D-337: buyer_details_change defaults to the Managing Director only.
-            self::assertSame($rule !== 'buyer_details_change', MakerCheckerGuard::selfApprovalAllowed($rule, $ed), "ED: {$rule}");
+            self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($rule, $ed), "ED: {$rule}");
         }
         foreach ($rules as $rule) {
             self::assertFalse(MakerCheckerGuard::selfApprovalAllowed($rule, $admin), "Admin (holds manage_permissions): {$rule}");

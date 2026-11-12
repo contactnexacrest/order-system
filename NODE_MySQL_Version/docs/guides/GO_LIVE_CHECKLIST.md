@@ -160,8 +160,9 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    9. [ ] `docs/migrations/2026-11-12a-settings-plain-labels.sql` (D-332: plain help sentences under the settings on Settings › Company; keys and values unchanged)
    10. [ ] `docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql` (D-335: supplier prices get a BASE for orders and TYPED / CALCULATED marks; "add up the cost parts" prices become typed prices with the same total — no price changes)
    11. [ ] `docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql` (D-336: order lines "As per annexure", Annexure B (as shipped), the annexure printed with the CI / PL — new columns only, existing orders print as before)
-   12. [ ] `docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql` (D-337: requests to update the buyer details of an order with an issued document, permission "Approve buyer details change" for MD and ED, self-approval rule MD only — new table and rows only, no order changes)
+   12. [ ] `docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql` (D-337: requests to update the buyer details of an order with an issued document, permission "Approve buyer details change" for MD and ED, self-approval rule MD and ED — new table and rows only, no order changes)
    13. [ ] `docs/migrations/2026-11-12e-follow-ups-d338.sql` (D-338: reorder request lines can say "As per annexure" — one new column, no data change)
+   14. [ ] `docs/migrations/2026-11-12f-buyer-details-self-approval-md-ed.sql` (D-337: the self-approval rule for buyer details changes ticks the Executive Director too — one row, no order data change)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

@@ -37,7 +37,7 @@ use App\Repositories\UserRepository;
  * reason 10–500 characters). One PENDING request per order. A holder of
  * approve_buyer_details_change approves or refuses it (refusal needs a note of
  * 10+ characters); nobody decides their own request unless Admin › Self-approval
- * rules "buyer_details_change" allows it (default MD only). If the client's
+ * rules "buyer_details_change" allows it (default MD and ED). If the client's
  * details changed after the request (hash of the snapshot), the request LAPSES
  * and nothing is applied — also when the client is saved again while it waits.
  * Issued documents never change: they keep their stored render context and

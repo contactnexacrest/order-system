@@ -16,7 +16,7 @@ use App\Tests\Support\DbTestCase;
  * follow the client — at once while nothing is issued, by an approved request
  * after. Covers case 1 (automatic, flash wording, audit, FYI notice), the
  * "issued" rule, the request / approve / refuse / lapse paths, the one open
- * request rule and the self-approval rule (default MD only).
+ * request rule and the self-approval rule (default MD and ED).
  * Node twin: tests/integration/buyerDetailsRefresh.test.js (same wording).
  */
 final class BuyerDetailsRefreshTest extends DbTestCase
@@ -261,19 +261,31 @@ final class BuyerDetailsRefreshTest extends DbTestCase
         self::assertArrayHasKey('buyer_details_change', SelfApprovalRules::RULES);
         $ed = $this->createTestUser('Executive Director');
         $md = $this->createTestUser('Managing Director');
-        self::assertFalse(SelfApprovalRules::allowed('buyer_details_change', $ed), 'default: not the ED');
+        // Owner, 12 Nov 2026: the default is the MD and the ED, like every other rule.
+        self::assertTrue(SelfApprovalRules::allowed('buyer_details_change', $ed), 'default: the ED');
         self::assertTrue(SelfApprovalRules::allowed('buyer_details_change', $md), 'default: the MD');
 
-        $clientId = $this->newClient();
-        $orderId = $this->issuedOrderWithChangedEmail($clientId, 'self' . bin2hex(random_bytes(3)) . '@buyer.test');
-        BuyerDetailsRefreshService::request($orderId, $ed, 'The buyer changed their e-mail');
-        $req = OrderBuyerDetailRequestRepository::pendingForOrder($orderId);
-        $msg = 'You asked for this change — someone else must approve it (Admin › Self-approval rules).';
-        self::assertSame($msg, BuyerDetailsRefreshService::approve((int) $req['id'], $orderId, $ed, ''));
-        self::assertSame($msg, BuyerDetailsRefreshService::refuse((int) $req['id'], $orderId, $ed, 'Refusing my own request'));
-        self::assertSame('PENDING', OrderBuyerDetailRequestRepository::find((int) $req['id'])['status']);
+        // Admin unticks the ED: the ED can no longer decide their own request.
+        $pdo = Database::connection();
+        $edRoleId = (int) $pdo->query("SELECT id FROM roles WHERE name = 'Executive Director'")->fetchColumn();
+        $pdo->prepare("DELETE FROM self_approval_rules WHERE rule_key = 'buyer_details_change' AND role_id = :r")->execute(['r' => $edRoleId]);
+        try {
+            self::assertFalse(SelfApprovalRules::allowed('buyer_details_change', $ed), 'ED unticked');
+            $clientId = $this->newClient();
+            $orderId = $this->issuedOrderWithChangedEmail($clientId, 'self' . bin2hex(random_bytes(3)) . '@buyer.test');
+            BuyerDetailsRefreshService::request($orderId, $ed, 'The buyer changed their e-mail');
+            $req = OrderBuyerDetailRequestRepository::pendingForOrder($orderId);
+            $msg = 'You asked for this change — someone else must approve it (Admin › Self-approval rules).';
+            self::assertSame($msg, BuyerDetailsRefreshService::approve((int) $req['id'], $orderId, $ed, ''));
+            self::assertSame($msg, BuyerDetailsRefreshService::refuse((int) $req['id'], $orderId, $ed, 'Refusing my own request'));
+            self::assertSame('PENDING', OrderBuyerDetailRequestRepository::find((int) $req['id'])['status']);
+        } finally {
+            $pdo->prepare("INSERT INTO self_approval_rules (rule_key, role_id) SELECT 'buyer_details_change', :r FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM self_approval_rules WHERE rule_key = 'buyer_details_change' AND role_id = :r2)")->execute(['r' => $edRoleId, 'r2' => $edRoleId]);
+        }
 
         // The MD's own request: allowed by the default rule.
+        $clientId = $this->newClient();
         $orderId2 = $this->issuedOrderWithChangedEmail($clientId, 'self2' . bin2hex(random_bytes(3)) . '@buyer.test');
         BuyerDetailsRefreshService::request($orderId2, $md, 'The buyer changed their e-mail');
         $req2 = OrderBuyerDetailRequestRepository::pendingForOrder($orderId2);

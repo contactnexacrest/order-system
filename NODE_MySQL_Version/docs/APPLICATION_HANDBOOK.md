@@ -1347,7 +1347,7 @@ acting department, any membership) is ticked. Seed default for every rule:
 | `short_payment` | clear short a payment whose receipts they recorded | SHORT_PAYMENT_SELF_APPROVED |
 | `price_discount` | approve a line price below the floor that they set (D-240/D-245) | PRICE_DISCOUNT_SELF_APPROVED |
 | `bank_details` | verify bank details (associates and suppliers) they entered themselves, with a reason (D-293) | (reason kept on the bank change) |
-| `buyer_details_change` | approve or refuse their own request to copy the client's details onto an order with an issued document (D-337; **default Managing Director only**) | BUYER_DETAILS_CHANGE_APPROVED / _REFUSED (decided by the requester) |
+| `buyer_details_change` | approve or refuse their own request to copy the client's details onto an order with an issued document (D-337; **default Managing Director and Executive Director**) | BUYER_DETAILS_CHANGE_APPROVED / _REFUSED (decided by the requester) |
 
 There is **no other exception**: Admin, System Administrator and Super
 Admin self-approve only if one of their roles is ticked. A rule change is

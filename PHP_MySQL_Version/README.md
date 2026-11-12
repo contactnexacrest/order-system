@@ -2699,6 +2699,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-12b-supplier-prices-base
 mysql -u <user> -p <database> < docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12e-follow-ups-d338.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-12f-buyer-details-self-approval-md-ed.sql
 ```
 
 Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,

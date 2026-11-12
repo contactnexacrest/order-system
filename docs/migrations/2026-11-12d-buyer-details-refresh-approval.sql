@@ -19,7 +19,7 @@
 --   * New permission approve_buyer_details_change, granted to Managing Director
 --     and Executive Director (Admin can grant it like any other permission).
 --   * Admin › Self-approval rules: new rule buyer_details_change, default
---     Managing Director only (not re-added if an Admin has changed the rule).
+--     Managing Director and Executive Director (not re-added if an Admin has changed the rule).
 --   * No data change: existing orders keep the details they have.
 --
 -- Safe to run twice: CREATE TABLE IF NOT EXISTS and INSERT … WHERE NOT EXISTS
@@ -57,6 +57,6 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve
 
 INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT 'buyer_details_change', r.id FROM roles r
- WHERE r.name = 'Managing Director'
+ WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = 'buyer_details_change')
    AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.action_type = 'SELF_APPROVAL_RULE_CHANGED' AND a.field_name = 'buyer_details_change');

@@ -10,7 +10,7 @@ const departmentRepository = require('../repositories/departmentRepository');
  * may approve their own work is set in Admin → Self-approval rules (Super
  * Admins only), one list of roles per rule. Defaults: Managing Director
  * and Executive Director on every rule (QA Round 8: seven rules), except
- * buyer_details_change (D-337): Managing Director only. A person qualifies when any of
+ * buyer_details_change (D-337) as well. A person qualifies when any of
  * their own roles (primary role or a department membership) is ticked.
  */
 const RULES = {
@@ -25,7 +25,7 @@ const RULES = {
   price_discount: 'Approve an order line price below the floor where they set that price themselves (D-245)',
   // Owner decision 11 Nov 2026 (D-293): verify bank details (associates and suppliers) they entered themselves, with a reason.
   bank_details: 'Verify bank details (associates and suppliers) they entered themselves — with a reason',
-  // Owner decision 12 Nov 2026 (D-337): default Managing Director only.
+  // Owner decision 12 Nov 2026 (D-337): default Managing Director and Executive Director, like the other rules (owner, 12 Nov 2026).
   buyer_details_change: 'Approve copying the client\'s current details onto an order with an issued document, where they asked for it themselves',
 };
 
