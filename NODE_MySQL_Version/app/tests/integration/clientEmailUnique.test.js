@@ -34,7 +34,7 @@ describe('One email per client (QA Round 5, R5-02)', () => {
   const fakeRes = () => ({ redirect() {}, status() { return this; }, send() {}, renderView() {} });
   const fakeReq = (body, params = {}) => ({
     session: {}, user: { id: userId }, permissions: {}, params,
-    body: { billing_address: '1 Test Street', consignee_same_as_buyer: '1', notify_party_same_as_consignee: '1', ...body },
+    body: { billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country', consignee_same_as_buyer: '1', notify_party_same_as_consignee: '1', ...body },
   });
 
   it('refuses a second client with the same email', async () => {

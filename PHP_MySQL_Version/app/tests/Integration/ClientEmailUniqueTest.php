@@ -46,7 +46,7 @@ final class ClientEmailUniqueTest extends DbTestCase
 
     private function post(array $fields): void
     {
-        $_POST = $fields + ['billing_address' => '1 Test Street', 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
+        $_POST = $fields + ['billing_address_line1' => '1 Test Street', 'billing_city' => 'Test City', 'billing_country' => 'Test Country', 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
     }
 
     public function testCreatingASecondClientWithTheSameEmailIsRefused(): void

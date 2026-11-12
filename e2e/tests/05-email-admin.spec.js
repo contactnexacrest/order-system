@@ -119,7 +119,9 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
       await login(page, 'admin');
       await page.goto('/clients/create');
       await page.locator('input[name="company_legal_name"]').fill(`Email Approval Buyer ${UNIQUE}`);
-      await page.locator('textarea[name="billing_address"]').fill('1 Email Test Street, Test City, Test Country');
+      await page.locator('input[name="billing_address_line1"]').fill('1 Email Test Street');
+      await page.locator('input[name="billing_city"]').fill('Test City');
+      await page.locator('input[name="billing_country"]').fill('Test Country');
       await page.locator('input[name="email"]').fill(`email-approval-buyer-${UNIQUE}@nexacrest.test`);
       await page.getByRole('button', { name: 'Create Client' }).click();
       await expect(page).toHaveURL(/\/clients\/\d+$/);

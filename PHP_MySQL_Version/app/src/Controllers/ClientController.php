@@ -50,10 +50,10 @@ final class ClientController
         $user = AuthService::currentUser();
 
         $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
-        $billingAddress = trim((string) ($_POST['billing_address'] ?? ''));
+        $billingAddress = self::composedBillingAddress();
 
-        if ($companyLegalName === '' || $billingAddress === '') {
-            Flash::set('error', 'Company legal name and billing address are required.');
+        if ($companyLegalName === '' || $billingAddress === null) {
+            Flash::set('error', self::REQUIRED_MESSAGE);
             Flash::setOld($_POST);
             header('Location: /clients/create');
             return;
@@ -121,10 +121,10 @@ final class ClientController
         $user = AuthService::currentUser();
 
         $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
-        $billingAddress = trim((string) ($_POST['billing_address'] ?? ''));
+        $billingAddress = self::composedBillingAddress();
 
-        if ($companyLegalName === '' || $billingAddress === '') {
-            Flash::set('error', 'Company legal name and billing address are required.');
+        if ($companyLegalName === '' || $billingAddress === null) {
+            Flash::set('error', self::REQUIRED_MESSAGE);
             Flash::setOld($_POST);
             header("Location: /clients/{$source['id']}/duplicate");
             return;
@@ -162,6 +162,30 @@ final class ClientController
 
         Flash::set('success', "Client created as a duplicate of \"{$source['company_legal_name']}\" — Buyer Inquiry Ref {$clientUniqueNumber}.");
         header("Location: /clients/{$clientId}");
+    }
+
+    /** D-346: shown when the company name or a required billing-address part is missing. */
+    public const REQUIRED_MESSAGE = 'Company legal name, Billing Address Line 1, City / Town and Billing Country are required.';
+
+    /**
+     * Owner decision D-346 (12 Nov 2026): the single "Billing Address" box is
+     * gone — clients.billing_address is composed from the structured parts by
+     * the shared ClientAddress::compose(). Null when Line 1, City / Town or
+     * Billing Country is missing (all three are required).
+     */
+    private static function composedBillingAddress(): ?string
+    {
+        $part = static fn (string $key): string => trim((string) ($_POST[$key] ?? ''));
+        if ($part('billing_address_line1') === '' || $part('billing_city') === '' || $part('billing_country') === '') {
+            return null;
+        }
+        return \App\Helpers\ClientAddress::compose(
+            $part('billing_address_line1'),
+            $part('billing_address_line2'),
+            $part('billing_city'),
+            $part('billing_postcode'),
+            $part('billing_country')
+        );
     }
 
     /** @return array<string,mixed> every field store()/duplicateStore() can set, shared so both build it identically. */
@@ -261,9 +285,9 @@ final class ClientController
         }
 
         $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
-        $billingAddress = trim((string) ($_POST['billing_address'] ?? ''));
-        if ($companyLegalName === '' || $billingAddress === '') {
-            Flash::set('error', 'Company legal name and billing address are required.');
+        $billingAddress = self::composedBillingAddress();
+        if ($companyLegalName === '' || $billingAddress === null) {
+            Flash::set('error', self::REQUIRED_MESSAGE);
             header("Location: /clients/{$clientId}/edit");
             return;
         }

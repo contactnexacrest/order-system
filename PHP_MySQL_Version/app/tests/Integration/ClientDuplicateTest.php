@@ -41,8 +41,8 @@ final class ClientDuplicateTest extends DbTestCase
         // QA Round 6, R6-N16: clients.email is unique — each run its own.
         $this->sourceEmail = 'jane-' . bin2hex(random_bytes(4)) . '@example.test';
         $pdo->prepare(
-            "INSERT INTO clients (client_unique_number, company_legal_name, billing_address, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
-             VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)"
+            "INSERT INTO clients (client_unique_number, company_legal_name, billing_address, billing_address_line1, billing_city, billing_country, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
+             VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville, United Kingdom', '1 Test Street', 'Testville', 'United Kingdom', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)"
         )->execute(['unique_number' => $uniqueNumber, 'email' => $this->sourceEmail, 'created_by' => $this->userId]);
         $id = (int) $pdo->lastInsertId();
         return ClientRepository::find($id);
@@ -76,7 +76,7 @@ final class ClientDuplicateTest extends DbTestCase
         $source = $this->createSourceClient();
         $_POST = [
             'company_legal_name' => $source['company_legal_name'],
-            'billing_address' => $source['billing_address'],
+            'billing_address_line1' => $source['billing_address_line1'], 'billing_city' => $source['billing_city'], 'billing_country' => $source['billing_country'],
             'contact_person' => $source['contact_person'],
             'email' => $source['email'],
             'phone' => $source['phone'],
@@ -100,7 +100,7 @@ final class ClientDuplicateTest extends DbTestCase
         $source = $this->createSourceClient();
         $_POST = [
             'company_legal_name' => 'Acme Exports (Europe) Ltd', // the changed field
-            'billing_address' => $source['billing_address'],
+            'billing_address_line1' => $source['billing_address_line1'], 'billing_city' => $source['billing_city'], 'billing_country' => $source['billing_country'],
             'contact_person' => $source['contact_person'],
             // QA Round 5, R5-02: a duplicate needs its own email too.
             'email' => 'europe-' . bin2hex(random_bytes(3)) . '@example.test',
@@ -128,7 +128,7 @@ final class ClientDuplicateTest extends DbTestCase
         $source = $this->createSourceClient();
         $_POST = [
             'company_legal_name' => $source['company_legal_name'],
-            'billing_address' => 'A genuinely different address, 2 New Road',
+            'billing_address_line1' => '2 New Road', 'billing_city' => 'Testville', 'billing_country' => 'United Kingdom',
             'consignee_same_as_buyer' => '1',
             'notify_party_same_as_consignee' => '1',
         ];
@@ -150,7 +150,7 @@ final class ClientDuplicateTest extends DbTestCase
 
     public function testDuplicateStore404sForAMissingClient(): void
     {
-        $_POST = ['company_legal_name' => 'X', 'billing_address' => 'Y'];
+        $_POST = ['company_legal_name' => 'X', 'billing_address_line1' => 'Y', 'billing_city' => 'Y', 'billing_country' => 'Y'];
 
         ob_start();
         (new ClientController())->duplicateStore(['id' => '999999999']);
@@ -162,7 +162,7 @@ final class ClientDuplicateTest extends DbTestCase
     public function testDuplicateStoreStillRequiresCompanyNameAndBillingAddress(): void
     {
         $source = $this->createSourceClient();
-        $_POST = ['company_legal_name' => '', 'billing_address' => ''];
+        $_POST = ['company_legal_name' => '', 'billing_address_line1' => '', 'billing_city' => '', 'billing_country' => ''];
         $countBefore = (int) Database::connection()->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 
         ob_start();
@@ -176,7 +176,7 @@ final class ClientDuplicateTest extends DbTestCase
     public function testFindDuplicatesOfReturnsEveryClientDuplicatedFromIt(): void
     {
         $source = $this->createSourceClient();
-        $_POST = ['company_legal_name' => 'Acme Exports (Branch 2)', 'billing_address' => $source['billing_address'], 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
+        $_POST = ['company_legal_name' => 'Acme Exports (Branch 2)', 'billing_address_line1' => $source['billing_address_line1'], 'billing_city' => $source['billing_city'], 'billing_country' => $source['billing_country'], 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
         ob_start();
         (new ClientController())->duplicateStore(['id' => (string) $source['id']]);
         ob_end_clean();
@@ -190,7 +190,7 @@ final class ClientDuplicateTest extends DbTestCase
     public function testShowPageLinksBothDirectionsOfTheDuplicateRelationship(): void
     {
         $source = $this->createSourceClient();
-        $_POST = ['company_legal_name' => 'Acme Exports (Branch 3)', 'billing_address' => $source['billing_address'], 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
+        $_POST = ['company_legal_name' => 'Acme Exports (Branch 3)', 'billing_address_line1' => $source['billing_address_line1'], 'billing_city' => $source['billing_city'], 'billing_country' => $source['billing_country'], 'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1'];
         ob_start();
         (new ClientController())->duplicateStore(['id' => (string) $source['id']]);
         ob_end_clean();

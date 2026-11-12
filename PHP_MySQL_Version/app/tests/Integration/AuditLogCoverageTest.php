@@ -50,7 +50,7 @@ final class AuditLogCoverageTest extends DbTestCase
     {
         $userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['company_legal_name' => 'L-23 Audit Test Buyer Ltd', 'billing_address' => '1 Test Street'];
+        $_POST = ['company_legal_name' => 'L-23 Audit Test Buyer Ltd', 'billing_address_line1' => '1 Test Street', 'billing_city' => 'Test City', 'billing_country' => 'Test Country'];
 
         ob_start();
         (new ClientController())->store([]);

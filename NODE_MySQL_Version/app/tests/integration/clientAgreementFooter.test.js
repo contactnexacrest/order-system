@@ -132,7 +132,7 @@ describe('Client agreement footer (Batch 3 #12)', () => {
 
     const staffId = await createTestStaffUser(); // ordinary staff, not Super Admin
     await clientsController.update(
-      fakeReq(staffId, { company_legal_name: 'Attempted Rename Ltd', billing_address: client.billing_address }, { id: String(clientId) }),
+      fakeReq(staffId, { company_legal_name: 'Attempted Rename Ltd', billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country' }, { id: String(clientId) }),
       fakeRes()
     );
 

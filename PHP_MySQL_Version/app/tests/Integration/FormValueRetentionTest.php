@@ -56,7 +56,7 @@ final class FormValueRetentionTest extends DbTestCase
     {
         $_POST = [
             'company_legal_name' => '',
-            'billing_address'    => '',
+            'billing_address_line1' => '',
             'contact_person'     => 'Chief Buyer',
             'email'              => 'buyer.contact@example.com',
         ];
@@ -77,7 +77,7 @@ final class FormValueRetentionTest extends DbTestCase
 
     public function testClientCreateFormOldValuesAreOneShot(): void
     {
-        $_POST = ['company_legal_name' => '', 'billing_address' => '', 'contact_person' => 'One Shot Co'];
+        $_POST = ['company_legal_name' => '', 'billing_address_line1' => '', 'contact_person' => 'One Shot Co'];
         ob_start();
         (new ClientController())->store([]);
         ob_end_clean();

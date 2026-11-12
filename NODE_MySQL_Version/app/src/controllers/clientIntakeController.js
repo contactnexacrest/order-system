@@ -241,9 +241,10 @@ async function extractAndValidate(req) {
   const billingCity = String(req.body.billing_city || '').trim();
   const billingPostcode = String(req.body.billing_postcode || '').trim();
   const billingCountry = String(req.body.billing_country || '').trim();
-  const composedBillingAddress = [billingAddressLine1, billingAddressLine2, billingCity, billingPostcode, billingCountry]
-    .filter((part) => part !== '')
-    .join(', ');
+  // D-346: one shared composer for every path ("Line 1, Line 2, City Postcode, Country").
+  const composedBillingAddress = require('../helpers/clientAddress').compose(
+    billingAddressLine1, billingAddressLine2, billingCity, billingPostcode, billingCountry,
+  );
 
   const data = {
     company_legal_name: String(req.body.company_legal_name || '').trim(),

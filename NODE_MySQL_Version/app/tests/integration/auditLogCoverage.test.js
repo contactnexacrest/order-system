@@ -68,7 +68,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
 
   it('client creation is audit-logged', async () => {
     const userId = await createTestUser();
-    const req = fakeReq({ id: userId }, { company_legal_name: 'L-23 Audit Test Buyer Ltd', billing_address: '1 Test Street' });
+    const req = fakeReq({ id: userId }, { company_legal_name: 'L-23 Audit Test Buyer Ltd', billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country' });
 
     await clientsController.store(req, fakeRes());
 

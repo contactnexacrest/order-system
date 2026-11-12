@@ -51,7 +51,7 @@ final class CooTypeServerSideWhitelistTest extends DbTestCase
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = [
             'company_legal_name' => 'R-13 Test Buyer Ltd',
-            'billing_address'    => '1 Test Street',
+            'billing_address_line1' => '1 Test Street', 'billing_city' => 'Test City', 'billing_country' => 'Test Country',
             'coo_type'           => 'TBC',
         ];
 

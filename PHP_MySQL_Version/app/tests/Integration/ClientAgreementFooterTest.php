@@ -138,7 +138,9 @@ final class ClientAgreementFooterTest extends DbTestCase
         $staffId = $this->createTestUser('Admin'); // ordinary staff, not Super Admin
         $_SESSION['_auth_user_id'] = $staffId;
         $_POST['company_legal_name'] = 'Attempted Rename Ltd';
-        $_POST['billing_address'] = $client['billing_address'];
+        $_POST['billing_address_line1'] = '1 Test Street';
+        $_POST['billing_city'] = 'Test City';
+        $_POST['billing_country'] = 'Test Country';
 
         ob_start();
         $this->controller->update(['id' => $clientId]);

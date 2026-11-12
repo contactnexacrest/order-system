@@ -161,7 +161,7 @@ describe('Round 5 validation (Batch 6)', () => {
   it('Client update refuses a malformed e-mail', async () => {
     const clientId = await createTestClient();
     const client = await clientRepository.find(clientId);
-    const req = fakeReq({ company_legal_name: client.company_legal_name, billing_address: client.billing_address || 'Somewhere 1', email: 'not-an-email' }, { id: String(clientId) });
+    const req = fakeReq({ company_legal_name: client.company_legal_name, billing_address_line1: 'Somewhere 1', billing_city: 'Test City', billing_country: 'Test Country', email: 'not-an-email' }, { id: String(clientId) });
     await clientsController.update(req, fakeRes());
 
     expect(lastFlash(req).message).toBe('Email must be a valid e-mail address.');

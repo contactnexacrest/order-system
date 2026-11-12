@@ -54,7 +54,7 @@ describe('coo_type server-side whitelist (External QA report R-13)', () => {
     const userId = await createTestUser();
     const req = {
       user: { id: userId },
-      body: { company_legal_name: 'R-13 Test Buyer Ltd', billing_address: '1 Test Street', coo_type: 'TBC' },
+      body: { company_legal_name: 'R-13 Test Buyer Ltd', billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country', coo_type: 'TBC' },
       params: {},
       session: {},
     };

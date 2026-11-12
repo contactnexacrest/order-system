@@ -56,7 +56,9 @@ describe('Stage-gate integrity (QA-1 regression): closeOrder + other stage-skip 
       .send({
         _csrf: clientCsrf,
         company_legal_name: 'QA-1 Regression Test Buyer Ltd',
-        billing_address: '1 Test Street, Test City',
+        billing_address_line1: '1 Test Street',
+        billing_city: 'Test City',
+        billing_country: 'Test Country',
       });
     expect(clientRes.status).toBe(302);
     const clientId = parseInt(clientRes.headers.location.match(/\/clients\/(\d+)/)[1], 10);

@@ -1784,6 +1784,20 @@ error caused by an associate code (D-246).
 can be **duplicated** to a new Buyer Inquiry Ref (save refused if nothing
 changed).
 
+**Billing address (D-346).** The Add / Edit / Duplicate Client forms have no
+single "Billing Address" box: Billing Address Line 1 \*, Line 2, City /
+Town \*, Postcode, Billing Country \* (required in the browser and on the
+server: "Company legal name, Billing Address Line 1, City / Town and Billing
+Country are required."). `clients.billing_address` — still what documents,
+the Zoho payload and domestic documents read — is always composed from the
+parts by one shared helper, `ClientAddress::compose()` (Node
+`helpers/clientAddress.js`), used by the client forms and both public intake
+forms (`ClientIntakeController`, `PiIntakeController`): "Line 1, Line 2,
+City Postcode, Country" (city and postcode joined by a space, empty parts
+skipped). A legacy client with only the old single box shows "Address on
+file (old single box): … — copy it into the boxes above." under the address
+fields on Edit; saving needs the parts.
+
 Code: `ClientIntakeController`, `ClientIntakeReviewController`,
 `ClientController` (Node `clientsController.js`), `AssociateIntakeService`.
 

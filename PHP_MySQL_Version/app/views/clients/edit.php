@@ -31,24 +31,24 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars($client['company_legal_name']) ?>" placeholder="e.g., Test Company Ltd" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" rows="2" placeholder="e.g., 123 Example Street, Test City, Country" required><?= htmlspecialchars($client['billing_address']) ?></textarea>
-        </label>
-        <label>Billing Address Line 1
-          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+        <label>Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required>
         </label>
         <label>Billing Address Line 2
           <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($client['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
         </label>
-        <label>City / Town
-          <input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>" placeholder="e.g., Birmingham">
+        <label>City / Town *
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>" placeholder="e.g., Birmingham" required>
         </label>
         <label>Postcode
           <input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>" placeholder="e.g., B1 1AA">
         </label>
-        <label>Billing Country
-          <input type="text" name="billing_country" value="<?= htmlspecialchars($client['billing_country'] ?? '') ?>" placeholder="e.g., United Kingdom">
+        <label>Billing Country *
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($client['billing_country'] ?? '') ?>" placeholder="e.g., United Kingdom" required>
         </label>
+        <?php if (trim((string) ($client['billing_address'] ?? '')) !== '' && (trim((string) ($client['billing_address_line1'] ?? '')) === '' || trim((string) ($client['billing_city'] ?? '')) === '' || trim((string) ($client['billing_country'] ?? '')) === '')): ?>
+          <p class="muted small legacy-billing-address" style="grid-column:1 / -1">Address on file (old single box): <?= htmlspecialchars((string) $client['billing_address']) ?> — copy it into the boxes above.</p>
+        <?php endif; ?>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>

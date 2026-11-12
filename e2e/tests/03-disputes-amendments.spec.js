@@ -112,7 +112,9 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
 
     await page.goto('/clients/create');
     await page.locator('input[name="company_legal_name"]').fill(`Dispute Amend Buyer ${UNIQUE}`);
-    await page.locator('textarea[name="billing_address"]').fill('1 Dispute Test Street, Test City, Test Country');
+    await page.locator('input[name="billing_address_line1"]').fill('1 Dispute Test Street');
+    await page.locator('input[name="billing_city"]').fill('Test City');
+    await page.locator('input[name="billing_country"]').fill('Test Country');
     clientEmail = `dispute-amend-buyer-${UNIQUE}@nexacrest.test`;
     await page.locator('input[name="email"]').fill(clientEmail);
     await page.getByRole('button', { name: 'Create Client' }).click();

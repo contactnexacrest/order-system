@@ -117,7 +117,9 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
       await page.goto('/clients/create');
       await assertNoHorizontalOverflow(page);
       await page.locator('input[name="company_legal_name"]').fill(`Mobile Layout Buyer ${UNIQUE}`);
-      await page.locator('textarea[name="billing_address"]').fill('1 Mobile Test Street, Test City, Test Country');
+      await page.locator('input[name="billing_address_line1"]').fill('1 Mobile Test Street');
+      await page.locator('input[name="billing_city"]').fill('Test City');
+      await page.locator('input[name="billing_country"]').fill('Test Country');
       clientEmail = `mobile-layout-buyer-${UNIQUE}@nexacrest.test`;
       await page.locator('input[name="email"]').fill(clientEmail);
       await page.getByRole('button', { name: 'Create Client' }).click();

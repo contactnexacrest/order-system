@@ -57,7 +57,7 @@ describe('Over-long/invalid form fields no longer crash the request (External QA
     const res = await agent.post('/clients').type('form').send({
       _csrf: csrf,
       company_legal_name: 'x'.repeat(500), // column is VARCHAR(255)
-      billing_address: '1 Test Street',
+      billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country',
     });
 
     expect(res.status).not.toBe(500);
@@ -111,7 +111,7 @@ describe('Over-long/invalid form fields no longer crash the request (External QA
       .post('/clients')
       .type('form')
       .set('X-Requested-With', 'XMLHttpRequest')
-      .send({ _csrf: csrf, company_legal_name: 'x'.repeat(500), billing_address: '1 Test Street' });
+      .send({ _csrf: csrf, company_legal_name: 'x'.repeat(500), billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country' });
 
     expect(res.status).toBe(422);
     expect(res.body.error.toLowerCase()).toContain('too long');
@@ -134,7 +134,7 @@ describe('Over-long/invalid form fields no longer crash the request (External QA
     const res = await agent.post('/clients').type('form').send({
       _csrf: csrf,
       company_legal_name: 'R-05 Body Size Test Ltd',
-      billing_address: '1 Test Street',
+      billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country',
       ...padding,
     });
 
@@ -150,7 +150,7 @@ describe('Over-long/invalid form fields no longer crash the request (External QA
     const res = await agent.post('/clients').type('form').send({
       _csrf: csrf,
       company_legal_name: 'R-05 Oversized Test Ltd',
-      billing_address: 'x'.repeat(3 * 1024 * 1024), // 3MB, over the new 2mb limit
+      billing_address_line1: 'x'.repeat(3 * 1024 * 1024), // 3MB, over the new 2mb limit
     });
 
     expect(res.status).toBe(413);

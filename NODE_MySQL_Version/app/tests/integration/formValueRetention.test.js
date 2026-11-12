@@ -66,7 +66,7 @@ describe('Form value retention on validation failure (Batch 3 #4)', () => {
     const storeRes = await agent.post('/clients').type('form').send({
       _csrf: csrf,
       company_legal_name: '',
-      billing_address: '',
+      billing_address_line1: '',
       contact_person: 'Node Contact Buyer',
       email: 'contact.node@example.com',
     });
@@ -84,7 +84,7 @@ describe('Form value retention on validation failure (Batch 3 #4)', () => {
     await agent.post('/clients').type('form').send({
       _csrf: csrf,
       company_legal_name: '',
-      billing_address: '',
+      billing_address_line1: '',
       contact_person: 'One Shot Node Co',
     });
 

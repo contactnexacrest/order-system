@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const flash = require('../helpers/flash');
 const fieldValidator = require('../helpers/fieldValidator');
+const clientAddress = require('../helpers/clientAddress');
 const passwordHash = require('../helpers/passwordHash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
@@ -48,10 +49,10 @@ async function store(req, res) {
   const user = req.user;
 
   const companyLegalName = String(req.body.company_legal_name || '').trim();
-  const billingAddress = String(req.body.billing_address || '').trim();
+  const billingAddress = composedBillingAddress(req);
 
-  if (companyLegalName === '' || billingAddress === '') {
-    flash.set(req, 'error', 'Company legal name and billing address are required.');
+  if (companyLegalName === '' || billingAddress === null) {
+    flash.set(req, 'error', REQUIRED_MESSAGE);
     flash.setOld(req, req.body);
     res.redirect('/clients/create');
     return;
@@ -117,10 +118,10 @@ async function duplicateStore(req, res) {
   const user = req.user;
 
   const companyLegalName = String(req.body.company_legal_name || '').trim();
-  const billingAddress = String(req.body.billing_address || '').trim();
+  const billingAddress = composedBillingAddress(req);
 
-  if (companyLegalName === '' || billingAddress === '') {
-    flash.set(req, 'error', 'Company legal name and billing address are required.');
+  if (companyLegalName === '' || billingAddress === null) {
+    flash.set(req, 'error', REQUIRED_MESSAGE);
     flash.setOld(req, req.body);
     res.redirect(`/clients/${source.id}/duplicate`);
     return;
@@ -160,6 +161,30 @@ async function duplicateStore(req, res) {
 
   flash.set(req, 'success', `Client created as a duplicate of "${source.company_legal_name}" — Buyer Inquiry Ref ${clientUniqueNumber}.`);
   res.redirect(`/clients/${clientId}`);
+}
+
+/** D-346: shown when the company name or a required billing-address part is missing. */
+const REQUIRED_MESSAGE = 'Company legal name, Billing Address Line 1, City / Town and Billing Country are required.';
+
+/**
+ * Owner decision D-346 (12 Nov 2026): the single "Billing Address" box is
+ * gone — clients.billing_address is composed from the structured parts by
+ * the shared clientAddress.compose(). Null when Line 1, City / Town or
+ * Billing Country is missing (all three are required). Port of
+ * ClientController::composedBillingAddress().
+ */
+function composedBillingAddress(req) {
+  const part = (key) => String((req.body || {})[key] || '').trim();
+  if (part('billing_address_line1') === '' || part('billing_city') === '' || part('billing_country') === '') {
+    return null;
+  }
+  return clientAddress.compose(
+    part('billing_address_line1'),
+    part('billing_address_line2'),
+    part('billing_city'),
+    part('billing_postcode'),
+    part('billing_country'),
+  );
 }
 
 /** Every field store()/duplicateStore() can set, shared so both build it identically. */
@@ -276,9 +301,9 @@ async function update(req, res) {
   }
 
   const companyLegalName = String(req.body.company_legal_name || '').trim();
-  const billingAddress = String(req.body.billing_address || '').trim();
-  if (companyLegalName === '' || billingAddress === '') {
-    flash.set(req, 'error', 'Company legal name and billing address are required.');
+  const billingAddress = composedBillingAddress(req);
+  if (companyLegalName === '' || billingAddress === null) {
+    flash.set(req, 'error', REQUIRED_MESSAGE);
     res.redirect(`/clients/${clientId}/edit`);
     return;
   }

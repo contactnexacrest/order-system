@@ -19,23 +19,20 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="{{ old.company_legal_name or '' }}" placeholder="e.g., Test Company Ltd" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" rows="2" placeholder="e.g., 123 Example Street, Test City, Country" required>{{ old.billing_address or '' }}</textarea>
-        </label>
-        <label>Billing Address Line 1
-          <input type="text" name="billing_address_line1" value="{{ old.billing_address_line1 or '' }}" placeholder="Street number and street name">
+        <label>Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="{{ old.billing_address_line1 or '' }}" placeholder="Street number and street name" required>
         </label>
         <label>Billing Address Line 2
           <input type="text" name="billing_address_line2" value="{{ old.billing_address_line2 or '' }}" placeholder="Area / district — if applicable">
         </label>
-        <label>City / Town
-          <input type="text" name="billing_city" value="{{ old.billing_city or '' }}" placeholder="e.g., Birmingham">
+        <label>City / Town *
+          <input type="text" name="billing_city" value="{{ old.billing_city or '' }}" placeholder="e.g., Birmingham" required>
         </label>
         <label>Postcode
           <input type="text" name="billing_postcode" value="{{ old.billing_postcode or '' }}" placeholder="e.g., B1 1AA">
         </label>
-        <label>Billing Country
-          <input type="text" name="billing_country" value="{{ old.billing_country or '' }}" placeholder="e.g., United Kingdom">
+        <label>Billing Country *
+          <input type="text" name="billing_country" value="{{ old.billing_country or '' }}" placeholder="e.g., United Kingdom" required>
         </label>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="{{ old.vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">

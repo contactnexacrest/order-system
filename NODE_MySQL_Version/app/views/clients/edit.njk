@@ -30,24 +30,24 @@
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="{{ client.company_legal_name }}" placeholder="e.g., Test Company Ltd" required>
         </label>
-        <label class="full">Billing Address *
-          <textarea name="billing_address" rows="2" placeholder="e.g., 123 Example Street, Test City, Country" required>{{ client.billing_address }}</textarea>
-        </label>
-        <label>Billing Address Line 1
-          <input type="text" name="billing_address_line1" value="{{ client.billing_address_line1 or '' }}" placeholder="Street number and street name">
+        <label>Billing Address Line 1 *
+          <input type="text" name="billing_address_line1" value="{{ client.billing_address_line1 or '' }}" placeholder="Street number and street name" required>
         </label>
         <label>Billing Address Line 2
           <input type="text" name="billing_address_line2" value="{{ client.billing_address_line2 or '' }}" placeholder="Area / district — if applicable">
         </label>
-        <label>City / Town
-          <input type="text" name="billing_city" value="{{ client.billing_city or '' }}" placeholder="e.g., Birmingham">
+        <label>City / Town *
+          <input type="text" name="billing_city" value="{{ client.billing_city or '' }}" placeholder="e.g., Birmingham" required>
         </label>
         <label>Postcode
           <input type="text" name="billing_postcode" value="{{ client.billing_postcode or '' }}" placeholder="e.g., B1 1AA">
         </label>
-        <label>Billing Country
-          <input type="text" name="billing_country" value="{{ client.billing_country or '' }}" placeholder="e.g., United Kingdom">
+        <label>Billing Country *
+          <input type="text" name="billing_country" value="{{ client.billing_country or '' }}" placeholder="e.g., United Kingdom" required>
         </label>
+        {% if (client.billing_address or '') | trim and (not ((client.billing_address_line1 or '') | trim) or not ((client.billing_city or '') | trim) or not ((client.billing_country or '') | trim)) %}
+          <p class="muted small legacy-billing-address" style="grid-column:1 / -1">Address on file (old single box): {{ client.billing_address }} — copy it into the boxes above.</p>
+        {% endif %}
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="{{ client.vat_eori_tax_no or '' }}" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>

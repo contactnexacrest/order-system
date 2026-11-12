@@ -200,7 +200,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
         ob_start();
         (new ClientController())->editForm(['id' => (string) $clientId]);
         $fingerprint = $this->fingerprintFrom((string) ob_get_clean());
-        $base = ['company_legal_name' => 'PHPUnit Buyer Ltd', 'billing_address' => '1 Test Street', 'edit_fingerprint' => $fingerprint];
+        $base = ['company_legal_name' => 'PHPUnit Buyer Ltd', 'billing_address_line1' => '1 Test Street', 'billing_city' => 'Test City', 'billing_country' => 'Test Country', 'edit_fingerprint' => $fingerprint];
 
         $_POST = $base + ['contact_person' => 'Person A'];
         (new ClientController())->update(['id' => (string) $clientId]);

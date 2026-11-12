@@ -173,7 +173,7 @@ final class Round5ValidationTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $client = ClientRepository::find($clientId);
-        $_POST = ['company_legal_name' => $client['company_legal_name'], 'billing_address' => $client['billing_address'] ?: 'Somewhere 1', 'email' => 'not-an-email'];
+        $_POST = ['company_legal_name' => $client['company_legal_name'], 'billing_address_line1' => 'Somewhere 1', 'billing_city' => 'Test City', 'billing_country' => 'Test Country', 'email' => 'not-an-email'];
         $this->quietly(fn () => (new ClientController())->update(['id' => (string) $clientId]));
 
         self::assertSame('Email must be a valid e-mail address.', $this->lastFlash()['message']);

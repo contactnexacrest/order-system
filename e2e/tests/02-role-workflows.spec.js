@@ -271,7 +271,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
     await test.step('Admin creates the client and a CIF order', async () => {
       await page.goto('/clients/create');
       await page.locator('input[name="company_legal_name"]').fill(`Role Workflow Buyer ${UNIQUE}`);
-      await page.locator('textarea[name="billing_address"]').fill('1 Role Test Street, Test City, Test Country');
+      await page.locator('input[name="billing_address_line1"]').fill('1 Role Test Street');
+      await page.locator('input[name="billing_city"]').fill('Test City');
+      await page.locator('input[name="billing_country"]').fill('Test Country');
       clientEmail = `role-workflow-buyer-${UNIQUE}@nexacrest.test`;
       await page.locator('input[name="email"]').fill(clientEmail);
       await page.getByRole('button', { name: 'Create Client' }).click();

@@ -221,9 +221,10 @@ final class ClientIntakeController
         $billingCity = trim((string) ($_POST['billing_city'] ?? ''));
         $billingPostcode = trim((string) ($_POST['billing_postcode'] ?? ''));
         $billingCountry = trim((string) ($_POST['billing_country'] ?? ''));
-        $composedBillingAddress = implode(', ', array_filter([
-            $billingAddressLine1, $billingAddressLine2, $billingCity, $billingPostcode, $billingCountry,
-        ], static fn ($part) => $part !== ''));
+        // D-346: one shared composer for every path ("Line 1, Line 2, City Postcode, Country").
+        $composedBillingAddress = \App\Helpers\ClientAddress::compose(
+            $billingAddressLine1, $billingAddressLine2, $billingCity, $billingPostcode, $billingCountry
+        );
 
         $data = [
             'company_legal_name'     => trim((string) ($_POST['company_legal_name'] ?? '')),

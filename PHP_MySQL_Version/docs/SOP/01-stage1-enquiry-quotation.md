@@ -109,6 +109,23 @@ Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
 (buyer inquiry ref, incoterm, payment preset, etc.).
 
+**Billing address in parts (D-346, owner decision 12 Nov 2026).** The Add
+Client, Edit Client and Duplicate Client forms have no single "Billing
+Address" box any more. Fill in **Billing Address Line 1 \***, Line 2,
+**City / Town \***, Postcode and **Billing Country \*** — Line 1, City /
+Town and Billing Country are required (the form checks them before it
+sends, and the server refuses the save with "Company legal name, Billing
+Address Line 1, City / Town and Billing Country are required."). The app
+builds the address that documents and Zoho show from these parts, always
+the same way: **Line 1, Line 2, City Postcode, Country** — e.g. "1 Test
+Street, Unit 4, Birmingham B1 1AA, United Kingdom" (empty parts are
+left out). The public Quotation and PI-details forms build it the same way.
+
+An older client saved before the parts existed may have only the old single
+box. Its Edit form shows, under the address fields, "Address on file (old
+single box): … — copy it into the boxes above." Copy it into Line 1, City /
+Town, Postcode and Country; the save needs those parts.
+
 **One email per client** (QA Round 5, owner decision 2026-10-28). The
 client portal logs in by email, so two clients can't share one. Saving a
 client — new, duplicated, edited, or accepted from Quotation Intake Review
@@ -145,8 +162,9 @@ receiving the cargo, and the party to notify on arrival are often three
 different entities:
 
 - **Buyer Details** — the client's own company name, structured billing
-  address (Line 1/2, City, Postcode — kept alongside the older single
-  free-text Billing Address field for backward compatibility), VAT/EORI,
+  address (Line 1 \*, Line 2, City / Town \*, Postcode, Billing Country \*;
+  the address documents and Zoho show is composed from these parts as
+  "Line 1, Line 2, City Postcode, Country" — D-346), VAT/EORI,
   and contact details. Always independently entered — there's no "same
   as" checkbox here.
 - **Consignee Details** — defaults to a checked **Same as Buyer?**

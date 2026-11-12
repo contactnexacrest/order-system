@@ -53,8 +53,8 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     // QA Round 6, R6-N16: clients.email is unique — each run its own.
     sourceEmail = `jane-${Math.random().toString(16).slice(2, 10)}@example.test`;
     const result = await db.execute(
-      `INSERT INTO clients (client_unique_number, company_legal_name, billing_address, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
-       VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)`,
+      `INSERT INTO clients (client_unique_number, company_legal_name, billing_address, billing_address_line1, billing_city, billing_country, contact_person, email, phone, country_of_destination, coo_type, consignee_same_as_buyer, notify_party_same_as_consignee, created_by)
+       VALUES (:unique_number, 'Acme Exports Ltd', '1 Test Street, Testville, United Kingdom', '1 Test Street', 'Testville', 'United Kingdom', 'Chief Buyer', :email, '+1 555 0000', 'United Kingdom', 'To Be Confirmed', 1, 1, :created_by)`,
       { unique_number: uniqueNumber, email: sourceEmail, created_by: userId }
     );
     return clientRepository.find(result.insertId);
@@ -84,7 +84,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const res = fakeRes();
     await clientsController.duplicateStore(fakeReq({
       company_legal_name: source.company_legal_name,
-      billing_address: source.billing_address,
+      billing_address_line1: source.billing_address_line1, billing_city: source.billing_city, billing_country: source.billing_country,
       contact_person: source.contact_person,
       email: source.email,
       phone: source.phone,
@@ -104,7 +104,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const res = fakeRes();
     await clientsController.duplicateStore(fakeReq({
       company_legal_name: 'Acme Exports (Europe) Ltd',
-      billing_address: source.billing_address,
+      billing_address_line1: source.billing_address_line1, billing_city: source.billing_city, billing_country: source.billing_country,
       contact_person: source.contact_person,
       // QA Round 5, R5-02: a duplicate needs its own email too.
       email: `europe-${Math.random().toString(16).slice(2, 8)}@example.test`,
@@ -129,7 +129,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const res = fakeRes();
     await clientsController.duplicateStore(fakeReq({
       company_legal_name: source.company_legal_name,
-      billing_address: 'A genuinely different address, 2 New Road',
+      billing_address_line1: '2 New Road', billing_city: 'Testville', billing_country: 'United Kingdom',
       consignee_same_as_buyer: '1',
       notify_party_same_as_consignee: '1',
     }, { id: String(source.id) }), res);
@@ -146,7 +146,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
 
   it('duplicateStore 404s for a missing client', async () => {
     const res = fakeRes();
-    await clientsController.duplicateStore(fakeReq({ company_legal_name: 'X', billing_address: 'Y' }, { id: '999999999' }), res);
+    await clientsController.duplicateStore(fakeReq({ company_legal_name: 'X', billing_address_line1: 'Y', billing_city: 'Y', billing_country: 'Y' }, { id: '999999999' }), res);
     expect(res.statusCode).toBe(404);
   });
 
@@ -155,7 +155,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const countBefore = (await db.queryOne('SELECT COUNT(*) AS c FROM clients')).c;
 
     const res = fakeRes();
-    await clientsController.duplicateStore(fakeReq({ company_legal_name: '', billing_address: '' }, { id: String(source.id) }), res);
+    await clientsController.duplicateStore(fakeReq({ company_legal_name: '', billing_address_line1: '', billing_city: '', billing_country: '' }, { id: String(source.id) }), res);
 
     const countAfter = (await db.queryOne('SELECT COUNT(*) AS c FROM clients')).c;
     expect(countAfter).toBe(countBefore);
@@ -166,7 +166,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const res = fakeRes();
     await clientsController.duplicateStore(fakeReq({
       company_legal_name: 'Acme Exports (Branch 2)',
-      billing_address: source.billing_address,
+      billing_address_line1: source.billing_address_line1, billing_city: source.billing_city, billing_country: source.billing_country,
       consignee_same_as_buyer: '1',
       notify_party_same_as_consignee: '1',
     }, { id: String(source.id) }), res);
@@ -182,7 +182,7 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
     const createRes = fakeRes();
     await clientsController.duplicateStore(fakeReq({
       company_legal_name: 'Acme Exports (Branch 3)',
-      billing_address: source.billing_address,
+      billing_address_line1: source.billing_address_line1, billing_city: source.billing_city, billing_country: source.billing_country,
       consignee_same_as_buyer: '1',
       notify_party_same_as_consignee: '1',
     }, { id: String(source.id) }), createRes);

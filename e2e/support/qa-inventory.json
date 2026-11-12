@@ -46578,14 +46578,9 @@
      "placeholder": "e.g., Test Company Ltd"
     },
     {
-     "name": "billing_address",
-     "type": "textarea",
-     "required": true,
-     "placeholder": "e.g., 123 Example Street, Test City, Country"
-    },
-    {
      "name": "billing_address_line1",
      "type": "text",
+     "required": true,
      "placeholder": "Street number and street name"
     },
     {
@@ -46596,6 +46591,7 @@
     {
      "name": "billing_city",
      "type": "text",
+     "required": true,
      "placeholder": "e.g., Birmingham"
     },
     {
@@ -46606,6 +46602,7 @@
     {
      "name": "billing_country",
      "type": "text",
+     "required": true,
      "placeholder": "e.g., United Kingdom"
     },
     {
@@ -46762,14 +46759,9 @@
      "placeholder": "e.g., Test Company Ltd"
     },
     {
-     "name": "billing_address",
-     "type": "textarea",
-     "required": true,
-     "placeholder": "e.g., 123 Example Street, Test City, Country"
-    },
-    {
      "name": "billing_address_line1",
      "type": "text",
+     "required": true,
      "placeholder": "Street number and street name"
     },
     {
@@ -46780,6 +46772,7 @@
     {
      "name": "billing_city",
      "type": "text",
+     "required": true,
      "placeholder": "e.g., Birmingham"
     },
     {
@@ -46790,6 +46783,7 @@
     {
      "name": "billing_country",
      "type": "text",
+     "required": true,
      "placeholder": "e.g., United Kingdom"
     },
     {

@@ -67,7 +67,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     // What the slower of two simultaneous saves does once both passed the "already used" check.
     jest.spyOn(clientRepository, 'findOtherWithEmail').mockResolvedValue(null);
     const res = await admin.post(`/clients/${second}/update`).set('Referer', page).type('form')
-      .send({ _csrf: csrf, company_legal_name: 'Jest Second Buyer', billing_address: '2 Test Street', email: email.toUpperCase() });
+      .send({ _csrf: csrf, company_legal_name: 'Jest Second Buyer', billing_address_line1: '2 Test Street', billing_city: 'Test City', billing_country: 'Test Country', email: email.toUpperCase() });
     jest.restoreAllMocks();
     expect((await flashAfter(res)).message).toBe('Another client already uses this email — each client needs its own (the client portal logs in by it). Nothing was saved.');
     expect((await db.queryOne('SELECT email FROM clients WHERE id = :id', { id: second })).email).not.toBe(email.toUpperCase());
@@ -164,7 +164,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     const clientId = await createTestClient();
     const page = `/clients/${clientId}/edit`;
     const fingerprint = fingerprintFrom((await admin.get(page)).text);
-    const base = { company_legal_name: 'Jest Buyer Ltd', billing_address: '1 Test Street', edit_fingerprint: fingerprint };
+    const base = { company_legal_name: 'Jest Buyer Ltd', billing_address_line1: '1 Test Street', billing_city: 'Test City', billing_country: 'Test Country', edit_fingerprint: fingerprint };
 
     expect((await flashAfter(await post(`/clients/${clientId}/update`, { ...base, contact_person: 'Person A' }, page))).type).not.toBe('error');
     expect((await flashAfter(await post(`/clients/${clientId}/update`, { ...base, contact_person: 'Person B' }, page))).message).toContain('was changed by');
