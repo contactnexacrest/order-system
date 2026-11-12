@@ -163,7 +163,9 @@ final class DocxComponents
         $table->addRow(null, ['cantSplit' => true]);
         $cell = $table->addCell(5000, ['bgColor' => $bg, 'valign' => 'center']);
         $cell->addText($text, ['bold' => true, 'size' => 11, 'color' => self::WHITE], self::KEEP_NEXT);
-        $section->addTextBreak(1, 4, self::KEEP_NEXT);
+        // D-356: an empty run, not addTextBreak() — PHPWord writes a second, empty <w:pPr> for a
+        // text break with a paragraph style, which Word may report as a damaged file.
+        $section->addText('', ['size' => 4], self::KEEP_NEXT);
     }
 
     // ------------------------------------------------------------------

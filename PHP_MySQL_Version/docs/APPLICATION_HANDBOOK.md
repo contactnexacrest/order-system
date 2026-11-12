@@ -4249,6 +4249,8 @@ unchanged). Only where a page breaks can change (the PI's Payment Terms now star
 page when the box would not fit below the heading); page counts are unchanged. Documents already
 issued are not touched.
 
+**Word files: clean spacer under section headings (D-356, 12 Nov 2026, owner confirm 1 + confirm 2).** The small spacer under each section heading in the PHP Word files is written as an empty, keep-with-next paragraph (`DocxComponents::addSectionTitle()`), not as a text break with a paragraph style. PHPWord wrote that text break with a second, empty paragraph-property block (about 9-11 per document since D-354), which Microsoft Word can report as a damaged file and offer to repair. Wording, layout, page counts and keep-with-next are unchanged; PDFs and the Node Word files were never affected.
+
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 
 **Quality documents card.** Per category, up to 10 documents. On the order page: Pending → Received → Approved, file required for Received/Approved. Internal; never shown to the client.
