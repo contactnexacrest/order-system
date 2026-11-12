@@ -187,11 +187,28 @@
     }
   }
 
+  // D-350: older browsers have no event.submitter; the submit button that
+  // was last clicked is remembered (see init()) so its choice is still kept.
+  var lastSubmitButton = null;
+  function submitterOf(e, form) {
+    if (e.submitter) return e.submitter;
+    return lastSubmitButton && lastSubmitButton.form === form ? lastSubmitButton : null;
+  }
+
+  // D-351: the question may also be written on the pressed submit button
+  // (a plain one, a formaction one, or one outside its form via form="…").
+  // The button's question wins over the form's own, so nobody is asked
+  // twice. Cancel stops the submit here (capture phase), so the "Working…"
+  // listener below never disables a button; OK lets the normal submit go
+  // ahead with the pressed button's name/value and formaction.
   function initConfirmDialogs() {
     document.addEventListener('submit', function (e) {
       var form = e.target;
       if (!(form instanceof HTMLFormElement)) return;
-      var message = form.dataset.confirm;
+      var submitter = submitterOf(e, form);
+      var message = submitter && submitter.hasAttribute('data-confirm')
+        ? submitter.getAttribute('data-confirm')
+        : form.dataset.confirm;
       if (message === undefined) return;
       if (!window.confirm(message)) {
         e.preventDefault();
@@ -2206,7 +2223,6 @@
 
     // D-350: older browsers have no event.submitter; remember the submit
     // button that was last clicked so its choice is still kept.
-    var lastSubmitButton = null;
     document.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button, input[type="submit"]') : null;
       if (btn && btn.form && (btn.type === 'submit')) lastSubmitButton = btn;
@@ -2225,7 +2241,7 @@
       if (!(form instanceof HTMLFormElement)) return;
       var method = (form.getAttribute('method') || 'get').toLowerCase();
       if (method !== 'post') return;
-      markSubmitting(form, e.submitter || (lastSubmitButton && lastSubmitButton.form === form ? lastSubmitButton : null));
+      markSubmitting(form, submitterOf(e, form));
       saveFormDraft(form);
     });
 

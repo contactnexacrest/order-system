@@ -665,7 +665,7 @@ A new associate does not get the whole portal at once. The MD decides how much e
 
 **Changing an associate's level (MD only)** — open the associate, go to **Portal access**, choose the level (or Custom and the ticks), give the reason (at least 10 characters) and save. The history under the card shows who changed what, when and why. Other staff see the card greyed out.
 
-**Changing what a level shows (MD only)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back. "Show FOB order value" is off for Starter by default.
+**Changing what a level shows (MD only)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back (the browser asks "Put the recommended defaults back for all three levels?" first; Cancel changes nothing). "Show FOB order value" is off for Starter by default.
 
 **When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) "Ready for the Quoting level?" shows on the associate page and on the dashboard of everyone with **Manage associates** (D-263). Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
 

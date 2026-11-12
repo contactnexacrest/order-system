@@ -441,7 +441,9 @@ today's settings, exactly as before. A new order therefore prints exactly as it 
 
 **A real change (for example a new bank account).** The Managing Director can open the
 order, Step 1, and use **Refresh company details on this order** in the box "Kept with this
-order since the PI was approved". A reason of at least 10 characters is required. Only the
+order since the PI was approved". A reason of at least 10 characters is required, and the
+browser asks "Use today's company details (bank, LUT, IEC, address) on this order's next
+documents?" first — Cancel changes nothing. Only the
 company details are replaced with today's (bank, LUT, IEC, address and the rest); the
 clauses, tolerance and validity days stay as kept. The change is written to the audit log
 with the old and new values and the reason. Documents already issued are not changed; the
