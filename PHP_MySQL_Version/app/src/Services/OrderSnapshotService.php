@@ -138,7 +138,9 @@ final class OrderSnapshotService
             $flag = $p->fetchColumn();
             $requiresMd = $flag === false ? null : (int) $flag;
         }
-        $fx = PricingRepository::settings()['pricing_fx_rate'] ?? null;
+        // D-340 follow-up (owner, 12 Nov 2026): the rate prices were actually built with — the automatic
+        // pricing rate when Automatic is on (market × (1 − cushion)), else the manual rate — not the raw setting.
+        $fx = \App\Services\FxRateService::rate();
         $tolerance = $company['quantity_shortfall_tolerance_pct'] ?? null;
 
         $pdo->prepare(

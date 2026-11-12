@@ -114,7 +114,9 @@ async function freeze(orderId) {
     const p = await db.queryOne('SELECT requires_md_approval FROM payment_presets WHERE id = :id', { id: row.payment_preset_id });
     requiresMd = p ? Number(p.requires_md_approval) : null;
   }
-  const fx = (await pricingRepository.settings()).pricing_fx_rate;
+  // D-340 follow-up (owner, 12 Nov 2026): the rate prices were actually built with — the automatic
+  // pricing rate when Automatic is on (market × (1 − cushion)), else the manual rate — not the raw setting.
+  const fx = await require('./fxRateService').rate(await pricingRepository.settings());
   const tolerance = company.quantity_shortfall_tolerance_pct;
   await db.execute(
     `UPDATE orders SET frozen_at = NOW(), frozen_snapshot_json = :j, quantity_tolerance_pct = :t,
