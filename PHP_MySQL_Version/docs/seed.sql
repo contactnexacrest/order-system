@@ -161,7 +161,7 @@ WHERE p.permission_key = 'view_own_incentives'
 -- cut-off day are gone; the amount is a % of profit or a fixed amount (Pricing settings), the
 -- roles are an editable list (incentive_roles), and the MD is reminded N days before a payout run.
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
-  ('program_enabled', '0'),
+  ('program_enabled', '1'),
   ('lock_reminder_days', '3');
 
 -- ================================================================
@@ -1541,7 +1541,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- manage_orders, and the auto-confirm window stays 48 hours.
 -- ================================================================
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive, requires_super_admin) VALUES
-  ('email_testing_mode', '0', 'boolean', 'mail', 'On = e-mails to buyers and suppliers are held; staff and associate e-mails and every MUST e-mail still go out. Set on Settings › E-mail.', 0, 0),
+  ('email_testing_mode', '1', 'boolean', 'mail', 'On = e-mails to buyers and suppliers are held; staff and associate e-mails and every MUST e-mail still go out. Set on Settings › E-mail.', 0, 0),
   ('reply_to_email', '', 'email', 'mail', 'Where buyers'' replies go — a sales mailbox someone reads. Leave empty to use the company e-mail address.', 0, 0),
   ('mail_approval_queue_enabled', '1', 'boolean', 'mail', 'On (default) = every document e-mail to a buyer is approved by a second person before it goes out. Off = one staff member who can generate documents sends it directly.', 0, 0),
   ('oc_ack_override_restricted', '0', 'boolean', 'orders', 'Off (default) = anyone who manages orders can record the buyer''s acknowledgement of the Order Confirmation by hand. On = only roles given the "Override buyer acknowledgement" permission.', 0, 0),
@@ -2245,8 +2245,8 @@ SELECT 'price_discount', r.id FROM roles r WHERE r.name IN ('Managing Director',
 -- Admin → Pricing), the three pricing permissions, and the starting commission
 -- levels and ladder. Example values; the MD sets the real ones before go-live.
 INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
-  ('margin_pct', '20.00'),          -- minimum price = cost ÷ (1 − margin %): margin on the selling price, not markup
-  ('other_cost_pct', '2.50'),       -- other costs to FOB, % of the supplier price
+  ('margin_pct', '15.00'),          -- minimum price = cost ÷ (1 − margin %): margin on the selling price, not markup
+  ('other_cost_pct', '5.50'),       -- other costs to FOB, % of the supplier price
   ('pricing_fx_rate', '82.0000'),   -- ₹ per USD used to turn supplier prices into USD
   ('buffer_pct', '3.00'),           -- quote price = floor × (1 + buffer %)
   ('incentive_mode', 'pct'),        -- team-incentive reserve: % of (minimum price − cost), or USD per unit
@@ -2359,6 +2359,7 @@ JOIN (SELECT 'Grade / quality' AS sn, 'Premium' AS n, 1 AS b, 'none' AS t, NULL 
       SELECT 'Size / format', 'Cut-to-size', 0, 'pct', 12, NULL, 6 UNION ALL
       SELECT 'Size / format', 'Block: gangsaw size', 0, 'none', NULL, NULL, 7 UNION ALL
       SELECT 'Size / format', 'Block: cutter size', 0, 'pct', -12, NULL, 8 UNION ALL
+      SELECT 'Size / format', 'Monument (cut to size)', 0, 'none', NULL, NULL, 9 UNION ALL
       SELECT 'Edge work', 'None', 1, 'none', NULL, NULL, 1 UNION ALL
       SELECT 'Edge work', 'Chamfer', 0, 'usd_rm', 1.5, NULL, 2 UNION ALL
       SELECT 'Edge work', 'Bullnose', 0, 'usd_rm', 4, NULL, 3 UNION ALL
