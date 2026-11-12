@@ -45,7 +45,7 @@
 {% include '_line_table.njk' %}
 {% else %}
 <table class="products">
-  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
+  <tr class="col-head"><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
   {% for p in products %}
   {% set lineColor = '#1D6FA8' if loop.index % 2 == 1 else '#2D7D56' %}
   <tr>
@@ -97,7 +97,7 @@
 <div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and is the value declared on the Indian Shipping Bill — shown separately below regardless of Incoterm.{% if not order.is_fob %} {% if order.is_cif %}Freight &amp; Insurance is{% else %}Freight is{% endif %} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.{% else %} Freight &amp; Insurance is not applicable — buyer arranges, FOB.{% endif %}</div>
 
 <table class="kv" style="table-layout:fixed;">
-  <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION A — INVOICE VALUE</td></tr>
+  <tr class="col-head"><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION A — INVOICE VALUE</td></tr>
   <tr>
     <td class="k" style="width:34%;">FOB Value (goods)</td>
     <td class="v" style="width:26%; text-align:right;">{{ order.currency_code }} {{ financial.fob_value }}</td>
@@ -115,7 +115,7 @@
     <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ financial.total_commercial_invoice_value }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}= FOB Value (no freight/insurance on an FOB order){% else %}= FOB Value + Freight{% if order.is_cif %} &amp; Insurance{% endif %}{% endif %} &middot; Currency: {{ order.currency_code }}</td>
   </tr>
-  <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION B — PAYMENT SETTLEMENT</td></tr>
+  <tr class="col-head"><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION B — PAYMENT SETTLEMENT</td></tr>
   <tr>
     <td class="k">&#8730;&nbsp; Advance — {{ 'RECEIVED' if payment_status.advance_cleared_at else 'PENDING' }}</td>
     <td class="v" style="text-align:right;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }}</td>

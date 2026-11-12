@@ -30,7 +30,7 @@
     <th{% if t.span > 1 %} colspan="{{ t.span }}"{% endif %} style="width:{{ t.width }}%;">{{ t.text }}</th>
     {% endfor %}
   </tr>
-  <tr><th style="border-top-color:#173B73;"></th>{% for b in lt.heads.bottom %}<th>{{ b }}</th>{% endfor %}</tr>
+  <tr class="col-head"><th style="border-top-color:#173B73;"></th>{% for b in lt.heads.bottom %}<th>{{ b }}</th>{% endfor %}</tr>
   </thead>
   <tbody>
   {% for r in lt.rows %}
@@ -102,7 +102,7 @@
 {% if lt.simple | length and not lt.with_prices %}
 {# Packing List: the other goods and charges, without prices. #}
 <table class="products">
-  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th></tr>
+  <tr class="col-head"><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th></tr>
   {% for p in lt.simple %}
   {% set lineColor = '#1D6FA8' if p.no % 2 == 1 else '#2D7D56' %}
   <tr>
@@ -115,7 +115,7 @@
 </table>
 {% elseif lt.simple | length %}
 <table class="products">
-  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
+  <tr class="col-head"><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
   {% for p in lt.simple %}
   {% set lineColor = '#1D6FA8' if p.no % 2 == 1 else '#2D7D56' %}
   <tr>

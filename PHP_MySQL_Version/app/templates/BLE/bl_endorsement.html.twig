@@ -41,6 +41,12 @@
   .signatory-block .for-company { font-size: 9pt; color: #444444; margin-bottom: 4pt; }
   .signatory-block .line { border-top: 1pt solid #999999; margin-top: 6pt; padding-top: 3pt; font-size: 8.5pt; color: #666666; }
 
+  /* Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     table's column-header row, never sits alone at the foot of a page (see _layout). */
+  .section-title, .sub-title { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  tr.col-head, thead tr { page-break-after: avoid; break-after: avoid; }
 </style>
 </head>
 <body>

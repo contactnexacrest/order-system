@@ -52,6 +52,12 @@
   ul.flags { margin: 4pt 0 0 14pt; padding: 0; font-size: 8.5pt; }
   ul.flags li { margin-bottom: 2pt; }
   .footer-note { margin-top: 14pt; font-size: 8pt; font-style: italic; color: #555555; border-top: 1pt solid #999999; padding-top: 6pt; }
+  /* Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     table's column-header row, never sits alone at the foot of a page (see _layout). */
+  .section-title, .sub-title { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  tr.col-head, thead tr { page-break-after: avoid; break-after: avoid; }
 </style>
 </head>
 <body>
@@ -85,7 +91,7 @@
   <div class="empty-note">No products on this order.</div>
 {% else %}
 <table class="data">
-  <tr><th>Description</th><th>HS Code</th><th class="num">Quantity</th><th class="num">Unit Price</th><th class="num">Amount ({{ snapshot.currency }})</th></tr>
+  <tr class="col-head"><th>Description</th><th>HS Code</th><th class="num">Quantity</th><th class="num">Unit Price</th><th class="num">Amount ({{ snapshot.currency }})</th></tr>
   {% for p in snapshot.products %}
   <tr><td>{{ p.description }}</td><td>{{ p.hs_code }}</td><td class="num">{{ p.quantity }}</td><td class="num">{{ p.unit_price }}</td><td class="num">{{ p.amount }}</td></tr>
   {% endfor %}
@@ -97,7 +103,7 @@
   <div class="empty-note">No payment received from the buyer yet.</div>
 {% else %}
 <table class="data">
-  <tr><th>Leg</th><th class="num">Amount ({{ snapshot.currency }})</th><th class="num">Rate (&#8377;)</th><th class="num">INR</th><th>Received</th><th>Cleared</th><th>Basis</th></tr>
+  <tr class="col-head"><th>Leg</th><th class="num">Amount ({{ snapshot.currency }})</th><th class="num">Rate (&#8377;)</th><th class="num">INR</th><th>Received</th><th>Cleared</th><th>Basis</th></tr>
   {% for r in snapshot.receipts %}
   <tr><td>{{ r.leg }}</td><td class="num">{{ r.amount_display or r.amount }}</td><td class="num">{{ r.rate }}</td><td class="num">{{ r.inr_display or r.inr }}</td><td>{{ r.received }}</td><td>{{ r.cleared }}</td><td>{{ r.basis }}</td></tr>
   {% endfor %}
@@ -119,7 +125,7 @@
   <div class="empty-note">No supplier bills or payments recorded yet.</div>
 {% else %}
 <table class="data">
-  <tr><th>Leg</th><th>Bill / Invoice</th><th class="num">Taxable &#8377;</th><th class="num">GST &#8377;</th><th class="num">Bill Total &#8377;</th><th>Paid</th><th>Mode · UTR</th></tr>
+  <tr class="col-head"><th>Leg</th><th>Bill / Invoice</th><th class="num">Taxable &#8377;</th><th class="num">GST &#8377;</th><th class="num">Bill Total &#8377;</th><th>Paid</th><th>Mode · UTR</th></tr>
   {% for b in snapshot.supplier.bills %}
   <tr><td>{{ b.leg }}</td><td>{{ b.bill }}</td><td class="num">{{ b.taxable }}</td><td class="num">{{ b.gst }}</td><td class="num">{{ b.total }}</td><td{% if b.unpaid %} class="warn"{% endif %}>{{ b.paid }}</td><td>{{ b.utr }}</td></tr>
   {% endfor %}
@@ -131,7 +137,7 @@
 <div class="section-title">C. EXPENSES — EVERY COST OF THIS ORDER</div>
 <div class="sub-title">C1. Freight &amp; insurance</div>
 <table class="data">
-  <tr><th>Item</th><th>Source</th><th class="num">Amount (INR)</th></tr>
+  <tr class="col-head"><th>Item</th><th>Source</th><th class="num">Amount (INR)</th></tr>
   {% for r in snapshot.freight_rows %}
   <tr><td>{{ r[0] }}</td><td>{{ r[1] }}</td><td class="num">{{ r[2] }}</td></tr>
   {% endfor %}
@@ -142,7 +148,7 @@
   <div class="empty-note">No logistics partner bills recorded yet.</div>
 {% else %}
 <table class="data">
-  <tr><th>Partner</th><th>For</th><th>Bill / Invoice</th><th class="num">Bill Total &#8377;</th><th>Paid</th><th>Mode · UTR</th></tr>
+  <tr class="col-head"><th>Partner</th><th>For</th><th>Bill / Invoice</th><th class="num">Bill Total &#8377;</th><th>Paid</th><th>Mode · UTR</th></tr>
   {% for b in snapshot.logistics %}
   <tr><td>{{ b.partner }}</td><td>{{ b.for }}</td><td>{{ b.bill }}</td><td class="num">{{ b.total }}</td><td{% if b.unpaid %} class="warn"{% endif %}>{{ b.paid }}</td><td>{{ b.utr }}</td></tr>
   {% endfor %}
@@ -154,7 +160,7 @@
   <div class="empty-note">No other order costs recorded.</div>
 {% else %}
 <table class="data">
-  <tr><th>Category</th><th>Description</th><th class="num">Amount (INR)</th><th>Date</th><th>Recorded By</th></tr>
+  <tr class="col-head"><th>Category</th><th>Description</th><th class="num">Amount (INR)</th><th>Date</th><th>Recorded By</th></tr>
   {% for c in snapshot.costs %}
   <tr><td>{{ c.category }}{% if c.tag %} <span class="tag">{{ c.tag }}</span>{% endif %}</td><td>{{ c.description }}</td><td class="num">{{ c.amount }}</td><td>{{ c.date }}</td><td>{{ c.by }}</td></tr>
   {% endfor %}
@@ -166,7 +172,7 @@
   <div class="empty-note">No expenses recorded yet — while there are none, travel uses the provisional % in C3. Once real travel expenses are added, they replace it.</div>
 {% else %}
 <table class="data">
-  <tr><th>Date</th><th>Category</th><th>Details</th><th class="num">Amount (INR)</th><th>Paid By</th><th>Receipt</th></tr>
+  <tr class="col-head"><th>Date</th><th>Category</th><th>Details</th><th class="num">Amount (INR)</th><th>Paid By</th><th>Receipt</th></tr>
   {% for e in snapshot.expenses %}
   <tr><td>{{ e.date }}</td><td>{{ e.category }}</td><td>{{ e.details }}</td><td class="num">{{ e.amount }}</td><td>{{ e.paid_by }}</td><td>{{ e.receipt }}</td></tr>
   {% endfor %}
@@ -178,7 +184,7 @@
   <div class="empty-note">None linked to this order.</div>
 {% else %}
 <table class="data">
-  <tr><th>Category</th><th>Description</th><th>Vendor</th><th class="num">Amount</th><th>Date</th></tr>
+  <tr class="col-head"><th>Category</th><th>Description</th><th>Vendor</th><th class="num">Amount</th><th>Date</th></tr>
   {% for z in snapshot.zoho %}
   <tr><td>{{ z.category }}{% if z.tag %} <span class="tag">{{ z.tag }}</span>{% endif %}</td><td>{{ z.description }}</td><td>{{ z.vendor }}</td><td class="num">{{ z.amount }}</td><td>{{ z.date }}</td></tr>
   {% endfor %}
@@ -187,7 +193,7 @@
 {% endif %}
 <div class="sub-title">Expenses summary</div>
 <table class="data">
-  <tr><th>Group</th><th class="num">Amount (INR)</th></tr>
+  <tr class="col-head"><th>Group</th><th class="num">Amount (INR)</th></tr>
   {% for r in snapshot.summary %}
   <tr><td>{{ r[0] }}</td><td class="num">{{ r[1] }}</td></tr>
   {% endfor %}
@@ -199,7 +205,7 @@
   <div class="empty-note">No export benefit claims are linked to this order.</div>
 {% else %}
 <table class="data">
-  <tr><th>Scheme</th><th>Reference No.</th><th class="num">Claimed</th><th>Claimed Date</th><th class="num">Received</th><th>Received Date</th><th>Status</th></tr>
+  <tr class="col-head"><th>Scheme</th><th>Reference No.</th><th class="num">Claimed</th><th>Claimed Date</th><th class="num">Received</th><th>Received Date</th><th>Status</th></tr>
   {% for b in snapshot.benefits %}
   <tr><td>{{ b.scheme }}</td><td>{{ b.reference }}</td><td class="num">{{ b.claimed }}</td><td>{{ b.claimed_date }}</td><td class="num">{{ b.received }}</td><td>{{ b.received_date }}</td><td>{{ b.status }}</td></tr>
   {% endfor %}
@@ -224,7 +230,7 @@
 {% endif %}
 <div class="sub-title">Cash position so far (money actually in and out)</div>
 <table class="data">
-  <tr><th>Received from buyer</th><th>Benefits received</th><th>Paid to supplier</th><th>Paid to logistics</th><th>Expenses</th><th>Net so far</th></tr>
+  <tr class="col-head"><th>Received from buyer</th><th>Benefits received</th><th>Paid to supplier</th><th>Paid to logistics</th><th>Expenses</th><th>Net so far</th></tr>
   <tr>{% for v in snapshot.cash %}<td class="num">{% if loop.last %}<b>{{ v }}</b>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
 </table>
 

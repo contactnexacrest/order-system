@@ -207,6 +207,21 @@
   .legal-terms-box p.clause, .definitions-box p.clause { margin: 0 0 4pt; color: #000000; }
   .legal-terms-box p.clause .clause-title, .definitions-box p.clause .clause-title { font-weight: bold; color: #17233A; }
 
+  /* Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     table's column-header row, is never left alone at the foot of a page — it moves to the
+     next page together with its first rows. Works the same in Dompdf (PHP) and Chromium (Node):
+     both honour page-break-after/break-after: avoid on a block heading and on a table row, so
+     a heading keeps with the table that follows, and a header row (tr.col-head, or any row of
+     a thead) keeps with the first body row. .section-title and .section-title-highlight above
+     already carry the rule (R5-12). Nothing else on the page changes. */
+  .weight-caption, .annexure-product-title,
+  .legal-terms-box .box-header, .legal-terms-box .box-intro,
+  .definitions-box .box-header, .definitions-box .box-intro,
+  .annexure-terms h3, .annexure-terms h4 { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  tr.col-head, thead tr { page-break-after: avoid; break-after: avoid; }
+
   {% if watermark.enabled and watermark.show_text %}
   .watermark-text { position: fixed; top: 300px; left: 40px; font-size: {{ watermark.font_size }}px; color: {{ watermark.color }};
     opacity: {{ watermark.opacity }}; transform: rotate(-{{ watermark.angle }}deg); z-index: 0; }

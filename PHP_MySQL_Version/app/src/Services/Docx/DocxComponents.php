@@ -59,6 +59,17 @@ final class DocxComponents
 
     public const FONT = 'Carlito';
 
+    /**
+     * Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     * table's column-header row, is never left alone at the foot of a page — Word moves it to
+     * the next page together with its first rows. KEEP_NEXT ("keep with next") goes on every
+     * heading paragraph and on every paragraph of a column-header row (a paragraph in a table
+     * row with keep-with-next keeps that row with the next one); HEADER_ROW marks the header
+     * row "repeat as header row" and "do not split". Node twin: docxComponents.js.
+     */
+    public const KEEP_NEXT = ['keepNext' => true];
+    public const HEADER_ROW = ['tblHeader' => true, 'cantSplit' => true];
+
     /** @var string[] temp files created by decodeDataUriToTempFile(), cleaned up after each document render */
     private static array $tempFiles = [];
 
@@ -149,10 +160,10 @@ final class DocxComponents
     public static function addSectionTitle(Section $section, string $text, string $bg = self::NAVY): void
     {
         $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
+        $table->addRow(null, ['cantSplit' => true]);
         $cell = $table->addCell(5000, ['bgColor' => $bg, 'valign' => 'center']);
-        $cell->addText($text, ['bold' => true, 'size' => 11, 'color' => self::WHITE]);
-        $section->addTextBreak(1, 4);
+        $cell->addText($text, ['bold' => true, 'size' => 11, 'color' => self::WHITE], self::KEEP_NEXT);
+        $section->addTextBreak(1, 4, self::KEEP_NEXT);
     }
 
     // ------------------------------------------------------------------
@@ -247,13 +258,13 @@ final class DocxComponents
         $colCount = count($headers);
 
         $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
+        $table->addRow(null, self::HEADER_ROW);
         foreach ($headers as $i => $h) {
             $cell = $table->addCell($widths[$i] ?? intdiv(5000, $colCount), [
                 'bgColor' => self::NAVY_MID,
                 'valign' => 'center',
             ]);
-            $cell->addText($h, ['bold' => true, 'size' => 9, 'color' => self::WHITE]);
+            $cell->addText($h, ['bold' => true, 'size' => 9, 'color' => self::WHITE], self::KEEP_NEXT);
         }
 
         foreach ($rows as $row) {
@@ -302,7 +313,7 @@ final class DocxComponents
             $widths = array_map(static fn ($p) => (int) round($p * 50), $lt['heads']['widths']);
             $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000, 'layout' => \PhpOffice\PhpWord\Style\Table::LAYOUT_FIXED]);
             $head = static function ($cell, string $text): void {
-                $cell->addText($text, ['bold' => true, 'size' => 8, 'color' => self::WHITE], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+                $cell->addText($text, ['bold' => true, 'size' => 8, 'color' => self::WHITE], ['alignment' => Jc::CENTER, 'spaceAfter' => 0] + self::KEEP_NEXT);
             };
             $hStyle = ['bgColor' => self::NAVY_MID, 'valign' => 'center', 'borderSize' => 4, 'borderColor' => 'C9D1E3'];
             // Header row 1: "#" spans both rows; "Dimensions (cm)" spans L W H.
@@ -471,10 +482,10 @@ final class DocxComponents
     {
         $widths = array_map(static fn($p) => (int) round($p * 50), $widthsPct);
         $table = $section->addTable(['unit' => TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
+        $table->addRow(null, self::HEADER_ROW);
         foreach ($headers as $i => $h) {
             $cell = $table->addCell($widths[$i] ?? null, ['bgColor' => self::NAVY, 'valign' => 'center']);
-            $cell->addText($h, ['bold' => true, 'size' => 9, 'color' => self::WHITE]);
+            $cell->addText($h, ['bold' => true, 'size' => 9, 'color' => self::WHITE], self::KEEP_NEXT);
         }
         foreach ($rows as $row) {
             $table->addRow();
@@ -509,9 +520,9 @@ final class DocxComponents
         }
     }
 
-    public static function addPlainParagraph(Section $section, string $text, array $style = []): void
+    public static function addPlainParagraph(Section $section, string $text, array $style = [], array $pStyle = []): void
     {
-        $section->addText($text, array_merge(['size' => 9.5], $style), ['spaceAfter' => 60]);
+        $section->addText($text, array_merge(['size' => 9.5], $style), ['spaceAfter' => 60] + $pStyle);
     }
 
     // ------------------------------------------------------------------
@@ -543,7 +554,7 @@ final class DocxComponents
             $text .= ', Buyer Inquiry Ref ' . $order['buyer_inquiry_ref'];
         }
         $text .= '.';
-        $section->addText($text, ['bold' => true, 'size' => 8.5, 'color' => self::NAVY], ['spaceAfter' => 80]);
+        $section->addText($text, ['bold' => true, 'size' => 8.5, 'color' => self::NAVY], ['spaceAfter' => 80] + self::KEEP_NEXT);
     }
 
     public static function addSignatureBlock(Section $section, array $context): void
@@ -649,8 +660,8 @@ final class DocxComponents
                 continue;
             }
             self::addColorBox($section, $bg, $border, function (AbstractContainer $cell) use ($clauses, $header, $intro): void {
-                $cell->addText($header, ['bold' => true, 'size' => 10, 'color' => self::NAVY]);
-                $cell->addText($intro, ['italic' => true, 'size' => 8.5, 'color' => self::MUTED]);
+                $cell->addText($header, ['bold' => true, 'size' => 10, 'color' => self::NAVY], self::KEEP_NEXT);
+                $cell->addText($intro, ['italic' => true, 'size' => 8.5, 'color' => self::MUTED], self::KEEP_NEXT);
                 foreach ($clauses as $clause) {
                     $run = $cell->addTextRun(['spaceAfter' => 60]);
                     $run->addText("\u{2022} ", ['size' => 9]);

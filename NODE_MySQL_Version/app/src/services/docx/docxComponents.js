@@ -180,9 +180,20 @@ function plain(text, style = {}, pStyle = {}) {
 }
 
 /** Vertical breathing room between blocks — PHPWord's addTextBreak(1, N). */
-function spacer(afterTwips = 120) {
-  return new Paragraph({ text: '', spacing: { after: afterTwips } });
+function spacer(afterTwips = 120, pStyle = {}) {
+  return new Paragraph(Object.assign({ text: '', spacing: { after: afterTwips } }, pStyle));
 }
+
+/**
+ * Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+ * table's column-header row, is never left alone at the foot of a page — Word moves it to the
+ * next page together with its first rows. KEEP_NEXT ("keep with next") goes on every heading
+ * paragraph and on every paragraph of a column-header row (a paragraph in a table row with
+ * keep-with-next keeps that row with the next one); HEADER_ROW marks the header row "repeat
+ * as header row" and "do not split". PHP twin: DocxComponents::KEEP_NEXT / HEADER_ROW.
+ */
+const KEEP_NEXT = { keepNext: true };
+const HEADER_ROW = { tableHeader: true, cantSplit: true };
 
 function cell(children, opts = {}) {
   const paras = Array.isArray(children) ? children : [children];
@@ -393,9 +404,9 @@ function sectionTitle(text, bg = NAVY) {
   const table = new Table({
     width: FULL_WIDTH,
     margins: TABLE_MARGINS,
-    rows: [new TableRow({ children: [cell(plain(text, { bold: true, size: 22, color: WHITE }), { width: pctWidth(100), shading: shade(bg), verticalAlign: VerticalAlign.CENTER })] })],
+    rows: [new TableRow({ cantSplit: true, children: [cell(plain(text, { bold: true, size: 22, color: WHITE }, KEEP_NEXT), { width: pctWidth(100), shading: shade(bg), verticalAlign: VerticalAlign.CENTER })] })],
   });
-  return [table, spacer(80)];
+  return [table, spacer(80, KEEP_NEXT)];
 }
 
 // --------------------------------------------------------------------
@@ -459,8 +470,9 @@ function kvTable(rows, solidLabel = false, labelWidthPct = 30) {
 
 function productsTable(headers, widthsPct, rows) {
   const headerRow = new TableRow({
+    ...HEADER_ROW,
     children: headers.map((h, i) =>
-      cell(plain(h, { bold: true, size: 18, color: WHITE }), { width: pctWidth(widthsPct[i]), shading: shade(NAVY_MID), verticalAlign: VerticalAlign.CENTER })
+      cell(plain(h, { bold: true, size: 18, color: WHITE }, KEEP_NEXT), { width: pctWidth(widthsPct[i]), shading: shade(NAVY_MID), verticalAlign: VerticalAlign.CENTER })
     ),
   });
 
@@ -514,7 +526,7 @@ function lineTable(lt, simpleHeaders = [], simpleWidths = [], simpleRows = []) {
     const cols = widths.length;
     const twips = widths.map((w) => Math.round(CONTENT_WIDTH_TWIPS * w / 100));
     const hBorders = thinBorders('C9D1E3');
-    const head = (text, w, extra = {}) => cell(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(text, { bold: true, size: 16, color: WHITE })] }),
+    const head = (text, w, extra = {}) => cell(new Paragraph({ alignment: AlignmentType.CENTER, keepNext: true, children: [run(text, { bold: true, size: 16, color: WHITE })] }),
       Object.assign({ width: pctWidth(w), shading: shade(NAVY_MID), verticalAlign: VerticalAlign.CENTER, borders: hBorders }, extra));
     const top = [head('#', widths[0], { rowSpan: 2 })];
     lt.heads.top.forEach((t) => top.push(head(t.text, t.width, t.span > 1 ? { columnSpan: t.span } : {})));
@@ -625,7 +637,8 @@ function totalsTable(rows, labelWidthPct = 55) {
 
 function checklistTable(headers, widthsPct, rows) {
   const headerRow = new TableRow({
-    children: headers.map((h, i) => cell(plain(h, { bold: true, size: 18, color: WHITE }), { width: pctWidth(widthsPct[i]), shading: shade(NAVY), verticalAlign: VerticalAlign.CENTER })),
+    ...HEADER_ROW,
+    children: headers.map((h, i) => cell(plain(h, { bold: true, size: 18, color: WHITE }, KEEP_NEXT), { width: pctWidth(widthsPct[i]), shading: shade(NAVY), verticalAlign: VerticalAlign.CENTER })),
   });
   const bodyRows = rows.map(
     (row) =>
@@ -650,7 +663,8 @@ function stepBadge(label) {
 
 function threeColFinanceTable(headerText, rows, headerBg) {
   const headerRow = new TableRow({
-    children: [cell(plain(headerText, { bold: true, color: WHITE }), { width: pctWidth(100), columnSpan: 3, shading: shade(headerBg) })],
+    ...HEADER_ROW,
+    children: [cell(plain(headerText, { bold: true, color: WHITE }, KEEP_NEXT), { width: pctWidth(100), columnSpan: 3, shading: shade(headerBg) })],
   });
   const bodyRows = rows.map(([label, value, remark, highlight]) => {
     const bg = highlight ? AMBER_BG : WHITE;
@@ -735,7 +749,7 @@ function signatureDocRefLine(context) {
   if (meta.generated_date) text += `, dated ${meta.generated_date}`;
   if (order.buyer_inquiry_ref) text += `, Buyer Inquiry Ref ${order.buyer_inquiry_ref}`;
   text += '.';
-  return plain(text, { bold: true, size: 17, color: NAVY }, { spacing: { after: 80 } });
+  return plain(text, { bold: true, size: 17, color: NAVY }, { spacing: { after: 80 }, ...KEEP_NEXT });
 }
 
 function signatureBlock(context) {
@@ -821,8 +835,8 @@ function legalTermsSection(context) {
   for (const [clauses, bg, border, head, intro] of boxes) {
     if (!clauses.length) continue;
     const paras = [
-      plain(head, { bold: true, size: 20, color: NAVY }),
-      plain(intro, { italics: true, size: 17, color: MUTED }),
+      plain(head, { bold: true, size: 20, color: NAVY }, KEEP_NEXT),
+      plain(intro, { italics: true, size: 17, color: MUTED }, KEEP_NEXT),
       ...clauses.map((clause) => rich([
         ['\u2022 ', { size: 18 }],
         [`${clause.title || ''}:`, { bold: true, size: 18, color: NAVY }],
@@ -910,6 +924,8 @@ function watermarkHeader(watermark) {
 }
 
 module.exports = {
+  KEEP_NEXT,
+  HEADER_ROW,
   // colors
   NAVY,
   NAVY_MID,

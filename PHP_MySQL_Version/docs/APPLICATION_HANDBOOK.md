@@ -4212,6 +4212,25 @@ layout are otherwise unchanged, and page counts stay the same (a row or a sectio
 move to the previous page because a label no longer wraps). The input forms in the app keep
 their "*" for required fields.
 
+**Headings keep with what follows (D-354, 12 Nov 2026, owner confirm 1 + confirm 2).** In every
+generated document, PDF and Word, both stacks, a section heading or a table's column-header row
+is never left alone at the foot of a page: it moves to the next page together with its first
+rows. PDF (Dompdf on PHP, Chromium on Node, the same CSS in `_layout.html.twig` / `_layout.njk`
+and in the standalone MTT, IMP, DOM, CAFIN and BLE templates): headings (`.section-title`,
+`.section-title-highlight`, `.weight-caption`, `.sub-title`, `.annexure-product-title`, the
+Legal Terms / Definitions box header and intro line, Additional Terms h3/h4) carry
+`page-break-after: avoid; break-after: avoid`; every column-header row is marked
+`tr.col-head` (or sits in a `thead`) and carries the same rule, so it stays with the first body
+row; `thead` repeats; table rows are not split. Both engines honour these. Word
+(`DocxComponents.php` / `docxComponents.js` and the builders): section headings, the
+signature reference line, the Weight & Volume caption, the Legal Terms / Definitions box header
+and intro, and every column-header row carry "keep with next" (`keepNext`); header rows are also
+"repeat as header row" and "do not split" (`tblHeader`, `cantSplit`). Wording, amounts, fonts
+and sizes are unchanged; only where a page breaks can change (for example the Freight Debit
+Note now starts page 2 with "4. FREIGHT & CHARGES"; one Supplier PO grew from 2 to 3 pages).
+Headings inside the WYSIWYG Additional Terms text are not marked keep-with-next in Word
+(PhpWord's HTML import offers no hook; Node matches).
+
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 
 **Quality documents card.** Per category, up to 10 documents. On the order page: Pending → Received → Approved, file required for Received/Approved. Internal; never shown to the client.

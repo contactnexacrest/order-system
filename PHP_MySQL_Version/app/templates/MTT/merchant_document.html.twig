@@ -30,6 +30,12 @@
   .words { margin-top: 4pt; font-style: italic; }
   .box { border: 1px solid #D7DEE6; padding: 4pt 6pt; margin-top: 6pt; }
   .sign { margin-top: 18pt; text-align: right; }
+  /* Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     table's column-header row, never sits alone at the foot of a page (see _layout). */
+  .section-title, .sub-title { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  tr.col-head, thead tr { page-break-after: avoid; break-after: avoid; }
 </style>
 </head>
 <body>
@@ -81,7 +87,7 @@
 
 <div class="section-title">GOODS</div>
 <table class="items">
-  <tr><th>#</th><th>Description</th><th>HS code</th><th class="num">Qty</th><th>Unit</th><th class="num">Unit price ({{ currency }})</th><th class="num">Amount ({{ currency }})</th></tr>
+  <tr class="col-head"><th>#</th><th>Description</th><th>HS code</th><th class="num">Qty</th><th>Unit</th><th class="num">Unit price ({{ currency }})</th><th class="num">Amount ({{ currency }})</th></tr>
   {% for l in lines %}
   <tr><td>{{ l.no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td class="num">{{ l.quantity }}</td><td>{{ l.unit }}</td><td class="num">{{ l.unit_price }}</td><td class="num">{{ l.amount }}</td></tr>
   {% endfor %}

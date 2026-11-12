@@ -30,6 +30,12 @@
   .box { border: 1px solid #D7DEE6; padding: 4pt 6pt; margin-top: 6pt; }
   .sign { margin-top: 18pt; text-align: right; }
   .banner { background: #EAF3DE; color: #27500A; padding: 4pt 8pt; margin: 6pt 0; font-weight: bold; }
+  /* Owner decision D-354 (12 Nov 2026, owner confirm 1 + confirm 2): a section heading, or a
+     table's column-header row, never sits alone at the foot of a page (see _layout). */
+  .section-title, .sub-title { page-break-after: avoid; break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  tr.col-head, thead tr { page-break-after: avoid; break-after: avoid; }
 </style>
 </head>
 <body>
@@ -76,7 +82,7 @@
 
 <div class="section-title">GOODS</div>
 <table class="items">
-  <tr>
+  <tr class="col-head">
     <th>#</th><th>Description</th><th>HSN</th><th class="num">Qty</th><th>Unit</th>
     <th class="num">Rate (₹)</th><th class="num">Taxable (₹)</th><th class="num">GST</th>
     {% if intra_state %}<th class="num">CGST (₹)</th><th class="num">SGST (₹)</th>{% else %}<th class="num">IGST (₹)</th>{% endif %}
@@ -108,7 +114,7 @@
 {% if code == 'GTI' %}
 <div class="section-title">HSN SUMMARY</div>
 <table class="items">
-  <tr><th>HSN</th><th class="num">GST</th><th class="num">Taxable (₹)</th>{% if intra_state %}<th class="num">CGST (₹)</th><th class="num">SGST (₹)</th>{% else %}<th class="num">IGST (₹)</th>{% endif %}<th class="num">Total tax (₹)</th></tr>
+  <tr class="col-head"><th>HSN</th><th class="num">GST</th><th class="num">Taxable (₹)</th>{% if intra_state %}<th class="num">CGST (₹)</th><th class="num">SGST (₹)</th>{% else %}<th class="num">IGST (₹)</th>{% endif %}<th class="num">Total tax (₹)</th></tr>
   {% for h in hsn_summary %}
   <tr><td>{{ h.hsn_code }}</td><td class="num">{{ h.gst_rate }}</td><td class="num">{{ h.taxable }}</td>{% if intra_state %}<td class="num">{{ h.cgst }}</td><td class="num">{{ h.sgst }}</td>{% else %}<td class="num">{{ h.igst }}</td>{% endif %}<td class="num">{{ h.tax_total }}</td></tr>
   {% endfor %}

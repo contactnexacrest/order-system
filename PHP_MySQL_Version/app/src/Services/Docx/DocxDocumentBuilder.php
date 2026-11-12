@@ -361,7 +361,7 @@ final class DocxDocumentBuilder
 
     private static function weightTable(Section $section, array $order, array $context = []): void
     {
-        DocxComponents::addPlainParagraph($section, 'Weight & Volume (Estimated — actuals confirmed on Packing List after production)', ['bold' => true, 'size' => 10.5, 'color' => DocxComponents::NAVY]);
+        DocxComponents::addPlainParagraph($section, 'Weight & Volume (Estimated — actuals confirmed on Packing List after production)', ['bold' => true, 'size' => 10.5, 'color' => DocxComponents::NAVY], DocxComponents::KEEP_NEXT);
         $rows = [
             // D-343: a detailed order's QT / PI print the CBM worked out from the lines (as the PDF).
             ['Total CBM (m³)', (string) ($order['weight_total_cbm'] ?? self::g($order, 'estimated_total_cbm', 'To Be Confirmed')), 'm³'],
@@ -1025,9 +1025,9 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)');
         DocxComponents::addSignatureDocRefLine($section, $context);
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
-        $table->addCell(2500, ['bgColor' => DocxComponents::NAVY_MID])->addText('Prepared & Issued by NexaCrest', ['bold' => true, 'color' => DocxComponents::WHITE]);
-        $table->addCell(2500, ['bgColor' => DocxComponents::NAVY_MID])->addText('Accepted by Buyer  •  Fill, Sign & Return', ['bold' => true, 'color' => DocxComponents::WHITE]);
+        $table->addRow(null, DocxComponents::HEADER_ROW);
+        $table->addCell(2500, ['bgColor' => DocxComponents::NAVY_MID])->addText('Prepared & Issued by NexaCrest', ['bold' => true, 'color' => DocxComponents::WHITE], DocxComponents::KEEP_NEXT);
+        $table->addCell(2500, ['bgColor' => DocxComponents::NAVY_MID])->addText('Accepted by Buyer  •  Fill, Sign & Return', ['bold' => true, 'color' => DocxComponents::WHITE], DocxComponents::KEEP_NEXT);
         $table->addRow();
         $leftCell = $table->addCell(2500, ['valign' => 'top', 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
         $leftCell->addText((string) self::g($signatory, 'name', ''), ['bold' => true, 'color' => DocxComponents::NAVY], ['spaceBefore' => 160]);
@@ -1175,9 +1175,9 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '7. SUPPLIER ACCEPTANCE', $green);
         DocxComponents::addSignatureDocRefLine($section, $context);
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
-        $table->addCell(2500, ['bgColor' => $green])->addText('Issued by NexaCrest International Private Limited', ['bold' => true, 'color' => DocxComponents::WHITE]);
-        $table->addCell(2500, ['bgColor' => $green])->addText('Accepted by Supplier  •  Sign, Stamp & Return', ['bold' => true, 'color' => DocxComponents::WHITE]);
+        $table->addRow(null, DocxComponents::HEADER_ROW);
+        $table->addCell(2500, ['bgColor' => $green])->addText('Issued by NexaCrest International Private Limited', ['bold' => true, 'color' => DocxComponents::WHITE], DocxComponents::KEEP_NEXT);
+        $table->addCell(2500, ['bgColor' => $green])->addText('Accepted by Supplier  •  Sign, Stamp & Return', ['bold' => true, 'color' => DocxComponents::WHITE], DocxComponents::KEEP_NEXT);
         $table->addRow();
         $leftCell = $table->addCell(2500, ['valign' => 'top', 'borderSize' => 4, 'borderColor' => DocxComponents::BORDER_GRAY]);
         $leftCell->addText((string) self::g($signatory, 'name', ''), ['bold' => true, 'color' => DocxComponents::NAVY], ['spaceBefore' => 160]);
@@ -1204,8 +1204,8 @@ final class DocxDocumentBuilder
     private static function threeColFinanceTable(Section $section, string $headerText, array $rows, string $headerBg): void
     {
         $table = $section->addTable(['unit' => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT, 'width' => 5000]);
-        $table->addRow();
-        $table->addCell(5000, ['bgColor' => $headerBg, 'gridSpan' => 3])->addText($headerText, ['bold' => true, 'color' => DocxComponents::WHITE]);
+        $table->addRow(null, DocxComponents::HEADER_ROW);
+        $table->addCell(5000, ['bgColor' => $headerBg, 'gridSpan' => 3])->addText($headerText, ['bold' => true, 'color' => DocxComponents::WHITE], DocxComponents::KEEP_NEXT);
         foreach ($rows as $row) {
             $label = $row[0];
             $value = $row[1];

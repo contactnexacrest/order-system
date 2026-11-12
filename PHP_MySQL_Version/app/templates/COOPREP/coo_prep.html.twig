@@ -26,7 +26,7 @@
 <div class="section-title">1. DOCUMENTS TO SUBMIT TO CAPEXIL / CHA</div>
 <p class="placeholder-italic" style="font-size:9pt;">Tick each item once collected and ready. Do not apply for COO until all mandatory items are ticked.</p>
 <table class="checklist">
-  <tr><th style="width:6%;">&#8730;</th><th>Document</th><th>What to check before submitting</th><th>Where it comes from</th></tr>
+  <tr class="col-head"><th style="width:6%;">&#8730;</th><th>Document</th><th>What to check before submitting</th><th>Where it comes from</th></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Commercial Invoice (signed copy)</strong></td><td>Must be signed and stamped. Values, HS code, buyer/seller details must be final — no estimates.</td><td>{{ order.ci_ref ?: 'NexaCrest_05_CommercialInvoice.docx' }}</td></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Packing List (signed copy)</strong></td><td>{{ category_documents.package_noun }} count, weights, CBM must be actuals — not estimates from PI.</td><td>NexaCrest_04_PackingList.docx</td></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Fumigation Certificate (copy)</strong></td><td>Provided as standard with every NexaCrest shipment — collect from fumigation agency and include with COO application.</td><td>Fumigation agency — standard every shipment</td></tr>
@@ -46,7 +46,7 @@
   {% set hsCodeList = hsCodeList|merge([p.hs_code]) %}
 {% endfor %}
 <table class="checklist">
-  <tr><th>Field</th><th>Value for this shipment</th><th>Source document</th></tr>
+  <tr class="col-head"><th>Field</th><th>Value for this shipment</th><th>Source document</th></tr>
   <tr><td><strong>Exporter — Legal Name</strong></td><td>{{ company.legal_name }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
   <tr><td><strong>Exporter — Registered Address</strong></td><td>{{ company.registered_office }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
   <tr><td><strong>Exporter — GSTIN</strong></td><td>{{ company.gstin }}</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>

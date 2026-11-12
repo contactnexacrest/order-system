@@ -29,7 +29,7 @@
 {% block section1 %}
 <div class="section-title">1. PRODUCTS &amp; PRICES — AS AMENDED</div>
 <table class="products">
-  <tr><th>#</th><th>Product</th><th>Size (cm)</th><th>Pcs</th><th>{{ products_amendment.qty_header }}</th><th>{{ products_amendment.price_header }}</th><th>{{ products_amendment.total_header }}</th><th>Change</th></tr>
+  <tr class="col-head"><th>#</th><th>Product</th><th>Size (cm)</th><th>Pcs</th><th>{{ products_amendment.qty_header }}</th><th>{{ products_amendment.price_header }}</th><th>{{ products_amendment.total_header }}</th><th>Change</th></tr>
   {% for r in products_amendment.rows %}
   <tr{% if r.removed %} class="removed"{% endif %}>
     <td class="line-no">{{ r.no }}</td>
