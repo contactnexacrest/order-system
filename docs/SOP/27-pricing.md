@@ -151,6 +151,25 @@ The D-240 reference selling price, its note settings and its order-level discoun
 are gone; a product keeps only its **selling unit** (Products → edit). Zoho items now go with
 rate 0.
 
+## Prices in other units (D-339, 12 Nov 2026)
+
+The product page has a read-only card **Prices in other units**: for each
+thickness the product offers, the price per CBM, per SQM and per SQFT, worked
+out from the product's prices (1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT).
+Nothing is saved. You see the sets your permissions allow: the **supplier
+price** (people who may see purchase prices), the **staff quote and floor**
+(people who see selling prices) and **every associate level** (MD and ED). A
+thickness with its own typed supplier price shows "typed price wins (D-335)".
+Per piece needs a size, so it is shown on the order line, not here.
+
+On an order line the quote is filled in the line's unit and a typed price is
+never replaced; the floor is shown in the line's unit (SOP 01, "Number of
+pieces and the detailed product table").
+
+**Associates** see, on their price request (the result of **Get price**), their
+own quote and lowest price per CBM, per SQM and per SQFT for the thickness they
+asked for — their level only.
+
 ## Settings to check on go-live day (owner decision, 5 Nov 2026)
 
 The installed values below are the owner's chosen starting values. Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need entering by hand on the day the site goes live (Products › Pricing › Pricing settings):

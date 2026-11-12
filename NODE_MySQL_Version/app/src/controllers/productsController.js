@@ -373,8 +373,15 @@ async function show(req, res) {
     }
   }
 
+  // Owner decision D-339: "Prices in other units" (read-only, nothing stored) — the supplier price for
+  // people who may see purchase prices, the staff quote and floor for people who see selling prices,
+  // every associate level for people who see the price build-up (MD / ED).
+  const unitMay = { supplier: canSeeSuppliers, staff: canBuildup || canStaffPrice, levels: canBuildup };
+  const unitPrices = Object.values(unitMay).includes(true) ? await require('../services/unitPrices').card(details.product, unitMay) : null;
+
   const usage = await productRepository.usage(id);
   res.renderView('products/show', {
+    unitPrices,
     usage,
     usageText: productRepository.usageText(usage),
     deleteRefusal: productRepository.deleteRefusal(details.product, usage),

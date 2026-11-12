@@ -510,6 +510,98 @@ function productsTable(headers, widthsPct, rows) {
   return [table, spacer(120)];
 }
 
+/**
+ * Owner decision D-339 (12 Nov 2026, owner confirmed twice): the detailed product table
+ * (lineTable.build()) — 8 pt, two header rows repeated on every page, a grey detail row
+ * under each line (documents with prices), the TOTAL row and, with mixed units, the
+ * "Totals by unit" row. The lines not sold by size follow in today's simple table
+ * (simpleHeaders / simpleRows, built by the caller as today); the Packing List's simple
+ * rows carry no prices. PHP twin: DocxComponents::addLineTable().
+ */
+function lineTable(lt, simpleHeaders = [], simpleWidths = [], simpleRows = []) {
+  const out = [];
+  if ((lt.variant || 'none') !== 'none') {
+    const widths = lt.heads.widths;
+    const cols = widths.length;
+    const twips = widths.map((w) => Math.round(CONTENT_WIDTH_TWIPS * w / 100));
+    const hBorders = thinBorders('C9D1E3');
+    const head = (text, w, extra = {}) => cell(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(text, { bold: true, size: 16, color: WHITE })] }),
+      Object.assign({ width: pctWidth(w), shading: shade(NAVY_MID), verticalAlign: VerticalAlign.CENTER, borders: hBorders }, extra));
+    const top = [head('#', widths[0], { rowSpan: 2 })];
+    lt.heads.top.forEach((t) => top.push(head(t.text, t.width, t.span > 1 ? { columnSpan: t.span } : {})));
+    const bottom = lt.heads.bottom.map((b, i) => head(b, widths[i + 1]));
+    const rows = [
+      new TableRow({ tableHeader: true, cantSplit: true, children: top }),
+      new TableRow({ tableHeader: true, cantSplit: true, children: bottom }),
+    ];
+    const c = (text, w, align = 'right', font = {}, extra = {}) => {
+      const dash = text === '—';
+      const al = dash || align === 'center' ? AlignmentType.CENTER : align === 'left' ? AlignmentType.LEFT : AlignmentType.RIGHT;
+      return cell(new Paragraph({ alignment: al, children: [run(String(text), Object.assign({ size: 16 }, dash ? { color: MUTED } : {}, font))] }),
+        Object.assign({ width: pctWidth(w), borders: thinBorders(), verticalAlign: VerticalAlign.TOP }, extra));
+    };
+    const full = lt.variant === 'full';
+    const prices = !!lt.with_prices;
+    lt.rows.forEach((r) => {
+      const cells = [c(String(r.no), widths[0], 'center'), c(r.material, widths[1], 'left'), c(r.finish, widths[2], 'center')];
+      if (full) {
+        if (r.annexure !== null) cells.push(c(r.annexure, widths[3] + widths[4] + widths[5], 'center', { italics: true, color: '8A5A00' }, { columnSpan: 3 }));
+        else cells.push(c(r.l, widths[3]), c(r.w, widths[4]), c(r.h, widths[5]));
+        cells.push(c(r.per_piece, widths[6]), c(r.pcs, widths[7]), c(r.all_pcs, widths[8]));
+        if (prices) cells.push(c(r.price_unit, widths[9]), c(r.price_piece, widths[10]), c(r.total, widths[11]));
+        else cells.push(c(r.crates, widths[9]));
+      } else {
+        if (r.annexure !== null) cells.push(c(r.annexure, widths[3], 'center', { italics: true, color: '8A5A00' }));
+        else cells.push(c(r.thickness, widths[3]));
+        cells.push(c(r.qty, widths[4]));
+        if (prices) cells.push(c(r.price_unit, widths[5]), c(r.total, widths[6]));
+        else cells.push(c(r.crates, widths[5]));
+      }
+      rows.push(new TableRow({ cantSplit: true, children: cells }));
+      if (prices) {
+        const segs = [];
+        r.detail.forEach((d, k) => {
+          if (k > 0) segs.push(run('   ·   ', { size: 14, color: MUTED }));
+          if (d.label !== null) segs.push(run(`${d.label} `, { size: 14, bold: true, color: NAVY }));
+          segs.push(run(String(d.text), { size: 14, color: '3B4560' }));
+        });
+        rows.push(new TableRow({
+          cantSplit: true,
+          children: [
+            cell(new Paragraph({ children: [run('')] }), { width: pctWidth(widths[0]), shading: shade(SPEC_BG), borders: thinBorders() }),
+            cell(new Paragraph({ children: segs }), { width: pctWidth(100 - widths[0]), columnSpan: cols - 1, shading: shade(SPEC_BG), borders: thinBorders() }),
+          ],
+        }));
+      }
+    });
+    const tot = (text, w, extra = {}) => cell(new Paragraph({ alignment: AlignmentType.RIGHT, children: [run(String(text), { size: 16, bold: true, color: WHITE })] }),
+      Object.assign({ width: pctWidth(w), shading: shade(NAVY), borders: thinBorders(), verticalAlign: VerticalAlign.CENTER }, extra));
+    const lead = full ? 7 : 4;
+    const totCells = [cell(new Paragraph({ children: [run('TOTAL', { size: 16, bold: true, color: WHITE })] }),
+      { width: pctWidth(widths.slice(0, lead).reduce((a, b) => a + b, 0)), columnSpan: lead, shading: shade(NAVY), borders: thinBorders(), verticalAlign: VerticalAlign.CENTER })];
+    if (full) {
+      totCells.push(tot(lt.total.pcs, widths[7]), tot(lt.total.measure, widths[8]));
+      if (prices) totCells.push(tot('', widths[9]), tot('', widths[10]), tot(lt.total.amount, widths[11]));
+      else totCells.push(tot('', widths[9]));
+    } else {
+      totCells.push(tot(lt.total.measure, widths[4]));
+      if (prices) totCells.push(tot('', widths[5]), tot(lt.total.amount, widths[6]));
+      else totCells.push(tot('', widths[5]));
+    }
+    rows.push(new TableRow({ cantSplit: true, children: totCells }));
+    if (lt.totals_by_unit) {
+      rows.push(new TableRow({
+        cantSplit: true,
+        children: [cell(new Paragraph({ children: [run(lt.totals_by_unit, { size: 16, bold: true, color: NAVY })] }),
+          { width: pctWidth(100), columnSpan: cols, shading: shade(SPEC_BG), borders: thinBorders() })],
+      }));
+    }
+    out.push(new Table({ width: FULL_WIDTH, margins: TABLE_MARGINS, columnWidths: twips, layout: TableLayoutType.FIXED, rows }), spacer(120));
+  }
+  if (simpleRows.length) out.push(...productsTable(simpleHeaders, simpleWidths, simpleRows));
+  return out;
+}
+
 // --------------------------------------------------------------------
 // Totals table: last (highlight) row uses navy-mid, white bold.
 // rows: [{label, value, highlight}]
@@ -856,6 +948,7 @@ module.exports = {
   colorBox,
   kvTable,
   productsTable,
+  lineTable,
   totalsTable,
   checklistTable,
   stepBadge,

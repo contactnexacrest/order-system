@@ -13,6 +13,15 @@
       <div><div class="muted small">Quote price</div><div style="font-size:1.5em;font-weight:700">USD {{ r.quote | money }}{{ ' / CBM' if unit == 'CBM' else '' }}</div></div>
       <div><div class="muted small">Lowest price you may agree with the buyer</div><div style="font-size:1.5em;font-weight:700">USD {{ r.lowest | money }}{{ ' / CBM' if unit == 'CBM' else '' }}</div></div>
     </div>
+    {% if otherUnits %}{# Owner decision D-339: your two prices in the other units (worked out, nothing saved) #}
+      <h2>Your prices in other units{% if otherUnits.mm != null %} — {{ otherUnits.mm / 10 }} cm thick{% endif %}</h2>
+      <table class="list">
+        <tr><th></th><th class="r">per CBM</th><th class="r">per SQM</th><th class="r">per SQFT</th></tr>
+        <tr><td>Quote price (USD)</td>{% for u in ['CBM', 'SQM', 'SQFT'] %}<td class="r">{{ (otherUnits.quote[u] | money) if otherUnits.quote[u] != null else '—' }}</td>{% endfor %}</tr>
+        <tr><td>Lowest you may agree (USD)</td>{% for u in ['CBM', 'SQM', 'SQFT'] %}<td class="r">{{ (otherUnits.lowest[u] | money) if otherUnits.lowest[u] != null else '—' }}</td>{% endfor %}</tr>
+      </table>
+      <p class="muted small">1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
+    {% endif %}
     {% if breakdown.per_m2 %}<p class="muted small">About USD {{ breakdown.per_m2 | money }} per square metre (one cubic metre gives {{ breakdown.m2_per_cbm }} m²). This is only to compare; the order is priced per cubic metre.</p>{% endif %}
     <table class="list">
       {% for l in breakdown.lines or [] %}<tr><td>{{ l.label }}</td><td class="r">{{ l.change }}</td></tr>{% endfor %}

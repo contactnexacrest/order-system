@@ -1,0 +1,163 @@
+{# Owner decision D-339 (12 Nov 2026, owner confirmed twice; mockups approved): the detailed
+   product table — A4 portrait, 8 pt, fixed layout, two header rows repeated on every page.
+   line_table comes from lineTable.build() (documentDataAssembler). Lines that are not sold by
+   size (services, charges, units such as Set or Lot) keep today's rows in the simple table below.
+   PHP twin: templates/_line_table.html.twig. #}
+<style>
+  table.lt { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 6pt; }
+  table.lt th { background: #173B73; color: #FFFFFF; font-size: 8pt; font-weight: bold; padding: 2pt 2pt; text-align: center; border: 1px solid #C9D1E3; line-height: 1.1; }
+  table.lt td { border: 1px solid #D7DEE6; padding: 2.5pt 2pt; font-size: 8pt; text-align: right; vertical-align: top; line-height: 1.1; }
+  table.lt td.l { text-align: left; }
+  table.lt td.c { text-align: center; }
+  table.lt td.na { text-align: center; color: #5B6573; }
+  table.lt td.ann { text-align: center; font-style: italic; color: #8A5A00; }
+  table.lt tr { page-break-inside: avoid; }
+  div.lt-keep { page-break-inside: avoid; }
+  table.lt tr.det td { background: #EFF3F7; color: #3B4560; font-size: 7pt; text-align: left; }
+  table.lt tr.det .spec-label { font-weight: bold; color: #17233A; }
+  table.lt tr.tot td { background: #17233A; color: #FFFFFF; font-weight: bold; }
+  table.lt tr.tot2 td { background: #EFF3F7; color: #17233A; font-weight: bold; text-align: left; }
+</style>
+{% set lt = line_table %}
+{% if lt.variant != 'none' %}
+{# A short table stays on one page with its header; a long one breaks between lines, the header repeated. #}
+<div class="{{ 'lt-keep' if lt.rows | length <= 12 else 'lt-flow' }}">
+<table class="lt">
+  <thead>
+  <tr>
+    <th style="width:{{ lt.heads.widths[0] }}%; border-bottom-color:#173B73;">#</th>
+    {% for t in lt.heads.top %}
+    <th{% if t.span > 1 %} colspan="{{ t.span }}"{% endif %} style="width:{{ t.width }}%;">{{ t.text }}</th>
+    {% endfor %}
+  </tr>
+  <tr><th style="border-top-color:#173B73;"></th>{% for b in lt.heads.bottom %}<th>{{ b }}</th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+  {% for r in lt.rows %}
+  <tr>
+    <td class="c">{{ r.no }}</td>
+    <td class="l">{{ r.material }}</td>
+    <td class="c">{{ r.finish }}</td>
+    {% if lt.variant == 'full' %}
+      {% if r.annexure %}
+    <td class="ann" colspan="3">{{ r.annexure }}</td>
+      {% else %}
+    <td{% if r.l == '—' %} class="na"{% endif %}>{{ r.l }}</td>
+    <td{% if r.w == '—' %} class="na"{% endif %}>{{ r.w }}</td>
+    <td{% if r.h == '—' %} class="na"{% endif %}>{{ r.h }}</td>
+      {% endif %}
+    <td{% if r.per_piece == '—' %} class="na"{% endif %}>{{ r.per_piece }}</td>
+    <td{% if r.pcs == '—' %} class="na"{% endif %}>{{ r.pcs }}</td>
+    <td{% if r.all_pcs == '—' %} class="na"{% endif %}>{{ r.all_pcs }}</td>
+      {% if lt.with_prices %}
+    <td>{{ r.price_unit }}</td>
+    <td{% if r.price_piece == '—' %} class="na"{% endif %}>{{ r.price_piece }}</td>
+    <td>{{ r.total }}</td>
+      {% else %}
+    <td{% if r.crates == '—' %} class="na"{% endif %}>{{ r.crates }}</td>
+      {% endif %}
+    {% else %}
+      {% if r.annexure %}
+    <td class="ann">{{ r.annexure }}</td>
+      {% else %}
+    <td{% if r.thickness == '—' %} class="na"{% endif %}>{{ r.thickness }}</td>
+      {% endif %}
+    <td>{{ r.qty }}</td>
+      {% if lt.with_prices %}
+    <td>{{ r.price_unit }}</td>
+    <td>{{ r.total }}</td>
+      {% else %}
+    <td{% if r.crates == '—' %} class="na"{% endif %}>{{ r.crates }}</td>
+      {% endif %}
+    {% endif %}
+  </tr>
+  {% if lt.with_prices %}
+  <tr class="det">
+    <td></td>
+    <td colspan="{{ lt.colspan - 1 }}">{% for d in r.detail %}{% if not loop.first %}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endif %}{% if d.label %}<span class="spec-label">{{ d.label }}</span> {% endif %}{{ d.text }}{% endfor %}</td>
+  </tr>
+  {% endif %}
+  {% endfor %}
+  {% if lt.variant == 'full' %}
+  <tr class="tot">
+    <td colspan="7" style="text-align:left;">TOTAL</td>
+    <td>{{ lt.total.pcs }}</td>
+    <td>{{ lt.total.measure }}</td>
+    {% if lt.with_prices %}<td></td><td></td><td>{{ lt.total.amount }}</td>{% else %}<td></td>{% endif %}
+  </tr>
+  {% else %}
+  <tr class="tot">
+    <td colspan="4" style="text-align:left;">TOTAL</td>
+    <td>{{ lt.total.measure }}</td>
+    {% if lt.with_prices %}<td></td><td>{{ lt.total.amount }}</td>{% else %}<td></td>{% endif %}
+  </tr>
+  {% endif %}
+  {% if lt.totals_by_unit %}
+  <tr class="tot2"><td colspan="{{ lt.colspan }}">{{ lt.totals_by_unit }}</td></tr>
+  {% endif %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% if lt.simple | length and not lt.with_prices %}
+{# Packing List: the other goods and charges, without prices. #}
+<table class="products">
+  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th></tr>
+  {% for p in lt.simple %}
+  {% set lineColor = '#1D6FA8' if p.no % 2 == 1 else '#2D7D56' %}
+  <tr>
+    <td class="line-no" style="color:{{ lineColor }};">{{ p.no }}</td>
+    <td>{{ p.description }}{{ (' — ' + p.finish) if p.finish else '' }}</td>
+    <td class="num">{{ p.quantity }}</td>
+    <td>{{ p.unit }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% elseif lt.simple | length %}
+<table class="products">
+  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  {% for p in lt.simple %}
+  {% set lineColor = '#1D6FA8' if p.no % 2 == 1 else '#2D7D56' %}
+  <tr>
+    <td class="line-no" style="color:{{ lineColor }};">{{ p.no }}</td>
+    <td>{{ p.description }}</td>
+    <td class="num">{{ p.quantity }}</td>
+    <td>{{ p.unit }}</td>
+    <td class="num">{{ p.unit_price }}</td>
+    <td class="num">{{ p.amount }}</td>
+  </tr>
+  {% if p.line_type == 'service' %}
+  {# Owner decision D-215: a service line shows its SAC code and is invoiced separately. #}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ p.no }}.</span>
+      <span class="spec-label">Service</span>
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">SAC Code:</span> {{ p.sac_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span>Invoiced separately on our Export Service Invoice
+    </td>
+  </tr>
+  {% elseif p.attributes %}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ p.no }}.</span>
+      {% for a in p.attributes %}<span class="spec-label">{{ a.label }}:</span> {{ a.value }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endfor %}<span class="spec-label">HS Code:</span> {{ p.hs_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
+    </td>
+  </tr>
+  {% elseif p.dimensions or p.finish %}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ p.no }}.</span>
+      <span class="spec-label">Dimensions:</span> {{ p.dimensions or 'To Be Confirmed' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish or 'To Be Confirmed' }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ p.hs_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
+    </td>
+  </tr>
+  {% endif %}
+  {% endfor %}
+</table>
+{% endif %}

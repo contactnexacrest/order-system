@@ -469,6 +469,51 @@ printed only with the Commercial Invoice and Packing List (see
 [Chapter 8](./08-stage8-ci-balance.md)); the Quotation, Buyer PO, PI and OC
 always keep Annexure A.
 
+### Number of pieces and the detailed product table (owner decision D-339, 12 Nov 2026)
+
+New orders print a **detailed product table** on the Quotation, Buyer PO, PI,
+OC, Commercial Invoice and Packing List: Material / Colour, Surface / Finish,
+the size L × W × H, the measure of one piece (CBM, SQM or SQFT), the **No. of
+pieces**, the measure of all pieces, the price per unit, the price per piece
+and the total. Orders that existed before 12 Nov 2026 keep the old table —
+their documents do not change.
+
+**Entering a line with sizes (e.g. CHM Black P6, 180 × 80 × 13 cm, 25 pieces,
+priced per CBM).** Open the line (**Edit** or **+ Add product**). In step 3
+*Size and quantity* choose the unit (**CBM**), type **Length 180**, **Width 80**,
+**Thickness 13** and **No. of pieces 25**. The **Qty** is worked out for you
+(4.680 CBM — "worked out: 25 × 0.1872 CBM") and cannot be typed; the box under
+the fields shows *This line: 0.1872 CBM per piece · 25 pcs = 4.680 CBM · USD
+365.04 per piece · total USD 9,126.00*. For SQM and SQFT only Length and Width
+are needed (e.g. 60 × 60 tiles, 500 pieces = 180.00 SQM). For **PCS** the Qty is
+the number of pieces. The server works the quantity out again when you save;
+without the pieces the line is refused: *Product line: enter the No. of pieces —
+with the size given, the quantity is worked out from the pieces.*
+
+**A line without sizes** (CBM-only or SQM-only quote, random blocks): leave
+Length / Width empty and **No. of pieces** empty, type the **Qty** as before, and
+use **Size note** for what the buyer should read under the line (e.g. "Random
+sizes, as available"). If no line of the order has a size, the documents print
+the short table (Material, Finish, Thickness, Qty, price, total).
+
+**Lines "As per annexure"** work as before (no pieces); on the documents the
+size columns read "As per Annexure A" and the grey row "Qty as per Annexure A".
+
+**The price.** When you pick a product, or change the unit, the size or the
+thickness, the quote price is filled in **in the line's unit** (e.g. USD 39.00
+per SQM for a 2 cm tile from USD 1,950.00 per CBM). Once you type your own
+price it is never replaced. Next to the price you see your floor in the line's
+unit, e.g. *Your floor: USD 37.20 per SQM — this price is 4.8% above*. Below the
+floor the line goes to the MD for approval as before.
+
+**What the documents show.** All lines in one unit: the headings name the unit
+(CBM, SQM, SQFT). Different units on one order: each figure names its unit
+("0.1872 CBM", "1,950.00 /CBM") and the totals are given per unit ("Totals by
+unit: 4.680 CBM · 180.00 SQM · 20 PCS"). Services, charges and goods sold by
+Set, Lot, Ton or RMT stay in the small table below. The line total is always
+quantity × unit price, exactly as before. The Packing List shows the same table
+without prices.
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's

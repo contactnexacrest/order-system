@@ -28,6 +28,10 @@
 {% endif %}
 
 <div class="section-title">{{ section_numbers.order_summary }}. ORDER SUMMARY</div>
+{# Owner decision D-339: the detailed product table on an order with the detailed layout (new orders). #}
+{% if line_table %}
+{% include '_line_table.njk' %}
+{% endif %}
 {% set productList = [] %}
 {% for p in products %}
   {% set productList = productList.concat([p.description ~ ' (Qty: ' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
@@ -37,7 +41,7 @@
   <tr><td class="k">Quotation Date *</td><td class="v">{{ order.quotation_date or '—' }}</td></tr>
   <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ order.pi_ref or '—' }}</td></tr>
   {% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %}<tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>{% endif %}
-  <tr><td class="k">Product(s) *</td><td class="v">{{ productList|join('; ') }}</td></tr>
+  {% if not line_table %}<tr><td class="k">Product(s) *</td><td class="v">{{ productList|join('; ') }}</td></tr>{% endif %}
   <tr><td class="k">Total Order Value (FOB) *</td><td class="v">{{ order.currency_code }} {{ financial.total_value }}</td></tr>
   <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}</td></tr>
   <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>

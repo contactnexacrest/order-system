@@ -792,9 +792,20 @@ async function priceRequest(req, res) {
   let breakdown = {};
   if (r.breakdown) { try { breakdown = JSON.parse(r.breakdown) || {}; } catch (e) { breakdown = {}; } }
   const { figures, ...shown } = r; // never the full figures (cost) — D-255
+  const product = await require('../repositories/productRepository').find(Number(r.product_id));
+  // Owner decision D-339: the associate's own two prices (their level only) per CBM / SQM / SQFT
+  // at the requested thickness — the same prices, nothing new is priced.
+  const unitPrices = require('../services/unitPrices');
+  const mm = product ? await unitPrices.selectionThicknessMm(product, String(r.selection ?? '')) : null;
+  const otherUnits = r.quote !== null && r.quote !== undefined ? {
+    quote: unitPrices.convert(Number(r.quote), String(r.unit ?? ''), mm),
+    lowest: unitPrices.convert(Number(r.lowest), String(r.unit ?? ''), mm),
+    mm,
+  } : null;
   await render(req, res, 'price_request', {
     r: shown,
-    product: await require('../repositories/productRepository').find(Number(r.product_id)),
+    otherUnits,
+    product,
     status: priceRequestService.displayStatus(r),
     breakdown,
     left: await priceRequestService.leftToday(a),

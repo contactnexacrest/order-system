@@ -3,7 +3,8 @@
   whoever sells the order and sets the line's floor for the sitewide data-floor note in app.js).
   Owner decisions of 11 Nov 2026: D-270 (point 25) piece size, thickness <-> Thickness option,
   Dimensions text, prices per the line's unit; D-271 (point 13) a switched-off option is shown,
-  never replaced; D-273 (point 17) the side panel. Included once per page. Port of _product_picker_js.php.
+  never replaced; D-273 (point 17) the side panel. D-339 (12 Nov 2026): a typed price (data-auto="0") is
+  never overwritten by a filled or converted quote. Included once per page. Port of _product_picker_js.php.
 #}
 <script>
 (function () {
@@ -44,8 +45,11 @@
         text += (text ? ' · ' : '') + 'Prices are built in USD — no price filled in on an order in another currency.';
         price.removeAttribute('data-floor');
       } else if (pair) {
-        price.value = pair[0].toFixed(2);
-        price.dataset.auto = '1';
+        // D-339: a price the staff member typed is never overwritten (data-auto="0").
+        if (price.dataset.auto !== '0') {
+          price.value = pair[0].toFixed(2);
+          price.dataset.auto = '1';
+        }
         price.setAttribute('data-floor', pair[1].toFixed(2));
         text += (text ? ' · ' : '') + 'Quote price USD ' + pair[0].toFixed(2) + ' filled in; your lowest price is USD ' + pair[1].toFixed(2) + '.';
       }
@@ -204,7 +208,8 @@
         if (!d) { return; }
         var per = d.unit ? ' per ' + d.unit : '';
         if (d.ok) {
-          if (fill || price.dataset.auto === '1' || price.value.trim() === '') {
+          // D-270 / D-339: the quote converted into the line's unit, only while the price was not typed.
+          if (price.value.trim() === '' || (price.dataset.auto !== '0' && (fill || price.dataset.auto === '1'))) {
             price.value = Number(d.quote).toFixed(2);
             price.dataset.auto = '1';
           }

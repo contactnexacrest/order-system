@@ -4139,6 +4139,42 @@ Migration `2026-11-12c-annexure-b-as-per-annexure.sql`. Tests: `AnnexureBAndAsPe
 
 **Follow-ups (D-338, 12 Nov 2026).** Reorder request lines can say "As per annexure" too, and a duplicated (or reordered) order keeps a copy of Annexure A (not B) — see §5 (Order edit and duplication). A line "As per annexure" whose price needs the piece size gets one refusal wording everywhere — see §7 (Line statuses). Migration `2026-11-12e-follow-ups-d338.sql` (`order_reorder_request_products.as_per_annexure`). Tests: `FollowUpsD338Test` / `followUpsD338.test.js`.
 
+### 8.9 The detailed product table, No. of pieces and prices in other units (D-339)
+
+Owner decision D-339 (12 Nov 2026, owner "confirm 1" and "confirm 2 with option a"; mockups approved). Code: `LineTable` (PHP `app/src/Services/LineTable.php`, Node `src/services/lineTable.js`) builds the table from the order lines (pure functions); `DocumentDataAssembler::lineTableBlock()` / `documentDataAssembler.lineTableBlock()` adds it to the document context as `line_table`; templates `_line_table.html.twig` / `_line_table.njk`; Word: `DocxComponents::addLineTable()` / `docxComponents.lineTable()`; `UnitPrices` / `unitPrices.js` for the product card.
+
+| Data | Meaning |
+|---|---|
+| `orders.line_table_layout` | `classic` = the six-column product table as before; `detailed` = the table below. Default `detailed` (new orders, duplicates and reorders). Migration `2026-11-12g` set every order that existed then to `classic`, so their documents never change. No screen switches it. |
+| `order_products.pieces_count` | No. of pieces (whole number). With the size in CBM / SQM / SQFT it works out the line quantity; PCS: quantity = pieces. |
+| `order_products.size_note` | Up to 200 characters, e.g. "Random sizes, as available" — printed as "Sizes: …" in the line's grey row. |
+
+**Which documents.** Quotation, PI, Order Confirmation, Commercial Invoice, Buyer PO (with prices) and Packing List (no prices) of a `detailed` order, PDF and Word. Only the product section changes: on QT / PI / CI it replaces the six-column table; on the OC and Buyer PO it stands above the order summary and replaces its Product(s) / Quantity / Unit / Unit Price rows; on the PL it stands in the Product Summary and replaces the Product Description row. Everything else (header, buyer / consignee, totals box, terms, legal terms, signatures, annexure, CAFIN) is unchanged. Issued documents keep their stored context.
+
+**Columns.** # · Material / Colour (the line's description; when the line's product has a colour / variety option it is added) · Surface / Finish (the line's finish, else its surface-finish option) · Dimensions (cm) L W H · <Unit> per piece · Qty No. of pcs · <Unit> all pcs · Price (<CCY>) per <Unit> · Price (<CCY>) per piece · Total Price (<CCY>), then TOTAL (pieces, measure, amount). PL: the last column is "Crates / Packages" = the crates whose product description is the line's description, else "—". Grey row under each line (with prices only): "Qty as per Annexure X" · "Sizes:" size note · "Dimensions:" text of a line without a piece size · another category's attributes · HS Code · Country of Origin. A4 portrait, 8 pt, fixed layout, both header rows repeated on every page (PDF thead, Word `tblHeader`); a table of up to 12 lines is kept on one page.
+
+**Variants (chosen automatically).**
+
+| Situation | Table |
+|---|---|
+| Every goods line in one unit | Headings name the unit (CBM, SQM, SQFT, PCS); cells show numbers only. |
+| Mixed units | "Measure per piece", "Measure all pcs", "Price (CCY) per unit"; each cell names its unit ("0.1872 CBM", "1,950.00 /CBM"); TOTAL shows pieces and amount only; extra row "Totals by unit: 4.680 CBM · 180.00 SQM · 20 PCS" (never added across units). |
+| No goods line has Length × Width | Short table: # · Material / Colour · Surface / Finish · Thickness (cm) · Qty <Unit> · Price per <Unit> · Total (PL: … · Qty · Crates / Packages). |
+| Line "As per annexure" (D-336) | "As per Annexure X" across L W H (X = A; on CI / PL the chosen annexure), "—" for per piece, pieces and price per piece; all pcs = the line quantity; grey row starts "Qty as per Annexure X". |
+| Line without a size in a full table | "—" for L W H, per piece, pieces, price per piece; all pcs = the quantity. |
+| PCS line | No measure ("—"); price per unit = price per piece. |
+| Service, charge, goods in Ton / RMT / Set / Lot … | Today's rows in the simple table below (on the PL without prices). |
+
+**Measures and rounding** (the same in `LineTable`, `lineTable.js` and `app.js`): CBM per piece = L × W × H / 1,000,000 (4 decimals); SQM = L × W / 10,000 (4 decimals kept, 2 shown); SQFT = SQM × 10.7639 (2 decimals); all pieces = per piece × pieces (CBM 3 decimals, SQM / SQFT 2); price per piece = unit price × measure per piece (2 decimals), half away from zero. **The line total is the line's own amount** (`fob_value` = quantity × unit price, as before) — never worked out again from the rounded figures shown. Amounts as the documents already format them (order currency, 1,234,567.00).
+
+**Order line form (detailed orders only).** Order page › Products › Edit / + Add product › step 3, and the New Order form rows: **No. of pieces** and **Size note** ("e.g. Random sizes, as available"). With Length and Width (and Thickness for CBM) and a unit of CBM / SQM / SQFT the pieces are required (`app.js` `data-pieces-count` in `fieldError()`) and the Qty becomes read-only, worked out (`initLinePieces`; hint "worked out: 25 × 0.1872 CBM"); PCS: Qty = pieces; without a size the Qty is typed. The server works the quantity out again from the pieces and the size and never uses the browser's figure (`piecesInput()`; refusal "Product line: enter the No. of pieces — with the size given, the quantity is worked out from the pieces."). "As per annexure" lines take no pieces. Summary under the fields: "This line: 0.1872 CBM per piece · 25 pcs = 4.680 CBM · USD 365.04 per piece · total USD 9,126.00". The products table shows "25 pcs" and the size note under the Size. Duplicating a line copies pieces and size note. On a `classic` order the form is as before.
+
+**Price filled in, converted, never over a typed price.** Pick from Products, or a change of unit, size, thickness or option, fills the quote converted into the line's unit (`/pricing/line-quote`, D-270) only while the price was filled automatically (`data-auto="1"`) or is empty; once the staff member types a price (`data-auto="0"`) it is never replaced. On a detailed order the floor shows next to the price in the line's unit: "Your floor: USD 37.20 per SQM — this price is 4.8% above" (`data-floor-show`; below the floor the D-245 P2 message as before). Approval rules unchanged (D-245 P2, D-270, D-338).
+
+**Product page › "Prices in other units"** (read-only, nothing stored; `UnitPrices::card()`): one row per thickness option (or "Base price"), per CBM / per SQM / per SQFT, worked out with `LineUnits::factor()`. Sets shown by permission: supplier price (INR) — may see purchase prices; staff quote and staff floor — sees selling prices; every associate level (quote and lowest) — `view_price_buildup` (MD / ED). A thickness whose supplier price is TYPED (D-335) shows "typed price wins (D-335)" and no per-CBM figure. **Associates:** their price request page (the result of Get price) shows their own quote and lowest per CBM / SQM / SQFT at the requested thickness — their level only, nothing newly priced (`UnitPrices::convert()`).
+
+Migration `2026-11-12g-detailed-line-table.sql`. Tests: `LineTableTest` / `lineTable.test.js`, `D339DetailedLineTableTest` / `d339DetailedLineTable.test.js`. Test orders made by the test helpers are `classic`, so the Natural Stone fixtures (§8.6) are unchanged.
+
 ---
 
 ## 9. Settings and configuration

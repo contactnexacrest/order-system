@@ -40,6 +40,10 @@
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.</p>
+{# Owner decision D-339: the detailed product table on an order with the detailed layout (new orders). #}
+{% if line_table %}
+{% include '_line_table.njk' %}
+{% else %}
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
   {% for p in products %}
@@ -76,6 +80,7 @@
   {% endif %}
   {% endfor %}
 </table>
+{% endif %}
 {# Real bug this fixes: synthesizing "C-001 to C-{{ crate_count }}" assumed
    crate numbers are always sequential digits with no zero-padding, so a
    2-crate order using the app's own "C-001"/"C-002" convention (see the

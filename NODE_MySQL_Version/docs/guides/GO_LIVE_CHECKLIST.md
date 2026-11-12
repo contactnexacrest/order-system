@@ -163,6 +163,7 @@ For a database that already holds data. Owner decisions D-268, D-269, D-270–D-
    12. [ ] `docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql` (D-337: requests to update the buyer details of an order with an issued document, permission "Approve buyer details change" for MD and ED, self-approval rule MD and ED — new table and rows only, no order changes)
    13. [ ] `docs/migrations/2026-11-12e-follow-ups-d338.sql` (D-338: reorder request lines can say "As per annexure" — one new column, no data change)
    14. [ ] `docs/migrations/2026-11-12f-buyer-details-self-approval-md-ed.sql` (D-337: the self-approval rule for buyer details changes ticks the Executive Director too — one row, no order data change)
+   15. [ ] `docs/migrations/2026-11-12g-detailed-line-table.sql` (D-339: the detailed product table on the QT / PI / OC / CI / Buyer PO / Packing List, No. of pieces and Size note on an order line — every order that already exists is set to the classic table, so its documents print exactly as before; orders created after the upgrade get the detailed table)
 
    `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
 4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.

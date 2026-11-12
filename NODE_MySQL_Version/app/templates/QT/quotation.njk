@@ -22,6 +22,10 @@
 {% endif %}
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
+{# Owner decision D-339: the detailed product table on an order with the detailed layout (new orders). #}
+{% if line_table %}
+{% include '_line_table.njk' %}
+{% else %}
 <table class="products">
   <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
   {% for p in products %}
@@ -69,6 +73,7 @@
   {% endif %}
   {% endfor %}
 </table>
+{% endif %}
 
 <table class="totals">
   <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>

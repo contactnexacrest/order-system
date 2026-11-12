@@ -94,7 +94,10 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ lp.quantity if (lp.quantity != null) else '' }}" placeholder="e.g. 40"></label>
+            {% if detailedLines %}{# Owner decision D-339: No. of pieces — with the size given, the Qty is worked out from it (app.js and the server). #}
+            <label>No. of pieces<input type="text" inputmode="numeric" name="pieces_count" data-pieces-count maxlength="7" value="{{ lp.pieces_count if (lp.pieces_count != null) else '' }}" placeholder="e.g. 25"></label>
+            {% endif %}
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ lp.quantity if (lp.quantity != null) else '' }}" placeholder="e.g. 40">{% if detailedLines %}<small class="muted qty-worked-out" aria-live="polite"></small>{% endif %}</label>
             <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" {{ 'checked' if lp.quantity_is_tbc else '' }}> Qty To Be Confirmed</label>
             {# Owner decision D-336: the size is given in the annexure; never with "Qty To Be Confirmed" (app.js and the server). #}
             <input type="hidden" name="as_per_annexure_field" value="1">
@@ -102,10 +105,16 @@
           </div>
           <p class="muted small annexure-line-hint">"Qty To Be Confirmed" or "As per annexure" — only one of the two. As per annexure: the sizes go in Annexure A (order page › Annexure A); the Qty is still needed.</p>
           <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
+          {% if detailedLines %}
+          {% set pieceSummary = null if isNew else pieceSummaries[lp.id] %}
+          <p class="muted small">With Length and Width (and Thickness for CBM) in CBM, SQM or SQFT, type the No. of pieces — the Qty is worked out from it. PCS: the Qty is the pieces. Without a size, type the Qty as before.</p>
+          <p class="line-pieces-summary notice notice-info small" aria-live="polite" data-currency="{{ order.currency_code or '' }}"{% if not pieceSummary %} hidden{% endif %}>{{ pieceSummary or '' }}</p>
+          <label>Size note <small class="muted">(only when no size is given — printed under the line on the documents)</small><input type="text" name="size_note" maxlength="200" value="{{ lp.size_note or '' }}" placeholder="e.g. Random sizes, as available"></label>
+          {% endif %}
         </section>
         <section class="line-step"><h4><span class="step-no">4</span> Price</h4>
           <div class="size-grid">
-            <label>Unit price {{ order.currency_code or '' }}<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ lp.unit_price if (lp.unit_price != null) else '' }}" placeholder="e.g. 495.00" data-floor-message="{{ 'Below the lowest for this order' if linePricing.ctx.associate else 'Below your lowest price' }}"{% if lcFloor %} data-floor="{{ lcFloor }}"{% endif %}></label>
+            <label>Unit price {{ order.currency_code or '' }}<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ lp.unit_price if (lp.unit_price != null) else '' }}" placeholder="e.g. 495.00"{% if detailedLines %} data-floor-show data-floor-currency="{{ order.currency_code or '' }}"{% endif %} data-floor-message="{{ 'Below the lowest for this order' if linePricing.ctx.associate else 'Below your lowest price' }}"{% if lcFloor %} data-floor="{{ lcFloor }}"{% endif %}></label>
             <div class="line-total-box"><span class="muted small">Line total</span><output class="line-total">{{ (lp.fob_value | money) if (not isNew and lp.fob_value != null) else '—' }}</output></div>
           </div>
           <div class="price-ref-box" aria-live="polite">{% if lc and sees.selling %}{% include "orders/_line_price.njk" %}{% endif %}</div>

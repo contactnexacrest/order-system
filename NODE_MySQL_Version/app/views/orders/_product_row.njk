@@ -14,7 +14,7 @@
     {% endif %}
     {% if p.finish and not rowChips.length %}<div class="muted small">{{ p.finish }}</div>{% endif %}
   </td>
-  <td>{% if p.as_per_annexure and p.as_per_annexure != '0' %}<span class="muted">As per annexure</span>{% else %}{{ p.dimensions or '' }}{% endif %}</td>
+  <td>{% if p.as_per_annexure and p.as_per_annexure != '0' %}<span class="muted">As per annexure</span>{% else %}{{ p.dimensions or '' }}{% endif %}{% if p.pieces_count %}<div class="muted small">{{ (p.pieces_count | int).toLocaleString('en-US') }} pcs</div>{% endif %}{% if p.size_note %}<div class="muted small">{{ p.size_note }}</div>{% endif %}</td>
   <td class="num">{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity if p.quantity != null else '') }}</td>
   <td>{{ p.unit or '' }}</td>
   {% if sees.selling %}

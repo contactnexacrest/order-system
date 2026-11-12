@@ -549,6 +549,19 @@ async function store(req, res) {
   // committed, and a negative quantity was never rejected at all. Checked
   // here, same "before anything is written" placement as the HS-code check
   // above.
+  // Owner decision D-339: a new order prints the detailed product table — each row's No. of
+  // pieces works out its quantity here (the browser's figure is never trusted).
+  const rowPieces = {};
+  for (let i = 0; i < descriptions.length; i++) {
+    if (str(descriptions[i]) === '') continue;
+    rowPieces[i] = piecesInput(body, i, false);
+    if (rowPieces[i][2] !== null) {
+      flash.set(req, 'error', `Product line ${i + 1}: ${rowPieces[i][2]}`);
+      flash.setOld(req, body);
+      res.redirect(`/orders/create?client_id=${clientId}`);
+      return;
+    }
+  }
   {
     const quantitiesInput = [].concat(body.product_quantity || []);
     const unitPricesInput = [].concat(body.product_unit_price || []);
@@ -630,6 +643,7 @@ async function store(req, res) {
   const createdLineIds = [];
   const createdSpecs = [];
   const createdSizes = [];
+  const createdPieces = []; // D-339
   const { orderId, orderReference } = await divisionService.withDivision(newOrderDivision, () => db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
@@ -715,6 +729,7 @@ async function store(req, res) {
       createdLineIds.push(lineId);
       createdSpecs.push(rowSels[i] !== undefined ? rowSels[i] : require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
       createdSizes.push(rowSizes[i] || {});
+      createdPieces.push(rowPieces[i] || [null, null, null]);
     }
 
     return result;
@@ -726,6 +741,7 @@ async function store(req, res) {
   for (let k = 0; k < createdLineIds.length; k++) {
     await require('../services/orderLinePricing').saveSelection(createdLineIds[k], createdSpecs[k] ?? null, null);
     await orderProductRepository.setPieceSize(createdLineIds[k], createdSizes[k] || {});
+    await orderProductRepository.setPieces(createdLineIds[k], (createdPieces[k] || [])[0] ?? null, (createdPieces[k] || [])[1] ?? null);
   }
   for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
 
@@ -994,6 +1010,22 @@ async function linePricingViewData(req, orderId) {
     otherLines: lines.filter((l) => (l.line_type || 'goods') !== 'goods'),
     lineSummary: olp.summary(linePricing.lines),
     lineTotals: olp.totals(lines, linePricing.lines),
+    // Owner decision D-339: an order with the detailed product table (new orders) asks for the No. of pieces;
+    // each line's pieces summary ("This line: 0.1872 CBM per piece · 25 pcs = 4.680 CBM · …").
+    ...(await (async () => {
+      const order = await orderRepository.find(orderId);
+      const detailed = !!order && (order.line_table_layout || 'classic') === 'detailed';
+      const lt = require('../services/lineTable');
+      const lu = require('../services/lineUnits');
+      const pieceSummaries = {};
+      if (detailed) {
+        for (const l of lines) {
+          pieceSummaries[Number(l.id)] = lt.summary(l.unit, lu.size(l.piece_length_cm), lu.size(l.piece_width_cm), lu.size(l.piece_thickness_cm),
+            l.pieces_count !== null && l.pieces_count !== undefined ? Number(l.pieces_count) : null, l.unit_price !== null ? Number(l.unit_price) : null, String(order.currency_code || ''));
+        }
+      }
+      return { detailedLines: detailed, pieceSummaries };
+    })()),
     copiedLineId: parseInt((req.query || {}).copied, 10) || 0,
     containerCbm: require('../services/lineUnits').CONTAINER_CBM,
     piBlockReason: linePricing.blocking.length ? await require('../services/orderLinePricing').documentBlockReason(orderId, 'PI') : null,
@@ -1100,6 +1132,50 @@ function dimensionsFromSize(size) {
 }
 
 /**
+ * Owner decision D-339: a line's "No. of pieces" and "Size note" — the order page's
+ * pieces_count / size_note, or row `row` of the New Order form's product_pieces_count[] /
+ * product_size_note[]. With the size its unit is worked out from (CBM / SQM / SQFT with
+ * Length and Width, and Thickness for CBM) the pieces are required and the quantity is
+ * worked out here from them, whatever the browser sent (PCS: the quantity is the pieces).
+ * body's quantity (and "Qty To Be Confirmed") are set to it. A line "As per annexure"
+ * keeps D-336 (no pieces). Only on an order with the detailed product table.
+ * Returns [pieces, size note, error].
+ */
+function piecesInput(body, row, perAnnexure) {
+  const lineTable = require('../services/lineTable');
+  const lineUnits = require('../services/lineUnits');
+  const get = (f) => (row === null ? (body[f] ?? '') : ([].concat(body[`product_${f}`] ?? [])[row] ?? ''));
+  const [pieces, error] = lineTable.readPieces(get('pieces_count'));
+  const [note, noteError] = lineTable.readSizeNote(get('size_note'));
+  if ((error ?? noteError) !== null) return [null, null, error ?? noteError];
+  if (perAnnexure) return [null, note, null];
+  const [size, sizeError] = lineSizeInput(body, row);
+  if (sizeError !== null) return [pieces, note, null]; // the size's own message follows
+  const unit = String(get('unit')).trim();
+  const tbcFlags = body.product_quantity_tbc || {};
+  const tbc = row === null ? !!body.quantity_is_tbc : !!tbcFlags[row];
+  const [quantity, qtyError] = lineTable.serverQuantity(unit !== '' ? unit : null, lineUnits.size(size.piece_length_cm), lineUnits.size(size.piece_width_cm),
+    lineUnits.size(size.piece_thickness_cm), pieces, false, tbc);
+  if (qtyError !== null) return [pieces, note, qtyError];
+  if (quantity !== null) {
+    if (row === null) {
+      body.quantity = quantity;
+      delete body.quantity_is_tbc;
+    } else {
+      body.product_quantity = [].concat(body.product_quantity ?? []);
+      body.product_quantity[row] = quantity;
+      if (body.product_quantity_tbc && typeof body.product_quantity_tbc === 'object') delete body.product_quantity_tbc[row];
+    }
+  }
+  return [pieces, note, null];
+}
+
+/** D-339: the order prints the detailed product table (new orders); 'classic' orders keep the line form as before. */
+function detailedLines(order) {
+  return (order.line_table_layout || 'classic') === 'detailed';
+}
+
+/**
  * Owner decision D-336: the line form's "As per annexure" tick box. Never together
  * with "Qty To Be Confirmed"; the quantity stays required (it is the line's
  * quantity). When ticked, the piece size and the Dimensions text are cleared in
@@ -1175,6 +1251,13 @@ async function addProduct(req, res) {
     res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
+  // Owner decision D-339: No. of pieces → the quantity is worked out on the server.
+  const [pieces, sizeNote, piecesError] = detailedLines(order) ? piecesInput(body, null, perAnnexure) : [null, null, null];
+  if (piecesError !== null) {
+    flash.set(req, 'error', `Product line: ${piecesError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
 
   // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
   const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price));
@@ -1230,6 +1313,7 @@ async function addProduct(req, res) {
   await require('../services/orderLinePricing').saveSelection(newLineId, specSel, priceRequest ? Number(priceRequest.id) : null);
   await orderProductRepository.setPieceSize(newLineId, lineSize);
   await orderProductRepository.setAsPerAnnexure(newLineId, perAnnexure);
+  if (detailedLines(order)) await orderProductRepository.setPieces(newLineId, pieces, sizeNote);
   if (priceRequest) await require('../services/priceRequestService').markOrdered(Number(priceRequest.id), orderId);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
@@ -1272,6 +1356,15 @@ async function updateProduct(req, res) {
   const [perAnnexure, annexureError] = annexureLineInput(body, product.as_per_annexure);
   if (annexureError !== null) {
     flash.set(req, 'error', `Product line: ${annexureError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
+  // Owner decision D-339: No. of pieces → the quantity is worked out on the server
+  // (a form without the field keeps the line's pieces and size note).
+  const piecesForm = detailedLines(order) && Object.prototype.hasOwnProperty.call(body, 'pieces_count');
+  const [pieces, sizeNote, piecesError] = piecesForm ? piecesInput(body, null, perAnnexure) : [null, null, null];
+  if (piecesError !== null) {
+    flash.set(req, 'error', `Product line: ${piecesError}`);
     res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
@@ -1345,6 +1438,7 @@ async function updateProduct(req, res) {
   }
   await orderProductRepository.setPieceSize(productId, lineSize);
   await orderProductRepository.setAsPerAnnexure(productId, perAnnexure);
+  if (piecesForm) await orderProductRepository.setPieces(productId, pieces, sizeNote);
   const newPrice = str(body.unit_price);
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
     await orderProductRepository.setPriceSetBy(productId, req.user.id);

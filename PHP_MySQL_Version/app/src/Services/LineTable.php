@@ -370,7 +370,14 @@ final class LineTable
                 $bottom[] = 'Packages';
             }
         }
-        return ['top' => array_map(static fn (array $t): array => ['text' => $t[0], 'span' => $t[1]], $top), 'bottom' => $bottom, 'widths' => $widths];
+        // Each top cell's width (%): the columns it spans.
+        $out = [];
+        $wi = 1;
+        foreach ($top as [$text, $span]) {
+            $out[] = ['text' => $text, 'span' => $span, 'width' => array_sum(array_slice($widths, $wi, $span))];
+            $wi += $span;
+        }
+        return ['top' => $out, 'bottom' => $bottom, 'widths' => $widths];
     }
 
     /** Packing List: the crates whose product description is this line's, or a dash. */

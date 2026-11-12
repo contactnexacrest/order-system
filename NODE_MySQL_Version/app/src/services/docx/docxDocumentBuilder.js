@@ -152,8 +152,9 @@ function productTableHeaders(currency) {
 /** Builds the shared 6-col product table + spec sub-row rows (QT/PI/OC/CI all share this exact schema). */
 function buildProductRows(products) {
   return (products || []).map((p, i) => {
-    const lineColor = i % 2 === 0 ? '1D6FA8' : '2D7D56';
-    const n = i + 1;
+    // D-339: a line below the detailed table keeps its own number on the document.
+    const n = Number(p.no ?? i + 1);
+    const lineColor = n % 2 === 1 ? '1D6FA8' : '2D7D56';
     // Owner decision D-215: a service line shows its SAC code and is invoiced separately.
     const specText = (p.line_type || 'goods') === 'service'
       ? [
@@ -194,6 +195,23 @@ function buildProductRows(products) {
       specText,
     };
   });
+}
+
+/**
+ * Owner decision D-339: the product table — the detailed table on an order with the detailed
+ * layout (context.line_table), else today's table. The lines not sold by size follow in
+ * today's rows (on the Packing List without prices).
+ */
+function productsTable(context, currency, products) {
+  const lt = context.line_table;
+  if (!lt) return C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products));
+  if (lt.with_prices) return C.lineTable(lt, productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(lt.simple));
+  const rows = lt.simple.map((p) => ({
+    cells: [String(p.no), `${p.description || ''}${p.finish ? ` — ${p.finish}` : ''}`, String(p.quantity ?? ''), String(p.unit ?? '')],
+    lineColor: Number(p.no) % 2 === 1 ? '1D6FA8' : '2D7D56',
+    align: [null, null, 'right', null],
+  }));
+  return C.lineTable(lt, ['#', 'Product Description *', 'Qty *', 'Unit *'], [8, 62, 15, 15], rows);
 }
 
 function weightTable(order, context = {}) {
@@ -307,7 +325,7 @@ function renderQt(context) {
   );
 
   children.push(...C.sectionTitle('3. PRODUCT / ORDER DETAILS'));
-  children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(context.products)));
+  children.push(...productsTable(context, currency, context.products));
 
   const freightText = order.is_fob
     ? 'NIL'
@@ -433,7 +451,7 @@ function renderPi(context) {
 
   children.push(...C.sectionTitle('3. PRODUCT / ORDER DETAILS'));
   const products = context.products || [];
-  children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products)));
+  children.push(...productsTable(context, currency, products));
 
   const piTotalsRows = products.map((p) => ({ label: `${p.description || ''} (${p.quantity ?? ''} ${p.unit || ''} × ${p.unit_price ?? ''})`, value: `${currency} ${p.amount ?? ''}` }));
   piTotalsRows.push({ label: `TOTAL PI VALUE (${currency}) *`, value: financial && financial.has_services ? g(financial, 'total_with_services') : g(financial, 'fob_value'), highlight: true });
@@ -617,6 +635,7 @@ function renderOc(context) {
 
   const productList = (context.products || []).map((p) => `${p.description || ''} (Qty: ${p.quantity ?? ''} ${p.unit || ''})`);
   children.push(...C.sectionTitle('3. ORDER SUMMARY'));
+  if (context.line_table) children.push(...productsTable(context, currency, context.products)); // D-339
   children.push(
     ...C.kvTable([
       { label: 'Quotation No. *', value: g(order, 'quotation_ref', '—') },
@@ -624,7 +643,7 @@ function renderOc(context) {
       { label: 'Proforma Invoice No. *', value: g(order, 'pi_ref', '—') },
       // Owner decision D-224 (D1, 2 Nov 2026, confirmed twice): the buyer's PO number, when entered.
       ...buyerPoRow(order),
-      { label: 'Product(s) *', value: productList.join('; ') },
+      ...(context.line_table ? [] : [{ label: 'Product(s) *', value: productList.join('; ') }]),
       { label: 'Total Order Value (FOB) *', value: `${currency} ${g(financial, 'total_value')}` },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
@@ -913,15 +932,19 @@ function renderBuyerPo(context) {
 
   const productList = products.map((p) => p.description || '').join('; ');
   children.push(...C.sectionTitle('3. ORDER DETAILS  (Pre-filled from Quotation — buyer to confirm)'));
+  if (context.line_table) children.push(...productsTable(context, currency, products)); // D-339
   children.push(
     ...C.kvTable([
       { label: 'Against Quotation No. *', value: `${g(order, 'quotation_ref', '—')} (fixed)` },
       { label: 'Quotation Date *', value: `${g(order, 'quotation_date', '—')} (fixed)` },
-      { label: 'Product Description *', value: productList },
-      // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
-      { label: 'Quantity *', value: products.length ? products.map((p) => String(p.quantity ?? '')).join('; ') : 'To Be Confirmed' },
-      { label: 'Unit *', value: products.length ? products.map((p) => String(p.unit ?? '')).join('; ') : 'To Be Confirmed' },
-      { label: `Unit Price (${currency}) *`, value: products.length ? products.map((p) => String(p.unit_price ?? '')).join('; ') : 'To Be Confirmed' },
+      // D-339: on an order with the detailed product table, the table above lists the lines.
+      ...(context.line_table ? [] : [
+        { label: 'Product Description *', value: productList },
+        // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
+        { label: 'Quantity *', value: products.length ? products.map((p) => String(p.quantity ?? '')).join('; ') : 'To Be Confirmed' },
+        { label: 'Unit *', value: products.length ? products.map((p) => String(p.unit ?? '')).join('; ') : 'To Be Confirmed' },
+        { label: `Unit Price (${currency}) *`, value: products.length ? products.map((p) => String(p.unit_price ?? '')).join('; ') : 'To Be Confirmed' },
+      ]),
       { label: `Total FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
@@ -1298,9 +1321,10 @@ function renderPl(context) {
   const productList = products.map((p) => `${p.description || ''}${p.finish ? ` — ${p.finish}` : ''}`).join('; ');
   const hsCodeList = products.map((p) => p.hs_code || '').join(', ');
   children.push(...C.sectionTitle('3. PRODUCT SUMMARY'));
+  if (context.line_table) children.push(...productsTable(context, '', products)); // D-339: the detailed table, no prices
   children.push(
     ...C.kvTable([
-      { label: 'Product Description *', value: productList },
+      ...(context.line_table ? [] : [{ label: 'Product Description *', value: productList }]),
       { label: 'HS Code *', value: hsCodeList },
       { label: 'Country of Origin *', value: 'India' },
       { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed') !== '—' ? `${g(packing, 'actual_quantity_packed')}${g(packing, 'actual_quantity_unit') !== '—' ? ` ${g(packing, 'actual_quantity_unit')}` : ''}` : 'To Be Confirmed' },
@@ -1613,7 +1637,7 @@ function renderCi(context) {
 
   children.push(...C.sectionTitle('4. PRODUCT / ORDER DETAILS'));
   children.push(C.plain('Quantities and values below reflect ACTUAL shipment — must match Packing List. Must not exceed PI quantities.', { italics: true, size: 17, color: C.MUTED }));
-  children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products)));
+  children.push(...productsTable(context, currency, products));
   let plRefLine = `PL Reference: ${g(order, 'pl_ref', 'To Be Confirmed')}`;
   if (crates.length) {
     plRefLine += crates.length > 1 ? ` — ${cd(context).package_nouns} ${crates[0].crate_no || ''} to ${crates[crates.length - 1].crate_no || ''}` : ` — ${cd(context).package_noun} ${crates[0].crate_no || ''}`;

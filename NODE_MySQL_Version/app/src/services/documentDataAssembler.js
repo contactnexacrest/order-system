@@ -180,6 +180,7 @@ async function assemble(orderId, documentTypeCode = null) {
   const resolvedNotifyParty = resolveNotifyParty(order, resolvedConsignee);
   const [showConsigneeSection, showNotifyPartySection] = await sectionDisplayFlags(resolvedConsignee, resolvedNotifyParty);
 
+  let formattedProducts = [];
   return {
     company,
     assets,
@@ -267,7 +268,7 @@ async function assemble(orderId, documentTypeCode = null) {
     show_notify_party_section: showNotifyPartySection,
     // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
     category_documents: await require('./categoryDocumentProfile').forOrder(orderId),
-    products: products.map((p) => {
+    products: (formattedProducts = products.map((p) => {
       // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
       const perAnnexure = annexureLineLetter !== null && !!Number(p.as_per_annexure || 0);
       const quantity = p.quantity_is_tbc ? 'To Be Confirmed' : formatNumber(p.quantity);
@@ -285,7 +286,10 @@ async function assemble(orderId, documentTypeCode = null) {
       attributes: require('../repositories/productCategoryRepository').documentAttributes(p),
       sac_code: p.sac_code || null,
       };
-    }),
+    })),
+    // Owner decision D-339: the detailed product table on an order with the 'detailed' layout (new orders);
+    // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
+    line_table: await lineTableBlock(order, products, formattedProducts, documentTypeCode, annexureLineLetter, orderId),
     financial: {
       fob_value: formatMoney(fobValue),
       fob_value_raw: fobValue,
@@ -383,6 +387,53 @@ async function assemble(orderId, documentTypeCode = null) {
  * controls that per-preset from the Payment Presets screen rather than a
  * code change.
  */
+/**
+ * Owner decision D-339 (12 Nov 2026, confirmed twice): the detailed product table (lineTable)
+ * of the QT / PI / OC / CI / Buyer PO (with prices) and Packing List (without), on an order
+ * whose line_table_layout is 'detailed'. Null on a 'classic' order and on every other document.
+ */
+async function lineTableBlock(order, products, formatted, documentTypeCode, annexureLetter, orderId) {
+  const lineTable = require('./lineTable');
+  const code = String(documentTypeCode || '').toUpperCase();
+  if ((order.line_table_layout || lineTable.LAYOUT_CLASSIC) !== lineTable.LAYOUT_DETAILED || !lineTable.DOCUMENTS.includes(code)) {
+    return null;
+  }
+  const crateCounts = {};
+  if (code === 'PL') {
+    for (const c of await orderCrateRepository.forOrder(orderId)) {
+      const key = String(c.product_description ?? '').trim().toLowerCase();
+      if (key !== '') crateCounts[key] = (crateCounts[key] || 0) + 1;
+    }
+  }
+  const names = {};
+  for (const p of products) names[Number(p.id)] = await lineNames(p);
+  return lineTable.build(products, formatted, String(order.currency_code || ''), annexureLetter, code !== 'PL', crateCounts, names);
+}
+
+/**
+ * D-339: "Material / Colour" = the line's description, with the colour / variety option
+ * chosen on the line when its product offers one (and the description does not name it yet);
+ * "Surface / Finish" = the line's finish, else its chosen surface-finish option.
+ */
+async function lineNames(line) {
+  let material = String(line.description);
+  let finish = String(line.finish ?? '').trim();
+  const selection = require('./orderLinePricing').lineSelection(line);
+  const product = selection !== null && line.catalog_product_id ? await require('../repositories/productRepository').find(Number(line.catalog_product_id)) : null;
+  if (product) {
+    for (const s of await require('./productSpecs').offered(product)) {
+      if (selection[s.id] === undefined) continue;
+      const found = s.options.find((o) => Number(o.id) === Number(selection[s.id]));
+      if (!found) continue;
+      const chosen = String(found.name);
+      const name = String(s.name);
+      if (/colou?r|variety|shade/i.test(name) && !material.toLowerCase().includes(chosen.toLowerCase())) material += ` — ${chosen}`;
+      if (finish === '' && /finish|surface/i.test(name)) finish = chosen;
+    }
+  }
+  return { material, finish };
+}
+
 async function blBlock(companyLegalName, showBlInstructions) {
   if (!showBlInstructions) {
     return { type_instruction: null, consignee_instruction: null };

@@ -164,6 +164,9 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
     }
   );
   const orderId = result.insertId;
+  // Owner decision D-339: the tests written before it pin the classic product table (as every
+  // order that existed before migration 2026-11-12g); a test of the detailed table sets 'detailed'.
+  await db.execute("UPDATE orders SET line_table_layout = 'classic' WHERE id = :id", { id: orderId });
   await orderStageRepository.initializeForOrder(orderId);
   await orderComplianceTaskRepository.initializeForOrder(orderId);
   await orderExportBenefitSchemeRepository.initializeForOrder(orderId);

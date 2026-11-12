@@ -26,15 +26,8 @@
   <thead>
   <tr>
     <th style="width:{{ lt.heads.widths[0] }}%; border-bottom-color:#173B73;">#</th>
-    {% set wi = 1 %}
     {% for t in lt.heads.top %}
-    {% if t.span > 1 %}
-    <th colspan="{{ t.span }}" style="width:{{ lt.heads.widths[wi] + lt.heads.widths[wi + 1] + lt.heads.widths[wi + 2] }}%;">{{ t.text }}</th>
-    {% set wi = wi + 3 %}
-    {% else %}
-    <th style="width:{{ lt.heads.widths[wi] }}%;">{{ t.text }}</th>
-    {% set wi = wi + 1 %}
-    {% endif %}
+    <th{% if t.span > 1 %} colspan="{{ t.span }}"{% endif %} style="width:{{ t.width }}%;">{{ t.text }}</th>
     {% endfor %}
   </tr>
   <tr><th style="border-top-color:#173B73;"></th>{% for b in lt.heads.bottom %}<th>{{ b }}</th>{% endfor %}</tr>
