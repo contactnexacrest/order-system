@@ -52,6 +52,28 @@ ask for support. The sections have plain titles too ("Security and logging
 in", "RBI purpose codes", "Screen layout", "Zoho Books" …) and are in A–Z
 order.
 
+### Changing the Managing Director's name or title (D-349, 12 Nov 2026)
+
+When you change **Managing Director name** or **Managing Director title** on
+Settings › Company and press **Save changes** (with your reason), nothing is saved
+yet. A page opens: *"The Managing Director's name changed from "…" to "…". Apply it to:"*
+
+- ☑ **N open orders** whose kept company details still show the old name
+  (orders whose PI is approved keep their own copy — closed, lost and cancelled
+  orders are never touched). Their order numbers are listed.
+- ☑ **N documents still in Draft / In review** that print the company's
+  fallback signatory with the old name. Their numbers are listed.
+- If the person who signs is a founder login, a note says the name under the
+  signature comes from that login, which the app cannot change on purpose —
+  change it with the founder SQL block in the README (First-time setup).
+- *Not changed:* documents already approved or sent; closed and cancelled orders.
+
+Press **Save and apply** to save the setting and update the ticked items, or
+**Save setting only** to save just the setting. Untick a box to leave that group
+as it is. Going back to Settings saves nothing. Every change is in the Audit Log
+(old → new, which orders, which documents). A draft PDF already made keeps the
+old name until it is regenerated; the final copy made on approval shows the new one.
+
 ### Sign-in security (D-265)
 
 Every staff member, in every role, and every buyer enters a 6-digit code
@@ -465,6 +487,11 @@ once — can only be archived, never deleted; trying anyway shows a clear
 message naming where they still appear ("… can't be deleted — they still
 appear in: …. History is never removed, so archive (deactivate) them
 instead.") rather than failing silently.
+
+**Renaming a signatory (D-349).** When you change the name of a user who can
+sign documents (not a founder login), their documents still in Draft / In review
+take the new name; the message after saving says how many. Approved and sent
+documents keep the name they were issued with.
 
 Notice the **"Protected — founder"** tag on certain accounts: these
 specific users can't be edited, deactivated, archived, deleted, or

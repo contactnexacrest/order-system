@@ -110,6 +110,14 @@ final class SettingsController
         $submitted = $_POST['settings'] ?? [];
         $reason = trim((string) ($_POST['reason'] ?? ''));
         $unlocked = $_POST['unlocked'] ?? []; // { [setting_key]: '1' } — set only by the explicit unlock gesture
+        // D-349: the second step of an MD name / title change ("Save and apply" / "Save setting only")
+        // replays the submission kept in the session; every check below runs again on it.
+        $mdChoice = $params['md_sync_choice'] ?? null;
+        if ($mdChoice !== null) {
+            $submitted = $params['settings'] ?? [];
+            $reason = trim((string) ($params['reason'] ?? ''));
+            $unlocked = $params['unlocked'] ?? [];
+        }
 
         if (!is_array($submitted)) {
             Flash::set('error', 'Malformed submission.');
@@ -241,6 +249,18 @@ final class SettingsController
             return;
         }
 
+        // D-349: an MD name / title change first shows what else still carries the old value
+        // (open orders, draft documents) and asks "Save and apply" or "Save setting only".
+        $mdChanges = \App\Services\MdNameSyncService::onlyMdKeys($toApply);
+        if ($mdChanges !== [] && $mdChoice === null) {
+            $_SESSION['md_sync_pending'] = [
+                'settings' => $submitted, 'reason' => $reason, 'unlocked' => $unlocked,
+                'changes' => $mdChanges, 'at' => time(),
+            ];
+            header('Location: /settings/md-change');
+            return;
+        }
+
         foreach ($toApply as $key => $change) {
             CompanySettingsRepository::set($key, $change['new'], (int) $user['id']);
             if ($byKey[$key]['is_protected']) {
@@ -258,8 +278,61 @@ final class SettingsController
             );
         }
 
-        Flash::set('success', count($toApply) . ' setting(s) updated.');
+        $message = count($toApply) . ' setting(s) updated.';
+        if ($mdChanges !== [] && $mdChoice === 'apply') {
+            $done = \App\Services\MdNameSyncService::apply($mdChanges, (int) $user['id'], $reason, !empty($params['apply_orders']), !empty($params['apply_documents']));
+            $message .= " Applied to {$done['orders']} open order(s) and {$done['documents']} draft / in-review document(s).";
+        } elseif ($mdChanges !== []) {
+            $message .= ' Open orders and draft documents were left as they are.';
+        }
+        Flash::set('success', $message);
         header('Location: /settings');
+    }
+
+    /** D-349: the "Apply it to:" step after an MD name / title change in Settings › Company. */
+    public function mdChangeForm(array $params): void
+    {
+        $pending = self::pendingMdChange();
+        if ($pending === null) {
+            Flash::set('error', 'There is no Managing Director name or title change waiting to be saved. Make the change again.');
+            header('Location: /settings');
+            return;
+        }
+        View::render('settings/md_change', [
+            'changes' => $pending['changes'],
+            'preview' => \App\Services\MdNameSyncService::preview($pending['changes']),
+        ], 'layout/base');
+    }
+
+    /** D-349: "Save and apply" / "Save setting only" — saves the kept submission (all checks run again). */
+    public function mdChangeSave(array $params): void
+    {
+        $pending = self::pendingMdChange();
+        unset($_SESSION['md_sync_pending']);
+        $choice = (string) ($_GET['choice'] ?? $_POST['choice'] ?? '');
+        if ($pending === null || !in_array($choice, ['apply', 'setting_only'], true)) {
+            Flash::set('error', 'Nothing was saved: the change was no longer waiting, or no choice was made. Make the change again.');
+            header('Location: /settings');
+            return;
+        }
+        $this->update([
+            'md_sync_choice' => $choice,
+            'settings' => $pending['settings'],
+            'reason' => $pending['reason'],
+            'unlocked' => $pending['unlocked'],
+            'apply_orders' => !empty($_POST['apply_orders']),
+            'apply_documents' => !empty($_POST['apply_documents']),
+        ]);
+    }
+
+    /** The waiting MD change (30 minutes at most), or null. */
+    private static function pendingMdChange(): ?array
+    {
+        $p = $_SESSION['md_sync_pending'] ?? null;
+        if (!is_array($p) || (int) ($p['at'] ?? 0) < time() - 1800 || !is_array($p['settings'] ?? null)) {
+            return null;
+        }
+        return $p;
     }
 
     /**

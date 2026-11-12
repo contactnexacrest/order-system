@@ -291,6 +291,9 @@ $router->post('/account/forget-computers', [$account, 'forgetComputers'], [Sessi
 
 $router->get('/settings', [$settings, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// D-349: MD name / title change — "Apply it to:" open orders and draft documents.
+$router->get('/settings/md-change', [$settings, 'mdChangeForm'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/settings/md-change', [$settings, 'mdChangeSave'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-zoho-email', [$settings, 'testZohoEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-zoho-books', [$settings, 'testZohoBooks'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-smtp-email', [$settings, 'testSmtpEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

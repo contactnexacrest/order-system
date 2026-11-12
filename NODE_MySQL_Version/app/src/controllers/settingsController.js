@@ -15,6 +15,7 @@ const zohoGuard = require('../services/zohoGuard');
 const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
 const settingLabels = require('../helpers/settingLabels');
+const mdNameSyncService = require('../services/mdNameSyncService');
 
 // Port of App\Controllers\SettingsController.
 
@@ -80,9 +81,14 @@ async function index(req, res) {
 
 async function update(req, res) {
   const user = req.user;
-  const submitted = req.body.settings || {};
-  const reason = String(req.body.reason || '').trim();
-  const unlocked = req.body.unlocked || {}; // { [setting_key]: '1' } — set only by the explicit unlock gesture
+  // D-349: the second step of an MD name / title change ("Save and apply" / "Save setting only")
+  // replays the submission kept in the session; every check below runs again on it.
+  const replay = req.mdSyncReplay || null;
+  const mdChoice = replay ? replay.md_sync_choice : null;
+  const input = replay || req.body;
+  const submitted = input.settings || {};
+  const reason = String(input.reason || '').trim();
+  const unlocked = input.unlocked || {}; // { [setting_key]: '1' } — set only by the explicit unlock gesture
 
   if (typeof submitted !== 'object' || Array.isArray(submitted)) {
     flash.set(req, 'error', 'Malformed submission.');
@@ -192,6 +198,18 @@ async function update(req, res) {
     }
   }
 
+  // D-349: an MD name / title change first shows what else still carries the old value
+  // (open orders, draft documents) and asks "Save and apply" or "Save setting only".
+  const mdChanges = mdNameSyncService.onlyMdKeys(toApply);
+  const hasMdChange = Object.keys(mdChanges).length > 0;
+  if (hasMdChange && mdChoice === null) {
+    req.session.md_sync_pending = {
+      settings: submitted, reason, unlocked, changes: mdChanges, at: Math.floor(Date.now() / 1000),
+    };
+    res.redirect('/settings/md-change');
+    return;
+  }
+
   for (const [key, change] of Object.entries(toApply)) {
     await companySettingsRepository.set(key, change.new, user.id);
     if (byKey[key].is_protected) {
@@ -202,8 +220,60 @@ async function update(req, res) {
       secretSetting.isSecret(key) ? secretSetting.forAudit(change.new) : change.new, reason);
   }
 
-  flash.set(req, 'success', `${Object.keys(toApply).length} setting(s) updated.`);
+  let message = `${Object.keys(toApply).length} setting(s) updated.`;
+  if (hasMdChange && mdChoice === 'apply') {
+    const done = await mdNameSyncService.apply(mdChanges, user.id, reason, !!replay.apply_orders, !!replay.apply_documents);
+    message += ` Applied to ${done.orders} open order(s) and ${done.documents} draft / in-review document(s).`;
+  } else if (hasMdChange) {
+    message += ' Open orders and draft documents were left as they are.';
+  }
+  flash.set(req, 'success', message);
   res.redirect('/settings');
+}
+
+/** The waiting MD change (30 minutes at most), or null. */
+function pendingMdChange(req) {
+  const p = req.session.md_sync_pending;
+  if (!p || typeof p !== 'object' || (parseInt(p.at, 10) || 0) < Math.floor(Date.now() / 1000) - 1800
+      || !p.settings || typeof p.settings !== 'object') {
+    return null;
+  }
+  return p;
+}
+
+/** D-349: the "Apply it to:" step after an MD name / title change in Settings › Company. */
+async function mdChangeForm(req, res) {
+  const pending = pendingMdChange(req);
+  if (!pending) {
+    flash.set(req, 'error', 'There is no Managing Director name or title change waiting to be saved. Make the change again.');
+    res.redirect('/settings');
+    return;
+  }
+  res.renderView('settings/md_change', {
+    changes: pending.changes,
+    preview: await mdNameSyncService.preview(pending.changes),
+  });
+}
+
+/** D-349: "Save and apply" / "Save setting only" — saves the kept submission (all checks run again). */
+async function mdChangeSave(req, res) {
+  const pending = pendingMdChange(req);
+  delete req.session.md_sync_pending;
+  const choice = String((req.query && req.query.choice) || req.body.choice || '');
+  if (!pending || !['apply', 'setting_only'].includes(choice)) {
+    flash.set(req, 'error', 'Nothing was saved: the change was no longer waiting, or no choice was made. Make the change again.');
+    res.redirect('/settings');
+    return;
+  }
+  req.mdSyncReplay = {
+    md_sync_choice: choice,
+    settings: pending.settings,
+    reason: pending.reason,
+    unlocked: pending.unlocked,
+    apply_orders: !!req.body.apply_orders,
+    apply_documents: !!req.body.apply_documents,
+  };
+  await update(req, res);
 }
 
 /**
@@ -293,4 +363,4 @@ async function testSmtpEmail(req, res) {
   res.redirect('/settings');
 }
 
-module.exports = { index, update, testZohoEmail, testZohoBooks, testSmtpEmail };
+module.exports = { index, update, mdChangeForm, mdChangeSave, testZohoEmail, testZohoBooks, testSmtpEmail };

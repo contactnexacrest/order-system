@@ -200,7 +200,13 @@ final class UserController
             );
         }
 
-        Flash::set('success', "{$name} updated.");
+        // D-349: a signatory's new name goes onto their documents still in Draft / In review
+        // (approved and sent documents never change; a protected founder login never reaches here).
+        $synced = (string) $target['name'] !== $name
+            ? \App\Services\MdNameSyncService::userRenamed($userId, (string) $target['name'], $name, (int) $actor['id'])
+            : 0;
+
+        Flash::set('success', "{$name} updated." . ($synced > 0 ? " The new name is now on {$synced} draft / in-review document(s) they sign." : ''));
         header('Location: /users');
     }
 

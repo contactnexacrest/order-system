@@ -2147,6 +2147,41 @@ details on this order** (Step 1; `POST /orders/{id}/company-details/refresh`;
 already issued stay as they are. Tests: `OrderSelfContainedTest` /
 `orderSelfContained.test.js`.
 
+**MD name or title changed in Settings › Company (D-349, 12 Nov 2026, owner confirm 1 +
+confirm 2).** Saving a change to `md_name` or `md_title` (all the usual checks first: reason,
+value, protected, Super Admin) does not save straight away: the submission is kept in the
+session (30 minutes) and `GET /settings/md-change` shows "The Managing Director's name changed
+from "<old>" to "<new>". Apply it to:" with two ticked boxes — **N open orders** (status not
+`complete` / `lost` / `cancelled`, frozen, whose `frozen_snapshot_json.company.md_name` /
+`md_title` still equals the old value; their references are listed) and **N documents still in
+Draft / In review** whose kept signatory is the company fallback (`signatory_user_id IS NULL`,
+`signatory_name_snapshot` / `signatory_designation_snapshot` equal to the old value). When the
+default signatory (`company_default_signatory`) is a protected founder login whose `users.name`
+differs from the new name, an info line says: "The name printed under the signature comes from
+the founder login, which the app cannot change on purpose. Change it with the founder SQL block
+in the README (First-time setup)." (the app never renames a founder; the DB trigger would refuse
+it). Then "Not changed: N documents already approved or sent; N closed and cancelled orders."
+and two buttons: **Save and apply** and **Save setting only** (`POST /settings/md-change?choice=
+apply|setting_only`, `manage_company_settings`; the choice travels in the button's `formaction`
+because app.js disables the pressed button). Both replay the kept submission through the same
+checks and save the setting; "Save and apply" then runs `MdNameSyncService::apply`
+(`mdNameSyncService.apply`) in one transaction: the ticked orders' snapshot keys, the ticked
+documents' signatory snapshots and, on those documents, `company_snapshot_json` and the stored
+`render_context_json` (`company.md_name/md_title`, `signatory.name/designation`, where they still
+show the old value — the FINAL copy is re-rendered from it on approval; the DRAFT PDF already
+made keeps the old wording until it is regenerated). Audit: `ORDER_MD_DETAILS_SYNCED` (orders,
+`frozen_snapshot_json.company.<key>`, old → new) and `DOCUMENT_SIGNATORY_SNAPSHOT_SYNCED`
+(documents, column, old → new), reason "D-349 apply from Settings › Company: <reason>".
+Approved and sent documents, and closed / lost / cancelled orders, never change. Going back to
+Settings saves nothing.
+
+**Signatory renamed in Admin › Users (D-349).** When a non-protected, signatory-eligible user's
+name is changed on Users › Edit, `MdNameSyncService::userRenamed` puts the new name on
+`signatory_name_snapshot` (and `render_context_json.signatory.name`) of that user's documents
+still in Draft / In review; audit `DOCUMENT_SIGNATORY_SNAPSHOT_SYNCED` per document. The success
+message says how many. Approved and sent documents never change; founder logins cannot be edited
+here at all.
+
 ### 5.6 Incoterm effects (FOB / CFR / CIF)
 
 | | FOB | CFR | CIF |
@@ -4113,6 +4148,9 @@ The client portal lists only customer-facing documents that are approved or sent
 3. `company_default_signatory`;
 4. fallback: `company_settings.md_name` / `md_title` and the global signature asset.
 
+A change to `md_name` / `md_title`, or to a signatory user's name in Admin › Users, can be
+applied to open orders and Draft / In-review documents (D-349, §5.5).
+
 The user must be `is_signatory_eligible`. The block prints the user's signature image, their designation seal or the company seal (`assets` type `seal`), as images, not black boxes (D-058). Re-renders reuse the signatory stored with the revision (`signatoryFromSnapshot`). The name printed is `users.name`, which is why real names are entered only at go-live (§9.4). An optional disclaimer under the signature block (`show_generated_document_disclaimer`, off by default, D-066).
 
 ### 8.4 Watermarks
@@ -4138,6 +4176,15 @@ Every page carries the reference and the watermark (D-065). A blank watermark se
 | Documents to be provided | The standard 5 | The 5, then each quality document (e.g. "6. Mill Test Certificate 3.1") |
 | Supplier PO section 3 | "Material / Stone Type", ±2 mm / ±0.5 mm | "Material / Product Type", "As per the approved drawing / specification", Quality Documents Required |
 | T&C | Natural stone clause set | The category's clause set |
+
+**Certificate of Origin line (D-349, 12 Nov 2026, owner confirm 1 + confirm 2).** Item 3 of
+"Documents to be provided" (QT), "Export documentation" (PI) and "Documents provided with this
+shipment" (CI), PDF and Word, prints `order.coo_line` from `DocumentDataAssembler::cooLine()` /
+`documentDataAssembler.cooLine()`: when `coo_type` is empty, NULL, "TBC" or "To Be Confirmed"
+(trimmed, any case) it reads "3. Certificate of Origin Issued by CAPEXIL"; otherwise "3.
+Certificate of Origin — <type> — Issued by CAPEXIL" as before. The Word builder reads the same
+value (falling back to the same helper), so the PDF and Word wording never differ. Other
+documents that show the COO type (Buyer PO, OC, COOPREP) are unchanged.
 
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 

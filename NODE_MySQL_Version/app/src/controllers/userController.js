@@ -12,6 +12,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const userRepository = require('../repositories/userRepository');
 const grantGuard = require('../services/grantGuard');
+const mdNameSyncService = require('../services/mdNameSyncService');
 
 /**
  * Port of App\Controllers\UserController — admin user-management screen.
@@ -189,7 +190,13 @@ async function update(req, res) {
     await auditLogRepository.log(actor.id, 'USER_UPDATED', 'users', userId, field, oldVal !== null && oldVal !== undefined ? String(oldVal) : null, newVal !== null && newVal !== undefined ? String(newVal) : null);
   }
 
-  flash.set(req, 'success', `${name} updated.`);
+  // D-349: a signatory's new name goes onto their documents still in Draft / In review
+  // (approved and sent documents never change; a protected founder login never reaches here).
+  const synced = String(target.name) !== name
+    ? await mdNameSyncService.userRenamed(userId, String(target.name), name, actor.id)
+    : 0;
+
+  flash.set(req, 'success', `${name} updated.${synced > 0 ? ` The new name is now on ${synced} draft / in-review document(s) they sign.` : ''}`);
   res.redirect('/users');
 }
 

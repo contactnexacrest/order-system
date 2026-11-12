@@ -213,6 +213,9 @@ async function assemble(orderId, documentTypeCode = null) {
       est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
       coo_type: order.coo_type ?? 'To Be Confirmed',
+      // D-349: the "Certificate of Origin" line of "Documents to be provided"
+      // on the QT / PI / CI (PDF and Word read this one value).
+      coo_line: cooLine(order.coo_type),
       // D-336: on the CI / PL "an annexure is printed" (the one chosen for them).
       include_annexure_a: annexureIncluded,
       currency_code: order.currency_code,
@@ -1153,6 +1156,21 @@ function formatNumber(value) {
   return Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
+/**
+ * D-349 (owner, 12 Nov 2026): the Certificate of Origin line on the QT / PI / CI.
+ * No type chosen yet (empty, NULL, "TBC", "To Be Confirmed") prints
+ * "Certificate of Origin Issued by CAPEXIL"; a chosen type prints
+ * "Certificate of Origin — <type> — Issued by CAPEXIL". The PDF templates and
+ * the Word builder both print this value, so the two never differ.
+ */
+function cooLine(cooType) {
+  const type = String(cooType ?? '').trim();
+  if (type === '' || ['tbc', 'to be confirmed'].includes(type.toLowerCase())) {
+    return 'Certificate of Origin Issued by CAPEXIL';
+  }
+  return `Certificate of Origin — ${type} — Issued by CAPEXIL`;
+}
+
 function formatDate(value) {
   if (!value) {
     return null;
@@ -1211,6 +1229,7 @@ module.exports = {
   formatMoney,
   formatNumber,
   formatDate,
+  cooLine,
   balanceTriggerSentence,
   resolveAgreementFooter,
   resolveConsignee,

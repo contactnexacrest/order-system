@@ -171,7 +171,7 @@
   <p><strong>The following documents are provided with this shipment:</strong></p>
   <p>1.&nbsp;&nbsp;Commercial Invoice (this document)</p>
   <p>2.&nbsp;&nbsp;Packing List</p>
-  <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
+  <p>3.&nbsp;&nbsp;{{ order.coo_line }}</p>
   <p>4.&nbsp;&nbsp;Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest</p>
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
   {% for q in category_documents.quality_documents %}<p>{{ loop.index + 5 }}.&nbsp;&nbsp;{{ q.name }} — required for {{ q.category }}</p>{% endfor %}

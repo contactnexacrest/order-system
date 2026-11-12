@@ -194,6 +194,12 @@ final class DocxDocumentBuilder
         return ($po === '' || $po === 'NIL') ? [] : [['label' => "Buyer's PO / Ref No.", 'value' => $po]];
     }
 
+    /** D-349: the Certificate of Origin line, the same value the PDF prints. */
+    private static function cooLine(array $order): string
+    {
+        return (string) ($order['coo_line'] ?? \App\Services\DocumentDataAssembler::cooLine($order['coo_type'] ?? null));
+    }
+
     private static function g(array $arr, string $path, $default = '—')
     {
         $cur = $arr;
@@ -512,7 +518,7 @@ final class DocxDocumentBuilder
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
             '1.  Commercial Invoice',
             '2.  Packing List',
-            '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
+            '3.  ' . self::cooLine($order),
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
@@ -671,7 +677,7 @@ final class DocxDocumentBuilder
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
             '1.  Commercial Invoice',
             '2.  Packing List',
-            '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
+            '3.  ' . self::cooLine($order),
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared in NexaCrest bank account',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
@@ -1683,7 +1689,7 @@ final class DocxDocumentBuilder
         self::documentsProvidedParagraphs($section, 'The following documents are provided with this shipment:', [
             '1.  Commercial Invoice (this document)',
             '2.  Packing List',
-            '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
+            '3.  ' . self::cooLine($order),
             '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),

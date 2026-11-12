@@ -218,6 +218,9 @@ final class DocumentDataAssembler
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
                 'coo_type'             => $order['coo_type'] ?? 'To Be Confirmed',
+                // D-349: the "Certificate of Origin" line of "Documents to be provided"
+                // on the QT / PI / CI (PDF and Word read this one value).
+                'coo_line'             => self::cooLine($order['coo_type'] ?? null),
                 // D-336: on the CI / PL "an annexure is printed" (the one chosen for them).
                 'include_annexure_a'   => $annexureIncluded,
                 'currency_code'        => $order['currency_code'],
@@ -394,6 +397,22 @@ final class DocumentDataAssembler
      * detailed product table — worked out from the goods lines (LineTable::totalCbm), 3 decimals; null ("To Be Confirmed",
      * or the estimate typed on the order) when a goods line cannot be turned into CBM, and on every other order and document.
      */
+    /**
+     * D-349 (owner, 12 Nov 2026): the Certificate of Origin line on the QT / PI / CI.
+     * No type chosen yet (empty, NULL, "TBC", "To Be Confirmed") prints
+     * "Certificate of Origin Issued by CAPEXIL"; a chosen type prints
+     * "Certificate of Origin — <type> — Issued by CAPEXIL". The PDF templates and
+     * the Word builder both print this value, so the two never differ.
+     */
+    public static function cooLine(?string $cooType): string
+    {
+        $type = trim((string) $cooType);
+        if ($type === '' || in_array(strtolower($type), ['tbc', 'to be confirmed'], true)) {
+            return 'Certificate of Origin Issued by CAPEXIL';
+        }
+        return 'Certificate of Origin — ' . $type . ' — Issued by CAPEXIL';
+    }
+
     private static function weightTotalCbm(array $order, array $products, ?string $documentTypeCode): string
     {
         if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) === LineTable::LAYOUT_DETAILED) {

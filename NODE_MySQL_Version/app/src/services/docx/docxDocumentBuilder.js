@@ -125,6 +125,14 @@ function partiesSections(context, showBuyerPo = false) {
   return out;
 }
 
+/** D-349: the Certificate of Origin line, the same value the PDF prints. */
+function cooLine(order) {
+  if (order && order.coo_line) {
+    return String(order.coo_line);
+  }
+  return require('../documentDataAssembler').cooLine(order ? order.coo_type : null);
+}
+
 function g(obj, path, fallback = '—') {
   let cur = obj;
   for (const key of path.split('.')) {
@@ -411,7 +419,7 @@ function renderQt(context) {
     ...documentsProvidedParagraphs('Upon shipment, the following documents will be provided:', [
       '1.  Commercial Invoice',
       '2.  Packing List',
-      `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
+      `3.  ${cooLine(order)}`,
       `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared`,
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
@@ -602,7 +610,7 @@ function renderPi(context) {
     ...documentsProvidedParagraphs('Upon shipment, the following documents will be provided:', [
       '1.  Commercial Invoice',
       '2.  Packing List',
-      `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
+      `3.  ${cooLine(order)}`,
       `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared in NexaCrest bank account`,
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
@@ -1739,7 +1747,7 @@ function renderCi(context) {
     ...documentsProvidedParagraphs('The following documents are provided with this shipment:', [
       '1.  Commercial Invoice (this document)',
       '2.  Packing List',
-      `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
+      `3.  ${cooLine(order)}`,
       '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),

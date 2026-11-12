@@ -741,6 +741,9 @@ app.post('/users/:id/forget-computers', requireAuth, requirePermission('manage_u
 app.post('/account/forget-computers', requireAuth, verifyCsrf, asyncHandler(accountController.forgetComputers));
 app.get('/settings', requireAuth, requirePermission('manage_company_settings'), asyncHandler(settingsController.index));
 app.post('/settings/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.update));
+// D-349: MD name / title change — "Apply it to:" open orders and draft documents.
+app.get('/settings/md-change', requireAuth, requirePermission('manage_company_settings'), asyncHandler(settingsController.mdChangeForm));
+app.post('/settings/md-change', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.mdChangeSave));
 app.post('/settings/test-zoho-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoEmail));
 app.post('/settings/test-zoho-books', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoBooks));
 app.post('/settings/test-smtp-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testSmtpEmail));
