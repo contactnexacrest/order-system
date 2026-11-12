@@ -316,6 +316,19 @@ document.getElementById('product-rows').addEventListener('click', function (e) {
   if (!e.target.classList.contains('duplicate-row')) return;
   var sourceRow = e.target.closest('.product-row');
   var clone = sourceRow.cloneNode(true);
+  // Owner, 12 Nov 2026: a copy is an exact copy. cloneNode keeps typed boxes but not the
+  // drop-down choices, ticks or text areas — copy every field's current value across.
+  var from = sourceRow.querySelectorAll('select, input, textarea');
+  var to = clone.querySelectorAll('select, input, textarea');
+  for (var i = 0; i < from.length && i < to.length; i++) {
+    if (to[i].type === 'checkbox' || to[i].type === 'radio') { to[i].checked = from[i].checked; }
+    else if (to[i].type !== 'file') { to[i].value = from[i].value; }
+  }
   document.getElementById('product-rows').appendChild(clone);
+  // Let the worked-out Qty, floor note and summary refresh on the copy. Only typed boxes are
+  // nudged: a "change" on the product drop-down would refill the line from the product.
+  clone.querySelectorAll('input').forEach(function (el) {
+    if (el.type !== 'file' && el.type !== 'hidden' && el.type !== 'checkbox' && el.type !== 'radio') { el.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
 });
 </script>
