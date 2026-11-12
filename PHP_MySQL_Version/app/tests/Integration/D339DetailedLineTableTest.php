@@ -97,7 +97,7 @@ final class D339DetailedLineTableTest extends DbTestCase
         }
         $r = DocumentGenerationService::generate($orderId, 'QT', $this->admin, null, true, true);
         $docx = $this->docxText((int) $r['docx_file_id']);
-        self::assertStringContainsString('Product Description *', $docx);
+        self::assertStringContainsString('Product Description', $docx);
         self::assertStringNotContainsString('No. of pcs', $docx);
     }
 

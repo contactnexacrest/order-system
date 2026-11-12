@@ -80,12 +80,12 @@ describe('Quotation / Proforma Invoice layout (owner, 1 Nov 2026)', () => {
     const doc = await generate(await order('PO-2026-0457'), 'QT');
     for (const [format, text] of Object.entries(doc)) {
       expect([format, text.includes('Certificate of Origin Type')]).toEqual([format, false]);
-      expect([format, count(text, 'Port of Discharge *')]).toEqual([format, 1]);
+      expect([format, count(text, 'Port of Discharge')]).toEqual([format, 1]);
       expect(text).toContain('Poti, Georgia');
       expect(text).toContain('Certificate of Origin — Non-Preferential — Issued by CAPEXIL');
     }
     expect(doc.pdf).toMatch(/CONSIGNEE DETAILS(?:(?!Certificate of Origin|Port of Discharge).)*PRODUCT \/ ORDER DETAILS/s);
-    expect(doc.pdf.indexOf('Port of Discharge *')).toBeGreaterThan(doc.pdf.indexOf('SHIPPING / COMMERCIAL TERMS'));
+    expect(doc.pdf.indexOf('Port of Discharge')).toBeGreaterThan(doc.pdf.indexOf('SHIPPING / COMMERCIAL TERMS'));
   });
 
   it('Quotation: the CoO line follows the selected type', async () => {

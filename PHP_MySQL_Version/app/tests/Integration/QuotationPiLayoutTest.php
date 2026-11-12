@@ -61,14 +61,14 @@ final class QuotationPiLayoutTest extends DbTestCase
 
         foreach ($doc as $format => $text) {
             self::assertStringNotContainsString('Certificate of Origin Type', $text, "QT {$format}: no untitled CoO row");
-            self::assertSame(1, substr_count($text, 'Port of Discharge *'), "QT {$format}: Port of Discharge printed once, in Shipping / Commercial Terms");
+            self::assertSame(1, substr_count($text, 'Port of Discharge'), "QT {$format}: Port of Discharge printed once, in Shipping / Commercial Terms");
             self::assertStringContainsString('Poti, Georgia', $text);
             self::assertMatchesRegularExpression('/Certificate of Origin — Non-Preferential — Issued by CAPEXIL/u', $text, "QT {$format}: CoO line keeps the selected type");
         }
         // PDF: Consignee Details runs straight into Product / Order Details.
         self::assertMatchesRegularExpression('/CONSIGNEE DETAILS(?:(?!Certificate of Origin|Port of Discharge).)*PRODUCT \/ ORDER DETAILS/su', $doc['pdf']);
         // Port of Discharge sits after the Shipping / Commercial Terms heading.
-        self::assertGreaterThan(strpos($doc['pdf'], 'SHIPPING / COMMERCIAL TERMS'), strpos($doc['pdf'], 'Port of Discharge *'));
+        self::assertGreaterThan(strpos($doc['pdf'], 'SHIPPING / COMMERCIAL TERMS'), strpos($doc['pdf'], 'Port of Discharge'));
     }
 
     public function testQuotationCooLineFollowsTheSelectedType(): void

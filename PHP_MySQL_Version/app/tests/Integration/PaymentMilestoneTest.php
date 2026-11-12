@@ -117,7 +117,7 @@ final class PaymentMilestoneTest extends DbTestCase
         self::assertNotEmpty($result['docx_file_id'], 'the Word copy is made too');
 
         $oc = (string) file_get_contents(dirname(__DIR__, 2) . '/templates/OC/order_confirmation.html.twig');
-        self::assertStringContainsString('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }}) *</td><td class="v">{{ m.amount }}', $oc);
+        self::assertStringContainsString('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }})</td><td class="v">{{ m.amount }}', $oc);
     }
 
     /** Owner confirmed twice (1 Nov 2026): the CI shows each milestone and asks only for what is left. */

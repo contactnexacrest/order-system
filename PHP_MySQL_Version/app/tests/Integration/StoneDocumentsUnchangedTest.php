@@ -26,6 +26,8 @@ use App\Tests\Support\DbTestCase;
  * Legal Terms & Definitions); the PDF fixtures did not change.
  * Owner decision D-352 (12 Nov 2026): the mandatory-fields note and the red "*" (QT/PI payment terms, PI/OC estimated shipment,
  * CI money rows and amount in words) were removed from every PDF and Word fixture by hand; nothing else changed.
+ * Owner decision D-353 (12 Nov 2026): the remaining plain "*" after field labels was removed from every PDF and Word
+ * fixture by hand (every standalone "*"); nothing else changed.
  */
 final class StoneDocumentsUnchangedTest extends DbTestCase
 {

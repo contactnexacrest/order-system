@@ -7,10 +7,10 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">INVOICE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref or '—' }}</span></td>
-    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">INVOICE NO.</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE</span><span class="value">{{ order.pi_ref or '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
@@ -25,7 +25,7 @@
 
 <div class="section-title">3. SERVICES</div>
 <table class="products">
-  <tr><th>#</th><th>Service *</th><th>SAC *</th><th>Qty *</th><th>Unit *</th><th>Rate ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  <tr><th>#</th><th>Service</th><th>SAC</th><th>Qty</th><th>Unit</th><th>Rate ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
   {% for p in products %}
   {% set lineColor = '#1D6FA8' if loop.index % 2 == 1 else '#2D7D56' %}
   <tr>
@@ -40,7 +40,7 @@
   {% endfor %}
 </table>
 <table class="totals">
-  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL ({{ order.currency_code }}) *</td><td class="v" style="text-align:right;">{{ financial.service_value }}</td></tr>
+  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL ({{ order.currency_code }})</td><td class="v" style="text-align:right;">{{ financial.service_value }}</td></tr>
 </table>
 
 <div class="section-title">4. BANK DETAILS</div>

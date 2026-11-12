@@ -142,6 +142,10 @@ documents) — checked against every script: no recorded video opens a generated
 app pages and e-mail cards with the PDF's file name only), and no narration mentions the note or the stars.
 No video is affected.
 
+D-353 (12 Nov 2026: the plain "*" after field labels removed from every generated document, PDF and Word) —
+checked against every script: no recorded video opens a generated document (they attach or name the PDF
+file only), and no narration mentions the label stars. No video is affected.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

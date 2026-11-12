@@ -5,10 +5,10 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">DEBIT NOTE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
-    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">DEBIT NOTE NO.</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
@@ -31,18 +31,18 @@
   {% set productList = productList|merge([p.description ~ ' (' ~ p.quantity ~ ' ' ~ p.unit ~ ')']) %}
 {% endfor %}
 <table class="kv">
-  <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ order.pi_ref ?: '—' }}</td></tr>
+  <tr><td class="k">Proforma Invoice No.</td><td class="v">{{ order.pi_ref ?: '—' }}</td></tr>
   <tr><td class="k">Product(s)</td><td class="v">{{ productList|join('; ') }}</td></tr>
-  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}. Freight recovery applies as agreed under the referenced Proforma Invoice.</td></tr>
-  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
-  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}. Freight recovery applies as agreed under the referenced Proforma Invoice.</td></tr>
+  <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Shipping Line</td><td class="v">{{ freight.freight_forwarder_name ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Cargo Status *</td><td class="v">{{ packing.packing_date ? 'Packed and ready for shipment as of ' ~ packing.packing_date : 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Cargo Status</td><td class="v">{{ packing.packing_date ? 'Packed and ready for shipment as of ' ~ packing.packing_date : 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">4. FREIGHT &amp; CHARGES</div>
 <table class="products">
-  <tr><th>Description *</th><th>Container Type *</th><th>Amount ({{ order.currency_code }}) *</th><th>Remarks</th></tr>
+  <tr><th>Description</th><th>Container Type</th><th>Amount ({{ order.currency_code }})</th><th>Remarks</th></tr>
   <tr>
     <td>Ocean Freight</td>
     <td class="placeholder-italic">{{ order.container_type }}</td>
@@ -69,7 +69,7 @@
   </tr>
 </table>
 <table class="totals">
-  <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) * &nbsp;<span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(incl. GST if applicable)</span></td><td class="v" style="font-style:italic;">{{ freight.total_freight_and_insurance ?: 'To Be Confirmed' }}</td></tr>
+  <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) &nbsp;<span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(incl. GST if applicable)</span></td><td class="v" style="font-style:italic;">{{ freight.total_freight_and_insurance ?: 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">5. PAYMENT INSTRUCTIONS</div>

@@ -5,15 +5,15 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">AMENDMENT NO. *</span><span class="value">{{ meta.document_reference }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">AMENDMENT NO.</span><span class="value">{{ meta.document_reference }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-amber"><span class="label">EFFECTIVE DATE OF AMENDMENT *</span> &nbsp; <span class="value">{{ amendment.effective_from ?: 'To Be Confirmed — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
+<div class="banner banner-amber"><span class="label">EFFECTIVE DATE OF AMENDMENT</span> &nbsp; <span class="value">{{ amendment.effective_from ?: 'To Be Confirmed — date from which amended terms apply' }}</span> &nbsp;&nbsp;<span class="note">This amendment is not valid unless signed by authorised representatives of both parties.</span></div>
 {% endblock %}
 
 {% block section1 %}
@@ -30,13 +30,13 @@
 </table>
 
 <table class="kv" style="margin-top:6pt;">
-  <tr><td class="k" style="background:#FFFDE7;">The Importer *</td><td class="v" style="background:#FFFDE7;"><strong>{{ buyer.company_legal_name }}</strong></td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Registered Address *</td><td class="v" style="background:#FFFDE7;">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">VAT / EORI / Tax Reg. No. *</td><td class="v" style="background:#FFFDE7;">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Contact Person *</td><td class="v" style="background:#FFFDE7;">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Designation / Title *</td><td class="v" style="background:#FFFDE7;">To Be Confirmed</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Phone *</td><td class="v" style="background:#FFFDE7;">{{ buyer.phone ?: '—' }}</td></tr>
-  <tr><td class="k" style="background:#FFFDE7;">Email *</td><td class="v" style="background:#FFFDE7;">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">The Importer</td><td class="v" style="background:#FFFDE7;"><strong>{{ buyer.company_legal_name }}</strong></td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Registered Address</td><td class="v" style="background:#FFFDE7;">{{ buyer.billing_address }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">VAT / EORI / Tax Reg. No.</td><td class="v" style="background:#FFFDE7;">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Contact Person</td><td class="v" style="background:#FFFDE7;">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Designation / Title</td><td class="v" style="background:#FFFDE7;">To Be Confirmed</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Phone</td><td class="v" style="background:#FFFDE7;">{{ buyer.phone ?: '—' }}</td></tr>
+  <tr><td class="k" style="background:#FFFDE7;">Email</td><td class="v" style="background:#FFFDE7;">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
 </table>
 {% endblock %}
 
@@ -44,24 +44,24 @@
 
 <div class="section-title">2. ORIGINAL DOCUMENT REFERENCE</div>
 <table class="kv">
-  <tr><td class="k">Quotation No. *</td><td class="v">{{ amendment.original.quotation_ref ?: '—' }}</td></tr>
-  <tr><td class="k">Quotation Date *</td><td class="v">{{ amendment.original.quotation_date ?: '—' }}</td></tr>
-  <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ amendment.original.pi_ref ?: '—' }}</td></tr>
-  <tr><td class="k">PI Date *</td><td class="v">{{ amendment.original.pi_date ?: '—' }}</td></tr>
+  <tr><td class="k">Quotation No.</td><td class="v">{{ amendment.original.quotation_ref ?: '—' }}</td></tr>
+  <tr><td class="k">Quotation Date</td><td class="v">{{ amendment.original.quotation_date ?: '—' }}</td></tr>
+  <tr><td class="k">Proforma Invoice No.</td><td class="v">{{ amendment.original.pi_ref ?: '—' }}</td></tr>
+  <tr><td class="k">PI Date</td><td class="v">{{ amendment.original.pi_date ?: '—' }}</td></tr>
   <tr><td class="k">Order Confirmation No.</td><td class="v">{{ amendment.original.oc_ref ?: 'Not yet issued' }}</td></tr>
-  <tr><td class="k">Product / Order Summary *</td><td class="v">{{ amendment.original.product_summary ?: '—' }}</td></tr>
-  <tr><td class="k">Total FOB Value ({{ amendment.original.currency }}) *</td><td class="v">{{ amendment.original.total_fob_value ?: '—' }}</td></tr>
+  <tr><td class="k">Product / Order Summary</td><td class="v">{{ amendment.original.product_summary ?: '—' }}</td></tr>
+  <tr><td class="k">Total FOB Value ({{ amendment.original.currency }})</td><td class="v">{{ amendment.original.total_fob_value ?: '—' }}</td></tr>
 </table>
 
 <div class="section-title">3. ORIGINAL PAYMENT TERMS — AS STATED IN PROFORMA INVOICE</div>
 <div class="box-warning-red">&#8252; Copy these terms exactly from the original Proforma Invoice — character for character. Any difference between what is written here and what appears on the PI may be used to argue that the terms were already varied before this amendment. Exact copy only.</div>
 <table class="kv">
-  <tr><td class="k">Advance Payment *</td><td class="v">{{ amendment.original.advance_terms_text ?: '—' }}</td></tr>
-  <tr><td class="k">Advance Amount *</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.advance_amount ?: '—' }}</td></tr>
-  <tr><td class="k">Balance Payment *</td><td class="v">{{ amendment.original.balance_terms_text ?: '—' }}</td></tr>
-  <tr><td class="k">Balance Amount *</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.balance_amount ?: '—' }}</td></tr>
+  <tr><td class="k">Advance Payment</td><td class="v">{{ amendment.original.advance_terms_text ?: '—' }}</td></tr>
+  <tr><td class="k">Advance Amount</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.advance_amount ?: '—' }}</td></tr>
+  <tr><td class="k">Balance Payment</td><td class="v">{{ amendment.original.balance_terms_text ?: '—' }}</td></tr>
+  <tr><td class="k">Balance Amount</td><td class="v">{{ amendment.original.currency }} {{ amendment.original.balance_amount ?: '—' }}</td></tr>
   <tr><td class="k">Freight Terms</td><td class="v">{{ amendment.original.freight_terms ?: '—' }}</td></tr>
-  <tr><td class="k">Currency *</td><td class="v">{{ amendment.original.currency }}</td></tr>
+  <tr><td class="k">Currency</td><td class="v">{{ amendment.original.currency }}</td></tr>
   <tr><td class="k">Port of Loading</td><td class="v">{{ amendment.original.port_of_loading }}</td></tr>
   <tr><td class="k">Incoterms</td><td class="v">{{ amendment.original.incoterm_label }}</td></tr>
   <tr><td class="k">LUT No.</td><td class="v">{{ amendment.original.lut_number }}</td></tr>
@@ -72,18 +72,18 @@
 <div class="section-title">4. AMENDED PAYMENT TERMS — REPLACING SECTION 3 ABOVE</div>
 <div class="box-confirm-green">&#8730;&nbsp; These amended terms replace the original payment terms stated in Section 3 above in their entirety. All other terms and conditions of the original Quotation and Proforma Invoice remain unchanged and in full force.</div>
 <table class="kv">
-  <tr><td class="k">Amended Advance Payment *</td><td class="v">{{ amendment.amended.advance_terms_text ?: 'Unchanged from Section 3 above' }}</td></tr>
-  <tr><td class="k">Amended Advance Amount *</td><td class="v">{{ amendment.amended.advance_amount ? (amendment.original.currency ~ ' ' ~ amendment.amended.advance_amount) : 'Unchanged from Section 3 above' }}</td></tr>
-  <tr><td class="k">Amended Balance Payment *</td><td class="v">{{ amendment.amended.balance_terms ?: 'Unchanged from Section 3 above' }}</td></tr>
-  <tr><td class="k">Amended Balance Amount *</td><td class="v">{{ amendment.amended.balance_amount ? (amendment.original.currency ~ ' ' ~ amendment.amended.balance_amount) : 'Unchanged from Section 3 above' }}</td></tr>
-  <tr><td class="k">Effective From *</td><td class="v">{{ amendment.effective_from ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Amended Advance Payment</td><td class="v">{{ amendment.amended.advance_terms_text ?: 'Unchanged from Section 3 above' }}</td></tr>
+  <tr><td class="k">Amended Advance Amount</td><td class="v">{{ amendment.amended.advance_amount ? (amendment.original.currency ~ ' ' ~ amendment.amended.advance_amount) : 'Unchanged from Section 3 above' }}</td></tr>
+  <tr><td class="k">Amended Balance Payment</td><td class="v">{{ amendment.amended.balance_terms ?: 'Unchanged from Section 3 above' }}</td></tr>
+  <tr><td class="k">Amended Balance Amount</td><td class="v">{{ amendment.amended.balance_amount ? (amendment.original.currency ~ ' ' ~ amendment.amended.balance_amount) : 'Unchanged from Section 3 above' }}</td></tr>
+  <tr><td class="k">Effective From</td><td class="v">{{ amendment.effective_from ?: 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">5. REASON FOR AMENDMENT</div>
 <table class="kv">
-  <tr><td class="k">Reason *</td><td class="v">{{ amendment.reason }}</td></tr>
-  <tr><td class="k">Requested By *</td><td class="v">{{ amendment.requested_by }}</td></tr>
-  <tr><td class="k">MD Approval Date *</td><td class="v">{{ amendment.md_approved_at ?: 'Pending MD approval' }}</td></tr>
+  <tr><td class="k">Reason</td><td class="v">{{ amendment.reason }}</td></tr>
+  <tr><td class="k">Requested By</td><td class="v">{{ amendment.requested_by }}</td></tr>
+  <tr><td class="k">MD Approval Date</td><td class="v">{{ amendment.md_approved_at ?: 'Pending MD approval' }}</td></tr>
 </table>
 
 <div class="section-title">6. LEGAL EFFECT OF THIS AMENDMENT</div>
@@ -98,14 +98,14 @@
 
 <div class="section-title">7. THE IMPORTER — ACKNOWLEDGEMENT &amp; SIGNATURE</div>
 <table class="kv acceptance-table">
-  <tr><td class="k">The Importer — Company Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">The Importer — Company Name</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Registered Address</td><td class="v">{{ buyer.billing_address }}</td></tr>
   <tr><td class="k">VAT / EORI / Tax Reg. No.</td><td class="v">{{ buyer.vat_eori_tax_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Authorised Signatory Name *</td><td class="v">&nbsp;</td></tr>
-  <tr><td class="k">Designation *</td><td class="v">&nbsp;</td></tr>
-  <tr><td class="k">Date of Signing *</td><td class="v">&nbsp;</td></tr>
-  <tr><td class="k">The Importer — Signature *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
-  <tr><td class="k">Company Stamp / Seal *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+  <tr><td class="k">Authorised Signatory Name</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">Designation</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">Date of Signing</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">The Importer — Signature</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+  <tr><td class="k">Company Stamp / Seal</td><td class="v" style="height:26px;">&nbsp;</td></tr>
 </table>
 
 <div class="section-title">8. PAYMENT INSTRUCTIONS UNDER AMENDED TERMS</div>

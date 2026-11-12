@@ -126,7 +126,7 @@ describe('Payment milestones (D-215, 5a)', () => {
     expect(result.docx_file_id).toBeTruthy();
 
     const oc = fs.readFileSync(path.join(__dirname, '..', '..', 'templates', 'OC', 'order_confirmation.njk'), 'utf8');
-    expect(oc).toContain('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }}) *</td><td class="v">{{ m.amount }}');
+    expect(oc).toContain('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }})</td><td class="v">{{ m.amount }}');
   });
 
   // Owner confirmed twice (1 Nov 2026): the CI shows each milestone and asks only for what is left.

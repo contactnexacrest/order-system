@@ -13,10 +13,10 @@
 <p class="placeholder-italic" style="font-size:9pt; margin:0 0 4pt;">This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.</p>
 <table class="meta">
   <tr>
-    <td><span class="label">PO NUMBER *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">BUYER ORDER REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
-    <td><span class="label">EXPORT ORDER REF *</span><span class="value">{{ order.pi_ref or order.quotation_ref or '—' }}</span></td>
+    <td><span class="label">PO NUMBER</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER ORDER REF</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">EXPORT ORDER REF</span><span class="value">{{ order.pi_ref or order.quotation_ref or '—' }}</span></td>
   </tr>
 </table>
 {% endblock %}
@@ -25,27 +25,27 @@
 
 <div class="section-title">2. SUPPLIER DETAILS &nbsp;(Pre-filled by NexaCrest)</div>
 <table class="kv">
-  <tr><td class="k">Supplier Legal Name *</td><td class="v">{{ supplier_po.supplier_legal_name }}</td></tr>
-  <tr><td class="k">Address *</td><td class="v">{{ supplier_po.supplier_address }}</td></tr>
-  <tr><td class="k">GSTIN *</td><td class="v">{{ supplier_po.supplier_gstin or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Supplier Legal Name</td><td class="v">{{ supplier_po.supplier_legal_name }}</td></tr>
+  <tr><td class="k">Address</td><td class="v">{{ supplier_po.supplier_address }}</td></tr>
+  <tr><td class="k">GSTIN</td><td class="v">{{ supplier_po.supplier_gstin or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">PAN</td><td class="v">{{ supplier_po.supplier_pan or '—' }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ supplier_po.supplier_contact_person or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Phone *</td><td class="v">{{ supplier_po.supplier_phone or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Supplier Type *</td><td class="v">{{ supplier_po.supplier_type or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Contact Person</td><td class="v">{{ supplier_po.supplier_contact_person or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Phone</td><td class="v">{{ supplier_po.supplier_phone or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Supplier Type</td><td class="v">{{ supplier_po.supplier_type or 'To Be Confirmed' }}</td></tr>
 </table>
 
 <div class="section-title">3. MATERIAL SPECIFICATIONS &nbsp;(All fields mandatory — no exceptions)</div>
 <div class="banner banner-red" style="text-align:left; font-size:9pt;">&#8252;&nbsp; <strong>All specifications below are binding.</strong> <span style="font-weight:normal; color:#5A1414;">Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.</span></div>
 <table class="kv">
-  <tr><td class="k">{{ category_documents.material_label }} *</td><td class="v">{{ supplier_po.material_stone_type or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Grade *</td><td class="v">{{ supplier_po.grade }} only — no mixed grades, no seconds</td></tr>
-  <tr><td class="k">Surface Finish *</td><td class="v">{{ supplier_po.surface_finish or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Dimensions *</td><td class="v">{{ supplier_po.dimensions or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">{{ category_documents.material_label }}</td><td class="v">{{ supplier_po.material_stone_type or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Grade</td><td class="v">{{ supplier_po.grade }} only — no mixed grades, no seconds</td></tr>
+  <tr><td class="k">Surface Finish</td><td class="v">{{ supplier_po.surface_finish or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Dimensions</td><td class="v">{{ supplier_po.dimensions or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Dimensional Tolerance</td><td class="v">{{ supplier_po.dimensional_tolerance or category_documents.tolerance_default }}</td></tr>
-  <tr><td class="k">Quantity *</td><td class="v">{{ supplier_po.quantity }}</td></tr>
-  <tr><td class="k">Unit *</td><td class="v">{{ supplier_po.unit or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Quantity</td><td class="v">{{ supplier_po.quantity }}</td></tr>
+  <tr><td class="k">Unit</td><td class="v">{{ supplier_po.unit or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Colour Reference</td><td class="v">{{ supplier_po.colour_reference }}</td></tr>
-  {% if category_documents.quality_documents.length %}<tr><td class="k">Quality Documents Required *</td><td class="v">{% for q in category_documents.quality_documents %}{{ q.name }}{% if not loop.last %}; {% endif %}{% endfor %} — to be supplied with the goods</td></tr>{% endif %}
+  {% if category_documents.quality_documents.length %}<tr><td class="k">Quality Documents Required</td><td class="v">{% for q in category_documents.quality_documents %}{{ q.name }}{% if not loop.last %}; {% endif %}{% endfor %} — to be supplied with the goods</td></tr>{% endif %}
 </table>
 
 {% if supplier_po.special_requirements %}
@@ -57,37 +57,37 @@
 <table class="kv" style="table-layout:fixed;">
   <tr><td colspan="3" style="background:#1A4A08; color:#FFFFFF; font-weight:bold; border-color:#1A4A08;">Field</td></tr>
   <tr>
-    <td class="k" style="width:34%;">Unit Price (INR) *</td>
+    <td class="k" style="width:34%;">Unit Price (INR)</td>
     <td class="v" style="width:26%; text-align:right;">{{ supplier_po.unit_price_inr }}</td>
     <td class="v" style="width:40%; font-style:italic; font-size:8.5pt; color:#555555;">Rate as agreed</td>
   </tr>
   <tr>
-    <td class="k">Quantity *</td>
+    <td class="k">Quantity</td>
     <td class="v" style="text-align:right;">{{ supplier_po.quantity }} {{ supplier_po.unit }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Must match Section 3 exactly</td>
   </tr>
   <tr>
-    <td class="k">Basic Value *</td>
+    <td class="k">Basic Value</td>
     <td class="v" style="text-align:right;">{{ supplier_po.basic_value_inr }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Unit Price &times; Quantity</td>
   </tr>
   <tr>
-    <td class="k">GST *</td>
+    <td class="k">GST</td>
     <td class="v" style="text-align:right;">{{ supplier_po.gst_rate_pct or 'X' }}% — {{ supplier_po.gst_amount_inr }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">CGST + SGST (intrastate) OR IGST (interstate)</td>
   </tr>
   <tr>
-    <td class="k" style="background:#FFF3CD; font-weight:bold;">TOTAL PAYABLE *</td>
+    <td class="k" style="background:#FFF3CD; font-weight:bold;">TOTAL PAYABLE</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ supplier_po.total_payable_inr }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Basic Value + GST</td>
   </tr>
   <tr>
-    <td class="k">Advance ({{ supplier_po.advance_pct or 'X' }}%) *</td>
+    <td class="k">Advance ({{ supplier_po.advance_pct or 'X' }}%)</td>
     <td class="v" style="text-align:right;">{{ supplier_po.advance_amount_inr }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Payable before production commences</td>
   </tr>
   <tr>
-    <td class="k" style="background:#FFF3CD; font-weight:bold;">Balance *</td>
+    <td class="k" style="background:#FFF3CD; font-weight:bold;">Balance</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ supplier_po.balance_amount_inr }}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Payable ONLY after delivery + inspection + written acceptance by NexaCrest</td>
   </tr>
@@ -95,11 +95,11 @@
 
 <div class="section-title">5. DELIVERY TERMS</div>
 <table class="kv">
-  <tr><td class="k">Delivery Location *</td><td class="v">{{ supplier_po.delivery_location or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Required Delivery Date *</td><td class="v">{{ supplier_po.required_delivery_date or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Delivery Location</td><td class="v">{{ supplier_po.delivery_location or 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Required Delivery Date</td><td class="v">{{ supplier_po.required_delivery_date or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Delivery Confirmation</td><td class="v">Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.</td></tr>
   <tr><td class="k">Time is of the Essence</td><td class="v">Delivery by the agreed date is of the essence of this Purchase Order. Failure to deliver by the agreed date may result in cancellation of this PO and / or recovery of losses incurred by NexaCrest as a result of the delay, including but not limited to demurrage, vessel rebooking charges and buyer penalties.</td></tr>
-  <tr><td class="k">Packing *</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>
+  <tr><td class="k">Packing</td><td class="v">{{ supplier_po.packing_requirement }}</td></tr>
 </table>
 
 {% if terms is defined and terms|length > 0 %}

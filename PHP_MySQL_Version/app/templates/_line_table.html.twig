@@ -102,7 +102,7 @@
 {% if lt.simple and not lt.with_prices %}
 {# Packing List: the other goods and charges, without prices. #}
 <table class="products">
-  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th></tr>
+  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th></tr>
   {% for p in lt.simple %}
   {% set lineColor = p.no is odd ? '#1D6FA8' : '#2D7D56' %}
   <tr>
@@ -115,7 +115,7 @@
 </table>
 {% elseif lt.simple %}
 <table class="products">
-  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
   {% for p in lt.simple %}
   {% set lineColor = p.no is odd ? '#1D6FA8' : '#2D7D56' %}
   <tr>

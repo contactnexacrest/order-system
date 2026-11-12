@@ -88,23 +88,23 @@ final class DocxDocumentBuilder
     {
         $v = static fn(string $k): string => trim((string) ($buyer[$k] ?? ''));
         $rows = [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address Line 1 *', 'value' => $v('billing_address_line1') !== '' ? $v('billing_address_line1') : self::g($buyer, 'billing_address')],
+            ['label' => 'Company Legal Name', 'value' => self::g($buyer, 'company_legal_name')],
+            ['label' => 'Billing Address Line 1', 'value' => $v('billing_address_line1') !== '' ? $v('billing_address_line1') : self::g($buyer, 'billing_address')],
         ];
         if ($v('billing_address_line2') !== '') {
             $rows[] = ['label' => 'Billing Address Line 2', 'value' => $v('billing_address_line2')];
         }
         if ($v('billing_city') !== '') {
-            $rows[] = ['label' => 'City / Town *', 'value' => $v('billing_city')];
+            $rows[] = ['label' => 'City / Town', 'value' => $v('billing_city')];
         }
         if ($v('billing_postcode') !== '') {
-            $rows[] = ['label' => 'Postcode *', 'value' => $v('billing_postcode')];
+            $rows[] = ['label' => 'Postcode', 'value' => $v('billing_postcode')];
         }
-        $rows[] = ['label' => 'Country *', 'value' => $v('country_of_destination') !== '' ? $v('country_of_destination') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'Contact Person *', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'Phone *', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
-        $rows[] = ['label' => 'Email *', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Country', 'value' => $v('country_of_destination') !== '' ? $v('country_of_destination') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'VAT / EORI / Tax Reg. No.', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Contact Person', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Phone', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
+        $rows[] = ['label' => 'Email', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
         return $rows;
     }
 
@@ -146,23 +146,23 @@ final class DocxDocumentBuilder
     {
         $v = static fn (string $k): string => trim((string) ($c[$k] ?? ''));
         $rows = [
-            ['label' => 'Company Legal Name *', 'value' => $v('company_legal_name')],
-            ['label' => 'Address Line 1 *', 'value' => $v('address_line1')],
+            ['label' => 'Company Legal Name', 'value' => $v('company_legal_name')],
+            ['label' => 'Address Line 1', 'value' => $v('address_line1')],
         ];
         if ($v('address_line2') !== '') {
             $rows[] = ['label' => 'Address Line 2', 'value' => $v('address_line2')];
         }
         if ($v('city') !== '') {
-            $rows[] = ['label' => 'City / Town *', 'value' => $v('city')];
+            $rows[] = ['label' => 'City / Town', 'value' => $v('city')];
         }
         if ($v('postcode') !== '') {
-            $rows[] = ['label' => 'Postcode *', 'value' => $v('postcode')];
+            $rows[] = ['label' => 'Postcode', 'value' => $v('postcode')];
         }
-        $rows[] = ['label' => 'Country *', 'value' => $v('country') !== '' ? $v('country') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'VAT / EORI / Tax Reg. *', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'Contact Person *', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
-        $rows[] = ['label' => 'Phone *', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
-        $rows[] = ['label' => 'Email *', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Country', 'value' => $v('country') !== '' ? $v('country') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'VAT / EORI / Tax Reg.', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Contact Person', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Phone', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
+        $rows[] = ['label' => 'Email', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
         return $rows;
     }
 
@@ -291,7 +291,7 @@ final class DocxDocumentBuilder
 
     private static function productTableHeaders(string $currency): array
     {
-        return ["#", "Product Description *", "Qty *", "Unit *", "Unit Price ({$currency}) *", "Amount ({$currency}) *"];
+        return ["#", "Product Description", "Qty", "Unit", "Unit Price ({$currency})", "Amount ({$currency})"];
     }
 
     /** Builds the shared 6-col product table + spec sub-row rows (QT/PI/OC/CI all share this exact schema). */
@@ -356,7 +356,7 @@ final class DocxDocumentBuilder
             'lineColor' => ((int) $p['no'] % 2 === 1) ? '1D6FA8' : '2D7D56',
             'align' => [null, null, 'right', null],
         ], $lt['simple']);
-        DocxComponents::addLineTable($section, $lt, ['#', 'Product Description *', 'Qty *', 'Unit *'], [8, 62, 15, 15], $rows);
+        DocxComponents::addLineTable($section, $lt, ['#', 'Product Description', 'Qty', 'Unit'], [8, 62, 15, 15], $rows);
     }
 
     private static function weightTable(Section $section, array $order, array $context = []): void
@@ -370,7 +370,7 @@ final class DocxDocumentBuilder
             [self::cd($context)['package_count_label'], self::g($order, 'estimated_package_count', 'To Be Confirmed'), self::cd($context)['package_nouns']],
             ['Package Type', self::g($order, 'estimated_package_type', 'To Be Confirmed'), '—'],
         ];
-        DocxComponents::addChecklistTable($section, ['Parameter', 'Estimated Value *', 'Unit'], [50, 35, 15], array_map(
+        DocxComponents::addChecklistTable($section, ['Parameter', 'Estimated Value', 'Unit'], [50, 35, 15], array_map(
             static fn(array $r) => ['cells' => [(string) $r[0], (string) $r[1], (string) $r[2]]],
             $rows
         ));
@@ -453,14 +453,14 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('QT'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'QUOTATION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($order, 'quotation_date') !== '—' ? self::g($order, 'quotation_date') : self::g($meta, 'generated_date', '')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'QUOTATION NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($order, 'quotation_date') !== '—' ? self::g($order, 'quotation_date') : self::g($meta, 'generated_date', '')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
             $run->addText("", ['size' => 9.5]);
-            $run->addText('VALID UNTIL * ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+            $run->addText('VALID UNTIL ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
             $run->addText(' ' . self::g($order, 'quotation_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('Prices and terms are not valid after this date.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
         });
@@ -478,7 +478,7 @@ final class DocxDocumentBuilder
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
         $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
-            ['label' => "FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
+            ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
             ['label' => "Insurance ({$currency})", 'value' => $insuranceText],
             ['label' => "TOTAL QUOTED VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
@@ -488,9 +488,9 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'shipping', 4) . '. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Lead Time', 'value' => self::g($order, 'est_lead_time_text')],
             ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
@@ -544,15 +544,15 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('PI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PI NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'PI DATE *', 'value' => self::g($order, 'pi_date') !== '—' ? self::g($order, 'pi_date') : self::g($meta, 'generated_date', '')],
-            ['label' => 'QUOTATION REF *', 'value' => self::g($order, 'quotation_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'PI NUMBER', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'PI DATE', 'value' => self::g($order, 'pi_date') !== '—' ? self::g($order, 'pi_date') : self::g($meta, 'generated_date', '')],
+            ['label' => 'QUOTATION REF', 'value' => self::g($order, 'quotation_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
             $run->addText("", ['size' => 9.5]);
-            $run->addText('VALID UNTIL * ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+            $run->addText('VALID UNTIL ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
             $run->addText(' ' . self::g($order, 'pi_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('Payment must be received before this date for prices and terms to remain valid.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
         });
@@ -577,7 +577,7 @@ final class DocxDocumentBuilder
         foreach ($products as $p) {
             $piTotalsRows[] = ['label' => ($p['description'] ?? '') . ' (' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ' × ' . ($p['unit_price'] ?? '') . ')', 'value' => $currency . ' ' . ($p['amount'] ?? '')];
         }
-        $piTotalsRows[] = ['label' => "TOTAL PI VALUE ({$currency}) *", 'value' => !empty($financial['has_services']) ? self::g($financial, 'total_with_services') : self::g($financial, 'fob_value'), 'highlight' => true];
+        $piTotalsRows[] = ['label' => "TOTAL PI VALUE ({$currency})", 'value' => !empty($financial['has_services']) ? self::g($financial, 'total_with_services') : self::g($financial, 'fob_value'), 'highlight' => true];
         DocxComponents::addTotalsTable($section, $piTotalsRows, 65);
         DocxComponents::addRichParagraph($section, [
             ['Remark: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
@@ -589,7 +589,7 @@ final class DocxDocumentBuilder
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
         $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
-            ['label' => "FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
+            ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
             ['label' => "Insurance ({$currency})", 'value' => $insuranceText],
             ['label' => "TOTAL PI VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
@@ -620,9 +620,9 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'shipping', 4) . '. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Shipment Date', 'value' => self::g($order, 'est_shipment_date_text')],
             ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
@@ -691,10 +691,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('OC'), null); // OC's header carries no incoterm chip
         DocxComponents::addMetaBar($section, [
-            ['label' => 'OC NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'OC NUMBER', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($financial) {
             $cell->addText("\u{221A}  ORDER CONFIRMED", ['bold' => true, 'size' => 13, 'color' => DocxComponents::GREEN_BORDER]);
@@ -716,32 +716,32 @@ final class DocxDocumentBuilder
             self::productsTable($section, $context, $currency, $context['products'] ?? []); // D-339
         }
         DocxComponents::addKvTable($section, [
-            ['label' => 'Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—')],
-            ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—')],
-            ['label' => 'Proforma Invoice No. *', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'Quotation No.', 'value' => self::g($order, 'quotation_ref', '—')],
+            ['label' => 'Quotation Date', 'value' => self::g($order, 'quotation_date', '—')],
+            ['label' => 'Proforma Invoice No.', 'value' => self::g($order, 'pi_ref', '—')],
             // Owner decision D-224 (D1, 2 Nov 2026, confirmed twice): the buyer's PO number, when entered.
             ...self::buyerPoRow($order),
-            ...(!empty($context['line_table']) ? [] : [['label' => 'Product(s) *', 'value' => implode('; ', $productList)]]),
-            ['label' => 'Total Order Value (FOB) *', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
+            ...(!empty($context['line_table']) ? [] : [['label' => 'Product(s)', 'value' => implode('; ', $productList)]]),
+            ['label' => 'Total Order Value (FOB)', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Certificate of Origin', 'value' => self::g($order, 'coo_type')],
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment_status', 4) . '. PAYMENT STATUS');
         $hasAdvance = !empty($financial['has_advance']);
         $paymentRows = array_merge($hasAdvance ? [
-            ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ') *', 'value' => self::g($financial, 'advance_amount')],
-            ['label' => 'Advance Received (' . $currency . ') *', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
-            ['label' => 'Advance T/T Received On *', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
+            ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ')', 'value' => self::g($financial, 'advance_amount')],
+            ['label' => 'Advance Received (' . $currency . ')', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
+            ['label' => 'Advance T/T Received On', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
         ] : [], array_map(
             // Owner decision D-215 (5a, confirmed twice): one row per milestone between the advance and the balance.
-            static fn (array $m): array => ['label' => $m['pct'] . '% Payment Due (' . $currency . ') *', 'value' => $m['amount'] . '  —  ' . $m['due_text']],
+            static fn (array $m): array => ['label' => $m['pct'] . '% Payment Due (' . $currency . ')', 'value' => $m['amount'] . '  —  ' . $m['due_text']],
             $financial['milestones'] ?? []
         ), [
             // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
-            ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ') *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
+            ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ')', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
             ['label' => 'Currency', 'value' => $currency],
         ]);
         if (empty($order['is_fob'])) {
@@ -800,7 +800,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('ANNEXA'), null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'ANNEXURE NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'ANNEXURE TO', 'value' => self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'buyer_inquiry_ref'))],
             ['label' => 'ORDER REF', 'value' => self::g($order, 'order_reference', '')],
             ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
@@ -970,14 +970,14 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('BUYERPO'), 'ORDER ACCEPTANCE — Issued to Buyer for Signature and Return');
         DocxComponents::addPlainParagraph($section, 'This Purchase Order is prepared by NexaCrest and sent to the buyer for signature and return. Buyer fills Column B of Section 4 only. All other fields are pre-filled by NexaCrest.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'QT REFERENCE *', 'value' => self::g($order, 'quotation_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'PO NUMBER', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'QT REFERENCE', 'value' => self::g($order, 'quotation_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order) {
             $run = $cell->addTextRun();
-            $run->addText("VALID UNTIL * ", ['bold' => true, 'color' => DocxComponents::AMBER_LABEL]);
+            $run->addText("VALID UNTIL ", ['bold' => true, 'color' => DocxComponents::AMBER_LABEL]);
             $run->addText(' ' . self::g($order, 'quotation_valid_until', 'To Be Confirmed') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
             $run->addText('This Purchase Order must be signed and returned before the Quotation validity expires.', ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
         });
@@ -986,16 +986,16 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE DETAILS  (Pre-filled by NexaCrest — buyer to confirm)');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
-            ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
-            ['label' => 'VAT / EORI / Tax Reg. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
-            ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Phone *', 'value' => self::g($consignee, 'phone', '—')],
-            ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
-            ['label' => 'Country of Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Company Legal Name', 'value' => self::g($buyer, 'company_legal_name')],
+            ['label' => 'Billing Address', 'value' => self::g($buyer, 'billing_address')],
+            ['label' => 'Consignee Name', 'value' => self::g($buyer, 'consignee_name')],
+            ['label' => 'Consignee Address', 'value' => self::g($buyer, 'consignee_address')],
+            ['label' => 'VAT / EORI / Tax Reg.', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Contact Person', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
+            ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
+            ['label' => 'Email', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
+            ['label' => 'Country of Destination', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
         ]);
 
         $productList = implode('; ', array_map(static fn(array $p) => $p['description'] ?? '', $products));
@@ -1004,21 +1004,21 @@ final class DocxDocumentBuilder
             self::productsTable($section, $context, $currency, $products); // D-339
         }
         DocxComponents::addKvTable($section, [
-            ['label' => 'Against Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—') . ' (fixed)'],
-            ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—') . ' (fixed)'],
+            ['label' => 'Against Quotation No.', 'value' => self::g($order, 'quotation_ref', '—') . ' (fixed)'],
+            ['label' => 'Quotation Date', 'value' => self::g($order, 'quotation_date', '—') . ' (fixed)'],
             // D-339: on an order with the detailed product table, the table above lists the lines.
             ...(!empty($context['line_table']) ? [] : [
-                ['label' => 'Product Description *', 'value' => $productList],
+                ['label' => 'Product Description', 'value' => $productList],
                 // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
-                ['label' => 'Quantity *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['quantity'] ?? ''), $products)) : 'To Be Confirmed'],
-                ['label' => 'Unit *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit'] ?? ''), $products)) : 'To Be Confirmed'],
-                ['label' => "Unit Price ({$currency}) *", 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit_price'] ?? ''), $products)) : 'To Be Confirmed'],
+                ['label' => 'Quantity', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['quantity'] ?? ''), $products)) : 'To Be Confirmed'],
+                ['label' => 'Unit', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit'] ?? ''), $products)) : 'To Be Confirmed'],
+                ['label' => "Unit Price ({$currency})", 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit_price'] ?? ''), $products)) : 'To Be Confirmed'],
             ]),
-            ['label' => "Total FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
+            ['label' => "Total FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
-            ['label' => 'Certificate of Origin *', 'value' => self::g($order, 'coo_type')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Certificate of Origin', 'value' => self::g($order, 'coo_type')],
             ['label' => 'Payment Terms', 'value' => self::g($financial, 'buyer_po_payment_terms') . self::freightTermsSentence((string) self::g($order, 'incoterm_code', ''))],
         ]);
 
@@ -1097,23 +1097,23 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('SUPPO'), 'Issued to Supplier for Signature and Return');
         DocxComponents::addPlainParagraph($section, 'This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'BUYER ORDER REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
-            ['label' => 'EXPORT ORDER REF *', 'value' => self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'quotation_ref', '—')],
+            ['label' => 'PO NUMBER', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'BUYER ORDER REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'EXPORT ORDER REF', 'value' => self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'quotation_ref', '—')],
         ]);
 
         self::addDefaultSection1($section, $context, 'BUYER (NexaCrest International Private Limited)');
         // Re-tint section 1's title green to match this document's extra_style override.
         DocxComponents::addSectionTitle($section, '2. SUPPLIER DETAILS  (Pre-filled by NexaCrest)', $green);
         DocxComponents::addKvTable($section, [
-            ['label' => 'Supplier Legal Name *', 'value' => self::g($sp, 'supplier_legal_name')],
-            ['label' => 'Address *', 'value' => self::g($sp, 'supplier_address')],
-            ['label' => 'GSTIN *', 'value' => self::g($sp, 'supplier_gstin', 'To Be Confirmed')],
+            ['label' => 'Supplier Legal Name', 'value' => self::g($sp, 'supplier_legal_name')],
+            ['label' => 'Address', 'value' => self::g($sp, 'supplier_address')],
+            ['label' => 'GSTIN', 'value' => self::g($sp, 'supplier_gstin', 'To Be Confirmed')],
             ['label' => 'PAN', 'value' => self::g($sp, 'supplier_pan', '—')],
-            ['label' => 'Contact Person *', 'value' => self::g($sp, 'supplier_contact_person', 'To Be Confirmed')],
-            ['label' => 'Phone *', 'value' => self::g($sp, 'supplier_phone', 'To Be Confirmed')],
-            ['label' => 'Supplier Type *', 'value' => self::g($sp, 'supplier_type', 'To Be Confirmed')],
+            ['label' => 'Contact Person', 'value' => self::g($sp, 'supplier_contact_person', 'To Be Confirmed')],
+            ['label' => 'Phone', 'value' => self::g($sp, 'supplier_phone', 'To Be Confirmed')],
+            ['label' => 'Supplier Type', 'value' => self::g($sp, 'supplier_type', 'To Be Confirmed')],
         ]);
 
         DocxComponents::addSectionTitle($section, '3. MATERIAL SPECIFICATIONS  (All fields mandatory — no exceptions)', $green);
@@ -1123,16 +1123,16 @@ final class DocxDocumentBuilder
             $run->addText("Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.", ['color' => DocxComponents::RED_SUB, 'size' => 9]);
         });
         DocxComponents::addKvTable($section, array_merge([
-            ['label' => self::cd($context)['material_label'] . ' *', 'value' => self::g($sp, 'material_stone_type', 'To Be Confirmed')],
-            ['label' => 'Grade *', 'value' => self::g($sp, 'grade') . ' only — no mixed grades, no seconds'],
-            ['label' => 'Surface Finish *', 'value' => self::g($sp, 'surface_finish', 'To Be Confirmed')],
-            ['label' => 'Dimensions *', 'value' => self::g($sp, 'dimensions', 'To Be Confirmed')],
+            ['label' => self::cd($context)['material_label'], 'value' => self::g($sp, 'material_stone_type', 'To Be Confirmed')],
+            ['label' => 'Grade', 'value' => self::g($sp, 'grade') . ' only — no mixed grades, no seconds'],
+            ['label' => 'Surface Finish', 'value' => self::g($sp, 'surface_finish', 'To Be Confirmed')],
+            ['label' => 'Dimensions', 'value' => self::g($sp, 'dimensions', 'To Be Confirmed')],
             ['label' => 'Dimensional Tolerance', 'value' => self::g($sp, 'dimensional_tolerance', self::cd($context)['tolerance_default'])],
-            ['label' => 'Quantity *', 'value' => self::g($sp, 'quantity')],
-            ['label' => 'Unit *', 'value' => self::g($sp, 'unit', 'To Be Confirmed')],
+            ['label' => 'Quantity', 'value' => self::g($sp, 'quantity')],
+            ['label' => 'Unit', 'value' => self::g($sp, 'unit', 'To Be Confirmed')],
             ['label' => 'Colour Reference', 'value' => self::g($sp, 'colour_reference')],
         ], self::cd($context)['quality_documents'] === [] ? [] : [
-            ['label' => 'Quality Documents Required *', 'value' => implode('; ', array_map(static fn (array $q): string => $q['name'], self::cd($context)['quality_documents'])) . ' — to be supplied with the goods'],
+            ['label' => 'Quality Documents Required', 'value' => implode('; ', array_map(static fn (array $q): string => $q['name'], self::cd($context)['quality_documents'])) . ' — to be supplied with the goods'],
         ]));
 
         if (!empty($sp['special_requirements'])) {
@@ -1146,23 +1146,23 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '4. COMMERCIAL TERMS', $green);
         $commercialRows = [
-            ['Unit Price (INR) *', self::g($sp, 'unit_price_inr'), 'Rate as agreed'],
-            ['Quantity *', self::g($sp, 'quantity') . ' ' . self::g($sp, 'unit', ''), 'Must match Section 3 exactly'],
-            ['Basic Value *', self::g($sp, 'basic_value_inr'), 'Unit Price × Quantity'],
-            ['GST *', self::g($sp, 'gst_rate_pct', 'X') . '% — ' . self::g($sp, 'gst_amount_inr'), 'CGST + SGST (intrastate) OR IGST (interstate)'],
-            ['TOTAL PAYABLE *', self::g($sp, 'total_payable_inr'), 'Basic Value + GST', true],
-            ['Advance (' . self::g($sp, 'advance_pct', 'X') . '%) *', self::g($sp, 'advance_amount_inr'), 'Payable before production commences'],
-            ['Balance *', self::g($sp, 'balance_amount_inr'), 'Payable ONLY after delivery + inspection + written acceptance by NexaCrest', true],
+            ['Unit Price (INR)', self::g($sp, 'unit_price_inr'), 'Rate as agreed'],
+            ['Quantity', self::g($sp, 'quantity') . ' ' . self::g($sp, 'unit', ''), 'Must match Section 3 exactly'],
+            ['Basic Value', self::g($sp, 'basic_value_inr'), 'Unit Price × Quantity'],
+            ['GST', self::g($sp, 'gst_rate_pct', 'X') . '% — ' . self::g($sp, 'gst_amount_inr'), 'CGST + SGST (intrastate) OR IGST (interstate)'],
+            ['TOTAL PAYABLE', self::g($sp, 'total_payable_inr'), 'Basic Value + GST', true],
+            ['Advance (' . self::g($sp, 'advance_pct', 'X') . '%)', self::g($sp, 'advance_amount_inr'), 'Payable before production commences'],
+            ['Balance', self::g($sp, 'balance_amount_inr'), 'Payable ONLY after delivery + inspection + written acceptance by NexaCrest', true],
         ];
         self::threeColFinanceTable($section, "Field", $commercialRows, $green);
 
         DocxComponents::addSectionTitle($section, '5. DELIVERY TERMS', $green);
         DocxComponents::addKvTable($section, [
-            ['label' => 'Delivery Location *', 'value' => self::g($sp, 'delivery_location', 'To Be Confirmed')],
-            ['label' => 'Required Delivery Date *', 'value' => self::g($sp, 'required_delivery_date', 'To Be Confirmed')],
+            ['label' => 'Delivery Location', 'value' => self::g($sp, 'delivery_location', 'To Be Confirmed')],
+            ['label' => 'Required Delivery Date', 'value' => self::g($sp, 'required_delivery_date', 'To Be Confirmed')],
             ['label' => 'Delivery Confirmation', 'value' => 'Supplier must confirm delivery readiness in writing (WhatsApp acceptable) at least 7 days before the required delivery date.'],
             ['label' => 'Time is of the Essence', 'value' => 'Delivery by the agreed date is of the essence of this Purchase Order. Failure to deliver by the agreed date may result in cancellation of this PO and / or recovery of losses incurred by NexaCrest as a result of the delay, including but not limited to demurrage, vessel rebooking charges and buyer penalties.'],
-            ['label' => 'Packing *', 'value' => self::g($sp, 'packing_requirement')],
+            ['label' => 'Packing', 'value' => self::g($sp, 'packing_requirement')],
         ]);
 
         if (!empty($context['terms'])) {
@@ -1239,10 +1239,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('FDN'), 'FREIGHT COST RECOVERY');
         DocxComponents::addMetaBar($section, [
-            ['label' => 'DEBIT NOTE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'DEBIT NOTE NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) {
             $cell->addText("PAYMENT REQUIRED BEFORE SHIPMENT", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT], ['alignment' => Jc::CENTER]);
@@ -1262,24 +1262,24 @@ final class DocxDocumentBuilder
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . ' (' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ')', $context['products'] ?? []));
         DocxComponents::addSectionTitle($section, '3. ORDER REFERENCE');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Proforma Invoice No. *', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'Proforma Invoice No.', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'Product(s)', 'value' => $productList],
-            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label') . '. Freight recovery applies as agreed under the referenced Proforma Invoice.'],
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label') . '. Freight recovery applies as agreed under the referenced Proforma Invoice.'],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Shipping Line', 'value' => self::g($freight, 'freight_forwarder_name', 'To Be Confirmed')],
-            ['label' => 'Cargo Status *', 'value' => self::g($context, 'packing.packing_date') !== '—' ? ('Packed and ready for shipment as of ' . self::g($context, 'packing.packing_date')) : 'To Be Confirmed'],
+            ['label' => 'Cargo Status', 'value' => self::g($context, 'packing.packing_date') !== '—' ? ('Packed and ready for shipment as of ' . self::g($context, 'packing.packing_date')) : 'To Be Confirmed'],
         ]);
 
         DocxComponents::addSectionTitle($section, '4. FREIGHT & CHARGES');
-        DocxComponents::addProductsTable($section, ['Description *', 'Container Type *', "Amount ({$currency}) *", 'Remarks'], [22, 18, 20, 40], [
+        DocxComponents::addProductsTable($section, ['Description', 'Container Type', "Amount ({$currency})", 'Remarks'], [22, 18, 20, 40], [
             ['cells' => ['Ocean Freight', self::g($order, 'container_type'), self::g($freight, 'confirmed_freight_rate', 'To Be Confirmed'), 'Confirmed rate — ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge')], 'align' => [null, null, 'right', null]],
             ['cells' => ['Origin Charges (if any)', '', 'NIL', 'THC, documentation charges at ' . self::g($order, 'port_of_loading') . ' — if applicable'], 'align' => [null, null, 'right', null]],
             ['cells' => ['Insurance', '', self::g($order, 'incoterm_code') === 'CIF' ? self::g($freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], 'align' => [null, null, 'right', null]],
             ['cells' => ['GST / IGST (if applicable)', '', 'NIL', 'Freight recovery is a pure cost reimbursement, not a taxable service supply'], 'align' => [null, null, 'right', null]],
         ]);
         DocxComponents::addTotalsTable($section, [
-            ['label' => "TOTAL AMOUNT DUE ({$currency}) *  (incl. GST if applicable)", 'value' => self::g($freight, 'total_freight_and_insurance', 'To Be Confirmed'), 'highlight' => true],
+            ['label' => "TOTAL AMOUNT DUE ({$currency})  (incl. GST if applicable)", 'value' => self::g($freight, 'total_freight_and_insurance', 'To Be Confirmed'), 'highlight' => true],
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT INSTRUCTIONS');
@@ -1326,10 +1326,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('PL'), null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PL NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'PL NUMBER', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
 
         self::addDefaultSection1($section, $context, 'EXPORTER');
@@ -1337,9 +1337,9 @@ final class DocxDocumentBuilder
         // D-343: buyer, consignee and notify party as the PDF, same numbers, then the incoterm and ports.
         self::partiesSections($section, $context);
         DocxComponents::addKvTable($section, [
-            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
         ]);
 
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . (!empty($p['finish']) ? ' — ' . $p['finish'] : ''), $products));
@@ -1349,14 +1349,14 @@ final class DocxDocumentBuilder
             self::productsTable($section, $context, '', $products); // D-339: the detailed table, no prices
         }
         DocxComponents::addKvTable($section, [
-            ...(!empty($context['line_table']) ? [] : [['label' => 'Product Description *', 'value' => $productList]]),
-            ['label' => 'HS Code *', 'value' => $hsCodeList],
-            ['label' => 'Country of Origin *', 'value' => 'India'],
-            ['label' => 'Total Quantity *', 'value' => self::g($packing, 'actual_quantity_packed') !== '—' ? self::g($packing, 'actual_quantity_packed') . (self::g($packing, 'actual_quantity_unit') !== '—' ? ' ' . self::g($packing, 'actual_quantity_unit') : '') : 'To Be Confirmed'],
-            ['label' => 'Total No. of ' . self::cd($context)['package_nouns'] . ' *', 'value' => self::g($packing, 'crate_count', 'To Be Confirmed')],
-            ['label' => 'Total Net Weight *', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
-            ['label' => 'Total Gross Weight *', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
-            ['label' => 'Total CBM *', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
+            ...(!empty($context['line_table']) ? [] : [['label' => 'Product Description', 'value' => $productList]]),
+            ['label' => 'HS Code', 'value' => $hsCodeList],
+            ['label' => 'Country of Origin', 'value' => 'India'],
+            ['label' => 'Total Quantity', 'value' => self::g($packing, 'actual_quantity_packed') !== '—' ? self::g($packing, 'actual_quantity_packed') . (self::g($packing, 'actual_quantity_unit') !== '—' ? ' ' . self::g($packing, 'actual_quantity_unit') : '') : 'To Be Confirmed'],
+            ['label' => 'Total No. of ' . self::cd($context)['package_nouns'], 'value' => self::g($packing, 'crate_count', 'To Be Confirmed')],
+            ['label' => 'Total Net Weight', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
+            ['label' => 'Total Gross Weight', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
+            ['label' => 'Total CBM', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'crate_breakdown', 4) . '. ' . self::cd($context)['package_upper'] . '-LEVEL BREAKDOWN  (from factory packing data)');
@@ -1388,7 +1388,7 @@ final class DocxDocumentBuilder
                     ],
                 ];
             }
-            DocxComponents::addProductsTable($section, [self::cd($context)['package_noun'] . ' No. *', 'Marks & Numbers *', 'Product Description & Finish *', self::cd($context)['package_noun'] . ' Size  L×W×H (cm) *'], [12, 33, 35, 20], $rows);
+            DocxComponents::addProductsTable($section, [self::cd($context)['package_noun'] . ' No.', 'Marks & Numbers', 'Product Description & Finish', self::cd($context)['package_noun'] . ' Size  L×W×H (cm)'], [12, 33, 35, 20], $rows);
         } else {
             DocxComponents::addPlainParagraph($section, self::cd($context)['package_noun'] . '-level breakdown not yet recorded.', ['italic' => true, 'size' => 8.7, 'color' => '5b6774']);
         }
@@ -1431,10 +1431,10 @@ final class DocxDocumentBuilder
             $run->addText('All details must match the Commercial Invoice and Packing List exactly. Any mismatch on the issued BL is expensive and time-consuming to correct — amendments after BL issuance attract charges and delays.', ['italic' => true, 'color' => DocxComponents::BLUE_TEXT]);
         }, 0);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'BL INSTRUCTION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'BL INSTRUCTION NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
 
         DocxComponents::addSectionTitle($section, '1. SHIPPER / EXPORTER  (appears on BL exactly as written)');
@@ -1449,10 +1449,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '2. CONSIGNEE  (buyer — appears on BL exactly as written)');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($consignee, 'company_legal_name')],
-            ['label' => 'Full Address *', 'value' => self::g($consignee, 'address_line1', 'To Be Confirmed')],
-            ['label' => 'Country *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'VAT / EORI / Tax Ref *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
+            ['label' => 'Company Legal Name', 'value' => self::g($consignee, 'company_legal_name')],
+            ['label' => 'Full Address', 'value' => self::g($consignee, 'address_line1', 'To Be Confirmed')],
+            ['label' => 'Country', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
+            ['label' => 'VAT / EORI / Tax Ref', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
         ], true);
 
         DocxComponents::addSectionTitle($section, '3. NOTIFY PARTY');
@@ -1462,27 +1462,27 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '4. SHIPMENT DETAILS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Place of Delivery', 'value' => 'Same as Port of Discharge unless buyer has an inland delivery arrangement'],
-            ['label' => 'Vessel Name *', 'value' => self::g($shipping, 'vessel_name', 'TBC — to be confirmed by shipping line at time of booking')],
-            ['label' => 'Voyage Number *', 'value' => self::g($shipping, 'voyage_number', 'To Be Confirmed')],
-            ['label' => 'ETD (Estimated Time of Departure) *', 'value' => self::g($shipping, 'etd', 'To Be Confirmed')],
-            ['label' => 'ETA (Estimated Time of Arrival) *', 'value' => self::g($shipping, 'eta', 'To Be Confirmed')],
+            ['label' => 'Vessel Name', 'value' => self::g($shipping, 'vessel_name', 'TBC — to be confirmed by shipping line at time of booking')],
+            ['label' => 'Voyage Number', 'value' => self::g($shipping, 'voyage_number', 'To Be Confirmed')],
+            ['label' => 'ETD (Estimated Time of Departure)', 'value' => self::g($shipping, 'etd', 'To Be Confirmed')],
+            ['label' => 'ETA (Estimated Time of Arrival)', 'value' => self::g($shipping, 'eta', 'To Be Confirmed')],
         ], true);
 
         $containerType = (string) self::g($order, 'container_type', '');
         DocxComponents::addSectionTitle($section, '5. CONTAINER & CARGO DETAILS');
         DocxComponents::addKvTable($section, [
             ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
-            ['label' => 'Container Load Type *', 'value' => str_contains($containerType, 'LCL') ? 'LCL (Less than Container Load)' : 'FCL (Full Container Load)'],
-            ['label' => 'Container Size *', 'value' => str_contains($containerType, 'LCL') ? 'N/A — LCL shipment' : ($containerType !== '' ? $containerType : 'To Be Confirmed')],
-            ['label' => 'Container No. *', 'value' => self::g($shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing')],
-            ['label' => 'Seal No. *', 'value' => self::g($shipping, 'seal_no', 'TBC — to be confirmed after stuffing')],
-            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List exactly'],
-            ['label' => 'Gross Weight *', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
-            ['label' => 'Net Weight *', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
-            ['label' => 'Total CBM *', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
+            ['label' => 'Container Load Type', 'value' => str_contains($containerType, 'LCL') ? 'LCL (Less than Container Load)' : 'FCL (Full Container Load)'],
+            ['label' => 'Container Size', 'value' => str_contains($containerType, 'LCL') ? 'N/A — LCL shipment' : ($containerType !== '' ? $containerType : 'To Be Confirmed')],
+            ['label' => 'Container No.', 'value' => self::g($shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing')],
+            ['label' => 'Seal No.', 'value' => self::g($shipping, 'seal_no', 'TBC — to be confirmed after stuffing')],
+            ['label' => 'No. of Packages', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List exactly'],
+            ['label' => 'Gross Weight', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
+            ['label' => 'Net Weight', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
+            ['label' => 'Total CBM', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
         ], true);
 
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . (!empty($p['finish']) ? ', ' . $p['finish'] : ''), $products));
@@ -1490,16 +1490,16 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '6. CARGO DESCRIPTION  (appears on BL exactly as written)');
         $crateCount = self::g($context, 'packing.crate_count', 'N');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Description of Goods *', 'value' => $productList . ' — must match Commercial Invoice exactly'],
-            ['label' => 'HS Code *', 'value' => $hsCodeList],
-            ['label' => 'Marks & Numbers *', 'value' => 'NEXACREST / ' . strtoupper((string) self::g($buyer, 'company_legal_name', '')) . ' / ' . strtoupper((string) self::g($order, 'port_of_discharge', '')) . " / C-001/{$crateCount} to C-{$crateCount}/{$crateCount} / " . self::g($order, 'pi_ref', '—') . ' / MADE IN INDIA'],
-            ['label' => 'Country of Origin *', 'value' => 'India'],
+            ['label' => 'Description of Goods', 'value' => $productList . ' — must match Commercial Invoice exactly'],
+            ['label' => 'HS Code', 'value' => $hsCodeList],
+            ['label' => 'Marks & Numbers', 'value' => 'NEXACREST / ' . strtoupper((string) self::g($buyer, 'company_legal_name', '')) . ' / ' . strtoupper((string) self::g($order, 'port_of_discharge', '')) . " / C-001/{$crateCount} to C-{$crateCount}/{$crateCount} / " . self::g($order, 'pi_ref', '—') . ' / MADE IN INDIA'],
+            ['label' => 'Country of Origin', 'value' => 'India'],
         ], true);
 
         $isFob = !empty($order['is_fob']);
         DocxComponents::addSectionTitle($section, "7. FREIGHT & CHARGES ON BL  |  " . self::g($order, 'incoterm_label'));
         DocxComponents::addKvTable($section, [
-            ['label' => 'Freight Terms *', 'value' => $isFob ? 'Freight Collect (buyer pays freight — FOB)' : 'Freight Prepaid (seller pays freight — CFR/CIF)'],
+            ['label' => 'Freight Terms', 'value' => $isFob ? 'Freight Collect (buyer pays freight — FOB)' : 'Freight Prepaid (seller pays freight — CFR/CIF)'],
             ['label' => 'Freight Amount', 'value' => $isFob ? 'N/A — Freight Collect' : (self::g($freight, 'confirmed_freight_rate', 'To Be Confirmed') . ' ' . $currency)],
         ], true);
 
@@ -1517,12 +1517,12 @@ final class DocxDocumentBuilder
         });
         $blRows = [];
         if (($bl['type_instruction'] ?? null) !== null) {
-            $blRows[] = ['label' => 'BL Type *', 'value' => self::g($bl, 'type_instruction')];
+            $blRows[] = ['label' => 'BL Type', 'value' => self::g($bl, 'type_instruction')];
         }
-        $blRows[] = ['label' => 'No. of Original Copies *', 'value' => '3 (three originals)'];
+        $blRows[] = ['label' => 'No. of Original Copies', 'value' => '3 (three originals)'];
         $blRows[] = ['label' => 'No. of Non-Negotiable Copies', 'value' => '3'];
         if (($bl['consignee_instruction'] ?? null) !== null) {
-            $blRows[] = ['label' => 'BL Consignee Instruction *', 'value' => self::g($bl, 'consignee_instruction')];
+            $blRows[] = ['label' => 'BL Consignee Instruction', 'value' => self::g($bl, 'consignee_instruction')];
         }
         DocxComponents::addKvTable($section, $blRows, true);
         DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, '042C53', function (AbstractContainer $cell) {
@@ -1558,10 +1558,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('CI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'INVOICE NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($company) {
             $run = $cell->addTextRun();
@@ -1578,15 +1578,15 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'shipping_details', 3) . '. SHIPPING DETAILS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Incoterm *', 'value' => self::g($order, 'incoterm_label')],
-            ['label' => 'Port of Loading *', 'value' => self::g($order, 'port_of_loading')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
+            ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
+            ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
+            ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
-            ['label' => 'Container No. *', 'value' => self::g($shipping, 'container_no', 'To Be Confirmed')],
-            ['label' => 'Bill of Lading No. *', 'value' => self::g($shipping, 'bl_number', 'To Be Confirmed')],
-            ['label' => 'Bill of Lading Date *', 'value' => self::g($shipping, 'bl_date', 'TBC — must match this invoice date')],
-            ['label' => 'Vessel / Voyage *', 'value' => self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / ' . self::g($shipping, 'voyage_number') : '')],
-            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List'],
+            ['label' => 'Container No.', 'value' => self::g($shipping, 'container_no', 'To Be Confirmed')],
+            ['label' => 'Bill of Lading No.', 'value' => self::g($shipping, 'bl_number', 'To Be Confirmed')],
+            ['label' => 'Bill of Lading Date', 'value' => self::g($shipping, 'bl_date', 'TBC — must match this invoice date')],
+            ['label' => 'Vessel / Voyage', 'value' => self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / ' . self::g($shipping, 'voyage_number') : '')],
+            ['label' => 'No. of Packages', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List'],
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'product', 4) . '. PRODUCT / ORDER DETAILS');
@@ -1702,10 +1702,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('ESI'), null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
-            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'INVOICE NO.', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
+            ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($company) {
             $run = $cell->addTextRun();
@@ -1719,9 +1719,9 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '2. BUYER DETAILS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Country *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+            ['label' => 'Company Legal Name', 'value' => self::g($buyer, 'company_legal_name')],
+            ['label' => 'Billing Address', 'value' => self::g($buyer, 'billing_address')],
+            ['label' => 'Country', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
         ]);
 
         DocxComponents::addSectionTitle($section, '3. SERVICES');
@@ -1734,8 +1734,8 @@ final class DocxDocumentBuilder
                 'specText' => null,
             ];
         }
-        DocxComponents::addProductsTable($section, ['#', 'Service *', 'SAC *', 'Qty *', 'Unit *', "Rate ({$currency}) *", "Amount ({$currency}) *"], [6, 32, 12, 10, 10, 15, 15], $rows);
-        DocxComponents::addKvTable($section, [['label' => "TOTAL ({$currency}) *", 'value' => self::g($financial, 'service_value')]]);
+        DocxComponents::addProductsTable($section, ['#', 'Service', 'SAC', 'Qty', 'Unit', "Rate ({$currency})", "Amount ({$currency})"], [6, 32, 12, 10, 10, 15, 15], $rows);
+        DocxComponents::addKvTable($section, [['label' => "TOTAL ({$currency})", 'value' => self::g($financial, 'service_value')]]);
 
         DocxComponents::addSectionTitle($section, '4. BANK DETAILS');
         $bank = array_values(array_filter(
@@ -1770,10 +1770,10 @@ final class DocxDocumentBuilder
 
         DocxComponents::addHeader($section, $context, self::titleFor('COOPREP'), null);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'SHIPMENT REF *', 'value' => self::g($order, 'pi_ref', '—')],
-            ['label' => 'DATE PREPARED *', 'value' => self::g($meta, 'generated_date', '')],
-            ['label' => 'COO TYPE *', 'value' => self::g($order, 'coo_type')],
-            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+            ['label' => 'SHIPMENT REF', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'DATE PREPARED', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'COO TYPE', 'value' => self::g($order, 'coo_type')],
+            ['label' => 'BUYER INQUIRY REF', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
         DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, 'B9CADA', function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
@@ -1805,30 +1805,30 @@ final class DocxDocumentBuilder
         $hsCodeList = implode(', ', array_map(static fn(array $p) => $p['hs_code'] ?? '', $products));
         $hardcoded = 'Hardcoded — never changes';
         $infoRows = [
-            ['Exporter — Legal Name *', self::g($company, 'legal_name'), $hardcoded],
-            ['Exporter — Registered Address *', self::g($company, 'registered_office'), $hardcoded],
-            ['Exporter — GSTIN *', self::g($company, 'gstin'), $hardcoded],
-            ['Exporter — IEC *', self::g($company, 'iec_pan'), $hardcoded],
-            ['Consignee — Legal Name *', self::g($consignee, 'company_legal_name'), 'Commercial Invoice Section 2'],
-            ['Consignee — Address *', self::g($consignee, 'address_line1', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
-            ['Consignee — Country *', self::g($consignee, 'country', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
-            ['Vessel Name & Voyage No. *', self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / V.' . self::g($shipping, 'voyage_number') : ''), 'Bill of Lading'],
-            ['Port of Loading *', self::g($order, 'port_of_loading'), $hardcoded],
-            ['Port of Discharge *', self::g($order, 'port_of_discharge'), 'Bill of Lading / Commercial Invoice Section 3'],
-            ['Bill of Lading No. *', self::g($shipping, 'bl_number', 'To Be Confirmed'), 'Bill of Lading'],
-            ['Bill of Lading Date *', self::g($shipping, 'bl_date', 'TBC — same as CI date'), 'Bill of Lading / Commercial Invoice'],
-            ['Product Description *', $productList, 'Commercial Invoice Section 4'],
-            ['HS Code *', $hsCodeList, 'Hardcoded — verify against CI'],
-            ['Country of Origin *', 'India', $hardcoded],
-            ['No. of Packages *', self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed', 'Packing List Section 3 / BL'],
-            ['Gross Weight *', self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
-            ['Net Weight *', self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
-            ['Total CBM *', self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed', 'Packing List Section 3'],
-            ['FOB Value *', self::g($order, 'currency_code') . ' ' . self::g($financial, 'fob_value'), 'Commercial Invoice Section 4'],
-            ['Invoice No. & Date *', self::g($order, 'ci_ref', 'To Be Confirmed') . ' — ' . self::g($order, 'ci_date', 'To Be Confirmed'), 'Commercial Invoice meta bar'],
+            ['Exporter — Legal Name', self::g($company, 'legal_name'), $hardcoded],
+            ['Exporter — Registered Address', self::g($company, 'registered_office'), $hardcoded],
+            ['Exporter — GSTIN', self::g($company, 'gstin'), $hardcoded],
+            ['Exporter — IEC', self::g($company, 'iec_pan'), $hardcoded],
+            ['Consignee — Legal Name', self::g($consignee, 'company_legal_name'), 'Commercial Invoice Section 2'],
+            ['Consignee — Address', self::g($consignee, 'address_line1', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+            ['Consignee — Country', self::g($consignee, 'country', 'To Be Confirmed'), 'Commercial Invoice Section 2'],
+            ['Vessel Name & Voyage No.', self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / V.' . self::g($shipping, 'voyage_number') : ''), 'Bill of Lading'],
+            ['Port of Loading', self::g($order, 'port_of_loading'), $hardcoded],
+            ['Port of Discharge', self::g($order, 'port_of_discharge'), 'Bill of Lading / Commercial Invoice Section 3'],
+            ['Bill of Lading No.', self::g($shipping, 'bl_number', 'To Be Confirmed'), 'Bill of Lading'],
+            ['Bill of Lading Date', self::g($shipping, 'bl_date', 'TBC — same as CI date'), 'Bill of Lading / Commercial Invoice'],
+            ['Product Description', $productList, 'Commercial Invoice Section 4'],
+            ['HS Code', $hsCodeList, 'Hardcoded — verify against CI'],
+            ['Country of Origin', 'India', $hardcoded],
+            ['No. of Packages', self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed', 'Packing List Section 3 / BL'],
+            ['Gross Weight', self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
+            ['Net Weight', self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
+            ['Total CBM', self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed', 'Packing List Section 3'],
+            ['FOB Value', self::g($order, 'currency_code') . ' ' . self::g($financial, 'fob_value'), 'Commercial Invoice Section 4'],
+            ['Invoice No. & Date', self::g($order, 'ci_ref', 'To Be Confirmed') . ' — ' . self::g($order, 'ci_date', 'To Be Confirmed'), 'Commercial Invoice meta bar'],
             ['Competent Authority Signature', 'Signed and stamped by CAPEXIL authorised officer — not by NexaCrest', 'CAPEXIL issues — not your responsibility'],
         ];
-        DocxComponents::addChecklistTable($section, ['Field', 'Value for this shipment *', 'Source document'], [30, 40, 30], array_map(
+        DocxComponents::addChecklistTable($section, ['Field', 'Value for this shipment', 'Source document'], [30, 40, 30], array_map(
             static fn(array $r) => ['cells' => [static function (AbstractContainer $c) use ($r) { $c->addText($r[0], ['bold' => true]); }, $r[1], $r[2]]],
             $infoRows
         ));
@@ -1852,12 +1852,12 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '4. NEXACREST CAPEXIL REGISTRATION DETAILS');
         DocxComponents::addKvTable($section, [
-            ['label' => 'Prepared By *', 'value' => 'Name of person completing this sheet'],
+            ['label' => 'Prepared By', 'value' => 'Name of person completing this sheet'],
             ['label' => 'RCMC Issuing Body', 'value' => 'CAPEXIL — Chemicals and Allied Products Export Promotion Council'],
             ['label' => 'Member Company', 'value' => self::g($company, 'legal_name')],
             ['label' => 'IEC', 'value' => self::g($company, 'iec_pan')],
-            ['label' => 'RCMC Number *', 'value' => self::g($company, 'rcmc_number')],
-            ['label' => 'RCMC Valid Until *', 'value' => self::g($company, 'rcmc_valid_until')],
+            ['label' => 'RCMC Number', 'value' => self::g($company, 'rcmc_number')],
+            ['label' => 'RCMC Valid Until', 'value' => self::g($company, 'rcmc_valid_until')],
             ['label' => 'CAPEXIL Portal', 'value' => 'www.capexil.com — COO applications can be submitted online'],
             ['label' => 'CAPEXIL Office', 'value' => 'Chennai Regional Office handles granite/stone exporters from Karnataka — confirm with CHA'],
         ]);

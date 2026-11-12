@@ -4197,8 +4197,20 @@ followed the payment-terms lines (QT, PI), the production / estimated-shipment l
 money rows and the amount in words (CI) and the payment-due line (FDN). Amounts, wording and
 layout are otherwise unchanged. The `.mandatory-note` style stays (the CI "Total Invoice Value in
 Words" line uses it); `.mand-star`, `addMandatoryNote()` / `mandatoryNote()` and the Word
-`starRun()` helper are gone. The grey "*" printed after field labels (e.g. "QUOTATION NO. *")
-is not part of D-352 and still prints.
+`starRun()` helper are gone. The plain "*" that used to follow field labels was removed
+afterwards by D-353 (below).
+
+**No stars after field labels (D-353, 12 Nov 2026, owner confirm 1 + confirm 2).** Generated
+documents, PDF and Word, both stacks, no longer print the plain "*" after a field label or a
+column heading (e.g. "QUOTATION NO.", "DATE", "VALID UNTIL", "Company Legal Name", "Port of
+Discharge", "Product Description", "Qty"). This covers every document template (QT, ANNEXA, PI,
+OC, BUYERPO, SUPPO, FDN, PL, BLI, CI, ESI, COOPREP, AMD payment terms and products & prices),
+the shared partials (buyer, consignee, line table) and the Word builders
+(`DocxDocumentBuilder.php` / `docxDocumentBuilder.js`). The star was plain text, so no style
+was removed. No generated document now prints a "*" as a label marker; wording, amounts and
+layout are otherwise unchanged, and page counts stay the same (a row or a section heading can
+move to the previous page because a label no longer wraps). The input forms in the app keep
+their "*" for required fields.
 
 **Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
 

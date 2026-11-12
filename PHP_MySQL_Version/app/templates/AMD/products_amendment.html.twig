@@ -18,9 +18,9 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">AMENDMENT NO. *</span><span class="value">{{ meta.document_reference }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">AMENDMENT NO.</span><span class="value">{{ meta.document_reference }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ amendment.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 <p class="amd-refs">To Order {{ amendment.order_reference }}{% if amendment.original.quotation_ref %} · Quotation {{ amendment.original.quotation_ref }} dated {{ amendment.original.quotation_date }}{% endif %}{% if amendment.original.pi_ref %} · Proforma Invoice {{ amendment.original.pi_ref }} dated {{ amendment.original.pi_date }}{% endif %}</p>
@@ -51,10 +51,10 @@
 <div class="section-title">3. ACCEPTANCE</div>
 <p class="amd-text">This amendment is valid only when signed by authorised representatives of both parties. It amends the products, quantities and prices of the Quotation and Proforma Invoice referenced above; everything else stays as agreed.</p>
 <table class="kv acceptance-table">
-  <tr><td class="k">The Importer — Company Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Authorised Signatory Name *</td><td class="v">&nbsp;</td></tr>
-  <tr><td class="k">Date of Signing *</td><td class="v">&nbsp;</td></tr>
-  <tr><td class="k">The Importer — Signature *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
-  <tr><td class="k">Company Stamp / Seal *</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+  <tr><td class="k">The Importer — Company Name</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
+  <tr><td class="k">Authorised Signatory Name</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">Date of Signing</td><td class="v">&nbsp;</td></tr>
+  <tr><td class="k">The Importer — Signature</td><td class="v" style="height:26px;">&nbsp;</td></tr>
+  <tr><td class="k">Company Stamp / Seal</td><td class="v" style="height:26px;">&nbsp;</td></tr>
 </table>
 {% endblock %}

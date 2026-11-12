@@ -87,7 +87,7 @@ describe('D-339 detailed product table, No. of pieces, prices in other units', (
     }
     const r = await documentGenerationService.generate(orderId, 'QT', admin, null, true, true);
     const docx = await docxText(r.docx_file_id);
-    expect(docx).toContain('Product Description *');
+    expect(docx).toContain('Product Description');
     expect(docx).not.toContain('No. of pcs');
   });
 

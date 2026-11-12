@@ -35,16 +35,16 @@ describe('P5 copy wording (backlog #20, #79)', () => {
 
   it('ETD/ETA are spelled out on the BLI PDF template', () => {
     const html = read('templates/BLI/bl_instruction.njk');
-    expect(html).toContain('ETD (Estimated Time of Departure) *');
-    expect(html).toContain('ETA (Estimated Time of Arrival) *');
+    expect(html).toContain('ETD (Estimated Time of Departure)');
+    expect(html).toContain('ETA (Estimated Time of Arrival)');
     expect(html).not.toContain('Est. Departure');
     expect(html).not.toContain('Est. Arrival');
   });
 
   it('ETD/ETA are spelled out on the DOCX builder', () => {
     const js = read('src/services/docx/docxDocumentBuilder.js');
-    expect(js).toContain('ETD (Estimated Time of Departure) *');
-    expect(js).toContain('ETA (Estimated Time of Arrival) *');
+    expect(js).toContain('ETD (Estimated Time of Departure)');
+    expect(js).toContain('ETA (Estimated Time of Arrival)');
   });
 
   it('Supplier PO free-text fields have placeholder hints', () => {

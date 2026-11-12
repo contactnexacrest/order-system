@@ -3,10 +3,10 @@
 {% block meta_table %}
 <table class="meta">
   <tr>
-    <td><span class="label">INVOICE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
-    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
-    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
-    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+    <td><span class="label">INVOICE NO.</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
   </tr>
 </table>
 {% endblock %}
@@ -27,15 +27,15 @@
 
 <div class="section-title">{{ section_numbers.shipping_details }}. SHIPPING DETAILS</div>
 <table class="kv">
-  <tr><td class="k">Incoterm *</td><td class="v">{{ order.incoterm_label }}</td></tr>
-  <tr><td class="k">Port of Loading *</td><td class="v">{{ order.port_of_loading }}</td></tr>
-  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
+  <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}</td></tr>
+  <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>
+  <tr><td class="k">Port of Discharge</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Number of Containers</td><td class="v">{{ shipping.container_count ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Container No. *</td><td class="v">{{ shipping.container_no ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number ?: 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date ?: 'To Be Confirmed — must match this invoice date' }}</td></tr>
-  <tr><td class="k">Vessel / Voyage *</td><td class="v">{{ shipping.vessel_name ?: 'To Be Confirmed' }}{{ shipping.voyage_number ? ' / ' ~ shipping.voyage_number : '' }}</td></tr>
-  <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' ' ~ category_documents.packing_label : 'To Be Confirmed' }} — must match Packing List</td></tr>
+  <tr><td class="k">Container No.</td><td class="v">{{ shipping.container_no ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Bill of Lading No.</td><td class="v">{{ shipping.bl_number ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Bill of Lading Date</td><td class="v">{{ shipping.bl_date ?: 'To Be Confirmed — must match this invoice date' }}</td></tr>
+  <tr><td class="k">Vessel / Voyage</td><td class="v">{{ shipping.vessel_name ?: 'To Be Confirmed' }}{{ shipping.voyage_number ? ' / ' ~ shipping.voyage_number : '' }}</td></tr>
+  <tr><td class="k">No. of Packages</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' ' ~ category_documents.packing_label : 'To Be Confirmed' }} — must match Packing List</td></tr>
 </table>
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
@@ -45,7 +45,7 @@
 {% include '_line_table.html.twig' %}
 {% else %}
 <table class="products">
-  <tr><th>#</th><th>Product Description *</th><th>Qty *</th><th>Unit *</th><th>Unit Price ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  <tr><th>#</th><th>Product Description</th><th>Qty</th><th>Unit</th><th>Unit Price ({{ order.currency_code }})</th><th>Amount ({{ order.currency_code }})</th></tr>
   {% for p in products %}
   {% set lineColor = loop.index is odd ? '#1D6FA8' : '#2D7D56' %}
   <tr>

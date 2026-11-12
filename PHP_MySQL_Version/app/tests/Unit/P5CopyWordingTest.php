@@ -44,8 +44,8 @@ final class P5CopyWordingTest extends TestCase
     public function testEtdEtaAreSpelledOutOnBliPdfTemplate(): void
     {
         $html = $this->read('templates/BLI/bl_instruction.html.twig');
-        self::assertStringContainsString('ETD (Estimated Time of Departure) *', $html);
-        self::assertStringContainsString('ETA (Estimated Time of Arrival) *', $html);
+        self::assertStringContainsString('ETD (Estimated Time of Departure)', $html);
+        self::assertStringContainsString('ETA (Estimated Time of Arrival)', $html);
         self::assertStringNotContainsString('Est. Departure', $html);
         self::assertStringNotContainsString('Est. Arrival', $html);
     }
@@ -53,8 +53,8 @@ final class P5CopyWordingTest extends TestCase
     public function testEtdEtaAreSpelledOutOnDocxBuilder(): void
     {
         $php = $this->read('src/Services/Docx/DocxDocumentBuilder.php');
-        self::assertStringContainsString('ETD (Estimated Time of Departure) *', $php);
-        self::assertStringContainsString('ETA (Estimated Time of Arrival) *', $php);
+        self::assertStringContainsString('ETD (Estimated Time of Departure)', $php);
+        self::assertStringContainsString('ETA (Estimated Time of Arrival)', $php);
     }
 
     public function testSupplierPoFreeTextFieldsHavePlaceholderHints(): void
