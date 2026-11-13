@@ -84,9 +84,12 @@
 <script>
 (function () {
   var nextIndex = {{ (products.length if products and products.length > 0 else 1) }};
+  // UI-004: a copy of the first line is kept from page load, so "+ Add product line" still
+  // works after the buyer has removed every line with ×.
+  var rowTemplate = document.getElementById('product-rows').firstElementChild.cloneNode(true);
   document.getElementById('add-product-row').addEventListener('click', function () {
     var rows = document.getElementById('product-rows');
-    var clone = rows.firstElementChild.cloneNode(true);
+    var clone = (rows.firstElementChild || rowTemplate).cloneNode(true);
     clone.querySelectorAll('input[type=text]').forEach(function (el) {
       el.value = '';
       el.name = el.name.replace(/\[\d+\]/, '[' + nextIndex + ']');

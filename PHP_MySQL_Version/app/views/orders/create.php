@@ -302,9 +302,12 @@ function lookupSailingLeadTime() {
     .catch(function () { /* best-effort suggestion only — a failed lookup never blocks the form */ });
 }
 
+// UI-004: a copy of the first line is kept from page load, so "+ Add product line" still
+// works after every line has been removed with ×.
+var productRowTemplate = document.getElementById('product-rows').firstElementChild.cloneNode(true);
 document.getElementById('add-product-row').addEventListener('click', function () {
   var rows = document.getElementById('product-rows');
-  var clone = rows.firstElementChild.cloneNode(true);
+  var clone = (rows.firstElementChild || productRowTemplate).cloneNode(true);
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
