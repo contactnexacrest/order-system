@@ -35,9 +35,10 @@ async function show(req, res) {
   // UI-005 / D-266: links to SOP chapters this person may not open become plain text,
   // and screenshots they may not load are left out (no broken image).
   const roleId = req.user && req.user.role_id !== null && req.user.role_id !== undefined ? Number(req.user.role_id) : null;
-  const visible = await sopAccess.visibleSlugs(req.user.id, roleId, req.permissions);
+  const userId = (req.user && req.user.id) || 0; // parity with PHP ($user['id'] ?? 0)
+  const visible = await sopAccess.visibleSlugs(userId, roleId, req.permissions);
   html = sopAccess.filterChapterLinks(html, visible);
-  html = await sopAccess.filterScreenshots(html, req.user.id, req.permissions, visible);
+  html = await sopAccess.filterScreenshots(html, userId, req.permissions, visible);
   send(html);
 }
 

@@ -85,7 +85,7 @@ describe('Audit log coverage, N-08 Cluster E', () => {
     const orderId = await createTestOrder(await createTestClient());
     const productId = await orderAnnexureRepository.createProduct(orderId, { name: 'With Image', description: '', dimensions: '', finish: '', components: '', technical_notes: '' });
     const userId = await createTestUser();
-    const file = { buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]), originalname: 'product.png', mimetype: 'image/png' };
+    const file = { buffer: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4c70000000049454e44ae426082', 'hex') /* a real 1x1 PNG — HNT-006 checks the full signature */, originalname: 'product.png', mimetype: 'image/png' };
 
     await annexureController.uploadImage(fakeReq(orderId, userId, {}, { productId: String(productId) }, file), fakeRes());
 

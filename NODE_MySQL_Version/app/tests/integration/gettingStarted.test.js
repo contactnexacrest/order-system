@@ -25,7 +25,7 @@ describe('Getting Started controller', () => {
   }
 
   it('renders with no layout wrapper, for any logged-in user regardless of role', async () => {
-    const req = { user: { name: 'Example Contact' }, permissions: {} };
+    const req = { user: { id: 0, name: 'Example Contact' }, permissions: {} };
     const res = fakeRes();
 
     await gettingStartedController.show(req, res);
@@ -43,7 +43,7 @@ describe('Getting Started controller', () => {
   });
 
   it('passes the signed-in user\'s name through to the view', async () => {
-    const req = { user: { name: 'Example Contact' }, permissions: {} };
+    const req = { user: { id: 0, name: 'Example Contact' }, permissions: {} };
     const res = fakeRes();
 
     await gettingStartedController.show(req, res);
