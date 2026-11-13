@@ -276,7 +276,7 @@ sees "Someone else must verify details you entered."
 ### Products & pricing (owner decision D-245)
 
 Pricing (margin, buffer, pricing exchange rate, team-incentive reserve, stale days, and
-"Goods lines must be picked from Products" — on by default) is set under **Products › Pricing › Pricing settings**
+"Goods lines must be picked from Products" — on by default) is set under **Products › Global pricing settings**
 (MD only) — see [Pricing](./27-pricing.md). The D-240 reference-price
 note settings and the "Approve price discount" permission were removed by D-245 P2.
 

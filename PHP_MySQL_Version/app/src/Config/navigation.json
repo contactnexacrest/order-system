@@ -105,11 +105,8 @@
       "items": [
         { "label": "All products", "href": "/products", "when": { "any": ["view_product_catalog"] } },
         { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
-        { "label": "Price rules", "href": "/products/price-rules", "match": ["/products/categories"], "activeQuery": { "tab": ["rules"] }, "when": { "any": ["manage_pricing", "view_price_buildup"] } },
         { "label": "Pricing", "children": [
-          { "label": "Pricing settings (margin, buffer, exchange rate)", "href": "/pricing/settings", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
           { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
-          { "label": "Exchange-rate history", "href": "/pricing/settings#exchange-rate", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
           { "label": "Specifications", "href": "/pricing/specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } }
         ] },
         { "label": "Price requests", "href": "/associates/price-requests", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } },

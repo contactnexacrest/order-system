@@ -31,6 +31,16 @@ function statusFilter(value) {
   return STATUSES.includes(value) ? value : 'active';
 }
 
+/**
+ * D-362 (13 Nov 2026, owner request): the tab to open. A status tab (or filter chip) with no
+ * products opens the Active tab instead — or All when Active is empty too. A tab that has
+ * products (and All, the last resort) is kept.
+ */
+function openTab(status, counts) {
+  if (Number((counts || {})[status] || 0) > 0 || status === 'all') return status;
+  return Number((counts || {}).active || 0) > 0 ? 'active' : 'all';
+}
+
 /** D-361: the SQL condition (alias p) for one status filter. */
 function statusSql(status) {
   const o = offersSql();
@@ -250,6 +260,6 @@ async function setPriceRuleFields(id, f) {
 
 module.exports = {
   notQuotable, isQuotable,
-  STATUSES, all, statusFilter, listing, statusCounts, search, usage, usageText, deleteRefusal, setActive,
+  STATUSES, all, statusFilter, openTab, listing, statusCounts, search, usage, usageText, deleteRefusal, setActive,
   find, create, update, remove, forPicker, setPriceRuleFields,
 };

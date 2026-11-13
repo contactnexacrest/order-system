@@ -45,7 +45,7 @@
     {# Owner decision D-255 (5 Nov 2026): the options that change the price. #}
     {% if permissions.view_price_buildup or permissions.manage_product_specifications or permissions.manage_pricing %}<p><a class="btn-sm btn-secondary" href="/products/{{ product.id }}/specifications">Price options (specifications)</a>
       {# D-300 (point 12): the category's price rules; a product with its own values shows "own rule". #}
-      {% if productCategoryId and (permissions.view_price_buildup or permissions.manage_pricing) %}<a class="btn-sm btn-secondary" href="/products/categories/{{ productCategoryId }}?tab=rules">Price rules</a>{% endif %}
+      {% if productCategoryId and (permissions.view_price_buildup or permissions.manage_pricing) %}<a class="btn-sm btn-secondary" href="/products/categories/{{ productCategoryId }}?tab=rules">Category price rules</a>{% endif %}
       {% if product.thick_k_factor != null or product.container_cbm != null or product.container_max_t != null %} <span class="badge badge-warning" title="This product has its own price rule (× K or container) — set on Edit">own rule</span>{% endif %}</p>{% endif %}
   </div>
 

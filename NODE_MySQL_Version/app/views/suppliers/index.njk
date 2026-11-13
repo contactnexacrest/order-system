@@ -84,7 +84,7 @@
         <td>{{ off.dates }}</td>
         <td>{% set offFrom = 'suppliers' %}{% set canSwitch = canEditPrice %}{% include "suppliers/_offer_switch.njk" %}</td>
         <td></td>
-        <td>{% if canEditPrice and off.editable %}<a href="/products/suppliers/{{ off.id }}/edit-price?from=suppliers" class="btn-sm btn-secondary">Edit price</a>{% endif %}</td>
+        <td>{% if canEditPrice and off.editable %}<div class="row-actions"><a href="/products/suppliers/{{ off.id }}/edit-price?from=suppliers" class="btn-sm btn-secondary">Edit price</a></div>{% endif %}</td>
       </tr>
       {% endfor %}
       {% endfor %}

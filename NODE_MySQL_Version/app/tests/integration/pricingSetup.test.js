@@ -132,7 +132,7 @@ describe('Pricing setup (D-245, P1)', () => {
     msg = await post(agent, '/pricing/settings', '/pricing/settings', {
       margin_pct: '22.5', other_cost_pct: '2.5', pricing_fx_rate: '82', buffer_pct: '3', incentive_mode: 'pct', incentive_value: '15', stale_days: '60',
     });
-    expect(msg).toContain('Pricing settings saved');
+    expect(msg).toContain('Global pricing settings saved');
     expect((await pricingRepository.settings()).margin_pct).toBe('22.50');
     const log = await db.queryOne("SELECT user_id, field_name, old_value, new_value FROM audit_log WHERE action_type = 'PRICING_SETTING_CHANGED' ORDER BY id DESC LIMIT 1");
     expect([Number(log.user_id), log.field_name, log.old_value, log.new_value]).toEqual([md.id, 'margin_pct', '20.00', '22.50']);
@@ -244,7 +244,7 @@ describe('Pricing setup (D-245, P1)', () => {
   it('the pages open', async () => {
     const md = await login(await user('Managing Director'));
     const settings = (await md.get('/pricing/settings')).text;
-    expect(settings).toContain('Pricing Settings');
+    expect(settings).toContain('Global pricing settings');
     expect(settings).toContain('name="margin_pct"');
     const levels = (await md.get('/pricing/commission-levels')).text;
     expect(levels).toContain('Associate Commission Levels');

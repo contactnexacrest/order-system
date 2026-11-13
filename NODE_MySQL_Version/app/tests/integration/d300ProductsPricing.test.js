@@ -255,7 +255,7 @@ describe('D-300 to D-306 products and pricing', () => {
 
     const agent = await login(md);
     let page = (await agent.get(`/products/categories/${cat}?tab=rules`)).text;
-    for (const s of ['General (name, units, HS code, packing, documents)', 'Options and their price effect', 'Price rules (thickness %, container)', 'Products in this category',
+    for (const s of ['General (name, units, HS code, packing, documents)', 'Options and their price effect', 'Category price rules (thickness %, container)', 'Products in this category',
       'Container and weight', 'Save rules', 'data-rules-example']) expect(page).toContain(s);
     page = (await agent.get(`/products/categories/${cat}?tab=options`)).text;
     expect(page).toContain('What changes the price in this category');

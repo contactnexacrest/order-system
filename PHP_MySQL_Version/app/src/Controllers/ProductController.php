@@ -54,11 +54,20 @@ final class ProductController
         $statusCounts = null;
 
         if ($searched) {
-            $products = ProductRepository::search($query, $status);
             $statusCounts = ProductRepository::statusCounts($query);
         } elseif ($canBrowse) {
-            $products = ProductRepository::listing($status);
             $statusCounts = ProductRepository::statusCounts();
+        }
+        // D-362 (13 Nov 2026, owner request): a tab or filter chip with 0 products opens Active
+        // instead (All when Active is 0 too); the flash message is kept for the next page.
+        if ($statusCounts !== null && ($__open = ProductRepository::openTab($status, $statusCounts)) !== $status) {
+            header('Location: /products?status=' . $__open . ($searched ? '&q=' . rawurlencode($query) : ''));
+            return;
+        }
+        if ($searched) {
+            $products = ProductRepository::search($query, $status);
+        } elseif ($canBrowse) {
+            $products = ProductRepository::listing($status);
         } else {
             // Search-only user with no query submitted yet — no full-list
             // query executes at all. This is the actual enforcement point;
@@ -512,7 +521,11 @@ final class ProductController
             echo 'Product not found.';
             return;
         }
-        $back = ($_POST['return_to'] ?? '') === 'list' ? '/products?status=' . ($active ? 'inactive' : 'active') : "/products/{$id}";
+        // D-362: from the list, back to the tab the user was on (posted as status / q).
+        $fromList = ($_POST['return_to'] ?? '') === 'list';
+        $tab = ProductRepository::statusFilter($_POST['status'] ?? ($active ? 'inactive' : 'active'));
+        $q = trim((string) ($_POST['q'] ?? ''));
+        $back = $fromList ? '/products?status=' . $tab . ($q !== '' ? '&q=' . rawurlencode($q) : '') : "/products/{$id}";
         if ((bool) $product['is_active'] === $active) {
             Flash::set('success', 'Product "' . $product['name'] . '" is already ' . ($active ? 'active' : 'inactive') . '.');
             header("Location: {$back}");
@@ -531,6 +544,16 @@ final class ProductController
         Flash::set('success', $active
             ? 'Product "' . $product['name'] . '" is active again — it shows in the list and can be picked on order lines.'
             : 'Product "' . $product['name'] . '" is deactivated — it is hidden from the active list and cannot be picked on new order lines.');
+        if ($fromList) {
+            // D-362 (13 Nov 2026, owner request): when the tab the user was on is now empty, open the
+            // tab that now holds the product — Active after Reactivate, Inactive after Deactivate.
+            $counts = ProductRepository::statusCounts($q !== '' ? $q : null);
+            if ((int) ($counts[$tab] ?? 0) === 0) {
+                $to = $active ? 'active' : 'inactive';
+                $to = (int) ($counts[$to] ?? 0) > 0 ? $to : ProductRepository::openTab($tab, $counts);
+                $back = '/products?status=' . $to . ($q !== '' ? '&q=' . rawurlencode($q) : '');
+            }
+        }
         header("Location: {$back}");
     }
 

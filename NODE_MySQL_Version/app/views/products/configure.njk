@@ -40,7 +40,7 @@
             {% for o in offers %}
               <tr><td>{{ o.supplier }}{% if not o.linked %} <small class="muted">(not linked to a supplier record)</small>{% endif %}</td><td>{{ o.price }}</td><td>{{ o.quoted_on }}</td><td>{{ o.valid_until }}</td>
                 <td>{% if o.usable %}active{% else %}<span class="muted">paused</span>{% endif %}</td>
-                <td>{% if canEditPrice and o.editable %}<a href="/products/suppliers/{{ o.id }}/edit-price?from=configure">Edit price</a>{% endif %}</td></tr>
+                <td>{% if canEditPrice and o.editable %}<div class="row-actions"><a class="btn-sm btn-secondary" href="/products/suppliers/{{ o.id }}/edit-price?from=configure">Edit price</a></div>{% endif %}</td></tr>
             {% endfor %}
             {% if not offers.length %}<tr><td colspan="6" class="muted">No supplier prices yet — add them from Procurement › Suppliers › + Add product.</td></tr>{% endif %}
           </table>
@@ -68,7 +68,7 @@
             </tr>
           {% endfor %}
         </table>
-        <p class="muted small">"reset" on one row puts back that one value (the category value if the category has one, else global) — then Save. Empty values in Pricing settings and Price rules are filled from the level above.</p>
+        <p class="muted small">"reset" on one row puts back that one value (the category value if the category has one, else global) — then Save. Empty values in Global pricing settings and Category price rules are filled from the level above.</p>
         {% if followGlobal %}<p class="notice notice-info small">This product follows the <b>global</b> values and ignores its category's values ("Reset all to global values"). "Reset all to category values" makes it follow its category again.</p>{% endif %}
         <p>
           <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-category">Reset all to category values</button>

@@ -23,6 +23,9 @@ $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fm
 $__g = $__r['global'];
 $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="button" class="btn-link small" data-clear-field="' . $n . '">reset to global</button>' : '';
 ?>
+<?php // D-362 (13 Nov 2026, owner request): named "Category price rules" — per category, not global. ?>
+<h2>Category price rules</h2>
+<p class="muted" data-testid="applies-note"><strong>Applies to every product in the category unless the product changes it.</strong></p>
 <form method="get" action="/products/price-rules" class="field-grid">
   <label>Category
     <select name="category" onchange="this.form.submit()">
@@ -59,7 +62,7 @@ $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="but
   </details>
   <?php endif; ?>
 
-  <?php // D-361 (13 Nov 2026, mockup p6): the category's own %s — empty = follow the global value (Pricing settings). ?>
+  <?php // D-361 (13 Nov 2026, mockup p6): the category's own %s — empty = follow the global value (Global pricing settings). ?>
   <h2>Margin, other costs and buffer</h2>
   <div class="field-grid">
     <label>Margin %<?= $__rg('margin_pct') ?><input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="<?= View::e((string) ($__old['margin_pct'] ?? $__fmt($__r['margin_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['margin_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
@@ -73,7 +76,7 @@ $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="but
     <label>Maximum (tonnes)<?= $__rg('container_max_t') ?><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_max_t'] ?? $__fmt($__r['container_max_t']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['container_max_t'])) ?> (global)"<?= $__ro ?>></label>
     <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><?= $__rg('weight_t_per_cbm') ?><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="<?= View::e((string) ($__old['weight_t_per_cbm'] ?? $__fmt($__r['weight']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['weight_t_per_cbm'])) ?> (global)"<?= $__ro ?>></label>
   </div>
-  <p class="small muted">A value typed here applies to every product in the category that has not changed it for itself; empty = the global value (Pricing settings). "reset to global" empties the value — then Save. The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
+  <p class="small muted">A value typed here applies to every product in the category that has not changed it for itself; empty = the global value (Global pricing settings). "reset to global" empties the value — then Save. The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
   <?php if ($canManagePricing): ?>
     <label>Reason for the change *<textarea name="reason" rows="2" required maxlength="500" placeholder="e.g. Supplier rates for 30 mm went up in November"><?= View::e((string) ($__old['reason'] ?? '')) ?></textarea></label>
     <button type="submit">Save rules</button>

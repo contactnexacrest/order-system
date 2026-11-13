@@ -47,8 +47,8 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
   <?php if (!empty($canBuildup)): ?><p class="muted small">Supplier prices are in ₹; every other price is in USD per the product's unit, FOB, worked out from the configured base price. Yellow badge = this product overrides a pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked.</p><?php endif; ?>
   <p>
     <?php if ($canManage): ?><a class="btn-sm" href="/products/categories">Categories</a><?php endif; ?>
-    <?php if (!empty($canPriceRules)): ?><a class="btn-sm" href="/products/price-rules">Price rules</a><?php endif; ?>
-    <?php if (!empty($canPricingSettings)): ?><a class="btn-sm" href="/pricing/settings">Pricing settings</a><?php endif; ?>
+    <?php if (!empty($canPriceRules)): ?><a class="btn-sm" href="/products/price-rules">Category price rules</a><?php endif; ?>
+    <?php if (!empty($canPricingSettings)): ?><a class="btn-sm" href="/pricing/settings">Global pricing settings</a><?php endif; ?>
     <?php if (!empty($canFixHs)): ?><a class="btn-sm btn-secondary" href="/products/fix-hs-codes">Fix HS codes</a><?php endif; ?>
     <?php if (!empty($canLinkPrices) && $unlinkedCount > 0): ?><a class="btn-sm btn-secondary" href="/products/link-prices" data-testid="link-these-prices">Link these prices (<?= (int) $unlinkedCount ?>)</a><?php endif; ?>
     <?php if (!empty($canGoSuppliers)): ?><a class="btn-sm btn-secondary" href="/suppliers">Go to Suppliers</a><?php endif; ?>
@@ -127,7 +127,7 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
             <?php if ($canManage): // Owner decision D-358 (13 Nov 2026) ?> · <a href="/products/<?= (int) $p['id'] ?>/duplicate" data-duplicate-link>Duplicate</a><?php endif; ?>
             <?php if ($canManage && !$p['is_active']): ?>
               <?php if ($__st['can_activate']): ?>
-                <form method="post" action="/products/<?= (int) $p['id'] ?>/reactivate" class="inline-form" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+                <form method="post" action="/products/<?= (int) $p['id'] ?>/reactivate" class="inline-form" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="return_to" value="list"><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php if ($searched): ?><input type="hidden" name="q" value="<?= View::e($query) ?>"><?php endif; ?><button type="submit" class="btn-sm">Reactivate</button></form>
               <?php else: ?>
                 <button type="button" class="btn-sm btn-secondary" disabled title="<?= View::e((string) $__st['reason']) ?>">Reactivate</button>
               <?php endif; ?>

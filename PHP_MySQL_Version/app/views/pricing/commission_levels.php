@@ -101,5 +101,5 @@ for ($i = 0; $i < 2; $i++) {
     </table>
     <?php if ($canManage): ?><button type="submit" class="btn-sm">Save ladder</button><?php endif; ?>
   </form>
-  <p><a class="btn-sm" href="/pricing/settings">Pricing settings</a></p>
+  <p><a class="btn-sm" href="/pricing/settings">Global pricing settings</a></p>
 </div>

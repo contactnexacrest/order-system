@@ -13,7 +13,7 @@ $__id = (int) $__c['id'];
 $__tabs = ['general' => 'General (name, units, HS code, packing, documents)'];
 if ($seesPricing) {
     $__tabs['options'] = 'Options and their price effect';
-    $__tabs['rules'] = 'Price rules (thickness %, container)';
+    $__tabs['rules'] = 'Category price rules (thickness %, container)';
 }
 $__tabs['products'] = 'Products in this category (' . count($products) . ')';
 $__return = "/products/categories/{$__id}?tab=general";
@@ -67,7 +67,7 @@ $__return = "/products/categories/{$__id}?tab=general";
         </select>
       </label>
       <label>Quality documents its orders need <small class="muted">(one per line, at most <?= \App\Repositories\ProductCategoryRepository::MAX_QUALITY_DOCUMENTS ?>)</small><textarea name="quality_documents" rows="3" maxlength="1300" placeholder="e.g. Mill test certificate 3.1&#10;Drawing approval"<?= $__ro ?>><?= View::e((string) ($__c['quality_documents'] ?? '')) ?></textarea></label>
-      <label>Weight per CBM (tonnes) <small class="muted">(for Ton prices and the container weight limit; also on Price rules)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="<?= ($__c['weight_t_per_cbm'] ?? null) !== null ? View::e(rtrim(rtrim((string) $__c['weight_t_per_cbm'], '0'), '.')) : '' ?>" placeholder="e.g. 2.7"<?= $__ro ?>></label>
+      <label>Weight per CBM (tonnes) <small class="muted">(for Ton prices and the container weight limit; also on Category price rules)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="<?= ($__c['weight_t_per_cbm'] ?? null) !== null ? View::e(rtrim(rtrim((string) $__c['weight_t_per_cbm'], '0'), '.')) : '' ?>" placeholder="e.g. 2.7"<?= $__ro ?>></label>
       <label>T&amp;C clause set
         <select name="tc_clause_set"<?= $__ro ?>>
           <option value="">Not set</option>

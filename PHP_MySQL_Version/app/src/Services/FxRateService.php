@@ -206,7 +206,7 @@ final class FxRateService
         $msg = 'Exchange rate ' . $date . ': ₹' . number_format($rate, 4) . ' per USD from ' . $source . ($change !== null ? ' (' . self::signed($change) . ')' : '') . '.';
         if ($status === 'waiting_md') {
             $text = 'The market rate moved ' . self::signed($change) . ' today (₹' . number_format((float) $inUse['market_rate'], 2) . ' → ₹' . number_format($rate, 2)
-                . '). It is not used for prices until you approve it: Products › Pricing settings › Exchange rate.';
+                . '). It is not used for prices until you approve it: Products › Global pricing settings › Exchange rate.';
             foreach (PermissionRepository::usersWithPermission('manage_pricing') as $mdId) {
                 NotificationRepository::createInAppOnly((int) $mdId, 'fx_rate_approval', null, mb_substr($text, 0, 500));
             }

@@ -66,7 +66,7 @@ final class SetupChecklist
 
     /** Ticks a person gives on the page (stored in setup_checklist_ticks). key => [label, permission]. */
     public const TICKS = [
-        'pricing_confirmed' => ['The MD has checked the pricing settings (exchange rate and margins)', 'manage_pricing'],
+        'pricing_confirmed' => ['The MD has checked the global pricing settings (exchange rate and margins)', 'manage_pricing'],
         'commission_levels_confirmed' => ['The MD has checked the commission levels', 'manage_pricing'],
         'tds_benefits_confirmed' => ['TDS settings and export-benefit deadlines confirmed with the CA', 'manage_company_settings'],
     ];
@@ -143,7 +143,7 @@ final class SetupChecklist
         $items[] = self::item('backups', 'Backups — folder, encryption and an off-site copy', $backupMissing === [],
             $backupMissing === [] ? 'Set; see the Backups page for the last runs.' : 'Missing in app/.env: ' . implode(', ', $backupMissing) . '.', '/admin/backups', 'Open Backups');
 
-        $items[] = self::tickItem('pricing_confirmed', 'Pricing confirmed by the MD — exchange rate and margins', '/pricing/settings', 'Open Pricing settings', $userId, $roleId);
+        $items[] = self::tickItem('pricing_confirmed', 'Pricing confirmed by the MD — exchange rate and margins', '/products', 'Open Products › Global pricing settings', $userId, $roleId);
 
         $activeLevels = (int) Database::connection()->query('SELECT COUNT(*) FROM commission_levels WHERE is_active = 1')->fetchColumn();
         $levels = self::tickItem('commission_levels_confirmed', 'Commission levels', '/pricing/commission-levels', 'Open Commission levels', $userId, $roleId);

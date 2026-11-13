@@ -83,7 +83,7 @@
         <td><?= htmlspecialchars($__off['dates']) ?></td>
         <td><?php $__from = 'suppliers'; $__canSwitch = !empty($canEditPrice); require __DIR__ . '/_offer_switch.php'; ?></td>
         <td></td>
-        <td><?php if (!empty($canEditPrice) && $__off['editable']): ?><a href="/products/suppliers/<?= (int) $__off['id'] ?>/edit-price?from=suppliers" class="btn-sm btn-secondary">Edit price</a><?php endif; ?></td>
+        <td><?php if (!empty($canEditPrice) && $__off['editable']): ?><div class="row-actions"><a href="/products/suppliers/<?= (int) $__off['id'] ?>/edit-price?from=suppliers" class="btn-sm btn-secondary">Edit price</a></div><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>
       <?php endforeach; ?>

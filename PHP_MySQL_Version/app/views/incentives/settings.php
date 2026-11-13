@@ -10,12 +10,12 @@ foreach ($roles as $__r) {
 <div class="card">
   <h1>Team Incentives</h1>
   <p class="muted">Only people with "Manage team incentives" can see this page. Staff never see an order's profit or another person's amount. Every change is recorded in the audit log.</p>
-  <p><a href="/incentives/ready">Ready to lock (<?= (int) $readyCount ?>)</a> · <a href="/incentives/payouts">Incentive payouts</a> · <a href="/associates">Associates</a> · <a href="/pricing/settings">Pricing settings (incentive % or amount)</a></p>
+  <p><a href="/incentives/ready">Ready to lock (<?= (int) $readyCount ?>)</a> · <a href="/incentives/payouts">Incentive payouts</a> · <a href="/associates">Associates</a> · <a href="/pricing/settings">Global pricing settings (incentive % or amount)</a></p>
 
   <form method="post" action="/incentives/settings">
     <?= Csrf::field() ?>
     <fieldset><legend>Program</legend>
-      <label class="setting-row"><span class="setting-label">Incentive program on<small class="muted">On: every order gets the team incentive of the global rule (Pricing settings: a % of profit or a fixed amount; a product may have its own). Off: no order gets one, unless the MD sets one by hand on an order. Associates are still paid under their agreements.</small></span>
+      <label class="setting-row"><span class="setting-label">Incentive program on<small class="muted">On: every order gets the team incentive of the global rule (Global pricing settings: a % of profit or a fixed amount; a product may have its own). Off: no order gets one, unless the MD sets one by hand on an order. Associates are still paid under their agreements.</small></span>
         <input type="checkbox" name="program_enabled" value="1"<?= $settings['enabled'] ? ' checked' : '' ?>></label>
       <label class="setting-row"><span class="setting-label">Remind the MD before a payout run (days)<small class="muted">Orders ready to lock but not locked are listed to the MD this many days before each payout run (<?= htmlspecialchars(AssociateCommission::runLabel()) ?>). 0 = no reminder.</small></span>
         <input type="number" name="lock_reminder_days" min="0" max="28" step="1" required value="<?= (int) $settings['reminder_days'] ?>" placeholder="e.g. 3"></label>

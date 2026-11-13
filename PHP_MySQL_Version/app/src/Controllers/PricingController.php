@@ -87,7 +87,7 @@ final class PricingController
                 $changed++;
             }
         }
-        Flash::set('success', $changed === 0 ? 'Nothing changed.' : 'Pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
+        Flash::set('success', $changed === 0 ? 'Nothing changed.' : 'Global pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
         header('Location: /pricing/settings');
     }
 

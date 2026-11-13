@@ -16,7 +16,7 @@ or associates beyond their own two prices.**
 | Associate floor (shown as **Associate lowest**) | staff floor ÷ (1 − commission %), or + a fixed USD amount | at 5%: **USD 1,355.26** |
 | Quote price | floor × (1 + buffer %) | staff **USD 1,326.13**; associate at 5% **USD 1,395.92** |
 
-Every % or amount has a **global value** (Products › Pricing › **Pricing settings**). A product can override
+Every % or amount has a **global value** (Products › **Global pricing settings**). A product can override
 any of them on its own page; an empty field means "use the global value".
 
 ## Who sees and changes what
@@ -31,9 +31,9 @@ Sales staff (anyone who may see selling prices) see only **Quote price** and **Y
 lowest price** on the product page and list. Supplier prices and cost components on the
 product page are shown only to people who may see purchase prices.
 
-## Products › Pricing › Pricing settings (MD)
+## Products › Global pricing settings (MD)
 
-1. **Pricing settings:** minimum margin (% of price), other costs to FOB (%), pricing
+1. **Global pricing settings:** minimum margin (% of price), other costs to FOB (%), pricing
    exchange rate (₹ per USD — keep it a little below the market rate), negotiating buffer
    (%), team incentive reserve (% of profit or USD per unit), and after how many days a
    supplier price is "stale". Every change is logged (who, when, before → after). New
@@ -58,7 +58,7 @@ update it before Sales quotes.
 
 ## Prices on order lines (phase P2)
 
-**Goods lines must be picked from Products** (Products › Pricing › Pricing settings, MD only; **on** by default).
+**Goods lines must be picked from Products** (Products › Global pricing settings, MD only; **on** by default).
 While it is on, a **goods** line on a **USD** order must be picked from Products: a goods
 line typed by hand is refused, with the message beside the picker in the browser ("Pick
 this goods line from Products — on a USD order goods lines cannot be typed by hand (service
@@ -172,16 +172,16 @@ asked for — their level only.
 
 ## Settings to check on go-live day (owner decision, 5 Nov 2026)
 
-The installed values below are the owner's chosen starting values. Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need entering by hand on the day the site goes live (Products › Pricing › Pricing settings):
+The installed values below are the owner's chosen starting values. Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need entering by hand on the day the site goes live (Products › Global pricing settings):
 
 | Setting | Value | Where |
 |---|---|---|
-| Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Pricing › Pricing settings › Exchange Rate |
-| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Pricing › Pricing settings, and per product |
-| Minimum margin | 20% of the price (raise per product where the market allows) | Products › Pricing › Pricing settings |
-| Negotiating buffer | 3% | Products › Pricing › Pricing settings |
-| Team incentive | 15% of profit (review after 6 months) | Products › Pricing › Pricing settings |
-| Supplier price stale after | 60 days | Products › Pricing › Pricing settings |
+| Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Global pricing settings › Exchange Rate |
+| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Global pricing settings, and per product |
+| Minimum margin | 20% of the price (raise per product where the market allows) | Products › Global pricing settings |
+| Negotiating buffer | 3% | Products › Global pricing settings |
+| Team incentive | 15% of profit (review after 6 months) | Products › Global pricing settings |
+| Supplier price stale after | 60 days | Products › Global pricing settings |
 | Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission › Commission settings and ladder |
 | Payout day | monthly, on the **last day of the month**; a Sunday or holiday moves to the working day before (D-292) | Associates › Commission › Commission settings and ladder |
 | Counting order | invoiced FOB of ₹5,00,000 or more | Associates › Commission › Commission settings and ladder |
@@ -259,9 +259,9 @@ most; typing the Thickness (cm) chooses the Thickness option for you (13 cm → 
 
 | Setting | Default | Where |
 |---|---|---|
-| Price per CBM from (mm) | 50 | Products › Pricing › Pricing settings |
-| Associate price requests per day | 10 | Products › Pricing › Pricing settings (per associate: Associates › Price access) |
-| An associate's price stays valid for (days) | 7 | Products › Pricing › Pricing settings (per associate: Associates › Price access) |
+| Price per CBM from (mm) | 50 | Products › Global pricing settings |
+| Associate price requests per day | 10 | Products › Global pricing settings (per associate: Associates › Price access) |
+| An associate's price stays valid for (days) | 7 | Products › Global pricing settings (per associate: Associates › Price access) |
 
 ## Pricing a new product in 5 steps (D-256, 5 Nov 2026)
 
@@ -462,7 +462,7 @@ time — older price") until someone adds a price with **+ Add / update a price*
 the card is used. Market prices › **Edit** changes the supplier, dates, packing and loading, CHA + transport and
 notes; the thickness prices are changed on the card.
 
-**Price rules (MD).** Products › Price rules (or Categories › <category> › Price rules): the thickness %s,
+**Category price rules (MD).** Products › Category price rules (or Categories › <category> › Category price rules): the thickness %s,
 the "× 40" for 50 mm and above, **+ Add a thickness** (e.g. 18 mm −5 %), what one container holds (8 CBM,
 max 27 t) and the stone weight (2.7 t per CBM). The example column changes as you type. Give a reason and
 **Save rules**; it is in the Audit Log. New prices use the rules at once; quotes already sent keep theirs.
@@ -504,7 +504,7 @@ If the price "used for pricing" is switched off, the product shows "The supplier
 (inactive supplier or offer)." until another price is used or the supplier is active again.
 
 **Where pricing values come from (D-359).** Margin, other costs and buffer: the product's own value, else its
-category's, else Pricing settings. Weight per CBM, container size, container weight and the thickness factor: the
+category's, else Global pricing settings. Weight per CBM, container size, container weight and the thickness factor: the
 product's, else the category's, else the global defaults (2.70 t per CBM, 27 t, 8 CBM, × 40). Nothing changed in the
 prices on the day this came in.
 
@@ -566,8 +566,8 @@ unit, quoted on, valid until — **Save**. The product's base price stays as it 
 have no supplier record (the 13 Nov update linked exact names itself). Pick the supplier in each row and click **Link**;
 add a supplier quickly if it is missing. The prices do not change.
 
-**Pricing settings** has a block **Default physical values for every category and product**: weight (tonnes per CBM),
-container max tonnes, container CBM and the thickness factor. **Price rules** (per category) now also has **Margin %,
+**Global pricing settings** has a block **Default physical values for every category and product**: weight (tonnes per CBM),
+container max tonnes, container CBM and the thickness factor. **Category price rules** (per category) now also has **Margin %,
 Other costs % and Buffer %** — empty means "use the global value" (shown in the empty box); **reset to global** beside
 any value empties it (then give the reason and **Save rules**).
 
@@ -582,7 +582,7 @@ the buyer pays. *Example:* we quote USD 1,000 at a market rate of ₹88.40. The 
 ₹86.63; USD 1,000 now brings ₹86,630, not ₹88,400 — because prices were worked out at ₹86.63, the cost is
 still covered.
 
-Products › Pricing › Pricing settings › **Exchange Rate (USD → INR)** starts with the box **RATE USED FOR
+Products › Global pricing settings › **Exchange Rate (USD → INR)** starts with the box **RATE USED FOR
 PRICES RIGHT NOW** (D-340, 12 Nov 2026): the rate in big type and a badge — *Automatic · fetched today*,
 *Automatic · rate of <date>*, *Manual fall-back* (nothing fetched yet) or *Manual* — then the market rate,
 when it was fetched, the source and the cushion ("2.0% → ₹88.40 × 0.98"), and any warning. **Green** = the
@@ -626,7 +626,7 @@ never on a document.
 ## One page per category (D-306)
 
 Products › Categories › <category>: **General** (name, units, HS code, packing, documents) · **Options and
-their price effect** (was the separate Specifications page under Pricing) · **Price rules** · **Products in this
+their price effect** (was the separate Specifications page under Pricing) · **Category price rules** · **Products in this
 category**. On a product's options page, "edit for all products in <category>" opens the category's
 options; **Change for this product only** changes just that product.
 
@@ -639,6 +639,21 @@ the product catalogue can **Reactivate** it, or **Delete…** it — only when i
 supplier prices, images and price history go with it). A used product cannot be deleted, so its orders stay complete.
 On an active product's page the button is **Deactivate**, not Delete. Every deactivation, reactivation and delete is in
 the audit log.
+
+Since 13 Nov 2026 (D-362) a tab with no products opens **Active** instead (or **All** when Active is empty too). After
+you reactivate the last product on the **Inactive** tab, the list opens **Active** with the green message and the
+product in it; the same the other way round after a deactivation from the list.
+
+## Global pricing settings and Category price rules (D-362, 13 Nov 2026)
+
+- **Global pricing settings** (`/pricing/settings`) — *applies to every product unless a category or product changes it.*
+- **Category price rules** (one page per category) — *applies to every product in the category unless the product changes it.*
+
+Both open only from the link bar on the **Products** screen: **Categories · Category price rules · Global pricing
+settings · Fix HS codes · Go to Suppliers**. They are no longer in the left menu or the Products menu bar (the
+**Pricing** drop-down keeps Commission levels and ladder, and Specifications); the exchange-rate history is on Global
+pricing settings › Exchange rate. On a supplier's page, the Suppliers list and Configure, **Edit price** and **Open
+product** are small buttons side by side.
 
 ## Duplicate a product (D-358, 13 Nov 2026)
 

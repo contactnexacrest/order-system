@@ -198,6 +198,16 @@ table with price prefill and a reason for a changed price) — checked against e
   **B09** (MD / ED: Products list, Configure, Pricing settings, Price rules).
 Listed only — nothing re-recorded; the owner decides whether B01 Part 1 and B02 are re-recorded.
 
+D-362 (13 Nov 2026: "Edit price" / "Open product" drawn as small buttons on a supplier's page, the Suppliers list and
+Configure; a Products tab with 0 products opens Active, and after Reactivate / Deactivate from the list the tab that now
+holds the product; "Pricing settings" renamed **Global pricing settings** and "Price rules" **Category price rules**, each
+with a one-line note, reached only from the Products screen's link bar; the menu items "Price rules", "Pricing settings
+(margin, buffer, exchange rate)" and "Exchange-rate history" removed) — checked against every script: no recorded video
+opens the Products list, a supplier's page, Configure, Pricing settings or Price rules, or shows the Products menu bar
+or the Pricing drop-down; no recorded narration says "Pricing settings" or "Price rules". No recorded video is affected.
+Not yet recorded but will show these: **B05** (Procurement: supplier page and Suppliers list buttons) and **B09** (MD /
+ED: Products list tabs, Global pricing settings, Category price rules). Listed only — nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

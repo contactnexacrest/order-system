@@ -163,7 +163,7 @@ final class ProductCategoryController
             Flash::set('error', $error);
             Flash::setOld($_POST);
         } else {
-            Flash::set('success', $changes === 0 ? 'Nothing changed.' : 'Price rules saved (' . $changes . ' change' . ($changes === 1 ? '' : 's') . '). Prices worked out from now on use them; quotes already sent keep their prices.');
+            Flash::set('success', $changes === 0 ? 'Nothing changed.' : 'Category price rules saved (' . $changes . ' change' . ($changes === 1 ? '' : 's') . '). Prices worked out from now on use them; quotes already sent keep their prices.');
         }
         header("Location: /products/categories/{$id}?tab=rules");
     }

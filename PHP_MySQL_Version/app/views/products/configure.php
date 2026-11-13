@@ -51,7 +51,7 @@ $__old = $old['level'] ?? null;
             <?php foreach ($offers as $__o): ?>
               <tr><td><?= View::e($__o['supplier']) ?><?= $__o['linked'] ? '' : ' <small class="muted">(not linked to a supplier record)</small>' ?></td><td><?= View::e($__o['price']) ?></td><td><?= View::e($__o['quoted_on']) ?></td><td><?= View::e($__o['valid_until']) ?></td>
                 <td><?= $__o['usable'] ? 'active' : '<span class="muted">paused</span>' ?></td>
-                <td><?php if ($canEditPrice && $__o['editable']): ?><a href="/products/suppliers/<?= (int) $__o['id'] ?>/edit-price?from=configure">Edit price</a><?php endif; ?></td></tr>
+                <td><?php if ($canEditPrice && $__o['editable']): ?><div class="row-actions"><a class="btn-sm btn-secondary" href="/products/suppliers/<?= (int) $__o['id'] ?>/edit-price?from=configure">Edit price</a></div><?php endif; ?></td></tr>
             <?php endforeach; ?>
             <?php if ($offers === []): ?><tr><td colspan="6" class="muted">No supplier prices yet — add them from Procurement › Suppliers › + Add product.</td></tr><?php endif; ?>
           </table>
@@ -79,7 +79,7 @@ $__old = $old['level'] ?? null;
             </tr>
           <?php endforeach; ?>
         </table>
-        <p class="muted small">"reset" on one row puts back that one value (the category value if the category has one, else global) — then Save. Empty values in Pricing settings and Price rules are filled from the level above.</p>
+        <p class="muted small">"reset" on one row puts back that one value (the category value if the category has one, else global) — then Save. Empty values in Global pricing settings and Category price rules are filled from the level above.</p>
         <?php if ($followGlobal): ?><p class="notice notice-info small">This product follows the <b>global</b> values and ignores its category's values ("Reset all to global values"). "Reset all to category values" makes it follow its category again.</p><?php endif; ?>
         <p>
           <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-category">Reset all to category values</button>

@@ -2386,10 +2386,12 @@ the same filters, counts, fields, actions and money rules on both templates
   to is decided by its path (longest prefix wins), so a new page under a
   section's path gets the bar with no change to the page. No bar on the
   Dashboard, Notifications, My account and My tasks. (11 Nov 2026 build
-  review) A category's Price rules tab (`/products/categories/<id>?tab=rules`,
-  where Products › Price rules leads) underlines **Price rules**, its other
-  tabs **Categories**; an open drop-down's page (e.g. Pricing settings)
-  underlines the drop-down. The Approvals bar's counts are what this person
+  review) A category's tabs underline **Categories**; an open drop-down's
+  page underlines the drop-down. (D-362, 13 Nov 2026) **Category price
+  rules** (`/products/price-rules` → `/products/categories/<id>?tab=rules`)
+  and **Global pricing settings** (`/pricing/settings`) are not in any menu:
+  they are reached only from the Products screen's link bar; on them the
+  left menu still marks **Products** (prefixes `/products`, `/pricing`). The Approvals bar's counts are what this person
   may approve — the same numbers as the Approvals page's chips (E-mails =
   sends waiting for this person's Level-2 approval, not the whole send queue).
 
@@ -2399,7 +2401,7 @@ the same filters, counts, fields, actions and money rules on both templates
 | Orders | Active · Archived · Quotation requests (n) · PI-stage details (n) · Reorder requests · Disputes · Complaints |
 | Clients | All clients · + Add client · Agreements; button "Open in Orders ›" |
 | Associates | All · + Add · Registrations (n) · Price requests · Commission ▾ (settings and ladder, levels) · Payouts · TDS register · Access levels · Report |
-| Products | All · Categories · Price rules · Pricing ▾ (settings, commission levels and ladder, exchange-rate history, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products); button "Open Suppliers in Procurement ›" (D-361: "+ Add" and "Link suppliers" removed — products come from Procurement › Suppliers › + Add product; "Link these prices (N)" is a button on the Products page) |
+| Products | All · Categories · Pricing ▾ (commission levels and ladder, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products); button "Open Suppliers in Procurement ›" (D-361: "+ Add" and "Link suppliers" removed — products come from Procurement › Suppliers › + Add product; "Link these prices (N)" is a button on the Products page) |
 | Procurement & suppliers | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
 | Finance & accounts | CA / Accounting · Zoho sync (n) · Incentive payouts · My incentives · Team incentive settings; on CA pages "Open in Reports ›" |
 | Reports | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
@@ -2561,6 +2563,8 @@ the same filters, counts, fields, actions and money rules on both templates
   - **D-361:** also Not configured · No active supplier · No supplier yet; the search matches supplier names; a
     product is offered on orders only when quotable (configured with an active supplier offer, or "No supplier yet");
     Configure / Edit (`/products/{id}/configure`) holds the base price and the three levels — see §7.1 D-361.
+  - **D-362:** a tab or chip with 0 products opens Active (All when Active is 0 too); after Reactivate / Deactivate
+    from the list an emptied tab opens the tab that now holds the product.
     An inactive product cannot be picked on new order lines and shows **Used on**:
     orders whose lines were picked from it (removed lines included), associate price
     requests, procurement lines (`ProductRepository::usage()`), or "not used anywhere";
@@ -2618,7 +2622,7 @@ the same filters, counts, fields, actions and money rules on both templates
 
 - **Purpose.** Work out a safe selling price per unit (FOB, USD) from the
   supplier price, and stop anyone selling below it.
-- **Screens.** Products › Pricing › Pricing settings (`/pricing/settings`; MD edits, MD/ED view; section headings
+- **Screens.** Products › Global pricing settings (`/pricing/settings`; MD edits, MD/ED view; section headings
   and legends in Title Case — Exchange Rate, Margin and Costs, Team Incentive Reserve, Supplier Prices, Order
   Lines, Specifications and Associate Prices, Who Can Do What — D-338),
   product page build-up, Procurement › Market prices
@@ -3145,7 +3149,7 @@ the same filters, counts, fields, actions and money rules on both templates
   D-245 it is the line-price approval (Prices tab). The Prices tab also
   holds the daily exchange rate when it moved more than 2 % and waits for
   the MD's OK (D-301; holders of `manage_pricing`; the button opens
-  Products › Pricing settings › Exchange rate).
+  Products › Global pricing settings › Exchange rate).
 - **Columns.** Waiting since ("Today 10:42", "Yesterday", "9 Nov") · What ·
   Order / who · Details · a button that opens the **exact existing approval
   screen** (line price approval page, order Step 1 for payment terms,
@@ -3417,7 +3421,7 @@ Needed** (or Optional) with a button to the page where it is set:
 | E-mail server | SMTP_HOST, PORT, USERNAME, PASSWORD, FROM_ADDRESS set in `.env` | Send a test e-mail (`/settings#smtp-test`) |
 | Zoho (optional) | Zoho Books on with an organisation id | Company Settings |
 | Backups | BACKUP_DIR, BACKUP_ENCRYPTION_KEY_FILE, BACKUP_OFFSITE_TARGET set | Backups |
-| Pricing confirmed by the MD | ticked (only `manage_pricing` may tick) | Pricing settings |
+| Pricing confirmed by the MD | ticked (only `manage_pricing` may tick) | Global pricing settings |
 | Commission levels | ticked by the MD and at least one active level | Commission levels |
 | TDS and benefit deadlines confirmed with the CA | ticked | TDS settings |
 | This year's holidays | ticked for the year ("add state and festival holidays for <year>" — a new tick every year); button to add any missing national holidays for this year and next | Holiday Calendar |
@@ -3646,7 +3650,7 @@ Category values, product overrides. A grid price used for pricing is also the pe
 the Thickness option's % is not applied again on top of a grid price. Old one-price rows ('unit', 'cbm',
 'combo') work as before, plus CHA from the product default when set.
 
-**Price rules (D-300).** Products › Categories › <category> › Price rules (`/products/categories/{id}?tab=rules`,
+**Category price rules (D-300).** Products › Categories › <category> › Category price rules (`/products/categories/{id}?tab=rules`,
 menu link `/products/price-rules`): thickness %s (the category's Thickness options), × K, + Add a thickness
 (below 50 mm), container CBM / maximum t, stone t per CBM, live example column (app.js `initRulesExample`).
 Saving needs `manage_pricing` (MD) and a reason; every change is `PRICE_RULE_CHANGED` / `PRICE_RULE_ADDED`
@@ -3707,12 +3711,12 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
 `PricingService::settings()['pricing_fx_rate']` is the rate in use: latest `fx_rates` row with status
 `in_use` × (1 − cushion %). Daily job `fetch_fx_rate.php` / `fetchFxRate.js` (07:05 IST): Frankfurter, then
 open.er-api.com; failure → a `failed` row, the last rate stays (warning); a move > 2 % against the rate in use
-→ `waiting_md`, in-app notice to `manage_pricing` holders, MD decides on Pricing settings with a reason
+→ `waiting_md`, in-app notice to `manage_pricing` holders, MD decides on Global pricing settings with a reason
 (`/pricing/fx-rates/{id}/decide`). The MD can also "Fetch today's rate now". Issued QT / PI keep their prices
 (price snapshot on the line). The rate line with [Why?] (`pricing/_fx_rate_line`) appears only on the
-catalogue header and Pricing settings, for build-up viewers.
+catalogue header and Global pricing settings, for build-up viewers.
 
-**Rate used for prices right now (D-340).** On Pricing settings the separate "Exchange Rate" block above the
+**Rate used for prices right now (D-340).** On Global pricing settings the separate "Exchange Rate" block above the
 form is gone; the **Exchange Rate (USD → INR)** fieldset starts with a box titled "RATE USED FOR PRICES RIGHT
 NOW" (`FxRateService::status()` / `fxRateService.status()`, which adds to `current()`): the rate in big type
 with a badge — **Automatic · fetched today**, **Automatic · rate of 11 Nov 2026**, **Manual fall-back**
@@ -3761,7 +3765,7 @@ order from an associate's client, staff see "for this order" figures and the not
 (level)" only for `view_price_buildup`.
 
 **Category page (D-306).** `/products/categories/{id}` with tabs General | Options and their price effect |
-Price rules | Products in this category (`ProductCategoryController::show`). `/pricing/specifications` (GET)
+Category price rules | Products in this category (`ProductCategoryController::show`). `/pricing/specifications` (GET)
 redirects to the Options tab; the specification actions redirect there too. A product's options page links
 "edit for all products in <category>".
 
@@ -3783,7 +3787,7 @@ redirects to the Options tab; the specification actions redirect there too. A pr
   same price at the same thickness, otherwise a price for every thickness typed at the base thickness (other thicknesses
   worked out by the price rules, as an older `auto_fill` row) or a price per unit, with that offer's CHA, packing and dates.
 - **Three levels.** Margin %, other costs, buffer %: the product's own value, else its category's
-  (`product_categories.margin_pct`, `other_cost_pct`, `buffer_pct`; empty = follow global), else Pricing settings. Weight
+  (`product_categories.margin_pct`, `other_cost_pct`, `buffer_pct`; empty = follow global), else Global pricing settings. Weight
   t/CBM, container CBM, container max t, thickness factor K: product → category → global (`pricing_settings`
   `weight_t_per_cbm` 2.70, `container_max_t` 27.00, `container_cbm` 8.00, `thick_k_factor` 40 — the last fallback). The
   team incentive is product → global. `catalog_products.pricing_follow_global` = 1 ("Reset all to global values") skips
@@ -3872,8 +3876,8 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
   addProductChoices / createProduct / addOffer` (Node `supplierOffers.js`), views `suppliers/index`, `form`, `add_product`,
   `_add_product`, `_offer_switch`; `EditPriceController` accepts `from=suppliers`. CSS `.filter-pill`, `.offer-switch`,
   `.add-offer-*`.
-- **Done in D-361** (below): Products list, Configure / Edit, Link a supplier, Link these prices, Pricing settings physical
-  block, Price rules per category, the quotable rule in Pick from Products, the Supplier PO supplier-choice table.
+- **Done in D-361** (below): Products list, Configure / Edit, Link a supplier, Link these prices, Global pricing settings physical
+  block, Category price rules (margin / other costs / buffer), the quotable rule in Pick from Products, the Supplier PO supplier-choice table.
 
 **Products, Configure and the Supplier PO (D-361, 13 Nov 2026, owner "go with recommendation"; Push 3 of 3; mockups
 products_now_vs_after, p3–p8, decision_d1 part A, decision_d2, configure_three_levels_mockup).** Owner decisions of 13 Nov:
@@ -3900,7 +3904,7 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   supplier yet; `manage_suppliers` + `record_market_prices`), View · Duplicate, Reactivate only when quotable (else greyed with
   the reason; the reactivate route refuses it too). Filters: Active · Inactive · All · Not configured · No active supplier · No
   supplier yet (the last three across active and inactive, shown when not 0). Search also matches a supplier's name (typed or
-  directory). Buttons: Categories · Price rules · Pricing settings · Fix HS codes · **Link these prices (N)** (only while N > 0) ·
+  directory). Buttons: Categories · Category price rules · Global pricing settings · Fix HS codes · **Link these prices (N)** (only while N > 0) ·
   **Go to Suppliers**; "+ Add Product" and "Link suppliers" are gone from the page and the Products menu (their routes still
   work). Empty state "No products yet — 1. Add a supplier · 2. Add the products they offer · 3. Configure" with Go to Suppliers.
 - **Configure / Edit (`/products/{id}/configure`, `manage_product_catalog`).** Left: **Base price (₹ / CBM, 50 mm and above |
@@ -3929,9 +3933,9 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   (`supplier_id` NULL): product, supplier as typed, price, dates, and a Supplier * drop-down (exact name pre-selected) with
   **Link** (`SupplierOffers::linkPrice()`: `supplier_id` and the legal name, history "Linked to supplier", audit
   `SUPPLIER_PRICE_LINKED`); "+ Add a new supplier (quick)" returns here.
-- **Pricing settings** — block **Default physical values for every category and product**: weight t / CBM (0.1–20), container
+- **Global pricing settings** — block **Default physical values for every category and product**: weight t / CBM (0.1–20), container
   max t (1–100), container CBM (0.5–100), thickness factor (1–1000), stored as 2.70 / 27.00 / 8.00 / 40.
-- **Price rules** (per category, MD, with a reason) — new **Margin, other costs and buffer** fields (empty = global; the
+- **Category price rules** (per category, MD, with a reason) — new **Margin, other costs and buffer** fields (empty = global; the
   placeholder shows the global value) and a **reset to global** button beside every value (empties it; then Save).
 - **Pick from Products** offers only quotable active products (`ProductRepository::forPicker()`); products not configured or
   with no active supplier are listed greyed under "Not offered yet" with "— not configured yet — ask the product manager" /
@@ -3949,6 +3953,26 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   `OrderSupplierPoRepository::setOfferChoice`; views `products/index`, `configure`, `link_supplier`, `link_prices`,
   `_price_rules`, `pricing/settings`, `orders/_product_picker`, `orders/show`; app.js `initConfigure` and the
   `data-required-if-differs` rule; CSS D-361 block. The Products list has no board view (no Kanban twin).
+
+**Three small fixes (D-362, 13 Nov 2026, owner request).**
+- **Row-action buttons.** "Edit price" / "Open product" (supplier page › Prices given for products, Suppliers list offer
+  rows, Configure › See all supplier prices) sit in a `.row-actions` cell as small buttons (`btn-sm`, `btn-sm
+  btn-secondary`): side by side, each on one line, wrapping as whole buttons below 760 px. Cause: an `<a class="btn-sm">`
+  had only padding (no `display`, `white-space`, background), so the border of `btn-secondary` drew on an inline,
+  wrapping link. CSS D-362 block (both stacks).
+- **Products tabs.** `ProductRepository::openTab()` (Node `productRepository.openTab`): a status tab or filter chip with 0
+  products redirects to Active (All when Active is 0 too), keeping the search and the flash message. Reactivate /
+  Deactivate posted from the list (`return_to=list`, with the tab `status` and `q`) returns to that tab; when it is now
+  empty it opens the tab that now holds the product — Active after Reactivate, Inactive after Deactivate. Deactivate on a
+  product's page still returns to that page.
+- **Names and one place.** `/pricing/settings` is **Global pricing settings** (note "Applies to every product unless a
+  category or product changes it"); the category rules tab is **Category price rules** (note "Applies to every product in
+  the category unless the product changes it"). Both are reached only from the Products screen's link bar (Categories ·
+  Category price rules · Global pricing settings · Fix HS codes · Go to Suppliers); the menu items "Price rules",
+  "Pricing settings (margin, buffer, exchange rate)" and "Exchange-rate history" are removed (Pricing ▾ keeps Commission
+  levels and ladder, Specifications). Admin › Settings › Setup checklist's pricing row now opens Products ("Open Products ›
+  Global pricing settings"). Other in-app links stay, with the new names. Routes and permissions unchanged; the left menu
+  still marks Products on both pages.
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
@@ -4168,7 +4192,7 @@ There are four different rates. Do not mix them up.
 
 | Rate | Where it comes from | Used for |
 |---|---|---|
-| **Pricing FX** (`pricing_settings.pricing_fx_rate`, seed 82.0000; since D-301 the daily `fx_rates` rate with `fx_mode` auto) | MD, Products › Pricing › Pricing settings. Automatic (default): the market rate fetched daily at 07:05 IST minus the cushion `fx_cushion_pct` (2 %); a daily change over 2 % waits for the MD. `pricing_fx_rate` is used in Manual mode and until the first fetch. | Turning supplier ₹ into USD prices. Converting USD-per-unit commission/incentive on non-USD orders. Frozen at PI approval as `orders.pricing_fx_rate_at_pi` (D-262). |
+| **Pricing FX** (`pricing_settings.pricing_fx_rate`, seed 82.0000; since D-301 the daily `fx_rates` rate with `fx_mode` auto) | MD, Products › Global pricing settings. Automatic (default): the market rate fetched daily at 07:05 IST minus the cushion `fx_cushion_pct` (2 %); a daily change over 2 % waits for the MD. `pricing_fx_rate` is used in Manual mode and until the first fetch. | Turning supplier ₹ into USD prices. Converting USD-per-unit commission/incentive on non-USD orders. Frozen at PI approval as `orders.pricing_fx_rate_at_pi` (D-262). |
 | **Recorded remittance rate** | Worked out: INR credited ÷ foreign amount (D-244). Typed only when "INR not known yet" is ticked. | Revenue, realised rate, D-212 descriptions. |
 | **Bank's rate on the advice** (optional) | Typed from the bank advice. | Checking the INR credited. |
 | **MTT USD rate** (`mtt_usd_inr_rate`, 84.0000) | Merchant Trade division setting. | Merchant margin in USD when neither leg is USD. |
@@ -4693,7 +4717,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 | `cbm_from_mm` | 50 | Per-CBM pricing from this thickness |
 | `price_request_daily_limit` | 10 | Associate automatic price requests per day |
 | `price_request_valid_days` | 7 | Associate price validity |
-| `weight_t_per_cbm` / `container_max_t` / `container_cbm` / `thick_k_factor` | 2.70 / 27.00 / 8.00 / 40 | D-359 / D-361: default physical values, used when neither the category (Price rules) nor the product (Configure) has one |
+| `weight_t_per_cbm` / `container_max_t` / `container_cbm` / `thick_k_factor` | 2.70 / 27.00 / 8.00 / 40 | D-359 / D-361: default physical values, used when neither the category (Category price rules) nor the product (Configure) has one |
 
 Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED). Self-approval rule `bank_details` (MD, ED): verify bank details one entered oneself, with a reason (D-293).
 
@@ -5355,7 +5379,7 @@ Other open points needing outside answers: O-11 (workflow specification §13 que
 | `__STORAGE_BASE_PATH__` | `assets`, `user_signature_assets`, `reference_library_documents` | The absolute storage path |
 | LUT expiry and RCMC valid-until 31 Mar 2027 | `company_settings` | Confirm |
 | ECGC policy number / valid-to | empty | Fill only if there is a policy |
-| `pricing_fx_rate` 82.00 | Products › Pricing › Pricing settings | Used only in Manual mode and until the first daily fetch (D-301) — press **Fetch now** on go-live day |
+| `pricing_fx_rate` 82.00 | Products › Global pricing settings | Used only in Manual mode and until the first daily fetch (D-301) — press **Fetch now** on go-live day |
 | Other costs to FOB 2.5% | Products › Pricing | Real figure from the first 3–5 shipments |
 | Logo, MD signature, seal, watermark | `/company-assets` | Real images (placeholders are labelled graphics) |
 | `APP_ENCRYPTION_KEY`, `SESSION_SECRET_KEY` | `.env` | Fresh random values |

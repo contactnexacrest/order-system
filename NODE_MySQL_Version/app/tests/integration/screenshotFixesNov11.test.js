@@ -59,14 +59,16 @@ describe('11 Nov 2026 screenshot fixes', () => {
   it('1. the Products bar marks Price rules on a category\'s rules tab and Pricing on Pricing settings', () => {
     const all = () => true;
     const flags = { approver: true, mod_associates: true };
-    expect(activeLabels(navigation.build(all, flags, {}, '/products/categories/5', { tab: 'rules' }).bar)).toEqual(['Price rules']);
+    // D-362: "Price rules" left the menu (Products link bar only) — the rules tab is under Categories.
+    expect(activeLabels(navigation.build(all, flags, {}, '/products/categories/5', { tab: 'rules' }).bar)).toEqual(['Categories']);
     expect(activeLabels(navigation.build(all, flags, {}, '/products/categories/5', { tab: 'general' }).bar)).toEqual(['Categories']);
     expect(activeLabels(navigation.build(all, flags, {}, '/products/categories/5', {}).bar)).toEqual(['Categories']);
     expect(activeLabels(navigation.build(all, flags, {}, '/products/categories', {}).bar)).toEqual(['Categories']);
     const pricing = navigation.build(all, flags, {}, '/pricing/settings', {}).bar;
-    expect(activeLabels(pricing)).toEqual(['Pricing']);
-    expect(pricing.items.find((i) => i.label === 'Pricing').children.filter((c) => c.active).map((c) => c.label))
-      .toEqual(['Pricing settings (margin, buffer, exchange rate)']);
+    // D-362: Global pricing settings and Exchange-rate history left the "Pricing" drop-down.
+    expect(activeLabels(pricing)).toEqual([]);
+    expect(pricing.items.find((i) => i.label === 'Pricing').children.map((c) => c.label))
+      .toEqual(['Commission levels and ladder', 'Specifications']);
     // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
     expect(read('views/partials/section_nav.njk')).toContain('<details class="section-nav-details">');
     const css = read('public/css/app.css');

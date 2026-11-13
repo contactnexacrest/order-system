@@ -27,11 +27,11 @@ describe('D-320: the short left menu, the section menu bars and the order action
     '/ports', '/payment-presets', '/compliance-task-types', '/admin/dropdown-options', '/email-templates', '/ui-templates',
     '/watermarks', '/company-assets', '/signatories', '/admin/divisions', '/admin/gst-rates', '/admin/import-duty-rates',
     '/admin/departments', '/admin/task-types', '/admin/permissions', '/users', '/admin/field-protection', '/incentives/settings',
-    '/pricing/settings', '/admin/overrides', '/sample-data', '/admin/data-export', '/admin/backups', '/super-admin',
+    '/admin/overrides', '/sample-data', '/admin/data-export', '/admin/backups', '/super-admin',
     '/admin/self-approval', '/test-mode',
     // Reached before only from links inside pages (the TDS register had no link at all).
     '/associates/tds', '/associates/registrations', '/associates/price-requests', '/associates/ladder', '/associates/access-levels',
-    '/associates/new', '/reports/associates', '/products/categories', '/products/price-rules', '/pricing/commission-levels',
+    '/associates/new', '/reports/associates', '/products/categories', '/pricing/commission-levels',
     '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
     '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
     '/products/create',
@@ -39,6 +39,8 @@ describe('D-320: the short left menu, the section menu bars and the order action
   // Decided bar (D-320 register): Procurement & suppliers has no "+ Add" entry; + Add supplier stays a button on the
   // Suppliers page, which shows the section's bar.
   const PAGE_BUTTON_ONLY = ['/suppliers/create'];
+  // D-362 (13 Nov 2026): reached only from the Products screen's link bar, not from a menu.
+  const PRODUCTS_LINK_BAR_ONLY = ['/pricing/settings', '/products/price-rules'];
   const ALL_FLAGS = {
     superAdmin: true, sopOpen: true, approver: true, mod_supplier_purchase: true, mod_import_stock: true,
     mod_merchant_trade: true, mod_associates: true, mod_team_incentive: true, div_gst: true, div_import_duty: true,
@@ -99,6 +101,10 @@ describe('D-320: the short left menu, the section menu bars and the order action
       expect([page, linked.has(page)]).toEqual([page, false]);
       expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'procurement']);
     }
+    for (const page of PRODUCTS_LINK_BAR_ONLY) {
+      expect([page, linked.has(page)]).toEqual([page, false]);
+      expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'products']);
+    }
     expect(navigation.build(all, ALL_FLAGS, {}, '/', {}).currentKey).toBe('dashboard');
   });
 
@@ -156,7 +162,8 @@ describe('D-320: the short left menu, the section menu bars and the order action
     expect(active(navigation.build(all, ALL_FLAGS, {}, '/orders/12', {}))).toEqual(['Active']);
     expect(active(navigation.build(all, ALL_FLAGS, {}, '/orders/archived', {}))).toEqual(['Archived']);
     expect(active(navigation.build(all, ALL_FLAGS, {}, '/reports/associates', {}))).toEqual(['Report']); // the longest prefix wins
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/pricing/settings', {}))).toEqual(['Pricing', 'Pricing settings (margin, buffer, exchange rate)']);
+    // D-362: Global pricing settings is reached only from the Products link bar — no menu item is marked.
+    expect(active(navigation.build(all, ALL_FLAGS, {}, '/pricing/settings', {}))).toEqual([]);
     expect(active(navigation.build(all, ALL_FLAGS, {}, '/approvals', { tab: 'prices' }))).toEqual(['Prices']);
     expect(active(navigation.build(all, ALL_FLAGS, {}, '/approvals', {}))).toEqual(['All']);
     expect(navigation.sectionKeyFor('/cafin')).toBeNull(); // "/ca" never covers "/cafin"

@@ -137,7 +137,7 @@ async function show(req, res) {
   }
   category.allowedUnits = productCategoryRepository.allowedUnits(category);
   const tabs = [['general', 'General (name, units, HS code, packing, documents)']];
-  if (seesPricing) tabs.push(['options', 'Options and their price effect'], ['rules', 'Price rules (thickness %, container)']);
+  if (seesPricing) tabs.push(['options', 'Options and their price effect'], ['rules', 'Category price rules (thickness %, container)']);
   tabs.push(['products', `Products in this category (${products.length})`]);
   const data = {
     category, tab, tabs, seesPricing, canManageCatalog: can('manage_product_catalog'), canManagePricing: can('manage_pricing'), products,
@@ -188,7 +188,7 @@ async function saveRules(req, res) {
     flash.set(req, 'error', error);
     flash.setOld(req, req.body || {});
   } else {
-    flash.set(req, 'success', changes === 0 ? 'Nothing changed.' : `Price rules saved (${changes} change${changes === 1 ? '' : 's'}). Prices worked out from now on use them; quotes already sent keep their prices.`);
+    flash.set(req, 'success', changes === 0 ? 'Nothing changed.' : `Category price rules saved (${changes} change${changes === 1 ? '' : 's'}). Prices worked out from now on use them; quotes already sent keep their prices.`);
   }
   res.redirect(`/products/categories/${id}?tab=rules`);
 }

@@ -103,15 +103,17 @@ final class ScreenshotFixesNov11Test extends DbTestCase
     {
         $all = static fn (): bool => true;
         $flags = ['approver' => true, 'mod_associates' => true];
-        self::assertSame(['Price rules'], self::activeLabels(Navigation::build($all, $flags, [], '/products/categories/5', ['tab' => 'rules'])['bar']));
+        // D-362: "Price rules" left the menu (Products link bar only) — the rules tab is under Categories.
+        self::assertSame(['Categories'], self::activeLabels(Navigation::build($all, $flags, [], '/products/categories/5', ['tab' => 'rules'])['bar']));
         self::assertSame(['Categories'], self::activeLabels(Navigation::build($all, $flags, [], '/products/categories/5', ['tab' => 'general'])['bar']));
         self::assertSame(['Categories'], self::activeLabels(Navigation::build($all, $flags, [], '/products/categories/5', [])['bar']));
         self::assertSame(['Categories'], self::activeLabels(Navigation::build($all, $flags, [], '/products/categories', [])['bar']));
         $pricing = Navigation::build($all, $flags, [], '/pricing/settings', [])['bar'];
-        self::assertSame(['Pricing'], self::activeLabels($pricing));
+        // D-362: Global pricing settings and Exchange-rate history left the "Pricing" drop-down.
+        self::assertSame([], self::activeLabels($pricing));
         $drop = array_values(array_filter($pricing['items'], static fn (array $i): bool => $i['label'] === 'Pricing'))[0];
-        self::assertSame(['Pricing settings (margin, buffer, exchange rate)'],
-            array_values(array_map(static fn (array $c): string => $c['label'], array_filter($drop['children'], static fn (array $c): bool => $c['active']))));
+        self::assertSame(['Commission levels and ladder', 'Specifications'],
+            array_values(array_map(static fn (array $c): string => $c['label'], $drop['children'])));
         // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
         self::assertStringContainsString('<details class="section-nav-details">', self::read('app/views/partials/section_nav.php'));
         $css = self::read('public_html/assets/css/app.css');

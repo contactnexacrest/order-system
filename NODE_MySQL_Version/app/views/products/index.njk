@@ -43,8 +43,8 @@
   {% if canBuildup %}<p class="muted small">Supplier prices are in ₹; every other price is in USD per the product's unit, FOB, worked out from the configured base price. Yellow badge = this product overrides a pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked.</p>{% endif %}
   <p>
     {% if canManage %}<a class="btn-sm" href="/products/categories">Categories</a>{% endif %}
-    {% if canPriceRules %}<a class="btn-sm" href="/products/price-rules">Price rules</a>{% endif %}
-    {% if canPricingSettings %}<a class="btn-sm" href="/pricing/settings">Pricing settings</a>{% endif %}
+    {% if canPriceRules %}<a class="btn-sm" href="/products/price-rules">Category price rules</a>{% endif %}
+    {% if canPricingSettings %}<a class="btn-sm" href="/pricing/settings">Global pricing settings</a>{% endif %}
     {% if canFixHs %}<a class="btn-sm btn-secondary" href="/products/fix-hs-codes">Fix HS codes</a>{% endif %}
     {% if canLinkPrices and unlinkedCount > 0 %}<a class="btn-sm btn-secondary" href="/products/link-prices" data-testid="link-these-prices">Link these prices ({{ unlinkedCount }})</a>{% endif %}
     {% if canGoSuppliers %}<a class="btn-sm btn-secondary" href="/suppliers">Go to Suppliers</a>{% endif %}
@@ -118,7 +118,7 @@
             {% if canManage %} · <a href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
             {% if canManage and not p.is_active %}
               {% if st.can_activate %}
-                <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+                <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><input type="hidden" name="status" value="{{ status }}">{% if searched %}<input type="hidden" name="q" value="{{ query }}">{% endif %}<button type="submit" class="btn-sm">Reactivate</button></form>
               {% else %}
                 <button type="button" class="btn-sm btn-secondary" disabled title="{{ st.reason }}">Reactivate</button>
               {% endif %}

@@ -187,7 +187,7 @@ async function fetchDaily(date = null) {
   if (status === 'waiting_md') {
     const notificationRepository = require('../repositories/notificationRepository');
     const permissionRepository = require('../repositories/permissionRepository');
-    const text = `The market rate moved ${signed(change)} today (₹${Number(inUse.market_rate).toFixed(2)} → ₹${rateV.toFixed(2)}). It is not used for prices until you approve it: Products › Pricing settings › Exchange rate.`;
+    const text = `The market rate moved ${signed(change)} today (₹${Number(inUse.market_rate).toFixed(2)} → ₹${rateV.toFixed(2)}). It is not used for prices until you approve it: Products › Global pricing settings › Exchange rate.`;
     for (const mdId of await permissionRepository.usersWithPermission('manage_pricing')) {
       await notificationRepository.createInAppOnly(Number(mdId), 'fx_rate_approval', null, text.slice(0, 500));
     }

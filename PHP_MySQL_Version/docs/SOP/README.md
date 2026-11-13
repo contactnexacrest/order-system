@@ -33,7 +33,7 @@ implementation detail.
 
 ## Modules alongside the pipeline
 
-> **Menu paths (11 Nov 2026).** The app's left menu has 13 entries and every section has a menu bar at the top of its pages ([Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)). The chapters write a path as *left-menu entry › menu-bar item › page*, for example *Settings › E-mail* or *Products › Pricing › Pricing settings*. Every chapter was brought up to date with these menus on 11 Nov 2026; the old names *Operations*, *Insights* and *Admin* are gone (their pages are now under Orders, Clients, Procurement & suppliers, Reports, Users & roles or Settings).
+> **Menu paths (11 Nov 2026).** The app's left menu has 13 entries and every section has a menu bar at the top of its pages ([Getting started → Finding your way around](./00-getting-started.md#finding-your-way-around)). The chapters write a path as *left-menu entry › menu-bar item › page*, for example *Settings › E-mail* or *Products › Global pricing settings*. Every chapter was brought up to date with these menus on 11 Nov 2026; the old names *Operations*, *Insights* and *Admin* are gone (their pages are now under Orders, Clients, Procurement & suppliers, Reports, Users & roles or Settings).
 
 
 - [Amendments](./10-amendments.md) — changing payment terms after the PI is issued.

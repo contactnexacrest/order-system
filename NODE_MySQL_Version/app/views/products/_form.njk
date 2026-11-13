@@ -49,7 +49,7 @@
     {% else %}
       <p class="small muted">{{ 'This product uses its own rules (marked "own rule").' if (ff and ff.hasOwn) else "This product uses the category's rules." }} Only the MD can switch on own rules for a product.</p>
     {% endif %}
-    <p class="small muted">Switch on to edit the rules for this product only; the thickness % are changed on the category's Price rules (or this product's Price options). Category › Price rules keeps the standard for all products.</p>
+    <p class="small muted">Switch on to edit the rules for this product only; the thickness % are changed on the Category price rules (or this product's Price options). The Category price rules keep the standard for every product in the category.</p>
   </fieldset>
 
   {# Owner decision D-245 P2: the product's selling unit (filled into an order line). Prices come from Products → pricing. #}

@@ -61,7 +61,7 @@ const RECOMMENDED = {
 
 /** Ticks a person gives on the page (setup_checklist_ticks). key => [label, permission]. */
 const TICKS = {
-  pricing_confirmed: ['The MD has checked the pricing settings (exchange rate and margins)', 'manage_pricing'],
+  pricing_confirmed: ['The MD has checked the global pricing settings (exchange rate and margins)', 'manage_pricing'],
   commission_levels_confirmed: ['The MD has checked the commission levels', 'manage_pricing'],
   tds_benefits_confirmed: ['TDS settings and export-benefit deadlines confirmed with the CA', 'manage_company_settings'],
 };
@@ -188,7 +188,7 @@ async function items(req, today = null) {
   out.push(item('backups', 'Backups — folder, encryption and an off-site copy', backupMissing.length === 0,
     backupMissing.length === 0 ? 'Set; see the Backups page for the last runs.' : `Missing in app/.env: ${backupMissing.join(', ')}.`, '/admin/backups', 'Open Backups'));
 
-  out.push(await tickItem('pricing_confirmed', 'Pricing confirmed by the MD — exchange rate and margins', '/pricing/settings', 'Open Pricing settings', permissions));
+  out.push(await tickItem('pricing_confirmed', 'Pricing confirmed by the MD — exchange rate and margins', '/products', 'Open Products › Global pricing settings', permissions));
 
   const levels = await tickItem('commission_levels_confirmed', 'Commission levels', '/pricing/commission-levels', 'Open Commission levels', permissions);
   if (Number((await db.queryOne('SELECT COUNT(*) AS n FROM commission_levels WHERE is_active = 1')).n) === 0) {

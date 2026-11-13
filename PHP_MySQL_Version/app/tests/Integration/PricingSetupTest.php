@@ -134,7 +134,7 @@ final class PricingSetupTest extends DbTestCase
 
         $_POST['margin_pct'] = '22.5';
         $this->render(fn () => (new PricingController())->saveSettings([]));
-        self::assertStringContainsString('Pricing settings saved', $this->flash());
+        self::assertStringContainsString('Global pricing settings saved', $this->flash());
         self::assertSame('22.50', PricingRepository::settings()['margin_pct']);
         $log = Database::connection()->query("SELECT user_id, field_name, old_value, new_value FROM audit_log WHERE action_type = 'PRICING_SETTING_CHANGED' ORDER BY id DESC LIMIT 1")->fetch();
         self::assertSame([$md, 'margin_pct', '20.00', '22.50'], [(int) $log['user_id'], $log['field_name'], $log['old_value'], $log['new_value']]);
@@ -277,7 +277,7 @@ final class PricingSetupTest extends DbTestCase
     {
         $this->actAs($this->createTestUser('Managing Director'));
         $settings = $this->render(fn () => (new PricingController())->settings([]));
-        self::assertStringContainsString('Pricing Settings', $settings);
+        self::assertStringContainsString('Global pricing settings', $settings);
         self::assertStringContainsString('name="margin_pct"', $settings);
         $levels = $this->render(fn () => (new PricingController())->levels([]));
         self::assertStringContainsString('Associate Commission Levels', $levels);

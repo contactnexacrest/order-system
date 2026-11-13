@@ -6,7 +6,8 @@ use App\Helpers\View;
 $__ro = $canManage ? '' : ' disabled';
 ?>
 <div class="card">
-  <h1>Pricing Settings</h1>
+  <h1>Global pricing settings</h1>
+  <p class="muted" data-testid="applies-note"><strong>Applies to every product unless a category or product changes it.</strong></p>
   <p class="muted">The global rules every product's price is built from (FOB, per unit, in USD). A product can override any of them on its own page. Only the MD can change these; every change is recorded in the audit log (who, when, before → after). New quotes use the new values; orders with an issued Proforma Invoice keep their prices. Never shown to clients, associates or sales staff.</p>
 
   <div class="alert alert-info">
@@ -113,7 +114,7 @@ $__ro = $canManage ? '' : ' disabled';
 
     <?php // D-361 (13 Nov 2026, mockup p5): the global physical defaults — the last of the three levels. ?>
     <fieldset id="physical-defaults"><legend>Default physical values for every category and product</legend>
-      <p class="muted small">Used when a category (Price rules) or a product (Configure) has no value of its own.</p>
+      <p class="muted small">Used when a category (Category price rules) or a product (Configure) has no value of its own.</p>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['weight_t_per_cbm']) ?> *<small class="muted">Stone weight, used for Ton prices and the container weight limit.</small><span class="help-line">Example: 2.70 → 8 CBM weigh 21.6 t.</span></span>
         <input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" required value="<?= View::e((string) $settings['weight_t_per_cbm']) ?>" placeholder="e.g. 2.70"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['container_max_t']) ?> *<small class="muted">The most one container may weigh.</small><span class="help-line">Example: 27 → at 2.70 t per CBM a container holds at most 10 CBM by weight.</span></span>
@@ -152,5 +153,5 @@ $__ro = $canManage ? '' : ' disabled';
     <tr><td>Change these settings, product overrides, commission levels and ladder, category specifications</td><td>MD only</td></tr>
     <tr><td>Change one product's specifications (hide, change, add for that product)</td><td>Roles with "Manage a product's specifications" — Admin and MD to start</td></tr>
   </table>
-  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
+  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Category price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
 </div>

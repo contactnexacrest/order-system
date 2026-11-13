@@ -67,12 +67,21 @@ async function index(req, res) {
   let statusCounts = null;
 
   let products;
+  if (searched) statusCounts = await productRepository.statusCounts(query);
+  else if (canBrowse) statusCounts = await productRepository.statusCounts();
+  // D-362 (13 Nov 2026, owner request): a tab or filter chip with 0 products opens Active
+  // instead (All when Active is 0 too); the flash message is kept for the next page.
+  if (statusCounts !== null) {
+    const open = productRepository.openTab(status, statusCounts);
+    if (open !== status) {
+      res.redirect(`/products?status=${open}${searched ? `&q=${encodeURIComponent(query)}` : ''}`);
+      return;
+    }
+  }
   if (searched) {
     products = await productRepository.search(query, status);
-    statusCounts = await productRepository.statusCounts(query);
   } else if (canBrowse) {
     products = await productRepository.listing(status);
-    statusCounts = await productRepository.statusCounts();
   } else {
     // Search-only user with no query submitted yet — no full-list query
     // executes at all. This is the actual enforcement point; everything
@@ -548,7 +557,13 @@ async function setActive(req, res, active) {
     res.status(404).send('Product not found.');
     return;
   }
-  const back = (req.body || {}).return_to === 'list' ? `/products?status=${active ? 'inactive' : 'active'}` : `/products/${id}`;
+  // D-362: from the list, back to the tab the user was on (posted as status / q).
+  const body = req.body || {};
+  const fromList = body.return_to === 'list';
+  const tab = productRepository.statusFilter(body.status || (active ? 'inactive' : 'active'));
+  const q = String(body.q || '').trim();
+  const qs = q !== '' ? `&q=${encodeURIComponent(q)}` : '';
+  let back = fromList ? `/products?status=${tab}${qs}` : `/products/${id}`;
   if (!!Number(product.is_active) === active) {
     flash.set(req, 'success', `Product "${product.name}" is already ${active ? 'active' : 'inactive'}.`);
     res.redirect(back);
@@ -570,6 +585,16 @@ async function setActive(req, res, active) {
   flash.set(req, 'success', active
     ? `Product "${product.name}" is active again — it shows in the list and can be picked on order lines.`
     : `Product "${product.name}" is deactivated — it is hidden from the active list and cannot be picked on new order lines.`);
+  if (fromList) {
+    // D-362 (13 Nov 2026, owner request): when the tab the user was on is now empty, open the
+    // tab that now holds the product — Active after Reactivate, Inactive after Deactivate.
+    const counts = await productRepository.statusCounts(q !== '' ? q : null);
+    if (Number(counts[tab] || 0) === 0) {
+      let to = active ? 'active' : 'inactive';
+      if (Number(counts[to] || 0) === 0) to = productRepository.openTab(tab, counts);
+      back = `/products?status=${to}${qs}`;
+    }
+  }
   res.redirect(back);
 }
 

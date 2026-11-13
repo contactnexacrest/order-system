@@ -94,5 +94,5 @@ $__back = $__ap['from'] === 'supplier' ? '/suppliers/' . (int) $__s['id'] . '/ed
       <a class="btn-secondary btn" href="<?= View::e($__back) ?>">Cancel</a>
     </div>
   </div>
-  <p class="muted small">On save the offer is switched on. For a price for every thickness, the other thicknesses are worked out from the one you type by the category's price rules (as on Market prices).</p>
+  <p class="muted small">On save the offer is switched on. For a price for every thickness, the other thicknesses are worked out from the one you type by the Category price rules (as on Market prices).</p>
 </form>

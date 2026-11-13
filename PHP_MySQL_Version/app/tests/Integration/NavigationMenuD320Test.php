@@ -29,11 +29,11 @@ final class NavigationMenuD320Test extends DbTestCase
         '/ports', '/payment-presets', '/compliance-task-types', '/admin/dropdown-options', '/email-templates', '/ui-templates',
         '/watermarks', '/company-assets', '/signatories', '/admin/divisions', '/admin/gst-rates', '/admin/import-duty-rates',
         '/admin/departments', '/admin/task-types', '/admin/permissions', '/users', '/admin/field-protection', '/incentives/settings',
-        '/pricing/settings', '/admin/overrides', '/sample-data', '/admin/data-export', '/admin/backups', '/super-admin',
+        '/admin/overrides', '/sample-data', '/admin/data-export', '/admin/backups', '/super-admin',
         '/admin/self-approval', '/test-mode',
         // Reached before only from links inside pages (the TDS register had no link at all).
         '/associates/tds', '/associates/registrations', '/associates/price-requests', '/associates/ladder', '/associates/access-levels',
-        '/associates/new', '/reports/associates', '/products/categories', '/products/price-rules', '/pricing/commission-levels',
+        '/associates/new', '/reports/associates', '/products/categories', '/pricing/commission-levels',
         '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
         '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
         '/products/create',
@@ -44,6 +44,9 @@ final class NavigationMenuD320Test extends DbTestCase
      * Suppliers page, which shows the section's bar.
      */
     private const PAGE_BUTTON_ONLY = ['/suppliers/create'];
+
+    /** D-362 (13 Nov 2026): reached only from the Products screen's link bar, not from a menu. */
+    private const PRODUCTS_LINK_BAR_ONLY = ['/pricing/settings', '/products/price-rules'];
 
     private const ALL_FLAGS = [
         'superAdmin' => true, 'sopOpen' => true, 'approver' => true, 'mod_supplier_purchase' => true, 'mod_import_stock' => true,
@@ -133,6 +136,10 @@ final class NavigationMenuD320Test extends DbTestCase
             self::assertNotContains($page, $linked, "{$page} is a button on its section's page, not a menu link");
             self::assertSame('procurement', Navigation::sectionKeyFor($page), "{$page} shows the Procurement & suppliers bar");
         }
+        foreach (self::PRODUCTS_LINK_BAR_ONLY as $page) {
+            self::assertNotContains($page, $linked, "{$page} is a link on the Products screen, not a menu link");
+            self::assertSame('products', Navigation::sectionKeyFor($page), "{$page} keeps Products highlighted");
+        }
         self::assertSame('dashboard', Navigation::build(static fn (): bool => true, self::ALL_FLAGS, [], '/', [])['currentKey']);
     }
 
@@ -215,7 +222,8 @@ final class NavigationMenuD320Test extends DbTestCase
         self::assertSame(['Active'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/orders/12', [])));
         self::assertSame(['Archived'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/orders/archived', [])));
         self::assertSame(['Report'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/reports/associates', [])), 'the longest prefix wins');
-        self::assertSame(['Pricing', 'Pricing settings (margin, buffer, exchange rate)'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/pricing/settings', [])));
+        // D-362: Global pricing settings is reached only from the Products link bar — no menu item is marked.
+        self::assertSame([], $active(Navigation::build($all, self::ALL_FLAGS, [], '/pricing/settings', [])));
         self::assertSame(['Prices'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/approvals', ['tab' => 'prices'])));
         self::assertSame(['All'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/approvals', [])));
         self::assertNull(Navigation::sectionKeyFor('/cafin'), '"/ca" never covers "/cafin"');

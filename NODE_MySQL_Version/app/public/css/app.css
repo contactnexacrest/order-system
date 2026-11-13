@@ -1146,3 +1146,15 @@ dialog.confirm-box ul { margin: .4rem 0 .8rem 1.2rem; }
 .spo-offers td.lowest { color: #1b6e2d; font-weight: 600; }
 .spo-offers tr.not-offered td { color: #8a8a8a; }
 .spo-expired { background: #fff3cd; color: #7a5a00; border-radius: 10px; padding: 0 .5rem; font-size: .85em; }
+
+/* D-362 (13 Nov 2026, owner request): the row actions "Edit price" / "Open product" (supplier page,
+   Suppliers list offer rows, Configure's "See all supplier prices") were plain inline links with a
+   border, so the border cut through the text and wrapped onto two lines. In a .row-actions cell
+   they are now tidy small buttons, side by side, each on one line; on a narrow screen they wrap
+   (stack) as whole buttons. */
+.row-actions{display:flex;flex-wrap:nowrap;gap:0.35rem;align-items:center;}
+@media (max-width:760px){.row-actions{flex-wrap:wrap;}}
+.row-actions a.btn-sm{display:inline-block;white-space:nowrap;text-decoration:none;border-radius:8px;font-weight:600;line-height:1.25;padding:0.35rem 0.75rem;}
+.row-actions a.btn-sm:not(.btn-secondary):not(.btn-danger):not(.btn-success):not(.btn-accent):not(.btn-warning){background:var(--navy);color:#fff;border:1px solid var(--navy);}
+.row-actions a.btn-sm:not(.btn-secondary):not(.btn-danger):not(.btn-success):not(.btn-accent):not(.btn-warning):hover{background:var(--navy-strong);}
+.row-actions a.btn-sm.btn-secondary{color:var(--navy);}

@@ -9,7 +9,7 @@ NexaCrest rewards the team for orders that are won, delivered and paid for
 associate's commission (if the client came through an associate). That
 profit never counts below ₹0.
 
-- The **global rule** (Products › Pricing › Pricing settings) is a % of that profit
+- The **global rule** (Products › Global pricing settings) is a % of that profit
   (15% to start) or a fixed amount per unit; a product may have its own.
 - On one order, the MD may set **a % of this order's profit** or **a fixed
   amount** instead, with a written reason.

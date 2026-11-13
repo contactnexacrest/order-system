@@ -319,7 +319,7 @@ final class D300ProductsPricingTest extends DbTestCase
         $this->actAs($md);
         $_GET = ['tab' => 'rules'];
         $page = $this->render(fn () => (new ProductCategoryController())->show(['id' => (string) $cat]));
-        foreach (['General (name, units, HS code, packing, documents)', 'Options and their price effect', 'Price rules (thickness %, container)', 'Products in this category',
+        foreach (['General (name, units, HS code, packing, documents)', 'Options and their price effect', 'Category price rules (thickness %, container)', 'Products in this category',
             'Container and weight', 'Save rules', 'data-rules-example'] as $s) {
             self::assertStringContainsString($s, $page);
         }

@@ -669,7 +669,7 @@ offer it, existing lines keep it.
 ### "Pick from Products" and the price check (D-240; owner decision D-245 P2, 4 Nov 2026)
 
 The New Order form and the order page's add / edit line forms have **Pick from
-Products**. On a **USD order** a goods line must be picked from it while Products › Pricing › Pricing settings → "Goods lines must be picked from Products" is on (the default): a goods
+Products**. On a **USD order** a goods line must be picked from it while Products › Global pricing settings → "Goods lines must be picked from Products" is on (the default): a goods
 line typed by hand is refused ("Pick this goods line from Products — on a USD
 order goods lines cannot be typed by hand (service and charge lines can)."),
 beside the picker in the browser and again on saving. Service and charge lines,

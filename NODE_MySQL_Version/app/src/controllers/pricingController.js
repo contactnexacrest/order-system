@@ -77,7 +77,7 @@ async function saveSettings(req, res) {
       changed += 1;
     }
   }
-  flash.set(req, 'success', changed === 0 ? 'Nothing changed.' : 'Pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
+  flash.set(req, 'success', changed === 0 ? 'Nothing changed.' : 'Global pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
   res.redirect('/pricing/settings');
 }
 
