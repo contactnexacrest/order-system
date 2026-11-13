@@ -22,6 +22,7 @@ use App\Services\PricingService;
 use App\Services\ProductSpecs;
 use App\Services\ZohoBooksService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-256 (5 Nov 2026): pricing made easier to set up and check — an option
@@ -32,6 +33,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class D256PricingUsabilityTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private int $admin;
     private int $product;
     private int $associate;
@@ -44,6 +47,9 @@ final class D256PricingUsabilityTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+        // every pricing setting is pinned, so the result never depends on what ran before.
+        self::pinWorkedExamplePricing();
         $_POST = [];
         $_GET = [];
         $_SESSION = [];
@@ -69,6 +75,7 @@ final class D256PricingUsabilityTest extends DbTestCase
         $_SESSION = [];
         Flash::pull();
         PermissionService::resetCache();
+        self::resetPricingSettings();
         parent::tearDown();
     }
 

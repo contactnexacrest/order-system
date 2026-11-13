@@ -20,8 +20,9 @@ use App\Repositories\ProductSupplierRepository;
 final class PricingService
 {
     public const DEFAULTS = [
-        'margin_pct' => '20.00',
-        'other_cost_pct' => '2.50',
+        // SUI-006 (QA 13 Nov 2026): the same as the installed values (seed.sql, D-347) — used only when a row is missing.
+        'margin_pct' => '15.00',
+        'other_cost_pct' => '5.50',
         'pricing_fx_rate' => '82.0000',
         'buffer_pct' => '3.00',
         'incentive_mode' => 'pct',

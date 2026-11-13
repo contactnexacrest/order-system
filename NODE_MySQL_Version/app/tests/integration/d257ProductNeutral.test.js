@@ -22,7 +22,7 @@ const specRepository = require('../../src/repositories/specRepository');
 const documentDataAssembler = require('../../src/services/documentDataAssembler');
 const pricingService = require('../../src/services/pricingService');
 const productSpecs = require('../../src/services/productSpecs');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, pinWorkedExamplePricing, resetPricingSettings } = require('../support/fixtures');
 
 beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
 
@@ -49,6 +49,7 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
   });
 
   afterEach(async () => {
+    await resetPricingSettings();
     // Saving Natural Stone's settings here left its units and weight per CBM changed for later files
     // (d270OrderLineUnits, orderLinePricing rely on the seed) — put the seeded values back.
     if (stoneSeeded) {
@@ -61,6 +62,10 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
   });
 
   beforeEach(async () => {
+    // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+    // every pricing setting is pinned, so the result never depends on what ran before.
+    // Goods lines typed by hand stay allowed in this file (as in beforeAll above).
+    await pinWorkedExamplePricing({ require_product_pick: '0' });
     orderId = await createTestOrder(await createTestClient(), 'FOB');
     const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Admin'");
     const email = `jest-d257-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;

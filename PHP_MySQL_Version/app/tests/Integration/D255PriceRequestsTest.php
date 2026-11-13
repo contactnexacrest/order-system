@@ -17,6 +17,7 @@ use App\Services\PermissionService;
 use App\Services\PriceRequestService;
 use App\Services\ProductSpecs;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-255 (5 Nov 2026): specifications that change the price, CBM for
@@ -25,6 +26,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class D255PriceRequestsTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private int $admin;
     private int $product;
     private int $associate;
@@ -33,6 +36,9 @@ final class D255PriceRequestsTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+        // every pricing setting is pinned, so the result never depends on what ran before.
+        self::pinWorkedExamplePricing();
         $_POST = [];
         $_SESSION = [];
         $this->admin = $this->createTestUser('Admin');
@@ -56,6 +62,7 @@ final class D255PriceRequestsTest extends DbTestCase
     {
         $_POST = [];
         $_SESSION = [];
+        self::resetPricingSettings();
         parent::tearDown();
     }
 

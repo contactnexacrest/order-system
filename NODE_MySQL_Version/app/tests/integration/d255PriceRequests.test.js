@@ -16,7 +16,7 @@ const orderLinePricing = require('../../src/services/orderLinePricing');
 const priceRequestService = require('../../src/services/priceRequestService');
 const productSpecs = require('../../src/services/productSpecs');
 const associatePortalController = require('../../src/controllers/associatePortalController');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, pinWorkedExamplePricing, resetPricingSettings } = require('../support/fixtures');
 
 /**
  * Port of D255PriceRequestsTest.php — owner decision D-255 (5 Nov 2026): specifications that
@@ -63,6 +63,9 @@ describe('D-255 specifications and associate price requests', () => {
   });
 
   beforeEach(async () => {
+    // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+    // every pricing setting is pinned, so the result never depends on what ran before.
+    await pinWorkedExamplePricing();
     await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
     product = await productRepository.create({ name: `D255 Black Galaxy ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Granite', hs_code: '68022390', reference_unit: 'SQM' }, admin);
     await pricingRepository.saveProductOverrides(product, { pricing_margin_pct: null, pricing_other_cost_mode: 'pct', pricing_other_cost_value: '0', pricing_incentive_mode: null, pricing_incentive_value: null, pricing_buffer_pct: null });
@@ -75,6 +78,10 @@ describe('D-255 specifications and associate price requests', () => {
     client = await createTestClient();
     await db.execute("UPDATE clients SET associate_id = :a, associate_registered_on = '2026-09-01' WHERE id = :c", { a: associate, c: client });
     await priceRequestService.saveAccess(associate, { [await specRepository.systemCategoryId()]: ['slab', 'tile'] });
+  });
+
+  afterEach(async () => {
+    await resetPricingSettings();
   });
 
   afterAll(async () => {

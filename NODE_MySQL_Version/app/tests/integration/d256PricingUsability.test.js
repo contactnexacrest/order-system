@@ -21,7 +21,7 @@ const priceRequestService = require('../../src/services/priceRequestService');
 const pricingService = require('../../src/services/pricingService');
 const productSpecs = require('../../src/services/productSpecs');
 const zohoBooksService = require('../../src/services/zohoBooksService');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, pinWorkedExamplePricing, resetPricingSettings } = require('../support/fixtures');
 
 /**
  * Port of D256PricingUsabilityTest.php — owner decision D-256 (5 Nov 2026): an option worth 0
@@ -98,6 +98,9 @@ describe('D-256 pricing usability', () => {
   });
 
   beforeEach(async () => {
+    // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+    // every pricing setting is pinned, so the result never depends on what ran before.
+    await pinWorkedExamplePricing();
     await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
     product = await productRepository.create({ name: `D256 Black Galaxy ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Granite', hs_code: '68022390', reference_unit: 'SQM' }, admin);
     await specRepository.setProductFields(product, null, 'slab,tile', null);
@@ -111,6 +114,7 @@ describe('D-256 pricing usability', () => {
 
   afterEach(async () => {
     await incentiveRepository.setSetting('zoho_gst_commission_tax_id', '', admin);
+    await resetPricingSettings();
   });
 
   afterAll(async () => {

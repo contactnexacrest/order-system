@@ -21,6 +21,7 @@ use App\Services\DocumentDataAssembler;
 use App\Services\PricingService;
 use App\Services\ProductSpecs;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-257 Phase 0B (5 Nov 2026): product-neutral groundwork.
@@ -32,6 +33,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class D257ProductNeutralTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private int $userId;
     private int $orderId;
 
@@ -42,6 +45,9 @@ final class D257ProductNeutralTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // QA 13 Nov 2026 (SUI-006 / D-347): these figures use margin 20 % and other costs 2.5 % —
+        // every pricing setting is pinned, so the result never depends on what ran before.
+        self::pinWorkedExamplePricing();
         $this->stoneSeeded = (array) Database::connection()->query('SELECT id, ' . implode(', ', self::STONE_SETTINGS) . ' FROM product_categories WHERE is_system = 1 ORDER BY id LIMIT 1')->fetch(\PDO::FETCH_ASSOC);
         $this->allowHandTypedGoodsLines();
         $this->userId = $this->createTestUser('Admin');
@@ -66,6 +72,7 @@ final class D257ProductNeutralTest extends DbTestCase
         $_SESSION = [];
         $_POST = [];
         $_FILES = [];
+        self::resetPricingSettings();
         parent::tearDown();
     }
 
