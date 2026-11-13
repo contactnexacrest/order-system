@@ -16,7 +16,7 @@ $__fyYear = (int) substr($fyStart, 0, 4);
 ?>
 <div class="card">
   <h1>TDS on associate commission</h1>
-  <p class="muted"><a href="/associates">&larr; Associates</a> &middot; <a href="/associates/report">Associate report</a></p>
+  <p class="muted"><a href="/associates">&larr; Associates</a> &middot; <a href="/reports/associates">Associate report</a></p>
   <form method="get" action="/associates/tds" class="btn-row">
     <label>Financial year
       <select name="fy" aria-label="Financial year">

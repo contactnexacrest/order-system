@@ -68,3 +68,32 @@ describe('UI-004: "+ Add product line" still works after every line was removed'
     }
   });
 });
+
+/**
+ * UI-008: every fixed internal link in a view leads to a page route (the TDS
+ * register linked to /associates/report, which does not exist). A route
+ * parameter named …id only takes digits, as the controllers expect.
+ */
+describe('UI-008: no fixed link in a view leads to a missing page', () => {
+  it('every fixed href="/…" in views/ matches a GET route of src/server.js', () => {
+    const source = read(__dirname, '..', '..', 'src', 'server.js');
+    const routes = [...source.matchAll(/app\.get\(\s*'([^']+)'/g)].map((m) => new RegExp(`^${m[1]
+      .replace(/[.+?^$|[\]\\]/g, '\\$&')
+      .replace(/:([A-Za-z_]+)(\\\([^)]*\\\))?/g, (x, name) => (/id$/i.test(name) ? '\\d+' : '[^/]+'))}/?$`));
+    expect(routes.length).toBeGreaterThan(200);
+    const dead = [];
+    (function walk(dir) {
+      for (const f of fs.readdirSync(dir)) {
+        const p = path.join(dir, f);
+        if (fs.statSync(p).isDirectory()) { walk(p); continue; }
+        if (!p.endsWith('.njk')) continue;
+        for (const m of fs.readFileSync(p, 'utf8').matchAll(/href="(\/[^"{}]*)"/g)) {
+          const u = m[1].split(/[?#]/)[0];
+          if (/^\/(?:assets|css|js|img|favicon)/.test(u) || u.startsWith('//')) continue;
+          if (!routes.some((r) => r.test(u))) dead.push(`${path.relative(VIEWS, p)}: ${m[1]}`);
+        }
+      }
+    })(VIEWS);
+    expect(dead).toEqual([]);
+  });
+});
