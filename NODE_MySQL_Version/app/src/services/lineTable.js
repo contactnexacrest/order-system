@@ -47,10 +47,7 @@ const DASH = '—';
 
 /** PHP round($x, $d): half away from zero, blind to binary noise. */
 function roundTo(x, d) {
-  const n = Number(x);
-  if (!Number.isFinite(n)) return n;
-  const r = Number(Math.round(Number(Math.abs(n).toFixed(9) + 'e' + d)) + 'e-' + d);
-  return n < 0 && r !== 0 ? -r : r;
+  return require('../helpers/money').phpRound(x, d); // HNT-L01: exactly PHP round()
 }
 
 /** PHP number_format($v, $d) (en-US grouping). */

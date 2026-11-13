@@ -362,7 +362,7 @@ function trendsCsvRows(months) {
     const entries = Object.entries(m.fob_by_currency || {});
     const fobByCurrency = entries.length === 0
       ? '—'
-      : entries.map(([cc, amt]) => `${cc} ${Number(amt).toFixed(2)}`).join('; ');
+      : entries.map(([cc, amt]) => `${cc} ${require('../helpers/money').fixed2(amt)}`).join('; ');
     return {
       Month: m.month,
       'Orders Created': m.orders_created,
@@ -442,13 +442,13 @@ async function payments(req, res) {
       Status: r.status,
       'Advance Invoiced': r.advance_amount ?? '',
       'Advance Cleared': r.advance_cleared_at ? 'Yes' : (r.advance_amount !== null ? 'No' : ''),
-      'Advance Outstanding': r.advance_outstanding !== null ? r.advance_outstanding.toFixed(2) : '',
+      'Advance Outstanding': r.advance_outstanding !== null ? require('../helpers/money').fixed2(r.advance_outstanding) : '',
       'Balance Invoiced': r.balance_amount ?? '',
       'Balance Cleared': r.balance_cleared_at ? 'Yes' : (r.balance_amount !== null ? 'No' : ''),
-      'Balance Outstanding': r.balance_outstanding !== null ? r.balance_outstanding.toFixed(2) : '',
+      'Balance Outstanding': r.balance_outstanding !== null ? require('../helpers/money').fixed2(r.balance_outstanding) : '',
       'Freight Invoiced': r.freight_amount ?? '',
       'Freight Cleared': r.freight_cleared_at ? 'Yes' : (r.freight_amount !== null ? 'No' : ''),
-      'Freight Outstanding': r.freight_outstanding !== null ? r.freight_outstanding.toFixed(2) : '',
+      'Freight Outstanding': r.freight_outstanding !== null ? require('../helpers/money').fixed2(r.freight_outstanding) : '',
       Created: r.created_at,
     }));
     csv.stream(res, 'payments_report.csv', [

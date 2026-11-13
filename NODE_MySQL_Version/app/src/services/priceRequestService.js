@@ -8,6 +8,7 @@ const productRepository = require('../repositories/productRepository');
 const pricingEngine = require('./pricingEngine');
 const pricingService = require('./pricingService');
 const productSpecs = require('./productSpecs');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Services\PriceRequestService — owner decision D-255 (5 Nov 2026):
@@ -261,8 +262,8 @@ async function create(associate, product, selection, other, note) {
   if ((await leftToday(associate)) <= 0) return [null, refusal];
   row.kind = 'auto';
   row.status = 'valid';
-  row.quote = Number(w.quote).toFixed(2);
-  row.lowest = Number(w.lowest).toFixed(2);
+  row.quote = round2(Number(w.quote)).toFixed(2); // HNT-L01: PHP round()
+  row.lowest = round2(Number(w.lowest)).toFixed(2);
   row.figures = JSON.stringify(w.figures);
   row.breakdown = JSON.stringify({ lines: w.breakdown, charges: w.charges, per_m2: w.per_m2, m2_per_cbm: w.m2_per_cbm });
   row.valid_until = addDays(ymd(now), await validDays(associate));
@@ -357,13 +358,13 @@ async function priceManual(id, userId, quote, lowest, unit, note) {
   const associateRepository = require('../repositories/associateRepository');
   const associate = await associateRepository.find(Number(r.associate_id));
   const validUntil = addDays(ymd(), await validDays(associate || {}));
-  const round = (v) => Math.round(v * 100) / 100;
+  const round = (v) => round2(v);
   const figures = { quote: round(q), floor: round(l), minimum: round(l), unit, manual: true, from_price_request: true };
   await db.execute(
     `UPDATE price_requests SET status = 'priced', quote = :q, lowest = :l, unit = :u, price_note = :n, priced_by = :by, priced_at = NOW(),
             valid_until = :v, figures = :f, breakdown = :b WHERE id = :id AND status = 'pending'`,
     {
-      q: q.toFixed(2), l: l.toFixed(2), u: unit, n: note !== '' ? note : null, by: userId, v: validUntil, f: JSON.stringify(figures),
+      q: round2(q).toFixed(2), l: round2(l).toFixed(2), u: unit, n: note !== '' ? note : null, by: userId, v: validUntil, f: JSON.stringify(figures),
       b: JSON.stringify({ lines: [{ label: `Priced by NexaCrest${note !== '' ? `: ${note}` : ''}`, change: '—' }], charges: [] }), id,
     }
   );

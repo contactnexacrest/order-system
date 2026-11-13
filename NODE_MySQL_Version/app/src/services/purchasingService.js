@@ -2,6 +2,7 @@
 
 const activeDepartmentService = require('./activeDepartmentService');
 const makerCheckerGuard = require('./makerCheckerGuard');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Port of App\Services\PurchasingService. Owner decision D-214 (2026-10-31),
 // phase 3: approval limits. An award above the approval limit of the
@@ -13,7 +14,7 @@ const fmt = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2,
 
 /** The award's value: unit price × quantity, with GST. */
 function awardValue(quote, quantity) {
-  return Math.round(Number(quote.unit_price_inr) * Number(quantity) * (1 + Number(quote.gst_percent) / 100) * 100) / 100;
+  return round2(Number(quote.unit_price_inr) * Number(quantity) * (1 + Number(quote.gst_percent) / 100));
 }
 
 /** A designation's limit: its own figure; none set = any amount for a director, nothing below that. */

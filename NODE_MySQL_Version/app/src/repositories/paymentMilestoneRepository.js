@@ -10,6 +10,7 @@
  */
 const db = require('../config/db');
 const zohoGuard = require('../services/zohoGuard');
+const { round2, round4 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 const MAX_STEPS = 4;
 
@@ -29,13 +30,13 @@ async function totalPct(orderId) {
 /** D-215: the milestone money received so far (what the buyer no longer owes). */
 async function receivedTotal(orderId) {
   const row = await db.queryOne('SELECT COALESCE(SUM(received_amount), 0) AS total FROM order_payment_milestones WHERE order_id = :o', { o: orderId });
-  return Math.round(parseFloat(row.total) * 100) / 100;
+  return round2(parseFloat(row.total));
 }
 
 /** D-215: the milestones' planned amounts (each its share of the FOB value) — what the balance leg leaves out. */
 async function plannedTotal(orderId, fobTotal) {
-  const total = (await forOrder(orderId)).reduce((sum, m) => sum + Math.round(Number(fobTotal) * parseFloat(m.pct)) / 100, 0);
-  return Math.round(total * 100) / 100;
+  const total = (await forOrder(orderId)).reduce((sum, m) => sum + round2(Number(fobTotal) * parseFloat(m.pct) / 100), 0); // HNT-L01: PHP round()
+  return round2(total);
 }
 
 /**
@@ -119,7 +120,7 @@ async function notCleared(orderId) {
   return (await forOrder(orderId)).filter((m) => m.cleared_on === null);
 }
 
-const r2 = (n) => Math.round(Number(n) * 100) / 100;
+const r2 = (n) => round2(Number(n));
 
 /** Replaces the order's middle steps and sets its balance % to what is left (advance + steps + balance = 100). Saved together or not at all. */
 async function replaceSchedule(orderId, steps, advancePct) {
@@ -144,7 +145,7 @@ async function recordReceived(id, amount, receivedOn, rate, bankReference, staff
             staff_note = :note, recorded_by = :user, recorded_at = NOW()
       WHERE id = :id AND received_amount IS NULL`,
     {
-      amount: r2(amount), received_on: receivedOn, rate: Math.round(Number(rate) * 10000) / 10000, ref: String(bankReference).trim(),
+      amount: r2(amount), received_on: receivedOn, rate: round4(Number(rate)), ref: String(bankReference).trim(),
       note: staffNote !== null && staffNote !== undefined && String(staffNote).trim() !== '' ? String(staffNote).trim() : null, user: userId, id,
     }
   );

@@ -9,6 +9,7 @@ const orderProductRepository = require('../repositories/orderProductRepository')
 const orderStorage = require('../helpers/orderStorage');
 const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Services\PaymentActionService. Owner request (2026-10-27):
@@ -63,7 +64,7 @@ async function amountDue(order, leg) {
     const freight = await orderFreightRepository.find(order.id);
     return freight && freight.confirmed_freight_rate !== null
       // Q-R5-2: only a CIF seller insures; on CFR the Debit Note is freight only.
-      ? Math.round((parseFloat(freight.confirmed_freight_rate) + (String(order.incoterm_code || '').toUpperCase() === 'CIF' ? (parseFloat(freight.insurance_amount) || 0) : 0)) * 100) / 100
+      ? round2(parseFloat(freight.confirmed_freight_rate) + (String(order.incoterm_code || '').toUpperCase() === 'CIF' ? (parseFloat(freight.insurance_amount) || 0) : 0))
       : null;
   }
   return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(order.id), await require('../repositories/paymentMilestoneRepository').balanceDeduction(order.id, fob, false)); // QA batch 4, ORD-09

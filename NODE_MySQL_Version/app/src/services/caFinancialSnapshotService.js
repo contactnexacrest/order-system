@@ -17,6 +17,7 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
 const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
 const orderLedgerService = require('./orderLedgerService');
 const orderProfitabilityService = require('./orderProfitabilityService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Services\CaFinancialSnapshotService. Owner request
@@ -365,7 +366,7 @@ async function build(orderId) {
   const estIncentive = (!layer.incentives_locked && layer.incentive_state === 'estimated') ? Number(layer.incentive_inr) : 0;
   let plEstimated = null;
   if (estCommission > 0 || estIncentive > 0) {
-    const after = Math.round((Number(profit.profit_inr) - estCommission - estIncentive) * 100) / 100;
+    const after = round2(Number(profit.profit_inr) - estCommission - estIncentive);
     plEstimated = {
       commission: estCommission > 0 ? money(estCommission) : null,
       incentive: estIncentive > 0 ? money(estIncentive) : null,

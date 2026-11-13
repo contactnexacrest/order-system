@@ -9,6 +9,7 @@ const testModeService = require('../services/testModeService');
 const divisionService = require('../services/divisionService');
 const orderProfitabilityService = require('../services/orderProfitabilityService');
 const { todayIst } = require('../helpers/dbDateTime');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Test Mode (docs/schema.sql Section V) — reports must never mix test and
@@ -684,9 +685,6 @@ async function paymentsReport(dateFrom, dateTo, visibility = { sql: '', params: 
   return { rows, by_currency: sortObjectKeys(byCurrency) };
 }
 
-function round2(n) {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
 
 // ================================================================
 // DISPUTE REPORT
@@ -1542,7 +1540,7 @@ async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: ''
     rows.push(row);
     for (const k of keys) sum[k] += Number(row[k]);
   }
-  const totals = Object.fromEntries(keys.map((k) => [k, Math.round((sum[k] + Number.EPSILON) * 100) / 100]));
+  const totals = Object.fromEntries(keys.map((k) => [k, round2(sum[k])]));
   totals.margin_after_pct = totals.revenue_inr > 0 ? Math.round((totals.profit_after_incentive_inr / totals.revenue_inr) * 100 * 100) / 100 : null;
   return { rows, totals };
 }

@@ -41,7 +41,7 @@ const userRepository = require('../repositories/userRepository');
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** PHP round(x, 2) — the shared money helper (fresh-eyes review M3). */
-const { round2 } = require('../helpers/money');
+const { round2, round6 } = require('../helpers/money');
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -463,7 +463,7 @@ async function setEligible(actor, userId, eligible) {
 
 /** Indian grouping, no decimals: 14000 => "14,000". */
 function inr0(v) {
-  return Math.round(Number(v)).toLocaleString('en-IN');
+  return require('../helpers/money').phpRound(Number(v), 0).toLocaleString('en-IN'); // HNT-L01: PHP round(x, 0)
 }
 
 /**
@@ -703,7 +703,7 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
         payout_run_on: runOn, locked_on: today,
       }, c);
       // D-264: the rate is fixed with it (only reached when the commission was not already fixed at full payment).
-      await c.execute('UPDATE incentive_payouts SET due_on = :d, fixed_rate = :r, fixed_on = :f WHERE id = :id', { d: due, r: Math.round(Number(a.rate_inr) * 1e6) / 1e6, f: today, id: payoutId });
+      await c.execute('UPDATE incentive_payouts SET due_on = :d, fixed_rate = :r, fixed_on = :f WHERE id = :id', { d: due, r: round6(Number(a.rate_inr)), f: today, id: payoutId });
       // AS-3: a suspended associate's commission is held until the MD releases it.
       if (a.status === 'suspended') {
         await incentiveRepository.holdPayout(payoutId, 'The associate is suspended.', c);
@@ -737,7 +737,7 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       associate_due_on: earned ? due : null,
       associate_cost_entry_id: associateEntryId,
       associate_fixed_at: earned ? nowSql() : null,
-      associate_fixed_rate: earned ? Math.round(Number(a.rate_inr) * 1e6) / 1e6 : null,
+      associate_fixed_rate: earned ? round6(Number(a.rate_inr)) : null,
     }, userId, c);
     await incentiveRepository.addHistory(orderId, 'lock', null, `Team ₹${fmt2(calc.team_total)}`
       + (assocFixed ? '; associate already fixed at full payment' : (a ? `; associate ${earned ? `₹${fmt2(a.amount_inr)}` : 'none'}` : '')) + `; staff payout run ${staffRun}`, note, userId, c);

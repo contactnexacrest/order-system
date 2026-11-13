@@ -8,6 +8,7 @@ const departmentRepository = require('../repositories/departmentRepository');
 const grantGuard = require('../services/grantGuard');
 const roleRepository = require('../repositories/roleRepository');
 const userRepository = require('../repositories/userRepository');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Port of App\Controllers\DepartmentAdminController. Owner decision D-214
 // (2026-10-31), phase 1: Admin → Departments & designations (each
@@ -143,7 +144,6 @@ async function updateDesignation(req, res) {
   const level = String(req.body.level ?? '');
   const limitRaw = String(req.body.approval_limit_inr ?? '').trim();
   const limitNumber = Number(limitRaw);
-  const round2 = (n) => Math.round(n * 100) / 100;
   const oldLimit = d.approval_limit_inr !== null && d.approval_limit_inr !== undefined ? round2(Number(d.approval_limit_inr)) : null;
   const newLimit = limitRaw !== '' && Number.isFinite(limitNumber) ? round2(limitNumber) : null;
   const limitChanged = level !== d.level || oldLimit !== newLimit;
@@ -158,7 +158,7 @@ async function updateDesignation(req, res) {
     fail(req, res, error);
     return;
   }
-  await departmentRepository.updateDesignation(Number(d.id), title, level, !!req.body.is_active, limitRaw === '' ? null : Math.round(limitNumber * 100) / 100);
+  await departmentRepository.updateDesignation(Number(d.id), title, level, !!req.body.is_active, limitRaw === '' ? null : round2(limitNumber));
   // D-259: the designation's team incentive eligibility — the MD only (anyone else's form does not carry it).
   if (req.body.incentive_eligible_present && await require('../services/incentiveService').isMd(user)) {
     const eligible = req.body.incentive_eligible ? 1 : 0;

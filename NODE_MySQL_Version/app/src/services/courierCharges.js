@@ -9,6 +9,7 @@
  */
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 const MAX_INR = 100000;
 
@@ -22,7 +23,7 @@ function parse(body) {
   if (raw === '') return null;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return 'Courier charges must be a number of rupees (0 or more), or leave the box blank.';
-  const amount = Math.round(n * 100) / 100;
+  const amount = round2(n);
   if (amount > MAX_INR) {
     return `Courier charges of ₹${num(amount)} look too high for one document courier (more than ₹${num(MAX_INR)}). Check the courier bill.`;
   }

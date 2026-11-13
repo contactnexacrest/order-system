@@ -120,7 +120,7 @@ async function compute(payout, paidOn) {
   // QA batch 4, MON-1: TDS is never more than the payout. Whatever the cap cuts off is carried to the
   // associate's next payout in the same financial year (the latest paid payout records what is still owed).
   const carryIn = await shortfallCarried(associate.id, from, to, Number(payout.id || 0));
-  const due = Math.round((gross + catchUp) * rate / 100) + carryIn;
+  const due = require('../helpers/money').phpRound((gross + catchUp) * rate / 100, 0) + carryIn; // HNT-L01: PHP round(x, 0)
   const tds = Math.min(gross, due);
   result.rate = rate;
   result.tds = tds;

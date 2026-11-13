@@ -2,6 +2,7 @@
 
 const https = require('https');
 const db = require('../config/db');
+const { round4 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Services\FxRateService — owner decision D-301 (point 4, 11 Nov 2026):
@@ -83,7 +84,7 @@ function config(raw) {
 
 /** market × (1 − cushion %), 4 decimals (PHP round()). */
 function pricingRateFor(market, cushionPct) {
-  return Math.round(market * (1 - cushionPct / 100) * 10000 + Number.EPSILON) / 10000;
+  return round4(market * (1 - cushionPct / 100));
 }
 
 async function latestInUse() {

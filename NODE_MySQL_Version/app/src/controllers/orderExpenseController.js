@@ -11,6 +11,7 @@ const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const fileUploadService = require('../services/fileUploadService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Controllers\OrderExpenseController. Owner decisions
@@ -84,7 +85,7 @@ async function add(req, res) {
       return;
     }
   }
-  const rounded = Math.round(Number(amount) * 100) / 100;
+  const rounded = round2(Number(amount));
   const id = await orderExpenseRepository.create(orderId, {
     expense_date: date,
     category,

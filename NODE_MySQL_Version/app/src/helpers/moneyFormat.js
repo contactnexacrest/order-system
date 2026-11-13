@@ -15,10 +15,9 @@
 function roundHalfUp(x, decimals) {
   const n = Number(x);
   const negative = n < 0;
-  const [int, frac = ''] = Math.abs(n).toFixed(9).split('.');
-  const padded = (frac + '000000000').slice(0, 9);
-  let units = BigInt(int) * 10n ** BigInt(decimals) + BigInt(padded.slice(0, decimals) || '0');
-  if (Number(padded[decimals]) >= 5) units += 1n;
+  // HNT-L01 (owner-confirmed twice, 13 Nov 2026): exactly PHP round() (number_format rounds the same way).
+  const [int, frac = ''] = Math.abs(require('./money').phpRound(n, decimals)).toFixed(decimals).split('.');
+  const units = BigInt(int) * 10n ** BigInt(decimals) + BigInt(frac || '0');
   return { negative, units };
 }
 

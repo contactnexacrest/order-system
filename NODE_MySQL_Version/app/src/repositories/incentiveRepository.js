@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of IncentiveRepository.php. Team incentive program (owner decision
@@ -92,7 +93,7 @@ async function lockedInMonth(userId, role, month, exceptOrderId) {
     `SELECT COALESCE(SUM(amount_inr), 0) AS s FROM incentive_payouts
      WHERE payee_kind = 'staff' AND user_id = :u AND role = :r AND incentive_month = :m AND order_id <> :o`,
     { u: userId, r: role, m: month, o: exceptOrderId });
-  return Math.round(Number(r.s) * 100) / 100;
+  return round2(Number(r.s));
 }
 
 /** D-259: one kept line (not eligible / above a cap) written when the order is locked. */
@@ -337,7 +338,7 @@ async function setPayoutTds(id, rate, section, reason, overrideReason) {
 
 /** QA batch 4, MON-1: TDS still owed after this payout (capped at the payout), carried to the next one. */
 async function setPayoutTdsShortfall(id, shortfall) {
-  await db.execute('UPDATE incentive_payouts SET tds_shortfall_inr = :s WHERE id = :id', { s: Number(shortfall) > 0 ? Math.round(Number(shortfall) * 100) / 100 : null, id });
+  await db.execute('UPDATE incentive_payouts SET tds_shortfall_inr = :s WHERE id = :id', { s: Number(shortfall) > 0 ? round2(Number(shortfall)) : null, id });
 }
 
 /** Owner decision 2 Nov 2026 (D-235): the challan Accounts deposited the TDS with. */
@@ -383,9 +384,9 @@ async function addClawbackWithinPaid(payoutId, amountInr, month, note) {
     const paid = await conn.queryOne('SELECT * FROM incentive_payouts WHERE id = :id FOR UPDATE', { id: payoutId });
     if (!paid || paid.status !== 'paid' || Number(paid.amount_inr) <= 0) return { id: null, left: 0 };
     const sum = await conn.queryOne('SELECT COALESCE(-SUM(amount_inr), 0) AS s FROM incentive_payouts WHERE clawback_of_payout_id = :p', { p: payoutId });
-    const left = Math.round((Number(paid.paid_inr) - Number(sum.s)) * 100) / 100;
+    const left = round2(Number(paid.paid_inr) - Number(sum.s));
     if (!(amountInr > 0) || amountInr > left + 0.005) return { id: null, left };
-    const fc = paid.amount_fc !== null && paid.amount_fc !== undefined ? Math.round(Number(paid.amount_fc) * amountInr / Number(paid.amount_inr) * 100) / 100 : null;
+    const fc = paid.amount_fc !== null && paid.amount_fc !== undefined ? round2(Number(paid.amount_fc) * amountInr / Number(paid.amount_inr)) : null;
     const id = await addClawback(paid, amountInr, fc, month, note, conn);
     return { id, left };
   });

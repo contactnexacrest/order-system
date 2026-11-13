@@ -18,8 +18,7 @@ const LEGS = ['advance', 'freight', 'balance'];
 const TOLERANCE = 0.01;
 /** D-310: added to the refusal once the short payment waits in Approvals. */
 const SENT_TO_APPROVALS = ' It now waits in Approvals for them.';
-const { round2, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
-const round4 = (n) => Math.round(Number(n) * 10000) / 10000;
+const { round2, round4, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
 
 function label(leg, milestone = null) {
   return { advance: 'Advance', freight: 'Freight', balance: 'Balance' }[leg] || `Milestone ${Number((milestone && milestone.seq) || 0)}`;

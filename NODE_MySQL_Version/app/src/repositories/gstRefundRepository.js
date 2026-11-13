@@ -9,9 +9,10 @@
  * profit keep the GST — it left the bank. Port of GstRefundRepository.
  */
 const db = require('../config/db');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 const PARTS = { provisional: 'provisional', final: 'final / balance' };
-const r2 = (v) => Math.round(Number(v) * 100) / 100;
+const r2 = (v) => round2(Number(v));
 
 /** Every claim, newest period first, with what was credited. */
 async function claims() {

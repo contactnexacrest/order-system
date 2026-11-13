@@ -5,6 +5,7 @@ const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const incentiveRepository = require('../repositories/incentiveRepository');
 const associateTds = require('../services/associateTds');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Port of App\Controllers\AssociateTdsController — owner decision 2 Nov 2026
 // (D-235): TDS on associate commission — Settings → Associate TDS and the
@@ -43,7 +44,7 @@ async function saveSettings(req, res) {
   const values = {
     associate_tds_section: section,
     associate_tds_pct: rate.toFixed(2),
-    associate_tds_threshold_inr: String(Math.round(threshold * 100) / 100),
+    associate_tds_threshold_inr: String(round2(threshold)),
     associate_tds_no_pan_pct: noPan.toFixed(2),
     associate_tds_foreign: b.associate_tds_foreign ? '1' : '0',
     associate_15cb_required: b.associate_15cb_required ? '1' : '0',
@@ -75,7 +76,7 @@ async function register(req, res) {
     csv.stream(res, `associate-tds-${fyLabel.replace(/ /g, '')}${quarter !== null ? `-Q${quarter}` : ''}.csv`,
       ['Quarter', 'Paid on', 'Associate', 'PAN', 'Based in', 'Order', 'Gross (INR)', 'TDS (INR)', 'Section', 'Rate %', 'Net paid (INR)', 'Reason', 'Bank reference', 'Challan no.', 'Challan date', 'Form 16A uploaded'],
       rows.map((r) => [`Q${r.quarter}`, r.paid_on, r.name, r.pan, r.based_in === 'india' ? 'India' : `Abroad ${r.country || ''}`,
-        r.buyer_inquiry_ref || r.order_reference, (Number(r.paid_inr) + Number(r.tds_inr || 0)).toFixed(2), Number(r.tds_inr || 0).toFixed(2),
+        r.buyer_inquiry_ref || r.order_reference, round2(Number(r.paid_inr) + Number(r.tds_inr || 0)).toFixed(2), Number(r.tds_inr || 0).toFixed(2),
         r.tds_section, r.tds_rate, r.paid_inr, r.tds_reason, r.paid_reference, r.tds_challan_no, r.tds_challan_date, Number(r.form16a_count) > 0 ? 'yes' : 'no']));
     return;
   }

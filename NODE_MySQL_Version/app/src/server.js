@@ -190,7 +190,8 @@ njkEnv.addFilter('json', (value) => JSON.stringify(value === undefined ? null : 
 njkEnv.addFilter('money', (value) => {
   const num = parseFloat(value);
   if (Number.isNaN(num)) return value;
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // HNT-L01: rounded as PHP round() first — number_format does the same.
+  return require('./helpers/money').round2(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 });
 // Owner decision D-245 P2: a number with 1 decimal (PHP number_format($v, 1)), e.g. a margin %.
 njkEnv.addFilter('fixed1', (value) => {
@@ -200,12 +201,12 @@ njkEnv.addFilter('fixed1', (value) => {
 // Owner decision D-245 P2: a number as a plain 2-decimal string (PHP number_format($v, 2, '.', '')), e.g. for data-floor.
 njkEnv.addFilter('fixed2', (value) => {
   const num = parseFloat(value);
-  return Number.isNaN(num) ? '' : num.toFixed(2);
+  return Number.isNaN(num) ? '' : require('./helpers/money').round2(num).toFixed(2); // HNT-L01: PHP round() first
 });
 // D-245 P3: a rate with 4 decimals (PHP number_format($v, 4)), e.g. the realised ₹ per USD on a commission statement.
 njkEnv.addFilter('fixed4', (value) => {
   const num = parseFloat(value);
-  return Number.isNaN(num) ? '' : num.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  return Number.isNaN(num) ? '' : require('./helpers/money').round4(num).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }); // HNT-L01
 });
 // Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
 // Owner decision 2026-10-30: team incentives — whole-rupee amounts (PHP number_format($v, 0)) and month/cycle labels.
@@ -214,7 +215,7 @@ njkEnv.addFilter('qtyTrim', (value) => (value === null || value === undefined ? 
 njkEnv.addFilter('money0', (value) => {
   const num = parseFloat(value);
   if (Number.isNaN(num)) return value;
-  return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return require('./helpers/money').phpRound(num, 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); // HNT-L01: PHP round() first
 });
 // PHP's rtrim(rtrim(number_format($v, 2), '0'), '.') — a share like "40" or "15.5".
 njkEnv.addFilter('pct2', (value) => {

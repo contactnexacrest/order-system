@@ -27,6 +27,7 @@ const caFyLockGuard = require('../services/caFyLockGuard');
 const bankStatementCsvParser = require('../services/bankStatementCsvParser');
 const csv = require('../helpers/csv');
 const crypto = require('crypto');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // CA / Accounting module — independent of the order-pipeline system. Every
 // route here is gated on ca_module_view (see server.js), never on
@@ -49,7 +50,7 @@ function settlementRegisterCsvRows(legRows) {
     Currency: r.currency_code,
     'INR Actual': r.inr_actual,
     // D-244: the amount at the recorded rate while the INR credited is not known yet.
-    'INR Estimated (at recorded rate)': r.inr_actual === null && r.inr_estimated !== null && r.inr_estimated !== undefined ? Math.round(Number(r.inr_estimated) * 100) / 100 : null,
+    'INR Estimated (at recorded rate)': r.inr_actual === null && r.inr_estimated !== null && r.inr_estimated !== undefined ? round2(Number(r.inr_estimated)) : null,
     'Forex Gain/(Loss)': r.forex_gain_loss,
     // D-244 (owner 4 Nov 2026): rupees the bank kept from the credit — shown as bank charges, not forex.
     'Bank Charges (deducted from credit)': r.bank_charges_inr ?? null,

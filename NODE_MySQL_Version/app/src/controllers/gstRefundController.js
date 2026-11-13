@@ -16,10 +16,11 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const gstRefundRepository = require('../repositories/gstRefundRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const paymentDescription = require('../services/paymentDescription');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 const BACK = '/ca/gst-refunds';
 const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const r2 = (v) => Math.round(Number(v) * 100) / 100;
+const r2 = (v) => round2(Number(v));
 const isNum = (v) => /^-?\d*\.?\d+$/.test(String(v).trim());
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const longDate = (d) => { const [y, m, day] = String(d).slice(0, 10).split('-').map(Number); return `${day} ${MONTHS[m - 1]} ${y}`; };
@@ -43,7 +44,7 @@ async function index(req, res) {
     claim.period_label = paymentDescription.periodLabel(claim.period_from, claim.period_to);
     claim.gst_on_bills = await gstRefundRepository.gstOnBills(claim.period_from, claim.period_to);
     claim.outstanding = r2(Math.max(0, Number(claim.amount_claimed) - Number(claim.amount_credited) - Number(claim.amount_refused)));
-    claim.outstanding_plain = claim.outstanding.toFixed(2);
+    claim.outstanding_plain = r2(claim.outstanding).toFixed(2); // HNT-L01: PHP round()
     claim.credit_rows = (await gstRefundRepository.creditsFor(Number(claim.id))).map((c) => ({
       ...c, description: paymentDescription.gstRefund({ ...c, period_from: claim.period_from, period_to: claim.period_to, claim_arn: claim.claim_arn }),
     }));

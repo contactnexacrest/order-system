@@ -79,7 +79,7 @@ function note(key) {
   return value;
 }
 
-const fmt = (n) => Number(n).toFixed(2);
+const fmt = (n) => require('../helpers/money').fixed2(n); // HNT-L01: PHP round()
 const ucfirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const byId = (rows, idKey) => new Map(rows.map((r) => [String(r[idKey]), r]));
 

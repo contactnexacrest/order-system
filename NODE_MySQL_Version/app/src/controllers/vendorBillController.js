@@ -13,6 +13,7 @@ const orderVendorBillRepository = require('../repositories/orderVendorBillReposi
 const caFyLockGuard = require('../services/caFyLockGuard');
 const fileUploadService = require('../services/fileUploadService');
 const stageGateService = require('../services/stageGateService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Controllers\VendorBillController. Owner decisions (2026-10-27):
@@ -56,8 +57,8 @@ async function billFields(req) {
   return {
     bill_no: billNo.slice(0, 100),
     bill_date: billDate,
-    taxable_inr: Math.round(Number(taxable) * 100) / 100,
-    gst_inr: Math.round((Math.round(Number(taxable) * 100) / 100) * Number(gstRate)) / 100,
+    taxable_inr: round2(Number(taxable)),
+    gst_inr: require('../helpers/money').phpRound(round2(Number(taxable)) * Number(gstRate), 0) / 100, // HNT-L01: PHP round(round(t, 2) * rate) / 100
     note: note !== '' ? note.slice(0, 500) : null,
   };
 }
@@ -86,12 +87,12 @@ function paymentKindMismatch(paymentKind, docKind) {
 async function docKindFields(req, orderId, vendorKind, fields, sameVendor) {
   const docKind = str(req.body.doc_kind) || 'invoice';
   if (!orderVendorBillRepository.DOC_KINDS[docKind]) return 'Choose whether the bill is a Proforma or a Tax invoice.';
-  const total = Math.round((fields.taxable_inr + fields.gst_inr) * 100) / 100;
+  const total = round2(fields.taxable_inr + fields.gst_inr);
   if (docKind === 'proforma') {
     const asked = str(req.body.requested_amount_inr);
     if (asked === '') return { doc_kind: 'proforma', requested_amount_inr: null, replaces_bill_id: null };
     if (Number.isNaN(Number(asked)) || Number(asked) <= 0) return 'Enter the amount the proforma asks for now (₹), or leave it blank when it asks for the whole bill.';
-    const rounded = Math.round(Number(asked) * 100) / 100;
+    const rounded = round2(Number(asked));
     if (rounded > total + 0.004) return `The amount asked now cannot be more than the bill total (₹${money(total)}).`;
     return { doc_kind: 'proforma', requested_amount_inr: rounded, replaces_bill_id: null };
   }
@@ -269,7 +270,7 @@ async function payBill(req, res) {
     back(req, res, orderId, anchor, 'error', 'Enter the amount paid (₹).');
     return;
   }
-  if (Math.round(Number(amount) * 100) / 100 > bill.remaining + 0.004) {
+  if (round2(Number(amount)) > bill.remaining + 0.004) {
     back(req, res, orderId, anchor, 'error', `That is more than is still due on bill ${bill.bill_no} (₹${money(bill.remaining)}).`);
     return;
   }
@@ -290,7 +291,7 @@ async function payBill(req, res) {
     return;
   }
 
-  const paid = Math.round(Number(amount) * 100) / 100;
+  const paid = round2(Number(amount));
   await orderVendorBillRepository.addPayment(bill.id, leg, paidAt, paid, mode, reference.slice(0, 100), req.user.id);
   if (supplierPo !== null) {
     // The Supplier PO's own advance / balance paid figures (Steps 7e / 10a,

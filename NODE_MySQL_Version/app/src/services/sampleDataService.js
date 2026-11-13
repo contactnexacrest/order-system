@@ -38,6 +38,7 @@ const userRepository = require('../repositories/userRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const workingDaysCalculator = require('./workingDaysCalculator');
 const env = require('../config/env');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Phase E follow-up — "can we have some sample records to play with, and
@@ -470,8 +471,8 @@ async function advanceSampleOrderToStage5(orderId, userId) {
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
-  const advanceAmount = Math.round(fobTotal * parseFloat(order.advance_pct) / 100 * 100) / 100;
-  const balanceAmount = Math.round(fobTotal * parseFloat(order.balance_pct) / 100 * 100) / 100;
+  const advanceAmount = round2(fobTotal * parseFloat(order.advance_pct) / 100);
+  const balanceAmount = round2(fobTotal * parseFloat(order.balance_pct) / 100);
   const balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (balanceDueService)
 
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, advanceAmount, formatDate(new Date()));
@@ -603,8 +604,8 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   await documentGenerationService.generate(orderId, 'PI', userId);
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   order = await orderRepository.find(orderId);
-  const advanceAmount = Math.round(fobTotal * parseFloat(order.advance_pct) / 100 * 100) / 100;
-  const balanceAmount = Math.round(fobTotal * parseFloat(order.balance_pct) / 100 * 100) / 100;
+  const advanceAmount = round2(fobTotal * parseFloat(order.advance_pct) / 100);
+  const balanceAmount = round2(fobTotal * parseFloat(order.balance_pct) / 100);
   const balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (balanceDueService)
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, advanceAmount, formatDate(new Date()));
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, formatDate(new Date()), userId);

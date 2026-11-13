@@ -79,6 +79,7 @@ const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 const orderSupplierPoDocumentRepository = require('../repositories/orderSupplierPoDocumentRepository');
 const piIntakeRepository = require('../repositories/piIntakeRepository');
 const supplierRepository = require('../repositories/supplierRepository');
@@ -3080,7 +3081,7 @@ async function confirmLcUsable(req, res) {
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
-  const balanceAmount = Math.round(fobTotal * (parseFloat(order.balance_pct) / 100) * 100) / 100;
+  const balanceAmount = round2(fobTotal * parseFloat(order.balance_pct) / 100); // HNT-L01: PHP round()
   // Gap list G-2 (owner, 1 Nov 2026): an LC balance gets its due date when the scanned BL is sent to the buyer.
   const balanceDueDate = null;
 
@@ -3435,7 +3436,7 @@ async function saveSupplierPo(req, res) {
   let offer = offerId > 0 ? await require('../repositories/productSupplierRepository').find(offerId) : null;
   if (offer && Number(offer.supplier_id || 0) !== supplierId) offer = null; // a different supplier was chosen after the table row
   const quotedRaw = String(body.quoted_unit_price_inr || '').replace(/,/g, '').trim();
-  const quoted = offer && quotedRaw !== '' && !Number.isNaN(Number(quotedRaw)) ? Math.round(Number(quotedRaw) * 100) / 100 : null;
+  const quoted = offer && quotedRaw !== '' && !Number.isNaN(Number(quotedRaw)) ? round2(Number(quotedRaw)) : null;
   const agreedRaw = String(body.unit_price_inr || '').replace(/,/g, '').trim();
   const overrideReason = str(body.price_override_reason);
   const overridden = quoted !== null && agreedRaw !== '' && !Number.isNaN(Number(agreedRaw)) && Math.abs(Number(agreedRaw) - quoted) > 0.004;

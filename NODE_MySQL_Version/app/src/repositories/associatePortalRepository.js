@@ -15,6 +15,7 @@ const orderProductRepository = require('./orderProductRepository');
  */
 
 const incentive = () => require('../services/incentiveService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /** Plain-word stage, as a buyer would see it. */
 function stageLabel(order) {
@@ -224,7 +225,7 @@ async function totals(associateId, months = null, today = null) {
   const t = { earned: 0, waiting: 0, paid: 0, held: 0 };
   // D-264: the associate sees the order currency (USD) as the main figure — per currency.
   const fc = { earned: {}, waiting: {}, paid: {}, held: {} };
-  const add = (m, cur, v) => { m[cur] = Math.round(((m[cur] || 0) + v) * 100) / 100; };
+  const add = (m, cur, v) => { m[cur] = round2((m[cur] || 0) + v); };
   for (const p of await payouts(associateId)) {
     const amount = Number(p.amount_inr);
     const cur = String(p.currency_code || 'INR');
@@ -234,7 +235,7 @@ async function totals(associateId, months = null, today = null) {
     else if (p.status === 'held') { t.held += amount; add(fc.held, cur, amountFc); }
     else if (p.status === 'paid' && String(p.paid_on || '').slice(0, 7) >= from) { t.paid += Number(p.paid_inr); add(fc.paid, cur, amountFc); }
   }
-  for (const k of Object.keys(t)) t[k] = Math.round(t[k] * 100) / 100;
+  for (const k of Object.keys(t)) t[k] = round2(t[k]);
   return { ...t, months, fc };
 }
 

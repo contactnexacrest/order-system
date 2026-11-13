@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const financialYear = require('../helpers/financialYear');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // CA / Accounting module (Phase 4) — expenses imported one-way from Zoho
 // Books. Zoho Books stays the one place expenses are entered: the import
@@ -199,8 +200,8 @@ async function tdsSummary() {
       r.quarter = `Q4 FY${yearNum - 1}-${String(yearNum).slice(2, 4)}`;
     }
     r.expense_count = parseInt(r.expense_count, 10);
-    r.total_expense_amount = Math.round((parseFloat(r.total_expense_amount) + Number.EPSILON) * 100) / 100;
-    r.total_tds_amount = Math.round((parseFloat(r.total_tds_amount) + Number.EPSILON) * 100) / 100;
+    r.total_expense_amount = round2(parseFloat(r.total_expense_amount));
+    r.total_tds_amount = round2(parseFloat(r.total_tds_amount));
   }
   return rows;
 }

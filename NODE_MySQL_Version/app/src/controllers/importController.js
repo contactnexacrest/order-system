@@ -135,7 +135,7 @@ async function showData(s, permissions) {
     lcBankDefault: s.lc_bank || (await I.setting('imp_lc_bank')),
     chaDefault: s.cha_name || (await I.setting('imp_default_cha')),
     igstFmt: s.igst_total !== null && s.igst_total !== undefined ? G.inr(nz(s.igst_total)) : '',
-    dutyTotalFmt: s.bcd_total !== null && s.bcd_total !== undefined ? G.inr((Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total)).toFixed(2)) : '',
+    dutyTotalFmt: s.bcd_total !== null && s.bcd_total !== undefined ? G.inr(require('../helpers/money').fixed2(Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total))) : '',
     payments: (await repo.payments(id)).map((p) => ({ ...p, kind_label: I.PAYMENT_KINDS[p.kind] || p.kind, amount_fmt: fcOf(p.amount_fc), inr_fmt: G.inr(nz(p.amount_inr)) })),
     poFmt: I.fc(poCents),
     paidFmt: I.fc(paidCents),

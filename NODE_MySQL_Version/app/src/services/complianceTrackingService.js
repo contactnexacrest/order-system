@@ -5,6 +5,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const departmentRepository = require('../repositories/departmentRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const permissionRepository = require('../repositories/permissionRepository');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of ComplianceTrackingService.php. Owner decision (2 Nov 2026, gap-list Q-6 —
@@ -132,9 +133,9 @@ async function ecgcPosition(clientId) {
   for (const row of rows) {
     const received = (row.advance_remittance_received_at ? Number(row.advance_amount || 0) : 0)
       + (row.balance_remittance_received_at ? Number(row.balance_amount || 0) : 0);
-    const outstanding = Math.max(0, Math.round((Number(row.fob) - received) * 100) / 100);
+    const outstanding = Math.max(0, round2(Number(row.fob) - received));
     const ccy = row.currency_code || '';
-    exposure[ccy] = Math.round(((exposure[ccy] || 0) + outstanding) * 100) / 100;
+    exposure[ccy] = round2((exposure[ccy] || 0) + outstanding);
     open++;
   }
   const limit = client.ecgc_limit_amount !== null && client.ecgc_limit_amount !== undefined ? Number(client.ecgc_limit_amount) : null;
@@ -147,7 +148,7 @@ async function ecgcPosition(clientId) {
   let warning = null;
   if (limit !== null) {
     const inLimitCcy = exposure[currency || ''] || 0;
-    overBy = Math.round((inLimitCcy - limit) * 100) / 100;
+    overBy = round2(inLimitCcy - limit);
     if (expired) {
       warning = `The ECGC credit limit for this buyer expired on ${validTo} — ask ECGC to renew it before shipping.`;
     } else if (overBy > 0) {
@@ -277,7 +278,7 @@ async function saveClaimTracking(claim, input) {
     'UPDATE ca_export_benefits SET claim_status = :st, sanctioned_amount = :sa, sanctioned_at = :sd, claim_deadline = :dl, rejected_reason = :rr WHERE id = :id',
     {
       st: received ? 'received' : status,
-      sa: sanctioned === '' ? null : Math.round(Number(sanctioned) * 100) / 100,
+      sa: sanctioned === '' ? null : round2(Number(sanctioned)),
       sd: sanctionedAt || null,
       dl: deadline || null,
       rr: status === 'rejected' ? reason.slice(0, 500) : null,

@@ -139,7 +139,7 @@ function containers(cbm) {
 
 /** 180 → "180", 2.50 → "2.5". */
 function num(v) {
-  return String(Math.round(Number(v) * 100) / 100);
+  return String(require('../helpers/money').round2(Number(v))); // HNT-L01: PHP number_format rounds with round()
 }
 
 /** The message beside a missing size field, e.g. "Enter the length (cm) — needed to compare a price per piece …". */

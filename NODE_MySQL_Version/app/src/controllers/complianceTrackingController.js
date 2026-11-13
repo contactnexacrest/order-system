@@ -8,6 +8,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const fileUploadService = require('../services/fileUploadService');
 const moneyVisibility = require('../services/moneyVisibility');
 const complianceTrackingService = require('../services/complianceTrackingService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of ComplianceTrackingController.php. Owner decision (2 Nov 2026, gap-list Q-6):
@@ -62,7 +63,7 @@ async function saveClientEcgc(req, res) {
   const old = `${client.ecgc_limit_currency || ''} ${client.ecgc_limit_amount ?? '—'}`;
   await db.execute(
     'UPDATE clients SET ecgc_limit_amount = :a, ecgc_limit_currency = :c, ecgc_limit_approved_on = :ap, ecgc_limit_valid_to = :vt, ecgc_limit_ref = :r, ecgc_limit_file_id = :f WHERE id = :id',
-    { a: Math.round(Number(amount) * 100) / 100, c: currency, ap: approvedOn || null, vt: validTo || null, r: ref || null, f: fileId, id: clientId }
+    { a: round2(Number(amount)), c: currency, ap: approvedOn || null, vt: validTo || null, r: ref || null, f: fileId, id: clientId }
   );
   await auditLogRepository.log(req.user.id, 'CLIENT_ECGC_LIMIT_SET', 'clients', clientId, 'ecgc_limit_amount', old, `${currency} ${Number(amount).toFixed(2)}`, ref !== '' ? `ECGC ref ${ref}` : null);
   flash.set(req, 'success', 'ECGC credit limit saved.');

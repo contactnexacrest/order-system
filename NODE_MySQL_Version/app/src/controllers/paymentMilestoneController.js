@@ -10,6 +10,7 @@ const orderRepository = require('../repositories/orderRepository');
 const paymentMilestoneRepository = require('../repositories/paymentMilestoneRepository');
 const moneyVisibility = require('../services/moneyVisibility');
 const paymentDescription = require('../services/paymentDescription');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Port of App\Controllers\PaymentMilestoneController. Owner decision D-215
 // (5a): an order's own payment schedule — advance, the steps in between,
@@ -19,7 +20,7 @@ const paymentDescription = require('../services/paymentDescription');
 
 const back = (res, orderId) => res.redirect(`/orders/${orderId}#payment-schedule`);
 const pct = (v) => Number(v).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-const r2 = (n) => Math.round(Number(n) * 100) / 100;
+const r2 = (n) => round2(Number(n));
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
 
 /** @returns {[Array<{pct:number,due_text:string}>, string|null]} the steps, or the error */

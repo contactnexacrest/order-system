@@ -94,7 +94,7 @@ async function originalSnapshot(order) {
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const advancePct = parseFloat(order.advance_pct);
   const balancePct = parseFloat(order.balance_pct);
-  const advanceAmount = Math.round((fobValue * advancePct) / 100 * 100) / 100;
+  const advanceAmount = require('../helpers/money').round2(fobValue * advancePct / 100); // HNT-L01: PHP round()
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
   // 90-item backlog "ports city field": same fix as
   // documentDataAssembler — Incoterms convention prints the CITY alone,

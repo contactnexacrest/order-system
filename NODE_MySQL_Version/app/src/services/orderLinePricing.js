@@ -70,9 +70,10 @@ function cbmCalculatedReason(figures) {
   return `CBM price worked out from the supplier's ${from} mm price — no ${cbmFrom} mm+ price quoted`;
 }
 
-const n2 = (v) => Number(v).toFixed(2);
+const n2 = (v) => round2(Number(v)).toFixed(2); // HNT-L01: PHP round()
 const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const auditLog = (...a) => require('../repositories/auditLogRepository').log(...a);
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /** The order is one the client's associate earns on: forced "yes", or within the first-order window and not forced "no". */
 async function associateEarnsOn(order) {
@@ -361,8 +362,8 @@ async function lineQuote(product, ctx, selection, unit = null, size = {}) {
         ref_unit: f.unit, ref_quote: f.quote, ref_floor: f.floor, selection };
     }
     out.factor = conv.factor;
-    out.quote = Math.round(f.quote * conv.factor * 100) / 100;
-    out.floor = Math.round(f.floor * conv.factor * 100) / 100;
+    out.quote = round2(f.quote * conv.factor);
+    out.floor = round2(f.floor * conv.factor);
     out.unit = Math.abs(conv.factor - 1) > 1e-9 ? unit : f.unit;
   }
   return out;
@@ -542,7 +543,7 @@ function totals(lines, checks) {
     out.cbm += qty * per;
     out.counted += 1;
   }
-  out.amount = Math.round(out.amount * 100) / 100;
+  out.amount = round2(out.amount);
   out.containers = lineUnits.containers(out.cbm);
   out.cbm = Math.round(out.cbm * 100) / 100;
   return out;
@@ -732,7 +733,7 @@ async function approvalView(orderId, lineId) {
     const qty = line.quantity !== null && line.quantity !== undefined ? Number(line.quantity) : null;
     const reservePerUnit = Number(f.reserve);
     const cutPerUnit = Math.min(reservePerUnit, Math.max(0, Number(f.staff_floor) - price));
-    const r2 = (v) => Math.round(v * 100) / 100;
+    const r2 = (v) => round2(v);
     view.effect = {
       margin_pct: price > 0 ? Math.round((price - Number(f.cost)) / price * 1000) / 10 : null,
       short_per_unit: r2(Math.max(0, Number(f.floor) - price)),

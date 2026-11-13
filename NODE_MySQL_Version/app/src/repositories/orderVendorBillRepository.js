@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of App\Repositories\OrderVendorBillRepository. Owner decisions
@@ -33,7 +34,6 @@ const DOC_KINDS = { proforma: 'Proforma', invoice: 'Tax invoice' };
 
 const PAYMENT_MODES = ['NEFT / RTGS', 'IMPS', 'UPI', 'Cheque'];
 
-const round2 = (n) => Math.round(n * 100) / 100;
 
 async function create(orderId, vendorKind, data, userId) {
   const result = await db.execute(

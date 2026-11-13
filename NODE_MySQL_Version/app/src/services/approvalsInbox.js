@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Owner decision D-310 (point 27, 11 Nov 2026; mockup approvals.png): one
@@ -468,14 +469,14 @@ async function recordShortPaymentRequest(orderId, leg, milestone, userId, owed, 
   const milestoneId = milestone ? Number(milestone.id) : 0;
   const existing = await db.queryOne('SELECT id FROM short_payment_requests WHERE order_id = :o AND leg = :l AND milestone_id = :m', { o: orderId, l: leg, m: milestoneId });
   if (existing && (await shortRequestOpen(Number(existing.id)))) {
-    await db.execute('UPDATE short_payment_requests SET owed_amount = :a WHERE id = :id', { a: Math.round(owed * 100) / 100, id: existing.id });
+    await db.execute('UPDATE short_payment_requests SET owed_amount = :a WHERE id = :id', { a: round2(owed), id: existing.id });
     return;
   }
   await db.execute(
     `INSERT INTO short_payment_requests (order_id, leg, milestone_id, owed_amount, currency_code, requested_by, requested_at)
      VALUES (:o, :l, :m, :a, :c, :u, NOW())
      ON DUPLICATE KEY UPDATE owed_amount = VALUES(owed_amount), currency_code = VALUES(currency_code), requested_by = VALUES(requested_by), requested_at = NOW()`,
-    { o: orderId, l: leg, m: milestoneId, a: Math.round(owed * 100) / 100, c: currency || null, u: userId });
+    { o: orderId, l: leg, m: milestoneId, a: round2(owed), c: currency || null, u: userId });
   const order = await require('../repositories/orderRepository').find(orderId);
   const label = partPayment.label(leg, milestone);
   const message = `Order ${(order && order.order_reference) || `#${orderId}`}: ${label} is short by ${partPayment.money(currency, owed)} and waits for your approval to clear it short (Approvals).`;
@@ -483,7 +484,7 @@ async function recordShortPaymentRequest(orderId, leg, milestone, userId, owed, 
   for (const managerId of await require('../repositories/permissionRepository').usersWithPermission('approve_short_payment')) {
     if (Number(managerId) !== Number(userId)) await notifications.create(Number(managerId), null, 'short_payment_approval', orderId, message.slice(0, 500));
   }
-  await require('../repositories/auditLogRepository').log(userId, 'SHORT_PAYMENT_APPROVAL_REQUESTED', 'orders', orderId, `${leg}${milestone ? `:${milestone.seq || ''}` : ''}`, null, String(Math.round(owed * 100) / 100), message);
+  await require('../repositories/auditLogRepository').log(userId, 'SHORT_PAYMENT_APPROVAL_REQUESTED', 'orders', orderId, `${leg}${milestone ? `:${milestone.seq || ''}` : ''}`, null, String(round2(owed)), message);
 }
 
 /** What is still owed, or null when the request is answered (cleared short, or the rest received). */

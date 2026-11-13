@@ -1,4 +1,5 @@
 'use strict';
+const { round2 } = require('./money'); // HNT-L01: PHP round()
 
 /**
  * Owner decisions (2026-10-27): small lookups the order page needs for the
@@ -70,7 +71,7 @@ function supplierLegToPayNow(bills, supplierPo, leg) {
     for (const p of b.payments || []) paid[p.leg === 'balance' ? 'balance' : 'advance'] += Number(p.amount_inr);
   }
   const m = (v) => `₹${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const r = (v) => Math.round(v * 100) / 100;
+  const r = (v) => round2(v);
   if (leg === 'advance') {
     const planned = Number(supplierPo.advance_amount_inr || 0);
     if (planned <= 0) return null;
@@ -101,7 +102,7 @@ function totals(bills) {
     if (b.replaces_bill_id && !listed.has(Number(b.replaces_bill_id))) paid += Number(b.carried_paid || 0);
     due += Number(b.remaining);
   }
-  const r = (v) => Math.round(v * 100) / 100;
+  const r = (v) => round2(v);
   return { cost: r(cost), paid: r(paid), due: due > 0.004 ? r(due) : 0 };
 }
 
@@ -134,19 +135,19 @@ function supplierPrefill(bills, supplierPo, leg) {
 /** The figures the bill form renders from a prefill (same rounding as the PHP view and app.js). */
 function prefillFigures(gstRates, prefill) {
   const p = prefill || {};
-  const taxable = p.taxable !== null && p.taxable !== undefined && Number(p.taxable) > 0 ? Math.round(Number(p.taxable) * 100) / 100 : null;
+  const taxable = p.taxable !== null && p.taxable !== undefined && Number(p.taxable) > 0 ? round2(Number(p.taxable)) : null;
   const wanted = p.gst_rate !== null && p.gst_rate !== undefined && p.gst_rate !== '' && Number.isFinite(Number(p.gst_rate)) ? Number(p.gst_rate) : null;
   const known = wanted !== null && (gstRates || []).some((o) => Math.abs(Number(o.option_value) - wanted) < 0.001);
   let rateUsed = known ? wanted : null;
   if (rateUsed === null) for (const o of gstRates || []) if (o.is_default) rateUsed = Number(o.option_value);
-  const gst = taxable !== null ? Math.round(taxable * Number(rateUsed || 0)) / 100 : 0;
-  const asked = p.asked !== null && p.asked !== undefined && Number(p.asked) > 0 ? Math.round(Number(p.asked) * 100) / 100 : null;
+  const gst = taxable !== null ? require('./money').phpRound(taxable * Number(rateUsed || 0), 0) / 100 : 0; // HNT-L01: PHP round()
+  const asked = p.asked !== null && p.asked !== undefined && Number(p.asked) > 0 ? round2(Number(p.asked)) : null;
   return {
     taxable: taxable !== null ? taxable.toFixed(2) : null,
     rateKnown: known,
     isSelected: (o) => (known ? Math.abs(Number(o.option_value) - wanted) < 0.001 : !!o.is_default),
     gst: gst.toFixed(2),
-    total: ((taxable || 0) + gst).toFixed(2),
+    total: round2((taxable || 0) + gst).toFixed(2), // HNT-L01: PHP round()
     asked: asked !== null ? asked.toFixed(2) : null,
     hint: p.hint || null,
     askedHint: p.asked_hint || null,

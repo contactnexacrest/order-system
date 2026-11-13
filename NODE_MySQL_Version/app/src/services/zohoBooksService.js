@@ -13,6 +13,7 @@ const { KIND_LABELS } = require('./zohoInvoiceData');
 const { LOGISTICS_SERVICES, DOC_KINDS } = require('../repositories/orderVendorBillRepository');
 const { CATEGORIES: EXPENSE_CATEGORIES } = require('../repositories/orderExpenseRepository');
 const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * CA / Accounting module — the Zoho Books connection. It sends what the
@@ -339,7 +340,7 @@ const COST_ACCOUNTS = {
 const BENEFIT_INCOME_ACCOUNT = 'Export Incentive Income';
 const BENEFIT_SCRIP_ACCOUNT = 'Export Incentive e-Scrips';
 
-const money = (n) => Number(n).toFixed(2);
+const money = (n) => require('../helpers/money').fixed2(n); // HNT-L01: PHP round()
 
 /**
  * Stage 3: a supplier's or logistics partner's tax invoice as a Books bill,
@@ -1531,8 +1532,7 @@ async function getList(accessToken, url, key) {
 }
 
 function round(value, places) {
-  const f = 10 ** places;
-  return Math.round(value * f) / f;
+  return require('../helpers/money').phpRound(value, places); // HNT-L01: exactly PHP round()
 }
 
 function authHeaders(accessToken) {
@@ -1825,7 +1825,7 @@ async function associateCommission(cost) {
   const rate = fixedLevel ? associateCommission.levelLabel(fixedLevel)
     : (inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
       ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '');
-  const gst = Math.round(payouts.reduce((sum, p) => sum + Number(p.gst_inr || 0), 0) * 100) / 100;
+  const gst = round2(payouts.reduce((sum, p) => sum + Number(p.gst_inr || 0), 0));
   const gstTaxId = String((await require('../repositories/incentiveRepository').settings()).zoho_gst_commission_tax_id || '').trim();
   const what = `Associate commission — ${a.name} — for order ${cost.buyer_inquiry_ref} (${cost.buyer_name})`
     + (rate !== '' ? `, ${rate} on the invoiced FOB of the goods` : '')

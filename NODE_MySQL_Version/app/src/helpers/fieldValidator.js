@@ -14,7 +14,7 @@ const { todayIst } = require('./dbDateTime');
  */
 
 function plain(number) {
-  return String(Number(number.toFixed(2)));
+  return String(require('./money').round2(number)); // HNT-L01: PHP number_format rounds with round()
 }
 
 function wholeNumber(value, label, min = 0) {
@@ -85,7 +85,7 @@ const MAX_RATE = 999999.9999;
 /** Largest money amount the database keeps (DECIMAL(14,2)). */
 const MAX_AMOUNT = 999999999999.99;
 
-const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
+const round = (n, d) => require('./money').phpRound(n, d); // HNT-L01: PHP round()
 
 /** QA Round 6, R6-N22/N23: at least 0.0001 once rounded to 4 decimals, at most MAX_RATE. */
 function exchangeRate(rate, label = 'The exchange rate') {

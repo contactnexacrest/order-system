@@ -21,6 +21,7 @@ const zohoBooksService = require('../services/zohoBooksService');
 const benefitSettlementService = require('../services/benefitSettlementService');
 const fileUploadService = require('../services/fileUploadService');
 const { todayIst } = require('../helpers/dbDateTime');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 
 /**
@@ -155,7 +156,7 @@ async function benefitForChange(req, res, field) {
 }
 
 function describeBenefit(b) {
-  const money = (n) => Number(n).toFixed(2);
+  const money = (n) => round2(Number(n)).toFixed(2); // HNT-L01: PHP round()
   return `claimed ${money(b.claimed_amount)} on ${b.claimed_at} (ref ${b.reference_number || '—'}), received ${b.received_amount !== null ? `${money(b.received_amount)} on ${b.received_at}` : 'nothing'}`;
 }
 
@@ -706,7 +707,7 @@ async function saveTravelExpenses(req, res) {
       return;
     }
   }
-  const expenseAmount = Math.round((expensePct / 100) * fobTotal * rate * 100) / 100;
+  const expenseAmount = round2((expensePct / 100) * fobTotal * rate);
 
   // Owner rule D-212: the cost line says how the provisional amount was worked out.
   const travelDescription = paymentDescription.travelExpenses(factoryDistanceKm, expensePct, String(currencyCode), Number(fobTotal), rate);

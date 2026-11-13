@@ -22,6 +22,7 @@ const caFyLockRepository = require('../repositories/caFyLockRepository');
 const financialYear = require('../helpers/financialYear');
 const db = require('../config/db');
 const zohoSyncFailureNotifier = require('./zohoSyncFailureNotifier');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * CA / Accounting module — orchestrates a Zoho Books sync run, from either
@@ -255,7 +256,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
     try {
       const result = await zohoBooksService.pushRevenuePayment(
         Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
-        Number(m.received_amount), Math.round((Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id))) * 100) / 100,
+        Number(m.received_amount), round2(Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id))),
         String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`,
         target ? target.zoho_invoice_number : null, await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id)),
         await paymentDescription.milestonePayment(m, target ? target.zoho_invoice_number : null)
@@ -282,7 +283,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
     try {
       const amount = await zohoBooksService.applyPaymentToInvoice(
         String(m.zoho_reference), Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
-        Number(m.received_amount), Math.round((Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(Number(m.order_id), 'milestone', Number(m.id))) * 100) / 100,
+        Number(m.received_amount), round2(Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(Number(m.order_id), 'milestone', Number(m.id))),
         String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`, target.zoho_invoice_number, await remittanceDifference.chargesInr(Number(m.order_id), 'milestone', Number(m.id)),
         await paymentDescription.milestonePayment(m, target.zoho_invoice_number)
       );
@@ -390,7 +391,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
     return result;
   }
   const log = (type, orderId, leg, status, reference, message) => zohoSyncLogRepository.log(type, 'order', orderId, leg, status, reference, message, triggeredBy, triggeredByUserId);
-  const money = (n) => Number(n).toFixed(2);
+  const money = (n) => round2(Number(n)).toFixed(2); // HNT-L01: PHP round()
   // Owner decision 2026-10-29: put back what was deleted or changed in Books.
   for (const [key, count] of Object.entries(onlyOrderId === null ? await zohoRestoreService.purchases(startDate, triggeredBy, triggeredByUserId) : {})) {
     result[key] += count;
@@ -464,7 +465,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
   // changes afterwards. Counted with the expenses.
   for (const cost of await zohoPurchaseRepository.costEntriesToSync(startDate)) {
     if (!inScope(onlyOrderId, cost.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
-    const hash = crypto.createHash('sha256').update(JSON.stringify([cost.category, Math.round(Number(cost.amount_inr) * 100) / 100, String(cost.cost_date), cost.paid_from, cost.description])).digest('hex');
+    const hash = crypto.createHash('sha256').update(JSON.stringify([cost.category, round2(Number(cost.amount_inr)), String(cost.cost_date), cost.paid_from, cost.description])).digest('hex');
     if (cost.zoho_expense_id !== null && cost.zoho_pushed_hash === hash) {
       continue;
     }
@@ -544,7 +545,7 @@ async function importPendingExpenses(triggeredBy, triggeredByUserId) {
   }
 
   const result = { ...none };
-  const money = (n) => Number(n).toFixed(2);
+  const money = (n) => round2(Number(n)).toFixed(2); // HNT-L01: PHP round()
   const log = (id, status, zohoId, message) => zohoSyncLogRepository.log('expense_import', 'ca_expenses', id, null, status, zohoId, message, triggeredBy, triggeredByUserId);
   const locked = async (date) => {
     const fy = financialYear.label(String(date).slice(0, 10));
@@ -680,7 +681,7 @@ async function syncBenefits(triggeredBy, triggeredByUserId, onlyOrderId = null) 
         result.removed += 1;
         continue;
       }
-      const hash = crypto.createHash('sha256').update(JSON.stringify([benefit.scheme_name, Math.round(Number(benefit.received_amount) * 100) / 100, String(benefit.received_at), benefit.reference_number, benefit.order_id])).digest('hex');
+      const hash = crypto.createHash('sha256').update(JSON.stringify([benefit.scheme_name, round2(Number(benefit.received_amount)), String(benefit.received_at), benefit.reference_number, benefit.order_id])).digest('hex');
       if (journalId !== null && benefit.zoho_pushed_hash === hash) {
         continue;
       }
@@ -754,7 +755,7 @@ async function payoutCostsToSync(startDate) {
 
 /** What the journal is made of — a change sends the journal again (updated, never a second one). Same JSON as PHP. */
 function payoutCostHash(p) {
-  const f2 = (v) => Number(v || 0).toFixed(2);
+  const f2 = (v) => round2(Number(v || 0)).toFixed(2); // HNT-L01: PHP round()
   return crypto.createHash('sha256').update(JSON.stringify([f2(p.payout_difference_inr), String(p.paid_on).slice(0, 10), String(p.paid_reference || ''), f2(p.bank_charges_inr), f2(p.amount_fc), String(p.currency_code || '')])).digest('hex');
 }
 

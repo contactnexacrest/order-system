@@ -8,6 +8,7 @@ const caExpenseRepository = require('./caExpenseRepository');
 const orderLcDetailRepository = require('./orderLcDetailRepository');
 const financialYear = require('../helpers/financialYear');
 const zohoGuard = require('../services/zohoGuard');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // CA / Accounting module — independent of the order-pipeline system
 // (nav-gated on ca_module_view, never on manage_orders). Phase 1 was the
@@ -50,7 +51,7 @@ async function rateGapBankChargesByLeg() {
   for (const r of rows) {
     const id = Number(r.order_id);
     if (!map[id]) map[id] = {};
-    map[id][r.leg] = Math.round(parseFloat(r.charges) * 100) / 100;
+    map[id][r.leg] = round2(parseFloat(r.charges));
   }
   return map;
 }
@@ -77,7 +78,7 @@ async function settlementRegister() {
       // forex loss — they are already booked as a Bank Charges cost.
       const bankCharges = (bankChargesByLeg[Number(ops.order_id)] || {})[legDef.leg] ?? 0;
       if (forexGainLoss !== null && bankCharges > 0) {
-        forexGainLoss = Math.round((forexGainLoss + bankCharges) * 100) / 100;
+        forexGainLoss = round2(forexGainLoss + bankCharges);
       }
 
       const clearedAtTs = new Date(ops[legDef.clearedCol]).getTime();

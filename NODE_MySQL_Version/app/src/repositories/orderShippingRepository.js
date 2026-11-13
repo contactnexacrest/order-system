@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { round4 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 async function upsert(orderId, data) {
   await db.execute(
@@ -58,7 +59,7 @@ async function recordShippingBill(orderId, number, date, customsRate) {
     `INSERT INTO order_shipping (order_id, shipping_bill_no, shipping_bill_date, customs_exchange_rate)
      VALUES (:order_id, :no, :date, :rate)
      ON DUPLICATE KEY UPDATE shipping_bill_no = VALUES(shipping_bill_no), shipping_bill_date = VALUES(shipping_bill_date), customs_exchange_rate = VALUES(customs_exchange_rate)`,
-    { order_id: orderId, no: number, date, rate: Math.round(customsRate * 10000) / 10000 }
+    { order_id: orderId, no: number, date, rate: round4(customsRate) }
   );
 }
 

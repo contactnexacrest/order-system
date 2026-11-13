@@ -16,6 +16,7 @@ const associateDocumentRepository = require('../repositories/associateDocumentRe
 const associateRepository = require('../repositories/associateRepository');
 const fileUploadService = require('../services/fileUploadService');
 const fieldValidator = require('../helpers/fieldValidator');
+const { round2, round4 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of IncentiveController.php. Team incentive program and associates
@@ -92,7 +93,7 @@ async function parseCaps(body) {
         errors.push(`Enter the ${roles[key].label} cap ${k === 'order' ? 'per order' : 'per month'} as rupees from 0 to 1,00,00,00,000, or leave it empty for no cap.`);
         vals[k] = null;
       } else {
-        vals[k] = Math.round(Number(v) * 100) / 100;
+        vals[k] = round2(Number(v));
       }
     }
     out[String(key)] = vals;
@@ -270,7 +271,7 @@ async function saveOrder(req, res) {
     if (!isNum(rawValue) || Number(rawValue) < 0 || (mode === 'pct' && Number(rawValue) > 100) || Number(rawValue) > 100000000) {
       return back(req, res, orderId, 'error', mode === 'pct' ? 'Enter the % of the order\'s profit (0 to 100).' : 'Enter the incentive for this order as an amount of 0 or more.');
     }
-    value = mode === 'pct' ? Math.round(Number(rawValue) * 10000) / 10000 : Math.round(Number(rawValue) * 100) / 100;
+    value = mode === 'pct' ? round4(Number(rawValue)) : round2(Number(rawValue));
   }
   const old = incentiveService.orderRule(row);
   const amountChanged = mode !== old.mode || (value !== null && Math.abs(value - Number(old.value || 0)) > 0.00001);
@@ -500,7 +501,7 @@ async function payouts(req, res) {
   const payoutCosts = await require('../services/associatePayoutService').payoutCostsForMonth(month);
   res.renderView('incentives/payouts', {
     payoutCosts,
-    payoutCostsTotal: Math.round(payoutCosts.reduce((t, x) => t + Number(x.payout_difference_inr), 0) * 100) / 100,
+    payoutCostsTotal: round2(payoutCosts.reduce((t, x) => t + Number(x.payout_difference_inr), 0)),
     payoutCostsUnmapped: (await require('../services/associateCommission').settings()).zoho_payout_costs_account_id === '' ? require('../services/caSyncService').PAYOUT_COSTS_UNMAPPED : null,
     paidVia: incentiveRepository.PAID_VIA,
     staffTotal,
@@ -646,7 +647,7 @@ async function markPaid(req, res) {
         res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
         return;
       }
-      bankCharges = chargesRaw !== '' ? Math.round(Number(chargesRaw) * 100) / 100 : null;
+      bankCharges = chargesRaw !== '' ? round2(Number(chargesRaw)) : null;
       if (!india) {
         const debitedRaw = single ? String(body.bank_debited_inr ?? '').trim() : '';
         if (debitedRaw === '' || !Number.isFinite(Number(debitedRaw)) || Number(debitedRaw) <= 0 || Number(debitedRaw) > 1000000000) {
@@ -658,7 +659,7 @@ async function markPaid(req, res) {
           skippedAbroad++;
           continue;
         }
-        bankDebited = Math.round(Number(debitedRaw) * 100) / 100;
+        bankDebited = round2(Number(debitedRaw));
       }
     }
     // QA Round 6, R6-N17: a second click records and logs nothing more.

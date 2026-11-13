@@ -32,8 +32,7 @@ const CHOICES = {
   other: 'Other reason — type it',
 };
 
-const { round2, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
-const round4 = (n) => Math.round(Number(n) * 10000) / 10000;
+const { round2, round4, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
 const fmt = (n, digits) => (digits === 2 ? format2(n) : Number(n).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }));
 const money = (currency, amount) => `${currency} ${fmt(amount, 2)}`.trim();
 const isNumeric = (s) => /^\s*-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(String(s));

@@ -12,6 +12,7 @@ const supplierRepository = require('../repositories/supplierRepository');
 const orderAccessService = require('../services/orderAccessService');
 const purchasingService = require('../services/purchasingService');
 const activeDepartmentService = require('../services/activeDepartmentService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Port of App\Controllers\PurchasingController. Owner decision D-214
 // (2026-10-31), phase 3: Procurement. Sales raises a purchase requirement
@@ -166,7 +167,7 @@ async function addQuote(req, res) {
     fail(req, res, error, back);
     return;
   }
-  const id = await purchasingRepository.addQuote(r.id, supplier.id, Math.round(Number(price) * 100) / 100, Math.round(Number(gst) * 100) / 100, Number(lead),
+  const id = await purchasingRepository.addQuote(r.id, supplier.id, round2(Number(price)), round2(Number(gst)), Number(lead),
     validUntil || null, scalarString(req.body.quote_reference) || null, String(req.body.note ?? '').trim() || null, req.user.id);
   if (r.status === 'open') {
     await purchasingRepository.setStatus(r.id, 'quoted');

@@ -28,6 +28,7 @@ const incentiveService = require('../services/incentiveService');
 const uiTemplateService = require('../services/uiTemplateService');
 const pricingRepository = require('../repositories/pricingRepository');
 const pricingService = require('../services/pricingService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * Port of AssociateAdminController.php. Owner decision 1 Nov 2026 ("AS all
@@ -1154,7 +1155,7 @@ async function report(req, res) {
     );
     perf.push({
       id: Number(a.id), name: a.name, status: a.status, clients: Number(a.client_count), orders: inYear.length,
-      fob: Math.round(inYear.reduce((s, o) => s + Number(o.fob_value), 0) * 100) / 100,
+      fob: round2(inYear.reduce((s, o) => s + Number(o.fob_value), 0)),
       paid: Number(m.paid), tds: Number(m.tds), waiting: Number(m.waiting),
     });
   }

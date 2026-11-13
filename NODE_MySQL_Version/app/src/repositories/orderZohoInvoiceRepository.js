@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const zohoGuard = require('../services/zohoGuard');
+const { round2, round6 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 // Zoho integration Stage 2 (2026-10-29) — which Zoho Books invoice each
 // order's Commercial Invoice ('ci') and freight Debit Note ('dn') became,
@@ -31,8 +32,8 @@ async function save(orderId, kind, documentId, pushed) {
       zoho_invoice_id: pushed.zoho_invoice_id,
       zoho_invoice_number: pushed.zoho_invoice_number,
       currency_code: pushed.currency_code,
-      total: Math.round(pushed.total * 100) / 100,
-      exchange_rate: Math.round(pushed.exchange_rate * 1e6) / 1e6,
+      total: round2(pushed.total),
+      exchange_rate: round6(pushed.exchange_rate),
       pushed_hash: pushed.pushed_hash,
     }
   );

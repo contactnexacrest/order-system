@@ -23,11 +23,10 @@ const CLAIM_HOLD_REASON = 'A buyer claim on this order is open — the commissio
 const UNPAID_HOLD_REASON = 'The buyer did not pay this order in full — no commission is due on it.';
 
 const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const round2 = (v) => require('../helpers/money').round2(v);
+const { round2, round6 } = require('../helpers/money');
 const ymd = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v || '').slice(0, 10));
 const today = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
 const nowSql = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-const round6 = (v) => Math.round(Number(v) * 1e6) / 1e6;
 
 function associateCommission() { return require('./associateCommission'); }
 function associateRepository() { return require('../repositories/associateRepository'); }

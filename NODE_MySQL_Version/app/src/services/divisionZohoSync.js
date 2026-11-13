@@ -39,7 +39,7 @@ const TYPE_LABELS = {
   merchant_payment: 'merchant trade payment',
 };
 
-const n2 = (v) => Number(v).toFixed(2);
+const n2 = (v) => require('../helpers/money').fixed2(v); // HNT-L01: PHP round()
 
 /** What the next sync would send, by type (the same selectors run() pushes from). With only = [kind, id] limited to one record. */
 async function pending(start, only = null) {
@@ -189,7 +189,7 @@ async function sendNow(kind, id, userId) {
 /** The "App vs Zoho" check for one Domestic Trade order, import or merchant trade deal (reads only). */
 async function check(kind, id) {
   const records = [];
-  const total3 = (s) => Number((Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total)).toFixed(2));
+  const total3 = (s) => require('../helpers/money').round2(Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total)); // HNT-L01: PHP round()
   if (kind === 'order') {
     const dom = await require('../repositories/domesticOrderRepository').find(id);
     const order = await require('../repositories/orderRepository').find(id);
@@ -207,8 +207,8 @@ async function check(kind, id) {
     const supplier = await zohoBooksService.contactIdByName(String(s.supplier_name), 'vendor');
     const customs = await zohoBooksService.contactIdByName(zohoGuard.isProduction() ? 'Indian Customs' : `${zohoGuard.TEST_PREFIX}Indian Customs`, 'vendor');
     let billTotal = 0;
-    for (const l of await repo.lines(id)) billTotal += Number((Number(l.quantity) * Number(l.unit_price_fc)).toFixed(2));
-    records.push({ group: 'Purchase', item: `Supplier's bill ${s.reference}`, kind: 'bill', number: String(s.reference), zoho_id: s.zoho_bill_id, amount: Number(billTotal.toFixed(2)), unit: String(s.currency_code), vendor: true, contact: supplier });
+    for (const l of await repo.lines(id)) billTotal += require('../helpers/money').round2(Number(l.quantity) * Number(l.unit_price_fc));
+    records.push({ group: 'Purchase', item: `Supplier's bill ${s.reference}`, kind: 'bill', number: String(s.reference), zoho_id: s.zoho_bill_id, amount: require('../helpers/money').round2(billTotal), unit: String(s.currency_code), vendor: true, contact: supplier });
     if (s.boe_no && s.bcd_total !== null) records.push({ group: 'Customs', item: `Customs duty bill BE-${s.boe_no}`, kind: 'bill', number: `BE-${s.boe_no}`, zoho_id: s.zoho_duty_bill_id, amount: total3(s), unit: 'INR', vendor: true, contact: customs });
     if (zohoBooksService.importClearanceTotal(s) > 0 && s.boe_no) {
       const cha = await zohoBooksService.contactIdByName(String(s.cha_name || '').trim() !== '' ? String(s.cha_name) : 'Import clearance agent', 'vendor');
@@ -218,7 +218,7 @@ async function check(kind, id) {
       records.push({ group: 'Payments to the supplier', item: `${String(p.kind).charAt(0).toUpperCase()}${String(p.kind).slice(1)} payment ${p.bank_reference} on ${String(p.paid_on).slice(0, 10)}`, kind: 'payment', number: '', zoho_id: p.zoho_payment_id || null, amount: Number(p.amount_fc), unit: String(s.currency_code), vendor: true, contact: supplier });
     }
     if (s.duty_paid_on) records.push({ group: 'Customs', item: `Duty payment ${s.duty_bank_reference} on ${String(s.duty_paid_on).slice(0, 10)}`, kind: 'payment', number: '', zoho_id: s.duty_zoho_payment_id, amount: total3(s), unit: 'INR', vendor: true, contact: customs });
-    if (s.igst_credit_on) records.push({ group: 'Customs', item: `IGST input-credit journal on ${String(s.igst_credit_on).slice(0, 10)}`, kind: 'journal', number: '', zoho_id: s.zoho_igst_journal_id, amount: Number(Number(s.igst_total).toFixed(2)), unit: 'INR', vendor: false, contact: null });
+    if (s.igst_credit_on) records.push({ group: 'Customs', item: `IGST input-credit journal on ${String(s.igst_credit_on).slice(0, 10)}`, kind: 'journal', number: '', zoho_id: s.zoho_igst_journal_id, amount: require('../helpers/money').round2(Number(s.igst_total)), unit: 'INR', vendor: false, contact: null });
   } else {
     const repo = require('../repositories/merchantTradeRepository');
     const d = await repo.find(id);
@@ -228,12 +228,12 @@ async function check(kind, id) {
     let sell = 0;
     let buy = 0;
     for (const l of await repo.lines(id)) {
-      sell += Number((Number(l.quantity) * Number(l.sell_price_fc)).toFixed(2));
-      buy += Number((Number(l.quantity) * Number(l.buy_price_fc)).toFixed(2));
+      sell += require('../helpers/money').round2(Number(l.quantity) * Number(l.sell_price_fc));
+      buy += require('../helpers/money').round2(Number(l.quantity) * Number(l.buy_price_fc));
     }
     if (d.sale_invoice_no) {
-      records.push({ group: 'Sale', item: `Sale invoice ${d.sale_invoice_no}`, kind: 'invoice', number: String(d.sale_invoice_no), zoho_id: d.zoho_invoice_id, amount: Number(sell.toFixed(2)), unit: String(d.sale_currency), vendor: false, contact: buyer });
-      records.push({ group: 'Purchase', item: `Supplier's bill ${d.po_no}`, kind: 'bill', number: String(d.po_no), zoho_id: d.zoho_bill_id, amount: Number(buy.toFixed(2)), unit: String(d.purchase_currency), vendor: true, contact: supplier });
+      records.push({ group: 'Sale', item: `Sale invoice ${d.sale_invoice_no}`, kind: 'invoice', number: String(d.sale_invoice_no), zoho_id: d.zoho_invoice_id, amount: require('../helpers/money').round2(sell), unit: String(d.sale_currency), vendor: false, contact: buyer });
+      records.push({ group: 'Purchase', item: `Supplier's bill ${d.po_no}`, kind: 'bill', number: String(d.po_no), zoho_id: d.zoho_bill_id, amount: require('../helpers/money').round2(buy), unit: String(d.purchase_currency), vendor: true, contact: supplier });
     }
     for (const p of await repo.payments(id)) {
       const isBuy = p.leg === 'buy';

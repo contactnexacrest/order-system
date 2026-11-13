@@ -35,8 +35,9 @@ const lineUnits = require('./lineUnits');
  */
 
 const ps = () => require('./pricingService');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 const isSet = (v) => v !== null && v !== undefined;
-const fix2 = (v) => Number(v).toFixed(2);
+const fix2 = (v) => round2(Number(v)).toFixed(2); // HNT-L01: PHP round()
 
 // ------------------------------------------------------------------ offers
 
@@ -872,7 +873,7 @@ async function forOrderPo(orderId, s = null) {
         offered: !!o.usable && price !== null,
         why_not: !o.usable ? (supplier && !Number(supplier.is_active) ? 'inactive supplier' : 'offer switched off') : (price === null ? 'no price' : null),
         price, unit, label, valid_until: validUntil, expired: validUntil !== null && validUntil < today,
-        po_value: price !== null && qty !== null && sameUnit ? Math.round(price * qty * 100) / 100 : null, lowest: false,
+        po_value: price !== null && qty !== null && sameUnit ? round2(price * qty) : null, lowest: false,
       });
     }
     rows.sort((a, b) => ((a.offered ? 0 : 1) - (b.offered ? 0 : 1)) || ((a.price ?? Infinity) - (b.price ?? Infinity)));

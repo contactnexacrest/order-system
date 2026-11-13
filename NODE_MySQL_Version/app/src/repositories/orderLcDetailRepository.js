@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
 /**
  * docs/schema.sql Section BR — Letter of Credit + bank loan interest
@@ -92,7 +93,7 @@ async function confirmUsable(orderId, confirmedBy) {
  * the CI (caSyncService), so it can be corrected only until then.
  */
 async function recordReceived(orderId, receivedAt, amount, inrCredited, bankChargesInr, userId, bankReference = null) {
-  const r2 = (v) => Math.round(Number(v) * 100) / 100;
+  const r2 = (v) => round2(Number(v));
   await db.execute(
     `UPDATE order_lc_details
         SET lc_received_at = :received_at, lc_received_amount = :amount, lc_inr_credited = :inr,
