@@ -1,3 +1,5 @@
+# Re-opens only this folder (the app's web root) under the project-level "Require all denied" lock.
+Require all granted
 Options -Indexes
 RewriteEngine On
 

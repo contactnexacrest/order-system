@@ -56,6 +56,7 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
   - [ ] run the database and documents backups once by hand; **Settings › Backups** shows both as OK;
   - [ ] run `scripts/backup_test_restore.sh` once; Settings › Backups shows the test-restore as OK (the database copy includes `document_image_blobs`, the permanent document images — always restore the whole database);
   - [ ] off-site copy: when the provider is chosen, set `BACKUP_OFFSITE_TARGET`.
+- [ ] **Web lock (13 Nov 2026):** the project's top-level `.htaccess` (`Require all denied`) and the first line `Require all granted` in `PHP_MySQL_Version/public_html/.htaccess` are both on the server; the login page opens, and `PHP_MySQL_Version/README.md` opened through any other domain of the hosting account answers **403 Forbidden** (see the PHP README, "Web lock").
 
 ## C. First login and company setup
 

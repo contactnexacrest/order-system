@@ -501,6 +501,21 @@ Send to Buyer" section appears per generated document, plus new
   assignments, amendments awaiting MD approval, email sends awaiting Level-2
   approval, and the alert cron's own findings (below) all land here.
 
+### Web lock — keep everything except `public_html` off the web (13 Nov 2026)
+
+If the project folder sits inside the hosting account's web root (for example under
+`/home/<user>/public_html/...`), every file in it could be fetched by URL through another
+domain on the same account — including `app/.env`, `storage/` (order documents, CAFIN) and
+backups. Two `.htaccess` files prevent that and travel with every upload:
+
+- the project's top folder: `.htaccess` containing `Require all denied`;
+- `PHP_MySQL_Version/public_html/.htaccess` starts with `Require all granted`.
+
+Check after an upload: the login page opens, and
+`https://<another domain on the account>/<path to the project>/PHP_MySQL_Version/README.md`
+answers **403 Forbidden**. Best of all, keep the project outside `public_html` and point the
+(sub)domain at `PHP_MySQL_Version/public_html` only.
+
 ### Bluehost cron setup
 
 Seven scheduled jobs, all plain PHP scripts meant to be run via

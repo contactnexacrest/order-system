@@ -1,0 +1,5 @@
+# Web lock (13 Nov 2026): if this project folder ever sits inside a web root (e.g. Bluehost
+# public_html), nothing in it is served — not app/, .env, storage/ (order documents, CAFIN),
+# docs/, scripts/ or backups. Only PHP_MySQL_Version/public_html re-opens itself with
+# "Require all granted" at the top of its own .htaccess. Cron jobs are not affected.
+Require all denied
