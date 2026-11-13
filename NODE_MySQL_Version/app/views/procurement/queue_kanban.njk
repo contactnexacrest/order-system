@@ -7,7 +7,7 @@
     </div>
     <div class="btn-row" style="margin-top:0;">
       {% if cancelled > 0 %}<a class="tag" href="/procurement?view=list&amp;status=cancelled">Cancelled {{ cancelled }}</a>{% endif %}
-      <a class="btn-sm btn-secondary" href="/procurement?view=list{{ ('&amp;status=' + status) | safe if status else '' }}">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/procurement?view=list{{ ('&amp;status=' + (status | urlencode)) | safe if status else '' }}">Switch to list view</a>
     </div>
   </div>
 

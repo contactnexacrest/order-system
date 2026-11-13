@@ -6,7 +6,7 @@
       <p class="muted" style="margin:0;">A process issue or flaw the client flagged for us to fix next time — not a Dispute. {{ shownCount }} shown.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
-      <a class="btn-sm btn-secondary" href="/complaints?view=list{{ ('&amp;status=' + statusFilter) | safe if statusFilter else '' }}">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/complaints?view=list{{ ('&amp;status=' + (statusFilter | urlencode)) | safe if statusFilter else '' }}">Switch to list view</a>
     </div>
   </div>
 
