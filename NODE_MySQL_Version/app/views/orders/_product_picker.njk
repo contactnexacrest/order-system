@@ -22,6 +22,12 @@
         {% if pickerSpecs and pickerSpecs[pp.id] %}data-spec-options="{{ pickerSpecs[pp.id] | dump }}"{% endif %}
         {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
     {% endfor %}
+    {# D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. #}
+    {% if pickerBlocked and pickerBlocked.length %}
+      <optgroup label="Not offered yet">
+        {% for bp in pickerBlocked %}<option value="" disabled data-not-quotable="{{ bp.id }}">{{ bp.name }} — {{ bp.reason }}</option>{% endfor %}
+      </optgroup>
+    {% endif %}
   </select>
   <span class="muted small product-picker-hint" aria-live="polite"></span>
 </label>

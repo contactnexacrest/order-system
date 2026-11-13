@@ -182,6 +182,22 @@ filter and badge; the supplier page's "Prices given for products" gains the swit
 the Suppliers list (`/suppliers`) or a supplier's page, and every price shown on camera is unchanged (every product's
 figures compared before and after on both stacks). No video is affected; listed only, nothing re-recorded.
 
+D-361 (13 Nov 2026: Products list with Suppliers / Lowest – highest / Base price columns and the statuses Configured ·
+Not configured · No active supplier · No supplier yet; "+ Add Product" and "Link suppliers" removed; Configure / Edit with
+the three levels and resets; Link a supplier; Link these prices; Pricing settings physical block; Price rules per-category
+%; Pick from Products offers only quotable products, others greyed under "Not offered yet"; Supplier PO supplier-choice
+table with price prefill and a reason for a changed price) — checked against every script. Affected:
+- **B01 Part 1** (recorded) — "Pick from Products" on the new order: the screen and the price on camera are the same, but
+  the demo product must now be configured to be offered; the fixture `_b01.js` now fixes its base price at the same
+  ₹3,280 (no figure on camera changes). If other inactive, not-configured products exist when it is recorded again, the
+  picker also shows them greyed under "Not offered yet" at the bottom of the list.
+- **B02** (recorded) — the same demo product fixture (`_b02.js`, same fix); no figure on camera changes.
+- **A02-2** — opens Stage 5 after the Supplier PO terms are saved (the terms form with the new supplier table is not
+  shown); not affected.
+- Not yet recorded but will show these screens: **B05** (Procurement: Supplier PO table, Link these prices),
+  **B09** (MD / ED: Products list, Configure, Pricing settings, Price rules).
+Listed only — nothing re-recorded; the owner decides whether B01 Part 1 and B02 are re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

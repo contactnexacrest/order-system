@@ -107,7 +107,7 @@ on every page:
 | *Work* — **Orders** | Active · Archived · Quotation requests · PI-stage details · Reorder requests · Disputes · Complaints |
 | **Clients** | All clients · + Add client · Agreements |
 | **Associates** | All · + Add · Registrations · Price requests · Commission · Payouts · TDS register · Access levels · Report |
-| **Products** | All · + Add · Categories · Price rules · Pricing · Price requests · HS codes · Link suppliers |
+| **Products** | All · Categories · Price rules · Pricing · Price requests · HS codes (new products come from Procurement › Suppliers › + Add product — D-361) |
 | **Procurement & suppliers** | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
 | **Finance & accounts** | CA / Accounting · Zoho sync · Incentive payouts · My incentives · Team incentive settings |
 | *Overview* — **Reports** | All reports · Freight cost · Supplier report · Management cockpit · Audit log |

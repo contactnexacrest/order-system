@@ -1349,6 +1349,19 @@
         return el.dataset.requiredIfMessage || 'This field is required.';
       }
     }
+    // data-required-if-differs="<a>|<b>" (D-361): required while fields a and b of the same
+    // form are both filled and differ — e.g. the Supplier PO's reason when the agreed unit
+    // price is not the chosen supplier's quoted price.
+    if (el.dataset.requiredIfDiffers && el.form && value === '') {
+      var pair = el.dataset.requiredIfDiffers.split('|');
+      var fa = el.form.elements.namedItem(pair[0]);
+      var fb = el.form.elements.namedItem(pair[1]);
+      var va = fa ? String(fa.value).replace(/,/g, '').trim() : '';
+      var vb = fb ? String(fb.value).replace(/,/g, '').trim() : '';
+      if (va !== '' && vb !== '' && Math.abs(parseFloat(va) - parseFloat(vb)) > 0.004) {
+        return el.dataset.requiredIfDiffersMessage || 'This field is required.';
+      }
+    }
     // data-required-unless="<file field>": required when that file field is empty
     // (e.g. the reason, when no receipt is attached).
     if (el.dataset.requiredUnless && el.form && value === '') {
@@ -2335,6 +2348,110 @@
     });
   }
 
+  // D-361 (13 Nov 2026, mockups p4 / p8 / configure_three_levels_mockup): Products › Configure /
+  // Edit and the Supplier PO terms form.
+  //  - [data-open-dialog="id"] opens that <dialog> (the "Reset all …" confirm boxes);
+  //    [data-close-dialog] closes the dialog it sits in.
+  //  - input[data-warn-below="x"][data-warn-target="id"]: shows #id while the value is below x
+  //    ("Below the lowest supplier price — no supplier sells at this price.").
+  //  - tr[data-level-row]: the three-level table — the "Comes from" badge follows the input
+  //    (this product / category / global) and "reset" puts back the inherited value.
+  //  - input[data-spo-offer] (radio): choosing a supplier's offer fills the Supplier PO's
+  //    supplier, unit price (and the quoted price kept with it), quantity and unit.
+  function initConfigure() {
+    document.addEventListener('click', function (e) {
+      var opener = e.target.closest && e.target.closest('[data-open-dialog]');
+      if (opener) {
+        var dlg = document.getElementById(opener.getAttribute('data-open-dialog'));
+        if (dlg && typeof dlg.showModal === 'function') { e.preventDefault(); dlg.showModal(); }
+        return;
+      }
+      var closer = e.target.closest && e.target.closest('[data-close-dialog]');
+      if (closer) {
+        var open = closer.closest('dialog');
+        if (open) { e.preventDefault(); open.close(); }
+        return;
+      }
+      // [data-clear-field="name"] (Price rules): "reset to global" empties that field of its form.
+      var clear = e.target.closest && e.target.closest('[data-clear-field]');
+      if (clear && clear.form) {
+        e.preventDefault();
+        var cf = clear.form.elements.namedItem(clear.getAttribute('data-clear-field'));
+        if (cf) { cf.value = ''; cf.dispatchEvent(new Event('input', { bubbles: true })); }
+        return;
+      }
+      var reset = e.target.closest && e.target.closest('[data-level-reset]');
+      if (reset) {
+        e.preventDefault();
+        var row = reset.closest('[data-level-row]');
+        var input = row && row.querySelector('[data-level-input]');
+        if (!input) return;
+        input.value = input.getAttribute('data-inherit') || '';
+        var mode = row.querySelector('[data-level-mode]');
+        if (mode) mode.value = 'pct';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    function levelBadge(input) {
+      var row = input.closest('[data-level-row]');
+      if (!row) return;
+      var badge = row.querySelector('[data-level-from]');
+      var resetLink = row.querySelector('[data-level-reset]');
+      var mode = row.querySelector('[data-level-mode]');
+      var inherit = input.getAttribute('data-inherit') || '';
+      var own = input.value.trim() !== '' && (Math.abs(parseFloat(input.value) - parseFloat(inherit)) > 1e-9 || isNaN(parseFloat(inherit)) || (mode && mode.value !== 'pct'));
+      if (badge) {
+        badge.textContent = own ? 'this product' : (input.getAttribute('data-inherit-from') || 'global');
+        badge.className = 'badge level-from level-from-' + (own ? 'product' : (input.getAttribute('data-inherit-from') || 'global'));
+      }
+      input.classList.toggle('level-own', own);
+      if (resetLink) resetLink.hidden = !own;
+    }
+    document.querySelectorAll('[data-level-input]').forEach(function (input) {
+      input.addEventListener('input', function () { levelBadge(input); });
+      var row = input.closest('[data-level-row]');
+      var mode = row && row.querySelector('[data-level-mode]');
+      if (mode) mode.addEventListener('change', function () { levelBadge(input); });
+      levelBadge(input);
+    });
+    document.querySelectorAll('input[data-warn-below]').forEach(function (input) {
+      var target = document.getElementById(input.getAttribute('data-warn-target'));
+      if (!target) return;
+      var check = function () {
+        var v = parseFloat(String(input.value).replace(/,/g, ''));
+        target.hidden = !(v > 0 && v < parseFloat(input.getAttribute('data-warn-below')));
+      };
+      input.addEventListener('input', check);
+      check();
+    });
+    document.addEventListener('change', function (e) {
+      var radio = e.target.closest && e.target.closest('input[data-spo-offer]');
+      if (!radio || !radio.checked || !radio.form) return;
+      var f = radio.form;
+      var set = function (name, value, onlyIfEmpty) {
+        var el = f.elements.namedItem(name);
+        if (!el || value === undefined || value === null || value === '') return;
+        if (onlyIfEmpty && String(el.value).trim() !== '') return;
+        if (el.tagName === 'SELECT') {
+          var has = Array.prototype.some.call(el.options, function (o) { return o.value === value; });
+          if (!has) return;
+        }
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      set('supplier_id', radio.getAttribute('data-supplier-id'));
+      set('supplier_offer_id', radio.value);
+      set('quoted_unit_price_inr', radio.getAttribute('data-price'));
+      set('unit_price_inr', radio.getAttribute('data-price'));
+      set('quantity', radio.getAttribute('data-quantity'), true);
+      set('unit', radio.getAttribute('data-unit'));
+      set('material_stone_type', radio.getAttribute('data-product'), true);
+      var note = f.querySelector('[data-spo-filled]');
+      if (note) note.textContent = 'Filled in from ' + radio.getAttribute('data-supplier-name') + ' — change the unit price if you agreed a different one (then give the reason).';
+    });
+  }
+
   // D-360 (13 Nov 2026, mockups p2 / decision_d1 part B): "+ Add product" on the Suppliers pages.
   // An existing product or a new one ("create a new product" swaps the fields; the hidden ones are
   // disabled field by field, so the sitewide validation skips them). The base thickness and the unit follow the
@@ -2525,6 +2642,7 @@
     initSectionMenus(); // D-320
     initEditPrice(); // D-359
     initAddOffer(); // D-360
+    initConfigure(); // D-361
   }
 
   if (document.readyState === 'loading') {

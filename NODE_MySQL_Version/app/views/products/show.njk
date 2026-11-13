@@ -11,7 +11,9 @@
   <p class="muted">Used on: <strong>{{ usageText }}</strong></p>
   {% if canManage %}
     <p>
-      <a class="btn-sm" href="/products/{{ product.id }}/edit">Edit</a>
+      {# D-361: Configure / Edit pricing (the base price and the three levels). #}
+      <a class="btn-sm btn-primary" href="/products/{{ product.id }}/configure">{{ "Edit pricing" if productConfigured else "Configure" }}</a>
+      <a class="btn-sm" href="/products/{{ product.id }}/edit">Edit details</a>
       {# Owner decision D-358 (13 Nov 2026): a copy of this product, Inactive until checked. #}
       <a class="btn-sm" href="/products/{{ product.id }}/duplicate" data-duplicate-link>Duplicate</a>
       {% if product.is_active %}

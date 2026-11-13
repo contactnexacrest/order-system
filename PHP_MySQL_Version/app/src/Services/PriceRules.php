@@ -66,6 +66,12 @@ final class PriceRules
             'container_cbm' => $num($category['container_cbm'] ?? null),
             'container_max_t' => $num($category['container_max_t'] ?? null),
             'weight' => $num($category['weight_t_per_cbm'] ?? null),
+            // D-361 (mockup p6): the category's own margin, other costs and buffer (empty = global),
+            // and the global values shown beside every empty field.
+            'margin_pct' => $num($category['margin_pct'] ?? null),
+            'other_cost_pct' => $num($category['other_cost_pct'] ?? null),
+            'buffer_pct' => $num($category['buffer_pct'] ?? null),
+            'global' => PricingService::settings(),
         ];
     }
 
@@ -113,7 +119,11 @@ final class PriceRules
         [$cbm, $e2] = $num('container_cbm', 0.5, 100, 2, 'One container holds (CBM)');
         [$maxT, $e3] = $num('container_max_t', 1, 100, 2, 'Container maximum (tonnes)');
         [$weight, $e4] = $num('weight_t_per_cbm', 0.1, 20, 3, 'Stone weight (tonnes per CBM)');
-        foreach ([$e1, $e2, $e3, $e4] as $e) {
+        // D-361: the category's own %s — empty = follow the global value.
+        [$margin, $e5] = $num('margin_pct', 0, 89.99, 2, 'Margin %');
+        [$other, $e6] = $num('other_cost_pct', 0, 100, 2, 'Other costs %');
+        [$buffer, $e7] = $num('buffer_pct', 0, 100, 2, 'Buffer %');
+        foreach ([$e1, $e2, $e3, $e4, $e5, $e6, $e7] as $e) {
             if ($e !== null) {
                 return [0, $e];
             }
@@ -140,7 +150,7 @@ final class PriceRules
             $add = ['mm' => $mm, 'pct' => (float) $newPct];
         }
         $changes = 0;
-        Database::transaction(static function () use ($categoryId, $r, $pctChanges, $k, $cbm, $maxT, $weight, $add, $reason, $userId, &$changes): void {
+        Database::transaction(static function () use ($categoryId, $r, $pctChanges, $k, $cbm, $maxT, $weight, $margin, $other, $buffer, $add, $reason, $userId, &$changes): void {
             foreach ($pctChanges as [$t, $v]) {
                 $opt = SpecRepository::findOption($t['id']);
                 SpecRepository::updateOption($t['id'], ['name' => $opt['name'], 'is_base' => (int) $opt['is_base'], 'change_type' => 'pct',
@@ -149,7 +159,8 @@ final class PriceRules
                 $changes++;
             }
             $fields = ['thick_k_factor' => [$r['k'], $k, '× K (50 mm and above per CBM)'], 'container_cbm' => [$r['container_cbm'], $cbm, 'Container CBM'],
-                'container_max_t' => [$r['container_max_t'], $maxT, 'Container maximum tonnes'], 'weight_t_per_cbm' => [$r['weight'], $weight, 'Stone weight t per CBM']];
+                'container_max_t' => [$r['container_max_t'], $maxT, 'Container maximum tonnes'], 'weight_t_per_cbm' => [$r['weight'], $weight, 'Stone weight t per CBM'],
+                'margin_pct' => [$r['margin_pct'], $margin, 'Margin %'], 'other_cost_pct' => [$r['other_cost_pct'], $other, 'Other costs %'], 'buffer_pct' => [$r['buffer_pct'], $buffer, 'Buffer %']];
             foreach ($fields as $col => [$old, $new, $label]) {
                 if (($old === null) !== ($new === null) || ($old !== null && abs($old - $new) > 1e-9)) {
                     Database::connection()->prepare("UPDATE product_categories SET {$col} = :v WHERE id = :id")->execute(['v' => $new, 'id' => $categoryId]);

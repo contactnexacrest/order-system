@@ -52,6 +52,11 @@ const LABELS = {
   price_request_valid_days: "An associate's price stays valid for (days)",
   fx_mode: 'Exchange rate: Automatic (fetched daily) or Manual',
   fx_cushion_pct: 'Cushion below the market rate (%)',
+  // D-361 (13 Nov 2026, mockup p5): the global physical defaults.
+  weight_t_per_cbm: 'Weight, tonnes per CBM',
+  container_max_t: 'Container max tonnes',
+  container_cbm: 'Container CBM',
+  thick_k_factor: 'Thickness factor (50 mm and above per CBM = base per m² × this)',
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -154,6 +159,21 @@ function readSettingsForm(post) {
       values[key] = '';
     } else {
       values[key] = String(n);
+    }
+  }
+  // D-361 (mockup p5): the global physical defaults (only when the form carries them) — used when
+  // neither the product nor its category has a value of its own.
+  for (const [key, [min, max, dec]] of Object.entries({ weight_t_per_cbm: [0.1, 20, 3], container_max_t: [1, 100, 2], container_cbm: [0.5, 100, 2], thick_k_factor: [1, 1000, 3] })) {
+    if (!Object.prototype.hasOwnProperty.call(post, key)) continue;
+    const v = String(post[key] ?? '').trim();
+    if (!new RegExp(`^\\d{1,4}(\\.\\d{1,${dec}})?$`).test(v) || Number(v) < min || Number(v) > max) {
+      const tp = require('./thicknessPrices');
+      errors.push(`${LABELS[key]}: enter a number from ${tp.fmt(min)} to ${tp.fmt(max)} with at most ${dec} decimals.`);
+      values[key] = '';
+    } else {
+      // Stored as before: 2.70 / 27.00 / 8.00 / 40 (more decimals only when typed).
+      const typed = v.includes('.') ? v.slice(v.indexOf('.') + 1).replace(/0+$/, '').length : 0;
+      values[key] = Number(v).toFixed(Math.max(key === 'thick_k_factor' ? 0 : 2, typed));
     }
   }
   // D-301: the exchange-rate mode and cushion (only when the form carries them).

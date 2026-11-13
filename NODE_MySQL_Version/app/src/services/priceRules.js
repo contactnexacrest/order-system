@@ -41,6 +41,12 @@ async function forCategory(categoryId) {
     container_cbm: num(category ? category.container_cbm : null),
     container_max_t: num(category ? category.container_max_t : null),
     weight: num(category ? category.weight_t_per_cbm : null),
+    // D-361 (mockup p6): the category's own margin, other costs and buffer (empty = global), and
+    // the global values shown beside every empty field.
+    margin_pct: num(category ? category.margin_pct : null),
+    other_cost_pct: num(category ? category.other_cost_pct : null),
+    buffer_pct: num(category ? category.buffer_pct : null),
+    global: await require('./pricingService').settings(),
   };
 }
 
@@ -74,7 +80,11 @@ async function save(categoryId, post, userId) {
   const [cbm, e2] = numIn('container_cbm', 0.5, 100, 2, 'One container holds (CBM)');
   const [maxT, e3] = numIn('container_max_t', 1, 100, 2, 'Container maximum (tonnes)');
   const [weight, e4] = numIn('weight_t_per_cbm', 0.1, 20, 3, 'Stone weight (tonnes per CBM)');
-  for (const e of [e1, e2, e3, e4]) if (e) return [0, e];
+  // D-361: the category's own %s — empty = follow the global value.
+  const [margin, e5] = numIn('margin_pct', 0, 89.99, 2, 'Margin %');
+  const [other, e6] = numIn('other_cost_pct', 0, 100, 2, 'Other costs %');
+  const [buffer, e7] = numIn('buffer_pct', 0, 100, 2, 'Buffer %');
+  for (const e of [e1, e2, e3, e4, e5, e6, e7]) if (e) return [0, e];
   const newMm = String(post.new_mm ?? '').trim();
   const newPct = String(post.new_change ?? '').trim();
   let add = null;
@@ -95,7 +105,8 @@ async function save(categoryId, post, userId) {
       await conn.execute("UPDATE spec_options SET change_type = 'pct', value = :v, updated_by = :u WHERE id = :id", { v: v.toFixed(4), u: userId, id: t.id });
       changes += 1;
     }
-    const fields = { thick_k_factor: [r.k, k], container_cbm: [r.container_cbm, cbm], container_max_t: [r.container_max_t, maxT], weight_t_per_cbm: [r.weight, weight] };
+    const fields = { thick_k_factor: [r.k, k], container_cbm: [r.container_cbm, cbm], container_max_t: [r.container_max_t, maxT], weight_t_per_cbm: [r.weight, weight],
+      margin_pct: [r.margin_pct, margin], other_cost_pct: [r.other_cost_pct, other], buffer_pct: [r.buffer_pct, buffer] };
     for (const [col, [oldV, newV]] of Object.entries(fields)) {
       if ((oldV === null) !== (newV === null) || (oldV !== null && Math.abs(oldV - newV) > 1e-9)) {
         await conn.execute(`UPDATE product_categories SET ${col} = :v WHERE id = :id`, { v: newV, id: categoryId });
@@ -111,7 +122,8 @@ async function save(categoryId, post, userId) {
   });
   // Audit after the commit (the audit log has its own connection).
   for (const [t, v] of pctChanges) await audit.log(userId, 'PRICE_RULE_CHANGED', 'spec_options', t.id, `${t.name} %`, `${thicknessPrices.fmt(t.pct)}%`, `${thicknessPrices.fmt(v)}%`, reason);
-  const fields = { thick_k_factor: [r.k, k], container_cbm: [r.container_cbm, cbm], container_max_t: [r.container_max_t, maxT], weight_t_per_cbm: [r.weight, weight] };
+  const fields = { thick_k_factor: [r.k, k], container_cbm: [r.container_cbm, cbm], container_max_t: [r.container_max_t, maxT], weight_t_per_cbm: [r.weight, weight],
+      margin_pct: [r.margin_pct, margin], other_cost_pct: [r.other_cost_pct, other], buffer_pct: [r.buffer_pct, buffer] };
   for (const [col, [oldV, newV]] of Object.entries(fields)) {
     if ((oldV === null) !== (newV === null) || (oldV !== null && Math.abs(oldV - newV) > 1e-9)) {
       await audit.log(userId, 'PRICE_RULE_CHANGED', 'product_categories', categoryId, col, oldV === null ? '—' : thicknessPrices.fmt(oldV), newV === null ? '—' : thicknessPrices.fmt(newV), reason);

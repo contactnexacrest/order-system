@@ -21,7 +21,7 @@
         {% set basis = r.price_basis or 'unit' %}{% set isCbm = basis == 'cbm' %}{% set isCombo = basis == 'combo' %}{% set isGrid = basis == 'grid' %}
         {% set used = (r.combo_in_use == 1) if isCombo else ((r.is_cbm_primary == 1) if isCbm else (r.is_primary == 1)) %}
         <td>{% if used %}<span class="badge badge-active">● {{ 'Exact' if isCombo else ('All thicknesses' if isGrid else 'Base') }}</span>{% else %}<span class="muted">○</span>{% endif %}</td>
-        <td>{{ r.supplier_name }}{% if not r.supplier_id %} <span class="badge badge-warning" title="Typed before the Suppliers directory link — link it on Link suppliers">not linked</span>{% endif %}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
+        <td>{{ r.supplier_name }}{% if not r.supplier_id %} <span class="badge badge-warning" title="Typed before the Suppliers directory link — link it on Products › Link these prices">not linked</span>{% endif %}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
         <td>{% if isCombo %}<span class="badge badge-purple">Exact: {{ r.combo_text }}</span> <small class="muted">per {{ 'CBM' if r.combo_per == 'cbm' else unitName }}</small>{% elif isGrid %}every thickness{% elif isCbm %}<span class="badge">CBM — thick stone</span>{% else %}{{ unitName }}{% endif %}</td>
         <td class="num">
           {% if isGrid and r.card %}

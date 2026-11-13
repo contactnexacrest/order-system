@@ -37,6 +37,15 @@ async function resolveSupplierSnapshot(supplierId, supplierType) {
   };
 }
 
+/**
+ * D-361 (decision 2): the supplier offer chosen on the terms form, its quoted price per unit, and the
+ * reason when the agreed price differs (also in the Audit Log). Not used by the PO document.
+ */
+async function setOfferChoice(id, offerId, quoted, reason) {
+  await db.execute('UPDATE order_supplier_po SET supplier_offer_id = :o, quoted_unit_price_inr = :q, price_override_reason = :r WHERE id = :id',
+    { o: offerId, q: quoted !== null && quoted !== undefined ? Number(quoted).toFixed(2) : null, r: reason ?? null, id });
+}
+
 async function create(orderId, supplierId, supplierPoReference, data, status = 'issued') {
   const snapshot = await resolveSupplierSnapshot(supplierId, data.supplier_type);
   const result = await db.execute(
@@ -187,7 +196,7 @@ async function isAckSkipped(id) {
   return Boolean(row && row.ack_skipped_at);
 }
 
-module.exports = {
+module.exports = { setOfferChoice,
   create, findLatestForOrder, markSigned, markAdvancePaid, markBalancePaid, paidOnDate,
   generateActionToken, findByValidActionToken, markAckSkipped, isAckSkipped,
 };

@@ -1117,3 +1117,32 @@ tr.offer-row-off td a:not(.btn-sm){color:var(--muted,#777);}
 .add-offer-new{border:1px dashed var(--navy,#1f3a68);border-radius:8px;padding:0.5rem 0.8rem;margin:0 0 0.6rem;}
 .add-offer-actions{display:flex;gap:0.5rem;align-items:center;}
 .add-offer-note{flex-basis:100%;margin:0;}
+
+/* D-361 (13 Nov 2026, mockups products_now_vs_after / p4 / p8 / configure_three_levels_mockup):
+   the Products list, Configure / Edit (three levels and the confirm boxes) and the Supplier PO
+   supplier choice. */
+.btn-primary { background: var(--primary, #1f3864); color: #fff; border-color: var(--primary, #1f3864); }
+.btn-primary:hover { filter: brightness(1.1); color: #fff; }
+.price-low { color: #1b6e2d; font-weight: 600; }
+.price-high { color: #a12622; font-weight: 600; }
+.empty-state { border: 2px dashed #c9b37a; border-radius: 10px; padding: 2rem 1rem; text-align: center; margin: 1rem 0; }
+.empty-state h2 { margin-top: 0; }
+.configure-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(420px, 1.4fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .configure-grid { grid-template-columns: 1fr; } }
+.configure-box { border: 1px solid #e3dcc8; border-radius: 8px; padding: 1rem; background: #fff; }
+.base-price-input { font-size: 1.25rem; max-width: 14rem; }
+.warn-box { background: #fff7e0; border-left: 4px solid #d9a400; padding: .6rem .8rem; margin: .6rem 0; }
+.change-box { background: #eef2fa; border-left: 4px solid #1f3864; padding: .6rem .8rem; margin: .6rem 0; }
+.levels-table input[type="text"] { max-width: 7rem; }
+.levels-table input.level-own { background: #fff6d8; border-color: #d9a400; }
+.badge.level-from { font-weight: 500; }
+.level-from-product { background: #fff3cd; color: #7a5a00; }
+.level-from-category { background: #e6ecf8; color: #1f3864; }
+.level-from-global { background: #e5f4e8; color: #1b6e2d; }
+dialog.confirm-box { border: 1px solid #d8d0bb; border-radius: 10px; padding: 1.2rem 1.4rem; max-width: 560px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+dialog.confirm-box::backdrop { background: rgba(0,0,0,.35); }
+dialog.confirm-box ul { margin: .4rem 0 .8rem 1.2rem; }
+.spo-offers { margin: .5rem 0 1rem; }
+.spo-offers td.lowest { color: #1b6e2d; font-weight: 600; }
+.spo-offers tr.not-offered td { color: #8a8a8a; }
+.spo-expired { background: #fff3cd; color: #7a5a00; border-radius: 10px; padding: 0 .5rem; font-size: .85em; }

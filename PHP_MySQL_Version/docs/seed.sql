@@ -2830,3 +2830,9 @@ INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
   ('container_max_t', '27.00'),   -- most a container may weigh
   ('container_cbm', '8.00'),      -- CBM per container
   ('thick_k_factor', '40');       -- 50 mm and above per CBM = base per m² × this
+
+-- Owner decision D-361 (13 Nov 2026; migration 2026-11-13b): the marker the read-only migration
+-- check looks for (a fresh install already has the end state of 13b).
+INSERT INTO audit_log (user_id, action_type, entity_type, entity_id, field_name, old_value, new_value, reason)
+SELECT NULL, 'MIGRATION_2026_11_13B', 'catalog_products', NULL, 'configured_base_follows_supplier', NULL, 'Fresh install: nothing to fix or link', 'Owner decision D-361 (13 Nov 2026)'
+  FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE action_type = 'MIGRATION_2026_11_13B');

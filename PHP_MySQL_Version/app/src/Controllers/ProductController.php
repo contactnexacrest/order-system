@@ -91,28 +91,26 @@ final class ProductController
             unset($product);
         }
 
+        // D-361 (mockup products_now_vs_after.png): every row says where the product stands —
+        // Configured / Not configured / No active supplier / No supplier yet — for everyone; the
+        // supplier prices (count, lowest – highest, configured base price) only for people who may
+        // see purchase prices.
         $canSeeHeadlineFob = $canViewPricing && \App\Services\MoneyVisibility::can('purchase');
-        if ($canSeeHeadlineFob) {
-            foreach ($products as &$product) {
-                $suppliers = ProductSupplierRepository::forProduct((int) $product['id']);
-                $primary = null;
-                foreach ($suppliers as $supplier) {
-                    if (!empty($supplier['is_primary'])) {
-                        $primary = $supplier;
-                        break;
-                    }
-                }
-                $primary = $primary ?? ($suppliers[0] ?? null);
-                // D-304 (point 14): "Supplier price ₹ / unit" — the used-for-pricing price in the product's unit
-                // (D-300: a price for every thickness shows its base thickness).
-                $parts = $primary ? \App\Services\PricingService::fobParts($product, $primary, ($primary['price_basis'] ?? '') === 'cbm' ? 'cbm' : 'unit', null) : null;
-                $product['headline_fob'] = $parts['supplier'] ?? null;
-                $product['headline_basis'] = $primary === null ? null : (($primary['price_basis'] ?? '') === 'grid'
-                    ? ($parts !== null && $parts['mm'] !== null ? \App\Services\ThicknessPrices::fmt((float) $parts['mm']) . ' mm base' : 'base')
-                    : (($primary['price_basis'] ?? '') === 'cbm' ? 'per CBM' : (!empty($primary['is_primary']) ? 'used for pricing' : 'latest price')));
+        $__s = \App\Services\PricingService::settings();
+        foreach ($products as &$product) {
+            $row = \App\Services\SupplierOffers::productRow($product, $__s);
+            $product['standing'] = $row['status'];
+            if ($canSeeHeadlineFob) {
+                $product['offers_view'] = $row;
             }
-            unset($product);
-        } else {
+            // Not configured: no selling price is shown or offered yet (the USD columns show "—").
+            if (!$row['status']['configured'] && !$row['status']['no_supplier_yet'] && isset($product['pricing'])) {
+                $product['pricing']['build'] = null;
+                $product['pricing']['missing'] = 'Not configured yet.';
+            }
+        }
+        unset($product);
+        if (!$canSeeHeadlineFob) {
             // Strip pricing data out of the response entirely — not just
             // hidden in the view — for roles without view_product_pricing.
             foreach ($products as &$product) {
@@ -121,11 +119,13 @@ final class ProductController
                     $product['default_transportation_cost'],
                     $product['default_packing_cost'],
                     $product['default_loading_cost'],
-                    $product['default_cha_cost']
+                    $product['default_cha_cost'],
+                    $product['configured_base_price_inr']
                 );
             }
             unset($product);
         }
+        $canLink = $this->can('manage_suppliers') && $this->can('record_market_prices');
 
         View::render('products/index', [
             'products'       => $products,
@@ -141,7 +141,14 @@ final class ProductController
             // D-304 (point 14): the rate line (build-up viewers) and "≈ USD" under the supplier price (product editors).
             'fx'             => $canBuildup || ($canSeeHeadlineFob && $canManage) ? \App\Services\FxRateService::current() : null,
             'canFixHs'       => $canManage,
-            'canLinkSuppliers' => $this->can('record_market_prices') || $this->can('manage_suppliers'),
+            // D-361: "Link suppliers" is gone from this page (the old route still works); "Link these
+            // prices (N)" while legacy supplier prices still need a supplier record; "Go to Suppliers".
+            'canLinkPrices'  => $this->can('record_market_prices') || $this->can('manage_suppliers'),
+            'unlinkedCount'  => $this->can('record_market_prices') || $this->can('manage_suppliers') ? \App\Services\SupplierOffers::unlinkedCount() : 0,
+            'canGoSuppliers' => $this->can('manage_suppliers'),
+            'canLinkSupplier' => $canLink,
+            'canEditPrice'   => $this->can('record_market_prices'),
+            'everCount'      => (int) \App\Config\Database::connection()->query('SELECT COUNT(*) FROM catalog_products')->fetchColumn(),
             'canPriceRules'  => $canBuildup || $this->can('manage_pricing'),
             'canPricingSettings' => $canBuildup || $this->can('manage_pricing'),
         ], 'layout/base');
@@ -508,6 +515,13 @@ final class ProductController
         $back = ($_POST['return_to'] ?? '') === 'list' ? '/products?status=' . ($active ? 'inactive' : 'active') : "/products/{$id}";
         if ((bool) $product['is_active'] === $active) {
             Flash::set('success', 'Product "' . $product['name'] . '" is already ' . ($active ? 'active' : 'inactive') . '.');
+            header("Location: {$back}");
+            return;
+        }
+        // D-361 (plan rule 4): a product is switched Active only when it is configured with at least
+        // one active supplier offer, or it is a product from before 13b with no supplier yet.
+        if ($active && !($st = \App\Services\SupplierOffers::status($product))['can_activate']) {
+            Flash::set('error', 'Product "' . $product['name'] . '" cannot be switched Active yet: ' . $st['reason']);
             header("Location: {$back}");
             return;
         }

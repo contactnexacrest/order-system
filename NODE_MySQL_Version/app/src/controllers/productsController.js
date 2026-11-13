@@ -103,27 +103,23 @@ async function index(req, res) {
     }
   }
 
+  // D-361 (mockup products_now_vs_after.png): every row says where the product stands — Configured /
+  // Not configured / No active supplier / No supplier yet — for everyone; the supplier prices (count,
+  // lowest – highest, configured base price) only for people who may see purchase prices.
   const canSeeHeadlineFob = canViewPricing && !!(req.permissions || {}).view_purchase_prices;
-  if (canSeeHeadlineFob) {
-    for (const product of products) {
-      const suppliers = await productSupplierRepository.forProduct(product.id);
-      let primary = null;
-      for (const supplier of suppliers) {
-        if (supplier.is_primary) {
-          primary = supplier;
-          break;
-        }
-      }
-      primary = primary ?? (suppliers[0] ?? null);
-      // D-304 (point 14): "Supplier price ₹ / unit" — the used-for-pricing price in the product's unit
-      // (D-300: a price for every thickness shows its base thickness).
-      const parts = primary ? await pricingService.fobParts(product, primary, (primary.price_basis || '') === 'cbm' ? 'cbm' : 'unit', null) : null;
-      product.headline_fob = parts ? parts.supplier : null;
-      product.headline_basis = primary === null ? null : ((primary.price_basis || '') === 'grid'
-        ? (parts && parts.mm !== null && parts.mm !== undefined ? `${require('../services/thicknessPrices').fmt(parts.mm)} mm base` : 'base')
-        : ((primary.price_basis || '') === 'cbm' ? 'per CBM' : (Number(primary.is_primary) === 1 ? 'used for pricing' : 'latest price')));
+  const supplierOffers = require('../services/supplierOffers');
+  const s361 = await pricingService.settings();
+  for (const product of products) {
+    const row = await supplierOffers.productRow(product, s361);
+    product.standing = row.status;
+    if (canSeeHeadlineFob) product.offers_view = row;
+    // Not configured: no selling price is shown or offered yet (the USD columns show "—").
+    if (!row.status.configured && !row.status.no_supplier_yet && product.pricing) {
+      product.pricing.build = null;
+      product.pricing.missing = 'Not configured yet.';
     }
-  } else {
+  }
+  if (!canSeeHeadlineFob) {
     // Strip pricing data out of the response entirely — not just hidden in
     // the view — for roles without view_product_pricing.
     for (const product of products) {
@@ -132,8 +128,11 @@ async function index(req, res) {
       delete product.default_packing_cost;
       delete product.default_loading_cost;
       delete product.default_cha_cost;
+      delete product.configured_base_price_inr;
     }
   }
+  const pm = req.permissions || {};
+  const canLinkPrices = !!pm.record_market_prices || !!pm.manage_suppliers;
 
   res.renderView('products/index', {
     products,
@@ -149,7 +148,14 @@ async function index(req, res) {
     // D-304 (point 14): the rate line (build-up viewers) and "≈ USD" under the supplier price (product editors).
     fx: canBuildup || (canSeeHeadlineFob && canManage) ? await require('../services/fxRateService').current() : null,
     canFixHs: canManage,
-    canLinkSuppliers: !!(req.permissions || {}).record_market_prices || !!(req.permissions || {}).manage_suppliers,
+    // D-361: "Link suppliers" is gone from this page (the old route still works); "Link these prices
+    // (N)" while legacy supplier prices still need a supplier record; "Go to Suppliers".
+    canLinkPrices,
+    unlinkedCount: canLinkPrices ? await supplierOffers.unlinkedCount() : 0,
+    canGoSuppliers: !!pm.manage_suppliers,
+    canLinkSupplier: !!pm.manage_suppliers && !!pm.record_market_prices,
+    canEditPrice: !!pm.record_market_prices,
+    everCount: Number(((await require('../config/db').queryOne('SELECT COUNT(*) AS n FROM catalog_products')) || {}).n || 0),
     canPriceRules: canBuildup || !!(req.permissions || {}).manage_pricing,
     canPricingSettings: canBuildup || !!(req.permissions || {}).manage_pricing,
     ...catalogueUnits(products),
@@ -382,6 +388,7 @@ async function show(req, res) {
 
   const usage = await productRepository.usage(id);
   res.renderView('products/show', {
+    productConfigured: require('../services/supplierOffers').isConfigured(details.product), // D-361
     // D-358: "Copied from …" while a product made by Duplicate is still inactive.
     copiedFrom: details.product.is_active ? null : await productDuplicateService.copiedFrom(id),
     unitPrices,
@@ -546,6 +553,16 @@ async function setActive(req, res, active) {
     flash.set(req, 'success', `Product "${product.name}" is already ${active ? 'active' : 'inactive'}.`);
     res.redirect(back);
     return;
+  }
+  // D-361 (plan rule 4): a product is switched Active only when it is configured with at least one
+  // active supplier offer, or it is a product from before 13b with no supplier yet.
+  if (active) {
+    const st = await require('../services/supplierOffers').status(product);
+    if (!st.can_activate) {
+      flash.set(req, 'error', `Product "${product.name}" cannot be switched Active yet: ${st.reason}`);
+      res.redirect(back);
+      return;
+    }
   }
   const user = req.user;
   await productRepository.setActive(id, active, user.id);

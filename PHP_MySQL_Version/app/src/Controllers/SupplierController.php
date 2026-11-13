@@ -262,6 +262,11 @@ final class SupplierController
         $type = trim((string) ($_POST['quick_type'] ?? ''));
         $productId = (int) ($_POST['product_id'] ?? 0);
         $back = $productId > 0 ? "/products/{$productId}/market-prices" : '/products/link-suppliers';
+        // D-361: also from Products › "Link these prices" and a product's "Link a supplier" form.
+        $returnTo = (string) ($_POST['return_to'] ?? '');
+        if (preg_match('#^/products/(link-prices|\d+/link-supplier)$#', $returnTo) === 1) {
+            $back = $returnTo;
+        }
         $types = array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('supplier_type'));
         $error = null;
         if (mb_strlen($name) < 2 || mb_strlen($name) > 255) {
@@ -284,6 +289,10 @@ final class SupplierController
         $id = SupplierRepository::quickAdd($name, $location, $phone, $type, $userId);
         AuditLogRepository::log($userId, 'SUPPLIER_QUICK_ADDED', 'suppliers', $id, 'supplier_legal_name', null, "{$name} — {$location} (details pending)");
         Flash::set('success', "\"{$name}\" added to the Suppliers directory (details pending) and picked below.");
+        if ($back === $returnTo) {
+            header('Location: ' . $back . '?supplier_id=' . $id);
+            return;
+        }
         header('Location: ' . ($productId > 0 ? "/products/{$productId}/market-prices?supplier_id={$id}#add-price" : '/products/link-suppliers'));
     }
 

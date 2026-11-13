@@ -57,6 +57,11 @@ final class PricingService
         'price_request_valid_days' => 'An associate\'s price stays valid for (days)',
         'fx_mode' => 'Exchange rate: Automatic (fetched daily) or Manual',
         'fx_cushion_pct' => 'Cushion below the market rate (%)',
+        // D-361 (13 Nov 2026, mockup p5): the global physical defaults.
+        'weight_t_per_cbm' => 'Weight, tonnes per CBM',
+        'container_max_t' => 'Container max tonnes',
+        'container_cbm' => 'Container CBM',
+        'thick_k_factor' => 'Thickness factor (50 mm and above per CBM = base per m² × this)',
     ];
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -146,6 +151,22 @@ final class PricingService
                 $values[$key] = '';
             } else {
                 $values[$key] = (string) $n;
+            }
+        }
+        // D-361 (mockup p5): the global physical defaults (only when the form carries them) — used
+        // when neither the product nor its category has a value of its own.
+        foreach (['weight_t_per_cbm' => [0.1, 20, 3], 'container_max_t' => [1, 100, 2], 'container_cbm' => [0.5, 100, 2], 'thick_k_factor' => [1, 1000, 3]] as $key => [$min, $max, $dec]) {
+            if (!array_key_exists($key, $post)) {
+                continue;
+            }
+            $v = trim((string) $post[$key]);
+            if (preg_match('/^\d{1,4}(\.\d{1,' . $dec . '})?$/', $v) !== 1 || (float) $v < $min || (float) $v > $max) {
+                $errors[] = self::LABELS[$key] . ': enter a number from ' . ThicknessPrices::fmt((float) $min) . ' to ' . ThicknessPrices::fmt((float) $max) . " with at most {$dec} decimals.";
+                $values[$key] = '';
+            } else {
+                // Stored as before: 2.70 / 27.00 / 8.00 / 40 (more decimals only when typed).
+                $typed = str_contains($v, '.') ? strlen(rtrim(substr($v, strpos($v, '.') + 1), '0')) : 0;
+                $values[$key] = number_format((float) $v, max($key === 'thick_k_factor' ? 0 : 2, $typed), '.', '');
             }
         }
         // D-301: the exchange-rate mode and cushion (only when the form carries them).

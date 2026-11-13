@@ -2967,6 +2967,32 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
         <?= Csrf::field() ?>
+        <?php // D-361 (decision 2, mockups p8 / decision_d2): choose the supplier from their quoted prices — the price fills in. ?>
+        <input type="hidden" name="supplier_offer_id" value="">
+        <input type="hidden" name="quoted_unit_price_inr" value="">
+        <?php foreach ($spoOffers ?? [] as $__spl): ?>
+          <table class="list spo-offers" data-testid="spo-offers">
+            <tr><th>Line <?= (int) $__spl['line_no'] ?>: <?= htmlspecialchars($__spl['product']) ?><?= $__spl['quantity'] !== null ? ', ' . htmlspecialchars(rtrim(rtrim(number_format($__spl['quantity'], 3, '.', ''), '0'), '.') . ' ' . $__spl['unit']) : '' ?><?= $__spl['thickness'] !== null ? ' (' . htmlspecialchars($__spl['thickness']) . ')' : '' ?></th>
+              <th>Quoted ₹ per unit</th><th>Valid until</th><th>PO value ₹ (this line)</th><th>Choose</th></tr>
+            <?php foreach ($__spl['offers'] as $__so): ?>
+              <tr class="<?= $__so['offered'] ? '' : 'not-offered' ?>">
+                <td><?= htmlspecialchars($__so['supplier']) ?><?= $__so['offered'] ? '' : ' (' . htmlspecialchars((string) $__so['why_not']) . ')' ?></td>
+                <?php if ($__so['offered']): ?>
+                  <td class="<?= $__so['lowest'] ? 'lowest' : '' ?>">₹<?= number_format((float) $__so['price'], 2) ?> <?= htmlspecialchars($__so['label']) ?><?= $__so['lowest'] ? ' (lowest)' : '' ?></td>
+                  <td><?= htmlspecialchars((string) ($__so['valid_until'] ?? '—')) ?><?= $__so['expired'] ? ' <span class="spo-expired">expired — confirm price</span>' : '' ?></td>
+                  <td><?= $__so['po_value'] !== null ? '₹' . number_format((float) $__so['po_value'], 2) : '<span class="muted small">units differ</span>' ?></td>
+                  <td><input type="radio" name="spo_offer_pick" value="<?= (int) $__so['offer_id'] ?>" data-spo-offer data-supplier-id="<?= (int) $__so['supplier_id'] ?>" data-supplier-name="<?= htmlspecialchars($__so['supplier']) ?>"
+                      data-price="<?= htmlspecialchars(number_format((float) $__so['price'], 2, '.', '')) ?>" data-quantity="<?= $__spl['quantity'] !== null ? htmlspecialchars(rtrim(rtrim(number_format($__spl['quantity'], 3, '.', ''), '0'), '.')) : '' ?>"
+                      data-unit="<?= htmlspecialchars($__spl['unit']) ?>" data-product="<?= htmlspecialchars($__spl['product']) ?>" aria-label="Choose <?= htmlspecialchars($__so['supplier']) ?>"></td>
+                <?php else: ?>
+                  <td class="muted">not offered</td><td></td><td></td><td></td>
+                <?php endif; ?>
+              </tr>
+            <?php endforeach; ?>
+            <?php if ($__spl['offers'] === []): ?><tr><td colspan="5" class="muted">No supplier has given a price for this product yet — choose the supplier below and type the price.</td></tr><?php endif; ?>
+          </table>
+        <?php endforeach; ?>
+        <?php if (!empty($spoOffers)): ?><p class="muted small">Choosing a supplier fills in the supplier and the unit price (lowest first). You can still change the price — then give the reason; it is kept with the PO. The Supplier PO document is unchanged.</p><?php endif; ?>
         <div class="field-grid">
         <label>Supplier *
           <select name="supplier_id" id="spo-supplier-select" required>
@@ -3011,6 +3037,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Colour Reference<input type="text" name="colour_reference" placeholder="e.g., Jet Black"></label>
         <label>Special Requirements/Instructions<input type="text" name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"></label>
         <label>Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small><input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr" placeholder="e.g., 450.00"></label>
+        <label>Reason the price differs from the quote <small class="muted" data-spo-filled>(only when you change a quoted price)</small><textarea name="price_override_reason" rows="2" maxlength="500" data-required-if-differs="unit_price_inr|quoted_unit_price_inr" data-required-if-differs-message="You changed the quoted price — give the reason (at least 10 characters); it is kept with the PO." placeholder="e.g. Agreed ₹178,000 after negotiation on 13 Nov"></textarea></label>
         <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr" placeholder="e.g., 225000.00"></label>
         <label>GST Rate (%)
           <select name="gst_rate_pct" data-spo-calc="gst_rate_pct">

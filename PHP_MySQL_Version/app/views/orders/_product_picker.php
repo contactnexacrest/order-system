@@ -6,7 +6,8 @@
  * or the client's associate at their commission level). The price stays editable;
  * its floor (the lowest price this seller may agree) travels with it as data-floor.
  *
- * In: $pickerProducts (ProductRepository::forPicker), $pickerPrices
+ * In: $pickerProducts (ProductRepository::forPicker — D-361: quotable products only),
+ *     $pickerBlocked (ProductRepository::notQuotable — shown greyed with the reason), $pickerPrices
  *     (OrderLinePricing::pickerPrices — empty for people who may not see selling
  *     prices), $__pickerName (field name), $__pickerSelected (int|null), optional
  *     $__pickerCurrency (order currency code) and $__pickerKey (the order's seller
@@ -32,6 +33,12 @@ $__pickerSpecName = str_ends_with((string) $__pickerName, '[]') ? 'product_spec_
         <?php if (!empty($pickerSpecs[(int) $__pp['id']])): ?>data-spec-options="<?= htmlspecialchars((string) json_encode($pickerSpecs[(int) $__pp['id']])) ?>"<?php endif; ?>
         <?= $__pickerSelected === (int) $__pp['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__pp['name']) ?> (HS <?= htmlspecialchars((string) $__pp['hs_code']) ?>)</option>
     <?php endforeach; ?>
+    <?php // D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. ?>
+    <?php if (!empty($pickerBlocked)): ?>
+      <optgroup label="Not offered yet">
+        <?php foreach ($pickerBlocked as $__bp): ?><option value="" disabled data-not-quotable="<?= (int) $__bp['id'] ?>"><?= htmlspecialchars((string) $__bp['name']) ?> — <?= htmlspecialchars($__bp['reason']) ?></option><?php endforeach; ?>
+      </optgroup>
+    <?php endif; ?>
   </select>
   <span class="muted small product-picker-hint" aria-live="polite"></span>
 </label>

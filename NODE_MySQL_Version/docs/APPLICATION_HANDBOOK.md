@@ -2011,7 +2011,7 @@ and a reason (logged `ORDER_EDITED_POST_CONFIRMATION`).
 
 | | |
 |---|---|
-| User does | First card: **Compliance — with the Supplier PO** (Due Diligence, ECGC by default). Optional **Purchase Requirements** card (Sales raises, Procurement quotes/awards — 6.6). 7a **Save Supplier PO Terms** (supplier from the Suppliers directory, material spec, GST %, advance %, delivery location from the supplier's factory addresses) — creates the record and reference. 7b Generate Supplier PO. 7c Send the **Supplier Link** (no login, 60 days) and/or attach the acknowledgement, or **Skip — supplier did not acknowledge** with a reason. 7d **Confirm Supplier Signed & Returned PO** — gate. 7e **Supplier Advance Paid**: add the supplier's bill (Proforma or Tax invoice, D-091), then **₹ Mark Paid** with the UTR (`manage_supplier_payments`). At 0% advance 7e completes by itself (D-012). |
+| User does | First card: **Compliance — with the Supplier PO** (Due Diligence, ECGC by default). Optional **Purchase Requirements** card (Sales raises, Procurement quotes/awards — 6.6). 7a **Save Supplier PO Terms** (D-361: choose the supplier from the table of their quoted prices for the line's product — the price fills in; a different agreed price needs a reason, kept with the PO; supplier from the Suppliers directory, material spec, GST %, advance %, delivery location from the supplier's factory addresses) — creates the record and reference. 7b Generate Supplier PO. 7c Send the **Supplier Link** (no login, 60 days) and/or attach the acknowledgement, or **Skip — supplier did not acknowledge** with a reason. 7d **Confirm Supplier Signed & Returned PO** — gate. 7e **Supplier Advance Paid**: add the supplier's bill (Proforma or Tax invoice, D-091), then **₹ Mark Paid** with the UTR (`manage_supplier_payments`). At 0% advance 7e completes by itself (D-012). |
 | Gate | Supplier PO approved; with `wet_signature_required_supplier_po` on, an acknowledgement file or the skip. Needs `manage_supplier_po`. After the gate, **FOB orders auto-skip Stage 6** (`maybeAutoSkipFreightStage`, audit `ORDER_STAGE_GATE_SKIPPED`). |
 | Stored | `order_supplier_po` (with its own snapshot of the supplier, D-086), `order_supplier_po_documents`, `order_vendor_bills`, `order_vendor_bill_payments`, `order_compliance_tasks`. |
 | Document | **SUPPO** `SC/SPO/…` — internal, never to the buyer; the buyer never learns the supplier. |
@@ -2399,7 +2399,7 @@ the same filters, counts, fields, actions and money rules on both templates
 | Orders | Active · Archived · Quotation requests (n) · PI-stage details (n) · Reorder requests · Disputes · Complaints |
 | Clients | All clients · + Add client · Agreements; button "Open in Orders ›" |
 | Associates | All · + Add · Registrations (n) · Price requests · Commission ▾ (settings and ladder, levels) · Payouts · TDS register · Access levels · Report |
-| Products | All · + Add · Categories · Price rules · Pricing ▾ (settings, commission levels and ladder, exchange-rate history, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products) · Link suppliers; button "Open Suppliers in Procurement ›" |
+| Products | All · Categories · Price rules · Pricing ▾ (settings, commission levels and ladder, exchange-rate history, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products); button "Open Suppliers in Procurement ›" (D-361: "+ Add" and "Link suppliers" removed — products come from Procurement › Suppliers › + Add product; "Link these prices (N)" is a button on the Products page) |
 | Procurement & suppliers | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
 | Finance & accounts | CA / Accounting · Zoho sync (n) · Incentive payouts · My incentives · Team incentive settings; on CA pages "Open in Reports ›" |
 | Reports | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
@@ -2558,6 +2558,9 @@ the same filters, counts, fields, actions and money rules on both templates
   - Category settings are frozen per order at PI approval (D-262).
   - **Active · Inactive · All (D-334).** The Products list and its search filter by
     status (`?status=active|inactive|all`, default Active) with a count on each chip.
+  - **D-361:** also Not configured · No active supplier · No supplier yet; the search matches supplier names; a
+    product is offered on orders only when quotable (configured with an active supplier offer, or "No supplier yet");
+    Configure / Edit (`/products/{id}/configure`) holds the base price and the three levels — see §7.1 D-361.
     An inactive product cannot be picked on new order lines and shows **Used on**:
     orders whose lines were picked from it (removed lines included), associate price
     requests, procurement lines (`ProductRepository::usage()`), or "not used anywhere";
@@ -3828,7 +3831,7 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
   Offers, prices and the switch are shown only to purchase-price viewers (`view_purchase_prices`, as on the supplier page);
   the switch, + Add product and Edit price need `record_market_prices` as well (without it the switch shows On / Off).
   Prices typed against a supplier name not linked to the directory (before D-303) are not listed under a supplier until
-  linked (Products › Link suppliers). The Suppliers list has no board view, so there is no Kanban twin to keep parallel.
+  linked (D-361: Products › Link these prices). The Suppliers list has no board view, so there is no Kanban twin to keep parallel.
 - **Edit supplier › Prices given for products (mockup p2).** Columns Product · Base thickness · Price · Quoted on · Valid until ·
   **Offer active** · **Actions** (**Edit price** `?from=supplier`, **Open product** `/products/{id}`). The "Used for pricing"
   column is removed from this table only — the product keeps its own pricing supplier (Market prices) until D-361. A
@@ -3869,9 +3872,83 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
   addProductChoices / createProduct / addOffer` (Node `supplierOffers.js`), views `suppliers/index`, `form`, `add_product`,
   `_add_product`, `_offer_switch`; `EditPriceController` accepts `from=suppliers`. CSS `.filter-pill`, `.offer-switch`,
   `.add-offer-*`.
-- **Left for D-361.** Products list (statuses, Configure / Edit, "Link a supplier", removed buttons); Configure screen (fixes
-  the configured base price; activates a product created here); Pricing settings physical block; Price rules per category;
-  the quotable rule in Pick from Products; Supplier PO supplier-choice table.
+- **Done in D-361** (below): Products list, Configure / Edit, Link a supplier, Link these prices, Pricing settings physical
+  block, Price rules per category, the quotable rule in Pick from Products, the Supplier PO supplier-choice table.
+
+**Products, Configure and the Supplier PO (D-361, 13 Nov 2026, owner "go with recommendation"; Push 3 of 3; mockups
+products_now_vs_after, p3–p8, decision_d1 part A, decision_d2, configure_three_levels_mockup).** Owner decisions of 13 Nov:
+(1) the base price never changes by itself; (2) only `manage_product_catalog` configures, edits pricing values or activates a
+product (creating one from a supplier stays `manage_suppliers` + `record_market_prices`, Inactive); (3) legacy supplier prices
+with no supplier record are linked by name by the migration, the rest on "Link these prices".
+- **Migration `2026-11-13b-products-fixed-base-and-link-legacy.sql`.** Every product with a base price: the stored copy is
+  refreshed from the usable price "used for pricing" (as 13a), then `configured_base_follows_supplier` = 0 — fixed at exactly
+  the price it uses today (no selling price changes; checked on both dev databases with the D-359 snapshot). Legacy supplier
+  prices (`supplier_id` NULL) are linked where the typed name, ends trimmed and capitals ignored, equals exactly one ACTIVE
+  supplier's legal name (history "Linked to supplier (migration 13b)"). New columns `catalog_products.legacy_no_supplier`
+  (set on the first run for products with no linked supplier), `order_supplier_po.supplier_offer_id`, `quoted_unit_price_inr`,
+  `price_override_reason`. Marker: Audit Log `MIGRATION_2026_11_13B` with the counts.
+- **Where a product stands** (`SupplierOffers::status()`; SQL `USABLE_SQL`, `CONFIGURED_SQL`, `NO_SUPPLIER_YET_SQL`,
+  `quotableSql()`). **Configured** = follows 0 with a base price. **No supplier yet** = `legacy_no_supplier` and no offer
+  linked to a directory supplier (ends as soon as one is linked: `supplierLinked()`, audit `PRODUCT_SUPPLIER_LINKED`).
+  **Quotable** (may be Active and picked) = No supplier yet, or Configured with ≥ 1 usable offer (plan rule 4). Statuses shown:
+  Configured / Not configured / No active supplier / No supplier yet.
+- **Products list (`/products`).** Columns Name · HS Code · Origin · **Suppliers** ("N active", "N paused") · **Lowest – highest
+  supplier price ₹** (usable offers quoted like the base; each a link to that offer's Edit price `?from=products`, lowest green,
+  highest red) · **Base price ₹ (configured)** ("not set" until configured; "≈ USD" for product editors) · the USD columns as
+  before (worked out from the configured base; "Not configured yet." for a product that is not) · **Latest supplier quote** ·
+  **Status** (Active / Inactive + the standing badge) · **Configure** (not configured) or **Edit**, **Link a supplier** (No
+  supplier yet; `manage_suppliers` + `record_market_prices`), View · Duplicate, Reactivate only when quotable (else greyed with
+  the reason; the reactivate route refuses it too). Filters: Active · Inactive · All · Not configured · No active supplier · No
+  supplier yet (the last three across active and inactive, shown when not 0). Search also matches a supplier's name (typed or
+  directory). Buttons: Categories · Price rules · Pricing settings · Fix HS codes · **Link these prices (N)** (only while N > 0) ·
+  **Go to Suppliers**; "+ Add Product" and "Link suppliers" are gone from the page and the Products menu (their routes still
+  work). Empty state "No products yet — 1. Add a supplier · 2. Add the products they offer · 3. Configure" with Go to Suppliers.
+- **Configure / Edit (`/products/{id}/configure`, `manage_product_catalog`).** Left: **Base price (₹ / CBM, 50 mm and above |
+  ₹ / m², 20 mm | ₹ / unit) *** — default the highest usable supplier price (its unit / thickness; configured products keep
+  theirs), "Default = highest active supplier price (…). Lowest: …", a warning below the lowest ("Below the lowest supplier
+  price — no supplier sells at this price."), **See all supplier prices (N)** (supplier, base price as quoted, dates, active /
+  paused, Edit price `?from=configure`), and — when the highest usable price differs from the base and a supplier price changed
+  after `configured_at` (`SupplierOffers::priceChange()`) — "Supplier prices changed: highest is now ₹X … **Use ₹X**"
+  (`POST …/configure/use-price` → `setConfiguredBase()`). Right: the three-level table Setting | Global | Category: <name> |
+  This product | Comes from (badge this product / category / global) with **reset** per own row (app.js puts back the inherited
+  value; saved as empty), rows Margin %, Other costs (% or USD per unit), Buffer %, Weight t / CBM, Container CBM, Container max
+  tonnes, Thickness factor; a value equal to the inherited one is not stored. **Reset all to category values** / **Reset all to
+  global values** each open a confirm box (`<dialog>`) listing the figure changes ("Margin % 20% → 15%") and the values that only
+  change level, Cancel / Reset (`POST …/configure/reset`, `PricingLevels::resetToCategory / resetToGlobal`). **Active** checkbox:
+  switched on only when quotable ("It stays Inactive: Not configured yet — ask the product manager." otherwise). Save (`POST
+  …/configure`): `setConfiguredBase()` when the price / unit / thickness changed (audit `PRODUCT_BASE_PRICE_SET`), each changed
+  value (audit `PRODUCT_PRICING_CHANGED`), the Active switch (audit `PRODUCT_REACTIVATED / DEACTIVATED`). The product page gets
+  **Configure / Edit pricing**. Details, specifications and images stay on Edit details.
+- **Edit price** accepts `from=products` (back to the list) and `from=configure`. `refreshFollowedBase()` no longer fills a base
+  price never configured, and "+ Add product" no longer refreshes a base price (decision 1).
+- **Link a supplier (`/products/{id}/link-supplier`, decision 1 part A).** Supplier * (active directory suppliers; "+ new
+  supplier" quick-add returns here with it picked), Their price (₹) *, For * (thickness) or Per * (unit), Quoted on *, Valid
+  until; saved with `SupplierOffers::addOffer()` (as "+ Add product"); green "Linked. … The red "No supplier yet" badge is gone
+  …". The configured base price stays.
+- **Link these prices (`/products/link-prices`, `record_market_prices` or `manage_suppliers`, decision 3).** Every legacy price
+  (`supplier_id` NULL): product, supplier as typed, price, dates, and a Supplier * drop-down (exact name pre-selected) with
+  **Link** (`SupplierOffers::linkPrice()`: `supplier_id` and the legal name, history "Linked to supplier", audit
+  `SUPPLIER_PRICE_LINKED`); "+ Add a new supplier (quick)" returns here.
+- **Pricing settings** — block **Default physical values for every category and product**: weight t / CBM (0.1–20), container
+  max t (1–100), container CBM (0.5–100), thickness factor (1–1000), stored as 2.70 / 27.00 / 8.00 / 40.
+- **Price rules** (per category, MD, with a reason) — new **Margin, other costs and buffer** fields (empty = global; the
+  placeholder shows the global value) and a **reset to global** button beside every value (empties it; then Save).
+- **Pick from Products** offers only quotable active products (`ProductRepository::forPicker()`); products not configured or
+  with no active supplier are listed greyed under "Not offered yet" with "— not configured yet — ask the product manager" /
+  "— no active supplier — ask Procurement" (`notQuotable()`); a posted id must be quotable (`isQuotable()`).
+- **Supplier PO terms form (decision 2).** Above the fields, per order line picked from Products: a table of every offer from
+  a directory supplier (`SupplierOffers::forOrderPo()`): supplier, quoted ₹ per unit (at the line's thickness for a price for
+  every thickness, else the base), valid until ("expired — confirm price" when past), PO value for the line quantity (when the
+  units match), **Choose**; lowest first and marked; switched-off offers and inactive suppliers "not offered". Choosing fills
+  Supplier, Unit Price (and the hidden quoted price and offer id), Quantity / Material when empty, Unit. A unit price different
+  from the quote needs **Reason the price differs from the quote** (app.js `data-required-if-differs`; server: at least 10
+  characters) — kept in `order_supplier_po.price_override_reason` with `quoted_unit_price_inr` / `supplier_offer_id`, audit
+  `SUPPLIER_PO_PRICE_OVERRIDE`. The SUPPO document's layout and wording do not change; issued POs never change.
+- **Code.** `ProductConfigureController` (Node `productConfigureController.js`), `SupplierOffers` D-361 section,
+  `ProductRepository` statuses / `forPicker` / `notQuotable` / `isQuotable`, `PriceRules`, `PricingService::readSettingsForm`,
+  `OrderSupplierPoRepository::setOfferChoice`; views `products/index`, `configure`, `link_supplier`, `link_prices`,
+  `_price_rules`, `pricing/settings`, `orders/_product_picker`, `orders/show`; app.js `initConfigure` and the
+  `data-required-if-differs` rule; CSS D-361 block. The Products list has no board view (no Kanban twin).
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
@@ -4616,6 +4693,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 | `cbm_from_mm` | 50 | Per-CBM pricing from this thickness |
 | `price_request_daily_limit` | 10 | Associate automatic price requests per day |
 | `price_request_valid_days` | 7 | Associate price validity |
+| `weight_t_per_cbm` / `container_max_t` / `container_cbm` / `thick_k_factor` | 2.70 / 27.00 / 8.00 / 40 | D-359 / D-361: default physical values, used when neither the category (Price rules) nor the product (Configure) has one |
 
 Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED). Self-approval rule `bank_details` (MD, ED): verify bank details one entered oneself, with a reason (D-293).
 

@@ -1427,6 +1427,17 @@ app.get('/products/fix-hs-codes', requireAuth, requirePermission('manage_product
 app.post('/products/:id/hs-code', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(catalogueMasterController.saveHsCode));
 app.get('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), asyncHandler(catalogueMasterController.linkSuppliers));
 app.post('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(catalogueMasterController.saveLinks));
+// Owner decision D-361 (13 Nov 2026): Configure / Edit (manage_product_catalog only — owner decision 2), "Link a supplier"
+// for a product with no supplier yet (decision 1) and "Link these prices" for legacy supplier prices (decision 3).
+const productConfigureController = require('./controllers/productConfigureController');
+app.get('/products/link-prices', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), asyncHandler(productConfigureController.linkPricesForm));
+app.post('/products/link-prices', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(productConfigureController.linkPrices));
+app.get('/products/:id/configure', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productConfigureController.form));
+app.post('/products/:id/configure', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productConfigureController.save));
+app.post('/products/:id/configure/reset', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productConfigureController.reset));
+app.post('/products/:id/configure/use-price', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productConfigureController.usePrice));
+app.get('/products/:id/link-supplier', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), asyncHandler(productConfigureController.linkSupplierForm));
+app.post('/products/:id/link-supplier', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), verifyCsrf, asyncHandler(productConfigureController.linkSupplier));
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 // Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).

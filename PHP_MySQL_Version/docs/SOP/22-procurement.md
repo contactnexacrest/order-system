@@ -105,6 +105,15 @@ products and edit prices, the right to record supplier prices (Procurement, MD).
 - On the supplier's page the **Prices given for products** table shows Base thickness, Price, dates, **Offer active**,
   **Edit price** and **Open product**. (The old "Used for pricing" column is gone from this table; which supplier's
   price the product is priced from is still set on the product's Market prices.)
+- **D-361 (13 Nov 2026).** Changing or adding a supplier's price never changes the product's selling price by itself:
+  the product manager sees "Supplier prices changed: highest is now ₹X — Use ₹X" on the product and decides. A product
+  created here is configured and switched Active by the product manager (Products › **Configure**). Products with no
+  supplier yet show **Link a supplier** on Products; supplier prices typed before the directory are linked on Products ›
+  **Link these prices**. When the last active supplier of a product is switched off, the product is no longer offered on
+  new orders ("No active supplier").
+- **Supplier PO (D-361).** On the order's Stage 5 **Supplier PO terms** form a table lists every supplier's quoted price
+  for the line's product, lowest first — choose one and the supplier and unit price fill in (see
+  [Stage 5](./05-stage5-supplier-po.md)).
 
 ## 7. Cancelling
 

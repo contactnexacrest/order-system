@@ -157,7 +157,10 @@ async function followSupplier(productId, userId) {
 
 /** Keeps the stored copy of a FOLLOWING base price the same as the supplier price it follows. */
 async function refreshFollowedBase(product, userId = null) {
-  if (Number(product.configured_base_follows_supplier ?? 1) !== 1) return;
+  // D-361 (owner decision 1): the base price never changes by itself — after migration 13b no
+  // configured product follows the supplier, and a product never configured has no base price to
+  // keep in step (Configure sets it), so this only acts on a base price still following.
+  if (Number(product.configured_base_follows_supplier ?? 1) !== 1 || !isSet(product.configured_base_price_inr)) return;
   const offer = await ps().pricingSupplier(Number(product.id));
   const b = offer ? await offerBase(product, offer) : null;
   if (!b) return;
@@ -571,11 +574,10 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
     }
   }
   if (primary) await productService.setPrimarySupplier(productId, id);
+  // D-361 (owner decision 1): the product's base price does not change by itself — a manager
+  // configures it (or clicks "Use ₹X"). A product with no supplier yet now has one.
+  await supplierLinked(productId, userId);
   const fresh = (await productRepository.find(productId)) || product;
-  if (primary && !newProduct) {
-    // The product had no supplier price used for pricing: its base price now follows this one.
-    await refreshFollowedBase(fresh, userId);
-  }
   const after = await offerBase(fresh, (await productSupplierRepository.find(id)) || { id }, rules);
   const f2c = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   await thicknessPrices.history(id, 'Offer added (+ Add product)', null, after ? `₹${f2c(after.inr)} ${after.label}` : 'added', userId);
@@ -586,10 +588,227 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   return id;
 }
 
+// ------------------------------------------------------------------ D-361: products, Configure, Supplier PO
+
+/** SQL: an offer row (alias cps) that is usable — switched on and its directory supplier (if any) active. */
+const USABLE_SQL = '(cps.offer_active = 1 AND (cps.supplier_id IS NULL OR EXISTS (SELECT 1 FROM suppliers sd WHERE sd.id = cps.supplier_id AND sd.is_active = 1)))';
+/** SQL: product (alias p) is configured — its base price is fixed (owner decision 1). */
+const CONFIGURED_SQL = '(p.configured_base_follows_supplier = 0 AND p.configured_base_price_inr IS NOT NULL)';
+/** SQL: product (alias p) existed before 13b with no supplier, and still has none linked. */
+const NO_SUPPLIER_YET_SQL = '(p.legacy_no_supplier = 1 AND NOT EXISTS (SELECT 1 FROM catalog_product_suppliers cps2 WHERE cps2.product_id = p.id AND cps2.supplier_id IS NOT NULL))';
+
+/** SQL: product (alias p) may be active and quoted (plan rule 4 with the decision-1 exception). */
+function quotableSql() {
+  return `(${NO_SUPPLIER_YET_SQL} OR (${CONFIGURED_SQL} AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ${USABLE_SQL})))`;
+}
+
+/** Whether the product's base price is configured (fixed). */
+function isConfigured(product) {
+  return Number(product.configured_base_follows_supplier ?? 1) === 0 && isSet(product.configured_base_price_inr);
+}
+
+/**
+ * D-361: where a product stands — configured, its usable / paused offers, "No supplier yet" (existed
+ * before 13b with no linked supplier), whether it may be switched Active (and so quoted), and the
+ * one status the Products list shows.
+ */
+async function status(product, list = null) {
+  const all = list || (await offers(Number(product.id)));
+  const usableN = all.filter((o) => o.usable).length;
+  const linked = all.some((o) => isSet(o.supplier_id));
+  const configured = isConfigured(product);
+  const noSupplierYet = Number(product.legacy_no_supplier || 0) === 1 && !linked;
+  const canActivate = noSupplierYet || (configured && usableN > 0);
+  let key; let label; let badge;
+  if (noSupplierYet) [key, label, badge] = ['no_supplier_yet', 'No supplier yet', 'badge-danger'];
+  else if (!configured) [key, label, badge] = ['not_configured', 'Not configured', 'badge-warning'];
+  else if (usableN === 0) [key, label, badge] = ['no_active_supplier', 'No active supplier', 'badge-danger'];
+  else [key, label, badge] = ['configured', 'Configured', 'badge-success'];
+  const reason = canActivate ? null : (!configured ? 'Not configured yet — ask the product manager.' : "No active supplier — ask Procurement to add or switch on a supplier's price.");
+  return {
+    configured, usable: usableN, paused: all.length - usableN, linked, no_supplier_yet: noSupplierYet,
+    can_activate: canActivate, quotable: canActivate && Number(product.is_active || 0) === 1, key, label, badge, reason,
+  };
+}
+
+/** D-361: a directory supplier is now linked to the product — "No supplier yet" ends (the normal rule applies). */
+async function supplierLinked(productId, userId = null) {
+  const r = await db.execute('UPDATE catalog_products SET legacy_no_supplier = 0 WHERE id = :id AND legacy_no_supplier = 1', { id: productId });
+  const n = Number((r && (r.affectedRows ?? (r[0] && r[0].affectedRows))) || 0);
+  if (n > 0 && userId !== null && userId !== undefined) await auditLogRepository.log(userId, 'PRODUCT_SUPPLIER_LINKED', 'catalog_products', productId, 'legacy_no_supplier', '1', '0');
+}
+
+/** When an offer's price last changed (its thickness prices or its history), as "YYYY-MM-DD HH:MM:SS". */
+async function offerChangedAt(offerId) {
+  const r = await db.queryOne(`SELECT DATE_FORMAT(GREATEST(
+      COALESCE((SELECT MAX(updated_at) FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :a), '1000-01-01'),
+      COALESCE((SELECT MAX(changed_at) FROM catalog_supplier_price_history WHERE product_supplier_id = :b AND what NOT LIKE 'Linked to supplier%' AND what <> 'Offer active'), '1000-01-01')), '%Y-%m-%d %H:%i:%s') AS t`, { a: offerId, b: offerId });
+  const v = r && r.t ? String(r.t) : '';
+  return v === '' || v.startsWith('1000-01-01') ? null : v;
+}
+
+function dateTimeText(v) {
+  if (!isSet(v)) return '';
+  if (v instanceof Date) return `${ymd(v)} ${String(v.getHours()).padStart(2, '0')}:${String(v.getMinutes()).padStart(2, '0')}:${String(v.getSeconds()).padStart(2, '0')}`;
+  return String(v);
+}
+
+/**
+ * D-361 (owner decision 1): "Supplier prices changed: highest is now ₹X" — when the highest usable
+ * supplier price (quoted the same way as the base price) differs from the configured base price and
+ * a supplier price changed after the product was configured. Null otherwise.
+ */
+async function priceChange(product, lh = null) {
+  if (!isConfigured(product)) return null;
+  lh = lh || (await lowestHighest(product));
+  const high = lh.highest;
+  if (!high || Math.abs(Number(high.base.inr) - Number(product.configured_base_price_inr)) < 0.005) return null;
+  const at = dateTimeText(product.configured_at);
+  let changed = false;
+  for (const o of lh.offers) {
+    const c = await offerChangedAt(Number(o.id));
+    if (c !== null && (at === '' || c > at)) { changed = true; break; }
+  }
+  if (!changed) return null;
+  return { inr: Number(high.base.inr), mm: high.base.mm, unit: String(high.base.unit), label: String(high.base.label), supplier: String(high.supplier_name) };
+}
+
+/** "per CBM (50 mm and above)", "per m² (20 mm)", "per Sq.Ft" for the configured base price. */
+async function baseLabel(product, s = null) {
+  const mm = isSet(product.configured_base_thickness_mm) ? Number(product.configured_base_thickness_mm) : null;
+  if (mm !== null) {
+    const rules = await thicknessPrices.rules(product, s);
+    return `${mm === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(mm, Number(rules.cbm_from))})`;
+  }
+  const u = String(product.configured_base_unit || '');
+  return `per ${u === '' ? 'unit' : (lineUnits.label(u) || u)}`;
+}
+
+/**
+ * D-361: the Products list row figures — suppliers (usable / paused), lowest – highest supplier price
+ * (each a link to that offer's Edit price), the configured base price and its status.
+ */
+async function productRow(product, s = null) {
+  const all = await offers(Number(product.id));
+  const st = await status(product, all);
+  const lh = await lowestHighest(product, s);
+  const cfg = isConfigured(product) ? { inr: Number(product.configured_base_price_inr), label: await baseLabel(product, s) } : null;
+  let latest = null;
+  for (const o of all) {
+    const d = o.quoted_on ? (o.quoted_on instanceof Date ? ymd(o.quoted_on) : String(o.quoted_on).slice(0, 10)) : null;
+    if (o.usable && d !== null && (latest === null || d > latest)) latest = d;
+  }
+  for (const r of [lh.lowest, lh.highest]) if (r) r.base.amount = thicknessPrices.amount(r.base.inr);
+  return { status: st, lowest: lh.lowest, highest: lh.highest, base: cfg, latest_quote: latest };
+}
+
+/** D-361 (owner decision 3): supplier prices typed before the Suppliers directory and still not linked to a supplier record. */
+async function unlinkedPrices(s = null) {
+  s = s || (await ps().settings());
+  const rows = await db.query(`SELECT cps.* FROM catalog_product_suppliers cps JOIN catalog_products p ON p.id = cps.product_id
+    WHERE cps.supplier_id IS NULL ORDER BY p.name, cps.supplier_name, cps.id`);
+  const out = [];
+  const products = {};
+  for (const r of rows) {
+    const pid = Number(r.product_id);
+    if (!(pid in products)) products[pid] = await productRepository.find(pid);
+    if (!products[pid]) continue;
+    const row = await listRow(products[pid], r, await thicknessPrices.rules(products[pid], s), s);
+    row.typed_name = String(r.supplier_name);
+    row.used_for_pricing = Number(r.is_primary) === 1;
+    out.push(row);
+  }
+  return out;
+}
+
+/** How many legacy supplier prices still need linking. */
+async function unlinkedCount() {
+  const r = await db.queryOne('SELECT COUNT(*) AS n FROM catalog_product_suppliers cps JOIN catalog_products p ON p.id = cps.product_id WHERE cps.supplier_id IS NULL');
+  return Number((r || {}).n || 0);
+}
+
+/** D-361 (owner decision 3): links one legacy supplier price to a directory supplier. Returns an error or null. */
+async function linkPrice(offerId, supplierId, userId) {
+  const row = await productSupplierRepository.find(offerId);
+  if (!row) return 'That supplier price no longer exists.';
+  if (isSet(row.supplier_id)) return 'That supplier price is already linked to a supplier.';
+  const supplier = await require('../repositories/supplierRepository').find(supplierId);
+  if (!supplier || !Number(supplier.is_active)) return 'Choose an active supplier from the Suppliers directory.';
+  const name = String(supplier.supplier_legal_name);
+  await db.execute('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n, updated_by = :u WHERE id = :id AND supplier_id IS NULL',
+    { s: supplierId, n: [...name].slice(0, 255).join(''), u: userId, id: offerId });
+  await thicknessPrices.history(offerId, 'Linked to supplier', [...`typed: ${row.supplier_name}`].slice(0, 80).join(''), [...name].slice(0, 80).join(''), userId);
+  await auditLogRepository.log(userId, 'SUPPLIER_PRICE_LINKED', 'product_suppliers', offerId, 'supplier_id', `typed: ${row.supplier_name}`, `${name} (#${supplierId})`);
+  await supplierLinked(Number(row.product_id), userId);
+  return null;
+}
+
+/**
+ * D-361 (decision 2, mockups p8 / decision_d2): every supplier offer of an order line's product for
+ * the Supplier PO terms form — quoted ₹ per unit (at the line's thickness when the offer has a price
+ * for every thickness), valid until (expired marked), the PO value for the line quantity when the
+ * units match; lowest first and marked. Switched-off offers and inactive suppliers: "not offered".
+ */
+async function forOrderPo(orderId, s = null) {
+  s = s || (await ps().settings());
+  const supplierRepository = require('../repositories/supplierRepository');
+  const lines = await db.query(`SELECT id, line_no, catalog_product_id, description, quantity, unit, piece_thickness_cm FROM order_products
+    WHERE order_id = :o AND is_active = 1 AND catalog_product_id IS NOT NULL ORDER BY line_no, id`, { o: orderId });
+  const out = [];
+  const today = ymd(new Date());
+  for (const line of lines) {
+    const product = await productRepository.find(Number(line.catalog_product_id));
+    if (!product) continue;
+    const rules = await thicknessPrices.rules(product, s);
+    const cbmFrom = Number(rules.cbm_from);
+    const mm = isSet(line.piece_thickness_cm) && Number(line.piece_thickness_cm) > 0 ? Math.round(Number(line.piece_thickness_cm) * 10) : null;
+    const key = mm !== null ? (mm >= cbmFrom ? thicknessPrices.CBM : mm) : null;
+    const qty = isSet(line.quantity) ? Number(line.quantity) : null;
+    const lineUnit = String(lineUnits.canonical(String(line.unit || '')) || '');
+    const rows = [];
+    for (const o of await offers(Number(product.id))) {
+      if (!isSet(o.supplier_id) || !['unit', 'grid', 'cbm'].includes(o.price_basis || 'unit')) continue;
+      const supplier = await supplierRepository.find(Number(o.supplier_id));
+      let price = null; let unit = null; let label = '';
+      if ((o.price_basis || '') === 'grid') {
+        const vals = thicknessPrices.values(rules, await thicknessPrices.storedFor(Number(o.id)), thicknessPrices.autoFill(o));
+        if (key !== null && vals.values[key] && Number(vals.values[key].price) > 0) {
+          price = Number(vals.values[key].price);
+          unit = key === thicknessPrices.CBM ? 'CBM' : 'm2';
+          label = `${key === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(key, cbmFrom)})`;
+        }
+      }
+      if (price === null) {
+        const b = await offerBase(product, o, rules, s);
+        if (b) [price, unit, label] = [Number(b.inr), String(b.unit), String(b.label)];
+      }
+      const sameUnit = unit !== null && lineUnit !== '' && String(lineUnits.canonical(unit) || '') === lineUnit;
+      const validUntil = o.valid_until ? (o.valid_until instanceof Date ? ymd(o.valid_until) : String(o.valid_until).slice(0, 10)) : null;
+      rows.push({
+        offer_id: Number(o.id), supplier_id: Number(o.supplier_id), supplier: String((supplier && supplier.supplier_legal_name) || o.supplier_name),
+        offered: !!o.usable && price !== null,
+        why_not: !o.usable ? (supplier && !Number(supplier.is_active) ? 'inactive supplier' : 'offer switched off') : (price === null ? 'no price' : null),
+        price, unit, label, valid_until: validUntil, expired: validUntil !== null && validUntil < today,
+        po_value: price !== null && qty !== null && sameUnit ? Math.round(price * qty * 100) / 100 : null, lowest: false,
+      });
+    }
+    rows.sort((a, b) => ((a.offered ? 0 : 1) - (b.offered ? 0 : 1)) || ((a.price ?? Infinity) - (b.price ?? Infinity)));
+    if (rows.length && rows[0].offered) rows[0].lowest = true;
+    out.push({
+      line_id: Number(line.id), line_no: Number(line.line_no), product_id: Number(product.id), product: String(product.name),
+      description: String(line.description || ''), quantity: qty, unit: String(line.unit || ''), thickness: key !== null ? thicknessPrices.label(key, cbmFrom) : null, offers: rows,
+    });
+  }
+  return out;
+}
+
 module.exports = {
   usable, offers, markedForPricing, setOfferActive, offerBase, lowestHighest,
   configuredBase, setConfiguredBase, followSupplier, refreshFollowedBase, pricingRow,
   formThicknesses, preview, snapshot, save, undo,
   // D-360
   listRow, forSuppliers, countsBySupplier, existingOffer, priceShape, addProductChoices, createProduct, addOffer,
+  // D-361
+  USABLE_SQL, CONFIGURED_SQL, NO_SUPPLIER_YET_SQL, quotableSql, isConfigured, status, supplierLinked, priceChange,
+  baseLabel, productRow, unlinkedPrices, unlinkedCount, linkPrice, forOrderPo,
 };

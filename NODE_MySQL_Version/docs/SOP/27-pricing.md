@@ -521,7 +521,58 @@ product**; the supplier's page has the same in **Prices given for products**. Se
 - **+ Add product** records the supplier's price at one thickness; the other thicknesses are worked out by the
   category's price rules, exactly as on Market prices. It becomes the price the product is priced from only when the
   product has none yet; otherwise every price stays as it is.
-- A **new product** created from a supplier starts Inactive and not configured.
+- A **new product** created from a supplier starts Inactive and not configured — configure it on Products (D-361, below).
+
+## Products, Configure and the base price (D-361, 13 Nov 2026)
+
+**The base price never changes by itself.** Each product has a **configured base price** (₹ per m² at the base
+thickness, per CBM for 50 mm and above, or per unit). Every selling price is worked out from it. On 13 Nov 2026 every
+product was fixed at exactly the price it used that day — no selling price changed. When a supplier's price changes
+later, the product's **Configure / Edit** screen says **"Supplier prices changed: highest is now ₹X"** with a **Use ₹X**
+button; nothing changes until you click it. Quotations and Proforma Invoices already issued never change.
+
+**Products list.** Products › **All products** shows for each product: **Suppliers** (how many are active, how many
+paused), **Lowest – highest supplier price** (click either figure to open that supplier's **Edit price**), the
+**Base price (configured)**, the USD prices as before, the **latest supplier quote** and where the product stands:
+
+- **Configured** — it has a base price and at least one active supplier: it can be Active and quoted.
+- **Not configured** — created from a supplier, no base price yet: click **Configure**. It is not offered on orders.
+- **No active supplier** — configured, but every supplier is switched off or inactive: not offered on orders until
+  Procurement switches a supplier on.
+- **No supplier yet** (red) — a product from before suppliers were linked: it stays active and quotable with its price;
+  click **Link a supplier** to give it one. From then on the normal rule applies.
+
+Use the filters **Active · Inactive · All · Not configured · No active supplier · No supplier yet**. The search also
+finds a supplier's name. New products are added from **Procurement › Suppliers › + Add product** (the old "+ Add
+Product" and "Link suppliers" buttons are gone); **Go to Suppliers** takes you there.
+
+**Configure / Edit a product (product managers — Manage product catalogue).**
+1. Products › the product's **Configure** (or **Edit**) button.
+2. **Base price** — filled with the highest active supplier price; change it if you want. Below the lowest supplier price
+   you see "Below the lowest supplier price — no supplier sells at this price." **See all supplier prices** lists every
+   supplier's price with **Edit price**.
+3. **The three levels** — Margin %, Other costs, Buffer %, Weight t / CBM, Container CBM, Container max tonnes,
+   Thickness factor: the Global value, the Category value and **This product**. "Comes from" says which one is used.
+   Type a value to set it for this product only; **reset** puts back the category (or global) value.
+   **Reset all to category values** and **Reset all to global values** first show a box listing what changes
+   (e.g. "Margin % 20% → 15%") — click **Reset** to do it or **Cancel**.
+4. Tick **Active** to offer the product on orders (only possible when it is configured and has an active supplier).
+5. **Save.** A green message confirms the base price.
+
+**Link a supplier** (for a "No supplier yet" product): Supplier (or **+ new supplier**), their price, the thickness or
+unit, quoted on, valid until — **Save**. The product's base price stays as it is.
+
+**Link these prices (N)** appears on the Products page while supplier prices typed before the Suppliers directory still
+have no supplier record (the 13 Nov update linked exact names itself). Pick the supplier in each row and click **Link**;
+add a supplier quickly if it is missing. The prices do not change.
+
+**Pricing settings** has a block **Default physical values for every category and product**: weight (tonnes per CBM),
+container max tonnes, container CBM and the thickness factor. **Price rules** (per category) now also has **Margin %,
+Other costs % and Buffer %** — empty means "use the global value" (shown in the empty box); **reset to global** beside
+any value empties it (then give the reason and **Save rules**).
+
+**Pick from Products** on an order offers only products that can be quoted. A product that is not configured, or has no
+active supplier, is shown greyed under "Not offered yet" with the reason — ask the product manager or Procurement.
 
 ## Exchange rate (D-301, 11 Nov 2026)
 
@@ -559,7 +610,7 @@ never on a document.
 - A product's HS code is picked from the HS Code Master List (pre-filled with the category's default).
   People who manage HS codes see **+ Add a new HS code**. Order lines accept only master-list codes.
 - One-time clean-up: Products › HS codes › **Fix HS codes on products** (choose the right code for each product listed) and
-  Products › **Link suppliers** (**Match by name** links exact names at once; pick or quick-add the rest).
+  Products › **Link these prices (N)** (D-361: shown while some supplier prices still need a supplier record; pick or quick-add the supplier in each row).
 - A supplier's page lists **Prices given for products**; untick **Details pending** once GSTIN, bank and
   contacts are complete.
 

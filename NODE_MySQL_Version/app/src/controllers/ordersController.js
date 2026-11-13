@@ -987,6 +987,7 @@ async function pickerViewData(req, withClients = false) {
   const pickerProducts = await require('../repositories/productRepository').forPicker();
   const selling = require('../services/moneyVisibility').can(req.permissions, 'selling');
   const out = { pickerProducts, pickerPrices: selling ? await orderLinePricing.pickerPrices(pickerProducts) : {}, pickerSpecs: await orderLinePricing.pickerSpecs(pickerProducts) };
+  out.pickerBlocked = await require('../repositories/productRepository').notQuotable(); // D-361
   if (withClients) {
     out.clientPriceKeys = selling ? await orderLinePricing.clientKeys(await clientRepository.all()) : {};
     // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
@@ -1059,8 +1060,9 @@ async function linePricingViewData(req, orderId) {
 async function catalogProductInput(value) {
   const id = parseInt(value, 10) || 0;
   if (id <= 0) return null;
-  const product = await require('../repositories/productRepository').find(id);
-  return product && Number(product.is_active) === 1 ? id : null;
+  // D-361 (plan rule 4): and quotable — configured with an active supplier offer, or a product from
+  // before migration 13b with no supplier yet (the same products Pick from Products offers).
+  return (await require('../repositories/productRepository').isQuotable(id)) ? id : null;
 }
 
 // Owner decision D-245 P2: below the floor (or no price) — staff send the line to the MD.
@@ -1958,6 +1960,8 @@ async function show(req, res) {
       // Owner decision D-245 P2: "Pick from Products" fills the quote price; each line's price check and the MD's approval.
       ...(await linePricingViewData(req, orderId)),
       suppliers: await supplierRepository.all(),
+      // D-361 (decision 2, mockups p8 / decision_d2): every supplier's offer for the order's product lines, for the Supplier PO terms form.
+      spoOffers: await require('../services/supplierOffers').forOrderPo(orderId),
       logisticsPartners: await logisticsPartnerRepository.all(),
       logisticsServiceTypes: logisticsPartnerRepository.SERVICE_TYPES,
       supplierPo,
@@ -3398,7 +3402,26 @@ async function saveSupplierPo(req, res) {
   }
 
   const body = req.body;
-  await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
+  // D-361 (decision 2): the supplier offer chosen in the table and its quoted price; an agreed price
+  // different from the quote needs a reason, kept with the PO and in the Audit Log.
+  const offerId = parseInt(body.supplier_offer_id || 0, 10) || 0;
+  let offer = offerId > 0 ? await require('../repositories/productSupplierRepository').find(offerId) : null;
+  if (offer && Number(offer.supplier_id || 0) !== supplierId) offer = null; // a different supplier was chosen after the table row
+  const quotedRaw = String(body.quoted_unit_price_inr || '').replace(/,/g, '').trim();
+  const quoted = offer && quotedRaw !== '' && !Number.isNaN(Number(quotedRaw)) ? Math.round(Number(quotedRaw) * 100) / 100 : null;
+  const agreedRaw = String(body.unit_price_inr || '').replace(/,/g, '').trim();
+  const overrideReason = str(body.price_override_reason);
+  const overridden = quoted !== null && agreedRaw !== '' && !Number.isNaN(Number(agreedRaw)) && Math.abs(Number(agreedRaw) - quoted) > 0.004;
+  if (overridden) {
+    const reasonError = require('../helpers/reasonValidator').check(overrideReason);
+    if (reasonError) {
+      const f2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      flash.set(req, 'error', `Unit price ₹${f2(agreedRaw)} is not the quoted ₹${f2(quoted)} — give the reason: ${reasonError}`);
+      res.redirect(`/orders/${orderId}#supplier-po-form`);
+      return;
+    }
+  }
+  const spoId = await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
     supplier_type: supplierType || null,
     material_stone_type: str(body.material_stone_type) || null,
     grade: str(body.grade) || 'Grade A',
@@ -3424,6 +3447,14 @@ async function saveSupplierPo(req, res) {
   });
   // External QA report L-23: saving Supplier PO terms was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'SUPPLIER_PO_SAVED', 'orders', orderId, 'supplier_po_reference', null, supplierPoReference);
+  if (offer) {
+    await orderSupplierPoRepository.setOfferChoice(Number(spoId), offerId, quoted, overridden ? [...overrideReason].slice(0, 500).join('') : null);
+    if (overridden) {
+      const f2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      await auditLogRepository.log(req.user ? req.user.id : null, 'SUPPLIER_PO_PRICE_OVERRIDE', 'order_supplier_po', Number(spoId), 'unit_price_inr',
+        `₹${f2(quoted)} quoted by ${supplier.supplier_legal_name}`, `₹${f2(agreedRaw)} agreed`, overrideReason);
+    }
+  }
 
   flash.set(req, 'success', `Supplier PO terms saved (${supplierPoReference}). Generate the Supplier PO document below.`);
   res.redirect(`/orders/${orderId}`);

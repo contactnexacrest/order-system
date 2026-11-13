@@ -210,7 +210,10 @@ async function quickAdd(req, res) {
   const phone = String(body.quick_phone ?? '').trim();
   const type = String(body.quick_type ?? '').trim();
   const productId = parseInt(body.product_id, 10) || 0;
-  const back = productId > 0 ? `/products/${productId}/market-prices` : '/products/link-suppliers';
+  let back = productId > 0 ? `/products/${productId}/market-prices` : '/products/link-suppliers';
+  // D-361: also from Products › "Link these prices" and a product's "Link a supplier" form.
+  const returnTo = String(body.return_to || '');
+  if (/^\/products\/(link-prices|\d+\/link-supplier)$/.test(returnTo)) back = returnTo;
   const types = (await require('../repositories/lookupRepository').dropdownOptions('supplier_type')).map((o) => String(o.option_value));
   let error = null;
   if ([...name].length < 2 || [...name].length > 255) error = 'Supplier name: 2 to 255 characters.';
@@ -226,6 +229,10 @@ async function quickAdd(req, res) {
   const id = await supplierRepository.quickAdd(name, location, phone, type, req.user.id);
   await auditLogRepository.log(req.user.id, 'SUPPLIER_QUICK_ADDED', 'suppliers', id, 'supplier_legal_name', null, `${name} — ${location} (details pending)`);
   flash.set(req, 'success', `"${name}" added to the Suppliers directory (details pending) and picked below.`);
+  if (back === returnTo) {
+    res.redirect(`${back}?supplier_id=${id}`);
+    return;
+  }
   res.redirect(productId > 0 ? `/products/${productId}/market-prices?supplier_id=${id}#add-price` : '/products/link-suppliers');
 }
 

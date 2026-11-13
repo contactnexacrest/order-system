@@ -1,0 +1,110 @@
+{#
+  Owner decision D-361 (13 Nov 2026; mockups p4 and configure_three_levels_mockup.png): Products ›
+  Configure / Edit — the price part of one product. The base price (default = the highest active
+  supplier price; never changes by itself), the three levels (Global | Category | This product |
+  Comes from) with a reset per row and "Reset all to category / global values" (each with a confirm
+  box listing the changes), and the Active switch. Details, specifications, thickness prices and
+  images stay on the product's own pages. PHP twin: app/views/products/configure.php.
+#}
+{% set catName = category.name if category else null %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products?status=all">← Products</a> · <a href="/products/{{ product.id }}">View</a> · <a href="/products/{{ product.id }}/edit">Edit details, specifications and images</a></p>
+  <h1>{{ 'Edit' if configured else 'Configure' }} — {{ product.name }} <small class="muted">(category: {{ catName or '—' }})</small></h1>
+  <p><span class="badge {{ 'badge-active' if product.is_active == 1 else 'badge-inactive' }}">{{ 'Active' if product.is_active == 1 else 'Inactive' }}</span>
+    <span class="badge {{ status.badge }}" data-standing="{{ status.key }}">{{ status.label }}</span>
+    <span class="muted small">{{ status.usable }} active supplier{{ '' if status.usable == 1 else 's' }}{% if status.paused > 0 %}, {{ status.paused }} paused{% endif %}</span></p>
+
+  <form method="post" action="/products/{{ product.id }}/configure" id="configure-form">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <input type="hidden" name="base_mm" value="{{ '' if baseMm === null else baseMm }}">
+    <input type="hidden" name="base_unit" value="{{ baseUnit }}">
+    <div class="configure-grid">
+      <div class="configure-box">
+        <label>Base price ({{ baseLabel }}) *
+          <input type="text" inputmode="decimal" name="base_price" class="base-price-input" required data-max-decimals="2" data-max-value="999999999999"
+            value="{{ basePrice }}" placeholder="e.g. 190000.00"
+            {% if lowest %}data-warn-below="{{ lowest.base.inr }}" data-warn-target="below-lowest"{% endif %}></label>
+        <p class="muted small">
+          {% if highest %}Default = highest active supplier price ({{ highest.supplier_name }} {{ highest.amount }}).{% if lowest and lowest.id != highest.id %} Lowest: {{ lowest.supplier_name }} {{ lowest.amount }}.{% endif %}
+          {% else %}No active supplier price yet — type the base price yourself.{% endif %}
+          The base price is fixed: it never changes by itself when a supplier's price changes.</p>
+        {% if lowest %}<div class="warn-box" id="below-lowest" hidden>Below the lowest supplier price ({{ lowest.amount }}) — no supplier sells at this price.</div>{% endif %}
+        {% if change %}
+          <div class="change-box" data-testid="price-change">Supplier prices changed: highest is now <b>{{ change.amount }}</b> {{ change.label }} ({{ change.supplier }}).
+            <button type="submit" form="use-price-form" class="btn-sm">Use {{ change.amount }}</button></div>
+        {% endif %}
+        <details>
+          <summary>See all supplier prices ({{ offers.length }})</summary>
+          <table class="list">
+            <tr><th>Supplier</th><th>Base price as quoted</th><th>Quoted on</th><th>Valid until</th><th>Offer</th><th></th></tr>
+            {% for o in offers %}
+              <tr><td>{{ o.supplier }}{% if not o.linked %} <small class="muted">(not linked to a supplier record)</small>{% endif %}</td><td>{{ o.price }}</td><td>{{ o.quoted_on }}</td><td>{{ o.valid_until }}</td>
+                <td>{% if o.usable %}active{% else %}<span class="muted">paused</span>{% endif %}</td>
+                <td>{% if canEditPrice and o.editable %}<a href="/products/suppliers/{{ o.id }}/edit-price?from=configure">Edit price</a>{% endif %}</td></tr>
+            {% endfor %}
+            {% if not offers.length %}<tr><td colspan="6" class="muted">No supplier prices yet — add them from Procurement › Suppliers › + Add product.</td></tr>{% endif %}
+          </table>
+        </details>
+      </div>
+
+      <div class="configure-box">
+        <table class="list levels-table">
+          <tr><th>Setting</th><th>Global</th><th>Category{% if catName %}: {{ catName }}{% endif %}</th><th>This product</th><th>Comes from</th><th></th></tr>
+          {% for r in rows %}{% set v = (oldLevel[r.key] if (oldLevel and oldLevel[r.key] !== undefined) else r.value) %}
+            <tr data-level-row="{{ r.key }}">
+              <td>{{ r.label }}</td>
+              <td>{{ r.global }}</td>
+              <td>{{ r.category if r.category !== '' else '—' }}</td>
+              <td><input type="text" inputmode="decimal" name="level[{{ r.key }}]" value="{{ v }}" data-level-input data-inherit="{{ r.inherit }}" data-inherit-from="{{ r.inherit_from }}"
+                  data-max-decimals="{{ r.decimals }}" placeholder="e.g. {{ r.inherit if r.inherit !== '' else '0' }}" aria-label="{{ r.label }} — this product">
+                {% if r.mode !== null %}
+                  <select name="other_cost_mode" data-level-mode aria-label="Other costs — % or USD per unit">
+                    <option value="pct"{% if r.mode == 'pct' %} selected{% endif %}>%</option>
+                    <option value="usd"{% if r.mode == 'usd' %} selected{% endif %}>USD per unit</option>
+                  </select>
+                {% endif %}</td>
+              <td><span class="badge level-from level-from-{{ r.from }}" data-level-from>{{ 'this product' if r.from == 'product' else r.from }}</span></td>
+              <td><a href="#" data-level-reset{% if not r.own %} hidden{% endif %}>reset</a></td>
+            </tr>
+          {% endfor %}
+        </table>
+        <p class="muted small">"reset" on one row puts back that one value (the category value if the category has one, else global) — then Save. Empty values in Pricing settings and Price rules are filled from the level above.</p>
+        {% if followGlobal %}<p class="notice notice-info small">This product follows the <b>global</b> values and ignores its category's values ("Reset all to global values"). "Reset all to category values" makes it follow its category again.</p>{% endif %}
+        <p>
+          <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-category">Reset all to category values</button>
+          <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-global">Reset all to global values</button>
+        </p>
+      </div>
+    </div>
+
+    <p><label class="inline-check"><input type="checkbox" name="is_active" value="1"{% if product.is_active == 1 %} checked{% endif %}> Active — offered in Pick from Products on new orders</label>
+      <br><small class="muted">Only when the product is configured and has at least one active supplier offer{% if status.no_supplier_yet %} (or, as now, it is a product from before suppliers were linked){% endif %}.{% if not status.can_activate and configured %} Now: {{ status.reason }}{% endif %}</small></p>
+    <button type="submit">Save</button>
+    <a class="btn-sm btn-secondary" href="/products?status=all">Cancel</a>
+  </form>
+
+  {% if change %}
+    <form method="post" action="/products/{{ product.id }}/configure/use-price" id="use-price-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"></form>
+  {% endif %}
+
+  {% for to, lines in [['category', previewCategory], ['global', previewGlobal]] %}
+    <dialog class="confirm-box" id="reset-{{ to }}" data-testid="confirm-{{ to }}">
+      <h3>Reset all to {{ to }} values?</h3>
+      {% if to == 'category' %}
+        <p>Every value changed for this product goes back to the <b>{{ catName or 'category' }}</b> category value (or the global value where the category has none):</p>
+      {% else %}
+        <p>This product will use the <b>global</b> values and ignore the {{ catName or 'category' }} category values:</p>
+      {% endif %}
+      {% if not lines.changes.length %}<p class="muted">No figure changes — the values are the same already.</p>
+      {% else %}<ul>{% for l in lines.changes %}<li>{{ l.label }} {{ l.now }} → {{ l.after }}</li>{% endfor %}</ul>{% endif %}
+      {% if lines.same.length %}<p class="muted small">Same figure, now from the {{ to }} level: {{ lines.same | join(', ') }}.</p>{% endif %}
+      <p>{{ 'Later changes to the category or global settings will then apply to this product automatically.' if to == 'category' else 'Later changes to the global settings will then apply to this product automatically.' }}</p>
+      <form method="post" action="/products/{{ product.id }}/configure/reset">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="to" value="{{ to }}">
+        <button type="button" class="btn-sm btn-secondary" data-close-dialog>Cancel</button>
+        <button type="submit" class="btn-sm btn-primary">Reset</button>
+      </form>
+    </dialog>
+  {% endfor %}
+</div>

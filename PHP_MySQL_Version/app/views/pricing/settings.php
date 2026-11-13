@@ -111,6 +111,19 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="stale_days" min="1" max="3650" step="1" required value="<?= View::e($settings['stale_days']) ?>" placeholder="e.g. 60"<?= $__ro ?>></label>
     </fieldset>
 
+    <?php // D-361 (13 Nov 2026, mockup p5): the global physical defaults — the last of the three levels. ?>
+    <fieldset id="physical-defaults"><legend>Default physical values for every category and product</legend>
+      <p class="muted small">Used when a category (Price rules) or a product (Configure) has no value of its own.</p>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['weight_t_per_cbm']) ?> *<small class="muted">Stone weight, used for Ton prices and the container weight limit.</small><span class="help-line">Example: 2.70 → 8 CBM weigh 21.6 t.</span></span>
+        <input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" required value="<?= View::e((string) $settings['weight_t_per_cbm']) ?>" placeholder="e.g. 2.70"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['container_max_t']) ?> *<small class="muted">The most one container may weigh.</small><span class="help-line">Example: 27 → at 2.70 t per CBM a container holds at most 10 CBM by weight.</span></span>
+        <input type="number" name="container_max_t" min="1" max="100" step="0.01" required value="<?= View::e((string) $settings['container_max_t']) ?>" placeholder="e.g. 27.00"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['container_cbm']) ?> *<small class="muted">What one container holds, used to spread CHA + transport per container.</small><span class="help-line">Example: 8 → ₹40,000 per container = ₹5,000 per CBM.</span></span>
+        <input type="number" name="container_cbm" min="0.5" max="100" step="0.01" required value="<?= View::e((string) $settings['container_cbm']) ?>" placeholder="e.g. 8.00"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['thick_k_factor']) ?> *<small class="muted">50 mm and above is priced per CBM = the base thickness price per m² × this factor.</small><span class="help-line">Example: 40 → ₹1,600 per m² × 40 = ₹64,000 per CBM.</span></span>
+        <input type="number" name="thick_k_factor" min="1" max="1000" step="0.001" required value="<?= View::e((string) $settings['thick_k_factor']) ?>" placeholder="e.g. 40"<?= $__ro ?>></label>
+    </fieldset>
+
     <fieldset><legend>Order Lines</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['require_product_pick']) ?> <small class="muted">On: a goods line on a USD order must be picked from Products (so its price is checked against the floor); a goods line typed by hand is refused. Service and charge lines can still be typed. Off: goods lines may be typed by hand and are not price-checked.</small><span class="help-line">Example: on — typing "Granite slab" by hand on a USD order is refused; pick it from Products so its price is checked.</span></span>
         <select name="require_product_pick"<?= $__ro ?>>

@@ -2239,6 +2239,32 @@
         {% if permissions.manage_supplier_po %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/supplier-po" id="supplier-po-form">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          {# D-361 (decision 2, mockups p8 / decision_d2): choose the supplier from their quoted prices — the price fills in. #}
+          <input type="hidden" name="supplier_offer_id" value="">
+          <input type="hidden" name="quoted_unit_price_inr" value="">
+          {% for spl in spoOffers %}
+            <table class="list spo-offers" data-testid="spo-offers">
+              <tr><th>Line {{ spl.line_no }}: {{ spl.product }}{% if spl.quantity !== null %}, {{ spl.quantity | qtyTrim }} {{ spl.unit }}{% endif %}{% if spl.thickness %} ({{ spl.thickness }}){% endif %}</th>
+                <th>Quoted ₹ per unit</th><th>Valid until</th><th>PO value ₹ (this line)</th><th>Choose</th></tr>
+              {% for so in spl.offers %}
+                <tr class="{{ '' if so.offered else 'not-offered' }}">
+                  <td>{{ so.supplier }}{% if not so.offered %} ({{ so.why_not }}){% endif %}</td>
+                  {% if so.offered %}
+                    <td class="{{ 'lowest' if so.lowest else '' }}">₹{{ so.price | money }} {{ so.label }}{% if so.lowest %} (lowest){% endif %}</td>
+                    <td>{{ so.valid_until or '—' }}{% if so.expired %} <span class="spo-expired">expired — confirm price</span>{% endif %}</td>
+                    <td>{% if so.po_value !== null %}₹{{ so.po_value | money }}{% else %}<span class="muted small">units differ</span>{% endif %}</td>
+                    <td><input type="radio" name="spo_offer_pick" value="{{ so.offer_id }}" data-spo-offer data-supplier-id="{{ so.supplier_id }}" data-supplier-name="{{ so.supplier }}"
+                        data-price="{{ so.price.toFixed(2) }}" data-quantity="{{ (spl.quantity | qtyTrim) if spl.quantity !== null else '' }}"
+                        data-unit="{{ spl.unit }}" data-product="{{ spl.product }}" aria-label="Choose {{ so.supplier }}"></td>
+                  {% else %}
+                    <td class="muted">not offered</td><td></td><td></td><td></td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+              {% if not spl.offers.length %}<tr><td colspan="5" class="muted">No supplier has given a price for this product yet — choose the supplier below and type the price.</td></tr>{% endif %}
+            </table>
+          {% endfor %}
+          {% if spoOffers and spoOffers.length %}<p class="muted small">Choosing a supplier fills in the supplier and the unit price (lowest first). You can still change the price — then give the reason; it is kept with the PO. The Supplier PO document is unchanged.</p>{% endif %}
           <div class="field-grid">
           <label>Supplier *
             <select name="supplier_id" id="spo-supplier-select" required>
@@ -2282,6 +2308,7 @@
           <label>Colour Reference<input type="text" name="colour_reference" placeholder="e.g., Jet Black"></label>
           <label>Special Requirements/Instructions<input type="text" name="special_requirements" placeholder="e.g., Polished finish, edge chamfer"></label>
           <label>Unit Price (INR) <small class="muted">(auto-calculates Basic Value when multiplied by Quantity)</small><input type="text" name="unit_price_inr" data-spo-calc="unit_price_inr" placeholder="e.g., 450.00"></label>
+          <label>Reason the price differs from the quote <small class="muted" data-spo-filled>(only when you change a quoted price)</small><textarea name="price_override_reason" rows="2" maxlength="500" data-required-if-differs="unit_price_inr|quoted_unit_price_inr" data-required-if-differs-message="You changed the quoted price — give the reason (at least 10 characters); it is kept with the PO." placeholder="e.g. Agreed ₹178,000 after negotiation on 13 Nov"></textarea></label>
           <label>Basic Value (INR) <small class="muted">(auto: Unit Price &times; Quantity)</small><input type="text" name="basic_value_inr" data-spo-calc="basic_value_inr" placeholder="e.g., 225000.00"></label>
           <label>GST Rate (%)
             <select name="gst_rate_pct" data-spo-calc="gst_rate_pct">

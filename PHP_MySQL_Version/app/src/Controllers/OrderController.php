@@ -384,6 +384,7 @@ final class OrderController
             'units'           => LookupRepository::dropdownOptions('unit'),
             // Owner decision D-245 P2: "Pick from Products" fills the quote price of whoever sells (selling-visible people only).
             'pickerProducts'  => \App\Repositories\ProductRepository::forPicker(),
+            'pickerBlocked'   => \App\Repositories\ProductRepository::notQuotable(), // D-361
             'pickerPrices'    => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
             'pickerSpecs'     => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
             'clientPriceKeys' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::clientKeys(ClientRepository::all()) : [],
@@ -958,8 +959,9 @@ final class OrderController
         if ($id <= 0) {
             return null;
         }
-        $product = \App\Repositories\ProductRepository::find($id);
-        return ($product !== null && (int) $product['is_active'] === 1) ? $id : null;
+        // D-361 (plan rule 4): and quotable — configured with an active supplier offer, or a product
+        // from before migration 13b with no supplier yet (the same products Pick from Products offers).
+        return \App\Repositories\ProductRepository::isQuotable($id) ? $id : null;
     }
 
     /** Owner decision D-245 P2: the New Order form's browser rule — the picker is required while the currency is USD. */
@@ -1699,6 +1701,8 @@ final class OrderController
             'activeUsers' => UserRepository::listActive(),
             'fobTotal' => OrderProductRepository::totalFobValue($orderId),
             'suppliers' => SupplierRepository::all(),
+            // D-361 (decision 2, mockups p8 / decision_d2): every supplier's offer for the order's product lines, for the Supplier PO terms form.
+            'spoOffers' => \App\Services\SupplierOffers::forOrderPo($orderId),
             'logisticsPartners' => \App\Repositories\LogisticsPartnerRepository::all(),
             'supplierPo' => $supplierPo,
             // Owner request (2026-10-27): who to pay in 7e / 10a.
@@ -1729,6 +1733,7 @@ final class OrderController
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             // Owner decision D-245 P2: "Pick from Products" fills the quote price; each line's price check and the MD's approval.
             'pickerProducts' => \App\Repositories\ProductRepository::forPicker(),
+            'pickerBlocked' => \App\Repositories\ProductRepository::notQuotable(), // D-361
             'pickerPrices' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
             'pickerSpecs' => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
             'linePricing' => \App\Services\OrderLinePricing::forOrder($orderId),
@@ -3112,7 +3117,23 @@ final class OrderController
             return;
         }
 
-        OrderSupplierPoRepository::create($orderId, $supplierId, $supplierPoReference, [
+        // D-361 (decision 2): the supplier offer chosen in the table and its quoted price; an agreed
+        // price different from the quote needs a reason, kept with the PO and in the Audit Log.
+        $__offerId = (int) ($_POST['supplier_offer_id'] ?? 0);
+        $__offer = $__offerId > 0 ? \App\Repositories\ProductSupplierRepository::find($__offerId) : null;
+        if ($__offer !== null && (int) ($__offer['supplier_id'] ?? 0) !== $supplierId) {
+            $__offer = null; // a different supplier was chosen after the table row: no quote to compare with
+        }
+        $__quoted = $__offer !== null && is_numeric(str_replace(',', '', (string) ($_POST['quoted_unit_price_inr'] ?? ''))) ? round((float) str_replace(',', '', (string) $_POST['quoted_unit_price_inr']), 2) : null;
+        $__agreedRaw = str_replace(',', '', trim((string) ($_POST['unit_price_inr'] ?? '')));
+        $__overrideReason = trim((string) ($_POST['price_override_reason'] ?? ''));
+        $__overridden = $__quoted !== null && is_numeric($__agreedRaw) && abs((float) $__agreedRaw - $__quoted) > 0.004;
+        if ($__overridden && ($__reasonError = \App\Helpers\ReasonValidator::check($__overrideReason)) !== null) {
+            Flash::set('error', 'Unit price ₹' . number_format((float) $__agreedRaw, 2) . ' is not the quoted ₹' . number_format($__quoted, 2) . ' — give the reason: ' . $__reasonError);
+            header("Location: /orders/{$orderId}#supplier-po-form");
+            return;
+        }
+        $__spoId = OrderSupplierPoRepository::create($orderId, $supplierId, $supplierPoReference, [
             'supplier_type'         => $supplierType !== '' ? $supplierType : null,
             'material_stone_type'   => trim((string) ($_POST['material_stone_type'] ?? '')) ?: null,
             'grade'                 => trim((string) ($_POST['grade'] ?? '')) ?: 'Grade A',
@@ -3140,6 +3161,13 @@ final class OrderController
         ]);
         // External QA report L-23: saving Supplier PO terms was never audit-logged.
         AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_PO_SAVED', 'orders', $orderId, 'supplier_po_reference', null, $supplierPoReference);
+        if ($__offer !== null) {
+            OrderSupplierPoRepository::setOfferChoice($__spoId, $__offerId, $__quoted, $__overridden ? mb_substr($__overrideReason, 0, 500) : null);
+            if ($__overridden) {
+                AuditLogRepository::log(AuthService::currentUserId(), 'SUPPLIER_PO_PRICE_OVERRIDE', 'order_supplier_po', $__spoId, 'unit_price_inr',
+                    '₹' . number_format($__quoted, 2) . ' quoted by ' . $supplier['supplier_legal_name'], '₹' . number_format((float) $__agreedRaw, 2) . ' agreed', $__overrideReason);
+            }
+        }
 
         Flash::set('success', "Supplier PO terms saved ({$supplierPoReference}). Generate the Supplier PO document below.");
         header("Location: /orders/{$orderId}");

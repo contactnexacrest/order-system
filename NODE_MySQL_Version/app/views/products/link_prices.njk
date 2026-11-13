@@ -1,0 +1,52 @@
+{#
+  Owner decision D-361 (13 Nov 2026; decision 3): Products › "Link these prices" — supplier prices typed
+  before the Suppliers directory (D-303) that migration 13b could not link by name. A manager picks the
+  supplier per row (or adds one); the price itself does not change. PHP twin: app/views/products/link_prices.php.
+#}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products?status=all">← Products</a></p>
+  <h1>Link these prices ({{ rows.length }})</h1>
+  <p class="muted">These supplier prices were typed before the Suppliers directory and are not linked to a supplier record yet. Pick the supplier for each — the price does not change. Once a product has a linked supplier, its red "No supplier yet" badge goes.</p>
+  {% if not rows.length %}
+    <p class="muted">Every supplier price is linked to a supplier. <a href="/products?status=all">Back to Products</a></p>
+  {% else %}
+    <table class="list">
+      <tr><th>Product</th><th>Supplier as typed</th><th>Price</th><th>Quoted on · valid until</th><th>Link to supplier *</th></tr>
+      {% for r in rows %}
+        <tr data-unlinked-row="{{ r.id }}">
+          <td><a href="/products/{{ r.product_id }}">{{ r.product_name }}</a>{% if r.used_for_pricing %} <small class="muted">(used for pricing)</small>{% endif %}</td>
+          <td>{{ r.typed_name }}</td>
+          <td>{{ r.price }}</td>
+          <td>{{ r.dates }}</td>
+          <td><form method="post" action="/products/link-prices" class="inline-form" style="display:flex;gap:6px;align-items:center">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="hidden" name="offer_id" value="{{ r.id }}">
+              <select name="supplier_id" required aria-label="Supplier for {{ r.typed_name }}" data-required-message="Choose the supplier.">
+                <option value="">Choose…</option>
+                {% for sp in pickList %}<option value="{{ sp.id }}"{% if picked == sp.id or (sp.name | trim | lower) == (r.typed_name | trim | lower) %} selected{% endif %}>{{ sp.name }}</option>{% endfor %}
+              </select>
+              <button type="submit" class="btn-sm">Link</button>
+            </form></td>
+        </tr>
+      {% endfor %}
+    </table>
+    <details class="quick-add" id="quick-add-supplier">
+      <summary class="btn-sm">+ Add a new supplier (quick)…</summary>
+      <form method="post" action="/suppliers/quick-add" class="field-grid card-nested">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="product_id" value="0">
+        <input type="hidden" name="return_to" value="/products/link-prices">
+        <label>Supplier name *<input type="text" name="quick_name" required minlength="2" maxlength="255" placeholder="e.g. Balaji Stone Exports"></label>
+        <label>Location *<input type="text" name="quick_location" required minlength="2" maxlength="120" placeholder="e.g. Kota, Rajasthan"></label>
+        <label>Phone *<input type="tel" name="quick_phone" required pattern="\+?[0-9][0-9 \-]{6,18}" data-pattern-message="Digits, spaces or dashes, with the country code, e.g. +91-0000000000." placeholder="e.g. +91-0000000000"></label>
+        <label>Supplier type
+          <select name="quick_type">
+            <option value="">Choose…</option>
+            {% for t in supplierTypes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+          </select></label>
+        <p class="small muted full">The supplier is added to the Suppliers directory marked <b>Details pending</b>; then pick it in the row above.</p>
+        <div><button type="submit" class="btn-sm btn-accent">Add supplier</button></div>
+      </form>
+    </details>
+  {% endif %}
+</div>

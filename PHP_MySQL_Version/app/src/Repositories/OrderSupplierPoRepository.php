@@ -45,6 +45,16 @@ final class OrderSupplierPoRepository
         ];
     }
 
+    /**
+     * D-361 (decision 2): the supplier offer chosen on the terms form, its quoted price per unit, and
+     * the reason when the agreed price differs (also in the Audit Log). Not used by the PO document.
+     */
+    public static function setOfferChoice(int $id, int $offerId, ?float $quoted, ?string $reason): void
+    {
+        Database::connection()->prepare('UPDATE order_supplier_po SET supplier_offer_id = :o, quoted_unit_price_inr = :q, price_override_reason = :r WHERE id = :id')
+            ->execute(['o' => $offerId, 'q' => $quoted !== null ? number_format($quoted, 2, '.', '') : null, 'r' => $reason, 'id' => $id]);
+    }
+
     public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data, string $status = 'issued'): int
     {
         $pdo = Database::connection();

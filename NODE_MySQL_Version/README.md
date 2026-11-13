@@ -1694,12 +1694,13 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-12h-price-lock-and-produ
 mysql -u <user> -p <database> < docs/migrations/2026-11-12i-monument-option-and-defaults.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12j-surface-finish-one-list.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13a-suppliers-products-configure.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-13b-products-fixed-base-and-link-legacy.sql
 ```
 
 Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,
 GSTIN, LUT and RCMC values (only a fresh install starts with placeholders). Then add the `fetchFxRate.js` cron line (07:05 IST) — or, with `RUN_JOBS_IN_PROCESS=true`, restart the app so `scheduler.js` runs it — and check outbound HTTPS to `api.frankfurter.app` and `open.er-api.com` (Products › Pricing › Pricing settings › Fetch now), and
 once, as the MD / a product editor: **Products › HS codes › Fix HS codes on products** and
-**Products › Link suppliers** (below).
+**Products › Link these prices** (D-361: shown only while supplier prices typed before the Suppliers directory still need a supplier record; migration 13b links exact names itself).
 
 **Menus (D-320–D-322, SOP 00).** The left menu has 13 entries — Dashboard, Approvals (n), My tasks
 (n) · Orders, Clients, Associates, Products, Procurement & suppliers, Finance & accounts · Reports ·
@@ -1764,9 +1765,9 @@ rate − 2 %; see the job above. **One master for HS code and supplier:** a prod
 picked from the HS Code Master List; a product price's supplier is picked from the Suppliers
 directory (quick-add makes a directory record marked *Details pending*). Two **one-time pages** for
 existing data: **Products › HS codes › Fix HS codes on products** (`/products/fix-hs-codes`, Manage
-product catalogue — choose a master code for each product listed) and **Products › Link suppliers**
-(`/products/link-suppliers`, Record market prices or Manage suppliers — *Match by name* links exact
-names at once; pick or quick-add the rest). Catalogue columns show currency and unit; "Supplier
+product catalogue — choose a master code for each product listed) and **Products › Link these prices**
+(`/products/link-prices`, Record market prices or Manage suppliers — D-361: migration 13b links exact
+names itself; pick or quick-add the supplier for each remaining row; the older `/products/link-suppliers` still works, unlinked). Catalogue columns show currency and unit; "Supplier
 price ₹ / unit" with ≈ USD for product editors; plain names **Staff lowest** and **Associate
 lowest**. Staff see only Quote and Your lowest; associates see no prices in the catalogue.
 Products › Categories › *category* has tabs General · Options and their price effect · Price rules ·

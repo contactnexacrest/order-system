@@ -1,0 +1,60 @@
+{#
+  Owner decision D-361 (13 Nov 2026; decision 1, mockup decision_d1.png part A): "Link a supplier" for
+  a product from before migration 13b that has no supplier yet — the supplier (or "+ new supplier"),
+  their price, per (unit) or for (thickness), quoted on, valid until. The product's configured base
+  price stays as it is (owner decision 1). Saved with supplierOffers.addOffer, the same as the
+  supplier page's "+ Add product". PHP twin: app/views/products/link_supplier.php.
+#}
+{% set pickedId = (old.supplier_id | int) if old.supplier_id else picked %}
+<div class="card">
+  <p class="muted small"><a href="/products?status=no_supplier_yet">← Products</a></p>
+  <h1>Link a supplier — {{ product.name }}</h1>
+  <p><span class="badge badge-danger">No supplier yet</span> <span class="muted small">This product existed before suppliers were linked. It stays active and quotable until a supplier is linked; then the normal rule applies.</span></p>
+  <form method="post" action="/products/{{ product.id }}/link-supplier" class="field-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Supplier *
+      <select name="supplier_id" required data-required-message="Choose the supplier — or add a new one below.">
+        <option value="">Choose…</option>
+        {% for sp in pickList %}<option value="{{ sp.id }}"{% if pickedId == sp.id %} selected{% endif %}>{{ sp.name }}{% if sp.locations.length %} — {{ sp.locations[0] }}{% endif %}</option>{% endfor %}
+      </select></label>
+    <label>Their price (₹) *
+      <input type="text" name="price" inputmode="decimal" required pattern="[0-9,]{1,15}(\.[0-9]{1,2})?" data-pattern-message="The price in ₹, e.g. 158000 or 158000.50." value="{{ old.price or '' }}" placeholder="e.g. 158000"></label>
+    {% if shape.grid %}
+      <label>For *
+        <select name="mm" required data-required-message="Choose the thickness the price is for.">
+          <option value="">Choose…</option>
+          {% set selMm = (old.mm if old.mm !== undefined else (shape.base_mm | string)) %}
+          {% for t in shape.thicknesses %}<option value="{{ t.mm }}"{% if (selMm | string) == (t.mm | string) %} selected{% endif %}>{{ t.label }} (per {{ 'CBM' if t.unit == 'CBM' else 'm²' }})</option>{% endfor %}
+        </select></label>
+    {% else %}
+      <label>Per *
+        <select name="unit" required data-required-message="Choose what the price is per.">
+          <option value="">Choose…</option>
+          {% set selU = old.unit if old.unit !== undefined else shape.units[0].value %}
+          {% for u in shape.units %}<option value="{{ u.value }}"{% if selU == u.value %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
+        </select></label>
+    {% endif %}
+    <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ old.quoted_on or today }}"></label>
+    <label>Valid until<input type="date" name="valid_until" value="{{ old.valid_until or '' }}" data-not-before="[name=quoted_on]" data-not-before-message="Valid until cannot be before the quoted date."></label>
+    <p class="muted small full">{% if configured %}The product's configured base price stays {{ baseText }}. If this supplier quotes a different price, the product shows "Supplier prices changed — Use ₹…" and you decide.{% else %}The product has no base price yet — Configure it after linking to set its selling price.{% endif %}</p>
+    <div class="full"><button type="submit">Save</button> <a class="btn-sm btn-secondary" href="/products?status=no_supplier_yet">Cancel</a></div>
+  </form>
+  <details class="quick-add" id="quick-add-supplier">
+    <summary class="btn-sm">+ new supplier…</summary>
+    <form method="post" action="/suppliers/quick-add" class="field-grid card-nested">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="product_id" value="0">
+      <input type="hidden" name="return_to" value="/products/{{ product.id }}/link-supplier">
+      <label>Supplier name *<input type="text" name="quick_name" required minlength="2" maxlength="255" placeholder="e.g. Balaji Stone Exports"></label>
+      <label>Location *<input type="text" name="quick_location" required minlength="2" maxlength="120" placeholder="e.g. Kota, Rajasthan"></label>
+      <label>Phone *<input type="tel" name="quick_phone" required pattern="\+?[0-9][0-9 \-]{6,18}" data-pattern-message="Digits, spaces or dashes, with the country code, e.g. +91-0000000000." placeholder="e.g. +91-0000000000"></label>
+      <label>Supplier type
+        <select name="quick_type">
+          <option value="">Choose…</option>
+          {% for t in supplierTypes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select></label>
+      <p class="small muted full">The supplier is added to the Suppliers directory marked <b>Details pending</b> and picked above.</p>
+      <div><button type="submit" class="btn-sm btn-accent">Add supplier</button></div>
+    </form>
+  </details>
+</div>

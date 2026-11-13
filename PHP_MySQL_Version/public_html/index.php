@@ -175,6 +175,7 @@ $sampleData = new SampleDataController();
 $dataExport = new DataExportController();
 $backups = new BackupController();
 $products = new ProductController();
+$productConfigure = new \App\Controllers\ProductConfigureController(); // D-361
 $pricing = new PricingController();
 $editPrice = new EditPriceController();
 $testMode = new TestModeController();
@@ -1196,6 +1197,16 @@ $router->get('/products/fix-hs-codes', [$catalogueMaster, 'fixHsCodes'], [Sessio
 $router->post('/products/{id}/hs-code', [$catalogueMaster, 'saveHsCode'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->get('/products/link-suppliers', [$catalogueMaster, 'linkSuppliers'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers'])]);
 $router->post('/products/link-suppliers', [$catalogueMaster, 'saveLinks'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
+// Owner decision D-361 (13 Nov 2026): Configure / Edit (manage_product_catalog only — owner decision 2), "Link a supplier"
+// for a product with no supplier yet (decision 1) and "Link these prices" for legacy supplier prices (decision 3).
+$router->get('/products/link-prices', [$productConfigure, 'linkPricesForm'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers'])]);
+$router->post('/products/link-prices', [$productConfigure, 'linkPrices'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
+$router->get('/products/{id}/configure', [$productConfigure, 'form'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/{id}/configure', [$productConfigure, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/configure/reset', [$productConfigure, 'reset'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/configure/use-price', [$productConfigure, 'usePrice'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->get('/products/{id}/link-supplier', [$productConfigure, 'linkSupplierForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices')]);
+$router->post('/products/{id}/link-supplier', [$productConfigure, 'linkSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 // Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).

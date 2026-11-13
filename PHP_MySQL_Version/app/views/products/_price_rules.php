@@ -19,6 +19,9 @@ $__old = \App\Helpers\Flash::pullOld();
 $__ex = 1600.0;
 $__k = $__r['k'];
 $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fmt($v);
+// D-361: the global values (shown in empty fields) and a "reset to global" per value.
+$__g = $__r['global'];
+$__rg = static fn (string $n): string => $canManagePricing ? ' <button type="button" class="btn-link small" data-clear-field="' . $n . '">reset to global</button>' : '';
 ?>
 <form method="get" action="/products/price-rules" class="field-grid">
   <label>Category
@@ -43,7 +46,7 @@ $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fm
     <?php endforeach; ?>
     <tr data-rule-cbm>
       <td><?= (int) $__r['cbm_from'] ?> mm and above (per CBM)</td>
-      <td class="rule-cell"><?= (int) $__r['base_mm'] ?> mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. 40" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per m² times" class="rule-input"<?= $__ro ?>></td>
+      <td class="rule-cell"><?= (int) $__r['base_mm'] ?> mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. <?= View::e(ThicknessPrices::fmt((float) $__r['global']['thick_k_factor'])) ?>" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per m² times" class="rule-input"<?= $__ro ?>><?= $__rg('thick_k_factor') ?></td>
       <td class="num" data-rule-example><?= $__k !== null ? '₹' . number_format($__ex * $__k, 0) . ' / CBM' : '—' ?></td>
     </tr>
   </table>
@@ -56,13 +59,21 @@ $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fm
   </details>
   <?php endif; ?>
 
+  <?php // D-361 (13 Nov 2026, mockup p6): the category's own %s — empty = follow the global value (Pricing settings). ?>
+  <h2>Margin, other costs and buffer</h2>
+  <div class="field-grid">
+    <label>Margin %<?= $__rg('margin_pct') ?><input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="<?= View::e((string) ($__old['margin_pct'] ?? $__fmt($__r['margin_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['margin_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
+    <label>Other costs %<?= $__rg('other_cost_pct') ?><input type="text" inputmode="decimal" name="other_cost_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['other_cost_pct'] ?? $__fmt($__r['other_cost_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['other_cost_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
+    <label>Buffer %<?= $__rg('buffer_pct') ?><input type="text" inputmode="decimal" name="buffer_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['buffer_pct'] ?? $__fmt($__r['buffer_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['buffer_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
+  </div>
+
   <h2>Container and weight</h2>
   <div class="field-grid">
-    <label>One container holds (CBM)<input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_cbm'] ?? $__fmt($__r['container_cbm']))) ?>" placeholder="e.g. 8"<?= $__ro ?>></label>
-    <label>Maximum (tonnes)<input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_max_t'] ?? $__fmt($__r['container_max_t']))) ?>" placeholder="e.g. 27"<?= $__ro ?>></label>
-    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="<?= View::e((string) ($__old['weight_t_per_cbm'] ?? $__fmt($__r['weight']))) ?>" placeholder="e.g. 2.7"<?= $__ro ?>></label>
+    <label>One container holds (CBM)<?= $__rg('container_cbm') ?><input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_cbm'] ?? $__fmt($__r['container_cbm']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['container_cbm'])) ?> (global)"<?= $__ro ?>></label>
+    <label>Maximum (tonnes)<?= $__rg('container_max_t') ?><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_max_t'] ?? $__fmt($__r['container_max_t']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['container_max_t'])) ?> (global)"<?= $__ro ?>></label>
+    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><?= $__rg('weight_t_per_cbm') ?><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="<?= View::e((string) ($__old['weight_t_per_cbm'] ?? $__fmt($__r['weight']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['weight_t_per_cbm'])) ?> (global)"<?= $__ro ?>></label>
   </div>
-  <p class="small muted">The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
+  <p class="small muted">A value typed here applies to every product in the category that has not changed it for itself; empty = the global value (Pricing settings). "reset to global" empties the value — then Save. The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
   <?php if ($canManagePricing): ?>
     <label>Reason for the change *<textarea name="reason" rows="2" required maxlength="500" placeholder="e.g. Supplier rates for 30 mm went up in November"><?= View::e((string) ($__old['reason'] ?? '')) ?></textarea></label>
     <button type="submit">Save rules</button>

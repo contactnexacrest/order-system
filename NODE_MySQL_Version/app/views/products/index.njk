@@ -1,18 +1,38 @@
+{#
+  Products list. Owner decision D-361 (13 Nov 2026, mockup products_now_vs_after.png): one row per
+  product, built from the suppliers' products — Suppliers (active), Lowest – highest supplier price
+  (each a link to that offer's Edit price), the configured Base price, the USD columns as before, the
+  latest supplier quote, and where the product stands (Configured / Not configured / No active
+  supplier / No supplier yet) with a filter for each. New products come from Procurement › Suppliers ›
+  "+ Add product" ("+ Add Product" and "Link suppliers" are gone from here).
+  PHP twin: app/views/products/index.php.
+#}
+{% set filters = [['active', 'Active'], ['inactive', 'Inactive'], ['all', 'All'], ['not_configured', 'Not configured'], ['no_active_supplier', 'No active supplier'], ['no_supplier_yet', 'No supplier yet']] %}
 <div class="card page-wide">
   <h1>Product Catalog</h1>
-  <p class="muted">The company's products — specifications, HS code, costs and suppliers. Products are picked on order lines and used for price checks. The prices here are internal and are never shown to buyers; an associate sees only their own price list.</p>
+  <p class="muted">One row per product, built from the suppliers' products — specifications, HS code, suppliers and the configured base price. Products are picked on order lines and used for price checks. The prices here are internal and are never shown to buyers; an associate sees only their own price list.</p>
+
+  {% if everCount == 0 and not searched %}
+    <div class="empty-state" data-testid="products-empty">
+      <h2>No products yet</h2>
+      <p>1. Add a supplier · 2. Add the products they offer, with their price · 3. The products appear here — click <b>Configure</b> to set the selling price.</p>
+      {% if canGoSuppliers %}<p><a class="btn-sm" href="/suppliers">Go to Suppliers</a></p>{% endif %}
+    </div>
+  {% else %}
 
   <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
-    <input type="text" name="q" value="{{ query }}" placeholder="Search by name, HS code, or specification…" style="flex:1" aria-label="Search by name, HS code, or specification">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search by name, HS code, specification or supplier…" style="flex:1" aria-label="Search by name, HS code, specification or supplier">
     {% if status != 'active' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
     <button type="submit" class="btn-sm">Search</button>
     {% if searched %}<a class="btn-sm" href="/products{% if status != 'active' %}?status={{ status }}{% endif %}">Clear</a>{% endif %}
   </form>
-  {# Owner (12 Nov 2026): Active · Inactive · All — on the full list and on a search. #}
+  {# Owner (12 Nov 2026): Active · Inactive · All; D-361: Not configured · No active supplier · No supplier yet. #}
   {% if statusCounts %}
     <div class="filter-chip-row" aria-label="Show products by status">
-      {% for k, label in [['active', 'Active'], ['inactive', 'Inactive'], ['all', 'All']] %}
-        <a class="filter-chip{% if status == k %} active{% endif %}" href="/products?status={{ k }}{% if searched %}&amp;q={{ query | urlencode }}{% endif %}">{{ label }} ({{ statusCounts[k] }})</a>
+      {% for k, label in filters %}
+        {% if k in ['active', 'inactive', 'all'] or statusCounts[k] > 0 or status == k %}
+        <a class="filter-chip{% if status == k %} active{% endif %}" href="/products?status={{ k }}{% if searched %}&amp;q={{ query | urlencode }}{% endif %}" data-filter="{{ k }}">{{ label }} ({{ statusCounts[k] }})</a>
+        {% endif %}
       {% endfor %}
     </div>
     {% if status != 'active' %}<p class="muted small">An inactive product cannot be picked on new order lines. "Used on" shows where it is still used: only a product that is not used anywhere can be deleted.</p>{% endif %}
@@ -20,14 +40,16 @@
 
   {# D-304 (point 14): the pricing rate, explained — price build-up viewers only. #}
   {% if canBuildup and fx %}{% include "pricing/_fx_rate_line.njk" %}{% endif %}
-  {% if canBuildup %}<p class="muted small">Supplier prices are in ₹; every other price is in USD per the product's unit, FOB. Yellow badge = this product overrides a global pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked.</p>{% endif %}
+  {% if canBuildup %}<p class="muted small">Supplier prices are in ₹; every other price is in USD per the product's unit, FOB, worked out from the configured base price. Yellow badge = this product overrides a pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked.</p>{% endif %}
   <p>
-    {% if canManage %}<a class="btn-sm btn-accent" href="/products/create">+ Add Product</a> <a class="btn-sm" href="/products/categories">Categories</a>{% endif %}
+    {% if canManage %}<a class="btn-sm" href="/products/categories">Categories</a>{% endif %}
     {% if canPriceRules %}<a class="btn-sm" href="/products/price-rules">Price rules</a>{% endif %}
     {% if canPricingSettings %}<a class="btn-sm" href="/pricing/settings">Pricing settings</a>{% endif %}
     {% if canFixHs %}<a class="btn-sm btn-secondary" href="/products/fix-hs-codes">Fix HS codes</a>{% endif %}
-    {% if canLinkSuppliers %}<a class="btn-sm btn-secondary" href="/products/link-suppliers">Link suppliers</a>{% endif %}
+    {% if canLinkPrices and unlinkedCount > 0 %}<a class="btn-sm btn-secondary" href="/products/link-prices" data-testid="link-these-prices">Link these prices ({{ unlinkedCount }})</a>{% endif %}
+    {% if canGoSuppliers %}<a class="btn-sm btn-secondary" href="/suppliers">Go to Suppliers</a>{% endif %}
   </p>
+  <p class="muted small">New products are added from <b>Procurement › Suppliers › + Add product</b>; they then appear here to configure.</p>
 
   {% if not canBrowse and not searched %}
     <p class="muted">Enter a search term above to find a product. You do not have permission to browse the full catalog list.</p>
@@ -37,51 +59,69 @@
         <th>Name</th>
         <th>HS Code</th>
         <th>Origin</th>
-        {# D-304 (point 14): every column says its currency and unit — one unit in the header when all rows share it. #}
-        {% if canViewPricing %}<th>Supplier price<br>₹ / {{ headerUnit }}</th>{% endif %}
+        {% if canViewPricing %}<th>Suppliers</th><th>Lowest – highest<br>supplier price ₹</th><th>Base price ₹<br>(configured)</th>{% endif %}
         {# Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. #}
-        {% if canBuildup %}<th class="num">Cost<br>USD / {{ headerUnit }}</th><th class="num">Min price<br>USD / {{ headerUnit }}</th><th class="num">Staff lowest<br>USD / {{ headerUnit }}</th><th class="num">Staff quote<br>USD / {{ headerUnit }}</th><th class="num">Associate lowest<br>USD / {{ headerUnit }}</th><th>Supplier price date</th>{% endif %}
+        {% if canBuildup %}<th class="num">Cost<br>USD / {{ headerUnit }}</th><th class="num">Min price<br>USD / {{ headerUnit }}</th><th class="num">Staff lowest<br>USD / {{ headerUnit }}</th><th class="num">Staff quote<br>USD / {{ headerUnit }}</th><th class="num">Associate lowest<br>USD / {{ headerUnit }}</th>{% endif %}
         {# D-305 (point 19): staff see only the quote and their own lowest price. #}
         {% if canStaffPrice %}<th class="num">Quote price<br>USD / {{ headerUnit }}</th><th class="num">Your lowest<br>USD / {{ headerUnit }}</th>{% endif %}
+        {% if canViewPricing or canBuildup %}<th>Latest supplier quote</th>{% endif %}
         <th>Status</th>
         {% if status != 'active' %}<th>Used on</th>{% endif %}
         <th></th>
       </tr>
       {% if not products.length %}
-        <tr><td colspan="14" class="muted">No products found.</td></tr>
+        <tr><td colspan="16" class="muted">No products found.</td></tr>
       {% endif %}
-      {% for p in products %}
-        <tr>
-          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if unitPerRow %} <small class="muted">per {{ p.reference_unit or 'unit' }}</small>{% endif %}{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
-          <td>{{ p.hs_code }}</td>
+      {% for p in products %}{% set st = p.standing %}{% set o = p.offers_view %}
+        <tr data-product-row="{{ p.id }}">
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if unitPerRow %} <small class="muted">per {{ p.reference_unit or 'unit' }}</small>{% endif %}{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
+          <td>{{ p.hs_code if p.hs_code else '—' }}</td>
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
-            <td>{% if p.headline_fob == null %}To Be Confirmed{% else %}₹{{ p.headline_fob | money }}
-              {% if canManage and fx and fx.rate > 0 %}<br><b class="usd-approx">≈ USD {{ (p.headline_fob / fx.rate) | money }}</b>{% endif %}
-              {% if p.headline_basis %}<br><small class="muted">{{ p.headline_basis }}</small>{% endif %}{% endif %}</td>
+            <td>{{ st.usable }} active{% if st.paused > 0 %}<br><small class="muted">{{ st.paused }} paused</small>{% endif %}</td>
+            <td>{% if not o.lowest %}—{% else %}
+              {% if o.lowest.id == o.highest.id %}{% set pair = [[o.lowest, '']] %}{% else %}{% set pair = [[o.lowest, 'price-low'], [o.highest, 'price-high']] %}{% endif %}
+              {% for pr in pair %}{% if not loop.first %} – {% endif %}{% if canEditPrice %}<a href="/products/suppliers/{{ pr[0].id }}/edit-price?from=products" class="{{ pr[1] }}" title="{{ pr[0].supplier_name }} — Edit price">₹{{ pr[0].base.amount }}</a>{% else %}<span class="{{ pr[1] }}">₹{{ pr[0].base.amount }}</span>{% endif %}{% endfor %}
+              <br><small class="muted">{{ o.lowest.base.label }}</small>{% endif %}</td>
+            <td>{% if not o.base %}<span class="muted">not set</span>{% else %}₹{{ o.base.inr | money }}
+              {% if canManage and fx and fx.rate > 0 %}<br><b class="usd-approx">≈ USD {{ (o.base.inr / fx.rate) | money }}</b>{% endif %}
+              <br><small class="muted">{{ o.base.label }}</small>{% endif %}</td>
           {% endif %}
           {% if canBuildup %}{% set b = p.pricing.build %}
             {% if not b %}
-              <td colspan="5" class="muted small">{{ p.pricing.missing }}</td><td>—</td>
+              <td colspan="5" class="muted small">{{ p.pricing.missing }}</td>
             {% else %}
               <td class="num">{{ b.cost | money }}</td>
               <td class="num">{{ b.minimum | money }}</td>
               <td class="num">{{ b.staff_floor | money }}</td>
               <td class="num">{{ b.staff_quote | money }}</td>
               <td class="num">{{ '—' if not p.pricing.lowest else (p.pricing.lowest.floor | money) }}</td>
-              <td>{{ p.pricing.price_date or '—' }}{% if p.pricing.staleness %} <span class="badge {{ 'badge-danger' if p.pricing.staleness == 'expired' else 'badge-warning' }}">{{ p.pricing.staleness }}</span>{% endif %}</td>
             {% endif %}
           {% endif %}
           {% if canStaffPrice %}{% set b = p.pricing.build %}
             <td class="num">{{ '—' if not b else (b.staff_quote | money) }}</td>
             <td class="num">{{ '—' if not b else (b.staff_floor | money) }}</td>
           {% endif %}
-          <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
+          {% if canViewPricing or canBuildup %}
+            <td>{{ (o.latest_quote if o and o.latest_quote else (p.pricing.price_date if p.pricing and p.pricing.price_date else '—')) }}{% if canBuildup and p.pricing.staleness and p.pricing.build %} <span class="badge {{ 'badge-danger' if p.pricing.staleness == 'expired' else 'badge-warning' }}">{{ p.pricing.staleness }}</span>{% endif %}</td>
+          {% endif %}
+          <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span>
+            <br><span class="badge {{ st.badge }}" data-standing="{{ st.key }}">{{ st.label }}</span></td>
           {% if status != 'active' %}<td{% if p.is_active or p.usage.total == 0 %} class="muted"{% endif %}>{{ '—' if p.is_active else p.usage_text }}</td>{% endif %}
-          <td><a class="btn-sm" href="/products/{{ p.id }}">View</a>
-            {% if canManage %}<a class="btn-sm" href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
+          <td>
+            {% if canManage %}{# D-361: Configure (not configured) or Edit — manage_product_catalog only (owner decision 2) #}
+              {% if st.configured %}<a class="btn-sm" href="/products/{{ p.id }}/configure">Edit</a>
+              {% else %}<a class="btn-sm btn-primary" href="/products/{{ p.id }}/configure">Configure</a>{% endif %}
+            {% endif %}
+            {% if st.no_supplier_yet and canLinkSupplier %}<a class="btn-sm btn-primary" href="/products/{{ p.id }}/link-supplier">Link a supplier</a>{% endif %}
+            <br><a href="/products/{{ p.id }}">View</a>
+            {% if canManage %} · <a href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
             {% if canManage and not p.is_active %}
-              <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+              {% if st.can_activate %}
+                <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
+              {% else %}
+                <button type="button" class="btn-sm btn-secondary" disabled title="{{ st.reason }}">Reactivate</button>
+              {% endif %}
               {% if p.delete_refusal === null %}
                 <form method="post" action="/products/{{ p.id }}/delete" class="inline-form" style="display:inline" data-confirm="Delete &quot;{{ p.name }}&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone."><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-danger">Delete…</button></form>
               {% else %}
@@ -92,5 +132,7 @@
         </tr>
       {% endfor %}
     </table>
+    <p class="muted small">"Lowest – highest" are the active suppliers' prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>
+  {% endif %}
   {% endif %}
 </div>

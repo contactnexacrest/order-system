@@ -31,7 +31,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         <?php $__basis = (string) ($r['price_basis'] ?? 'unit'); $__cbm = $__basis === 'cbm'; $__combo = $__basis === 'combo'; $__gridRow = $__basis === 'grid';
           $__used = $__combo ? !empty($r['combo_in_use']) : ($__cbm ? !empty($r['is_cbm_primary']) : !empty($r['is_primary'])); ?>
         <td><?= $__used ? '<span class="badge badge-active">● ' . ($__combo ? 'Exact' : ($__gridRow ? 'All thicknesses' : 'Base')) . '</span>' : '<span class="muted">○</span>' ?></td>
-        <td><?= View::e($r['supplier_name']) ?><?= empty($r['supplier_id']) ? ' <span class="badge badge-warning" title="Typed before the Suppliers directory link — link it on Link suppliers">not linked</span>' : '' ?><?= !empty($r['location']) ? '<br><small class="muted">' . View::e($r['location']) . '</small>' : '' ?></td>
+        <td><?= View::e($r['supplier_name']) ?><?= empty($r['supplier_id']) ? ' <span class="badge badge-warning" title="Typed before the Suppliers directory link — link it on Products › Link these prices">not linked</span>' : '' ?><?= !empty($r['location']) ? '<br><small class="muted">' . View::e($r['location']) . '</small>' : '' ?></td>
         <td><?php if ($__combo): ?><span class="badge badge-purple">Exact: <?= View::e((string) $r['combo_text']) ?></span> <small class="muted">per <?= ($r['combo_per'] ?? 'unit') === 'cbm' ? 'CBM' : View::e($__unit) ?></small>
           <?php elseif ($__gridRow): ?>every thickness<?php else: ?><?= $__cbm ? '<span class="badge">CBM — thick stone</span>' : View::e($__unit) ?><?php endif; ?></td>
         <td class="num">

@@ -167,6 +167,14 @@ async function show(req, res) {
       containerMaxT: String(old.container_max_t ?? (r.container_max_t !== null ? fmt(r.container_max_t) : '')),
       weight: String(old.weight_t_per_cbm ?? (r.weight !== null ? fmt(r.weight) : '')),
       newMm: String(old.new_mm ?? ''), newChange: String(old.new_change ?? ''), reason: String(old.reason ?? ''),
+      // D-361 (mockup p6): the category's own %s (empty = global) and the global values for the empty fields.
+      marginPct: String(old.margin_pct ?? (r.margin_pct !== null ? fmt(r.margin_pct) : '')),
+      otherCostPct: String(old.other_cost_pct ?? (r.other_cost_pct !== null ? fmt(r.other_cost_pct) : '')),
+      bufferPct: String(old.buffer_pct ?? (r.buffer_pct !== null ? fmt(r.buffer_pct) : '')),
+      g: {
+        margin: Number(r.global.margin_pct).toFixed(2), other: Number(r.global.other_cost_pct).toFixed(2), buffer: Number(r.global.buffer_pct).toFixed(2),
+        cbm: fmt(r.global.container_cbm), maxT: fmt(r.global.container_max_t), weight: fmt(r.global.weight_t_per_cbm), k: fmt(r.global.thick_k_factor),
+      },
     };
   }
   res.renderView('products/category', data, 'layout/base');

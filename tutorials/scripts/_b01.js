@@ -75,6 +75,8 @@ async function setup(demo) {
       'contact_phone' => null, 'contact_email' => null, 'fob_source' => 'direct', 'fob_value' => 3280.0, 'factory_cost' => null, 'transportation_cost' => null,
       'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], ${md});
     PricingRepository::setSupplierDates($s, date('Y-m-d'), null);
+    // D-361: a product is offered in Pick from Products once configured — fixed at the supplier's price, as before.
+    App\\Services\\SupplierOffers::setConfiguredBase($p, 3280.0, null, 'SQM', ${md});
     echo $p;`);
   await submitIntake(demo);
   const actors = { exec: { ...A.ROLES.exec, cookies: [] } };

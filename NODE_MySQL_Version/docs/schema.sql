@@ -6701,3 +6701,14 @@ ALTER TABLE catalog_products ADD COLUMN pricing_follow_global TINYINT(1) NOT NUL
 ALTER TABLE product_categories ADD COLUMN margin_pct DECIMAL(6,2) NULL;                 -- empty = follow the global value
 ALTER TABLE product_categories ADD COLUMN other_cost_pct DECIMAL(6,2) NULL;
 ALTER TABLE product_categories ADD COLUMN buffer_pct DECIMAL(6,2) NULL;
+
+-- Owner decision D-361 (13 Nov 2026, migration 2026-11-13b): products — the configured base price
+-- never changes by itself (a fresh install has no products, so configured_base_follows_supplier
+-- is set to 0 by the Configure screen); legacy_no_supplier = 1 marks a product that existed
+-- before 13b with no linked supplier (active, quotable, red "No supplier yet" badge until a
+-- supplier is linked). The Supplier PO keeps the supplier offer chosen, its quoted price and
+-- the reason when staff agreed a different price.
+ALTER TABLE catalog_products ADD COLUMN legacy_no_supplier TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE order_supplier_po ADD COLUMN supplier_offer_id BIGINT UNSIGNED NULL;        -- catalog_product_suppliers.id chosen on the PO terms form
+ALTER TABLE order_supplier_po ADD COLUMN quoted_unit_price_inr DECIMAL(14,2) NULL;      -- that offer's quoted price per unit
+ALTER TABLE order_supplier_po ADD COLUMN price_override_reason VARCHAR(500) NULL;      -- why the agreed price differs from the quote

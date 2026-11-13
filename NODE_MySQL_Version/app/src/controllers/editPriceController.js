@@ -49,12 +49,15 @@ function backUrl(row, from) {
   if (from === 'supplier' && row.supplier_id) return `/suppliers/${Number(row.supplier_id)}/edit#product-prices`;
   // D-360: opened from the Suppliers list.
   if (from === 'suppliers' && row.supplier_id) return `/suppliers#supplier-${Number(row.supplier_id)}`;
+  // D-361: opened from the Products list ("Lowest – highest") or the Configure / Edit screen.
+  if (from === 'products') return '/products?status=all';
+  if (from === 'configure') return `/products/${Number(row.product_id)}/configure`;
   return `/products/${Number(row.product_id)}/market-prices`;
 }
 
 function fromOf(req) {
   const f = String((req.query && req.query.from) || (req.body && req.body.from) || '');
-  return ['supplier', 'suppliers'].includes(f) ? f : 'product';
+  return ['supplier', 'suppliers', 'products', 'configure'].includes(f) ? f : 'product';
 }
 
 /** The form's own address, keeping where it was opened from. */

@@ -67,6 +67,19 @@ Supplier PO's own record at that moment, so the order is self-contained:
 editing, deactivating or deleting the supplier in the directory later
 never changes a Supplier PO already saved against them.
 
+**Choose the supplier from their quoted prices (D-361, 13 Nov 2026).** Above the
+fields, for each order line picked from Products, a table lists every supplier's
+quoted price for that product: **Supplier**, **Quoted ₹ per unit** (at the line's
+thickness), **Valid until** (a past date shows **expired — confirm price**), **PO
+value** for the line quantity, and **Choose**. The lowest is first and marked
+"(lowest)"; a switched-off offer or an inactive supplier shows "not offered".
+Click **Choose** on a row: the **Supplier**, **Unit Price** (and, when empty,
+Quantity, Unit and Material) fill in. You may still change the Unit Price — if
+it differs from the quoted price, **Reason the price differs from the quote** is
+required (at least 10 characters); it is kept with the Supplier PO and in the
+Audit Log. The Supplier PO document looks exactly as before; Supplier POs
+already issued never change.
+
 **Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
 Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %
 are filled in (Basic Value = Unit Price × Quantity; GST Amount = Basic

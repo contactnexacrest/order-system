@@ -14,8 +14,12 @@ use App\Config\Database;
  */
 final class ProductRepository
 {
-    /** The list filter values (owner, 12 Nov 2026): active is the default. */
-    public const STATUSES = ['active', 'inactive', 'all'];
+    /**
+     * The list filter values (owner, 12 Nov 2026): active is the default. D-361 (13 Nov 2026):
+     * also by where the product stands — not configured, no active supplier, no supplier yet
+     * (these three across active and inactive products).
+     */
+    public const STATUSES = ['active', 'inactive', 'all', 'not_configured', 'no_active_supplier', 'no_supplier_yet'];
 
     /** @return array<int, array<string,mixed>> */
     public static function all(bool $activeOnly = true): array
@@ -34,40 +38,60 @@ final class ProductRepository
         return in_array($value, self::STATUSES, true) ? (string) $value : 'active';
     }
 
+    /** D-361: the SQL condition (alias p) for one status filter. */
+    private static function statusSql(string $status): ?string
+    {
+        $o = \App\Services\SupplierOffers::class;
+        $usable = 'EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ' . $o::USABLE_SQL . ')';
+        return match ($status) {
+            'active' => 'p.is_active = 1',
+            'inactive' => 'p.is_active = 0',
+            'not_configured' => 'NOT ' . $o::CONFIGURED_SQL . ' AND NOT ' . $o::NO_SUPPLIER_YET_SQL,
+            'no_active_supplier' => $o::CONFIGURED_SQL . ' AND NOT ' . $o::NO_SUPPLIER_YET_SQL . ' AND NOT ' . $usable,
+            'no_supplier_yet' => $o::NO_SUPPLIER_YET_SQL,
+            default => null,
+        };
+    }
+
     /**
-     * The Products list: active, inactive or all products, optionally narrowed by a search term
-     * (name, HS code or specification).
+     * The Products list: active, inactive or all products (D-361: or not configured / no active
+     * supplier / no supplier yet), optionally narrowed by a search term (name, HS code,
+     * specification or — D-361 — a supplier's name).
      *
      * @return array<int, array<string,mixed>>
      */
     public static function listing(string $status = 'active', ?string $term = null): array
     {
         [$where, $params] = self::listingWhere($term);
-        if ($status === 'active') {
-            $where[] = 'is_active = 1';
-        } elseif ($status === 'inactive') {
-            $where[] = 'is_active = 0';
+        if (($cond = self::statusSql($status)) !== null) {
+            $where[] = $cond;
         }
-        $stmt = Database::connection()->prepare('SELECT * FROM catalog_products' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)) . ' ORDER BY name');
+        $stmt = Database::connection()->prepare('SELECT p.* FROM catalog_products p' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)) . ' ORDER BY p.name');
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     /**
-     * The numbers on the "Active (n) · Inactive (n) · All (n)" chips — the same rows listing() returns.
+     * The numbers on the filter chips — the same rows listing() returns.
      *
-     * @return array{active:int, inactive:int, all:int}
+     * @return array<string,int>
      */
     public static function statusCounts(?string $term = null): array
     {
         [$where, $params] = self::listingWhere($term);
-        $stmt = Database::connection()->prepare(
-            'SELECT COALESCE(SUM(is_active = 1), 0) AS active, COALESCE(SUM(is_active = 0), 0) AS inactive, COUNT(*) AS total
-             FROM catalog_products' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where))
-        );
+        $sums = [];
+        foreach (self::STATUSES as $st) {
+            $cond = self::statusSql($st);
+            $sums[] = $cond === null ? 'COUNT(*) AS `all`' : "COALESCE(SUM({$cond}), 0) AS `{$st}`";
+        }
+        $stmt = Database::connection()->prepare('SELECT ' . implode(', ', $sums) . ' FROM catalog_products p' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where)));
         $stmt->execute($params);
         $r = $stmt->fetch() ?: [];
-        return ['active' => (int) ($r['active'] ?? 0), 'inactive' => (int) ($r['inactive'] ?? 0), 'all' => (int) ($r['total'] ?? 0)];
+        $out = [];
+        foreach (self::STATUSES as $st) {
+            $out[$st] = (int) ($r[$st] ?? 0);
+        }
+        return $out;
     }
 
     /** @return array{0: list<string>, 1: array<string,string>} */
@@ -77,12 +101,13 @@ final class ProductRepository
         if ($term === '') {
             return [[], []];
         }
-        // Three distinct placeholders, not :term reused three times —
-        // PDO::ATTR_EMULATE_PREPARES is off (native prepares), which
-        // doesn't allow binding one named parameter to multiple positions
-        // in the same query (throws "Invalid parameter number").
+        // Distinct placeholders, not :term reused — PDO::ATTR_EMULATE_PREPARES is off (native
+        // prepares), which doesn't allow binding one named parameter to multiple positions.
+        // D-361: a supplier's name (typed, or the directory supplier's legal name) matches too.
         $needle = '%' . $term . '%';
-        return [['(name LIKE :term1 OR hs_code LIKE :term2 OR specifications LIKE :term3)'], ['term1' => $needle, 'term2' => $needle, 'term3' => $needle]];
+        return [['(p.name LIKE :term1 OR p.hs_code LIKE :term2 OR p.specifications LIKE :term3 OR EXISTS (SELECT 1 FROM catalog_product_suppliers cs
+            LEFT JOIN suppliers sx ON sx.id = cs.supplier_id WHERE cs.product_id = p.id AND (cs.supplier_name LIKE :term4 OR sx.supplier_legal_name LIKE :term5)))'],
+            ['term1' => $needle, 'term2' => $needle, 'term3' => $needle, 'term4' => $needle, 'term5' => $needle]];
     }
 
     /** @return array<int, array<string,mixed>> products matching the term (active ones unless a status is given) */
@@ -151,12 +176,43 @@ final class ProductRepository
             ->execute(['a' => $active ? 1 : 0, 'u' => $userId, 'id' => $id]);
     }
 
-    /** @return array<int, array{id:int,name:string,hs_code:string,specifications:string,reference_unit:?string}> active products for the "Pick from Products" list */
+    /**
+     * Active products for the "Pick from Products" list. D-361 (plan rule 4): only QUOTABLE ones —
+     * configured with at least one active supplier offer, or a product from before migration 13b
+     * that has no supplier yet.
+     *
+     * @return array<int, array{id:int,name:string,hs_code:string,specifications:string,reference_unit:?string}>
+     */
     public static function forPicker(): array
     {
         return Database::connection()->query(
-            'SELECT id, name, hs_code, specifications, reference_unit FROM catalog_products WHERE is_active = 1 ORDER BY name'
+            'SELECT p.id, p.name, p.hs_code, p.specifications, p.reference_unit FROM catalog_products p WHERE p.is_active = 1 AND '
+            . \App\Services\SupplierOffers::quotableSql() . ' ORDER BY p.name'
         )->fetchAll();
+    }
+
+    /**
+     * D-361: products staff may look for but cannot pick yet — not configured, or no active
+     * supplier — with the reason shown in the picker. A product deliberately deactivated (and
+     * otherwise ready) is left out, as before.
+     *
+     * @return list<array{id:int,name:string,reason:string}>
+     */
+    public static function notQuotable(): array
+    {
+        $o = \App\Services\SupplierOffers::class;
+        $rows = Database::connection()->query('SELECT p.id, p.name, ' . $o::CONFIGURED_SQL . ' AS configured FROM catalog_products p WHERE NOT '
+            . $o::quotableSql() . ' ORDER BY p.name')->fetchAll();
+        return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name'],
+            'reason' => (int) $r['configured'] === 1 ? 'no active supplier — ask Procurement' : 'not configured yet — ask the product manager'], $rows);
+    }
+
+    /** D-361: whether the product may be quoted now (active and quotable). */
+    public static function isQuotable(int $id): bool
+    {
+        $st = Database::connection()->prepare('SELECT COUNT(*) FROM catalog_products p WHERE p.id = :id AND p.is_active = 1 AND ' . \App\Services\SupplierOffers::quotableSql());
+        $st->execute(['id' => $id]);
+        return (int) $st->fetchColumn() > 0;
     }
 
     public static function find(int $id): ?array

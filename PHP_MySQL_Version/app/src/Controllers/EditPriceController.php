@@ -54,13 +54,20 @@ final class EditPriceController
         if ($from === 'suppliers' && !empty($row['supplier_id'])) {
             return '/suppliers#supplier-' . (int) $row['supplier_id'];
         }
+        // D-361: opened from the Products list ("Lowest – highest") or the Configure / Edit screen.
+        if ($from === 'products') {
+            return '/products?status=all';
+        }
+        if ($from === 'configure') {
+            return '/products/' . (int) $row['product_id'] . '/configure';
+        }
         return '/products/' . (int) $row['product_id'] . '/market-prices';
     }
 
     private static function from(): string
     {
         $f = (string) ($_GET['from'] ?? $_POST['from'] ?? '');
-        return in_array($f, ['supplier', 'suppliers'], true) ? $f : 'product';
+        return in_array($f, ['supplier', 'suppliers', 'products', 'configure'], true) ? $f : 'product';
     }
 
     /** The form's own address, keeping where it was opened from. */

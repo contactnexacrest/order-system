@@ -12,7 +12,9 @@
   <p class="muted">Used on: <strong><?= View::e($usageText) ?></strong></p>
   <?php if ($canManage): ?>
     <p>
-      <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/edit">Edit</a>
+      <?php // D-361: Configure / Edit pricing (the base price and the three levels). ?>
+      <a class="btn-sm btn-primary" href="/products/<?= (int) $product['id'] ?>/configure"><?= \App\Services\SupplierOffers::isConfigured($product) ? 'Edit pricing' : 'Configure' ?></a>
+      <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/edit">Edit details</a>
       <?php // Owner decision D-358 (13 Nov 2026): a copy of this product, Inactive until checked. ?>
       <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/duplicate" data-duplicate-link>Duplicate</a>
       <?php if ($product['is_active']): ?>

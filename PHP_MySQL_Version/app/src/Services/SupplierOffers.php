@@ -204,7 +204,10 @@ final class SupplierOffers
     /** Keeps the stored copy of a FOLLOWING base price the same as the supplier price it follows. */
     public static function refreshFollowedBase(array $product, ?int $userId = null): void
     {
-        if ((int) ($product['configured_base_follows_supplier'] ?? 1) !== 1) {
+        // D-361 (owner decision 1): the base price never changes by itself — after migration 13b no
+        // configured product follows the supplier, and a product never configured has no base price
+        // to keep in step (Configure sets it), so this only acts on a base price still following.
+        if ((int) ($product['configured_base_follows_supplier'] ?? 1) !== 1 || ($product['configured_base_price_inr'] ?? null) === null) {
             return;
         }
         $offer = PricingService::pricingSupplier((int) $product['id']);
@@ -670,11 +673,10 @@ final class SupplierOffers
         if ($primary) {
             (new ProductService())->setPrimarySupplier($productId, $id, $userId);
         }
+        // D-361 (owner decision 1): the product's base price does not change by itself — a manager
+        // configures it (or clicks "Use ₹X"). A product with no supplier yet now has one.
+        self::supplierLinked($productId, $userId);
         $fresh = ProductRepository::find($productId) ?? $product;
-        if ($primary && !$newProduct) {
-            // The product had no supplier price used for pricing: its base price now follows this one.
-            self::refreshFollowedBase($fresh, $userId);
-        }
         $after = self::offerBase($fresh, ProductSupplierRepository::find($id) ?? ['id' => $id], $rules);
         ThicknessPrices::history($id, 'Offer added (+ Add product)', null, $after !== null ? '₹' . number_format($after['inr'], 2) . ' ' . $after['label'] : 'added', $userId);
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
@@ -682,5 +684,277 @@ final class SupplierOffers
             . ($grid ? ((int) $in['mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label((int) $in['mm'], (int) $rules['cbm_from']) . ')' : 'per ' . $in['unit'])
             . ' quoted ' . $in['quoted_on'] . ' (+ Add product)' . ($primary ? ' (used for pricing)' : ''));
         return $id;
+    }
+
+    // ------------------------------------------------------------------ D-361: products, Configure, Supplier PO
+
+    /** SQL: an offer row (alias cps) that is usable — switched on and its directory supplier (if any) active. */
+    public const USABLE_SQL = "(cps.offer_active = 1 AND (cps.supplier_id IS NULL OR EXISTS (SELECT 1 FROM suppliers sd WHERE sd.id = cps.supplier_id AND sd.is_active = 1)))";
+
+    /** SQL: product (alias p) is configured — its base price is fixed (owner decision 1). */
+    public const CONFIGURED_SQL = "(p.configured_base_follows_supplier = 0 AND p.configured_base_price_inr IS NOT NULL)";
+
+    /** SQL: product (alias p) existed before 13b with no supplier, and still has none linked. */
+    public const NO_SUPPLIER_YET_SQL = "(p.legacy_no_supplier = 1 AND NOT EXISTS (SELECT 1 FROM catalog_product_suppliers cps2 WHERE cps2.product_id = p.id AND cps2.supplier_id IS NOT NULL))";
+
+    /** SQL: product (alias p) may be active and quoted (plan rule 4 with the decision-1 exception). */
+    public static function quotableSql(): string
+    {
+        return '(' . self::NO_SUPPLIER_YET_SQL . ' OR (' . self::CONFIGURED_SQL
+            . ' AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ' . self::USABLE_SQL . ')))';
+    }
+
+    /** Whether the product's base price is configured (fixed). */
+    public static function isConfigured(array $product): bool
+    {
+        return (int) ($product['configured_base_follows_supplier'] ?? 1) === 0 && ($product['configured_base_price_inr'] ?? null) !== null;
+    }
+
+    /**
+     * D-361: where a product stands — configured, its usable / paused offers, "No supplier yet"
+     * (existed before 13b with no linked supplier), whether it may be switched Active (and so
+     * quoted), and the one status the Products list shows.
+     *
+     * @return array{configured: bool, usable: int, paused: int, linked: bool, no_supplier_yet: bool, can_activate: bool, quotable: bool, key: string, label: string, badge: string, reason: ?string}
+     */
+    public static function status(array $product, ?array $offers = null): array
+    {
+        $offers ??= self::offers((int) $product['id']);
+        $usable = count(array_filter($offers, static fn (array $o): bool => !empty($o['usable'])));
+        $linked = count(array_filter($offers, static fn (array $o): bool => ($o['supplier_id'] ?? null) !== null)) > 0;
+        $configured = self::isConfigured($product);
+        $noSupplierYet = (int) ($product['legacy_no_supplier'] ?? 0) === 1 && !$linked;
+        $canActivate = $noSupplierYet || ($configured && $usable > 0);
+        if ($noSupplierYet) {
+            [$key, $label, $badge] = ['no_supplier_yet', 'No supplier yet', 'badge-danger'];
+        } elseif (!$configured) {
+            [$key, $label, $badge] = ['not_configured', 'Not configured', 'badge-warning'];
+        } elseif ($usable === 0) {
+            [$key, $label, $badge] = ['no_active_supplier', 'No active supplier', 'badge-danger'];
+        } else {
+            [$key, $label, $badge] = ['configured', 'Configured', 'badge-success'];
+        }
+        $reason = $canActivate ? null : (!$configured ? 'Not configured yet — ask the product manager.' : 'No active supplier — ask Procurement to add or switch on a supplier\'s price.');
+        return ['configured' => $configured, 'usable' => $usable, 'paused' => count($offers) - $usable, 'linked' => $linked, 'no_supplier_yet' => $noSupplierYet,
+            'can_activate' => $canActivate, 'quotable' => $canActivate && (int) ($product['is_active'] ?? 0) === 1, 'key' => $key, 'label' => $label, 'badge' => $badge, 'reason' => $reason];
+    }
+
+    /** D-361: a directory supplier is now linked to the product — "No supplier yet" ends (the normal rule applies). */
+    public static function supplierLinked(int $productId, ?int $userId = null): void
+    {
+        $st = Database::connection()->prepare('UPDATE catalog_products SET legacy_no_supplier = 0 WHERE id = :id AND legacy_no_supplier = 1');
+        $st->execute(['id' => $productId]);
+        if ($st->rowCount() > 0 && $userId !== null) {
+            AuditLogRepository::log($userId, 'PRODUCT_SUPPLIER_LINKED', 'catalog_products', $productId, 'legacy_no_supplier', '1', '0');
+        }
+    }
+
+    /** When an offer's price last changed (the row, its thickness prices or its history). */
+    private static function offerChangedAt(int $offerId): ?string
+    {
+        $st = Database::connection()->prepare('SELECT GREATEST(
+              COALESCE((SELECT MAX(updated_at) FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :a), \'1000-01-01\'),
+              COALESCE((SELECT MAX(changed_at) FROM catalog_supplier_price_history WHERE product_supplier_id = :b AND what NOT LIKE \'Linked to supplier%\' AND what <> \'Offer active\'), \'1000-01-01\'))');
+        $st->execute(['a' => $offerId, 'b' => $offerId]);
+        $v = (string) $st->fetchColumn();
+        return $v === '' || str_starts_with($v, '1000-01-01') ? null : $v;
+    }
+
+    /**
+     * D-361 (owner decision 1): "Supplier prices changed: highest is now ₹X" — when the highest
+     * usable supplier price (quoted the same way as the base price) differs from the configured
+     * base price and a supplier price changed after the product was configured. Null otherwise.
+     *
+     * @return array{inr: float, mm: ?int, unit: string, label: string, supplier: string}|null
+     */
+    public static function priceChange(array $product, ?array $lh = null): ?array
+    {
+        if (!self::isConfigured($product)) {
+            return null;
+        }
+        $lh ??= self::lowestHighest($product);
+        $high = $lh['highest'];
+        if ($high === null || abs((float) $high['base']['inr'] - (float) $product['configured_base_price_inr']) < 0.005) {
+            return null;
+        }
+        $at = (string) ($product['configured_at'] ?? '');
+        $changed = false;
+        foreach ($lh['offers'] as $o) {
+            $c = self::offerChangedAt((int) $o['id']);
+            if ($c !== null && ($at === '' || $c > $at)) {
+                $changed = true;
+                break;
+            }
+        }
+        if (!$changed) {
+            return null;
+        }
+        return ['inr' => (float) $high['base']['inr'], 'mm' => $high['base']['mm'], 'unit' => (string) $high['base']['unit'], 'label' => (string) $high['base']['label'],
+            'supplier' => (string) $high['supplier_name']];
+    }
+
+    /**
+     * D-361: the Products list row figures — suppliers (usable / paused), lowest – highest supplier
+     * price (each a link to that offer's Edit price), the configured base price and its status.
+     *
+     * @return array<string,mixed>
+     */
+    public static function productRow(array $product, ?array $settings = null): array
+    {
+        $offers = self::offers((int) $product['id']);
+        $status = self::status($product, $offers);
+        $lh = self::lowestHighest($product, $settings);
+        $cfg = self::isConfigured($product) ? ['inr' => (float) $product['configured_base_price_inr'],
+            'label' => self::baseLabel($product, $settings)] : null;
+        $latest = null;
+        foreach ($offers as $o) {
+            $d = !empty($o['quoted_on']) ? substr((string) $o['quoted_on'], 0, 10) : null;
+            if ($o['usable'] && $d !== null && ($latest === null || $d > $latest)) {
+                $latest = $d;
+            }
+        }
+        return ['status' => $status, 'lowest' => $lh['lowest'], 'highest' => $lh['highest'], 'base' => $cfg, 'latest_quote' => $latest];
+    }
+
+    /** "per CBM (50 mm and above)", "per m² (20 mm)", "per Sq.Ft" for the configured base price. */
+    public static function baseLabel(array $product, ?array $settings = null): string
+    {
+        $mm = ($product['configured_base_thickness_mm'] ?? null) !== null ? (int) $product['configured_base_thickness_mm'] : null;
+        if ($mm !== null) {
+            $rules = ThicknessPrices::rules($product, $settings);
+            return ($mm === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . ')';
+        }
+        $u = (string) ($product['configured_base_unit'] ?? '');
+        return 'per ' . ($u === '' ? 'unit' : (LineUnits::label($u) ?: $u));
+    }
+
+    /**
+     * D-361 (owner decision 3): supplier prices typed before the Suppliers directory and still not
+     * linked to a supplier record — for Products › "Link these prices".
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function unlinkedPrices(?array $settings = null): array
+    {
+        $settings ??= PricingService::settings();
+        $rows = Database::connection()->query('SELECT cps.* FROM catalog_product_suppliers cps JOIN catalog_products p ON p.id = cps.product_id
+            WHERE cps.supplier_id IS NULL ORDER BY p.name, cps.supplier_name, cps.id')->fetchAll(\PDO::FETCH_ASSOC);
+        $out = [];
+        $products = [];
+        foreach ($rows as $r) {
+            $pid = (int) $r['product_id'];
+            $products[$pid] ??= ProductRepository::find($pid);
+            if ($products[$pid] === null) {
+                continue;
+            }
+            $row = self::listRow($products[$pid], $r, ThicknessPrices::rules($products[$pid], $settings), $settings);
+            $row['typed_name'] = (string) $r['supplier_name'];
+            $row['used_for_pricing'] = !empty($r['is_primary']);
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /** How many legacy supplier prices still need linking. */
+    public static function unlinkedCount(): int
+    {
+        return (int) Database::connection()->query('SELECT COUNT(*) FROM catalog_product_suppliers cps JOIN catalog_products p ON p.id = cps.product_id WHERE cps.supplier_id IS NULL')->fetchColumn();
+    }
+
+    /**
+     * D-361 (owner decision 3): links one legacy supplier price to a directory supplier (it then
+     * carries the supplier's legal name). Returns an error or null.
+     */
+    public static function linkPrice(int $offerId, int $supplierId, int $userId): ?string
+    {
+        $row = ProductSupplierRepository::find($offerId);
+        if ($row === null) {
+            return 'That supplier price no longer exists.';
+        }
+        if ($row['supplier_id'] !== null) {
+            return 'That supplier price is already linked to a supplier.';
+        }
+        $supplier = \App\Repositories\SupplierRepository::find($supplierId);
+        if ($supplier === null || empty($supplier['is_active'])) {
+            return 'Choose an active supplier from the Suppliers directory.';
+        }
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET supplier_id = :s, supplier_name = :n, updated_by = :u WHERE id = :id AND supplier_id IS NULL')
+            ->execute(['s' => $supplierId, 'n' => mb_substr((string) $supplier['supplier_legal_name'], 0, 255), 'u' => $userId, 'id' => $offerId]);
+        ThicknessPrices::history($offerId, 'Linked to supplier', mb_substr('typed: ' . $row['supplier_name'], 0, 80), mb_substr((string) $supplier['supplier_legal_name'], 0, 80), $userId);
+        AuditLogRepository::log($userId, 'SUPPLIER_PRICE_LINKED', 'product_suppliers', $offerId, 'supplier_id', 'typed: ' . $row['supplier_name'], $supplier['supplier_legal_name'] . ' (#' . $supplierId . ')');
+        self::supplierLinked((int) $row['product_id'], $userId);
+        return null;
+    }
+
+    /**
+     * D-361 (decision 2, mockups p8 / decision_d2): every usable supplier offer of an order line's
+     * product for the Supplier PO terms form — quoted ₹ per unit (at the line's thickness when the
+     * offer has a price for every thickness), valid until (expired marked), the PO value for the
+     * line quantity when the units match; lowest first and marked. Offers that are switched off or
+     * whose supplier is inactive are listed as "not offered".
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function forOrderPo(int $orderId, ?array $settings = null): array
+    {
+        $settings ??= PricingService::settings();
+        $st = Database::connection()->prepare('SELECT id, line_no, catalog_product_id, description, quantity, unit, piece_thickness_cm FROM order_products
+            WHERE order_id = :o AND is_active = 1 AND catalog_product_id IS NOT NULL ORDER BY line_no, id');
+        $st->execute(['o' => $orderId]);
+        $out = [];
+        $today = date('Y-m-d');
+        foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $line) {
+            $product = ProductRepository::find((int) $line['catalog_product_id']);
+            if ($product === null) {
+                continue;
+            }
+            $rules = ThicknessPrices::rules($product, $settings);
+            $cbmFrom = (int) $rules['cbm_from'];
+            $mm = $line['piece_thickness_cm'] !== null && (float) $line['piece_thickness_cm'] > 0 ? (int) round((float) $line['piece_thickness_cm'] * 10) : null;
+            $key = $mm !== null ? ($mm >= $cbmFrom ? ThicknessPrices::CBM : $mm) : null;
+            $qty = $line['quantity'] !== null ? (float) $line['quantity'] : null;
+            $lineUnit = (string) LineUnits::canonical((string) ($line['unit'] ?? ''));
+            $rows = [];
+            foreach (self::offers((int) $product['id']) as $o) {
+                if ($o['supplier_id'] === null || !in_array($o['price_basis'] ?? 'unit', ['unit', 'grid', 'cbm'], true)) {
+                    continue;
+                }
+                $supplier = \App\Repositories\SupplierRepository::find((int) $o['supplier_id']);
+                $price = null;
+                $unit = null;
+                $label = '';
+                if (($o['price_basis'] ?? '') === 'grid') {
+                    $vals = ThicknessPrices::values($rules, ThicknessPrices::storedFor((int) $o['id']), ThicknessPrices::autoFill($o));
+                    if ($key !== null && isset($vals['values'][$key]) && (float) $vals['values'][$key]['price'] > 0) {
+                        $price = (float) $vals['values'][$key]['price'];
+                        $unit = $key === ThicknessPrices::CBM ? 'CBM' : 'm2';
+                        $label = ($key === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label($key, $cbmFrom) . ')';
+                    }
+                }
+                if ($price === null) {
+                    $b = self::offerBase($product, $o, $rules, $settings);
+                    if ($b !== null) {
+                        [$price, $unit, $label] = [(float) $b['inr'], (string) $b['unit'], (string) $b['label']];
+                    }
+                }
+                $sameUnit = $unit !== null && $lineUnit !== '' && (string) LineUnits::canonical($unit) === $lineUnit;
+                $validUntil = !empty($o['valid_until']) ? substr((string) $o['valid_until'], 0, 10) : null;
+                $rows[] = ['offer_id' => (int) $o['id'], 'supplier_id' => (int) $o['supplier_id'],
+                    'supplier' => (string) ($supplier['supplier_legal_name'] ?? $o['supplier_name']),
+                    'offered' => !empty($o['usable']) && $price !== null,
+                    'why_not' => empty($o['usable']) ? (($supplier !== null && empty($supplier['is_active'])) ? 'inactive supplier' : 'offer switched off') : ($price === null ? 'no price' : null),
+                    'price' => $price, 'unit' => $unit, 'label' => $label, 'valid_until' => $validUntil,
+                    'expired' => $validUntil !== null && $validUntil < $today,
+                    'po_value' => $price !== null && $qty !== null && $sameUnit ? round($price * $qty, 2) : null, 'lowest' => false];
+            }
+            usort($rows, static fn (array $a, array $b): int => [$a['offered'] ? 0 : 1, $a['price'] ?? INF] <=> [$b['offered'] ? 0 : 1, $b['price'] ?? INF]);
+            if ($rows !== [] && $rows[0]['offered']) {
+                $rows[0]['lowest'] = true;
+            }
+            $out[] = ['line_id' => (int) $line['id'], 'line_no' => (int) $line['line_no'], 'product_id' => (int) $product['id'], 'product' => (string) $product['name'],
+                'description' => (string) $line['description'], 'quantity' => $qty, 'unit' => (string) ($line['unit'] ?? ''), 'thickness' => $key !== null ? ThicknessPrices::label($key, $cbmFrom) : null,
+                'offers' => $rows];
+        }
+        return $out;
     }
 }

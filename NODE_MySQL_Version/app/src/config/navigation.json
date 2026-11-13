@@ -104,7 +104,6 @@
       "icon": "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"></path>",
       "items": [
         { "label": "All products", "href": "/products", "when": { "any": ["view_product_catalog"] } },
-        { "label": "+ Add product", "href": "/products/create", "when": { "any": ["manage_product_catalog"] } },
         { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
         { "label": "Price rules", "href": "/products/price-rules", "match": ["/products/categories"], "activeQuery": { "tab": ["rules"] }, "when": { "any": ["manage_pricing", "view_price_buildup"] } },
         { "label": "Pricing", "children": [
@@ -117,8 +116,7 @@
         { "label": "HS codes", "children": [
           { "label": "HS codes", "href": "/hs-codes", "when": { "any": ["manage_hs_codes"] } },
           { "label": "Fix HS codes on products", "href": "/products/fix-hs-codes", "when": { "any": ["manage_product_catalog"] } }
-        ] },
-        { "label": "Link suppliers", "href": "/products/link-suppliers", "when": { "any": ["record_market_prices", "manage_suppliers"] } }
+        ] }
       ],
       "crossLinks": [
         { "label": "Open Suppliers in Procurement ›", "href": "/suppliers", "onPaths": ["/products"], "when": { "any": ["manage_suppliers"] } }
