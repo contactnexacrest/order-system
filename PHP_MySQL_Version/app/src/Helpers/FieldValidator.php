@@ -75,6 +75,9 @@ final class FieldValidator
      * e-mailed link) — the amount, if given, above 0 and storable; the date,
      * if given, a real day that is not in the future.
      */
+    /** HNT-005: the earliest payment date a buyer may report (also the date field's min attribute). */
+    public const EARLIEST_PAYMENT_DATE = '2000-01-01';
+
     public static function reportedPayment(string $amount, string $date): ?string
     {
         $amount = trim($amount);
@@ -89,6 +92,10 @@ final class FieldValidator
         }
         if ($date !== '' && (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $date > date('Y-m-d'))) {
             return 'Enter the date you paid (today or earlier).';
+        }
+        // HNT-005: a year like 0000 or 1900 is a typing slip, not a payment date.
+        if ($date !== '' && $date < self::EARLIEST_PAYMENT_DATE) {
+            return 'Enter the date you paid — it cannot be before ' . date('j M Y', (int) strtotime(self::EARLIEST_PAYMENT_DATE)) . '.';
         }
         return null;
     }

@@ -29,9 +29,9 @@
     <form method="post" action="/payment-action/{{ token }}/report" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
-        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456" maxlength="150"></label>
-        <label>Amount Paid ({{ currency }}) *<input type="number" step="0.01" min="0.01" name="amount" required value="{{ amountDue.toFixed(2) if amountDue != null else '' }}" placeholder="e.g. 1500.00"></label>
-        <label>Date Paid *<input type="date" name="payment_date" required value="{{ today() }}"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required maxlength="150" placeholder="e.g. HDFCN26304123456"></label>
+        <label>Amount Paid ({{ currency }}) *<input type="number" step="0.01" min="0.01" max="999999999999.99" name="amount" required value="{{ amountDue.toFixed(2) if amountDue != null else '' }}" placeholder="e.g. 1500.00"></label>
+        <label>Date Paid *<input type="date" name="payment_date" required min="2000-01-01" max="{{ today() }}" value="{{ today() }}"></label>
         <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321" maxlength="255"></label>
         <label class="full">Screenshot or bank receipt of your payment *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
       </div>

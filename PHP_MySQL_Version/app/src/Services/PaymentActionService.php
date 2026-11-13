@@ -136,6 +136,14 @@ final class PaymentActionService
         if ($paymentDate === '' || \DateTimeImmutable::createFromFormat('!Y-m-d', $paymentDate) === false) {
             return ['ok' => false, 'message' => 'Enter the date you paid.'];
         }
+        // HNT-005: the amount must fit (DECIMAL(14,2)) and the date be a real, sensible past day —
+        // checked before the screenshot is stored, so a refused report leaves no file behind.
+        if ($error = \App\Helpers\FieldValidator::reportedPayment($amount, $paymentDate)) {
+            return ['ok' => false, 'message' => $error];
+        }
+        if (mb_strlen($transactionRef) > 150) {
+            return ['ok' => false, 'message' => 'The bank reference can be at most 150 characters.'];
+        }
         if (empty($_FILES['screenshot']['name'])) {
             return ['ok' => false, 'message' => 'Add a screenshot or the bank receipt of your payment.'];
         }

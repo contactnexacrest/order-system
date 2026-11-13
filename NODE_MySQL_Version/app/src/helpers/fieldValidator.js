@@ -121,6 +121,9 @@ function bankReference(value, label = 'The bank reference') {
  * given, a real day that is not in the future. Port of
  * FieldValidator::reportedPayment().
  */
+/** HNT-005: the earliest payment date a buyer may report (also the date field's min attribute). */
+const EARLIEST_PAYMENT_DATE = '2000-01-01';
+
 function reportedPayment(amount, date) {
   const a = String(amount ?? '').trim();
   const d = String(date ?? '').trim();
@@ -134,8 +137,10 @@ function reportedPayment(amount, date) {
     const day = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
     const real = day && day.getUTCFullYear() === Number(m[1]) && day.getUTCMonth() + 1 === Number(m[2]) && day.getUTCDate() === Number(m[3]);
     if (!real || d > todayIst()) return 'Enter the date you paid (today or earlier).';
+    // HNT-005: a year like 0000 or 1900 is a typing slip, not a payment date.
+    if (d < EARLIEST_PAYMENT_DATE) return 'Enter the date you paid — it cannot be before 1 Jan 2000.';
   }
   return null;
 }
 
-module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment, bankReference };
+module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment, bankReference, EARLIEST_PAYMENT_DATE };

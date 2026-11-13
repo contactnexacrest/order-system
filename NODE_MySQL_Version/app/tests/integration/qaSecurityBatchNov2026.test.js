@@ -275,4 +275,47 @@ describe('QA Nov 2026 security batch', () => {
       expect(Number(n.n)).toBe(1);
     });
   });
+
+  describe('HNT-005 public Payment Action form', () => {
+    it('HNT-005: an over-large amount or a 2099 / 0000 / 1900 date is refused beside the form, before any file is stored; never a 500', async () => {
+      const { createTestClient, createTestOrder, createTestFile, createTestDocument } = require('../support/fixtures');
+      const orderRepository = require('../../src/repositories/orderRepository');
+      const orderProductRepository = require('../../src/repositories/orderProductRepository');
+      const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
+      const clientId = await createTestClient();
+      const orderId = await createTestOrder(clientId);
+      await db.execute("UPDATE orders SET payment_method = 'CASH_ADVANCE' WHERE id = :id", { id: orderId });
+      await orderProductRepository.add(orderId, 1, 'Absolute black granite', null, null, '50', false, 'PCS', '150.00');
+      await orderPaymentStatusRepository.initializeForOrder(orderId);
+      const token = await orderRepository.generatePaymentActionToken(orderId);
+      const fileId = await createTestFile(orderId, clientId);
+      const file = await db.queryOne('SELECT server_path FROM file_store WHERE id = :id', { id: fileId });
+      fs.mkdirSync(path.dirname(file.server_path), { recursive: true });
+      fs.writeFileSync(file.server_path, '%PDF-1.4 proforma');
+      const documentId = await createTestDocument(orderId, 'PI', 'sent');
+      await db.execute('UPDATE documents SET pdf_file_id = :f WHERE id = :id', { f: fileId, id: documentId });
+
+      const files = async () => Number((await db.queryOne('SELECT COUNT(*) AS n FROM file_store WHERE order_id = :o', { o: orderId })).n);
+      const before = await files();
+      const agent = request.agent(app);
+      const form = (await agent.get(`/payment-action/${token}`)).text;
+      expect(form).toContain('max="999999999999.99"');
+      expect(form).toContain('min="2000-01-01"');
+      for (const [amount, date, message] of [
+        ['1e20', '2026-11-10', /amount paid/i],
+        ['100', '2099-01-01', /today or earlier/],
+        ['100', '0000-01-01', /today or earlier|cannot be before/],
+        ['100', '1900-01-01', /cannot be before/],
+      ]) {
+        const page = await agent.get(`/payment-action/${token}`);
+        const r = await agent.post(`/payment-action/${token}/report`)
+          .field('_csrf', page.text.match(/name="_csrf"\s+value="([^"]+)"/)[1]).field('transaction_ref', 'TEST-UTR-4').field('amount', amount).field('payment_date', date)
+          .attach('screenshot', Buffer.from('%PDF-1.4 remittance'), 'remittance.pdf');
+        expect([amount, date, r.status]).toEqual([amount, date, 302]);
+        expect((await agent.get(`/payment-action/${token}`)).text).toMatch(message);
+      }
+      expect(await files()).toBe(before);
+      expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM client_payment_reports WHERE order_id = :o', { o: orderId })).n)).toBe(0);
+    });
+  });
 });

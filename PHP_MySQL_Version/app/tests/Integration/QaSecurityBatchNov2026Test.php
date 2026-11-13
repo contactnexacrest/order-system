@@ -241,4 +241,29 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         $n = (int) \App\Config\Database::connection()->query("SELECT COUNT(*) FROM order_payment_receipts WHERE order_id = {$orderId} AND leg = 'milestone'")->fetchColumn();
         self::assertSame(1, $n, implode("\n", $out));
     }
+
+    /** HNT-005: the public Payment Action form refuses an over-large amount and a 2099 / 0000 / 1900 date before anything is stored. */
+    public function testHnt005PaymentActionReportBounds(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient('buyer-' . bin2hex(random_bytes(3)) . '@example.test'));
+        \App\Config\Database::connection()->prepare("UPDATE orders SET payment_method = 'CASH_ADVANCE' WHERE id = :id")->execute(['id' => $orderId]);
+        \App\Repositories\OrderProductRepository::add($orderId, 1, 'Absolute black granite', null, null, '50', false, 'PCS', '150.00');
+        \App\Repositories\OrderPaymentStatusRepository::initializeForOrder($orderId);
+        $this->createTestDocument($orderId, 'PI', 'sent', $this->createTestFile($orderId));
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        // No screenshot is attached: a refusal about the amount/date (not "Add a screenshot") proves the check runs before the upload.
+        $_FILES = [];
+        foreach ([['1e20', '2026-11-10', 'too large'], ['100', '2099-01-01', 'today or earlier'], ['100', '0000-01-01', 'today or earlier'], ['100', '1900-01-01', 'cannot be before']] as [$amount, $date, $expect]) {
+            $_POST = ['transaction_ref' => 'TEST-UTR-4', 'amount' => $amount, 'payment_date' => $date];
+            $r = \App\Services\PaymentActionService::report($order);
+            self::assertFalse($r['ok']);
+            self::assertStringContainsString($expect, $r['message'], "{$amount} / {$date}");
+        }
+        $token = \App\Repositories\OrderRepository::generatePaymentActionToken($orderId);
+        ob_start();
+        (new \App\Controllers\PaymentActionController())->show(['token' => $token]);
+        $html = (string) ob_get_clean();
+        self::assertStringContainsString('max="999999999999.99"', $html);
+        self::assertStringContainsString('min="2000-01-01"', $html);
+    }
 }

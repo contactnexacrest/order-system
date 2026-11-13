@@ -119,6 +119,15 @@ async function report(req, order) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate) || Number.isNaN(new Date(paymentDate).getTime())) {
     return { ok: false, message: 'Enter the date you paid.' };
   }
+  // HNT-005: the amount must fit (DECIMAL(14,2)) and the date be a real, sensible past day —
+  // checked before the screenshot is stored, so a refused report leaves no file behind.
+  const reportError = require('../helpers/fieldValidator').reportedPayment(amount, paymentDate);
+  if (reportError) {
+    return { ok: false, message: reportError };
+  }
+  if ([...transactionRef].length > 150) {
+    return { ok: false, message: 'The bank reference can be at most 150 characters.' };
+  }
   if (!req.file) {
     return { ok: false, message: 'Add a screenshot or the bank receipt of your payment.' };
   }

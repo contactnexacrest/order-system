@@ -83,9 +83,9 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456" maxlength="150"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required maxlength="150" placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
-        <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
+        <label>Date Paid<input type="date" name="payment_date" min="2000-01-01" max="<?= date('Y-m-d') ?>"></label>
         <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321" maxlength="255"></label>
         <label class="full">Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
