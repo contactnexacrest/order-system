@@ -266,4 +266,34 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         self::assertStringContainsString('max="999999999999.99"', $html);
         self::assertStringContainsString('min="2000-01-01"', $html);
     }
+
+    /** HNT-006: a .jpg holding a UTF-8 BOM + "<html><script>" and a .png holding SVG are refused; a real PNG is stored (same rule as Node). */
+    public function testHnt006UploadContentCheckParity(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $png = (string) hex2bin('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4b40000000049454e44ae426082');
+        $cases = [
+            ['x.jpg', "\xEF\xBB\xBF<html><script>alert(1)</script>", false],
+            ['y.png', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', false],
+            ['z.jpg', 'not really a jpeg', false],
+            ['real.png', $png, true],
+        ];
+        foreach ($cases as [$name, $content, $accepted]) {
+            $tmp = tempnam(sys_get_temp_dir(), 'hnt006');
+            file_put_contents($tmp, $content);
+            try {
+                \App\Services\FileUploadService::checkUpload(['name' => $name, 'tmp_name' => $tmp, 'size' => strlen($content), 'error' => UPLOAD_ERR_OK], 'order_additional_document');
+                self::assertTrue($accepted, "{$name} must be refused");
+            } catch (\RuntimeException $e) {
+                self::assertFalse($accepted, "{$name} must be accepted: " . $e->getMessage());
+                self::assertStringContainsString('does not match a safe file type', $e->getMessage());
+            } finally {
+                @unlink($tmp);
+            }
+        }
+        self::assertFalse(\App\Services\FileUploadService::imageContentMismatch("GIF89a....", 'gif'));
+        self::assertFalse(\App\Services\FileUploadService::imageContentMismatch("RIFF\x10\x00\x00\x00WEBPVP8 ", 'webp'));
+        self::assertFalse(\App\Services\FileUploadService::imageContentMismatch("\x00\x00\x00\x18ftypheic", 'heic'));
+        self::assertFalse(\App\Services\FileUploadService::imageContentMismatch('anything', 'pdf'));
+    }
 }

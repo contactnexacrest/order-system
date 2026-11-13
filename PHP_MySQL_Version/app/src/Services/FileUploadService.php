@@ -41,7 +41,44 @@ final class FileUploadService
      * behavior is identical and deterministic on both the PHP and Node
      * stacks (see fileUploadService.js's matching sniffDangerousContent()).
      */
-    private const DANGEROUS_CONTENT_PATTERN = '/^\s*(<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]|<script[\s>]|<\?php|<%)/i';
+    // HNT-006 (QA 13 Nov 2026): an optional UTF-8 byte-order mark and plain ASCII white space
+    // only, written out the same on both stacks (PHP's \s did not skip a BOM, Node's did).
+    private const DANGEROUS_CONTENT_PATTERN = '/^(?:\xEF\xBB\xBF)?[\t\n\x0B\f\r ]*(<!doctype[\t\n\x0B\f\r ]+html|<html[\t\n\x0B\f\r >]|<head[\t\n\x0B\f\r >]|<body[\t\n\x0B\f\r >]|<script[\t\n\x0B\f\r >]|<\?php|<%)/i';
+
+    /**
+     * HNT-006: an image upload must really be that image — its first bytes carry the
+     * format's signature ("magic bytes"). Extension => list of [offset, bytes] of which
+     * one must match. The same table is in fileUploadService.js.
+     */
+    private const IMAGE_SIGNATURES = [
+        'jpg' => [[0, "\xFF\xD8\xFF"]],
+        'jpeg' => [[0, "\xFF\xD8\xFF"]],
+        'png' => [[0, "\x89PNG\r\n\x1A\n"]],
+        'gif' => [[0, 'GIF87a'], [0, 'GIF89a']],
+        'webp' => [[8, 'WEBP']],
+        'bmp' => [[0, 'BM']],
+        'tif' => [[0, "II*\x00"], [0, "MM\x00*"]],
+        'tiff' => [[0, "II*\x00"], [0, "MM\x00*"]],
+        'heic' => [[4, 'ftyp']],
+    ];
+
+    /** HNT-006: true when an image extension's file does not start with that image format's signature. */
+    public static function imageContentMismatch(string $head, string $extension): bool
+    {
+        $signatures = self::IMAGE_SIGNATURES[strtolower($extension)] ?? null;
+        if ($signatures === null) {
+            return false;
+        }
+        if (strtolower($extension) === 'webp' && strncmp($head, 'RIFF', 4) !== 0) {
+            return true;
+        }
+        foreach ($signatures as [$offset, $bytes]) {
+            if (substr($head, $offset, strlen($bytes)) === $bytes) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /** @return bool true if the file's own leading bytes look like HTML/script content, regardless of what extension or Content-Type the browser claimed */
     private static function looksLikeDangerousContent(string $tmpName): bool
@@ -196,7 +233,7 @@ final class FileUploadService
             $maxMb = round(((int) $context['max_size_bytes']) / 1048576, 1);
             throw new \RuntimeException("File \"{$originalName}\" is too large — maximum is {$maxMb} MB for this upload.");
         }
-        if (self::looksLikeDangerousContent($tmpName)) {
+        if (self::looksLikeDangerousContent($tmpName) || self::imageContentMismatch((string) @file_get_contents($tmpName, false, null, 0, 64), $extension)) {
             throw new \RuntimeException("File \"{$originalName}\" was rejected: its content does not match a safe file type for a .{$extension} upload.");
         }
     }
@@ -238,7 +275,7 @@ final class FileUploadService
             throw new \RuntimeException("File \"{$originalName}\" is too large — maximum is {$maxMb} MB for this upload.");
         }
 
-        if (self::looksLikeDangerousContent($tmpName)) {
+        if (self::looksLikeDangerousContent($tmpName) || self::imageContentMismatch((string) @file_get_contents($tmpName, false, null, 0, 64), $extension)) {
             throw new \RuntimeException("File \"{$originalName}\" was rejected: its content does not match a safe file type for a .{$extension} upload.");
         }
 

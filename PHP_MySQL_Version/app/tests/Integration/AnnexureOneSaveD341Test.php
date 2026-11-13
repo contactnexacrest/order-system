@@ -303,7 +303,8 @@ final class AnnexureOneSaveD341Test extends DbTestCase
 
         // A good image that cannot be stored (no real HTTP upload here): the whole save is rolled back.
         $_SESSION['_flash'] = [];
-        $_FILES = ['images' => ['name' => [$one => 'slab.jpg'], 'type' => [$one => 'image/jpeg'], 'tmp_name' => [$one => $tmp], 'error' => [$one => UPLOAD_ERR_OK], 'size' => [$one => 19]]];
+        file_put_contents($tmp, "\xFF\xD8\xFF\xE0 jpeg bytes"); // HNT-006: a .jpg must start with the JPEG signature to pass the check
+        $_FILES = ['images' => ['name' => [$one => 'slab.jpg'], 'type' => [$one => 'image/jpeg'], 'tmp_name' => [$one => $tmp], 'error' => [$one => UPLOAD_ERR_OK], 'size' => [$one => 15]]];
         (new AnnexureController())->saveAll(['id' => (string) $orderId]);
         self::assertSame('error', self::flash()['type'] ?? null);
         self::assertStringStartsWith('Nothing was saved: ', (string) (self::flash()['message'] ?? ''));

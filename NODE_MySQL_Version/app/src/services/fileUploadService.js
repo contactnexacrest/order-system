@@ -47,7 +47,39 @@ async function findContext(contextKey) {
  * bytes, identical to fileUploadService.php's looksLikeDangerousContent(),
  * so behavior matches exactly between stacks.
  */
-const DANGEROUS_CONTENT_PATTERN = /^\s*(<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]|<script[\s>]|<\?php|<%)/i;
+// HNT-006 (QA 13 Nov 2026): an optional UTF-8 byte-order mark and plain ASCII white space
+// only, written out the same on both stacks (JS's \s also skipped a BOM and Unicode spaces, PHP's did not).
+const DANGEROUS_CONTENT_PATTERN = /^\uFEFF?[\t\n\x0B\f\r ]*(<!doctype[\t\n\x0B\f\r ]+html|<html[\t\n\x0B\f\r >]|<head[\t\n\x0B\f\r >]|<body[\t\n\x0B\f\r >]|<script[\t\n\x0B\f\r >]|<\?php|<%)/i;
+
+/**
+ * HNT-006: an image upload must really be that image — its first bytes carry the
+ * format's signature ("magic bytes"). Extension => list of [offset, bytes] of which one
+ * must match. The same table is in FileUploadService.php.
+ */
+const IMAGE_SIGNATURES = {
+  jpg: [[0, [0xff, 0xd8, 0xff]]],
+  jpeg: [[0, [0xff, 0xd8, 0xff]]],
+  png: [[0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]]],
+  gif: [[0, 'GIF87a'], [0, 'GIF89a']],
+  webp: [[8, 'WEBP']],
+  bmp: [[0, 'BM']],
+  tif: [[0, [0x49, 0x49, 0x2a, 0x00]], [0, [0x4d, 0x4d, 0x00, 0x2a]]],
+  tiff: [[0, [0x49, 0x49, 0x2a, 0x00]], [0, [0x4d, 0x4d, 0x00, 0x2a]]],
+  heic: [[4, 'ftyp']],
+};
+
+/** HNT-006: true when an image extension's file does not start with that image format's signature. */
+function imageContentMismatch(buffer, extension) {
+  const ext = String(extension || '').toLowerCase();
+  const signatures = IMAGE_SIGNATURES[ext];
+  if (!signatures) return false;
+  const at = (offset, bytes) => {
+    const b = typeof bytes === 'string' ? Buffer.from(bytes, 'latin1') : Buffer.from(bytes);
+    return buffer.length >= offset + b.length && buffer.subarray(offset, offset + b.length).equals(b);
+  };
+  if (ext === 'webp' && !at(0, 'RIFF')) return true;
+  return !signatures.some(([offset, bytes]) => at(offset, bytes));
+}
 
 /** @returns {boolean} true if the buffer's own leading bytes look like HTML/script content, regardless of what extension or Content-Type the browser claimed */
 function looksLikeDangerousContent(buffer) {
@@ -158,7 +190,7 @@ async function checkUpload(file, contextKey) {
     const maxMb = Math.round((parseInt(context.max_size_bytes, 10) / 1048576) * 10) / 10;
     throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
   }
-  if (looksLikeDangerousContent(file.buffer)) {
+  if (looksLikeDangerousContent(file.buffer) || imageContentMismatch(file.buffer, extension)) {
     throw new Error(`File "${originalName}" was rejected: its content does not match a safe file type for a .${extension} upload.`);
   }
 }
@@ -202,7 +234,7 @@ async function storeOne(buffer, originalName, mimeType, contextKey, subPath, cli
     throw new Error(`File "${originalName}" is too large — maximum is ${maxMb} MB for this upload.`);
   }
 
-  if (looksLikeDangerousContent(buffer)) {
+  if (looksLikeDangerousContent(buffer) || imageContentMismatch(buffer, extension)) {
     throw new Error(`File "${originalName}" was rejected: its content does not match a safe file type for a .${extension} upload.`);
   }
 
@@ -234,4 +266,4 @@ function sanitizePathSegment(value) {
   return String(value).replace(/[^A-Za-z0-9_-]+/g, '-') || 'x';
 }
 
-module.exports = { handleUpload, handleMultipleUploads, sanitizePathSegment, checkUpload, storeUpload, maxBytes };
+module.exports = { handleUpload, handleMultipleUploads, sanitizePathSegment, checkUpload, storeUpload, maxBytes, imageContentMismatch, looksLikeDangerousContent };

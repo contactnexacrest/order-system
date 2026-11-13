@@ -340,4 +340,45 @@ describe('QA Nov 2026 security batch', () => {
       }
     });
   });
+
+  describe('HNT-006 upload content check, same rule on both stacks', () => {
+    const fileUploadService = require('../../src/services/fileUploadService');
+    const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4b40000000049454e44ae426082', 'hex');
+
+    it('HNT-006: a BOM before <html><script> is caught on Node and PHP alike', () => {
+      expect(fileUploadService.looksLikeDangerousContent(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('<html><script>alert(1)</script>')]))).toBe(true);
+      expect(fileUploadService.looksLikeDangerousContent(Buffer.from('%PDF-1.4 <html>'))).toBe(false);
+    });
+
+    it('HNT-006: an image extension must carry that image format\'s signature', () => {
+      const m = fileUploadService.imageContentMismatch;
+      expect(m(PNG, 'png')).toBe(false);
+      expect(m(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]), 'jpg')).toBe(false);
+      expect(m(Buffer.from('GIF89a....'), 'gif')).toBe(false);
+      expect(m(Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 '), 'webp')).toBe(false);
+      expect(m(Buffer.from('\x00\x00\x00\x18ftypheic'), 'heic')).toBe(false);
+      expect(m(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'png')).toBe(true);
+      expect(m(Buffer.from('not really a jpeg'), 'jpg')).toBe(true);
+      expect(m(Buffer.from('anything'), 'pdf')).toBe(false); // only image types are checked
+    });
+
+    it('HNT-006: through the real upload, a BOM+HTML ".jpg" and an SVG ".png" are refused, a real PNG is kept', async () => {
+      const { createTestClient, createTestOrder } = require('../support/fixtures');
+      const orderId = await createTestOrder(await createTestClient());
+      const md = await user('Managing Director');
+      const count = async () => Number((await db.queryOne('SELECT COUNT(*) AS n FROM file_store WHERE order_id = :o', { o: orderId })).n);
+      const before = await count();
+      for (const [name, content] of [
+        ['x.jpg', Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('<html><script>alert(1)</script>')])],
+        ['y.png', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')],
+      ]) {
+        const csrf = (await md.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+        await md.agent.post(`/orders/${orderId}/additional-documents`).field('_csrf', csrf).field('title', 'TEST-upload').attach('document', content, name);
+      }
+      expect(await count()).toBe(before);
+      const csrf = (await md.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      await md.agent.post(`/orders/${orderId}/additional-documents`).field('_csrf', csrf).field('title', 'TEST-upload real').attach('document', PNG, 'real.png');
+      expect(await count()).toBe(before + 1);
+    });
+  });
 });
