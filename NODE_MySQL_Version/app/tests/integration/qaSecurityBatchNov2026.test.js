@@ -224,4 +224,55 @@ describe('QA Nov 2026 security batch', () => {
       }
     });
   });
+
+  describe('HNT-003 remittances recorded at the same moment', () => {
+    const { todayIst } = require('../../src/helpers/dbDateTime');
+
+    async function orderWithAdvanceDue() {
+      const { createTestClient, createTestOrder, allowHandTypedGoodsLines } = require('../support/fixtures');
+      const orderProductRepository = require('../../src/repositories/orderProductRepository');
+      await allowHandTypedGoodsLines();
+      const orderId = await createTestOrder(await createTestClient());
+      await orderProductRepository.add(orderId, 1, 'TEST-QA granite slab', '60x30', 'Polished', '10', false, 'PCS', '250.00');
+      await db.execute('UPDATE orders SET advance_pct = 40 WHERE id = :id', { id: orderId });
+      await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
+      return orderId; // advance due USD 1,000.00 of USD 2,500.00
+    }
+
+    it('HNT-003: two advance remittances of the full advance sent at once — only one is recorded', async () => {
+      const orderId = await orderWithAdvanceDue();
+      const a = await user('Managing Director');
+      const b = await user('Executive Director');
+      const csrfA = (await a.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const csrfB = (await b.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const fields = (ref, inr) => ({ advance_amount: '1000.00', advance_received_at: todayIst(), advance_inr_credited: inr, advance_bank_reference: ref });
+      await Promise.all([
+        a.agent.post(`/orders/${orderId}/payment/advance`).type('form').send({ _csrf: csrfA, ...fields('TEST-UTR-RACE-0', '84000') }),
+        b.agent.post(`/orders/${orderId}/payment/advance`).type('form').send({ _csrf: csrfB, ...fields('TEST-UTR-RACE-1', '84001') }),
+      ]);
+      const n = await db.queryOne("SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = 'advance'", { o: orderId });
+      expect(Number(n.n)).toBe(1);
+      expect(Number(n.t)).toBe(1000);
+    });
+
+    it('HNT-003: a payment milestone recorded twice at the same moment is recorded once', async () => {
+      const paymentMilestoneRepository = require('../../src/repositories/paymentMilestoneRepository');
+      const orderId = await orderWithAdvanceDue();
+      await paymentMilestoneRepository.replaceSchedule(orderId, [{ pct: 10, due_text: 'on shipment' }], 30);
+      await require('../support/fixtures').createTestDocument(orderId, 'PI', 'sent');
+      const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
+      const a = await user('Managing Director');
+      const b = await user('Executive Director');
+      const csrfA = (await a.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const csrfB = (await b.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const fields = (ref, inr) => ({ amount: '250.00', received_on: todayIst(), inr_credited: inr, bank_reference: ref });
+      const rs = await Promise.all([
+        a.agent.post(`/orders/${orderId}/payment/milestones/${m.id}`).type('form').send({ _csrf: csrfA, ...fields('TEST-UTR-MS-0', '21000') }),
+        b.agent.post(`/orders/${orderId}/payment/milestones/${m.id}`).type('form').send({ _csrf: csrfB, ...fields('TEST-UTR-MS-1', '21001') }),
+      ]);
+      expect(rs.map((r) => r.status)).toEqual([302, 302]);
+      const n = await db.queryOne("SELECT COUNT(*) AS n FROM order_payment_receipts WHERE order_id = :o AND leg = 'milestone'", { o: orderId });
+      expect(Number(n.n)).toBe(1);
+    });
+  });
 });

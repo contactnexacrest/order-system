@@ -585,6 +585,9 @@ function orderMessageFiles() {
   return [...uploadMedia.fields([{ name: 'attachments' }, { name: 'attachments[]' }]), flatten];
 }
 
+// HNT-003: payment recording actions run one at a time per order (services/partPaymentService.js claimOrderPayments).
+const paymentLock = require('./services/partPaymentService').withOrderPaymentLock;
+
 // QA Round 6, R6-N05/N07: a record id in a URL (:id, :orderId, ...) is a
 // positive whole number (1-15 digits) — "-1", "0", "1.5", "abc" or a
 // 20-digit id skip the route (404) instead of reaching a query. Port of
@@ -1318,7 +1321,7 @@ app.post('/orders/:id/payment/balance/inr-actual', requireAuth, requirePermissio
 app.post('/orders/:id/payment/balance/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteBalanceInrActual));
 app.post('/orders/:id/payment/freight/inr-actual', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightInrActual));
 app.post('/orders/:id/payment/freight/inr-actual/delete', requireAuth, requirePermission('inr_actual_delete'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteFreightInrActual));
-app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordAdvancePayment));
+app.post('/orders/:id/payment/advance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentLock(ordersController.recordAdvancePayment)));
 app.post('/orders/:id/payment-reports/:reportId/reviewed', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markPaymentReportReviewed));
 // External QA report Q-ROLE-1: clearing a payment (confirming the bank
 // actually received it) is split out of manage_payments (recording it)
@@ -1388,7 +1391,7 @@ app.post('/orders/:id/supplier-po/supplier-link', requireAuth, requirePermission
 app.post('/orders/:id/supplier-po/ack-skip', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipSupplierPoAck));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
-app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
+app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentLock(ordersController.recordFreightPayment)));
 app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
 
 app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.savePacking));
@@ -1402,11 +1405,11 @@ app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'
 app.post('/orders/:id/shipping-bill', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordShippingBill));
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));
 
-app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalancePayment));
+app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentLock(ordersController.recordBalancePayment)));
 app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
 // Owner decision D-215 (5a): the order's own payment schedule, and each milestone between the advance and the balance as its own payment.
 app.post('/orders/:id/payment-schedule', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.saveSchedule));
-app.post('/orders/:id/payment/milestones/:milestoneId', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.record));
+app.post('/orders/:id/payment/milestones/:milestoneId', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentLock(paymentMilestoneController.record)));
 app.post('/orders/:id/payment/milestones/:milestoneId/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.clear));
 
 app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));

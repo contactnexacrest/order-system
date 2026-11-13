@@ -134,7 +134,23 @@ final class PaymentMilestoneController
         return $m !== null && (int) $m['order_id'] === $orderId ? $m : null;
     }
 
+    /** HNT-003: the recording below runs while this order's payment lock is held (PartPaymentService::claimOrderPayments). */
     public function record(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!\App\Services\PartPaymentService::claimOrderPayments($orderId)) {
+            \App\Helpers\Flash::set('error', \App\Services\PartPaymentService::BUSY_MESSAGE);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        try {
+            $this->recordLocked($params);
+        } finally {
+            \App\Services\PartPaymentService::releaseOrderPayments($orderId);
+        }
+    }
+
+    private function recordLocked(array $params): void
     {
         $orderId = (int) $params['id'];
         $m = self::milestoneFor($orderId, $params);

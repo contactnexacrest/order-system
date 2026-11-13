@@ -50,6 +50,62 @@ async function legacyReceipt(orderId, leg, milestoneId, c = db) {
   return ops && ops.amount !== null && ops.received_on !== null ? ops : null;
 }
 
+/**
+ * HNT-003 (QA 13 Nov 2026): one payment recording per order at a time — see
+ * PHP PartPaymentService::claimOrderPayments(). A MySQL named lock held on its
+ * own pool connection (a named lock belongs to one connection) from before the
+ * amounts are read until the save is done.
+ *
+ * @returns {Promise<{release: function(): Promise<void>}|null>} null when it could not be taken in time
+ */
+async function claimOrderPayments(orderId, waitSeconds = 15) {
+  const conn = await db.pool.getConnection();
+  const name = "CONCAT('nx_pay_', DATABASE(), '_', ?)";
+  try {
+    const [[row]] = await conn.query(`SELECT GET_LOCK(${name}, ?) AS got`, [Number(orderId), Number(waitSeconds)]);
+    if (Number(row.got) !== 1) {
+      conn.release();
+      return null;
+    }
+  } catch (err) {
+    conn.release();
+    throw err;
+  }
+  return {
+    async release() {
+      try {
+        await conn.query(`SELECT RELEASE_LOCK(${name})`, [Number(orderId)]);
+      } finally {
+        conn.release();
+      }
+    },
+  };
+}
+
+/** HNT-003: what the recording actions say when the order's payment lock could not be taken. */
+const BUSY_MESSAGE = 'Another payment is being recorded on this order right now — wait a moment, refresh the page and check what is still due.';
+
+/**
+ * HNT-003: wraps an Express handler for a /orders/:id/payment/... recording action so it runs
+ * while the order's payment lock is held.
+ */
+function withOrderPaymentLock(handler) {
+  return async function lockedPaymentHandler(req, res) {
+    const orderId = parseInt(req.params.id, 10);
+    const lock = await claimOrderPayments(orderId);
+    if (!lock) {
+      require('../helpers/flash').set(req, 'error', BUSY_MESSAGE);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    try {
+      await handler(req, res);
+    } finally {
+      await lock.release();
+    }
+  };
+}
+
 async function receivedTotal(orderId, leg, milestoneId = null) {
   // Owner 2 Nov 2026 ("18 yes"): bank charges the banks deducted count as paid by the buyer.
   const row = await db.queryOne('SELECT COUNT(*) AS n, COALESCE(SUM(amount + COALESCE(bank_charges, 0)), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m', { o: orderId, l: leg, m: milestoneId });
@@ -321,6 +377,7 @@ async function pageData(orderId, milestones) {
 
 module.exports = {
   receiptExists,
+  claimOrderPayments, withOrderPaymentLock, BUSY_MESSAGE,
   LEGS, TOLERANCE, SENT_TO_APPROVALS, label, money, receipts, receivedTotal, orderReceivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
   clearCheck, recordShortfall, recordedBy, clearedMessage, pageData,
 };

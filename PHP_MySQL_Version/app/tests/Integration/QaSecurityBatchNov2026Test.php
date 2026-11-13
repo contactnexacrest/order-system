@@ -195,4 +195,50 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
             self::assertSame('rejected', $pdo->query("SELECT status FROM document_reviews WHERE id = {$reviewId}")->fetchColumn());
         }
     }
+
+    /** An order with USD 2,500.00 of goods and a 40 % advance (USD 1,000.00 due). */
+    private function orderWithAdvanceDue(): int
+    {
+        $this->allowHandTypedGoodsLines();
+        $orderId = $this->createTestOrder($this->createTestClient());
+        \App\Repositories\OrderProductRepository::add($orderId, 1, 'TEST-QA granite slab', '60x30', 'Polished', '10', false, 'PCS', '250.00');
+        $pdo = \App\Config\Database::connection();
+        $pdo->prepare('UPDATE orders SET advance_pct = 40 WHERE id = :id')->execute(['id' => $orderId]);
+        $pdo->prepare('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)')->execute(['o' => $orderId]);
+        return $orderId;
+    }
+
+    /** HNT-003: two advance remittances of the full advance recorded at the same moment — only one is saved. */
+    public function testHnt003ConcurrentAdvanceRecordedOnce(): void
+    {
+        $orderId = $this->orderWithAdvanceDue();
+        $md = $this->createTestUser('Managing Director');
+        $ed = $this->createTestUser('Executive Director');
+        $out = $this->runWorkersAtOnce([
+            ['payment', (string) $md, (string) $orderId, 'advance', '1000.00', 'TEST-UTR-RACE-0', '84000'],
+            ['payment', (string) $ed, (string) $orderId, 'advance', '1000.00', 'TEST-UTR-RACE-1', '84001'],
+            ['payment', (string) $md, (string) $orderId, 'advance', '1000.00', 'TEST-UTR-RACE-2', '84002'],
+        ]);
+        $row = \App\Config\Database::connection()->query("SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS t FROM order_payment_receipts WHERE order_id = {$orderId} AND leg = 'advance'")->fetch();
+        self::assertSame(1, (int) $row['n'], implode("\n", $out));
+        self::assertEqualsWithDelta(1000.0, (float) $row['t'], 0.001);
+    }
+
+    /** HNT-003 (hunt idea HNT-L02): one payment milestone recorded twice at the same moment is recorded once. */
+    public function testHnt003ConcurrentMilestoneRecordedOnce(): void
+    {
+        $orderId = $this->orderWithAdvanceDue();
+        \App\Repositories\PaymentMilestoneRepository::replaceSchedule($orderId, [['pct' => 10, 'due_text' => 'on shipment']], 30);
+        $this->createTestDocument($orderId, 'PI', 'sent');
+        $m = \App\Repositories\PaymentMilestoneRepository::forOrder($orderId)[0];
+        $md = $this->createTestUser('Managing Director');
+        $ed = $this->createTestUser('Executive Director');
+        $out = $this->runWorkersAtOnce([
+            ['payment', (string) $md, (string) $orderId, 'milestone', '250.00', 'TEST-UTR-MS-0', '21000', (string) $m['id']],
+            ['payment', (string) $ed, (string) $orderId, 'milestone', '250.00', 'TEST-UTR-MS-1', '21001', (string) $m['id']],
+            ['payment', (string) $md, (string) $orderId, 'milestone', '250.00', 'TEST-UTR-MS-2', '21002', (string) $m['id']],
+        ]);
+        $n = (int) \App\Config\Database::connection()->query("SELECT COUNT(*) FROM order_payment_receipts WHERE order_id = {$orderId} AND leg = 'milestone'")->fetchColumn();
+        self::assertSame(1, $n, implode("\n", $out));
+    }
 }

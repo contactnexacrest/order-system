@@ -2363,7 +2363,23 @@ final class OrderController
         return $raw !== '' && is_numeric($raw) ? (float) $raw : null;
     }
 
+    /** HNT-003: the recording below runs while this order's payment lock is held (PartPaymentService::claimOrderPayments). */
     public function recordAdvancePayment(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!\App\Services\PartPaymentService::claimOrderPayments($orderId)) {
+            \App\Helpers\Flash::set('error', \App\Services\PartPaymentService::BUSY_MESSAGE);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        try {
+            $this->recordAdvancePaymentLocked($params);
+        } finally {
+            \App\Services\PartPaymentService::releaseOrderPayments($orderId);
+        }
+    }
+
+    private function recordAdvancePaymentLocked(array $params): void
     {
         $orderId = (int) $params['id'];
         $amount = (float) ($_POST['advance_amount'] ?? 0);
@@ -3496,7 +3512,23 @@ final class OrderController
      * freight is a Stage 6 ("Freight Payment") activity, so Stage 6 must
      * actually be unlocked first (Stage 5 — Supplier PO — passed).
      */
+    /** HNT-003: the recording below runs while this order's payment lock is held (PartPaymentService::claimOrderPayments). */
     public function recordFreightPayment(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!\App\Services\PartPaymentService::claimOrderPayments($orderId)) {
+            \App\Helpers\Flash::set('error', \App\Services\PartPaymentService::BUSY_MESSAGE);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        try {
+            $this->recordFreightPaymentLocked($params);
+        } finally {
+            \App\Services\PartPaymentService::releaseOrderPayments($orderId);
+        }
+    }
+
+    private function recordFreightPaymentLocked(array $params): void
     {
         $orderId = (int) $params['id'];
         if (!StageGateService::isUnlocked($orderId, 6)) {
@@ -4084,7 +4116,23 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /** HNT-003: the recording below runs while this order's payment lock is held (PartPaymentService::claimOrderPayments). */
     public function recordBalancePayment(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (!\App\Services\PartPaymentService::claimOrderPayments($orderId)) {
+            \App\Helpers\Flash::set('error', \App\Services\PartPaymentService::BUSY_MESSAGE);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        try {
+            $this->recordBalancePaymentLocked($params);
+        } finally {
+            \App\Services\PartPaymentService::releaseOrderPayments($orderId);
+        }
+    }
+
+    private function recordBalancePaymentLocked(array $params): void
     {
         $orderId = (int) $params['id'];
         // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded from the

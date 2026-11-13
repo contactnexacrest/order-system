@@ -65,6 +65,30 @@ final class PartPaymentService
         return round($total, 2);
     }
 
+    /**
+     * HNT-003 (QA 13 Nov 2026): one payment recording per order at a time. Two
+     * staff recording a remittance at the same moment both read "still due"
+     * before either saved, so both passed the over-payment / difference checks
+     * (advance received 200 %). A MySQL named lock per order (and database) is
+     * taken before anything is read and held until the save is done, so the
+     * second recording waits and then sees the first one's receipt. Used by the
+     * advance, freight, balance and payment-milestone recording actions.
+     */
+    public static function claimOrderPayments(int $orderId, int $waitSeconds = 15): bool
+    {
+        $stmt = Database::connection()->prepare("SELECT GET_LOCK(CONCAT('nx_pay_', DATABASE(), '_', :o), :w)");
+        $stmt->execute(['o' => $orderId, 'w' => $waitSeconds]);
+        return (int) $stmt->fetchColumn() === 1;
+    }
+
+    public static function releaseOrderPayments(int $orderId): void
+    {
+        Database::connection()->prepare("SELECT RELEASE_LOCK(CONCAT('nx_pay_', DATABASE(), '_', :o))")->execute(['o' => $orderId]);
+    }
+
+    /** HNT-003: what the recording actions say when the order's payment lock could not be taken. */
+    public const BUSY_MESSAGE = 'Another payment is being recorded on this order right now — wait a moment, refresh the page and check what is still due.';
+
     public static function receivedTotal(int $orderId, string $leg, ?int $milestoneId = null): float
     {
         // Owner 2 Nov 2026 ("18 yes"): bank charges the banks deducted count as paid by the buyer.
