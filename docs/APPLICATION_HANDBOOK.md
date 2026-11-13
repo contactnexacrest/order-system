@@ -4495,6 +4495,7 @@ The app **builds** it from the facts, so it is never blank or wrong. Staff notes
 | Bank charges cost (D-244) | `Bank charges deducted in rupees from <Buyer>'s <leg> remittance for order <ref>: USD x at the bank's rate ₹r = ₹y, credited ₹z, charges ₹g · bank ref <UTR>` |
 | Associate payment (`AssociateTds::paymentDescription`) | `Associate commission for <Associate> — order <ref> — gross ₹84,000.00, TDS u/s 194H ₹1,680.00 (2%), net paid ₹82,320.00 + GST ₹15,120.00 on the associate's tax invoice (input credit), total paid ₹97,440.00 · UTR <ref>` (an associate abroad: `· SWIFT ref <ref>`) |
 | Associate payout cost | `Associate commission to <Associate> on order <ref> (payout no. <n>, settles their commission invoice for this order): ₹84,000.00 + GST ₹15,120.00, TDS ₹1,680.00 · bank ref <ref>` |
+| Supplier advance on a proforma | `Supplier advance payment for order <ref> · Supplier PO <no.> · against Proforma <PI no.> · bank ref <UTR>`; once applied in Books to the tax invoice that replaced it (QA ZOH-006): `… · against Tax invoice <no.> (advance paid on Proforma <PI no.>) · bank ref <UTR>` |
 | Inspection fee | `Pre-shipment inspection fee — <agency>, invoice <no.>` |
 | LC loan interest | `Bank loan interest (LC order) · LC <no.> · loan ₹1,000,000.00 at 9.5%` |
 | Travel % | `Travel expenses (factory visits) — 350 km to the factory, 1.5% of the order value USD 20,000.00 at ₹84.00` |

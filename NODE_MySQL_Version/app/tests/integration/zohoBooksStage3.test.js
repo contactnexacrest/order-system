@@ -185,6 +185,8 @@ describe('Zoho Books Stage 3', () => {
     expect(bill.payload.line_items[0].description.startsWith(`Supplier advance bill for order NX-${o.order} (Supplier PO TEST-SPO-1): taxable 100000.00 + GST 18000.00`)).toBe(true);
     expect(bill.payload.reference_number).toBe(`NX-${o.order}`);
     expect(vendorPayments['VP-1'].bills).toEqual([{ bill_id: 'BL-1', amount_applied: 50000 }]);
+    // QA ZOH-006 (rule D-212): once applied to the tax invoice, it names what it settles in Books and the proforma it was paid on.
+    expect(vendorPayments['VP-1'].description).toBe(`Supplier advance payment for order NX-${o.order} · Supplier PO TEST-SPO-1 · against Tax invoice TEST-INV-77 (advance paid on Proforma TEST-PI-77) · bank ref TEST-UTR-ADV`);
 
     await orderVendorBillRepository.addPayment(invoice, 'balance', '2026-10-28', 68000, 'NEFT / RTGS', 'TEST-UTR-BAL', userId);
     expect(await sync()).toEqual({ bills: 0, payments: 1, applied: 1, expenses: 0, failed: 0, skipped: 0 });

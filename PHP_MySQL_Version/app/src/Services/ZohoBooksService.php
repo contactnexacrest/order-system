@@ -484,6 +484,9 @@ final class ZohoBooksService
         $applied = 0.0;
         if ($targetBill !== null) {
             [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
+            if ($applied > 0) {
+                $payload['description'] = self::vendorPaymentDescription($payment, $bill, $targetBill); // QA ZOH-006
+            }
         }
         // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
         $existing = self::findExistingByReference($config, $accessToken, 'vendorpayments', 'vendorpayments', 'payment_id', (string) ($payload['reference_number'] ?? ''), ['vendor_id' => $vendorId],
@@ -507,7 +510,7 @@ final class ZohoBooksService
      *
      * @throws \RuntimeException on any failure
      */
-    public static function restoreVendorPayment(array $payment, array $bill, ?string $zohoBillId): void
+    public static function restoreVendorPayment(array $payment, array $bill, ?string $zohoBillId, ?array $targetBill = null): void
     {
         ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
         $config = self::config();
@@ -516,6 +519,9 @@ final class ZohoBooksService
         $payload = self::vendorPaymentPayload($config, $vendorId, $payment, $bill);
         if ($zohoBillId !== null) {
             $payload['bills'] = [['bill_id' => $zohoBillId, 'amount_applied' => $payload['amount']]];
+            if ($targetBill !== null) {
+                $payload['description'] = self::vendorPaymentDescription($payment, $bill, $targetBill); // QA ZOH-006
+            }
         }
         $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/vendorpayments/" . rawurlencode((string) $payment['zoho_payment_id']) . '?organization_id=' . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         if ($response['status'] < 200 || $response['status'] >= 300) {
@@ -562,6 +568,8 @@ final class ZohoBooksService
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
         $payload = self::vendorPaymentPayload($config, $vendorId, $payment, $bill);
         [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
+        // QA ZOH-006: applied to the tax invoice that replaced the proforma — the description names what it settles in Books.
+        $payload['description'] = self::vendorPaymentDescription($payment, $bill, $targetBill);
         if ($applied <= 0) {
             throw new \RuntimeException("Bill {$targetBill['bill_no']} in Zoho Books has nothing left to pay, so payment {$payment['payment_ref']} stays unapplied there — ask the CA how to book it.");
         }
@@ -2727,21 +2735,26 @@ final class ZohoBooksService
      * customer payments do — supplier advance / balance, or a logistics
      * partner's advance / final payment — with the order and the bill.
      */
-    private static function vendorPaymentDescription(array $payment, array $bill): string
+    private static function vendorPaymentDescription(array $payment, array $bill, ?array $targetBill = null): string
     {
         $order = (string) ($bill['buyer_inquiry_ref'] ?? '');
         $billLabel = (\App\Repositories\OrderVendorBillRepository::DOC_KINDS[$bill['doc_kind'] ?? ''] ?? 'Bill') . ' ' . $bill['bill_no'];
+        // QA ZOH-006 (rule D-212): a payment applied in Books to the tax invoice that replaced its proforma names
+        // that invoice — what it settles in Books — and the proforma it was paid on.
+        $paidOn = static fn (string $what): string => $targetBill !== null && (string) $targetBill['bill_no'] !== (string) $bill['bill_no']
+            ? (\App\Repositories\OrderVendorBillRepository::DOC_KINDS[$targetBill['doc_kind'] ?? ''] ?? 'Bill') . ' ' . $targetBill['bill_no'] . " ({$what} paid on {$billLabel})"
+            : $billLabel;
         // QA batch 4, ZOH-18 (rule D-212): the bank reference is named in the description too, as on the buyer's payments.
         $bankRef = trim((string) ($payment['payment_ref'] ?? '')) !== '' ? ' · bank ref ' . trim((string) $payment['payment_ref']) : '';
         if (($bill['vendor_kind'] ?? '') === 'supplier') {
             $leg = ($payment['leg'] ?? '') === 'balance' ? 'balance' : 'advance';
             return "Supplier {$leg} payment for order {$order}"
                 . (!empty($bill['supplier_po_reference']) ? " · Supplier PO {$bill['supplier_po_reference']}" : '')
-                . " · against {$billLabel}{$bankRef}";
+                . ' · against ' . $paidOn($leg) . $bankRef;
         }
         $service = \App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for'] ?? ''] ?? 'Logistics';
         $kind = ($bill['payment_kind'] ?? '') === 'advance' ? 'advance' : 'final';
-        return "{$service} — {$kind} payment for order {$order} · against {$billLabel}{$bankRef}";
+        return "{$service} — {$kind} payment for order {$order} · against " . $paidOn($kind) . $bankRef;
     }
 
     /** @return array{0: list<array{bill_id: string, amount_applied: float}>, 1: float} as much of $amount as the bill still owes */

@@ -251,7 +251,7 @@ async function purchases(startDate, triggeredBy, userId) {
       } else if (Math.abs(Number(row.amount) - Number(payment.amount_inr)) > 0.01) {
         if (await locked(String(payment.paid_at), 'vendor_payment', orderId, 'payment', zohoId, `${what} was changed in Zoho Books`, triggeredBy, userId)) continue;
         const target = payment.zoho_applied_at !== null ? await zohoPurchaseRepository.targetBillFor((await zohoPurchaseRepository.findBill(Number(bill.id))) || bill) : null;
-        await zohoBooksService.restoreVendorPayment(payment, bill, target ? String(target.zoho_bill_id) : null);
+        await zohoBooksService.restoreVendorPayment(payment, bill, target ? String(target.zoho_bill_id) : null, target || null);
         await log('vendor_payment', orderId, 'payment', 'success', zohoId, `${RESTORED}${what} put back to INR ${fmt(payment.amount_inr)} (Books had ${fmt(row.amount)}).`);
         out.payments += 1;
       }

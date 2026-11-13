@@ -438,6 +438,7 @@ async function pushVendorPayment(payment, bill, targetBill) {
   let applied = 0;
   if (targetBill) {
     [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
+    if (applied > 0) payload.description = vendorPaymentDescription(payment, bill, targetBill); // QA ZOH-006
   }
   // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
   const existing = await findExistingByReference(config, accessToken, 'vendorpayments', 'vendorpayments', 'payment_id', payload.reference_number || '', { vendor_id: vendorId },
@@ -459,7 +460,7 @@ async function pushVendorPayment(payment, bill, targetBill) {
  *
  * @throws on any failure
  */
-async function restoreVendorPayment(payment, bill, zohoBillId) {
+async function restoreVendorPayment(payment, bill, zohoBillId, targetBill = null) {
   zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
@@ -467,6 +468,7 @@ async function restoreVendorPayment(payment, bill, zohoBillId) {
   const payload = vendorPaymentPayload(config, vendorId, payment, bill);
   if (zohoBillId !== null) {
     payload.bills = [{ bill_id: zohoBillId, amount_applied: payload.amount }];
+    if (targetBill) payload.description = vendorPaymentDescription(payment, bill, targetBill); // QA ZOH-006
   }
   const res = await request('PUT', `https://${config.apiDomain}/books/v3/vendorpayments/${encodeURIComponent(String(payment.zoho_payment_id))}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   if (!res.ok) {
@@ -512,6 +514,8 @@ async function applyVendorPayment(payment, bill, targetBill) {
   const payload = vendorPaymentPayload(config, vendorId, payment, bill);
   let applied;
   [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
+  // QA ZOH-006: applied to the tax invoice that replaced the proforma — the description names what it settles in Books.
+  payload.description = vendorPaymentDescription(payment, bill, targetBill);
   if (applied <= 0) {
     throw new Error(`Bill ${targetBill.bill_no} in Zoho Books has nothing left to pay, so payment ${payment.payment_ref} stays unapplied there — ask the CA how to book it.`);
   }
@@ -1449,18 +1453,23 @@ function vendorPaymentPayload(config, vendorId, payment, bill) {
  * customer payments do — supplier advance / balance, or a logistics
  * partner's advance / final payment — with the order and the bill.
  */
-function vendorPaymentDescription(payment, bill) {
+function vendorPaymentDescription(payment, bill, targetBill = null) {
   const order = String(bill.buyer_inquiry_ref || '');
   const billLabel = `${DOC_KINDS[bill.doc_kind] || 'Bill'} ${bill.bill_no}`;
+  // QA ZOH-006 (rule D-212): a payment applied in Books to the tax invoice that replaced its proforma names
+  // that invoice — what it settles in Books — and the proforma it was paid on.
+  const paidOn = (what) => (targetBill && String(targetBill.bill_no) !== String(bill.bill_no)
+    ? `${DOC_KINDS[targetBill.doc_kind] || 'Bill'} ${targetBill.bill_no} (${what} paid on ${billLabel})`
+    : billLabel);
   // QA batch 4, ZOH-18 (rule D-212): the bank reference is named in the description too, as on the buyer's payments.
   const bankRef = String(payment.payment_ref || '').trim() !== '' ? ` · bank ref ${String(payment.payment_ref).trim()}` : '';
   if (bill.vendor_kind === 'supplier') {
     const leg = payment.leg === 'balance' ? 'balance' : 'advance';
-    return `Supplier ${leg} payment for order ${order}${bill.supplier_po_reference ? ` · Supplier PO ${bill.supplier_po_reference}` : ''} · against ${billLabel}${bankRef}`;
+    return `Supplier ${leg} payment for order ${order}${bill.supplier_po_reference ? ` · Supplier PO ${bill.supplier_po_reference}` : ''} · against ${paidOn(leg)}${bankRef}`;
   }
   const service = LOGISTICS_SERVICES[bill.bill_for] || 'Logistics';
   const kind = bill.payment_kind === 'advance' ? 'advance' : 'final';
-  return `${service} — ${kind} payment for order ${order} · against ${billLabel}${bankRef}`;
+  return `${service} — ${kind} payment for order ${order} · against ${paidOn(kind)}${bankRef}`;
 }
 
 /** As much of amount as the bill still owes. @return {Promise<[Array, number]>} */

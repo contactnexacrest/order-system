@@ -215,6 +215,8 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertStringStartsWith("Supplier advance bill for order NX-{$o['order']} (Supplier PO TEST-SPO-1): taxable 100000.00 + GST 18000.00", $bill['payload']['line_items'][0]['description'], 'owner rule D-212: the bill names its Supplier PO');
         self::assertSame("NX-{$o['order']}", $bill['payload']['reference_number']);
         self::assertSame([['bill_id' => 'BL-1', 'amount_applied' => 50000.0]], $this->vendorPayments['VP-1']['bills']);
+        // QA ZOH-006 (rule D-212): once applied to the tax invoice, it names what it settles in Books and the proforma it was paid on.
+        self::assertSame("Supplier advance payment for order NX-{$o['order']} · Supplier PO TEST-SPO-1 · against Tax invoice TEST-INV-77 (advance paid on Proforma TEST-PI-77) · bank ref TEST-UTR-ADV", $this->vendorPayments['VP-1']['description']);
 
         OrderVendorBillRepository::addPayment($invoice, 'balance', '2026-10-28', 68000.0, 'NEFT / RTGS', 'TEST-UTR-BAL', $this->userId);
         self::assertSame(['bills' => 0, 'payments' => 1, 'applied' => 1, 'expenses' => 0, 'failed' => 0, 'skipped' => 0], $this->sync());

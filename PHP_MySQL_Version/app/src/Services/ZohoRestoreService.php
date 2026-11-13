@@ -263,7 +263,7 @@ final class ZohoRestoreService
                         continue;
                     }
                     $target = $payment['zoho_applied_at'] !== null ? ZohoPurchaseRepository::targetBillFor(ZohoPurchaseRepository::findBill((int) $bill['id']) ?? $bill) : null;
-                    ZohoBooksService::restoreVendorPayment($payment, $bill, $target !== null ? (string) $target['zoho_bill_id'] : null);
+                    ZohoBooksService::restoreVendorPayment($payment, $bill, $target !== null ? (string) $target['zoho_bill_id'] : null, $target);
                     $log('vendor_payment', (int) $bill['order_id'], 'payment', 'success', $zohoId, self::RESTORED . "{$what} put back to INR " . number_format((float) $payment['amount_inr'], 2, '.', '') . ' (Books had ' . number_format((float) $row['amount'], 2, '.', '') . ').');
                     $out['payments']++;
                 }
