@@ -49,6 +49,11 @@ async function run(args) {
     console.error("Refused: --from-sync-log would take this database's real payments and customers. It runs only where ZOHO_ENVIRONMENT=test.");
     return 1;
   }
+  const blocked = zohoGuard.cleanupBlockedReason(); // QA HNT-L09
+  if (blocked !== null) {
+    console.error(blocked);
+    return 1;
+  }
   const option = (name) => {
     const i = args.indexOf(name);
     return i !== -1 && args[i + 1] !== undefined ? args[i + 1] : null;

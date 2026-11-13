@@ -35,11 +35,22 @@ require __DIR__ . '/../bootstrap.php';
 use App\Config\Database;
 use App\Services\ZohoBooksService;
 
+// QA HNT-L09: a command-line job — an error is one plain line on STDERR and exit code 1, never the web error page.
+set_exception_handler(static function (\Throwable $e): void {
+    error_log('[zoho_cleanup_test_records] ' . $e->getMessage());
+    fwrite(STDERR, 'Stopped: ' . $e->getMessage() . "\n");
+    exit(1);
+});
+
 $args = array_slice($argv, 1);
 $apply = in_array('--apply', $args, true);
 $fromSyncLog = in_array('--from-sync-log', $args, true);
 if ($fromSyncLog && App\Services\ZohoGuard::isProduction()) {
     fwrite(STDERR, "Refused: --from-sync-log would take this database's real payments and customers. It runs only where ZOHO_ENVIRONMENT=test.\n");
+    exit(1);
+}
+if (($blocked = App\Services\ZohoGuard::cleanupBlockedReason()) !== null) {
+    fwrite(STDERR, $blocked . "\n");
     exit(1);
 }
 $option = static function (string $name) use ($args): ?string {

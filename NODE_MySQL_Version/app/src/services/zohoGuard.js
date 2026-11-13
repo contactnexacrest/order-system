@@ -27,6 +27,15 @@ function integrationEnabled() {
   return String(env.get('ZOHO_INTEGRATION_ENABLED', 'false')).toLowerCase() === 'true';
 }
 
+/**
+ * QA HNT-L09: why the Zoho test-record clean-up job cannot run here (the server switch is off), or null.
+ * The job prints it as plain text and stops, instead of failing on its first Zoho request.
+ */
+function cleanupBlockedReason() {
+  return integrationEnabled() ? null
+    : 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env) — nothing was read from or removed in Zoho Books.';
+}
+
 /** 'production' only when .env says exactly that; anything else is 'test'. */
 function environment() {
   return String(env.get('ZOHO_ENVIRONMENT', 'test')).toLowerCase() === 'production' ? 'production' : 'test';
@@ -85,6 +94,7 @@ function assertCustomerAllowed(name) {
 }
 
 module.exports = {
+  cleanupBlockedReason,
   VARIABLES, TEST_PREFIX, integrationEnabled, environment, isProduction, governmentFeaturesAllowed,
   missingVariables, isGovernmentUrl, assertRequestAllowed, assertCustomerAllowed,
 };

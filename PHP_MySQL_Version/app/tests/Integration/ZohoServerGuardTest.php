@@ -203,4 +203,17 @@ final class ZohoServerGuardTest extends DbTestCase
         self::assertSame('error', $last['type']);
         self::assertSame('Zoho Mail is not used by this application — all mail goes through the SMTP server in .env (Bluehost).', $last['message']);
     }
+
+    /** QA HNT-L09: with Zoho switched off, the test-record clean-up job says so in plain text and stops. */
+    public function testHntL09TheCleanUpJobStopsInPlainTextWhenZohoIsOff(): void
+    {
+        $this->server('false', 'test', 'false');
+        self::assertSame('Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env) — nothing was read from or removed in Zoho Books.', ZohoGuard::cleanupBlockedReason());
+        $this->server('true', 'test', 'false');
+        self::assertNull(ZohoGuard::cleanupBlockedReason());
+        // The job checks it before its first Zoho request, and an error is one plain line on STDERR (never the web error page).
+        $script = (string) file_get_contents(__DIR__ . '/../../cron/zoho_cleanup_test_records.php');
+        self::assertLessThan(strpos($script, 'listTestContacts()'), strpos($script, 'ZohoGuard::cleanupBlockedReason()'));
+        self::assertStringContainsString("fwrite(STDERR, 'Stopped: ' . \$e->getMessage()", $script);
+    }
 }

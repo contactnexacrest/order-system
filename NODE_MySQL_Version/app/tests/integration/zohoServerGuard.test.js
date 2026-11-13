@@ -173,4 +173,26 @@ describe('Zoho server guard (.env) and Zoho Mail off', () => {
     const followUp = await agent.get(postRes.headers.location);
     expect(followUp.text).toContain('Zoho Mail is not used by this application — all mail goes through the SMTP server in .env (Bluehost).');
   });
+
+  test('QA HNT-L09: with Zoho switched off, the test-record clean-up job says so in plain text and stops', async () => {
+    server('false', 'test', 'false');
+    expect(zohoGuard.cleanupBlockedReason()).toBe('Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env) — nothing was read from or removed in Zoho Books.');
+    const calls = [];
+    zohoBooksService.setTransport((method, url) => {
+      calls.push(url);
+      return { status: 200, body: '{}' };
+    });
+    const errors = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((m) => errors.push(String(m)));
+    try {
+      expect(await require('../../src/jobs/zohoCleanupTestRecords').run(['--by', 'Admin'])).toBe(1);
+    } finally {
+      spy.mockRestore();
+      zohoBooksService.setTransport(null);
+    }
+    expect(errors).toEqual([zohoGuard.cleanupBlockedReason()]);
+    expect(calls).toEqual([]);
+    server('true', 'test', 'false');
+    expect(zohoGuard.cleanupBlockedReason()).toBeNull();
+  });
 });
