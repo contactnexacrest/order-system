@@ -81,7 +81,7 @@ old name until it is regenerated; the final copy made on approval shows the new 
 Every staff member, in every role, and every buyer enters a 6-digit code
 e-mailed at each login. It cannot be switched off for anyone; the Users list
 shows "2FA: Required". Admin's only choice is **Settings › Security → Remember an office computer
-for … days** (`login_remember_browser_days`; default **30**, 0–90; 0 = the
+for … days** (`login_remember_browser_days`; default **7**, 0–90; 0 = the
 code at every login). Above 0, staff (never buyers or associates) see **"This is my own
 office computer"** on the code screen and skip the code on that computer for
 that many days (D-283). A password change or reset forgets every remembered

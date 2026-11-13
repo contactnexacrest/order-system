@@ -70,6 +70,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-13c-permission-descriptions.sql` | QA PLN-003/004/005 | Text only: the descriptions of three permissions on Users & roles › Roles and permissions — `record_market_prices` (also Edit price, base and thickness prices, linking prices, and with `manage_suppliers` the offer Active switch and "+ Add product"), `edit_order_post_confirmation` (product rows and prices are fixed from the first approved Quotation, D-342, and change only by a "Products & prices" amendment), `manage_compliance_task_types` (the checklist uses `manage_compliance_checklist`, D-226). No permission, grant or role changes. Plain UPDATEs by `permission_key`, re-runnable, MySQL-safe; the last line shows "3 of 3". Checked 13 Nov 2026: run twice on scratch databases of both stacks built from the previous seed; the texts then equal a fresh install's. |
 | `2026-11-13d-expense-cost-bank-reference.sql` | QA ZOH-005 (owner decision 13 Nov 2026, Option A; rule D-212) | New empty columns `order_expenses.bank_reference`, `order_expenses.zoho_pushed_hash` and `order_cost_entries.bank_reference` (UTR / transaction ID, required on the forms when paid from the company account). No data change; on the next Zoho sync every order expense and order cost already in Books is updated once with the new description ("… · order expense paid from the company account · UTR …"), amounts, dates and accounts unchanged. Guarded through information_schema + PREPARE, re-runnable, MySQL-safe; the last line shows "3 of 3". Checked 13 Nov 2026: applied twice to scratch databases of both stacks built from the previous schema; the columns then equal a fresh install's. |
 | `2026-11-13e-quantity-warning-levels.sql` | Owner decision item 10a (13 Nov 2026) | The six large-quantity levels per unit in `company_settings` (category `orders`, Settings › Orders): `quantity_warning_level_sqm` 30000, `_sqft` 300000, `_cbm` 500, `_ton` 600, `_pcs` 600000, `_rmt` 60000 (1 to 1,000,000). Above its unit's level one order line (create, add, edit) or Domestic Trade line saves only with "I confirm this quantity" ticked (audit `LARGE_QUANTITY_CONFIRMED`); above 1,000,000 in any unit it is refused (in the app, no table change). INSERT … WHERE NOT EXISTS: a level already changed is kept. Re-runnable, MySQL-safe; the last line shows "6 of 6". Checked 13 Nov 2026: run twice on scratch copies of both stacks' previous seed; the rows then equal a fresh install's. |
+| `2026-11-13f-remember-office-computer-7-days.sql` | Owner decision D-369 (13 Nov 2026) | `login_remember_browser_days` 30 → 7 where still 30 (a changed value is kept) and its help text "default 7". Plain UPDATEs; safe to run twice. |
 
 ### Before `2026-11-13a`: two read-only checks
 
@@ -133,7 +134,7 @@ The files from `2026-11-12f` on were checked as their rows above say. Decisions 
 that need no database change (D-340, D-341, D-343–D-346, D-348–D-356, D-358, D-360, D-362–D-365)
 have no file here.
 
-The live-site order of work (backup, files `2026-11-11a` … `2026-11-13e`, the two checks above,
+The live-site order of work (backup, files `2026-11-11a` … `2026-11-13f`, the two checks above,
 the exchange-rate cron job at 07:05 IST, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026" (it covers the builds of
 11, 12 and 13 Nov 2026).

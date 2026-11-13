@@ -1701,6 +1701,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-13b-products-fixed-base-
 mysql -u <user> -p <database> < docs/migrations/2026-11-13c-permission-descriptions.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13d-expense-cost-bank-reference.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13e-quantity-warning-levels.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-13f-remember-office-computer-7-days.sql
 ```
 
 Before `2026-11-13a`, run the two read-only checks in `docs/migrations/README.md` ("Before
@@ -1753,7 +1754,7 @@ status and last login, Send set-password link, temporary password, Log in as).
 at least every 12 hours), all on *Settings › Security*. A popup 2 minutes before the end offers
 "Stay logged in" (keep-alive addresses `/keep-alive`, `/client/keep-alive`, `/associate/keep-alive`).
 The login-code screen's tick is now **"This is my own office computer"**
-(`login_remember_browser_days`, default **30**, 0–90); "Forget all remembered computers" on My
+(`login_remember_browser_days`, default **7** since D-369, 0–90); "Forget all remembered computers" on My
 Account, and for Admin on Users › Edit. The session store and cookie now follow the longest idle timeout (no longer a fixed one day).
 
 **Quote in any unit (D-270–D-273, SOPs 01, 17, 27).** A line may be priced in any unit of its
@@ -1828,7 +1829,7 @@ build"), waiting for the owner's decision (CLAUDE.md video rule).
 
 Everything below is in `docs/schema.sql` / `docs/seed.sql` (a new install needs nothing else) and in the
 Application Handbook; the SOP chapters say how staff use it. A **live** database is brought up to date
-with the files of the previous section, `2026-11-11a` … `2026-11-13e`, in that order — before
+with the files of the previous section, `2026-11-11a` … `2026-11-13f`, in that order — before
 `2026-11-13a` run the two read-only checks in `docs/migrations/README.md` ("Before 2026-11-13a") and
 keep their output. Then the `fetchFxRate.js` cron line at 07:05 IST (or `RUN_JOBS_IN_PROCESS=true`, so `scheduler.js` runs it; see "Background jobs") must be in place, and `docs/guides/GO_LIVE_CHECKLIST.md`
 section H lists what to check afterwards (Link these prices, the Products status filters, Testing mode

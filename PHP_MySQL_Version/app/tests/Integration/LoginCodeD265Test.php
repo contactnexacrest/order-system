@@ -43,7 +43,7 @@ final class LoginCodeD265Test extends DbTestCase
     protected function tearDown(): void
     {
         // Put back what was there (seed: 30 days) — forcing '0' here broke SessionTimeoutsD283Test's seed check later in the run.
-        CompanySettingsRepository::set('login_remember_browser_days', (string) ($this->rememberDaysBefore ?? '30'));
+        CompanySettingsRepository::set('login_remember_browser_days', (string) ($this->rememberDaysBefore ?? '7'));
         $_COOKIE = [];
         parent::tearDown();
     }

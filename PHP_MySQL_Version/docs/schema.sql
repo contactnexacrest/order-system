@@ -1447,7 +1447,7 @@ CREATE TABLE two_fa_backup_codes (
 ) ENGINE=InnoDB;
 
 -- Owner decision D-265 (7 Nov 2026): "Remember this browser for N days" for staff
--- (Admin › Settings › Security › login_remember_browser_days, 0 = off, the default).
+-- (Admin › Settings › Security › login_remember_browser_days, default 7 days since D-369; 0 = off).
 -- The cookie carries selector.validator.signature; only a SHA-256 of the validator is
 -- kept. A password change or reset bumps users.session_version and deletes the rows.
 CREATE TABLE login_remembered_browsers (

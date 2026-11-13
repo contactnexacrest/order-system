@@ -56,7 +56,7 @@ final class SetupChecklist
         'doc_cleanup_superseded_days' => ['Document clean-up: remove never-sent superseded revisions after (days)', '365'],
         'doc_cleanup_cafin_mode' => ['Document clean-up: old CAFIN copies', 'latest_only'],
         'password_expiry_days' => ['Password expiry (days, 0 = off)', '0'],
-        'login_remember_browser_days' => ['"This is my own office computer" lasts (days)', '30'],
+        'login_remember_browser_days' => ['"This is my own office computer" lasts (days)', '7'],
         'session_timeout_staff_minutes' => ['Staff signed out after idle (minutes)', '240'],
         'session_timeout_client_minutes' => ['Buyers signed out after idle (minutes)', '120'],
         'session_timeout_associate_minutes' => ['Associates signed out after idle (minutes)', '120'],

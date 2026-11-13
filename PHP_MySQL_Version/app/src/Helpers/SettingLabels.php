@@ -128,7 +128,7 @@ final class SettingLabels
         'rbi_purpose_code_freight' => ['Purpose code — freight / insurance payments', null],
         'failed_login_lockout_count' => ['Lock the account after … failed logins', null],
         'lockout_duration_minutes' => ['Account stays locked for … minutes', 'How many minutes an account stays locked after too many failed logins.'],
-        'login_remember_browser_days' => ['Remember an office computer for … days', 'Staff who tick "This is my own office computer" skip the e-mailed login code on that computer for this many days (0 to 90; default 30; 0 = always ask). A password change or "Forget all remembered computers" ends it.'],
+        'login_remember_browser_days' => ['Remember an office computer for … days', 'Staff who tick "This is my own office computer" skip the e-mailed login code on that computer for this many days (0 to 90; default 7; 0 = always ask). A password change or "Forget all remembered computers" ends it.'],
         'password_complexity_json' => ['Password rules', null],
         'password_expiry_days' => ['Passwords expire after … days', 'Staff must change their password after this many days; 0 = never (the default, as staff log in with an e-mailed code).'],
         'password_min_length' => ['Minimum password length', null],

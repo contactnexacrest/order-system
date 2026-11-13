@@ -43,7 +43,7 @@ final class LoginCodeSendLimitHntL04Test extends DbTestCase
 
     protected function tearDown(): void
     {
-        CompanySettingsRepository::set('login_remember_browser_days', (string) ($this->rememberDaysBefore ?? '30'));
+        CompanySettingsRepository::set('login_remember_browser_days', (string) ($this->rememberDaysBefore ?? '7'));
         $_SESSION = [];
         $_COOKIE = [];
         parent::tearDown();

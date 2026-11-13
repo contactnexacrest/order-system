@@ -58,7 +58,7 @@ final class SessionTimeoutsD283Test extends DbTestCase
         self::assertSame('120', (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_timeout_client_minutes'"));
         self::assertSame('120', (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_timeout_associate_minutes'"));
         self::assertSame('12', (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_absolute_staff_hours'"));
-        self::assertSame('30', (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'login_remember_browser_days'"));
+        self::assertSame('7', (string) $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'login_remember_browser_days'")); // D-369: 7 days
         self::assertNull($this->value("SELECT 1 FROM company_settings WHERE setting_key = 'session_timeout_minutes'"), 'the one shared timeout is gone');
     }
 

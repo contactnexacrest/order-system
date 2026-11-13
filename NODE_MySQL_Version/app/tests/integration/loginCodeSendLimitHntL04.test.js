@@ -71,7 +71,7 @@ describe('HNT-L04 at most 5 login codes per account in 15 minutes', () => {
   beforeAll(async () => { rememberDaysBefore = await companySettingsRepository.get('login_remember_browser_days'); });
   beforeEach(async () => { await companySettingsRepository.set('login_remember_browser_days', '0'); });
   afterAll(async () => {
-    await companySettingsRepository.set('login_remember_browser_days', String(rememberDaysBefore ?? '30'));
+    await companySettingsRepository.set('login_remember_browser_days', String(rememberDaysBefore ?? '7'));
     await db.pool.end();
   });
 

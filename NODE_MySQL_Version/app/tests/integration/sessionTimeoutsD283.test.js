@@ -51,7 +51,7 @@ describe('D-283 staying logged in', () => {
     expect(String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_timeout_client_minutes'"))).toBe('120');
     expect(String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_timeout_associate_minutes'"))).toBe('120');
     expect(String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'session_absolute_staff_hours'"))).toBe('12');
-    expect(String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'login_remember_browser_days'"))).toBe('30');
+    expect(String(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'login_remember_browser_days'"))).toBe('7'); // D-369: 7 days
     expect(await value("SELECT 1 FROM company_settings WHERE setting_key = 'session_timeout_minutes'")).toBeNull();
   });
 
