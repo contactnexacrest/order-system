@@ -60,6 +60,13 @@ final class MigrationIdempotencyTest extends DbTestCase
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
         $exitCode = proc_close($process);
+        // Owner D-371 (13 Nov 2026): a "PLAIN ALTER" migration (phpMyAdmin on the shared host refuses
+        // the information_schema + PREPARE guard) may only fail with "Duplicate column name" (1060)
+        // when its columns are already there — anything else is still an error.
+        if ($exitCode !== 0 && str_contains((string) file_get_contents($path), 'PLAIN ALTER (owner D-371')
+            && preg_match('/ERROR 1060 \(42S21\)/', (string) $stderr) && !preg_match('/ERROR (?!1060)\d+/', (string) $stderr)) {
+            return '';
+        }
         return $exitCode === 0 ? '' : "exit {$exitCode}: {$stderr}";
     }
 

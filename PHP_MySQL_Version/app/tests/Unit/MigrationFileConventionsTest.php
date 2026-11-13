@@ -81,6 +81,8 @@ final class MigrationFileConventionsTest extends TestCase
             '/\bINFORMATION_SCHEMA\b/i',
             '/\bDROP .* IF EXISTS\b/i',
             '/\bCREATE OR REPLACE\b/i',
+            // Owner D-371: plain ALTER for phpMyAdmin; a re-run only reports "Duplicate column name".
+            '/PLAIN ALTER \(owner D-371/',
         ];
 
         $unguarded = [];
