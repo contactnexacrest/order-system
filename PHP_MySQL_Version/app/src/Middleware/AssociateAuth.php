@@ -44,6 +44,14 @@ final class AssociateAuth
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
             \App\Services\SessionTimeouts::markPage('associate');
             $viewAs = AssociatePortalService::viewAsStaffId() !== null;
+            // HNT-L10 (QA 13 Nov 2026): staff "view as associate" lasts only while that same staff
+            // member is still signed in — after their logout or session end, nobody else using the
+            // browser sees the portal.
+            if ($viewAs && (int) (\App\Services\AuthService::currentUserId() ?? 0) !== (int) AssociatePortalService::viewAsStaffId()) {
+                AssociatePortalService::endViewAs();
+                header('Location: /associate/login');
+                return false;
+            }
             // QA ACC-10: a password changed or reset since this session logged in ends it.
             if (!$viewAs && ((int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true) || !AssociatePortalService::sessionPasswordStillCurrent($a['password_hash'] ?? null))) {
                 AssociatePortalService::logout();

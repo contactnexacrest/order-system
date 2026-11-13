@@ -103,6 +103,16 @@ final class ActiveDepartmentService
         return self::$membership === false ? null : self::$membership;
     }
 
+    /**
+     * HNT-L10 (QA 13 Nov 2026): on staff sign-out the chosen membership and any "Preview as"
+     * end with the sign-in (Node's logout regenerates the session, which drops them too).
+     */
+    public static function forgetOnLogout(): void
+    {
+        unset($_SESSION[self::SESSION_MEMBERSHIP], $_SESSION[self::SESSION_PREVIEW]);
+        self::resetCache();
+    }
+
     /** Admin "Preview as" / MD-ED "view as": the designation borrowed for this session. @return array<string,mixed>|null */
     public static function preview(): ?array
     {

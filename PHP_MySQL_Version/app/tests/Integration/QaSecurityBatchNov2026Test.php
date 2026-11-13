@@ -366,4 +366,30 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
             self::assertStringContainsString('data-max-value="10000000"', (string) file_get_contents(__DIR__ . '/../../views/' . $view));
         }
     }
+
+    /** HNT-L10: staff "view as associate" (and a department "Preview as") end when the staff member signs out. */
+    public function testHntL10ViewAsEndsOnStaffLogout(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        $pdo->exec("INSERT INTO associates (name, status, portal_enabled) VALUES ('TEST-QA View-as Associate', 'active', 1)");
+        $associateId = (int) $pdo->lastInsertId();
+        $md = $this->createTestUser('Managing Director');
+        $_SESSION = ['_auth_user_id' => $md];
+        \App\Services\AssociatePortalService::startViewAs($md, $associateId);
+        self::assertSame($md, \App\Services\AssociatePortalService::viewAsStaffId());
+
+        // While the same staff member is signed in, the portal opens.
+        self::assertTrue((\App\Middleware\AssociateAuth::required())([]));
+
+        @\App\Services\AuthService::logout();
+        self::assertNull(\App\Services\AssociatePortalService::viewAsStaffId());
+        self::assertNull(\App\Services\AssociatePortalService::currentId());
+        self::assertNull(\App\Services\ActiveDepartmentService::preview());
+
+        // And a view-as left behind without its staff sign-in (e.g. the staff session expired) is refused too.
+        $_SESSION = [];
+        \App\Services\AssociatePortalService::startViewAs($md, $associateId);
+        self::assertFalse((\App\Middleware\AssociateAuth::required())([]));
+        self::assertNull(\App\Services\AssociatePortalService::viewAsStaffId());
+    }
 }

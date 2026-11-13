@@ -462,4 +462,28 @@ describe('QA Nov 2026 security batch', () => {
       }
     });
   });
+
+  describe('HNT-L10 / HNT-L06 associate portal sign-out', () => {
+    it('HNT-L10: staff "view as associate" ends when the staff member signs out — the browser no longer opens the portal', async () => {
+      const md = await user('Managing Director');
+      const associateId = (await db.execute("INSERT INTO associates (name, status, portal_enabled) VALUES ('TEST-QA View-as Associate', 'active', 1)")).insertId;
+      const start = await md.agent.get(`/associates/${associateId}/view-as`);
+      expect(start.headers.location).toBe('/associate');
+      expect((await md.agent.get('/associate')).status).toBe(200);
+      const csrf = (await md.agent.get('/')).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      await md.agent.post('/logout').type('form').send({ _csrf: csrf });
+      const after = await md.agent.get('/associate');
+      expect(after.status).toBe(302);
+      expect(after.headers.location).toBe('/associate/login');
+    });
+
+    it('HNT-L06: GET /associate/logout signs nobody out (only the posted form with its CSRF token does)', async () => {
+      const md = await user('Managing Director');
+      const associateId = (await db.execute("INSERT INTO associates (name, status, portal_enabled) VALUES ('TEST-QA View-as Associate 2', 'active', 1)")).insertId;
+      await md.agent.get(`/associates/${associateId}/view-as`);
+      const r = await md.agent.get('/associate/logout');
+      expect(r.headers.location).toBe('/associate');
+      expect((await md.agent.get('/associate')).status).toBe(200);
+    });
+  });
 });

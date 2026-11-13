@@ -197,6 +197,12 @@ final class AuthService
         // logging out of this one. Scoped to only this service's own key,
         // matching ClientPortalService::logout()'s existing pattern.
         unset($_SESSION[self::SESSION_USER_ID]);
+        // HNT-L10: a "view as associate" this staff member had open ends with their sign-out
+        // (Node's logout regenerates the session keeping only the buyer portal, so it ends there too).
+        if (AssociatePortalService::viewAsStaffId() !== null) {
+            AssociatePortalService::endViewAs();
+        }
+        ActiveDepartmentService::forgetOnLogout();
         session_regenerate_id(true);
     }
 

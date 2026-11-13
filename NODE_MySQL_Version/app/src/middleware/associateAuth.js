@@ -33,6 +33,14 @@ function required() {
     req.session[LAST_ACTIVITY_KEY] = Date.now();
     await sessionTimeouts.markPage(req, 'associate');
     const viewAs = associatePortalService.viewAsStaffId(req) !== null;
+    // HNT-L10 (QA 13 Nov 2026): staff "view as associate" lasts only while that same staff
+    // member is still signed in — after their logout or session end, nobody else using the
+    // browser sees the portal.
+    if (viewAs && Number(require('../services/authService').currentUserId(req) || 0) !== Number(associatePortalService.viewAsStaffId(req))) {
+      await associatePortalService.endViewAs(req);
+      res.redirect('/associate/login');
+      return;
+    }
     // QA ACC-10: a password changed or reset since this session logged in ends it.
     if (!viewAs && (Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status) || !associatePortalService.sessionPasswordStillCurrent(req, a.password_hash))) {
       await associatePortalService.logout(req);
