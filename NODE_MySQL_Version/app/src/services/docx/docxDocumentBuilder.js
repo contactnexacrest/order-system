@@ -150,7 +150,7 @@ function titleFor(code) {
     OC: 'ORDER CONFIRMATION',
     BUYERPO: 'PURCHASE ORDER',
     SUPPO: 'PURCHASE ORDER — MATERIAL PROCUREMENT',
-    FDN: 'FREIGHT DEBIT NOTE',
+    FDN: 'DEBIT NOTE', // MTX-005 (owner, 13 Nov 2026): as the PDF
     PL: 'PACKING LIST',
     BLI: 'BILL OF LADING INSTRUCTION SHEET',
     CI: 'COMMERCIAL INVOICE',
@@ -1228,7 +1228,7 @@ function renderFdn(context) {
       C.plain('PAYMENT REQUIRED BEFORE SHIPMENT', { bold: true, size: 20, color: C.RED_TEXT }, { alignment: AlignmentType.CENTER }),
       C.rich(
         [
-          ['Payment of this Freight Debit Note is required within ', { size: 19, color: C.RED_SUB }],
+          ['Payment of this Debit Note is required within ', { size: 19, color: C.RED_SUB }],
           ['3 Calendar Days', { bold: true, size: 19, color: C.RED_TEXT }],
           [' of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line ', { size: 19, color: C.RED_SUB }],
           ['only upon receipt of full freight payment.', { bold: true, size: 19, color: C.RED_TEXT }],
@@ -1277,7 +1277,7 @@ function renderFdn(context) {
       C.rich([['Reference: ', { bold: true }], [`Quote Debit Note No. ${g(meta, 'document_reference')} and PI No. ${g(order, 'pi_ref', '—')} in the remittance`, { color: C.RED_SUB }]]),
       C.rich([
         ['‼ Critical: ', { bold: true }],
-        ['Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.', { color: C.RED_SUB }],
+        ['Share bank remittance copy as per Section 1 contact details above within 24 hours of payment. Shipment booking will be confirmed only upon verification of freight receipt.', { color: C.RED_SUB }],
       ]),
     ])
   );
@@ -1287,7 +1287,7 @@ function renderFdn(context) {
     ...C.kvTable(
       bankDetailsRows(
         context,
-        `Please quote FDN No. ${g(meta, 'document_reference', '')} in your wire transfer remarks.`,
+        `Please quote Debit Note No. ${g(meta, 'document_reference', '')} in your T/T remarks.`,
         `${g(company, 'rbi_purpose_code_freight')} — enter in the "Purpose of Remittance" field of your wire transfer form.`
       )
     )
@@ -1632,7 +1632,7 @@ function renderCi(context) {
       { label: 'Number of Containers', value: g(shipping, 'container_count', 'To Be Confirmed') },
       { label: 'Container No.', value: g(shipping, 'container_no', 'To Be Confirmed') },
       { label: 'Bill of Lading No.', value: g(shipping, 'bl_number', 'To Be Confirmed') },
-      { label: 'Bill of Lading Date', value: g(shipping, 'bl_date', 'TBC — must match this invoice date') },
+      { label: 'Bill of Lading Date', value: g(shipping, 'bl_date', 'To Be Confirmed — must match this invoice date') },
       { label: 'Vessel / Voyage', value: `${g(shipping, 'vessel_name', 'To Be Confirmed')}${g(shipping, 'voyage_number') !== '—' ? ` / ${g(shipping, 'voyage_number')}` : ''}` },
       { label: 'No. of Packages', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} ${cd(context).packing_label}` : 'To Be Confirmed'} — must match Packing List` },
     ])
@@ -1666,7 +1666,7 @@ function renderCi(context) {
     ], 0)
   );
 
-  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
+  const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
   const sectionARows = [
     ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')}`, 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
     [isCif || isFob ? 'Freight & Insurance' : 'Freight', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`}`, freightRemark],
@@ -1676,10 +1676,9 @@ function renderCi(context) {
 
   const advanceAmt = g(payment, 'advance_amount') !== '—' ? g(payment, 'advance_amount') : g(financial, 'advance_amount');
   const balanceAmt = g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount');
-  const freightStatus = isFob ? 'NIL (FOB)' : g(payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING';
+  const freightStatus = isFob ? 'NIL (FOB)' : g(payment, 'freight_cleared_at') !== '—' ? 'PAID VIA DEBIT NOTE' : 'PENDING';
   const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'To Be Confirmed')}`;
-  const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against FDN No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}`;
-  const freightAmtVal = g(payment, 'freight_amount', null);
+  const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}`;
   // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
   const milestones = financial.milestones || [];
   const milestoneRows = milestones.map((m) => [
@@ -1688,7 +1687,7 @@ function renderCi(context) {
     `Received: ${m.received ? `${m.received_on} · bank ref ${m.bank_reference}` : 'To Be Confirmed'}\nDue: ${m.due_text}`,
   ]);
   const receivedParts = milestones.map((m) => (m.received ? ` + ${m.received_amount}` : '')).join('');
-  const subtotalPaid = `${currency} ${milestones.length ? g(financial, 'subtotal_paid_with_milestones') : advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
+  const subtotalPaid = `${currency} ${milestones.length ? g(financial, 'subtotal_paid_with_milestones') : advanceAmt}${!isFob && payment.freight_amount ? ` + ${payment.freight_amount} (freight)` : ''}`;
   const sectionBRows = [
     [
       `√  Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
@@ -1697,7 +1696,7 @@ function renderCi(context) {
     ],
     ...milestoneRows,
     [`√  ${isCif || isFob ? 'Freight & Insurance' : 'Freight'} — ${freightStatus}`, freightAmtCell, freightRemark2],
-    ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${milestones.length ? ' + milestones' : ''}${!isFob ? ' + FDN (if applicable)' : ''}`],
+    ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${milestones.length ? ' + milestones' : ''}${!isFob ? ' + Debit Note (if applicable)' : ''}`],
     [
       '→  BALANCE DUE NOW',
       `${currency} ${balanceAmt}`,
@@ -1711,7 +1710,7 @@ function renderCi(context) {
         : `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} √`,
       isFob
         ? 'Freight & Insurance not applicable on an FOB order.'
-        : `${isCif ? 'Freight & Insurance is' : 'Freight is'} paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.`,
+        : `${isCif ? 'Freight & Insurance is' : 'Freight is'} paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.`,
     ],
   ];
   children.push(...C.threeColFinanceTable('SECTION B — PAYMENT SETTLEMENT', sectionBRows, C.NAVY_MID));
@@ -1743,7 +1742,7 @@ function renderCi(context) {
       '1.  Commercial Invoice (this document)',
       '2.  Packing List',
       `3.  ${cooLine(order)}`,
-      '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
+      '4.  Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest',
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
     ])

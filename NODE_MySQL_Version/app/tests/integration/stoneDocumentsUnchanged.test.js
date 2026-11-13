@@ -15,6 +15,9 @@
 // CI money rows and amount in words) were removed from every PDF and Word fixture by hand; nothing else changed.
 // Owner decision D-353 (12 Nov 2026): the remaining plain "*" after field labels was removed from every PDF and Word
 // fixture by hand (every standalone "*"); nothing else changed.
+// Owner decision MTX-005 (13 Nov 2026, item 3 Option A, confirmed twice): the Word CI fixtures (FOB_CI_docx, CIF_CI_docx)
+// were captured again once — the Word CI now uses the PDF's wording (Debit Note, not FDN; "To Be Confirmed"; the PDF's
+// Bill of Lading line; no "+ — (freight)"); the PDF fixtures did not change.
 jest.mock('../../src/services/pdfRenderService', () => ({
   renderPdfFromHtml: jest.fn().mockResolvedValue(Buffer.from('%PDF-fake')),
   closeBrowser: jest.fn(),

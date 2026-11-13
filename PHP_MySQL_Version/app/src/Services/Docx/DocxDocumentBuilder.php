@@ -221,7 +221,7 @@ final class DocxDocumentBuilder
             'OC' => 'ORDER CONFIRMATION',
             'BUYERPO' => 'PURCHASE ORDER',
             'SUPPO' => 'PURCHASE ORDER — MATERIAL PROCUREMENT',
-            'FDN' => 'FREIGHT DEBIT NOTE',
+            'FDN' => 'DEBIT NOTE', // MTX-005 (owner, 13 Nov 2026): as the PDF
             'PL' => 'PACKING LIST',
             'BLI' => 'BILL OF LADING INSTRUCTION SHEET',
             'CI' => 'COMMERCIAL INVOICE',
@@ -1251,7 +1251,7 @@ final class DocxDocumentBuilder
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) {
             $cell->addText("PAYMENT REQUIRED BEFORE SHIPMENT", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT], ['alignment' => Jc::CENTER]);
             $run = $cell->addTextRun(['alignment' => Jc::CENTER]);
-            $run->addText('Payment of this Freight Debit Note is required within ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
+            $run->addText('Payment of this Debit Note is required within ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
             $run->addText('3 Calendar Days', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
             $run->addText(' of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
             $run->addText('only upon receipt of full freight payment.', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
@@ -1299,13 +1299,13 @@ final class DocxDocumentBuilder
             $r3->addText('Quote Debit Note No. ' . self::g($meta, 'document_reference') . ' and PI No. ' . self::g($order, 'pi_ref', '—') . ' in the remittance', ['color' => DocxComponents::RED_SUB]);
             $r4 = $cell->addTextRun();
             $r4->addText("\u{203C} Critical: ", ['bold' => true]);
-            $r4->addText('Share bank remittance copy as per Section 1 contact details above immediately after payment. Shipment booking will be confirmed only upon verification of freight receipt.', ['color' => DocxComponents::RED_SUB]);
+            $r4->addText('Share bank remittance copy as per Section 1 contact details above within 24 hours of payment. Shipment booking will be confirmed only upon verification of freight receipt.', ['color' => DocxComponents::RED_SUB]);
         });
 
         DocxComponents::addSectionTitle($section, '6. BANK DETAILS  (for freight T/T payment)');
         DocxComponents::addKvTable($section, self::bankDetailsRows(
             $context,
-            'Please quote FDN No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.',
+            'Please quote Debit Note No. ' . self::g($meta, 'document_reference', '') . ' in your T/T remarks.',
             self::g($company, 'rbi_purpose_code_freight') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
         ));
 
@@ -1588,7 +1588,7 @@ final class DocxDocumentBuilder
             ['label' => 'Number of Containers', 'value' => self::g($shipping, 'container_count', 'To Be Confirmed')],
             ['label' => 'Container No.', 'value' => self::g($shipping, 'container_no', 'To Be Confirmed')],
             ['label' => 'Bill of Lading No.', 'value' => self::g($shipping, 'bl_number', 'To Be Confirmed')],
-            ['label' => 'Bill of Lading Date', 'value' => self::g($shipping, 'bl_date', 'TBC — must match this invoice date')],
+            ['label' => 'Bill of Lading Date', 'value' => self::g($shipping, 'bl_date', 'To Be Confirmed — must match this invoice date')],
             ['label' => 'Vessel / Voyage', 'value' => self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / ' . self::g($shipping, 'voyage_number') : '')],
             ['label' => 'No. of Packages', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List'],
         ]);
@@ -1622,7 +1622,7 @@ final class DocxDocumentBuilder
         // "Total ... Value") is untouched.
         $freightRemark = $isFob
             ? 'FOB: buyer arranges — write NIL'
-            : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
+            : 'Paid separately via Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
         $sectionARows = [
             ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value'), 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
             [$isCif || $isFob ? 'Freight & Insurance' : 'Freight', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))), $freightRemark],
@@ -1632,9 +1632,9 @@ final class DocxDocumentBuilder
 
         $advanceAmt = self::g($payment, 'advance_amount') !== '—' ? self::g($payment, 'advance_amount') : self::g($financial, 'advance_amount');
         $balanceAmt = self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount');
-        $freightStatus = $isFob ? 'NIL (FOB)' : (self::g($payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING');
+        $freightStatus = $isFob ? 'NIL (FOB)' : (self::g($payment, 'freight_cleared_at') !== '—' ? 'PAID VIA DEBIT NOTE' : 'PENDING');
         $freightAmtCell = $isFob ? 'NIL — FOB' : ($currency . ' ' . self::g($payment, 'freight_amount', 'To Be Confirmed'));
-        $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against FDN No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
+        $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
         // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
         $milestones = $financial['milestones'] ?? [];
         $milestoneRows = array_map(static fn (array $m): array => [
@@ -1643,14 +1643,14 @@ final class DocxDocumentBuilder
             'Received: ' . ($m['received'] ? $m['received_on'] . ' · bank ref ' . $m['bank_reference'] : 'To Be Confirmed') . "\nDue: {$m['due_text']}",
         ], $milestones);
         $receivedParts = implode('', array_map(static fn (array $m): string => $m['received'] ? ' + ' . $m['received_amount'] : '', $milestones));
-        $subtotalPaid = $currency . ' ' . ($milestones !== [] ? self::g($financial, 'subtotal_paid_with_milestones') : $advanceAmt) . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
+        $subtotalPaid = $currency . ' ' . ($milestones !== [] ? self::g($financial, 'subtotal_paid_with_milestones') : $advanceAmt) . (!$isFob && !empty($payment['freight_amount']) ? ' + ' . $payment['freight_amount'] . ' (freight)' : '');
         $sectionBRows = [
             ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt, 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
             ...$milestoneRows,
             ["\u{221A}  " . ($isCif || $isFob ? 'Freight & Insurance' : 'Freight') . " — {$freightStatus}", $freightAmtCell, $freightRemark2],
-            ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . ($milestones !== [] ? ' + milestones' : '') . (!$isFob ? ' + FDN (if applicable)' : '')],
+            ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . ($milestones !== [] ? ' + milestones' : '') . (!$isFob ? ' + Debit Note (if applicable)' : '')],
             ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt, '= FOB Value minus advance' . ($milestones !== [] ? ' and milestones' : '') . " received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
-            ['VERIFICATION', ($milestones !== [] ? "Advance + Milestones + Balance = FOB Value\n{$advanceAmt}{$receivedParts} + {$balanceAmt} = " : "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = ") . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
+            ['VERIFICATION', ($milestones !== [] ? "Advance + Milestones + Balance = FOB Value\n{$advanceAmt}{$receivedParts} + {$balanceAmt} = " : "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = ") . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
 
@@ -1671,7 +1671,7 @@ final class DocxDocumentBuilder
             '1.  Commercial Invoice (this document)',
             '2.  Packing List',
             '3.  ' . self::cooLine($order),
-            '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
+            '4.  Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
         ]);
