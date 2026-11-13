@@ -146,6 +146,18 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
     for (const p of moneyReports) expect([p, mdPage.includes(`href="${p}"`)]).toEqual([p, true]);
   });
 
+  it('SUI-002: product specification and configure links are plain text for the Procurement Manager', async () => {
+    const permissionService = require('../../src/services/permissionService');
+    const links = '<a href="/products/1/specifications?edit=3#spec-3">Not sold at 50 mm+</a> <a href="/products/1/configure#thickness-rules">Change the % rules for this product</a>';
+    const role = async (name) => {
+      const r = await db.queryOne('SELECT id FROM roles WHERE name = :n', { n: name });
+      return permissionService.load(0, Number(r.id), false);
+    };
+    expect(permittedLinks.filterHtml(links, await role('Procurement Manager')))
+      .toBe('<span class="link-not-permitted">Not sold at 50 mm+</span> <span class="link-not-permitted">Change the % rules for this product</span>');
+    expect(permittedLinks.filterHtml(links, await role('Managing Director'))).toBe(links);
+  });
+
   it('UI-007: the Setup checklist links only to pages the person may open', async () => {
     const sysadmin = await loginAs('System Administrator');
     const checklist = (await sysadmin.get('/admin/setup-checklist')).text;
@@ -164,7 +176,7 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
   it('UI-005 / D-266: Getting started shows only the screenshots and SOP chapters the role may open', async () => {
     const sopAccess = require('../../src/services/sopAccessService');
     const permissionService = require('../../src/services/permissionService');
-    for (const role of ['Export Executive', 'Logistics Executive', 'Investor (view only)', 'Viewer / Auditor']) {
+    for (const role of ['Export Executive', 'Logistics Executive', 'Investor (view only)', 'Viewer / Auditor', 'Accounts Executive', 'Procurement Manager']) { // SUI-003: also these two
       const agent = await loginAs(role);
       const user = await db.queryOne('SELECT id, role_id FROM users WHERE id = :id', { id: agent.userId });
       const perms = await permissionService.load(Number(user.id), Number(user.role_id), false);

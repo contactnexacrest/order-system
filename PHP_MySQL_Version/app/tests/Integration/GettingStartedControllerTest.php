@@ -94,12 +94,12 @@ final class GettingStartedControllerTest extends DbTestCase
      */
     public function testUi005ShowsOnlyTheScreenshotsAndChaptersTheRoleMayOpen(): void
     {
-        foreach (['Export Executive', 'Logistics Executive', 'Investor (view only)', 'Viewer / Auditor'] as $role) {
+        foreach (['Export Executive', 'Logistics Executive', 'Investor (view only)', 'Viewer / Auditor', 'Accounts Executive', 'Procurement Manager'] as $role) { // SUI-003: also Accounts Executive and Procurement Manager
             $userId = $this->createTestUser($role);
             $_SESSION['_auth_user_id'] = $userId;
             \App\Services\PermissionService::resetCache();
             $roleId = (int) \App\Config\Database::connection()->query('SELECT role_id FROM users WHERE id = ' . $userId)->fetchColumn();
-            $visible = \App\Services\SopAccessService::visibleSlugs($userId, $roleId, false);
+            $visible = \App\Services\SopAccessService::visibleSlugs($userId, $roleId, \App\Services\PermissionService::can($userId, $roleId, 'ca_module_view'));
 
             ob_start();
             (new GettingStartedController())->show([]);

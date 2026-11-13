@@ -35,6 +35,9 @@ const RULES = [
   [/^\/products(?:[?#]|$)/, ['view_product_catalog']],
   [/^\/products\/categories\/\d+(?:[?#]|$)/, ['manage_product_catalog', 'manage_pricing', 'view_price_buildup']],
   [/^\/pricing\/commission-levels(?:[?#]|$)/, ['view_price_buildup', 'manage_pricing']],
+  // SUI-002: the product page's "Pricing ready?" list and Market prices link to these.
+  [/^\/products\/\d+\/configure(?:[?#]|$)/, ['manage_product_catalog']],
+  [/^\/products\/\d+\/specifications(?:[?#]|$)/, ['view_price_buildup', 'manage_product_specifications', 'manage_pricing']],
   [/^\/audit-log(?:[/?#]|$)/, ['view_audit_log']],
   [/^\/ca\/cafin-export(?:[/?#]|$)/, ['view_cafin']],
   [/^\/ca\/(?:zoho-sync|fy-locks)(?:[/?#]|$)/, ['ca_module_manage']],

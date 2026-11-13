@@ -188,6 +188,16 @@ final class PermittedLinksTest extends DbTestCase
         }
     }
 
+    /** SUI-002: "Not sold at 50 mm+" (Pricing ready?) and "Change the % rules for this product" (Market prices) are plain text for the Procurement Manager. */
+    public function testSui002ProductSpecificationAndConfigureLinksFollowTheirRoutes(): void
+    {
+        $links = '<a href="/products/1/specifications?edit=3#spec-3">Not sold at 50 mm+</a> <a href="/products/1/configure#thickness-rules">Change the % rules for this product</a>';
+        $this->actAs($this->createTestUser('Procurement Manager'));
+        self::assertSame('<span class="link-not-permitted">Not sold at 50 mm+</span> <span class="link-not-permitted">Change the % rules for this product</span>', PermittedLinks::filterHtml($links));
+        $this->actAs($this->createTestUser('Managing Director'));
+        self::assertSame($links, PermittedLinks::filterHtml($links));
+    }
+
     /** UI-007: the System Administrator's Setup checklist does not link to product / pricing pages it cannot open. */
     public function testUi007TheSetupChecklistLinksOnlyToPagesThePersonMayOpen(): void
     {
