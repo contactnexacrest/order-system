@@ -1459,6 +1459,12 @@ app.post('/products/suppliers/:supplierId/market-price', requireAuth, requirePer
 // D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
 app.get('/products/suppliers/:supplierId/price', requireAuth, requirePermissionAny(['record_market_prices', 'view_price_buildup']), asyncHandler(pricingController.editPrice));
 app.post('/products/suppliers/:supplierId/price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.savePrice));
+// D-359 (plan rule 8): the simple "Edit price" form — one supplier's offer, one Save, Undo, live preview.
+const editPriceController = require('./controllers/editPriceController');
+app.get('/products/suppliers/:supplierId/edit-price', requireAuth, requirePermission('record_market_prices'), asyncHandler(editPriceController.form));
+app.get('/products/suppliers/:supplierId/edit-price/preview', requireAuth, requirePermission('record_market_prices'), asyncHandler(editPriceController.preview));
+app.post('/products/suppliers/:supplierId/edit-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(editPriceController.save));
+app.post('/products/suppliers/:supplierId/edit-price/undo', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(editPriceController.undo));
 // D-335: "Add / update a price" (one thickness typed, the ticked ones worked out) and the BASE for orders.
 app.post('/products/suppliers/:supplierId/thickness-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addThicknessPrice));
 app.post('/products/suppliers/:supplierId/base', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.setBase));

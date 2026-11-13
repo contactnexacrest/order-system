@@ -44,6 +44,8 @@
             </form>
           {% endif %}
           {% if r.fob_source == 'direct' %}<a class="btn-sm" href="/products/suppliers/{{ r.id }}/price">{{ 'Edit' if canRecord else 'View' }}</a>{% endif %}
+          {# D-359: the simple "Edit price" form (one price, the other thicknesses worked out, Undo). #}
+          {% if canRecord and r.fob_source == 'direct' %}<a class="btn-sm btn-accent" href="/products/suppliers/{{ r.id }}/edit-price">Edit price</a>{% endif %}
         </td>
       </tr>
     {% endfor %}

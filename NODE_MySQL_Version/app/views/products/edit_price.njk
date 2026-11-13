@@ -1,0 +1,110 @@
+{#
+  Owner decision D-359 (13 Nov 2026, plan rule 8, mockup edit_price_new.png): the simple "Edit price" form —
+  one supplier's price for one product. New price (big), per unit, for which thickness (default: the base
+  thickness), quoted on, valid until, "More (optional)": CHA + transport per container, packing and loading,
+  notes. Right: the other thicknesses worked out (old vs new, "Type it yourself" per thickness) and the selling
+  price after saving (MD / ED only). One Save; the page stays; a green message with Undo and "See price
+  history". The figures come from the server (supplierOffers.preview — the existing thicknessPrices /
+  pricingService maths). Port of views/products/edit_price.php.
+#}
+<div class="card page-wide">
+  <p class="muted small"><a href="{{ backUrl }}">&larr; Back</a></p>
+
+  {% if saved %}
+    <div class="alert alert-success edit-price-saved" role="status">
+      <strong>Saved.</strong> {{ saved }}
+      {% if undoToken %}
+        <form method="post" action="/products/suppliers/{{ row.id }}/edit-price/undo" class="inline-form">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="undo_token" value="{{ undoToken }}">
+          <input type="hidden" name="from" value="{{ from }}">
+          <button type="submit" class="btn-link">Undo</button>
+        </form> ·
+      {% endif %}
+      <a href="/products/suppliers/{{ row.id }}/price#history">See price history</a>
+    </div>
+    <p class="small muted">The old price is kept in the price history. Orders and quotations already issued are not changed (price lock D-342).</p>
+  {% endif %}
+
+  <div class="edit-price-panel">
+    <a class="edit-price-close" href="{{ backUrl }}" aria-label="Close">✕ close</a>
+    <h1>Edit price — {{ row.supplier_name }} · {{ product.name }}</h1>
+    <p class="muted">Today: {{ todayLine }}{% if inactive %} <span class="badge badge-warning">offer or supplier inactive — not used</span>{% endif %}</p>
+
+    <form method="post" action="/products/suppliers/{{ row.id }}/edit-price" class="edit-price-form" data-edit-price
+          data-preview-url="/products/suppliers/{{ row.id }}/edit-price/preview" data-was="{{ base.inr if base else '' }}">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="from" value="{{ from }}">
+      <div class="edit-price-cols">
+        <div>
+          <div class="edit-price-main">
+            <label>New price (₹) *<input type="text" inputmode="decimal" name="price" required class="edit-price-big" data-max-decimals="2" data-max-value="999999999999.99"
+                   placeholder="e.g. 185000" value="{{ priceValue }}" data-edit-price-input></label>
+            {% if grid %}
+              <span class="edit-price-per">per <strong data-edit-price-unit>{{ fromUnit }}</strong> for</span>
+              <label>Thickness *<select name="thickness_mm" required data-edit-price-thickness>
+                {% for t in thicknesses %}
+                  <option value="{{ t.mm }}" data-unit="{{ t.unit }}"{% if t.selected %} selected{% endif %}>{{ t.label }}{% if t.isBase %} (base){% endif %}</option>
+                {% endfor %}
+              </select></label>
+            {% else %}
+              <span class="edit-price-per">per <strong>{{ unitLabel }}</strong></span>
+            {% endif %}
+          </div>
+          <p class="small muted" data-edit-price-change>{{ wasLine }}</p>
+          <div class="field-grid">
+            <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ quotedOn }}"></label>
+            <label>Valid until<input type="date" name="valid_until" value="{{ validUntil }}"></label>
+          </div>
+          <details class="edit-price-more"{% if moreOpen %} open{% endif %}>
+            <summary><strong>More (optional)</strong> — CHA + transport, packing, notes</summary>
+            <div class="field-grid">
+              <label>CHA + transport per container (₹)<input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" value="{{ cha }}"
+                     placeholder="{{ chaPlaceholder }}"></label>
+              <label class="full checkbox-label"><input type="hidden" name="includes_packing_loading" value="0"><input type="checkbox" name="includes_packing_loading" value="1"{% if incl %} checked{% endif %}> Price includes packing and loading</label>
+              <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks">{{ notes }}</textarea></label>
+            </div>
+          </details>
+          <div class="edit-price-actions">
+            <button type="submit" class="btn-accent">Save</button>
+            <a class="btn-secondary" href="{{ backUrl }}">Cancel</a>
+          </div>
+        </div>
+
+        <div>
+          {% if grid %}
+            <h2 class="edit-price-h">Other thicknesses — worked out for you</h2>
+            <table class="list edit-price-calc">
+              <tr><th>Thickness</th><th class="num">Price</th><th class="num">Was</th><th></th></tr>
+              {% for l in lines %}
+                <tr data-edit-price-row="{{ l.mm }}"{% if l.from %} class="edit-price-from"{% endif %}>
+                  <td>{{ l.label }}</td>
+                  <td class="num"><span data-edit-price-new>{{ l.newText }}</span>
+                    <span class="badge" data-edit-price-how>{{ 'entered' if l.from else '' }}</span></td>
+                  <td class="num muted">{{ l.wasText }}</td>
+                  <td>
+                    <button type="button" class="btn-link small" data-edit-price-own-toggle{% if l.from %} hidden{% endif %}>Type it yourself</button>
+                    <label class="edit-price-own" hidden>Your price for {{ l.label }}<input type="text" inputmode="decimal" name="own[{{ l.mm }}]" data-max-decimals="2"
+                           placeholder="e.g. {{ l.placeholder }}" value="{{ l.own }}" data-edit-price-own></label>
+                  </td>
+                </tr>
+              {% endfor %}
+            </table>
+            <p class="small muted">Want a different price for one thickness? <strong>Type it yourself</strong> — that row then stays as you typed it.</p>
+          {% endif %}
+          {% if canSeeSelling %}
+            <p class="edit-price-selling" data-edit-price-selling>
+              {% if sellingText %}
+                <strong>Selling price after saving:</strong> minimum USD {{ sellingText.min }} · quote USD {{ sellingText.quote }} / {{ sellingText.unit }}
+                <span class="muted">(was {{ sellingText.wasMin }} · {{ sellingText.wasQuote }})</span>
+              {% elif sellingReason %}
+                <span class="muted">{{ sellingReason }}</span>
+              {% endif %}
+            </p>
+          {% endif %}
+          <p class="small muted" data-edit-price-error role="alert"></p>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

@@ -35,6 +35,11 @@ final class PricingService
         // D-301 (11 Nov 2026): the exchange rate is fetched daily; pricing rate = market × (1 − cushion %).
         'fx_mode' => 'auto',
         'fx_cushion_pct' => '2.0',
+        // D-359 (13 Nov 2026): global physical defaults — used when neither the product nor its category has a value.
+        'weight_t_per_cbm' => '2.70',
+        'container_max_t' => '27.00',
+        'container_cbm' => '8.00',
+        'thick_k_factor' => '40',
     ];
 
     /** Labels for the settings page and the audit log. */
@@ -72,6 +77,11 @@ final class PricingService
             'cbm_from_mm' => max(1, (int) $raw['cbm_from_mm']),
             'price_request_daily_limit' => max(0, (int) $raw['price_request_daily_limit']),
             'price_request_valid_days' => max(1, (int) $raw['price_request_valid_days']),
+            // D-359: the global level of the physical values (PricingLevels).
+            'weight_t_per_cbm' => (float) $raw['weight_t_per_cbm'],
+            'container_max_t' => (float) $raw['container_max_t'],
+            'container_cbm' => (float) $raw['container_cbm'],
+            'thick_k_factor' => (float) $raw['thick_k_factor'],
         ];
     }
 
@@ -188,11 +198,14 @@ final class PricingService
         return [$fields, $errors];
     }
 
-    /** The supplier row used for pricing: the one marked so (a base price, or D-300 a price for every thickness); otherwise none. */
+    /**
+     * The supplier row used for pricing: the one marked so (a base price, or D-300 a price for every thickness); otherwise none.
+     * D-359: only while it is usable — the offer switched on and its supplier active (SupplierOffers::usable()).
+     */
     public static function pricingSupplier(int $productId): ?array
     {
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
-            if (!empty($s['is_primary']) && in_array($s['price_basis'] ?? 'unit', ['unit', 'grid'], true)) {
+            if (!empty($s['is_primary']) && in_array($s['price_basis'] ?? 'unit', ['unit', 'grid'], true) && SupplierOffers::usable($s)) {
                 return $s;
             }
         }
@@ -203,14 +216,15 @@ final class PricingService
      * D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above).
      * D-300: a price for every thickness used for pricing also holds the per-CBM price.
      */
-    public static function cbmSupplier(int $productId): ?array
+    public static function cbmSupplier(int $productId, ?array $primary = null): ?array
     {
-        $primary = self::pricingSupplier($productId);
+        // D-359: the row the engine prices from (a fixed configured base price may stand in for the supplier's).
+        $primary ??= self::pricingSupplier($productId);
         if ($primary !== null && ($primary['price_basis'] ?? '') === 'grid') {
             return $primary;
         }
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
-            if (($s['price_basis'] ?? 'unit') === 'cbm' && !empty($s['is_cbm_primary'])) {
+            if (($s['price_basis'] ?? 'unit') === 'cbm' && !empty($s['is_cbm_primary']) && SupplierOffers::usable($s)) {
                 return $s;
             }
         }
@@ -268,8 +282,11 @@ final class PricingService
                 $spec['exact'] = $exact['text'];
             }
         }
+        // D-359: the configured base price (SupplierOffers::pricingRow) — the usable supplier price
+        // "used for pricing" while the product follows it, as before.
+        $primary = $exact === null ? SupplierOffers::pricingRow($product, self::pricingSupplier((int) $product['id']), $settings) : null;
         $supplier = $exact !== null ? $exact['supplier']
-            : ($spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id']) : self::pricingSupplier((int) $product['id']));
+            : ($spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id'], $primary) : $primary);
         // D-300 (point 12): a price for every thickness already holds the Thickness option's % —
         // the chosen thickness is priced from the grid, so the % is not applied again.
         $gridRules = null;
@@ -326,7 +343,10 @@ final class PricingService
                 $out['manual'] = true;
                 return $out;
             }
-            $out['missing'] = 'No supplier price is marked "used for pricing" yet.';
+            $marked = SupplierOffers::markedForPricing((int) $product['id']);
+            $out['missing'] = $marked !== null && !SupplierOffers::usable($marked)
+                ? 'The supplier price used for pricing is switched off (inactive supplier or offer).'
+                : 'No supplier price is marked "used for pricing" yet.';
             return $out;
         }
         // D-300: FOB cost (₹) = supplier price + CHA and transport per unit (+ packing and loading
@@ -362,21 +382,23 @@ final class PricingService
     }
 
     /**
-     * The margin, other costs, incentive and buffer that apply to a product: its own, else the
-     * pricing settings.
+     * The margin, other costs, incentive and buffer that apply to a product: its own, else
+     * (D-359) its category's, else the pricing settings.
      *
      * @return array{margin_pct: float, other_mode: string, other_value: float, incentive_mode: string, incentive_value: float, buffer_pct: float}
      */
     public static function effective(array $product, ?array $settings = null): array
     {
         $settings ??= self::settings();
+        // D-359: product → category → global (PricingLevels); the incentive is product → global.
+        $l = PricingLevels::resolve($product, $settings);
         return [
-            'margin_pct' => ($product['pricing_margin_pct'] ?? null) !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
-            'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
-            'other_value' => ($product['pricing_other_cost_mode'] ?? null) !== null ? (float) $product['pricing_other_cost_value'] : $settings['other_cost_pct'],
-            'incentive_mode' => $product['pricing_incentive_mode'] ?? $settings['incentive_mode'],
-            'incentive_value' => ($product['pricing_incentive_mode'] ?? null) !== null ? (float) $product['pricing_incentive_value'] : $settings['incentive_value'],
-            'buffer_pct' => ($product['pricing_buffer_pct'] ?? null) !== null ? (float) $product['pricing_buffer_pct'] : $settings['buffer_pct'],
+            'margin_pct' => (float) $l['margin_pct']['value'],
+            'other_mode' => (string) $l['other_cost']['value']['mode'],
+            'other_value' => (float) $l['other_cost']['value']['value'],
+            'incentive_mode' => (string) $l['incentive']['value']['mode'],
+            'incentive_value' => (float) $l['incentive']['value']['value'],
+            'buffer_pct' => (float) $l['buffer_pct']['value'],
         ];
     }
 
@@ -414,7 +436,8 @@ final class PricingService
         $settings ??= self::settings();
         if (($supplier['price_basis'] ?? '') === 'grid') {
             $gridRules ??= ThicknessPrices::rules($product, $settings);
-            return ThicknessPrices::cost($gridRules, ThicknessPrices::storedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
+            // D-359: a configured base price carries its own prices (_stored); a supplier row reads its stored ones.
+            return ThicknessPrices::cost($gridRules, $supplier['_stored'] ?? ThicknessPrices::storedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
         }
         $base = (new ProductService())->effectiveFobForSupplier($supplier, $product);
         if ($base === null) {
@@ -450,7 +473,7 @@ final class PricingService
     {
         $settings ??= self::settings();
         $rows = array_values(array_filter(ProductSupplierRepository::forProduct((int) $product['id']),
-            static fn (array $s): bool => ($s['price_basis'] ?? '') === 'combo' && (int) ($s['combo_in_use'] ?? 0) === 1 && (string) ($s['combo_per'] ?? 'unit') === $basis));
+            static fn (array $s): bool => ($s['price_basis'] ?? '') === 'combo' && (int) ($s['combo_in_use'] ?? 0) === 1 && (string) ($s['combo_per'] ?? 'unit') === $basis && SupplierOffers::usable($s)));
         if ($rows === []) {
             return null;
         }

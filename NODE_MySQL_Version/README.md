@@ -1693,6 +1693,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-12g-detailed-line-table.
 mysql -u <user> -p <database> < docs/migrations/2026-11-12h-price-lock-and-products-amendment.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12i-monument-option-and-defaults.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-12j-surface-finish-one-list.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-13a-suppliers-products-configure.sql
 ```
 
 Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,

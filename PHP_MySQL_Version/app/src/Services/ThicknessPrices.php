@@ -68,14 +68,17 @@ final class ThicknessPrices
         if ($k !== null) {
             $own[] = '× ' . self::fmt($k);
         }
-        $k ??= $num($category['thick_k_factor'] ?? null);
         $cbm = $num($product['container_cbm'] ?? null);
         $maxT = $num($product['container_max_t'] ?? null);
         if ($cbm !== null || $maxT !== null) {
             $own[] = 'container';
         }
-        $cbm ??= $num($category['container_cbm'] ?? null) ?? self::DEFAULT_CONTAINER_CBM;
-        $maxT ??= $num($category['container_max_t'] ?? null) ?? self::DEFAULT_CONTAINER_MAX_T;
+        // D-359: product → category → global (Pricing settings) — PricingLevels; a product that
+        // follows global skips its category.
+        $levels = PricingLevels::resolve($product, $settings, !empty($product['pricing_follow_global']) ? null : $category);
+        $k ??= $levels['thick_k_factor']['value'];
+        $cbm ??= $levels['container_cbm']['value'] ?? self::DEFAULT_CONTAINER_CBM;
+        $maxT ??= $levels['container_max_t']['value'] ?? self::DEFAULT_CONTAINER_MAX_T;
         $rows = [];
         $baseMm = null;
         foreach (ProductSpecs::offered($product) as $sp) {
@@ -110,7 +113,7 @@ final class ThicknessPrices
         return [
             'grid' => $k !== null && $k > 0 && $baseMm !== null && $unitOk,
             'base_mm' => $baseMm ?? 20, 'rows' => $rows, 'k' => $k, 'cbm_from' => $cbmFrom,
-            'container_cbm' => $cbm, 'container_max_t' => $maxT, 't_per_cbm' => OrderLinePricing::weightPerCbm($product),
+            'container_cbm' => $cbm, 'container_max_t' => $maxT, 't_per_cbm' => $levels['weight_t_per_cbm']['value'],
             'own' => array_values(array_unique($own)), 'category_id' => $categoryId, 'category_name' => $category['name'] ?? null,
             'unit' => $unit,
         ];

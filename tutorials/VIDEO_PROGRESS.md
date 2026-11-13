@@ -168,6 +168,13 @@ recorded video opens the staff Products list or a product page (B01 / A02-1 only
 order, C04 / C06 show the associate's catalogue, which has no Duplicate). An inactive copy is never offered in Pick
 from Products. No video is affected; nothing re-recorded.
 
+D-359 (13 Nov 2026: **Edit price** button on each supplier row of Products › a product › Market prices and an
+**Edit price** link on each row of a supplier's "Prices given for products"; the new Edit price form; offers of
+inactive suppliers no longer used for pricing; pricing values from product → category → global) — checked against
+every script: no recorded video opens Market prices, a supplier's page or a supplier-price page, and every price
+shown on camera (Pick from Products, Price check, Get price) is unchanged (every product's figures were compared
+before and after on both stacks). No video is affected; listed only, nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

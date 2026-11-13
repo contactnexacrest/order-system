@@ -52,7 +52,6 @@ function label(mm, cbmFrom = 50) {
 async function rules(product, settings = null) {
   const pricingService = require('./pricingService');
   const productSpecs = require('./productSpecs');
-  const orderLinePricing = require('./orderLinePricing');
   const s = settings || (await pricingService.settings());
   const categoryId = await productSpecs.categoryIdFor(product);
   const category = categoryId !== null && categoryId !== undefined
@@ -61,12 +60,16 @@ async function rules(product, settings = null) {
   const own = [];
   let k = num(product.thick_k_factor);
   if (k !== null) own.push(`× ${fmt(k)}`);
-  if (k === null) k = num(category ? category.thick_k_factor : null);
   let cbm = num(product.container_cbm);
   let maxT = num(product.container_max_t);
   if (cbm !== null || maxT !== null) own.push('container');
-  if (cbm === null) cbm = num(category ? category.container_cbm : null) ?? DEFAULT_CONTAINER_CBM;
-  if (maxT === null) maxT = num(category ? category.container_max_t : null) ?? DEFAULT_CONTAINER_MAX_T;
+  // D-359: product → category → global (Pricing settings) — pricingLevels; a product that
+  // follows global skips its category.
+  const pricingLevels = require('./pricingLevels');
+  const levels = pricingLevels.resolve(product, s, Number(product.pricing_follow_global || 0) === 1 ? null : category);
+  if (k === null) k = levels.thick_k_factor.value;
+  if (cbm === null) cbm = levels.container_cbm.value ?? DEFAULT_CONTAINER_CBM;
+  if (maxT === null) maxT = levels.container_max_t.value ?? DEFAULT_CONTAINER_MAX_T;
   const byMm = new Map();
   let baseMm = null;
   for (const sp of await productSpecs.offered(product)) {
@@ -88,7 +91,7 @@ async function rules(product, settings = null) {
   return {
     grid: k !== null && k > 0 && baseMm !== null && unitOk,
     base_mm: baseMm ?? 20, rows, k, cbm_from: cbmFrom,
-    container_cbm: cbm, container_max_t: maxT, t_per_cbm: await orderLinePricing.weightPerCbm(product),
+    container_cbm: cbm, container_max_t: maxT, t_per_cbm: levels.weight_t_per_cbm.value,
     own: [...new Set(own)], category_id: categoryId ?? null, category_name: category ? category.name : null, unit,
   };
 }

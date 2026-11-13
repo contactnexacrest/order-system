@@ -143,6 +143,8 @@ async function editForm(req, res) {
     vendor: supplier,
     // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
     productPrices: await productPricesFor(req, id),
+    // D-359: an "Edit price" link per row for those who record supplier prices.
+    canEditPrice: !!(req.permissions && req.permissions.record_market_prices),
   }, 'layout/base');
 }
 
@@ -160,7 +162,7 @@ async function productPricesFor(req, id) {
     } else {
       price = `₹${pp.fob_value !== null ? fmt2(pp.fob_value) : '—'} / ${(pp.price_basis || '') === 'cbm' ? 'CBM' : (String(pp.reference_unit || '') || 'unit')}`;
     }
-    out.push({ product_name: pp.product_name, price, quoted_on: pp.quoted_on ? String(pp.quoted_on).slice(0, 10) : '—',
+    out.push({ id: Number(pp.id), direct: (pp.fob_source || 'direct') === 'direct', product_name: pp.product_name, price, quoted_on: pp.quoted_on ? String(pp.quoted_on).slice(0, 10) : '—',
       valid_until: pp.valid_until ? String(pp.valid_until).slice(0, 10) : '—', used: Number(pp.is_primary) === 1 || Number(pp.is_cbm_primary || 0) === 1 || Number(pp.combo_in_use || 0) === 1 });
   }
   return out;

@@ -2638,6 +2638,13 @@ the same filters, counts, fields, actions and money rules on both templates
   - Cost never reaches the browser or an associate.
   - Market prices are dated rows with valid-until; one is "used for
     pricing"; stale/expired badges.
+  - **D-359 (13 Nov 2026):** a supplier's offer is used only while it is
+    switched on (`offer_active`) and its supplier is active; each value comes
+    from product → category → global; the selling price is worked out from
+    the product's configured base price (which follows the supplier price
+    "used for pricing" until the Configure screen fixes it). Simple **Edit
+    price** form per supplier price. Details: §7.1 "Suppliers, offers and the
+    configured base price".
   - **Price requests (associates):** Get price returns at once (number
     `PR-YY-DD-NNNN`, quote, lowest price, valid 7 days, max 10 a day). An
     "Other" request goes to staff, priced within 24 h by the MD. Staff can
@@ -2645,9 +2652,9 @@ the same filters, counts, fields, actions and money rules on both templates
 - **Tables.** `pricing_settings`, `commission_levels`,
   `commission_ladder_steps`, `catalog_product_suppliers`, `price_requests`,
   `associate_price_access`, `order_products` (frozen line figures).
-- **Code.** `PricingEngine`, `PricingService`, `OrderLinePricing`,
-  `PriceRequestService`, `PricingController`, `PriceRequestController`,
-  `PricingRepository`.
+- **Code.** `PricingEngine`, `PricingService`, `PricingLevels` (D-359), `SupplierOffers` (D-359),
+  `OrderLinePricing`, `PriceRequestService`, `PricingController`, `EditPriceController` (D-359),
+  `PriceRequestController`, `PricingRepository`.
 - **Permissions.** `record_market_prices` (Procurement, MD),
   `view_price_buildup` (MD, ED), `manage_pricing` (MD).
 - **SOP / decisions.** SOP 27, 24 (price requests); D-240 (replaced),
@@ -3753,6 +3760,57 @@ order from an associate's client, staff see "for this order" figures and the not
 Price rules | Products in this category (`ProductCategoryController::show`). `/pricing/specifications` (GET)
 redirects to the Options tab; the specification actions redirect there too. A product's options page links
 "edit for all products in <category>".
+
+**Suppliers, offers and the configured base price (D-359, 13 Nov 2026, owner "go with recommendation"; Push 1 of 3).**
+- **Offers.** Each `catalog_product_suppliers` row is one supplier's OFFER of a product (a product has many suppliers,
+  a supplier many products — never a product per supplier). An offer is **usable** only when `offer_active` = 1 and its
+  directory supplier is active (`suppliers.is_active`; a price typed before the directory link counts as active). An
+  unusable offer is never used: not as the price "used for pricing", not as the per-CBM price, not as an exact price for a
+  combination, not in lowest / highest. When the price marked "used for pricing" is switched off the product shows "The
+  supplier price used for pricing is switched off (inactive supplier or offer)." (`SupplierOffers::usable()` /
+  `supplierOffers.usable()`; the repository's `forProduct()` / `find()` carry `supplier_is_active`.)
+- **Configured base price.** `catalog_products.configured_base_price_inr` with `configured_base_unit` ('m2' at a
+  thickness, 'CBM' for 50 mm and above, or the product's unit), `configured_base_thickness_mm` (0 = 50 mm and above,
+  NULL = a plain price per unit), `configured_at` / `configured_by`. While `configured_base_follows_supplier` = 1 (every
+  product priced before D-359 — the migration filled the price it is priced from today — and every new product) the
+  base price is the usable supplier price "used for pricing", live, exactly as before; its stored copy is refreshed when
+  that price is saved through Edit price. Once fixed (D-361, follows = 0) it never changes by itself and the engine prices
+  from it: `SupplierOffers::pricingRow()` turns it into a price row — the offer used for pricing unchanged when it is the
+  same price at the same thickness, otherwise a price for every thickness typed at the base thickness (other thicknesses
+  worked out by the price rules, as an older `auto_fill` row) or a price per unit, with that offer's CHA, packing and dates.
+- **Three levels.** Margin %, other costs, buffer %: the product's own value, else its category's
+  (`product_categories.margin_pct`, `other_cost_pct`, `buffer_pct`; empty = follow global), else Pricing settings. Weight
+  t/CBM, container CBM, container max t, thickness factor K: product → category → global (`pricing_settings`
+  `weight_t_per_cbm` 2.70, `container_max_t` 27.00, `container_cbm` 8.00, `thick_k_factor` 40 — the last fallback). The
+  team incentive is product → global. `catalog_products.pricing_follow_global` = 1 ("Reset all to global values") skips
+  the category. The product's own other-costs value is the existing `pricing_other_cost_mode` / `_value` (% or USD).
+  `PricingLevels::resolve()` returns each value with where it comes from (product / category / global);
+  `resetPreview()` lists what a reset would change; `resetToCategory()` clears the product's own values;
+  `resetToGlobal()` clears them and sets the flag (audit `PRODUCT_PRICING_RESET`). Used by `PricingService::effective()`
+  and `ThicknessPrices::rules()`.
+- **Edit price** (`/products/suppliers/{id}/edit-price`, `record_market_prices`; mockup `edit_price_new.png`). Reached from
+  an **Edit price** button on each supplier row of Products › a product › Market prices and an **Edit price** link on each
+  row of the supplier page's "Prices given for products" (Cancel / close go back there, `?from=supplier`). Left: New price
+  (₹) * (big), per m² / CBM / the unit, Thickness * (a price for every thickness; default the base thickness, marked
+  "(base)"), "Was ₹… → now ₹… (−₹…, −… %)", Quoted on * (not in the future), Valid until (not before Quoted on), "More
+  (optional)": CHA + transport per container (₹; placeholder shows the product's default), Price includes packing and
+  loading, Notes; Save / Cancel. Right: "Other thicknesses — worked out for you" (thickness · price · was), **Type it
+  yourself** per thickness (that row is then saved as typed), and for `view_price_buildup` "Selling price after saving:
+  minimum USD … · quote USD … / unit (was … · …)" — only when this offer is the one the selling price comes from, else
+  why not. The figures come from `GET …/edit-price/preview` (JSON; `SupplierOffers::preview()` →
+  `ThicknessPrices::calcFrom` / `values`, `PricingService::fobParts` / `buildFromFob`); app.js `initEditPrice` only shows
+  them. Save (`POST …/edit-price`): a price for every thickness → `ThicknessPrices::addPrice()` with every other thickness
+  ticked (worked out from the entered one), then one `addPrice()` per typed thickness; the base thickness is not changed;
+  a plain price → `fob_value`; then dates, CHA, packing, notes (price history rows for each change, audit
+  `MARKET_PRICE_CHANGED` "… (Edit price)"). The page stays with a green "Saved. <supplier> · <product>: ₹old → ₹new per …,
+  quoted …. Other thicknesses updated." and **Undo** · **See price history**. Undo (`POST …/edit-price/undo`, one-time
+  token kept in the session) puts back every stored thickness price, the row's price, base, auto_fill, dates, CHA,
+  packing, notes and the product's configured-price copy, with a history row "Undo (Edit price)". Issued quotations and
+  orders never change (D-342).
+- **For D-360 / D-361.** `SupplierOffers::offers()`, `markedForPricing()`, `setOfferActive()` (history "Offer active",
+  audit `SUPPLIER_OFFER_ON/OFF`), `offerBase()`, `lowestHighest()` (usable offers quoted like the product's base),
+  `configuredBase()`, `setConfiguredBase()` (follows = 0, audit `PRODUCT_BASE_PRICE_SET`), `followSupplier()`,
+  `refreshFollowedBase()`, `pricingRow()`; Node twins in `supplierOffers.js` and `pricingLevels.js`.
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 

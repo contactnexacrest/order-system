@@ -18,8 +18,10 @@ final class ProductSupplierRepository
     /** @return array<int, array<string,mixed>> */
     public static function forProduct(int $productId): array
     {
+        // D-359: with the directory supplier's Active flag (NULL = not linked to the directory).
         $stmt = Database::connection()->prepare(
-            'SELECT * FROM catalog_product_suppliers WHERE product_id = :product_id ORDER BY is_primary DESC, supplier_name'
+            'SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id
+             WHERE cps.product_id = :product_id ORDER BY cps.is_primary DESC, cps.supplier_name'
         );
         $stmt->execute(['product_id' => $productId]);
         return $stmt->fetchAll();
@@ -27,7 +29,7 @@ final class ProductSupplierRepository
 
     public static function find(int $id): ?array
     {
-        $stmt = Database::connection()->prepare('SELECT * FROM catalog_product_suppliers WHERE id = :id');
+        $stmt = Database::connection()->prepare('SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id WHERE cps.id = :id');
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }

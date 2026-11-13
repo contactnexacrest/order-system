@@ -55,6 +55,8 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
             </form>
           <?php endif; ?>
           <?php if ($r['fob_source'] === 'direct'): ?><a class="btn-sm" href="/products/suppliers/<?= (int) $r['id'] ?>/price"><?= $canRecord ? 'Edit' : 'View' ?></a><?php endif; ?>
+          <?php // D-359: the simple "Edit price" form (one price, the other thicknesses worked out, Undo). ?>
+          <?php if ($canRecord && $r['fob_source'] === 'direct'): ?><a class="btn-sm btn-accent" href="/products/suppliers/<?= (int) $r['id'] ?>/edit-price">Edit price</a><?php endif; ?>
         </td>
       </tr>
     <?php endforeach; ?>

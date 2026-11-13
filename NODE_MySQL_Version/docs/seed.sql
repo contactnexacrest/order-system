@@ -2823,3 +2823,11 @@ SELECT 'buyer_details_change', r.id FROM roles r
 -- amendment that changes quantities on an order with a Supplier PO, Procurement revises it.
 INSERT IGNORE INTO department_task_types (task_key, department_code, title, standard_days, escalate_after_days, sort_order) VALUES
   ('revise_supplier_po', 'PROC', 'Revise the Supplier PO (products amendment)', 2, 3, 45);
+
+-- Owner decision D-359 (13 Nov 2026; migration 2026-11-13a): global physical defaults, used
+-- only when neither the product nor its category has a value.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('weight_t_per_cbm', '2.70'),   -- tonnes per CBM
+  ('container_max_t', '27.00'),   -- most a container may weigh
+  ('container_cbm', '8.00'),      -- CBM per container
+  ('thick_k_factor', '40');       -- 50 mm and above per CBM = base per m² × this

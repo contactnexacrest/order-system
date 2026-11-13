@@ -117,16 +117,17 @@ $selectedTypes = $supplier['types'] ?? [];
   <?php if ($isEdit && isset($productPrices) && $productPrices !== null): ?>
     <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
     <table class="list">
-      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th></tr>
+      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th><?php if (!empty($canEditPrice)): ?><th></th><?php endif; ?></tr>
       <?php foreach ($productPrices as $__pp): ?>
         <tr><td><?= htmlspecialchars((string) $__pp['product_name']) ?></td>
           <td><?php if (($__pp['price_basis'] ?? '') === 'grid'): $__g = \App\Services\ThicknessPrices::typedFor((int) $__pp['id']); ?>
               <?= htmlspecialchars(implode(' · ', array_map(static fn ($mm, $v) => ($mm === 0 ? '50 mm+' : $mm . ' mm') . ' ₹' . number_format((float) $v, 2) . ($mm === 0 ? ' / CBM' : ' / m²'), array_keys($__g), $__g))) ?> <small class="muted">(typed; others calculated)</small>
             <?php else: ?>₹<?= $__pp['fob_value'] !== null ? number_format((float) $__pp['fob_value'], 2) : '—' ?> <small class="muted">/ <?= htmlspecialchars(($__pp['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($__pp['reference_unit'] ?? '') ?: 'unit')) ?></small><?php endif; ?></td>
           <td><?= htmlspecialchars((string) ($__pp['quoted_on'] ?? '—')) ?></td><td><?= htmlspecialchars((string) ($__pp['valid_until'] ?? '—')) ?></td>
-          <td><?= !empty($__pp['is_primary']) || !empty($__pp['is_cbm_primary']) || !empty($__pp['combo_in_use']) ? 'Yes' : '—' ?></td></tr>
+          <td><?= !empty($__pp['is_primary']) || !empty($__pp['is_cbm_primary']) || !empty($__pp['combo_in_use']) ? 'Yes' : '—' ?></td>
+          <?php if (!empty($canEditPrice)): ?><td><?php if (($__pp['fob_source'] ?? 'direct') === 'direct'): ?><a class="btn-sm" href="/products/suppliers/<?= (int) $__pp['id'] ?>/edit-price?from=supplier">Edit price</a><?php endif; ?></td><?php endif; ?></tr>
       <?php endforeach; ?>
-      <?php if ($productPrices === []): ?><tr><td colspan="5" class="muted">No product prices from this supplier yet.</td></tr><?php endif; ?>
+      <?php if ($productPrices === []): ?><tr><td colspan="<?= !empty($canEditPrice) ? 6 : 5 ?>" class="muted">No product prices from this supplier yet.</td></tr><?php endif; ?>
     </table>
   <?php endif; ?>
 </div>

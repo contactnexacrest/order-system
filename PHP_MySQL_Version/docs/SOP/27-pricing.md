@@ -477,6 +477,36 @@ A product can have its own × K or container (Edit product, MD only) — it show
   **Use own rules for this product** to change × K and the container for this product only; switched off, the
   category's rules apply. The rules are only a calculator: they never change a typed price or the base.
 
+## Edit price — change one supplier's price in one form (D-359, 13 Nov 2026)
+
+**Where.** Products › a product › **Market prices** › **Edit price** on the supplier's row, or Procurement & suppliers ›
+Suppliers › the supplier › **Prices given for products** › **Edit price** on the product's row. You need the right to
+record supplier prices (Procurement, MD).
+
+**Steps.**
+1. Type the **New price (₹)**. For a price for every thickness choose the **Thickness** it is for — it starts on the
+   supplier's base thickness (marked "(base)"); the unit (per m², or per CBM for 50 mm and above) follows.
+2. Under the price you see "Was ₹… → now ₹… (−₹…, −… %)". On the right, **Other thicknesses — worked out for you**
+   shows each thickness's new price next to what it was. To keep a different price for one thickness, click **Type it
+   yourself** on its row and type it — that row is then saved as you typed it.
+3. Enter **Quoted on** (the date the supplier gave the price; not in the future) and, if the supplier said so,
+   **Valid until**. **More (optional)** holds CHA + transport per container (empty = the product's default), "Price
+   includes packing and loading" and Notes.
+4. The MD and ED also see **Selling price after saving** (minimum and quote, and what they were) when this supplier's
+   price is the one the selling price comes from.
+5. Click **Save**. You stay on the page with a green message ("Saved. … ₹old → ₹new …"), **Undo** and **See price
+   history**. Undo puts the price back exactly as it was before your save; both the save and the undo are in the price
+   history. Quotations and orders already issued never change.
+
+**Suppliers and offers that are switched off.** A price from a supplier marked inactive is never used for pricing.
+If the price "used for pricing" is switched off, the product shows "The supplier price used for pricing is switched off
+(inactive supplier or offer)." until another price is used or the supplier is active again.
+
+**Where pricing values come from (D-359).** Margin, other costs and buffer: the product's own value, else its
+category's, else Pricing settings. Weight per CBM, container size, container weight and the thickness factor: the
+product's, else the category's, else the global defaults (2.70 t per CBM, 27 t, 8 CBM, × 40). Nothing changed in the
+prices on the day this came in.
+
 ## Exchange rate (D-301, 11 Nov 2026)
 
 The USD rate is fetched every morning (Frankfurter, European Central Bank; backup open.er-api.com).

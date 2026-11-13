@@ -66,6 +66,7 @@ use App\Controllers\SignatoryController;
 use App\Controllers\PermissionAdminController;
 use App\Controllers\ProductController;
 use App\Controllers\PricingController;
+use App\Controllers\EditPriceController;
 use App\Controllers\SuperAdminController;
 use App\Middleware\SuperAdminOnly;
 use App\Middleware\TestModeGate;
@@ -175,6 +176,7 @@ $dataExport = new DataExportController();
 $backups = new BackupController();
 $products = new ProductController();
 $pricing = new PricingController();
+$editPrice = new EditPriceController();
 $testMode = new TestModeController();
 
 // --- Public (unauthenticated) routes ---
@@ -1227,6 +1229,11 @@ $router->post('/products/suppliers/{supplierId}/market-price', [$pricing, 'updat
 // D-300 (point 12): one supplier price — every thickness, CHA + transport, history. D-301 (point 4): the exchange rate.
 $router->get('/products/suppliers/{supplierId}/price', [$pricing, 'editPrice'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'view_price_buildup'])]);
 $router->post('/products/suppliers/{supplierId}/price', [$pricing, 'savePrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+// D-359 (plan rule 8): the simple "Edit price" form — one supplier's offer, one Save, Undo, live preview.
+$router->get('/products/suppliers/{supplierId}/edit-price', [$editPrice, 'form'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices')]);
+$router->get('/products/suppliers/{supplierId}/edit-price/preview', [$editPrice, 'preview'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices')]);
+$router->post('/products/suppliers/{supplierId}/edit-price', [$editPrice, 'save'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/edit-price/undo', [$editPrice, 'undo'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 // D-335: "Add / update a price" (one thickness typed, the ticked ones worked out) and the BASE for orders.
 $router->post('/products/suppliers/{supplierId}/thickness-price', [$pricing, 'addThicknessPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/products/suppliers/{supplierId}/base', [$pricing, 'setBase'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);

@@ -6682,3 +6682,22 @@ CREATE TABLE amendment_product_lines (
   KEY idx_amendment_product_lines_amendment (amendment_id, line_no),
   CONSTRAINT fk_amendment_product_lines_amendment FOREIGN KEY (amendment_id) REFERENCES amendments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Owner decision D-359 (13 Nov 2026, migration 2026-11-13a): suppliers, products and the
+-- configured base price (Push 1). A supplier's offer of a product can be switched off
+-- (offer_active; an inactive supplier's offers are never used either). A product holds its
+-- own configured base price (₹, per m² at a thickness / per CBM / per unit) which, while
+-- configured_base_follows_supplier = 1, follows the supplier price "used for pricing".
+-- Pricing values come from three levels: product → category → global (Pricing settings);
+-- pricing_follow_global = 1 makes a product skip its category.
+ALTER TABLE catalog_product_suppliers ADD COLUMN offer_active TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE catalog_products ADD COLUMN configured_base_price_inr DECIMAL(14,2) NULL;
+ALTER TABLE catalog_products ADD COLUMN configured_base_unit VARCHAR(20) NULL;          -- 'm2' (a thickness), 'CBM' (50 mm and above) or the product's unit
+ALTER TABLE catalog_products ADD COLUMN configured_base_thickness_mm INT NULL;          -- 0 = 50 mm and above per CBM; NULL = a plain price per unit
+ALTER TABLE catalog_products ADD COLUMN configured_base_follows_supplier TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE catalog_products ADD COLUMN configured_at DATETIME NULL;
+ALTER TABLE catalog_products ADD COLUMN configured_by BIGINT UNSIGNED NULL;
+ALTER TABLE catalog_products ADD COLUMN pricing_follow_global TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE product_categories ADD COLUMN margin_pct DECIMAL(6,2) NULL;                 -- empty = follow the global value
+ALTER TABLE product_categories ADD COLUMN other_cost_pct DECIMAL(6,2) NULL;
+ALTER TABLE product_categories ADD COLUMN buffer_pct DECIMAL(6,2) NULL;

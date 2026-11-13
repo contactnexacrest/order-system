@@ -31,6 +31,11 @@ const DEFAULTS = {
   // D-301 (11 Nov 2026): the exchange rate is fetched daily; pricing rate = market × (1 − cushion %).
   fx_mode: 'auto',
   fx_cushion_pct: '2.0',
+  // D-359 (13 Nov 2026): global physical defaults — used when neither the product nor its category has a value.
+  weight_t_per_cbm: '2.70',
+  container_max_t: '27.00',
+  container_cbm: '8.00',
+  thick_k_factor: '40',
 };
 
 const LABELS = {
@@ -87,6 +92,11 @@ async function settings() {
     cbm_from_mm: Math.max(1, parseInt(raw.cbm_from_mm, 10) || 0),
     price_request_daily_limit: Math.max(0, parseInt(raw.price_request_daily_limit, 10) || 0),
     price_request_valid_days: Math.max(1, parseInt(raw.price_request_valid_days, 10) || 0),
+    // D-359: the global level of the physical values (pricingLevels).
+    weight_t_per_cbm: Number(raw.weight_t_per_cbm),
+    container_max_t: Number(raw.container_max_t),
+    container_cbm: Number(raw.container_cbm),
+    thick_k_factor: Number(raw.thick_k_factor),
   };
 }
 
@@ -186,19 +196,25 @@ function readOverridesForm(post) {
   return [fields, errors];
 }
 
-/** The supplier row used for pricing: a base price, or D-300 a price for every thickness. */
+/**
+ * The supplier row used for pricing: a base price, or D-300 a price for every thickness.
+ * D-359: only while it is usable — the offer switched on and its supplier active (supplierOffers.usable()).
+ */
 async function pricingSupplier(productId) {
-  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1 && ['unit', 'grid'].includes(s.price_basis || 'unit')) || null;
+  const { usable } = require('./supplierOffers');
+  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1 && ['unit', 'grid'].includes(s.price_basis || 'unit') && usable(s)) || null;
 }
 
 /**
  * D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above).
  * D-300: a price for every thickness used for pricing also holds the per-CBM price.
  */
-async function cbmSupplier(productId) {
-  const primary = await pricingSupplier(productId);
+async function cbmSupplier(productId, primary = null) {
+  // D-359: the row the engine prices from (a fixed configured base price may stand in for the supplier's).
+  const { usable } = require('./supplierOffers');
+  if (primary === null || primary === undefined) primary = await pricingSupplier(productId);
   if (primary !== null && (primary.price_basis || '') === 'grid') return primary;
-  return (await productSupplierRepository.forProduct(productId)).find((s) => (s.price_basis || 'unit') === 'cbm' && Number(s.is_cbm_primary) === 1) || null;
+  return (await productSupplierRepository.forProduct(productId)).find((s) => (s.price_basis || 'unit') === 'cbm' && Number(s.is_cbm_primary) === 1 && usable(s)) || null;
 }
 
 function ymd(d) {
@@ -244,8 +260,12 @@ async function forProduct(product, levels = null, s = null, program = null, sele
       spec.exact = exact.text;
     }
   }
+  // D-359: the configured base price (supplierOffers.pricingRow) — the usable supplier price
+  // "used for pricing" while the product follows it, as before.
+  const supplierOffers = require('./supplierOffers');
+  const primary = exact === null ? await supplierOffers.pricingRow(product, await pricingSupplier(product.id), s) : null;
   const supplier = exact !== null ? exact.supplier
-    : (spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id) : await pricingSupplier(product.id));
+    : (spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id, primary) : primary);
   // D-300 (point 12): a price for every thickness already holds the Thickness option's % —
   // the chosen thickness is priced from the grid, so the % is not applied again.
   let gridRules = null;
@@ -261,7 +281,7 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     }
   }
   const has = (k) => product[k] !== null && product[k] !== undefined;
-  const effective = effectiveFor(product, s);
+  const effective = effectiveFor(product, s, await require('./pricingLevels').category(product));
   const overrides = [];
   if (has('pricing_margin_pct')) overrides.push(`margin ${pct(effective.margin_pct)}`);
   if (has('pricing_other_cost_mode')) overrides.push(`other costs ${modeLabel(effective.other_mode, effective.other_value)}`);
@@ -288,7 +308,10 @@ async function forProduct(product, levels = null, s = null, program = null, sele
       out.manual = true;
       return out;
     }
-    out.missing = 'No supplier price is marked "used for pricing" yet.';
+    const marked = await supplierOffers.markedForPricing(product.id);
+    out.missing = marked !== null && !supplierOffers.usable(marked)
+      ? 'The supplier price used for pricing is switched off (inactive supplier or offer).'
+      : 'No supplier price is marked "used for pricing" yet.';
     return out;
   }
   // D-300: FOB cost (₹) = supplier price + CHA and transport per unit (+ packing and loading
@@ -322,16 +345,20 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   return out;
 }
 
-/** The margin, other costs, incentive and buffer that apply to a product: its own, else the pricing settings. */
-function effectiveFor(product, s) {
-  const has = (k) => product[k] !== null && product[k] !== undefined;
+/**
+ * The margin, other costs, incentive and buffer that apply to a product: its own, else (D-359)
+ * its category's, else the pricing settings. cat: pricingLevels.category(product) — null when
+ * the product follows global or has no category.
+ */
+function effectiveFor(product, s, cat = null) {
+  const l = require('./pricingLevels').resolve(product, s, cat);
   return {
-    margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
-    other_mode: product.pricing_other_cost_mode || 'pct',
-    other_value: has('pricing_other_cost_mode') ? Number(product.pricing_other_cost_value) : s.other_cost_pct,
-    incentive_mode: product.pricing_incentive_mode || s.incentive_mode,
-    incentive_value: has('pricing_incentive_mode') ? Number(product.pricing_incentive_value) : s.incentive_value,
-    buffer_pct: has('pricing_buffer_pct') ? Number(product.pricing_buffer_pct) : s.buffer_pct,
+    margin_pct: Number(l.margin_pct.value),
+    other_mode: String(l.other_cost.value.mode),
+    other_value: Number(l.other_cost.value.value),
+    incentive_mode: String(l.incentive.value.mode),
+    incentive_value: Number(l.incentive.value.value),
+    buffer_pct: Number(l.buffer_pct.value),
   };
 }
 
@@ -343,7 +370,7 @@ function effectiveFor(product, s) {
 async function buildFromFob(product, fobInr, s = null, program = null) {
   s = s || (await settings());
   if (!(Number(fobInr) > 0)) return null;
-  const e = effectiveFor(product, s);
+  const e = effectiveFor(product, s, await require('./pricingLevels').category(product));
   const b = pricingEngine.build({
     supplier_inr: Number(fobInr), fx_rate: s.pricing_fx_rate,
     other_mode: e.other_mode, other_value: e.other_value, margin_pct: e.margin_pct,
@@ -363,7 +390,8 @@ async function fobParts(product, supplier, basis, mm, s = null, gridRules = null
   s = s || (await settings());
   if ((supplier.price_basis || '') === 'grid') {
     const r = gridRules || (await thicknessPrices.rules(product, s));
-    return thicknessPrices.cost(r, await thicknessPrices.storedFor(Number(supplier.id)), supplier, product, basis, mm);
+    // D-359: a configured base price carries its own prices (_stored); a supplier row reads its stored ones.
+    return thicknessPrices.cost(r, supplier._stored || (await thicknessPrices.storedFor(Number(supplier.id))), supplier, product, basis, mm);
   }
   const base = productService.effectiveFobForSupplier(supplier, product);
   if (base === null || base === undefined) return null;
@@ -390,7 +418,7 @@ async function fobParts(product, supplier, basis, mm, s = null, gridRules = null
 async function exactPrice(product, map, basis, s = null, offeredSpecs = null) {
   s = s || (await settings());
   const rows = (await productSupplierRepository.forProduct(product.id))
-    .filter((r) => (r.price_basis || '') === 'combo' && Number(r.combo_in_use || 0) === 1 && String(r.combo_per || 'unit') === basis);
+    .filter((r) => (r.price_basis || '') === 'combo' && Number(r.combo_in_use || 0) === 1 && String(r.combo_per || 'unit') === basis && require('./supplierOffers').usable(r));
   if (!rows.length) return null;
   const named = await pricingRepository.comboOptions(rows.map((r) => Number(r.id)));
   let best = null;

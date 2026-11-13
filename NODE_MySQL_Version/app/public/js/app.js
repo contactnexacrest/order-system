@@ -2222,6 +2222,120 @@
     timer = setInterval(tick, 5000);
   }
 
+  // D-359 (13 Nov 2026, plan rule 8): the simple "Edit price" form. While a price is typed, the
+  // other thicknesses, the old prices and the selling price come from the server
+  // (SupplierOffers::preview / supplierOffers.preview — the existing ThicknessPrices and
+  // PricingService maths); this only shows them. "Type it yourself" opens a box for one thickness.
+  function initEditPrice() {
+    document.querySelectorAll('form[data-edit-price]').forEach(function (form) {
+      var url = form.getAttribute('data-preview-url');
+      var price = form.querySelector('[data-edit-price-input]');
+      var sel = form.querySelector('[data-edit-price-thickness]');
+      var unit = form.querySelector('[data-edit-price-unit]');
+      var change = form.querySelector('[data-edit-price-change]');
+      var selling = form.querySelector('[data-edit-price-selling]');
+      var err = form.querySelector('[data-edit-price-error]');
+      var timer = null;
+      var seq = 0;
+      function amount(v) {
+        var n = Math.round(Number(v) * 100) / 100;
+        return '₹' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+      }
+      function usd(v) { return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      function query() {
+        var p = new URLSearchParams();
+        p.set('price', (price.value || '').replace(/,/g, '').trim());
+        if (sel) p.set('thickness_mm', sel.value);
+        form.querySelectorAll('[data-edit-price-own]').forEach(function (inp) {
+          var row = inp.closest('[data-edit-price-row]');
+          if (inp.value.trim() !== '' && row && !row.classList.contains('edit-price-from')) p.set(inp.name, inp.value.replace(/,/g, '').trim());
+        });
+        return p.toString();
+      }
+      function show(data) {
+        if (err) err.textContent = data.ok ? '' : (data.error || '');
+        (data.lines || []).forEach(function (l) {
+          if (l.from && change) {
+            if (l.was !== null && l.price !== null && Number(l.was) > 0 && Math.abs(Number(l.price) - Number(l.was)) >= 0.005) {
+              var d = Number(l.price) - Number(l.was);
+              var pct = Math.round(d / Number(l.was) * 1000) / 10;
+              change.textContent = 'Was ' + amount(l.was) + ' → now ' + amount(l.price) + ' (' + (d < 0 ? '−' : '+') + amount(Math.abs(d)) + ', ' + (pct < 0 ? '−' : '+') + Math.abs(pct) + ' %)';
+              change.classList.toggle('edit-price-down', d < 0);
+            } else {
+              change.textContent = l.was !== null ? 'Was ' + amount(l.was) : '';
+            }
+          }
+          if (l.mm === null) return;
+          var row = form.querySelector('[data-edit-price-row="' + l.mm + '"]');
+          if (!row) return;
+          row.classList.toggle('edit-price-from', !!l.from);
+          var cell = row.querySelector('[data-edit-price-new]');
+          if (cell) cell.textContent = l.price !== null ? amount(l.price) + ' / ' + l.unit : '—';
+          var how = row.querySelector('[data-edit-price-how]');
+          if (how) how.textContent = l.from ? 'entered' : (l.how === 'typed' ? 'typed' : '');
+          var toggle = row.querySelector('[data-edit-price-own-toggle]');
+          var own = row.querySelector('.edit-price-own');
+          if (toggle) toggle.hidden = !!l.from || (own && !own.hidden);
+          if (own && l.from) own.hidden = true;
+        });
+        if (selling && data.selling) {
+          var s = data.selling;
+          if (s.applies && s.min !== null && s.min !== undefined) {
+            selling.innerHTML = '';
+            var b = document.createElement('strong');
+            b.textContent = 'Selling price after saving:';
+            selling.appendChild(b);
+            selling.appendChild(document.createTextNode(' minimum USD ' + usd(s.min) + ' · quote USD ' + usd(s.quote) + ' / ' + (s.unit || '') + ' '));
+            var was = document.createElement('span');
+            was.className = 'muted';
+            was.textContent = '(was ' + usd(s.was_min) + ' · ' + usd(s.was_quote) + ')';
+            selling.appendChild(was);
+          } else {
+            selling.textContent = s.reason || '';
+          }
+        }
+      }
+      function refresh() {
+        var mine = ++seq;
+        fetch(url + '?' + query(), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (data) { if (mine === seq) show(data); })
+          .catch(function () { /* the server checks everything again on Save */ });
+      }
+      function later() {
+        clearTimeout(timer);
+        timer = setTimeout(refresh, 250);
+      }
+      price.addEventListener('input', later);
+      if (sel) {
+        sel.addEventListener('change', function () {
+          var opt = sel.options[sel.selectedIndex];
+          if (unit && opt) unit.textContent = opt.getAttribute('data-unit') || '';
+          refresh();
+        });
+      }
+      form.querySelectorAll('[data-edit-price-own-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var own = btn.closest('[data-edit-price-row]').querySelector('.edit-price-own');
+          if (!own) return;
+          own.hidden = false;
+          btn.hidden = true;
+          var inp = own.querySelector('input');
+          if (inp) inp.focus();
+        });
+      });
+      form.querySelectorAll('[data-edit-price-own]').forEach(function (inp) {
+        if (inp.value.trim() !== '') {
+          inp.closest('.edit-price-own').hidden = false;
+          var t = inp.closest('[data-edit-price-row]').querySelector('[data-edit-price-own-toggle]');
+          if (t) t.hidden = true;
+        }
+        inp.addEventListener('input', later);
+      });
+      refresh();
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -2290,6 +2404,7 @@
     initSupplierPick();
     initRulesExample();
     initSectionMenus(); // D-320
+    initEditPrice(); // D-359
   }
 
   if (document.readyState === 'loading') {

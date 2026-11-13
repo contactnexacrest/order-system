@@ -112,11 +112,12 @@
   {% if isEdit and productPrices %}
     <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
     <table class="list">
-      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th></tr>
+      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th>{% if canEditPrice %}<th></th>{% endif %}</tr>
       {% for pp in productPrices %}
-        <tr><td>{{ pp.product_name }}</td><td>{{ pp.price }}</td><td>{{ pp.quoted_on }}</td><td>{{ pp.valid_until }}</td><td>{{ 'Yes' if pp.used else '—' }}</td></tr>
+        <tr><td>{{ pp.product_name }}</td><td>{{ pp.price }}</td><td>{{ pp.quoted_on }}</td><td>{{ pp.valid_until }}</td><td>{{ 'Yes' if pp.used else '—' }}</td>
+          {% if canEditPrice %}<td>{% if pp.direct %}<a class="btn-sm" href="/products/suppliers/{{ pp.id }}/edit-price?from=supplier">Edit price</a>{% endif %}</td>{% endif %}</tr>
       {% endfor %}
-      {% if not productPrices.length %}<tr><td colspan="5" class="muted">No product prices from this supplier yet.</td></tr>{% endif %}
+      {% if not productPrices.length %}<tr><td colspan="{{ 6 if canEditPrice else 5 }}" class="muted">No product prices from this supplier yet.</td></tr>{% endif %}
     </table>
   {% endif %}
 </div>

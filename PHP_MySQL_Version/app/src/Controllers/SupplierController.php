@@ -88,6 +88,9 @@ final class SupplierController
             'detailsLink' => self::detailsLinkUrl($supplier),
             // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
             'productPrices' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE) ? \App\Repositories\ProductSupplierRepository::forDirectorySupplier($id) : null,
+            // D-359: an "Edit price" link per row for those who record supplier prices.
+            'canEditPrice' => ($__u = \App\Services\AuthService::currentUser()) !== null
+                && \App\Services\PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'record_market_prices'),
         ], 'layout/base');
     }
 

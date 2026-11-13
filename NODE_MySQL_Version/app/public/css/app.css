@@ -1067,3 +1067,25 @@ input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
 .amd-lines td.num input[type="text"] { width: 6.5em; min-width: 0; text-align: right; }
 .reissue-checklist .todo { color: #9a3412; font-weight: 600; }
 .reissue-checklist .ok { color: #166534; font-weight: 600; }
+
+/* D-359 (13 Nov 2026, plan rule 8): the simple "Edit price" form. */
+.edit-price-panel{position:relative;border:2px solid var(--navy,#1f3a68);border-radius:12px;padding:1.1rem 1.25rem;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.08);}
+.edit-price-panel h1{margin-right:5rem;}
+.edit-price-close{position:absolute;top:0.9rem;right:1.1rem;font-size:0.85rem;color:var(--muted,#666);}
+.edit-price-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.edit-price-main{display:flex;flex-wrap:wrap;align-items:flex-end;gap:0.5rem 0.75rem;}
+.edit-price-main label{margin-bottom:0;}
+.edit-price-big{font-size:1.35rem;font-weight:700;min-width:12rem;border:2px solid var(--navy,#1f3a68);}
+.edit-price-per{padding-bottom:0.6rem;}
+.edit-price-down{color:var(--danger,#a11);}
+.edit-price-more{margin:0.5rem 0 1rem;}
+.edit-price-more summary{cursor:pointer;color:var(--navy,#1f3a68);margin-bottom:0.6rem;}
+.edit-price-actions{display:flex;gap:0.6rem;align-items:center;}
+.edit-price-h{font-size:1rem;margin:0 0 0.4rem;}
+.edit-price-calc tr.edit-price-from td{font-weight:600;background:var(--gold-soft,#fbf3e2);}
+.edit-price-own{display:block;font-size:0.8rem;margin:0.25rem 0 0;}
+.edit-price-own[hidden]{display:none;}
+.edit-price-own input{max-width:9rem;}
+.edit-price-selling{margin-top:0.75rem;}
+.edit-price-saved .inline-form{display:inline;margin:0;}
+@media (max-width:760px){.edit-price-cols{grid-template-columns:1fr;}}
