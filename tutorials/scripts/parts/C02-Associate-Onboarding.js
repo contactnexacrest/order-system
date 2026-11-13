@@ -1,6 +1,8 @@
 'use strict';
 // C02 — How you become an associate: the registration link, NexaCrest's review,
 // setting your password and the first login. Also the second door: NexaCrest adds you directly.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-282 "Send set-password link"
+// (was "Send portal login link") and the login-page link with Copy on the associate page.
 const { ACTORS, nav } = require('../_common');
 
 const NEW = 'associate.new@email.com';
@@ -114,9 +116,9 @@ module.exports = {
         await d.select(d.page.locator('select[name="commission_mode"]'), 'ladder');
         await d.clickNav(d.page.getByRole('button', { name: 'Add associate' }));
       } },
-      { caption: 'Send portal login link', say: 'Then one button sends you the portal login link. From there, it is exactly the same as door one: set your password, log in with the code, and complete your profile.', do: async (d) => {
-        await d.scrollTo(d.page.getByRole('button', { name: 'Send portal login link' }));
-        await d.ring(d.page.getByRole('button', { name: 'Send portal login link' })); await d.wait(1500);
+      { caption: 'Send set-password link', say: 'Then one button, Send set-password link, e-mails you the link to set your password. The page also shows the login page link, with a Copy button, to send you any time. From there, it is exactly the same as door one: set your password, log in with the code, and complete your profile.', do: async (d) => {
+        await d.scrollTo(d.page.getByRole('button', { name: 'Send set-password link' }));
+        await d.ring(d.page.getByRole('button', { name: 'Send set-password link' })); await d.wait(1500);
       } },
 
       { card: 'list', kicker: 'Recap', title: 'From link to login', items: [

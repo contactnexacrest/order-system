@@ -1,5 +1,10 @@
 # Tutorial videos — progress and resume notes
 
+> **ON HOLD — owner 13 Nov 2026: do not record until the owner lifts the hold.** No recording, no
+> re-recording, no `tutorials/run.js` (not even `--plan`). The scripts were updated on 13 Nov 2026 so they
+> match the app and are ready for re-recording later — see "Script update of 13 Nov 2026" below. Which videos
+> are re-recorded, and when, is the owner's decision (CLAUDE.md, "Tutorial videos follow the app — ask first").
+
 Owner plan (6 Nov 2026): one series of narrated videos per group, in the order
 **C → A → D → B → E**. Each video 8–12 minutes, never over 15 (split into parts instead).
 US English voice (Piper `en_US-lessac-medium`). Interesting, not boring. No PII: role names,
@@ -235,6 +240,78 @@ information while none is active) — checked against every script: no recorded 
 product page or "Pricing ready?", and no narration names these columns or checks. No recorded video is affected. Not yet
 recorded but will show these: **B05** (Procurement: the supplier-price lines of "Pricing ready?") and **B09** (MD / ED:
 Products list short view and "Show all columns", "Pricing ready?"). Listed only — nothing re-recorded.
+
+## Script update of 13 Nov 2026 — docs audit C (owner request; recording still ON HOLD)
+
+The owner asked (13 Nov 2026) for every training and tutorial document, including the video scripts, to match
+the app so the videos are ready to be recorded again later. The scripts below were updated **from the app's
+views, controllers and seed data only** (PHP `app/views`, checked against the Node twins where they differ):
+nothing was recorded, `run.js` was not run, every script passes `node --check` and builds its step list.
+Covered: register rows D-336 – D-365 and the 11 Nov 2026 menu / wording changes listed above (D-268, D-273,
+D-280, D-282, D-290, D-293, D-310, D-320, D-330) where a script showed or said them. A recorded video marked
+"re-record needed" still plays, but its picture or narration now differs from the app; the owner decides.
+
+**Changes that touch several scripts**
+
+- **D-357 finish names:** every demo order line and the demo Supplier PO now use "Natural Polish" (was
+  "Polished") — `_a02.js`, `_b01.js`, `_b02.js`, `_buyer.js`; the purchase-requirement text in B01 Part 2 too.
+- **D-360 / D-361 products:** the B01 and B02 demo product's supplier price is now an offer of an active
+  directory supplier ("TEST Demo Quarry", created in the set-up, as "+ Add product" makes it) and the product
+  is configured, so it is offered in Pick from Products; no figure on camera changes (linking keeps every price,
+  as the D-361 migration check showed).
+- **D-342 price lock:** narration says the prices, products and exchange rate are fixed when the first
+  Quotation is approved (not at the PI); later changes only through a "Products & prices" amendment.
+- **D-310 / D-320 menus:** "My Reviews" → Approvals › Documents; "Email Approvals in the sidebar" →
+  Approvals › E-mails and the Approvals entry in the left menu; "Admin › …" → "Users & roles › …" or
+  "Settings › …"; Quotation Intake Review = Orders › Quotation requests; PI Intake Review = Orders › PI-stage details.
+- **D-280 e-mail wording:** "e-mail sending off" → "document e-mails to the buyer are held".
+- **D-330 buyer wording:** "Open order" (was View documents), "Please confirm your order" and "Yes, this is
+  correct — please go ahead" (was Your Acknowledgement Needed / I acknowledge and confirm to proceed), "Your
+  purchase order" (was Buyer PO), "Did not go ahead" (was Lost), "Tell us what we could do better" (was Report a
+  Process Issue), "Ask to cancel this order" (was Raise a Dispute), "Bank reference number (transaction ID, UTR
+  or SWIFT reference)", buyer stage names (Quotation · Order confirmed · In production · Shipping · Shipped).
+- **E-mail cards** (Group D) now copy the seeded templates (`email_templates` in seed.sql): subjects name our
+  company ("— NexaCrest International Private Limited"), not the buyer; bodies reworded as in the templates.
+- **No PII:** the Group D demo buyer is now "TEST Northsea Stone Trading B.V." (was without the TEST prefix);
+  all e-mails stay role-style or on `.example` domains.
+- **Documents (D-336, D-339, D-343 – D-345, D-349, D-352 – D-356):** no script opens a generated PDF or Word
+  file (they show app pages and e-mail cards with the file name only), so nothing changed for them.
+
+| Video | Recorded? | What changed in the script (13 Nov 2026) | Re-recording |
+|---|---|---|---|
+| A01 Everyone in ten minutes | yes (7 Nov) | Help link now the left-menu entry **Help & SOP** (selector `nav.sidebar-nav a[data-nav="help"]`; the left menu no longer has a link to `/sop`, so the old `header.sidebar a[href="/sop"]` step would have failed); dashboard narration names the short menu and section menu bars; "Admin › Departments" → Users & roles › Departments; "Admin, SOP access" → Users & roles, SOP access; "Admin, Sample Data" → Settings, Sample data. | **needed** (menus differ on screen) |
+| A02-1 One order, enquiry to confirmation | yes (7 Nov) | Products step points at the compact products table (old `#step-products input[…]` selectors gone, D-273) and says lines are fixed after QT approval (D-342); "My Reviews" → Approvals › Documents and the QT approval narration adds the price lock; "held" e-mail wording; PI approval narration (prices fixed at QT, terms frozen at PI); buyer portal: "Open order", "Please confirm your order", button "Yes, this is correct — please go ahead"; demo lines "Natural Polish". | **needed** |
+| A02-2 One order, factory to closure | yes (7 Nov) | Supplier PO narration: the supplier-offer table (lowest first, choosing fills supplier and price; a changed price needs a reason kept with the PO — D-361; the form itself is not shown); associate commission card and narration: "Earned — will be paid on <date>", paid on the payout day (default last day of the month, D-292); demo Supplier PO finish "Natural Polish". | **needed** |
+| B01 Part 1 Export Executive | yes (8 Nov) | **New step "Thickness and Size / format"** after Pick from Products: both start on "Choose…", no price until both are chosen (D-348); the script chooses "20 mm" and "Gangsaw slab", then points at the price hint and the Surface finish option (the line's finish, "Natural Polish"; no separate finish box — D-357). Pick from Products narration: only configured products with an active supplier, others greyed under "Not offered yet" (D-361). Products step: compact table and "+ Add product" (old input selectors gone). "Edit Annexure A" (D-341). **New step "Prices and products are now fixed"** after the QT approval, pointing at the price-lock note (`#price-lock-note`, D-342). Orders › Quotation requests; Approvals › Documents; "held" wording; Recent Activity = own orders (D-268); recap. Set-up `_b01.js`: supplier offer linked to the active demo supplier; Part 2's line "Natural Polish". | **needed** |
+| B01 Part 2 Export Executive | yes (8 Nov) | PI approval narration (prices and rate fixed at the QT; terms and company details frozen at the PI — D-342); PI Intake Review = Orders › PI-stage details; buyer's button "Yes, this is correct — please go ahead"; "document e-mails held"; Order Communication narration; purchase requirement "20 mm, Natural Polish, Grade A"; Recent Activity = own orders. | **needed** |
+| B02 Sales Manager and Director | yes (8 Nov) | Dashboard narration (My Approvals counts every kind; same counts on Approvals); "Ask MD" narration: waits on the MD's Approvals › Prices; prices card: after QT approval only a products amendment (D-342); "My Reviews … in the sidebar" → Approvals › Documents; quotation approved = prices fixed; "Admin › Self-approval rules" → Users & roles › Self-approval rules; Sales Director: left-menu **Approvals** entry instead of "Email Approvals" (selector changed), Approvals › E-mails caption; cockpit under Reports; Agreements under Clients, filter "Expiring within" (the old "Expiring soon" chip selector would have failed). Set-up `_b02.js`: supplier offer linked to the active demo supplier; line "Natural Polish". | **needed** |
+| C01 Associate welcome | yes (7 Nov) | Not changed in this pass. Still open from 11 Nov: associate Home / Commission wording (current % only, 4-step "How it works", new statuses, payout day — D-292), "Forgot password?" (D-282), bank bar (D-293), D-330 rewrites. | needed (open, see "Still to do") |
+| C02 Becoming an associate | yes (8 Nov) | Part C02: "Send portal login link" → **"Send set-password link"** with the login-page link and Copy (D-282). Part C03: KYC checklist names ID proof and Address proof separately and a **new upload step "Address proof"** (D-290; the staff accept loop now covers 6 documents); bank: button "Send — then confirm with the e-mailed code", **new steps on "Please confirm your new bank details"** (E-mail me a code, last 4 digits, code, "These are my bank details", Confirm; "This is not me" explained — D-293); staff side: **one** person verifies with at least two "how I checked" ticks (bank proof + phone) and "Verify" — the "First check" + Finance Manager "Verify (second person)" steps are removed (setting default "one person"). | **needed** |
+| C03 Starter level and first client | yes (7 Nov) | Not changed in this pass (no D-336 – D-365 item). Still open from 11 Nov: commission states wording (D-292), D-330 rewrites. | needed (open) |
+| C04 Prices, requests and levels | yes (7 Nov) | Part C06: **new step "Your prices in other units"** after Get price (per CBM / SQM / SQFT at the chosen thickness, D-339 / D-364); "What changed the price" now points at the last table (the first table is now the other-units one) and says the standard finish is Natural Polish (D-357). Parts C07 / C08 not changed (open from 11 Nov: D-305 catalogue, D-292 levels hidden from associates). | **needed** |
+| C05 Commission, statements and tax | yes (7 Nov) | Not changed in this pass. Still open from 11 Nov: payout day "last day of the month", new statuses, no level / ladder for associates, MD's commission rule (D-291, D-292). | needed (open) |
+| C06 Messages, changes, privacy, FAQ | yes (7 Nov) | Not changed in this pass. Still open from 11 Nov: notices / e-mails reworded (D-330, D-280), bank change confirmation and "This is not me" (D-293), address-proof grace (D-290), FAQ on payout day. | needed (open) |
+| D01 From enquiry to proforma | yes (8 Nov) | PI details form button **"Send my details"** (was "Submit PI Details" — the old selector would have failed); e-mail cards: Buyer Action Link ("NexaCrest — sign your purchase order and confirm your order", numbered steps), PI form link ("… please confirm your details for the proforma invoice"), QT and PI as the templates; "your own enquiry reference"; demo buyer "TEST Northsea Stone Trading B.V."; demo lines "Natural Polish". The address is typed in parts (D-346 — the public form was already in parts). | **needed** |
+| D02 Paying and your login | yes (7 Nov) | Payment link e-mail card and narration: "bank reference number (transaction ID, UTR or SWIFT reference)"; portal-invite and password-reset e-mail cards as the templates; LC PI e-mail card ("Please open the letter of credit (LC) as agreed …"); demo buyer TEST-prefixed. | **needed** |
+| D03 Inside your order | yes (7 Nov) | My Orders: "Open order", "Did not go ahead", plain stage names (the active order reads "In production"); "Please confirm your order" box and its button; "Your purchase order" section and its closed-upload text; "Tell us what we could do better"; OC e-mail card as the template; recap. | **needed** |
+| D04 Balance, shipping and closing | yes (7 Nov) | E-mail cards: freight bill subject "Freight bill (debit note) … — please pay before we ship", BL copy, CI and balance-received texts as the templates; My Orders says "Shipping"; Report a Payment: bank reference number wording, "Payments you have told us about", "Received — we are checking it"; Reorder This narration: "Quantity not decided yet" and the new **"As per annexure"** tick (D-338); the Finish list has no "Polished" any more (demo lines "Natural Polish", D-357). | **needed** |
+| D05 When something goes wrong | yes (8 Nov) | "Tell us what we could do better", "Ask to cancel this order" (portal heading, button and the staff tick wording), "Did not go ahead", "Open order", "Your purchase order" with its new text; "Log in as this client" now in the Client portal login block (D-282); amendment card adds the **Products & prices** amendment (D-342: after QT approval, quantities / sizes / lines only by a signed amendment, a price only goes down). | **needed** |
+| B03 – B11, E01 – E03 | not started | — Write against the 13 Nov app: **B05** Procurement (Suppliers list offers, Offer active switch, "+ Add product" with SQFT input, Edit price, Supplier PO supplier-offer table and price-override reason, "Supplier performance" button, "Pricing ready?" supplier lines); **B09** MD / ED (Products list short view and "Show all columns", Configure / Edit, Link a supplier, Link these prices, Global pricing settings, Category price rules, Configure › Thickness rules, Duplicate, price-lock and Products & prices amendments). | not recorded |
+
+**Still to do before the associate videos are recorded again (not done in this pass):** the associate
+narration of C01, C03, C04 (parts C07, C08), C05 and C06 on commission statuses, payout day, levels and the
+D-330 wording (11 Nov 2026 items D-282, D-290 – D-293, D-305, D-330). These need the associate portal pages
+read line by line against each narration and are best done together with the owner's decision on which
+associate videos to re-record.
+
+**Checked by reading only — to confirm on the first new take:** (1) B01 Part 1 — the New Order line's options
+box (`.product-row .spec-options`) and the hint text once both options are chosen; whether old inactive
+dev-test products appear greyed under "Not offered yet" (narrated in general terms, not pointed at). (2) B01
+Part 1 — the price-lock note shows for the Export Executive (needs "manage orders"). (3) C02 — the bank code
+appears on the confirm page only on a dev server (`showCodeOnScreen`); the "Verify" form needs the default
+setting "one person" and a verifier with "manage associate bank". (4) D03 / D04 — the plain stage names follow
+`AssociatePortalRepository::stageLabel` (stage 4 = "In production", stage 8 = "Shipping"). (5) A01 — Getting
+Started is a stand-alone page without the section menu bar, so only the left-menu entry is pointed at.
 
 ## Resume notes (for a new session)
 

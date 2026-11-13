@@ -4,11 +4,14 @@
 // Action Link (download our Purchase Order, upload the signed copy) and the PI details form.
 // Staff hand-offs are short; their routine steps between scenes run off camera (scripts/_buyer.js).
 // Source of truth: docs/APPLICATION_HANDBOOK.md 5.2–5.5, SOP 01–04.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): PI details form button
+// "Send my details" (D-330); demo buyer renamed "TEST Northsea Stone Trading B.V." (_buyer.js);
+// demo line finish "Natural Polish" (D-357). The address is typed in parts, as the form asks (D-346).
 
 const demo = require('../lib/demo');
 const B = require('./_buyer');
 
-const st = { order: 0, client: 0, qt: '', pi: '', buyerLink: '', piLink: '' };
+const st = { order: 0, ref: '', client: 0, qt: '', pi: '', buyerLink: '', piLink: '' };
 
 module.exports = {
   code: 'D01',
@@ -55,16 +58,17 @@ module.exports = {
       await d.type('textarea[name="notes"]', 'Black Galaxy granite slabs, 150 sqm, and Absolute Black tiles 60 x 60, 300 sqm. Shipment within 6 weeks.', { delay: 30 });
     } },
     { caption: 'Submit Request', say: 'Submit request. Done. We will review it and reply with a quotation within twenty four hours. And if you spot a mistake after sending, the e-mail we send you has a correction link, so you can fix it yourself before we review it.', do: async (d) => { await d.clickNav(d.page.getByRole('button', { name: 'Submit Request' })); await d.point('h1', 1200); await d.point(d.page.getByText('We\'ve received your quotation request', { exact: false }), 1500); } },
-    { as: 'exec', goto: '/client-intake', caption: 'Our side: Quotation Intake Review', say: 'A quick look at our side. Your request lands in our Quotation Intake Review. Our Export Executive checks it and clicks: Accept and Create Client. From now on you are a client in our system, with your own Buyer Inquiry Reference.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: B.BUYER.company }).first(), 1800); await d.clickNav(d.page.getByRole('button', { name: 'Accept & Create Client' }).first()); await d.point('h1', 1200); } },
+    { as: 'exec', goto: '/client-intake', caption: 'Our side: Quotation Intake Review', say: 'A quick look at our side. Your request lands in our Quotation Intake Review. Our Export Executive checks it and clicks: Accept and Create Client. From now on you are a client in our system, with your own enquiry reference.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: B.BUYER.company }).first(), 1800); await d.clickNav(d.page.getByRole('button', { name: 'Accept & Create Client' }).first()); await d.point('h1', 1200); } },
 
     // ---------- 2. The quotation ----------
     { card: 'chapter', title: 'Your quotation', subtitle: 'By e-mail, with the PDF attached.', say: 'Part two. Your quotation.', do: async () => {
       st.client = B.clientIdByEmail(demo);
       st.order = B.createOrder(demo, st.client);
+      st.ref = demo.sql(`SELECT order_reference FROM orders WHERE id = ${Number(st.order)}`);
       st.qt = B.moves.quotation(demo, st.order);
     } },
-    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Quotation ${st.qt} — ${B.BUYER.company}`; },
-      get lines() { return ['Dear Purchasing Manager,', `Please find attached our Quotation ${st.qt} for your reference.`, 'This quotation is valid until the date shown on it. Please let us know if you have any questions or would like to proceed.']; },
+    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Quotation ${st.qt} — ${B.OUR_COMPANY}`; },
+      get lines() { return ['Dear Purchasing Manager,', `Please find attached our Quotation ${st.qt} for your reference (your enquiry reference is on it).`, 'This quotation is valid until the date shown on it. Please let us know if you have any questions or would like to proceed.']; },
       get attach() { return [`${st.qt.replace(/\//g, '-')}.pdf`]; },
       say: 'Our team prices your order, and the quotation is checked and approved by a second person before it ever reaches you. Then it arrives by e-mail, as a P D F. It shows every product line, the price, the Incoterm, the payment terms, and the date until which the price is valid.' },
     { card: 'list', kicker: 'Before you reply', title: 'Read these on your quotation', items: [
@@ -76,8 +80,8 @@ module.exports = {
 
     // ---------- 3. Buyer Action Link and the signed PO ----------
     { card: 'chapter', title: 'Your Buyer Action Link', subtitle: 'Download our Purchase Order, upload the signed copy.', say: 'Part three. Your Buyer Action Link.', do: async () => { st.buyerLink = B.moves.buyerPoLink(demo, st.order); } },
-    { card: 'email', to: B.BUYER_EMAIL, subject: 'NexaCrest — acknowledge your order / upload your Buyer PO',
-      lines: ['Hello,', 'For your order, please use this link to download your Purchase Order, upload the signed copy with your PO number, and acknowledge your Order Confirmation once you receive it.', 'This link works for 90 days.'],
+    { card: 'email', to: B.BUYER_EMAIL, subject: 'NexaCrest — sign your purchase order and confirm your order',
+      get lines() { return ['Hello,', `For order ${st.ref}, please use this link to: 1. download your purchase order, 2. upload the signed copy with your PO number, 3. confirm your order when you receive our order confirmation.`, 'This link works for 90 days.']; },
       link: 'Buyer Action Link (secure — opens without a login)',
       say: 'You accepted. So we prepare the purchase order for you, in our standard format, and send you your Buyer Action Link. One link for the whole start of your order: it works for ninety days, and it always shows you just the one thing to do next.' },
     { as: 'buyer', do: async (d) => { await d.goto(`/buyer-action/${st.buyerLink}`); await d.point('h1', 1200); await d.point('.intake-summary', 1300); await d.point('.action-progress', 1500); }, caption: 'Your Order page', say: 'Here it is. Your order reference, the number of product lines, the order value, and the Incoterm. Along the top, your three steps: the purchase order, the advance payment, and the order confirmation. Right now: step one.' },
@@ -91,8 +95,8 @@ module.exports = {
 
     // ---------- 4. PI details form ----------
     { card: 'chapter', title: 'Confirm your details', subtitle: 'The Proforma Invoice Details Form.', say: 'Part four. Confirm your details.', do: async () => { st.piLink = B.moves.piFormLink(demo, st.order); } },
-    { card: 'email', to: B.BUYER_EMAIL, subject: 'NexaCrest — confirm your PI-stage details',
-      lines: ['Hello,', 'Thank you for accepting our Quotation.', 'To issue your Proforma Invoice, please confirm your shipping/consignee details at the link below.', 'This link works for 30 days.'],
+    { card: 'email', to: B.BUYER_EMAIL, subject: 'NexaCrest — please confirm your details for the proforma invoice',
+      get lines() { return ['Hello,', `Thank you for accepting our Quotation for order ${st.ref}.`, 'Before we can send your proforma invoice, please confirm your shipping details and who receives the goods:', 'This link works for 30 days.']; },
       link: 'Proforma Invoice Details Form (secure — opens without a login)',
       say: 'Before we issue the Proforma Invoice, we ask you to check the details that will be printed on it, and later on the shipping documents. Another short link.' },
     { as: 'buyer', do: async (d) => { await d.goto(`/pi-details/${st.piLink}`); await d.point('h1', 1200); await d.point('input[name="company_legal_name"]', 1500); }, caption: 'Already filled in for you', say: 'The good news: it is already filled in, with everything you gave us on the quotation form. You only check it, and add what is missing.' },
@@ -108,19 +112,19 @@ module.exports = {
       await d.point('textarea[name="quotation_acceptance_reference"]', 1500);
       await d.type('input[name="buyer_po_ref"]', 'NSS-PO-2611-01');
     } },
-    { caption: 'Confirm, and submit', say: 'Section six. Please read this carefully: once you submit, these details are locked. They will be printed on your invoices and shipping documents, so check them well. Tick the box to confirm, and: Submit P I Details.', do: async (d) => {
+    { caption: 'Confirm, and submit', say: 'Section six. Please read this carefully: once you submit, these details are locked. They will be printed on your invoices and shipping documents, so check them well. Tick the box to confirm, and: Send my details.', do: async (d) => {
       await d.scrollTo('input[name="confirm_lock"]');
       await d.point(d.page.locator('fieldset').filter({ has: d.page.locator('input[name="confirm_lock"]') }).locator('.intake-note'), 1800);
       await d.check('input[name="confirm_lock"]');
-      await d.clickNav(d.page.getByRole('button', { name: 'Submit PI Details' }));
+      await d.clickNav(d.page.getByRole('button', { name: 'Send my details' }));
       await d.point('h1', 1500);
     } },
     { as: 'exec', goto: '/pi-intake-review', caption: 'Our side: PI Intake Review', say: 'On our side, your confirmation appears in the P I Intake Review. The Export Executive clicks: Accept and Apply. Your confirmed details are now on your order, ready for the Proforma Invoice.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: B.BUYER.company }).first(), 1800); await d.clickNav(d.page.getByRole('button', { name: 'Accept & Apply' }).first()); await d.point('.alert', 1200); } },
 
     // ---------- 5. The Proforma Invoice ----------
     { card: 'chapter', title: 'Your Proforma Invoice', subtitle: 'What to pay now, and how.', say: 'Part five. Your Proforma Invoice.', do: async () => { st.pi = B.moves.proforma(demo, st.order); } },
-    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Proforma Invoice ${st.pi} — ${B.BUYER.company}`; },
-      get lines() { return ['Dear Purchasing Manager,', `Please find attached Proforma Invoice ${st.pi}, issued against Quotation ${st.qt}.`, 'This Proforma Invoice is valid until the date shown on it. Please arrange the advance payment shown in the box ADVANCE PAYABLE NOW.']; },
+    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Proforma Invoice ${st.pi} — ${B.OUR_COMPANY}`; },
+      get lines() { return ['Dear Purchasing Manager,', `Please find attached Proforma Invoice ${st.pi}, based on quotation ${st.qt}.`, 'This Proforma Invoice is valid until the date shown on it. Please pay the advance as agreed, so that we can start production.']; },
       get attach() { return [`${st.pi.replace(/\//g, '-')}.pdf`]; },
       say: 'The Proforma Invoice arrives by e-mail, checked and approved like every document. Look for the amber box on it: Advance payable now. It shows the exact amount: forty percent of sixteen thousand two hundred dollars, that is six thousand four hundred and eighty dollars, with our bank details.' },
     { as: 'buyer', do: async (d) => { await d.goto(`/buyer-action/${st.buyerLink}`); await d.point('.action-progress', 1500); }, caption: 'Your link moves on', say: 'And your Buyer Action Link has moved on by itself. Step one has a tick, and step two, the advance payment, is now current.' },

@@ -5,6 +5,10 @@
 // orders in the portal, and staff "Log in as this client" with its banner.
 // Source of truth: docs/SOP/12-client-portal.md, 10-amendments.md, 11-disputes.md, 19-complaints.md;
 // ClientPortalController, clients/show.php, layout/client.php.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-330 portal wording — "Tell us
+// what we could do better" (was Report a Process Issue), "Ask to cancel this order" (was Raise a Dispute),
+// "Did not go ahead" (was Lost), "Open order", "Your purchase order"; D-282 "Log in as this client" in the
+// Client portal login block; D-342 products & prices amendment mentioned on the amendment card.
 
 const demo = require('../lib/demo');
 const A = require('./_a02');
@@ -51,14 +55,14 @@ module.exports = {
   },
 
   steps: () => [
-    { card: 'title', say: 'Welcome back! Most orders run smoothly. But sometimes something needs to change, or something goes wrong. In this video: changing the payment terms, telling us about a problem, raising a dispute, what you see for a cancelled or lost order, and how our team can help you inside the portal.' },
+    { card: 'title', say: 'Welcome back! Most orders run smoothly. But sometimes something needs to change, or something goes wrong. In this video: changing the payment terms, telling us about a problem, asking to cancel, what you see for an order that was cancelled or did not go ahead, and how our team can help you inside the portal.' },
     { card: 'list', kicker: 'In this video', title: 'Five situations', items: [
       'Payment terms need to change: an amendment, on paper.',
-      'Something could be better: Report a Process Issue.',
-      'You want to cancel: Raise a Dispute, when switched on.',
-      'Cancelled and lost orders in your portal.',
+      'Something could be better: Tell us what we could do better.',
+      'You want to cancel: Ask to cancel this order, when switched on.',
+      'Cancelled orders, and orders that did not go ahead.',
       'Our team helps you inside the portal: the staff banner.',
-    ], say: 'Five situations. Payment terms that need to change. Something that could be better. Wanting to cancel an order. Cancelled and lost orders. And our team helping you inside your portal.' },
+    ], say: 'Five situations. Payment terms that need to change. Something that could be better. Wanting to cancel an order. Cancelled orders, and orders that did not go ahead. And our team helping you inside your portal.' },
 
     // ---------- 1. Amendment ----------
     { card: 'chapter', title: 'Changing the payment terms', subtitle: 'An amendment agreement, signed on paper.', say: 'Part one. Changing the payment terms.' },
@@ -68,7 +72,8 @@ module.exports = {
       'You receive an Amendment Agreement to sign, stamp and send back scanned.',
       'The new terms apply from the moment we receive your signed copy.',
       'Every later document carries a note naming the amendment in effect.',
-    ], say: 'Once the Proforma Invoice is issued, the payment terms are binding for both of us. If they must change, for example the advance percentage, the balance terms, or the number of days, we agree an amendment. You or we can ask for it. You receive an Amendment Agreement, sign and stamp it, and send us the scanned copy. The new terms apply from the moment we receive your signed copy, and every document we issue after that carries a note naming the amendment in effect.' },
+      'Products or prices after the quotation: also an amendment; a price only goes down.',
+    ], say: 'Once the Proforma Invoice is issued, the payment terms are binding for both of us. If they must change, for example the advance percentage, the balance terms, or the number of days, we agree an amendment. You or we can ask for it. You receive an Amendment Agreement, sign and stamp it, and send us the scanned copy. The new terms apply from the moment we receive your signed copy, and every document we issue after that carries a note naming the amendment in effect. The same goes for the products and prices: once your quotation is approved they are fixed, and any change, a quantity, a size, a line added or removed, is made by an amendment you sign. A price can then only go down, never up.' },
     { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Payment Terms Amendment — Order ${st.ref}`; },
       get lines() { return ['Dear Purchasing Manager,', `As agreed, please find attached the Payment Terms Amendment Agreement for your order ${st.ref}.`, 'Please sign and stamp it, and send us the scanned copy. The amended terms apply from the moment we receive it.']; },
       attach: ['Payment-Terms-Amendment-Agreement.pdf'],
@@ -82,15 +87,15 @@ module.exports = {
     ], say: 'What can an amendment change? The advance, as a percentage or an amount. The balance terms, and what triggers the balance: before shipment, or against the bill of lading. The number of days you have to pay the balance, and the balance amount. Anything not mentioned stays exactly as it was. And every amendment records why it was made, and from which date it applies.' },
 
     // ---------- 2. Process issue ----------
-    { card: 'chapter', title: 'Something could be better', subtitle: 'Report a Process Issue — always available.', say: 'Part two. Something could be better.' },
-    { as: 'buyer', caption: 'Report a Process Issue', say: 'Something about the order that we could do better? Open the order, and go to Report a Process Issue. It is always there, on every order. Describe the issue.', do: async (d) => {
+    { card: 'chapter', title: 'Something could be better', subtitle: 'Tell us what we could do better — always available.', say: 'Part two. Something could be better.' },
+    { as: 'buyer', caption: 'Tell us what we could do better', say: 'Something about the order that we could do better? Open the order, and go to Tell us what we could do better. It is always there, on every order. Describe the issue.', do: async (d) => {
       await d.goto(portal(st.order));
-      const s = section(d, 'Report a Process Issue');
+      const s = section(d, 'Tell us what we could do better');
       await d.scrollTo(s); await d.point(s.locator('h2'), 1200);
       await d.type(s.locator('form').last().locator('textarea[name="description"]'), 'The packing list reached us two days after the commercial invoice. Please send them together next time.', { delay: 35 });
     } },
     { caption: 'Report This Issue', say: 'Report This Issue.', do: async (d) => {
-      await d.clickNav(section(d, 'Report a Process Issue').getByRole('button', { name: 'Report This Issue' }));
+      await d.clickNav(section(d, 'Tell us what we could do better').getByRole('button', { name: 'Report This Issue' }));
       await d.point('.alert', 2200);
     } },
     { as: 'md', caption: 'Our side: the Complaint Log', say: 'On our side, management is notified at once. The order\'s complaints page lists every issue you raised, with its status: open, acknowledged, or resolved. Here the Managing Director opens your issue, and writes a reply.', do: async (d) => {
@@ -108,7 +113,7 @@ module.exports = {
     } },
     { as: 'buyer', caption: 'The conversation', say: 'In the portal, the issue now shows our team\'s reply, underneath. You can answer in the same place, and the conversation continues until it is resolved.', do: async (d) => {
       await d.goto(portal(st.order, '#order-complaints'));
-      const s = section(d, 'Report a Process Issue');
+      const s = section(d, 'Tell us what we could do better');
       await d.scrollTo(s.locator('.card-nested')); await d.point(s.locator('.card-nested'), 3500);
       await d.type(s.locator('.card-nested textarea[name="body"]'), 'Thank you, that will help us a lot.', { delay: 40 });
       await d.clickNav(s.locator('.card-nested').getByRole('button', { name: 'Send' }));
@@ -116,26 +121,26 @@ module.exports = {
     { caption: 'Sent', say: 'Sent. A process issue never stops or cancels your order. It simply helps us do better next time.', do: async (d) => { await d.point('.alert', 2500); } },
 
     // ---------- 3. Dispute ----------
-    { card: 'chapter', title: 'You want to cancel', subtitle: 'Raise a Dispute — when our team switches it on.', say: 'Part three. When you want to cancel.' },
+    { card: 'chapter', title: 'You want to cancel', subtitle: 'Ask to cancel this order — when our team switches it on.', say: 'Part three. When you want to cancel.' },
     { card: 'list', kicker: 'Disputes', title: 'Not the same as a process issue', items: [
       'A dispute means: you want to cancel the order and not go ahead.',
       'Talk to your NexaCrest contact first.',
-      'Our team switches on "Raise a Dispute" for that order.',
+      'Our team switches on "Ask to cancel this order" for that order.',
       'We respond within the time set in your order terms.',
-    ], say: 'A dispute is different. It means you want to cancel the order and not go ahead with us. Please talk to your NexaCrest contact first. If it comes to that, our team switches on the Raise a Dispute section for that order in your portal. We then respond within the time set out in your order terms. And of course you can still write to us in Order Updates at any time.' },
-    { as: 'md', caption: 'Our side: switched on', say: 'On our side, the Managing Director, or another manager who handles disputes, ticks: show Raise a Dispute to the client, for this order.', do: async (d) => {
+    ], say: 'A dispute is different. It means you want to cancel the order and not go ahead with us. Please talk to your NexaCrest contact first. If it comes to that, our team switches on the Ask to cancel this order section for that order in your portal. We then respond within the time set out in your order terms. And of course you can still write to us in Order Updates at any time.' },
+    { as: 'md', caption: 'Our side: switched on', say: 'On our side, the Managing Director, or another manager who handles disputes, ticks: show Ask to cancel this order, the dispute button, to the client, for this order.', do: async (d) => {
       await d.goto(`/orders/${st.order}#disputes`);
       await B.openTo(d, '#disputes form');
       const box = d.page.locator('#disputes input[name="dispute_button_visible_to_client"]');
       await d.point(box, 1500);
       await d.clickNav(box);
     } },
-    { as: 'buyer', caption: 'Raise a Dispute', say: 'Now the order page shows Raise a Dispute. Describe the issue, and click Raise a Dispute.', do: async (d) => {
+    { as: 'buyer', caption: 'Ask to cancel this order', say: 'Now the order page shows Ask to cancel this order. Describe the issue, and click Ask to cancel this order.', do: async (d) => {
       await d.goto(portal(st.order));
-      const s = section(d, 'Raise a Dispute');
+      const s = section(d, 'Ask to cancel this order');
       await d.scrollTo(s); await d.point(s.locator('p.muted'), 2000);
       await d.type(s.locator('textarea[name="description"]'), 'Our project has been stopped by the city. We would like to cancel this order. Please call us to discuss.', { delay: 35 });
-      await d.clickNav(s.getByRole('button', { name: 'Raise a Dispute' }));
+      await d.clickNav(s.getByRole('button', { name: 'Ask to cancel this order' }));
     } },
     { caption: 'Logged, with a date', say: 'Your dispute has been logged, and the message shows the date by which our team will respond. Our management is notified at once. The date is counted in our working days: our weekly day off and public holidays are not counted.', do: async (d) => { await d.point('.alert', 3500); } },
     { as: 'md', caption: 'Our side: the Dispute Log', say: 'On our side, your dispute is in the order\'s Dispute Log: the date of your notice, that it came from you through the portal, and the date our response is due. Our team works it through from here: they contact you, keep every letter and document with the dispute, and record how it was resolved.', do: async (d) => {
@@ -147,22 +152,22 @@ module.exports = {
     } },
 
     // ---------- 4. Cancelled and lost ----------
-    { card: 'chapter', title: 'Cancelled and lost orders', subtitle: 'What stays in your portal.', say: 'Part four. Cancelled and lost orders.' },
-    { as: 'buyer', goto: '/client', caption: 'Lost and Cancelled', say: 'In My Orders, an order that did not go ahead is under Lost. And an order that was called off is under Cancelled. They stay in your list, so you keep the full history.', do: async (d) => {
-      await d.point(section(d, 'Lost').locator('h2'), 2000);
+    { card: 'chapter', title: 'Cancelled, or did not go ahead', subtitle: 'What stays in your portal.', say: 'Part four. Cancelled orders, and orders that did not go ahead.' },
+    { as: 'buyer', goto: '/client', caption: 'Did not go ahead, and Cancelled', say: 'In My Orders, an order that did not go ahead is under Did not go ahead. And an order that was called off is under Cancelled. They stay in your list, so you keep the full history.', do: async (d) => {
+      await d.point(section(d, 'Did not go ahead').locator('h2'), 2000);
       await d.point(section(d, 'Cancelled').locator('h2'), 2000);
     } },
-    { card: 'list', kicker: 'Good to know', title: 'Cancelled and lost', items: [
-      'Lost: an order that did not go ahead, before any payment was made.',
+    { card: 'list', kicker: 'Good to know', title: 'Cancelled, or did not go ahead', items: [
+      'Did not go ahead: an order that stopped before any payment was made.',
       'Cancelled: an order called off; a second person at our side approves it.',
       'Both stay in My Orders, with every document you received.',
       'Changed your mind? Talk to your NexaCrest contact: we start a new order.',
-    ], say: 'What is the difference? Lost is an order that did not go ahead, before any payment was made. Cancelled is an order that was called off, and every cancellation at our side is approved by a second person, with any refund recorded. Both stay in My Orders, with every document you received. And if you change your mind later, simply talk to your NexaCrest contact, and we start a new order.' },
-    { caption: 'Inside a cancelled order', say: 'Inside a cancelled order, the documents you already received are still there to download. The Buyer PO box no longer offers an upload: it says the order is cancelled, so a Buyer PO can no longer be uploaded. And there is nothing to pay: Report a Payment says this order is cancelled, so there is no payment to report on it.', do: async (d) => {
-      await d.clickNav(section(d, 'Cancelled').getByRole('link', { name: 'View documents' }));
+    ], say: 'What is the difference? Did not go ahead is an order that stopped before any payment was made. Cancelled is an order that was called off, and every cancellation at our side is approved by a second person, with any refund recorded. Both stay in My Orders, with every document you received. And if you change your mind later, simply talk to your NexaCrest contact, and we start a new order.' },
+    { caption: 'Inside a cancelled order', say: 'Inside a cancelled order, the documents you already received are still there to download. Your purchase order no longer offers an upload: it says the order was cancelled, so you can no longer upload a purchase order. And there is nothing to pay: Report a Payment says this order is cancelled, so there is no payment to report on it.', do: async (d) => {
+      await d.clickNav(section(d, 'Cancelled').getByRole('link', { name: 'Open order' }));
       await d.point(section(d, 'Documents').locator('table'), 2200);
-      const po = section(d, 'Buyer PO');
-      await d.scrollTo(po); await d.point(po.getByText('can no longer be uploaded'), 3200);
+      const po = section(d, 'Your purchase order');
+      await d.scrollTo(po); await d.point(po.getByText('can no longer upload a purchase order'), 3200);
       const s = section(d, 'Report a Payment');
       await d.scrollTo(s); await d.point(s.locator('strong'), 3000);
     } },
@@ -183,7 +188,7 @@ module.exports = {
       await d.point(box, 1200);
       await d.clickNav(box);
     } },
-    { caption: 'Log in as this client', say: 'Now the button appears: Log in as this client. They confirm, and your portal opens.', do: async (d) => {
+    { caption: 'Log in as this client', say: 'Now the button appears, in the Client portal login block just above: Log in as this client. They confirm, and your portal opens.', do: async (d) => {
       const s = section(d, 'Client Portal Access');
       await d.scrollTo(s);
       const f = s.locator('form[action$="/impersonate"]');
@@ -216,10 +221,10 @@ module.exports = {
     ], say: 'One last situation: you are locked out. First, use forgot your password on the login page, as shown in the second video. If you cannot receive that e-mail, call your NexaCrest contact. Our team can give you a one-time temporary password, by phone or in person, never by e-mail. At your next sign-in, you choose a new password of your own.' },
     { card: 'list', kicker: 'Recap', title: 'When something goes wrong', items: [
       'New payment terms: a signed Amendment Agreement, on paper.',
-      'Report a Process Issue: always there, answered in the same place.',
-      'Raise a Dispute: to cancel, once our team switches it on.',
-      'Cancelled and lost orders stay in your list, with their documents.',
+      'Tell us what we could do better: always there, answered in the same place.',
+      'Ask to cancel this order: once our team switches it on.',
+      'Cancelled orders and those that did not go ahead stay in your list.',
       'Our team in your portal: always with the amber banner, always logged.',
-    ], say: 'Let us recap. Payment terms change only with a signed amendment agreement. Report a Process Issue is always there, and our team answers in the same place. To cancel, talk to us; Raise a Dispute appears once our team switches it on. Cancelled and lost orders stay in your list, with their documents. And when our team works in your portal for you, the amber banner always shows it, and it is always logged. That completes our videos for buyers. Thank you for watching, and thank you for your business!' },
+    ], say: 'Let us recap. Payment terms change only with a signed amendment agreement. Tell us what we could do better is always there, and our team answers in the same place. To cancel, talk to us; Ask to cancel this order appears once our team switches it on. Cancelled orders, and orders that did not go ahead, stay in your list, with their documents. And when our team works in your portal for you, the amber banner always shows it, and it is always logged. That completes our videos for buyers. Thank you for watching, and thank you for your business!' },
   ],
 };

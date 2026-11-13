@@ -5,6 +5,9 @@
 // productivity report and the agreements register. Standard template. Source of truth:
 // docs/APPLICATION_HANDBOOK.md 4.2, 4.3, 4.6, 5.3, 6.8, 6.12, 7.2, 3.10; SOP 01, 02, 13, 21, 23, 27.
 // Neither role has CAFIN, costs or the MD's price build-up: none is shown. Set-up: scripts/_b02.js.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-310 Approvals page (Documents,
+// E-mails, Prices tabs) instead of My Reviews / Email Approvals in the sidebar; D-320 menu paths; D-280
+// e-mail wording; D-342 prices fixed by the approved Quotation; D-361 demo product with an active supplier.
 
 const demo = require('../lib/demo');
 const B = require('./_b02');
@@ -61,7 +64,7 @@ module.exports = {
       await d.clickNav(d.page.getByRole('button', { name: 'Sign in' }));
     } },
     { caption: 'The e-mailed code', say: 'Then the second step: the six digit code we e-mail you at that moment. Type it, and press Verify. It works once, for a few minutes. Never share it: nobody from NexaCrest will ever ask you for it.', do: async (d) => { await typeLoginCode(d); } },
-    { caption: 'Dashboard · My Approvals', say: 'On the Dashboard, My Approvals counts the documents waiting for your review, and the amendments waiting for approval. Bottom left: you are working as Sales and Export Manager, in the Sales and Export department.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'My Approvals' })); await d.point(d.page.getByRole('heading', { name: 'My Approvals' }), 1500); await d.point('.dept-badge', 2000); } },
+    { caption: 'Dashboard · My Approvals', say: 'On the Dashboard, My Approvals counts what waits for you: prices, payment terms, documents to review, e-mails and amendments. The same counts are on Approvals, in the left menu. Bottom left: you are working as Sales and Export Manager, in the Sales and Export department.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'My Approvals' })); await d.point(d.page.getByRole('heading', { name: 'My Approvals' }), 1500); await d.point('.dept-badge', 2000); } },
     { goto: '/orders', caption: 'Every order, with who has it', say: 'Orders shows every order in the company, not only yours, because you may see all orders. Each card names the people assigned to it, so you see at once who is working on what.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('.tag-navy').first(), 2200); } },
 
     // ---------- 2. Assigning ----------
@@ -99,7 +102,7 @@ module.exports = {
     // ---------- 4. Prices ----------
     { card: 'chapter', title: 'Prices below the lowest price', subtitle: 'Only the Managing Director approves them.', say: 'Chapter four. Prices below the lowest price.' },
     { caption: 'Price check', say: 'The quotation still cannot be generated. The Price check shows why. The line was picked from Products. Its quote price is fifty three dollars and five cents, and the lowest price we may agree is fifty one fifty. The Export Executive agreed fifty and seventy five cents: below the lowest price.', do: async (d) => { await A.openTo(d, '#price-check'); await d.point(d.page.locator('#price-check tr').filter({ hasText: 'Absolute Black' }).first(), 4000); } },
-    { caption: 'Ask MD to approve line 1', say: 'You cannot approve this price, and neither can the Sales Director. Press Ask M D to approve line 1. The Managing Director is told at once, and the line shows that it was sent.', do: async (d) => {
+    { caption: 'Ask MD to approve line 1', say: 'You cannot approve this price, and neither can the Sales Director. Press Ask M D to approve line 1. The Managing Director is told at once, the request waits on their Approvals page under Prices, and the line shows that it was sent.', do: async (d) => {
       const b = d.page.getByRole('button', { name: 'Ask MD to approve line 1' });
       await d.point(b, 1200); await d.clickNav(b);
       await A.openTo(d, '#price-check'); await d.point(d.page.locator('#price-check').getByText('Sent to the MD for approval'), 2500);
@@ -108,8 +111,8 @@ module.exports = {
       'At or above the lowest price: nothing to approve.',
       'Below the lowest price: the MD approves it, with a reason, or refuses it.',
       'Below the minimum price: refused on saving. Nobody can approve it.',
-      'Change the price or options later, and the approval falls away.',
-    ], say: 'So, how prices work. At or above the lowest price, there is nothing to approve. Below the lowest price, the line can be saved, but the quotation and the proforma invoice wait until the Managing Director approves it, with a reason, or refuses it. Below the minimum price, the app refuses to save the line at all, and nobody can approve it. And if anyone later changes the price or the options of an approved line, the approval falls away, and it must be asked again.' },
+      'Change the price or options before the QT is approved: asked again. After: amendment only.',
+    ], say: 'So, how prices work. At or above the lowest price, there is nothing to approve. Below the lowest price, the line can be saved, but the quotation and the proforma invoice wait until the Managing Director approves it, with a reason, or refuses it. Below the minimum price, the app refuses to save the line at all, and nobody can approve it. If anyone changes the price or the options of an approved line before the quotation is approved, the approval falls away, and it must be asked again. Once the quotation is approved, the prices and products are fixed: a change then goes through a Products and prices amendment, and a price can only go down.' },
     { caption: 'Approved by the MD', do: async (d) => { B.mdApprovesLine(demo, order); await d.goto(at('#price-check')); await A.openTo(d, '#price-check'); await d.point(d.page.locator('#price-check .price-badge').first(), 2500); }, say: 'The Managing Director has approved the price, with a reason. The badge now reads: approved by the M D, and the quotation can be generated.' },
 
     // ---------- 5. Documents ----------
@@ -130,34 +133,34 @@ module.exports = {
       await d.select(sel, { label });
       await d.clickNav(d.page.getByRole('button', { name: 'Assign Reviewers' }).first());
     } },
-    { goto: '/reviews', caption: 'My Reviews', say: 'Every document waiting for you is in My Reviews, in the sidebar. Open the P D F and check it against the order: the buyer, the product, the quantity, the price and the terms.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('tr').filter({ hasText: 'QT' }).first(), 3000); } },
+    { goto: '/reviews', caption: 'Approvals › Documents', say: 'Every document waiting for you is on Approvals, under the Documents tab. Open the P D F and check it against the order: the buyer, the product, the quantity, the price and the terms.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('tr').filter({ hasText: 'QT' }).first(), 3000); } },
     { caption: 'Approve, or reject with a reason', say: 'If something is wrong, Reject, with the reason: the document goes back to draft, and the Export Executive generates a new revision. Here it is right: Approve. The P D F is redrawn as final, without the draft watermark.', do: async (d) => { const b = d.page.getByRole('button', { name: 'Approve' }).first(); await d.point(b, 1500); await d.clickNav(b); } },
-    { goto: at('#document-review-approval'), caption: 'Approved, not yet sent', say: 'Back on the order, the quotation is approved. E-mail sending is switched on in this company, so the next step is sending it to the buyer, and that has its own approval: the Export Executive asks to send it, and the Sales Director approves the e-mail.', do: async (d) => { await A.openTo(d, '#document-review-approval'); await d.point(d.page.locator('#document-review-approval').getByText('approved, not yet sent', { exact: false }).first(), 3000); } },
+    { goto: at('#document-review-approval'), caption: 'Approved, not yet sent', say: 'Back on the order, the quotation is approved, and its prices and products are now fixed. E-mails to buyers are switched on in this company, so the next step is sending it to the buyer, and that has its own approval: the Export Executive asks to send it, and the Sales Director approves the e-mail.', do: async (d) => { await A.openTo(d, '#document-review-approval'); await d.point(d.page.locator('#document-review-approval').getByText('approved, not yet sent', { exact: false }).first(), 3000); } },
 
     // ---------- 6. Rules ----------
     { card: 'list', kicker: 'Self-approval', title: 'Approving your own work', items: [
       'Your own document, your own order\'s terms: someone else approves.',
       'An e-mail you asked to send: always someone else, whatever the role.',
-      'Exceptions are set in Admin › Self-approval rules: by default MD and ED only.',
+      'Exceptions: Users & roles › Self-approval rules; by default MD and ED only.',
       'Purchase approval limits are Procurement\'s: they do not apply to Sales.',
-    ], say: 'A word on approving your own work. A document you generated, or the payment terms of an order you created, are approved by someone else. An e-mail you asked to send is always approved by someone else, whatever your role: an e-mail to a buyer cannot be called back. The only exceptions are set by the Admin, in Self-approval rules, and by default only the Managing and Executive Directors may approve their own work. And the money approval limits you may hear about are for Procurement\'s purchases: they do not apply to Sales.' },
+    ], say: 'A word on approving your own work. A document you generated, or the payment terms of an order you created, are approved by someone else. An e-mail you asked to send is always approved by someone else, whatever your role: an e-mail to a buyer cannot be called back. The only exceptions are set by the Admin, in Users and roles, Self-approval rules, and by default only the Managing and Executive Directors may approve their own work. And the money approval limits you may hear about are for Procurement\'s purchases: they do not apply to Sales.' },
 
     // ---------- 7. Sales Director ----------
     { card: 'chapter', title: 'The Sales Director', subtitle: 'E-mail approval, the cockpit, staff reports and agreements.', say: 'Chapter six. What the Sales Director sees as well.' },
-    { as: 'salesdir', goto: '/', caption: 'Emails awaiting Level-2 approval', say: 'Now the Sales Director. The Export Executive has asked to send the quotation to the buyer. That is Level 1. On the Dashboard, My Approvals counts the e-mails awaiting Level 2 approval, and Email Approvals in the sidebar shows the same count.', do: async (d) => {
+    { as: 'salesdir', goto: '/', caption: 'Emails awaiting Level-2 approval', say: 'Now the Sales Director. The Export Executive has asked to send the quotation to the buyer. That is Level 1. On the Dashboard, My Approvals counts the e-mails awaiting Level 2 approval, and Approvals, in the left menu, shows the count too.', do: async (d) => {
       B.execRequestsSend(demo, order);
       await d.goto('/');
       await d.scrollTo(d.page.getByRole('heading', { name: 'My Approvals' })); await d.point(d.page.getByText('Emails awaiting Level-2 approval').first(), 2200);
-      await d.point(d.page.locator('nav, aside').getByRole('link', { name: /Email Approvals/ }).first(), 1500);
+      await d.point(d.page.locator('nav.sidebar-nav a[data-nav="approvals"]').first(), 1500);
     } },
-    { goto: '/email-approvals', caption: 'Email Send Approvals', say: 'Email Send Approvals shows each waiting e-mail exactly as it will go: the buyer\'s address, the subject, the full text, and View attachment opens the very P D F that will be attached. Nothing is written again at sending time.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.getByText('purchasing@coralbay-stone.example').first(), 1500); await d.point(d.page.getByText('Subject:', { exact: false }).first(), 2000); await d.point(d.page.getByRole('link', { name: /View attachment/ }).first(), 1500); } },
+    { goto: '/email-approvals', caption: 'Approvals › E-mails', say: 'Approvals, the E-mails tab: Email Send Approvals shows each waiting e-mail exactly as it will go: the buyer\'s address, the subject, the full text, and View attachment opens the very P D F that will be attached. Nothing is written again at sending time.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.getByText('purchasing@coralbay-stone.example').first(), 1500); await d.point(d.page.getByText('Subject:', { exact: false }).first(), 2000); await d.point(d.page.getByRole('link', { name: /View attachment/ }).first(), 1500); } },
     { caption: 'Approve', say: 'All correct: Approve. It goes out with the next sending run, a few minutes later. Until then anyone can still Cancel it, with a reason, or press Send Now. If it is wrong, Reject it, and the Export Executive corrects it.', do: async (d) => { const b = d.page.getByRole('button', { name: /^Approve/ }).first(); await d.point(b, 1200); await d.clickNav(b); await d.point('.alert', 2500); } },
-    { goto: '/cockpit', caption: 'Management cockpit', say: 'Under Insights: the Management Cockpit. For each department: the open tasks, the overdue ones, the escalated ones, and the orders with no owner yet. Below: orders by status, everything escalated that needs management, and suppliers who are late. Counts and status only, never amounts.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('table.list').first(), 3000); await d.scrollTo(d.page.getByText('Escalated — needs management').first()); await d.point(d.page.getByText('Escalated — needs management').first(), 1500); } },
+    { goto: '/cockpit', caption: 'Management cockpit', say: 'Under Reports: the Management Cockpit. For each department: the open tasks, the overdue ones, the escalated ones, and the orders with no owner yet. Below: orders by status, everything escalated that needs management, and suppliers who are late. Counts and status only, never amounts.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('table.list').first(), 3000); await d.scrollTo(d.page.getByText('Escalated — needs management').first()); await d.point(d.page.getByText('Escalated — needs management').first(), 1500); } },
     { goto: '/reports/staff', caption: 'Staff Productivity Report', say: 'Reports, Staff Productivity: the documents each person generated, by type, and their actions in the app, for the dates you choose. Export C S V downloads it.', do: async (d) => {
       await d.page.evaluate(() => { for (const tr of document.querySelectorAll('table tr')) { const c = tr.querySelector('td'); if (c && /^MM /.test(c.innerText.trim())) tr.style.display = 'none'; } });
       await d.point('h1', 1000); await d.point(d.page.locator('tr').filter({ hasText: 'Export Executive' }).first(), 2500); await d.point(d.page.getByRole('link', { name: /Export CSV/ }).first(), 1200);
     } },
-    { goto: '/agreements', caption: 'Agreements', say: 'And Agreements: every agreement signed with a client, a supplier, a logistics partner or an associate, with its dates and the signed copy. You can view and download them; adding or changing one is for the Managing and Executive Directors and the Admin.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('a, button').filter({ hasText: /^Expiring soon/ }).first(), 1500); await d.point(d.page.locator('table tr').nth(1), 2000); } },
+    { goto: '/agreements', caption: 'Clients › Agreements', say: 'And Agreements, under Clients: every agreement signed with a client, a supplier, a logistics partner or an associate, with its dates and the signed copy. You can view and download them; adding or changing one is for the Managing and Executive Directors and the Admin.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.getByText('Expiring within').first(), 1500); await d.point(d.page.locator('table tr').nth(1), 2000); } },
 
     { card: 'list', kicker: 'Recap', title: 'Manager and Director in four lines', items: [
       'Assign orders (add first, then remove) and set your department\'s owner.',

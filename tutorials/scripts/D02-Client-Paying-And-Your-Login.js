@@ -3,6 +3,9 @@
 // The buyer reports the advance on the Payment Action Link, sets a password when the advance has
 // cleared, signs in, and resets a forgotten password; then the same buyer pays a second order by
 // Letter of Credit. Staff hand-offs are short; routine staff steps run off camera (scripts/_buyer.js).
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-330 / D-280 wording — "Bank reference
+// number (transaction ID, UTR or SWIFT reference)", the payment-link, portal-invite, password-reset and PI
+// e-mail texts as seeded; e-mail subjects name our company; demo buyer "TEST Northsea Stone Trading B.V.".
 // Source of truth: docs/APPLICATION_HANDBOOK.md 5.5 and 5.8, SOP 05; ClientPortalService.
 
 const demo = require('../lib/demo');
@@ -60,7 +63,7 @@ module.exports = {
     // ---------- 1. Payment Action Link ----------
     { card: 'chapter', title: 'Telling us you have paid', subtitle: 'The Payment Action Link.', say: 'Part one. Telling us you have paid.' },
     { card: 'email', to: B.BUYER_EMAIL, get subject() { return `NexaCrest — send us your payment details for order ${st.ref}`; },
-      get lines() { return ['Hello,', `For order ${st.ref}: once you have made the payment, please send us the payment screenshot together with the transaction details (Transaction ID / UTR, amount and date) on this secure link — no login needed.`, 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.']; },
+      get lines() { return ['Hello,', `For order ${st.ref}: once you have made the payment, please send us a screenshot of the payment and its details (bank reference number, amount and date) on this secure link. You do not need to sign in.`, 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.']; },
       link: 'Payment Action Link (secure — opens without a login)',
       say: 'You pay the advance by bank transfer, to the account printed on the Proforma Invoice. With the payment request we send you a Payment Action Link. Once you have paid, open it, and tell us about the transfer. It helps us find your money on our bank statement much faster.' },
     { card: 'list', kicker: 'Before you pay', title: 'Three tips for a smooth payment', items: [
@@ -69,7 +72,7 @@ module.exports = {
       'An e-mail says our bank details changed? Call your NexaCrest contact before paying.',
     ], say: 'Three tips before you pay. Pay only to the bank account printed on the Proforma Invoice. Put the Proforma Invoice number in the payment reference, so we can match your money at once. And if you ever receive an e-mail saying our bank details have changed, please call us before paying. Fraudsters copy e-mails like ours.' },
     { as: 'buyer', do: async (d) => { await d.goto(`/payment-action/${st.payLink}`); await d.point('h1', 1200); await d.point('legend', 1500); }, caption: 'Payment Details', say: 'Here is the page. It shows one payment at a time: right now, the advance, with the amount due already filled in.' },
-    { caption: 'Your transfer details', say: 'Type the transaction I D, or U T R, from your bank. Check the amount and the date. Add which bank and account you paid from. And attach the bank\'s remittance advice, or a screenshot of the transfer. Then: Send payment details.', do: async (d) => {
+    { caption: 'Your transfer details', say: 'Type the bank reference number from your bank: the transaction I D, U T R or SWIFT reference. Check the amount and the date. Add which bank and account you paid from. And attach the bank\'s remittance advice, or a screenshot of the transfer. Then: Send payment details.', do: async (d) => {
       await d.type('input[name="transaction_ref"]', 'NSSBANK20261107001');
       await d.point('input[name="amount"]', 900);
       await d.type('input[name="payer_bank_details"]', 'Sent from our bank in Rotterdam, account ending 0000');
@@ -88,7 +91,7 @@ module.exports = {
     // ---------- 2. Your login ----------
     { card: 'chapter', title: 'Your own login', subtitle: 'Created when the advance has cleared.', say: 'Part two. Your own login.', do: async () => { st.setLink = B.setPasswordLink(demo, st.client); } },
     { card: 'email', to: B.BUYER_EMAIL, subject: 'Your NexaCrest order portal access',
-      lines: ['Hello,', 'Your advance payment has been received and cleared — thank you.', 'You can now log in to track your order and download your documents at any time.', 'To set up your login, open this link within 72 hours. Your login email will be: ' + B.BUYER_EMAIL],
+      lines: ['Hello,', 'Thank you — we have received your advance payment.', 'You can now sign in at any time to follow your order and download your documents: the quotation, the proforma invoice and every document we send you from now on.', 'To set up your login, open this link within 72 hours (it works once). Your login email will be: ' + B.BUYER_EMAIL + '. After that, log in any time at the login page in this e-mail.'],
       link: 'Set your password (link valid for 72 hours)',
       say: 'The moment your advance clears, your login to our client portal is created automatically, and this e-mail arrives. Your login is your e-mail address. Open the link within seventy two hours, to choose your own password.' },
     { as: 'buyer', do: async (d) => {
@@ -127,7 +130,7 @@ module.exports = {
     } },
     { caption: 'The same message for everyone', say: 'Notice the message. It always says: if this address matches an account, a link has been sent. We never confirm whether an e-mail address has an account. That keeps your account private.', do: async (d) => { await d.point('.alert', 2500); } },
     { card: 'email', to: B.BUYER_EMAIL, subject: 'Reset your NexaCrest order portal password',
-      lines: ['Hello,', `A password reset was requested for your NexaCrest order portal account (${B.BUYER_EMAIL}).`, 'To set a new password, open this link within 72 hours.', 'If you didn\'t request this, you can ignore this email — your password will not be changed.'],
+      lines: ['Hello,', `Someone asked to reset the password of your NexaCrest buyer account (${B.BUYER_EMAIL}).`, 'To set a new password, open this link within 72 hours.', 'If you didn\'t request this, you can ignore this email — your password will not be changed.'],
       link: 'Set a new password (link valid for 72 hours)',
       say: 'The reset e-mail arrives. If you did not ask for it, just ignore it: nothing changes.', do: async () => { st.resetLink = B.setPasswordLink(demo, st.client); } },
     { as: 'buyer', do: async (d) => {
@@ -146,8 +149,8 @@ module.exports = {
       st.lcOrder = B.createOrder(demo, st.client, 'Irrevocable Letter of Credit at Sight');
       st.lcPi = B.moves.readyForPayment(demo, st.lcOrder, 'NSS-PO-2611-02');
     } },
-    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Proforma Invoice ${st.lcPi} — ${B.BUYER.company}`; },
-      lines: ['Dear Purchasing Manager,', 'Please find attached our Proforma Invoice for your second order.', 'NO ADVANCE PAYABLE — the full value of this order is payable by Letter of Credit.', 'Please open an Irrevocable Letter of Credit at Sight in our favour, as shown on the invoice, and send us a copy.'],
+    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Proforma Invoice ${st.lcPi} — ${B.OUR_COMPANY}`; },
+      lines: ['Dear Purchasing Manager,', 'Please find attached our Proforma Invoice for your second order.', 'This Proforma Invoice is valid until the date shown on it. Please open the letter of credit (LC) as agreed, so that we can start production.'],
       get attach() { return [`${st.lcPi.replace(/\//g, '-')}.pdf`]; },
       say: 'Some buyers pay by Letter of Credit: a promise from your bank to pay us when we present the shipping documents. Then there is no advance at all. The Proforma Invoice says so clearly: no advance payable, the full value is payable by Letter of Credit. You ask your bank to open the L C, exactly as the invoice describes, and send us a copy.' },
     { as: 'buyerLink', do: async (d) => { st.lcLink = B.moves.buyerLinkOnly(demo, st.lcOrder); await d.goto(`/buyer-action/${st.lcLink}`); await d.point('h1', 1000); await d.point('.action-progress', 1800); }, caption: 'Waiting for your Letter of Credit', say: 'On the Buyer Action Link for this second order, the payment step is current, waiting for your Letter of Credit. There is nothing to transfer: your bank does the work. As soon as we have checked your L C, the link moves on to the order confirmation.' },

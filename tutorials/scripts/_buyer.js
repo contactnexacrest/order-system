@@ -1,6 +1,6 @@
 'use strict';
 // Shared set-up for Group D (the buyer's side). Not a video itself (starts with "_").
-// One prospect, "Northsea Stone Trading B.V.", fills the public forms on camera; between scenes,
+// One prospect, "TEST Northsea Stone Trading B.V.", fills the public forms on camera; between scenes,
 // during the cards, staff do their routine steps off camera with the same service calls the app
 // uses (document generation and review, links), so every screen the buyer sees is real.
 // Runs inside the snapshot the runner restores afterwards.
@@ -10,7 +10,7 @@ const A = require('./_a02');
 
 const BUYER_EMAIL = 'purchasing@northsea-stone.example';
 const BUYER = {
-  company: 'Northsea Stone Trading B.V.',
+  company: 'TEST Northsea Stone Trading B.V.', // README rule: demo company names start with TEST (13 Nov 2026)
   line1: '12 Harbour Quay',
   city: 'Rotterdam',
   postcode: '3011 AD',
@@ -51,7 +51,7 @@ function createOrder(demo, clientId, preset = 'Standard — New Buyer') {
     $port = App\\Repositories\\LookupRepository::ports('loading')[0] ?? null;
     $preset = null; foreach (App\\Repositories\\LookupRepository::paymentPresets() as $p) if ($p['preset_name'] === ${JSON.stringify(preset)}) $preset = $p;
     $order = $call('createSampleOrderCustomLines', ${clientId}, $incoterm, $currency, $port, $preset, $exec, [
-      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Polished', 'quantity' => '150', 'unit' => 'sqm', 'unit_price' => '48.00', 'hs_code' => '68022390'],
+      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Natural Polish', 'quantity' => '150', 'unit' => 'sqm', 'unit_price' => '48.00', 'hs_code' => '68022390'],
       ['description' => 'Absolute Black Granite Tile', 'dimensions' => '60 x 60 x 1.5 cm', 'finish' => 'Honed', 'quantity' => '300', 'unit' => 'sqm', 'unit_price' => '30.00', 'hs_code' => '68022390'],
     ]);
     $pdo->prepare('UPDATE orders SET port_of_discharge_text = ?, is_sample_data = 0 WHERE id = ?')->execute(['Rotterdam, Netherlands', $order]);
@@ -191,4 +191,8 @@ function setPasswordLink(demo, clientId) {
   return `/client/set-password/${raw}`;
 }
 
-module.exports = { BUYER, BUYER_EMAIL, setup, createOrder, clientIdByEmail, moves, ref, setPasswordLink, portalPassword, typeLoginCode, signIn, openTo: A.openTo };
+// The e-mail templates name OUR company in the subject ({company_name} = Settings › Company › legal name),
+// e.g. "Quotation … — NexaCrest International Private Limited" (checked 13 Nov 2026 against seed.sql).
+const OUR_COMPANY = 'NexaCrest International Private Limited';
+
+module.exports = { BUYER, BUYER_EMAIL, OUR_COMPANY, setup, createOrder, clientIdByEmail, moves, ref, setPasswordLink, portalPassword, typeLoginCode, signIn, openTo: A.openTo };

@@ -75,6 +75,10 @@ async function setup(demo) {
       'contact_phone' => null, 'contact_email' => null, 'fob_source' => 'direct', 'fob_value' => 3280.0, 'factory_cost' => null, 'transportation_cost' => null,
       'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], ${md});
     PricingRepository::setSupplierDates($s, date('Y-m-d'), null);
+    // D-360 / D-361: the price is an offer of an active supplier in Procurement & suppliers › Suppliers (as "+ Add product"
+    // makes it), so the product counts as having an active supplier; linking changes no figure (D-361 migration check).
+    $sup = App\\Repositories\\SupplierRepository::create(['supplier_legal_name' => 'TEST Demo Quarry', 'city' => 'Demo city', 'state' => 'Demo state', 'types' => ['Quarry Owner']], ${md});
+    ProductSupplierRepository::linkSupplier($s, $sup, 'TEST Demo Quarry');
     // D-361: a product is offered in Pick from Products once configured — fixed at the supplier's price, as before.
     App\\Services\\SupplierOffers::setConfiguredBase($p, 3280.0, null, 'SQM', ${md});
     echo $p;`);
@@ -110,7 +114,7 @@ function orderAfterPart1(demo) {
     $port = App\\Repositories\\LookupRepository::ports('loading')[0] ?? null;
     $preset = null; foreach (App\\Repositories\\LookupRepository::paymentPresets() as $p) if ($p['preset_name'] === 'Standard — New Buyer') $preset = $p;
     $o = $call('createSampleOrderCustomLines', $c, $incoterm, $currency, $port, $preset, $exec, [
-      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Polished', 'quantity' => '200', 'unit' => 'sqm', 'unit_price' => '53.05', 'hs_code' => '68022390'],
+      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Natural Polish', 'quantity' => '200', 'unit' => 'sqm', 'unit_price' => '53.05', 'hs_code' => '68022390'],
     ]);
     $pdo->prepare('UPDATE orders SET port_of_discharge_text = ?, is_sample_data = 0 WHERE id = ?')->execute([${JSON.stringify(BUYER.port)}, $o]);
     $pdo->prepare('INSERT IGNORE INTO order_assignees (order_id, user_id, assigned_by) VALUES (?, ?, ?)')->execute([$o, $exec, $exec]);

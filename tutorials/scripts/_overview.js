@@ -2,7 +2,7 @@
 // Shared set-up for the Group A (Everyone) overview videos. Not a video itself (starts with "_").
 // The dev database is full of automated-test records with odd names, so these videos put them
 // aside (cancelled and archived, inside the snapshot the runner restores afterwards) and load the
-// app's own Sample Data (Admin > Sample Data): fictional [SAMPLE] buyers, orders at every stage.
+// app's own Sample Data (Settings › Sample data): fictional [SAMPLE] buyers, orders at every stage.
 
 const ACTORS = {
   md: { label: 'Managing Director', sub: 'NexaCrest staff · md@email.com', initials: 'MD', color: '#C9962B' },

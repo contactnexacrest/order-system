@@ -1,6 +1,9 @@
 'use strict';
 // C06 — Quoting: the catalogue (no prices), Get price for a chosen specification, the quote
 // price and the lowest you may agree, the daily limit, and what NexaCrest controls.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-339 "Your prices in other units"
+// (per CBM / SQM / SQFT, D-364 unit names) shown after Get price; D-357 finish names ("Natural Polish" is the
+// standard finish; "Leather" unchanged).
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.quoting@email.com';
@@ -44,8 +47,9 @@ module.exports = {
     } },
     { caption: 'Get price', say: 'Press Get price.', do: async (d) => { await d.clickNav(d.page.getByRole('button', { name: 'Get price' })); } },
     { caption: 'Quote price and lowest price', say: 'And there it is, instantly. Two numbers. The quote price, which you offer the buyer. And the lowest price you may agree, if the buyer negotiates. Both are FOB, an Indian port, per unit.', do: async (d) => { await d.ring(d.page.locator('.field-grid').first()); await d.wait(2200); } },
+    { caption: 'Your prices in other units', say: 'Below them, the same two prices in other units: per C B M, per S Q M and per S Q F T, at the thickness you chose. They are only there to compare, for a buyer who thinks in another unit. The order itself is priced in the unit above.', do: async (d) => { const h = d.page.getByRole('heading', { name: /Your prices in other units/ }); if (await h.count()) { await d.scrollTo(h); await d.point(h, 1200); await d.point(d.page.locator('table.list').first(), 2200); } else { await d.wait(1500); } } },
     { caption: 'Your commission does not change', say: 'Here is the friendly part: your commission is the same anywhere between those two prices. So negotiate freely within that range, it does not cost you anything.', do: async (d) => { await d.point(d.page.locator('p.small.muted').last(), 1800); } },
-    { caption: 'What changed the price', say: 'The lines show what changed the price compared to the standard specification, like a thicker slab or a special finish. Never costs or margins, only what moved the price.', do: async (d) => { const t = d.page.locator('table.list'); if (await t.count()) { await d.ring(t.first()); } await d.wait(1800); } },
+    { caption: 'What changed the price', say: 'The lines show what changed the price compared to the standard specification, like a thicker slab or a special finish: the standard finish is Natural Polish, so leather adds a little. Never costs or margins, only what moved the price.', do: async (d) => { const t = d.page.locator('table.list'); if (await t.count()) { await d.ring(t.last()); } await d.wait(1800); } },
     { caption: 'Valid until…', say: 'And the price is valid until the date shown. After that, simply ask again.', do: async (d) => { await d.point(d.page.locator('p.muted').nth(1), 1200); } },
 
     { card: 'chapter', title: 'Your price requests', say: 'Part four. Keeping track.' },

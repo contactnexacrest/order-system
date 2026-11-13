@@ -4,6 +4,10 @@
 // documents in the portal, reports the balance payment, sees it reviewed, the order closes, the buyer
 // leaves feedback and sends a Reorder This request. Staff steps run off camera (scripts/_buyer.js).
 // Source of truth: docs/SOP/12-client-portal.md, 08/09 stage chapters, 17 (reorder); ClientPortalController.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-330 e-mail texts (freight bill,
+// BL copy, CI, balance received — as the seeded templates read), "Bank reference number" field, "Payments you
+// have told us about", "Received — we are checking it", buyer stage "Shipping"; D-338 "As per annexure" and
+// "Quantity not decided yet" on Reorder This; D-357 Finish list without "Polished" (demo lines "Natural Polish").
 
 const demo = require('../lib/demo');
 const B = require('./_buyer');
@@ -64,19 +68,19 @@ module.exports = {
       'Booked and insured the sea freight (CIF orders).',
       'Packed your goods in crates and loaded them on the ship.',
     ], say: 'Since you acknowledged the Order Confirmation, our team has been busy. We ordered the stone, and followed production at the factory. We checked the quality, and arranged the inspection and the certificates your goods need. On a C I F order like this one, we booked and insured the sea freight. And we packed your goods in crates, and loaded them on the ship.' },
-    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Debit Note ${st.fdn} — Payment Required Before Shipment`; },
-      get lines() { return ['Dear Purchasing Manager,', `Please find attached Debit Note ${st.fdn}.`, 'Payment is required within 3 Calendar Days of this Debit Note\'s date. We will confirm shipment booking only upon receipt of full freight payment.']; },
+    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Freight bill (debit note) ${st.fdn} — please pay before we ship`; },
+      get lines() { return ['Dear Purchasing Manager,', `Please find attached Debit Note ${st.fdn}.`, 'Please pay this within 3 days of the date on it. We can book your shipment only after we receive the full freight payment.']; },
       get attach() { return [`${st.fdn.replace(/\//g, '-')}.pdf`]; },
       say: 'A step back, to just before shipment. On a C I F order, we book and insure the sea freight for you, so you receive a debit note for the freight and insurance. It is paid within three days, before we confirm the shipment booking. You tell us about that payment the same way as any other: on the Payment Action Link, or in the portal, choosing freight payment.' },
     { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Bill of Lading Copy — Order ${st.ref}`; },
-      get lines() { return ['Dear Purchasing Manager,', `Please find attached the scanned copy of the Bill of Lading for your order ${st.ref}.`, 'BL originals will be couriered upon clearance of the balance payment, per the agreed terms.']; },
+      get lines() { return ['Dear Purchasing Manager,', `Please find attached the scanned copy of the Bill of Lading for your order ${st.ref}.`, 'As agreed, we will send you the original bills of lading by courier once we have received your balance payment.']; },
       attach: ['Bill-of-Lading-scanned-copy.pdf'],
       say: 'When the ship has sailed, the shipping line issues the bill of lading. We e-mail you a scanned copy straight away. The original bills of lading follow by courier once your balance payment has cleared, as agreed in your terms.' },
-    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Commercial Invoice ${st.ci} — ${B.BUYER.company}`; },
-      get lines() { return ['Dear Purchasing Manager,', `Please find attached Commercial Invoice ${st.ci} for your order.`, 'Kindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.']; },
+    { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Commercial Invoice ${st.ci} — ${B.OUR_COMPANY}`; },
+      get lines() { return ['Dear Purchasing Manager,', `Please find attached Commercial Invoice ${st.ci} for your order.`, 'Please check the invoice amount and the payment details, and pay the balance as agreed.']; },
       get attach() { return [`${st.ci.replace(/\//g, '-')}.pdf`]; },
       say: 'Together with it comes the commercial invoice. It is made from the quantities actually packed and shipped, shows the advance you already paid, and the balance still to pay.' },
-    { as: 'buyer', goto: '/client', caption: 'My Orders', say: 'Let us sign in to the portal. The order is now at stage eight: Commercial Invoice and Balance.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: st.ref }), 2500); } },
+    { as: 'buyer', goto: '/client', caption: 'My Orders', say: 'Let us sign in to the portal. My Orders says where the order is now: shipping.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: st.ref }), 2500); } },
     { caption: 'Your shipping documents', say: 'Open the order. In Documents, the new ones are at the top: the commercial invoice, the packing list with every crate and its weight, and the debit note for the sea freight and insurance, which our team arranged because this is a C I F order.', do: async (d) => {
       await d.goto(portal(st.order));
       const s = section(d, 'Documents');
@@ -95,7 +99,7 @@ module.exports = {
       const s = section(d, 'Report a Payment');
       await d.scrollTo(s); await d.point(s.locator('h2'), 1200); await d.point(s.locator('p.muted').first(), 2500);
     } },
-    { caption: 'Your transfer details', say: 'Choose which payment: the balance. Type the transaction I D, or U T R, from your bank, the amount, and the date you paid. Add which bank you paid from, and attach the bank\'s remittance advice. Then: Submit Payment Details.', do: async (d) => {
+    { caption: 'Your transfer details', say: 'Choose which payment: the balance. Type the bank reference number from your bank: the transaction I D, U T R or SWIFT reference. Then the amount, and the date you paid. Add which bank you paid from, and attach the bank\'s remittance advice. Then: Submit Payment Details.', do: async (d) => {
       const s = section(d, 'Report a Payment');
       await d.select(s.locator('select[name="payment_type"]'), 'balance');
       await d.type(s.locator('input[name="transaction_ref"]'), 'NSSBANK20261121004');
@@ -106,7 +110,7 @@ module.exports = {
       await d.upload(s.locator('input[name="screenshot"]'), demo.sampleFile('balance-remittance-sample.pdf', 'SAMPLE REMITTANCE ADVICE - BALANCE - TUTORIAL DEMO'));
       await d.clickNav(s.getByRole('button', { name: 'Submit Payment Details' }));
     } },
-    { caption: 'Received — pending review', say: 'Thank you: we have noted your payment details. Below, under Previously Reported, your report shows: received, pending review. This does not mark the money as received. Our accounts team checks the real bank statement first.', do: async (d) => {
+    { caption: 'Received — pending review', say: 'Thank you: we have noted your payment details. Below, under Payments you have told us about, your report shows: received, we are checking it. This does not mark the money as received. Our accounts team checks the real bank statement first.', do: async (d) => {
       await d.point('.alert', 2200);
       const s = section(d, 'Report a Payment');
       await d.scrollTo(s.locator('h3')); await d.point(s.locator('table.list').last(), 2600);
@@ -114,11 +118,11 @@ module.exports = {
     { card: 'list', kicker: 'Paying the balance', title: 'Three tips', items: [
       'The balance falls due by the days in your payment terms, counted from the scanned Bill of Lading.',
       'Pay to the bank account on the Commercial Invoice; quote the invoice number.',
-      'Every report stays listed under Previously Reported, with your attachment.',
-    ], say: 'Three tips for the balance. It falls due by the number of days in your payment terms, counted from the day we sent you the scanned bill of lading. Pay to the bank account printed on the commercial invoice, and quote the invoice number in your payment. And every payment you report stays listed under Previously Reported, with your attachment, so you always have a record.' },
+      'Every report stays listed under "Payments you have told us about".',
+    ], say: 'Three tips for the balance. It falls due by the number of days in your payment terms, counted from the day we sent you the scanned bill of lading. Pay to the bank account printed on the commercial invoice, and quote the invoice number in your payment. And every payment you report stays listed under Payments you have told us about, with your attachment, so you always have a record.' },
     { card: 'chapter', title: 'Our side: received, then cleared', subtitle: 'Two people, for every payment.', say: 'A quick look at our side.', do: async () => { B.moves.balanceCleared(demo, st.order); } },
     { card: 'email', to: B.BUYER_EMAIL, get subject() { return `Balance Payment Received — Order ${st.ref}`; },
-      get lines() { return ['Dear Purchasing Manager,', `We confirm receipt and clearance of the balance payment for your order ${st.ref}.`, 'Thank you for your business — we are proceeding with final despatch formalities.']; },
+      get lines() { return ['Dear Purchasing Manager,', `We have received your balance payment for order ${st.ref}. Thank you for your business.`, 'We are now finishing the last shipping paperwork.']; },
       say: 'Our accounts team found your balance on the bank statement and recorded it. Then the Finance Manager confirmed it has really arrived, and cleared it. Two people check every payment. You receive this confirmation.' },
     { as: 'buyer', caption: 'Reviewed by our team', say: 'In the portal, your report now reads: reviewed by our team.', do: async (d) => {
       await d.goto(portal(st.order));
@@ -165,7 +169,7 @@ module.exports = {
       await d.scrollTo('h1'); await d.point(d.page.getByRole('link', { name: 'Reorder This' }), 1500);
       await d.clickNav(d.page.getByRole('link', { name: 'Reorder This' }));
     } },
-    { caption: 'Your product lines, copied', say: 'The form starts with the product lines of this order: the description, size, finish, quantity and unit. Edit them, remove a line with the cross, or add one with Add product line. Not sure of a quantity yet? Tick quantity to be confirmed. There are no prices here: our team confirms prices when we review your request.', do: async (d) => {
+    { caption: 'Your product lines, copied', say: 'The form starts with the product lines of this order: the description, size, finish, quantity and unit. Edit them, remove a line with the cross, or add one with Add product line. Not sure of a quantity yet? Tick Quantity not decided yet. Were the sizes of a line in the annexure of the earlier order? Tick As per annexure instead: then no size is needed, only the quantity. There are no prices here: our team confirms prices when we review your request.', do: async (d) => {
       await d.point('h1', 1200); await d.point('.product-row', 3000);
       await d.point(d.page.getByRole('button', { name: '+ Add product line' }), 1500);
     } },

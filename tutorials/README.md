@@ -1,5 +1,11 @@
 # Tutorial videos
 
+> **ON HOLD — owner, 13 Nov 2026: do not record or re-record anything until the owner lifts the hold.**
+> Do not run `tutorials/run.js` (not even `--plan`) while the hold stands. The scripts were brought up to
+> date with the app on 13 Nov 2026 (D-336 … D-365, plus the 11 Nov menu and wording changes) so they are
+> ready when recording restarts; `VIDEO_PROGRESS.md` lists, per video, what changed and whether a
+> re-recording is needed. Re-recording a video always needs the owner's go-ahead first (CLAUDE.md).
+
 Narrated, subtitled 1080p tutorial videos of the application, recorded automatically
 with Playwright against the **PHP stack** on the dev database, with an offline voice (Piper).
 The videos are **not committed** (see `.gitignore`); the scripts and `VIDEO_PROGRESS.md` are,
@@ -43,6 +49,16 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
   with the dev seed staff accounts (see `e2e/README.md`).
 * Recording writes demo records to the dev database. Do not record while a test run uses the
   same database (in the cloud session: `flock <scratchpad>/test4.lock node tutorials/run.js C01`).
+* The dev database must have every migration up to and including `2026-11-13b-products-fixed-base-and-link-legacy.sql`
+  (in `docs/migrations`; the 12 Nov ones add "As per annexure", the detailed line table, the price lock,
+  "Natural Polish" and the e-mail Testing mode default; 13a / 13b add supplier offers and configured base prices).
+  The scripts expect the app of 13 Nov 2026: a product is offered in "Pick from Products" only when it is
+  configured and has an active supplier (the set-ups `_b01.js` / `_b02.js` create one, linked to the demo
+  supplier "TEST Demo Quarry"); Thickness and Size / format start on "Choose…" and must be chosen before a price
+  shows (D-348); the finish of a picked line is its Surface finish option ("Natural Polish", D-357).
+* The first recording after a long pause should be checked step by step: the scripts were updated from the
+  views and controllers only (no recording was allowed), so a selector may still need a small fix. A failing
+  step names itself (`Step 7 (…): …`).
 
 ## How it works
 
@@ -73,7 +89,12 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
 Copy a script in `scripts/` (files starting with `_` are helpers). Rules:
 
 * No PII: role names and role e-mails only (`md@email.com`, `associate.starter@email.com`),
-  company names start with `TEST`, phone `+91-0000000000`.
+  company names start with `TEST` (or `[SAMPLE]` for the app's own Sample Data), buyer e-mails on
+  `.example` domains, phone `+91-0000000000`.
+* Use the app's current names: the left menu has 13 entries with a menu bar per section (D-320), so say
+  "Approvals › Documents" (not My Reviews), "Users & roles › …", "Settings › …"; buyer-facing wording follows
+  D-330 ("Open order", "Please confirm your order", "Did not go ahead" …). E-mail cards copy the seeded
+  e-mail templates (`docs/seed.sql`, `email_templates`); their subjects name our company, not the buyer.
 * Say what the screen shows; never claim behaviour you have not seen in the app.
 * 8–12 minutes per video, 15 at most. Check with `--plan`, then watch the result.
 * Update `VIDEO_PROGRESS.md` when a video is recorded and checked.

@@ -66,8 +66,8 @@ async function setup(demo) {
     $pdo->prepare('UPDATE clients SET contact_person = ? WHERE id = ?')->execute(['Purchasing Manager', $client]);
     App\\Services\\AssociateService::linkClient($client, ${a.id}, 'link', null, date('Y-m-d'), $exec);
     $order = $call('createSampleOrderCustomLines', $client, $incoterm, $currency, $port, $preset, $exec, [
-      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Polished', 'quantity' => '120', 'unit' => 'sqm', 'unit_price' => '48.00', 'hs_code' => '68022390'],
-      ['description' => 'Black Galaxy Granite Tile', 'dimensions' => '60 x 60 x 1.5 cm', 'finish' => 'Polished', 'quantity' => '400', 'unit' => 'sqm', 'unit_price' => '32.00', 'hs_code' => '68022390'],
+      ['description' => 'Black Galaxy Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Natural Polish', 'quantity' => '120', 'unit' => 'sqm', 'unit_price' => '48.00', 'hs_code' => '68022390'],
+      ['description' => 'Black Galaxy Granite Tile', 'dimensions' => '60 x 60 x 1.5 cm', 'finish' => 'Natural Polish', 'quantity' => '400', 'unit' => 'sqm', 'unit_price' => '32.00', 'hs_code' => '68022390'],
     ]);
     $pdo->prepare('UPDATE orders SET port_of_discharge_text = ? WHERE id = ?')->execute(['Rotterdam, Netherlands', $order]);
     // A real (not sample) order, so the associate's first-order commission applies; the buyer stays a [SAMPLE] client.
@@ -121,7 +121,7 @@ const MOVES = {
     $ref = App\\Services\\ReferenceNumberService::generateDocumentRef((int) Doc::documentTypeIdFor('SUPPO'));
     App\\Repositories\\OrderSupplierPoRepository::create(${o}, $sup, $ref, [
       'supplier_type' => 'Quarry Owner', 'material_stone_type' => 'Natural Granite, Black Galaxy', 'grade' => 'Grade A',
-      'surface_finish' => 'Polished', 'dimensions' => 'Slabs 300 x 180 x 2 cm; tiles 60 x 60 x 1.5 cm', 'dimensional_tolerance' => '+/- 1mm',
+      'surface_finish' => 'Natural Polish', 'dimensions' => 'Slabs 300 x 180 x 2 cm; tiles 60 x 60 x 1.5 cm', 'dimensional_tolerance' => '+/- 1mm',
       'quantity' => '520', 'unit' => 'sqm', 'colour_reference' => 'Sample swatch on file', 'unit_price_inr' => '2100.00',
       'basic_value_inr' => '1092000.00', 'gst_rate_pct' => '18.00', 'gst_amount_inr' => '196560.00', 'total_payable_inr' => '1288560.00',
       'advance_pct' => '0.00', 'advance_amount_inr' => '0.00', 'balance_amount_inr' => '1288560.00',

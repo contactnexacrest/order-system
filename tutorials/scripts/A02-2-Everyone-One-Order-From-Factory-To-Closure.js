@@ -4,6 +4,9 @@
 // On camera: production update, compliance checklist, BL issued, balance cleared, order closed,
 // what the buyer and the associate see. Between scenes the routine steps are done off camera.
 // Source of truth: docs/APPLICATION_HANDBOOK.md 5.4 (Steps 7–13), SOP 07–13.
+// Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-361 Supplier PO supplier choice
+// and price-override reason (narrated, the terms form is not shown); D-357 "Natural Polish" in the demo
+// data (_a02.js); D-292 associate wording "Earned — will be paid on <date>" and the payout day.
 
 const demo = require('../lib/demo');
 const A = require('./_a02');
@@ -34,7 +37,7 @@ module.exports = {
 
     // ---------- 1. Supplier ----------
     { card: 'chapter', title: 'Buying from the supplier', subtitle: 'Stage 5 · Supplier PO and production.', say: 'Chapter one. Buying the stone.', do: async () => { A.move(demo, 'supplierPo', order); } },
-    { as: 'procurement', goto: at('#step-group-stage-5'), caption: 'Step 7 · Supplier PO', say: 'The Procurement Executive takes over. They saved the supplier purchase order terms, the material, grade, finish, quantity, price and delivery place, and generated the supplier P O. The Managing Director approved it, and the supplier signed and returned it. That passes stage five.', do: async (d) => { await A.openTo(d, '#step-group-stage-5'); await d.point('#step-group-stage-5 > summary', 1500); await d.point('.process-step[data-stage="5"]', 1000); } },
+    { as: 'procurement', goto: at('#step-group-stage-5'), caption: 'Step 7 · Supplier PO', say: 'The Procurement Executive takes over. They saved the supplier purchase order terms. When the product has supplier offers, the form lists them, lowest first, and choosing one fills in the supplier and the price; a different price needs a reason, which is kept with the P O. Then the material, grade, finish, quantity and delivery place, and they generated the supplier P O. The Managing Director approved it, and the supplier signed and returned it. That passes stage five.', do: async (d) => { await A.openTo(d, '#step-group-stage-5'); await d.point('#step-group-stage-5 > summary', 1500); await d.point('.process-step[data-stage="5"]', 1000); } },
     { caption: 'Internal only', say: 'An important rule: the supplier purchase order is internal. It never goes to the buyer, and the buyer never learns who our supplier is. Procurement sees purchase prices; Sales sees selling prices.', do: async (d) => { await A.openTo(d, '#step-7b-supplier-po-generate > summary'); await d.point('#step-7b-supplier-po-generate > summary', 1800); } },
     { goto: at('#step-production'), caption: 'Step 8 · Production update', say: 'While the factory works, Procurement keeps everyone informed. Step 8: production status, and the estimated shipment date.', do: async (d) => {
       const f = await A.openTo(d, 'form[action$="/production-status"]');
@@ -70,9 +73,9 @@ module.exports = {
     { card: 'list', kicker: 'Done by itself', title: 'The associate\'s commission is fixed', items: [
       'Fixed automatically the moment the buyer has paid in full.',
       'At the exchange rate of all the buyer\'s payments; it never changes after that.',
-      'A payout is created and the associate is told; it is due after 30 days, or on hold while a buyer claim is open.',
+      'A payout is created and the associate is told; due after 30 days, paid on the next payout day.',
       'Only the team incentive still waits for the Managing Director\'s lock.',
-    ], say: 'And something happened by itself at that moment. Because the buyer has now paid in full, the associate\'s commission was fixed automatically, at the exchange rate of all the buyer\'s payments, so it never changes afterwards. The payout was created and the associate was told. It becomes due after thirty days, or goes on hold while a buyer claim is open. Only the team incentive still waits for the Managing Director to lock it.' },
+    ], say: 'And something happened by itself at that moment. Because the buyer has now paid in full, the associate\'s commission was fixed automatically, at the exchange rate of all the buyer\'s payments, so it never changes afterwards. The payout was created and the associate was told. It becomes due after thirty days, and is paid on the next payout day, by default the last day of the month; it goes on hold while a buyer claim is open. Only the team incentive still waits for the Managing Director to lock it.' },
 
     // ---------- 5. Closure ----------
     { card: 'chapter', title: 'Closing the order', subtitle: 'Stage 9 · Original documents to the buyer.', say: 'Chapter five. Closing the order.', do: async () => { A.move(demo, 'closeReady', order); } },
@@ -83,7 +86,7 @@ module.exports = {
       await d.clickNav(f.locator('button[type=submit]').first());
     } },
     { caption: 'All nine stages done', say: 'And there it is: all nine stages are done, and the buyer now sees the order as complete. The order stays open for the last loose ends: government export benefits, and the final financial review.', do: async (d) => { await d.point('.alert', 1500); await d.scrollTo('.process-stepper'); await d.point('.process-stepper', 1800); } },
-    { as: 'associate', goto: '/associate/orders', caption: 'What the associate sees', say: 'And the associate? They followed the order in their own portal the whole time. The buyer has paid in full, so their commission is now marked fixed, shown in the order\'s currency, and it is paid in the next payout run after it falls due. An associate based in India also sees one line with the fixed rupee amount they will receive. They never see our costs or margins.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: 'Harbourline' }).first(), 2500); } },
+    { as: 'associate', goto: '/associate/orders', caption: 'What the associate sees', say: 'And the associate? They followed the order in their own portal the whole time. The buyer has paid in full, so their commission now reads: Earned, will be paid on, and the date of the payout. It is shown in the order\'s currency. An associate based in India also sees one line with the fixed rupee amount they will receive. They never see our costs or margins.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: 'Harbourline' }).first(), 2500); } },
     { card: 'list', kicker: 'After closing', title: 'The last steps', items: [
       'Step 12: costs, export benefit eligibility and the profit review (Finance).',
       'Step 13g: government benefits claimed and received.',

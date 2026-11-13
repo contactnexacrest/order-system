@@ -45,6 +45,9 @@ async function setup(demo) {
       'contact_phone' => null, 'contact_email' => null, 'fob_source' => 'direct', 'fob_value' => 3280.0, 'factory_cost' => null, 'transportation_cost' => null,
       'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], ${md});
     PricingRepository::setSupplierDates($s, date('Y-m-d'), null);
+    // D-360 / D-361: the price is an offer of an active directory supplier, as "+ Add product" makes it (no figure changes).
+    $sup = App\\Repositories\\SupplierRepository::create(['supplier_legal_name' => 'TEST Demo Quarry', 'city' => 'Demo city', 'state' => 'Demo state', 'types' => ['Quarry Owner']], ${md});
+    ProductSupplierRepository::linkSupplier($s, $sup, 'TEST Demo Quarry');
     // D-361: a product is offered in Pick from Products once configured — fixed at the supplier's price, as before.
     App\\Services\\SupplierOffers::setConfiguredBase($p, 3280.0, null, 'SQM', ${md});
     echo $p;`).split('\n').pop());
@@ -59,7 +62,7 @@ async function setup(demo) {
     $port = App\\Repositories\\LookupRepository::ports('loading')[0] ?? null;
     $preset = null; foreach (App\\Repositories\\LookupRepository::paymentPresets() as $p) if (str_starts_with($p['preset_name'], 'Established Buyer')) $preset = $p;
     $o = $call('createSampleOrderCustomLines', $c, $incoterm, $currency, $port, $preset, $exec, [
-      ['description' => 'Absolute Black Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Polished', 'quantity' => '150', 'unit' => 'sqm', 'unit_price' => '50.00', 'hs_code' => '68022390'],
+      ['description' => 'Absolute Black Granite Slab', 'dimensions' => '300 x 180 x 2 cm', 'finish' => 'Natural Polish', 'quantity' => '150', 'unit' => 'sqm', 'unit_price' => '50.00', 'hs_code' => '68022390'],
     ]);
     $pdo->prepare('UPDATE orders SET port_of_discharge_text = ?, is_sample_data = 0, created_by = ? WHERE id = ?')->execute([${JSON.stringify(BUYER.port)}, $exec, $o]);
     $pdo->prepare('DELETE FROM order_assignees WHERE order_id = ?')->execute([$o]);
