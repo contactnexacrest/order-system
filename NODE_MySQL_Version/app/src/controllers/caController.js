@@ -255,7 +255,8 @@ async function divisionZohoCheck(req, res, kind, id, back, title, party) {
 async function orderZohoCheck(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
-  if (!order) {
+  // MTX-001: as PHP — someone who may not open the order sees nothing of it.
+  if (!order || !(await orderAccessService.mayOpenOrderId(orderId, req.user.id, req.permissions))) {
     res.status(404).send('Order not found.');
     return;
   }

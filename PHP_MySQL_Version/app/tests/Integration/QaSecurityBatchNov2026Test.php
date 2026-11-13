@@ -129,4 +129,27 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         }
         self::assertFalse(\App\Services\TwoFactorService::verify($code));
     }
+
+    /** MTX-001: a role with only ca_module_manage + manage_pricing, assigned to the order, gets 404 on its Zoho check and line price approval. */
+    public function testMtx001OrderSubPagesNeedOrderAccess(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $lineId = \App\Repositories\OrderProductRepository::add($orderId, 1, 'TEST-QA granite slab', '60x30', 'Polished', '10', false, 'PCS', '250.00');
+        $roleId = \App\Repositories\RoleRepository::create('TEST-MX-only ' . bin2hex(random_bytes(3)), null);
+        $pdo = \App\Config\Database::connection();
+        foreach (['ca_module_manage', 'manage_pricing'] as $k) {
+            $pdo->prepare('INSERT INTO role_permissions (role_id, permission_id, is_enabled) SELECT :r, id, 1 FROM permissions WHERE permission_key = :k')->execute(['r' => $roleId, 'k' => $k]);
+        }
+        $userId = $this->createTestUser('Admin');
+        $pdo->prepare('UPDATE users SET role_id = :r WHERE id = :u')->execute(['r' => $roleId, 'u' => $userId]);
+        $pdo->prepare('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)')->execute(['o' => $orderId, 'u' => $userId]);
+
+        $html = $this->render($userId, new \App\Controllers\CaController(), 'orderZohoCheck', [], ['id' => (string) $orderId]);
+        self::assertSame(404, http_response_code());
+        self::assertSame('Order not found.', $html);
+        http_response_code(200);
+        $html = $this->render($userId, new \App\Controllers\OrderController(), 'linePriceApproval', [], ['id' => (string) $orderId, 'productId' => (string) $lineId]);
+        self::assertSame(404, http_response_code());
+        self::assertStringNotContainsString('TEST-QA granite slab', $html);
+    }
 }

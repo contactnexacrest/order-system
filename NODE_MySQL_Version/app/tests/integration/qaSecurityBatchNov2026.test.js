@@ -141,4 +141,30 @@ describe('QA Nov 2026 security batch', () => {
       expect(Number((await db.queryOne('SELECT confirm_code_attempts AS n FROM associate_bank_accounts WHERE id = :id', { id: bankId })).n)).toBe(5);
     });
   });
+
+  describe('MTX-001 order sub-pages check that the user may open the order', () => {
+    it('MTX-001: a role with only ca_module_manage + manage_pricing, assigned to the order, gets 404 on its Zoho check and line price approval', async () => {
+      const { createTestClient, createTestOrder } = require('../support/fixtures');
+      const orderProductRepository = require('../../src/repositories/orderProductRepository');
+      const roleRepository = require('../../src/repositories/roleRepository');
+      const orderId = await createTestOrder(await createTestClient());
+      const lineId = await orderProductRepository.add(orderId, 1, 'TEST-QA granite slab', '60x30', 'Polished', '10', false, 'PCS', '250.00');
+      const roleId = await roleRepository.create(`TEST-MX-only ${crypto.randomBytes(3).toString('hex')}`, null);
+      for (const k of ['ca_module_manage', 'manage_pricing']) {
+        await db.execute('INSERT INTO role_permissions (role_id, permission_id, is_enabled) SELECT :r, id, 1 FROM permissions WHERE permission_key = :k', { r: roleId, k });
+      }
+      const u = await user('Admin');
+      await db.execute('UPDATE users SET role_id = :r WHERE id = :u', { r: roleId, u: u.id });
+      await db.execute('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)', { o: orderId, u: u.id });
+      const zoho = await u.agent.get(`/orders/${orderId}/zoho-check`);
+      expect(zoho.status).toBe(404);
+      const price = await u.agent.get(`/orders/${orderId}/products/${lineId}/price-approval`);
+      expect(price.status).toBe(404);
+      expect(price.text).not.toContain('TEST-QA granite slab');
+
+      // The MD (who may open the order) still sees the price-approval page.
+      const md = await user('Managing Director');
+      expect((await md.agent.get(`/orders/${orderId}/products/${lineId}/price-approval`)).status).toBe(200);
+    });
+  });
 });

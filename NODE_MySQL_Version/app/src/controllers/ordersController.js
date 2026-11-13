@@ -1077,7 +1077,8 @@ async function requestLinePriceApproval(req, res) {
 async function linePriceApproval(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const view = await require('../services/orderLinePricing').approvalView(orderId, parseInt(req.params.productId, 10));
-  if (!view) { // order access itself is checked for every /orders/:id path (sessionAuth)
+  // MTX-001: as PHP — besides the path guard (division + assignment), the user must be allowed to open orders at all.
+  if (!view || !(await orderAccessService.mayOpenOrderId(orderId, req.user.id, req.permissions))) {
     res.status(404).send('Order line not found.');
     return;
   }

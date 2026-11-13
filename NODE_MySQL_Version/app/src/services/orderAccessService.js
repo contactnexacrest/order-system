@@ -111,6 +111,16 @@ async function orderLinkChecker(userId, permissions) {
 }
 
 /**
+ * MTX-001 (QA 13 Nov 2026): port of PHP OrderAccessService::currentUserMayOpenOrderId —
+ * may this user open this one order (manage_orders or view_orders, plus the
+ * division, archived and assignment rules)? Pages that show part of an order
+ * outside its own page (the Zoho check, a line's price approval) use it.
+ */
+async function mayOpenOrderId(orderId, userId, permissions) {
+  return (await orderLinkChecker(userId, permissions))(Number(orderId));
+}
+
+/**
  * The archived and assignment rules alone (no page permission): whether a
  * record belonging to an order may appear in a list the user can open, e.g.
  * the Disputes and Complaints lists (QA Round 6, R6-N09).
@@ -158,4 +168,4 @@ function visibilitySql(userId, permissions, alias = 'o') {
   return { sql, params };
 }
 
-module.exports = { denialReason, missingRecordForPath, orderIdForPath, denialReasonForPath, orderLinkChecker, orderVisibilityChecker, visibleRows, visibilitySql };
+module.exports = { denialReason, missingRecordForPath, orderIdForPath, denialReasonForPath, orderLinkChecker, mayOpenOrderId, orderVisibilityChecker, visibleRows, visibilitySql };
