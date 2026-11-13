@@ -687,7 +687,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | Function | What it does |
 |---|---|
 | `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
-| `fieldError(el)` | D-348: a `required` drop-down still on its empty "Choose…" option with `data-required-message` shows that message (an order line's Thickness and Size / format). D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; SQM / SQFT thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, `data-min-exclusive="x"` (the number must be greater than x, with `data-min-exclusive-message`; `data-min-exclusive-unless="<checkbox>"` lifts it while that box is ticked — QA UI-011: New order and order-line Quantity must be more than 0 unless Qty To Be Confirmed), `data-max-product="<field>"` + `data-max-product-value="x"` (this number × that field of the form at most x, message `data-max-product-message` — QA HNT-L03: a Domestic Trade line's rate × quantity), bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
+| `fieldError(el)` | D-348: a `required` drop-down still on its empty "Choose…" option with `data-required-message` shows that message (an order line's Thickness and Size / format). D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; SQM / SQFT thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, `data-min-exclusive="x"` (the number must be greater than x, with `data-min-exclusive-message`; `data-min-exclusive-unless="<checkbox>"` lifts it while that box is ticked — QA UI-011: New order and order-line Quantity must be more than 0 unless Qty To Be Confirmed), `data-max-product="<field>"` + `data-max-product-value="x"` (this number × that field of the form at most x, message `data-max-product-message` — QA HNT-L03: a Domestic Trade line's rate × quantity), `data-confirm-above='{"<unit>": level, …}'` + `data-confirm-unit="<unit field>"` (+ `data-confirm-unless="<checkbox>"`, `data-confirm-message` with `{unit}`) — owner decision item 10a: above the level of the unit chosen or typed in the same row / form, the row's `[data-confirm-tick]` box ("I confirm this quantity") must be ticked; `initConfirmAbove()` shows that box only while needed and copies its tick into a hidden field named by `data-confirm-tick` (New Order rows), bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
 | `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
 | `initReasonFieldValidation()` | Reason fields need meaningful text (10 characters, or the field's own `minlength`). By default a grey "Must be at least 10 characters." hint shows under the field from the start; a field with `data-reason-hint="on-error"` (compact inline boxes, e.g. Reject / Cancel Send on Email Send Approvals, D-269) shows no hint and only the red error ("Reason must be at least 10 characters (n so far).") on blur or submit. |
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
@@ -2337,9 +2337,31 @@ reported as lost.
   new order at Stage 1; nothing from the source's history. Each line is the
   same full copy as a line's Duplicate (D-272) and is price-checked at once
   (`OrderLinePricing::afterSave`), so a line below its lowest goes to the MD.
-- **Quantity limit (QA HNT-011, 13 Nov 2026)**: one line's quantity can be at
-  most 10,000,000 (`OrderLineValidator::MAX_QUANTITY`, also the quantity
-  fields' `data-max-value`) on New Order, + Add product and Edit line.
+- **Quantity limits (owner decision item 10a, 13 Nov 2026; replaces the
+  HNT-011 cap of 10,000,000)**, on New Order, + Add product and Edit line, both
+  stacks, server and browser alike:
+  1. **Hard block**: one line's quantity can be at most 1,000,000 in any unit
+     (`OrderLineValidator::MAX_QUANTITY`, also the quantity fields'
+     `data-max-value="1000000"`) — "quantity can be at most 1,000,000".
+  2. **Confirm above about 20 containers of the unit**: above the level of the
+     line's unit the line saves only with the tick box **I confirm this
+     quantity** (`confirm_large_quantity`; New Order: one hidden
+     `product_confirm_large_quantity[]` per row, set by the box). Without it:
+     "This is unusually large for one line (more than about 20 containers of
+     <unit>). Check the quantity, or tick 'I confirm this quantity' to save it."
+     Levels (Settings › Orders, Admin / MD, 1 to 1,000,000):
+     `quantity_warning_level_sqm` 30,000 (SQM, M2), `_sqft` 300,000,
+     `_cbm` 500, `_ton` 600 (TON, MT), `_pcs` 600,000 (PCS, NOS), `_rmt` 60,000.
+     Other units (BOX, SET, KG, MTR …) have only the hard block; a TBC quantity
+     is never checked. The unit's kind comes from `LineUnits::canonical()`.
+     The box shows only while the quantity is above its level (app.js
+     `data-confirm-above` / `data-confirm-unit` / `data-confirm-tick`, one
+     generic rule in `fieldError()`); a saved line above its level opens ticked
+     in Edit line. Each confirmation is audited `LARGE_QUANTITY_CONFIRMED`
+     (who, line, quantity and unit, the level passed) — on Edit line only when
+     the quantity or unit changed. Code: `App\Services\QuantityLimits` /
+     `services/quantityLimits.js`. Domestic Trade lines follow the same rule (§ on
+     Domestic Trade).
 - **Unit price 0 (owner decision HNT-011, item 8 option A, 13 Nov 2026)**: a price typed as 0 is stored as 0.00 (line value 0.00, free of charge) on both stacks — documents print 0.00 and the line goes to Zoho at rate 0; only a blank price means "no price yet" (NULL, "To Be Confirmed", the invoice is held back). `OrderLineValidator::priceInput()` / `priceInput()` on every line save (New Order, + Add product, Edit line, reorder lines, repository); a Products goods line at 0 is below its minimum and refused (D-245), service / charge lines are not price-checked.
 - **Duplicate a line (D-272, owner point 24)**: an exact copy placed right
   below the original (later lines move down one `line_no`), marked "copy of
@@ -4413,7 +4435,8 @@ Example: FOB USD 20,000, milestone 2 = 30 % "on loading" → planned USD 6,000; 
 - **Same state** (seller's GST state code = place of supply): **CGST + SGST**, each half the rate.
 - **Other state**: **IGST** at the full rate.
 - Per line: taxable = quantity (3 decimals) × rate (2 decimals), rounded to the paisa; each tax rounded to the paisa, half away from zero. Totals are sums of lines. An HSN summary groups by HSN + rate.
-- **Limits of a line (QA HNT-L03, 13 Nov 2026), both stacks, server and browser:** quantity at most 1,00,00,000; the line value (quantity × rate) at most ₹9,99,99,99,99,999.99; and a line is refused when the invoice total (with GST, rounded to the rupee) would pass ₹9,99,99,99,99,999.99 — the same 999999999999.99 as every other amount. Before, PHP's integer maths overflowed (HTTP 500) on extreme lines where Node worked them out. Add line form: Quantity `max="10000000"`, Rate `max="99999999999.99"` with `data-max-product="quantity"`.
+- **Limits of a line (QA HNT-L03, 13 Nov 2026), both stacks, server and browser:** quantity at most 10,00,000 (owner decision item 10a: the hard block of 1,000,000 in any unit, as for export order lines); the line value (quantity × rate) at most ₹9,99,99,99,99,999.99; and a line is refused when the invoice total (with GST, rounded to the rupee) would pass ₹9,99,99,99,99,999.99 — the same 999999999999.99 as every other amount. Before, PHP's integer maths overflowed (HTTP 500) on extreme lines where Node worked them out. Add line form: Quantity `max="1000000"` / `data-max-value="1000000"`, Rate `max="99999999999.99"` with `data-max-product="quantity"`.
+- **Large quantity (owner decision item 10a, 13 Nov 2026):** above about 20 containers of the typed unit (the levels in Settings › Orders: SQM 30,000, SQFT 300,000, CBM 500, TON 600, PCS 600,000, RMT 60,000; the unit as typed, e.g. "sqm", "MT", "NOS", is matched to its kind) a line is added only with **I confirm this quantity** ticked; the message and the audit row (`LARGE_QUANTITY_CONFIRMED`, on the order) are the same as for export order lines. Other units: only the hard block.
 - **Round-off**: the invoice total is rounded to the rupee; the difference is the "round off" line.
 - GSTIN check: format plus the base-36 check character (`isValidGstin`).
 - Rates: Settings › Lists › GST rates (`gst_rates`, seed HSN 6802 = 18 %); DOM default `dom_default_gst_rate` 18. To be confirmed by the CA.
@@ -4877,7 +4900,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 | Shipping | `bl_type_instruction`, `bl_consignee_instruction` ("TO ORDER OF {company}") — protected |
 | Formats (protected) | `master_tracking_ref_format` NC/SC/{YY}/{DDMM}{NNN}, `order_ref_format` NC/SC/ORD/{YY}/{DDMM}{NNN} |
 | Disputes | `dispute_response_days_n` 10 (working days), `weekly_off_days` sunday |
-| Workflow / orders | `wet_signature_required_buyer_po` 1, `wet_signature_required_supplier_po` 1, `oc_ack_override_restricted` 0, `oc_ack_auto_confirm_hours` 48, `lead_time_display_unit` days |
+| Workflow / orders | `wet_signature_required_buyer_po` 1, `wet_signature_required_supplier_po` 1, `oc_ack_override_restricted` 0, `oc_ack_auto_confirm_hours` 48, `lead_time_display_unit` days; large-quantity levels (item 10a, Settings › Orders, 1 to 1,000,000) `quantity_warning_level_sqm` 30000, `_sqft` 300000, `_cbm` 500, `_ton` 600, `_pcs` 600000, `_rmt` 60000 |
 | Clients | `client_impersonation_enabled` 0, `client_portal_show_order_history` 1, `client_portal_show_document_downloads` 1 |
 | Compliance | `ecgc_policy_no` (empty), `ecgc_policy_cover_pct` 90, `ecgc_policy_valid_to` (empty), `ecgc_declaration_day` 10, `benefit_deadline_days_rodtep` 365, `_rosctl` 365, `_duty_drawback` 0, `_other` 0 |
 | System | `storage_base_path` — documentation only; the app reads `.env` |

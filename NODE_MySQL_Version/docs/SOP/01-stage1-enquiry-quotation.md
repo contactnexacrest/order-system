@@ -539,6 +539,22 @@ the number of pieces. The server works the quantity out again when you save;
 without the pieces the line is refused: *Product line: enter the No. of pieces —
 with the size given, the quantity is worked out from the pieces.*
 
+**How large a quantity can be (owner decision, 13 Nov 2026).** One line's
+**Qty** can be at most **1,000,000** in any unit — a larger number is a typing
+slip and is refused: *quantity can be at most 1,000,000*. Below that, a
+quantity above about **20 containers** of its unit needs a second look: SQM
+above 30,000, SQFT above 300,000, CBM above 500, TON (MT) above 600, PCS (NOS)
+above 600,000 or RMT above 60,000. As soon as you type such a quantity the box
+**I confirm this quantity** appears under the Qty, with the message *This is
+unusually large for one line (more than about 20 containers of SQM). Check the
+quantity, or tick 'I confirm this quantity' to save it.* Check the number; if it
+is right, tick the box and save. The tick is written to the Audit Log (who,
+which line, quantity and unit). This works the same on **New Order** (one box
+per line), **+ Add product** and **Edit line** (a saved large line opens with
+the box already ticked). Other units (BOX, SET, KG …) have only the 1,000,000
+limit. The Admin or MD can change the six levels in **Settings › Orders**
+("Large quantity: confirm a line above … SQM" and so on).
+
 **A line without sizes** (CBM-only or SQM-only quote, random blocks): leave
 Length / Width empty and **No. of pieces** empty, type the **Qty** as before, and
 use **Size note** for what the buyer should read under the line (e.g. "Random

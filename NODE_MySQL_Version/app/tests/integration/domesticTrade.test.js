@@ -344,29 +344,63 @@ describe('D-257 Phase 2 — Domestic Trade', () => {
    * worked it out. Now on both stacks: quantity at most 1,00,00,000, the line value (quantity ×
    * rate) and the invoice total at most ₹9,99,99,99,99,999.99. PHP: DomesticTradeTest.php.
    */
+  /**
+   * Owner decision item 10a (13 Nov 2026): a Domestic Trade line follows the same two levels as an
+   * export order line — refused above 10,00,000 in any unit, and above about 20 containers of its
+   * unit (SQM 30,000 … settings) saved only with "I confirm this quantity" ticked, which is audited.
+   * PHP: DomesticTradeTest::testItem10aQuantityLimits.
+   */
+  it('item 10a: the hard block and the per-unit confirmation on a Domestic Trade line', async () => {
+    const orderId = await domOrder();
+    const line = (quantity, unit, more = {}) => ({ description: 'Granite item 10a', hsn_code: '6802', quantity, unit, rate_inr: '10', gst_rate_pct: '18', ...more });
+    const add = (l) => step(() => D.addLine(orderId, l, domStaff.id));
+    const from = Number((await db.queryOne('SELECT COALESCE(MAX(id), 0) AS m FROM audit_log')).m);
+
+    expect(await add(line('1000000.001', 'BOX', { confirm_large_quantity: '1' }))).toBe('The quantity can be at most 10,00,000.');
+    expect(await add(line('30000.5', 'sqm'))).toBe("This is unusually large for one line (more than about 20 containers of SQM). Check the quantity, or tick 'I confirm this quantity' to save it.");
+    expect(await add(line('501', 'CBM'))).toBe("This is unusually large for one line (more than about 20 containers of CBM). Check the quantity, or tick 'I confirm this quantity' to save it.");
+    expect(await repo.lines(orderId)).toEqual([]);
+    expect(await add(line('30000', 'SQM'))).toBeNull();
+    expect(await add(line('1000000', 'BOX'))).toBeNull();
+    expect(await add(line('501', 'CBM', { confirm_large_quantity: '1' }))).toBeNull();
+    expect(await repo.lines(orderId)).toHaveLength(3);
+    const audit = await db.query("SELECT entity_type, entity_id, new_value FROM audit_log WHERE action_type = 'LARGE_QUANTITY_CONFIRMED' AND id > :f", { f: from });
+    expect(audit.map((a) => [a.entity_type, Number(a.entity_id), a.new_value])).toEqual([['orders', Number(orderId), '501 CBM']]);
+
+    const page = (await (await loginAs(domStaff)).get(`/orders/${orderId}`)).text;
+    expect(page).toMatch(/name="quantity"[^>]*max="1000000" data-max-value="1000000"[^>]*data-confirm-above="\{[^"]*&quot;SQM&quot;:30000[^"]*\}" data-confirm-unit="unit" data-confirm-message="This is unusually large/);
+    expect(page).toContain('<input type="checkbox" name="confirm_large_quantity" value="1" data-confirm-tick=""> I confirm this quantity</label>');
+  });
+
   it('HNT-L03: extreme line amounts are refused alike on both stacks, in the browser too', async () => {
     const orderId = await domOrder();
-    const line = (quantity, rate, gst = '18') => ({ description: 'Granite', hsn_code: '6802', quantity, unit: 'SQM', rate_inr: rate, gst_rate_pct: gst });
+    // Item 10a: a unit without a large-quantity level (BOX), so only the hard limits apply here.
+    const line = (quantity, rate, gst = '18') => ({ description: 'Granite', hsn_code: '6802', quantity, unit: 'BOX', rate_inr: rate, gst_rate_pct: gst });
     const add = (l) => step(() => D.addLine(orderId, l, domStaff.id));
 
-    expect(await add(line('99999999.999', '9999999.99'))).toBe('The quantity can be at most 1,00,00,000.');
-    expect(await add(line('10000000', '99999999999'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
-    expect(await add(line('10000000', '100000'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
+    expect(await add(line('99999999.999', '9999999.99'))).toBe('The quantity can be at most 10,00,000.');
+    expect(await add(line('1000000', '99999999999'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
+    expect(await add(line('1000000', '1000000'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
     expect(await repo.lines(orderId)).toEqual([]);
     expect((await D.totals(orderId)).invoice_total).toBe('0.00');
 
-    expect(await add(line('10000000', '99999.99', '0'))).toBeNull();
-    expect((await D.totals(orderId)).invoice_total).toBe('999999900000.00');
+    expect(await add(line('1000000', '999999.99', '0'))).toBeNull();
+    expect((await D.totals(orderId)).invoice_total).toBe('999999990000.00');
     expect(await add(line('1', '100000'))).toBe('With this line the invoice total would be more than ₹9,99,99,99,99,999.99.');
-    expect(await add(line('1', '99999.49', '0'))).toBeNull();
+    expect(await add(line('1', '9999.49', '0'))).toBeNull();
     expect((await D.totals(orderId)).invoice_total).toBe('999999999999.00');
     expect(await repo.lines(orderId)).toHaveLength(2);
 
     // The browser checks the same limits before the form is sent (same tags on both stacks).
     const page = (await (await loginAs(domStaff)).get(`/orders/${orderId}`)).text;
-    expect(page).toMatch(/name="quantity"[^>]*max="10000000"/);
+    expect(page).toMatch(/name="quantity"[^>]*max="1000000"/);
     expect(page).toMatch(/name="rate_inr"[^>]*max="99999999999.99"[^>]*data-max-product="quantity"[^>]*data-max-product-value="999999999999.99"/);
-    const tag = (text, name) => text.match(new RegExp(`<input type="number" name="${name}"[^>]*>`))[0];
+    // Item 10a: the quantity's per-unit attributes are filled in by each stack's template, so the tags
+    // are compared up to step="…" (rendered alike: quantityLimitsItem10a / DomesticTradeTest).
+    const tag = (text, name) => {
+      const t = text.match(new RegExp(`<input type="number" name="${name}"[^>]*>`))[0];
+      return name === 'quantity' ? t.slice(0, t.indexOf('step="0.001"') + 12) : t;
+    };
     const phpView = fs.readFileSync(`${__dirname}/../../../../PHP_MySQL_Version/app/views/domestic/show.php`, 'utf8');
     const nodeView = fs.readFileSync(`${__dirname}/../../views/domestic/show.njk`, 'utf8');
     for (const name of ['quantity', 'rate_inr']) expect(tag(phpView, name)).toBe(tag(nodeView, name));

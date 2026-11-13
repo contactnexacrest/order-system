@@ -166,7 +166,11 @@
           </label>
           {# Owner decision D-339: No. of pieces — with the size given in CBM / SQM / SQFT the Qty is worked out from it (PCS: the Qty is the pieces). #}
           <label>No. of pieces<input type="text" inputmode="numeric" name="product_pieces_count[]" data-pieces-count maxlength="7" value="{{ old.product_pieces_count[loop.index0] or '' if old.product_pieces_count else '' }}" placeholder="e.g. 25"></label>
-          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="10000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          {# Owner decision item 10a: at most 1,000,000 in any unit; above about 20 containers of the unit only with "I confirm this quantity" (app.js and the server). #}
+          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="1000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." data-confirm-above="{{ qtyLevels | dump }}" data-confirm-unit="product_unit[]" data-confirm-message="{{ qtyMessage }}" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          {% set confirmQty = (old.product_confirm_large_quantity[loop.index0] == '1') if old.product_confirm_large_quantity else false %}
+          <input type="hidden" name="product_confirm_large_quantity[]" value="{{ '1' if confirmQty else '0' }}">
+          <label class="checkbox-row" data-confirm-tick-box><input type="checkbox" data-confirm-tick="product_confirm_large_quantity[]" {{ 'checked' if confirmQty else '' }}> I confirm this quantity</label>
           <label>Size note <small class="muted">(only when no size is given)</small><input type="text" name="product_size_note[]" maxlength="200" value="{{ old.product_size_note[loop.index0] or '' if old.product_size_note else '' }}" placeholder="e.g. Random sizes, as available"></label>
           <label>Unit
             {% set unitVal = (old.product_unit[loop.index0] or '') if old.product_unit else '' %}
@@ -302,6 +306,9 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   var rows = document.getElementById('product-rows');
   var clone = (rows.firstElementChild || productRowTemplate).cloneNode(true);
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+  // Item 10a: a new row starts without "I confirm this quantity".
+  clone.querySelectorAll('[data-confirm-tick]').forEach(function (el) { el.checked = false; });
+  clone.querySelectorAll('[name="product_confirm_large_quantity[]"]').forEach(function (el) { el.value = '0'; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   // D-271 (point 13): a new row starts without the first row's options.

@@ -173,7 +173,11 @@
           </label>
           <?php // Owner decision D-339: No. of pieces — with the size given in CBM / SQM / SQFT the Qty is worked out from it (PCS: the Qty is the pieces). ?>
           <label>No. of pieces<input type="text" inputmode="numeric" name="product_pieces_count[]" data-pieces-count maxlength="7" value="<?= htmlspecialchars((string) ($old['product_pieces_count'][$__i] ?? '')) ?>" placeholder="e.g. 25"></label>
-          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="10000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          <?php // Owner decision item 10a: at most 1,000,000 in any unit; above about 20 containers of the unit only with "I confirm this quantity" (app.js and the server). ?>
+          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="1000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0."<?= \App\Services\QuantityLimits::fieldAttributes('product_unit[]') ?> value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          <?php $__confirmQty = (string) ($old['product_confirm_large_quantity'][$__i] ?? '') === '1'; ?>
+          <input type="hidden" name="product_confirm_large_quantity[]" value="<?= $__confirmQty ? '1' : '0' ?>">
+          <label class="checkbox-row" data-confirm-tick-box><input type="checkbox" data-confirm-tick="product_confirm_large_quantity[]" <?= $__confirmQty ? 'checked' : '' ?>> I confirm this quantity</label>
           <label>Size note <small class="muted">(only when no size is given)</small><input type="text" name="product_size_note[]" maxlength="200" value="<?= htmlspecialchars((string) ($old['product_size_note'][$__i] ?? '')) ?>" placeholder="e.g. Random sizes, as available"></label>
           <label>Unit
             <select name="product_unit[]">
@@ -309,6 +313,9 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   var rows = document.getElementById('product-rows');
   var clone = (rows.firstElementChild || productRowTemplate).cloneNode(true);
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+  // Item 10a: a new row starts without "I confirm this quantity".
+  clone.querySelectorAll('[data-confirm-tick]').forEach(function (el) { el.checked = false; });
+  clone.querySelectorAll('[name="product_confirm_large_quantity[]"]').forEach(function (el) { el.value = '0'; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   // D-271 (point 13): a new row starts without the first row's options.

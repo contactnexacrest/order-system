@@ -79,6 +79,8 @@ async function pageData(order, permissions) {
   const importRepository = require('../repositories/importRepository');
   const importService = require('../services/importService');
   return {
+    qtyLevels: await require('../services/quantityLimits').browserLevels(), // item 10a
+    qtyMessage: require('../services/quantityLimits').MESSAGE,
     isImp,
     stockProducts: isImp ? (await importRepository.stockOnHand([Number(order.division_id)])).map((r) => ({ ...r, qty_trim: String(r.qty_on_hand).replace(/\.?0+$/, '') })) : [],
     stockIssues: isImp ? await importService.stockShortfalls(Number(order.division_id), await repo.lines(orderId)) : [],

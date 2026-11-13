@@ -19,6 +19,7 @@ const flash = require('../helpers/flash');
 const fieldValidator = require('../helpers/fieldValidator');
 const remittanceInr = require('../services/remittanceInr');
 const orderLineValidator = require('../helpers/orderLineValidator');
+const quantityLimits = require('../services/quantityLimits');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
 const amendmentRepository = require('../repositories/amendmentRepository');
@@ -414,6 +415,8 @@ async function create(req, res) {
   res.renderView(
     'orders/create',
     {
+      qtyLevels: await quantityLimits.browserLevels(), // item 10a
+      qtyMessage: quantityLimits.MESSAGE,
       // Owner decision (2 Nov 2026, Q-6b): soft ECGC warning for a pre-selected buyer.
       ecgcNew: await (async () => {
         const cid = parseInt(old.client_id || preselectedClientId || 0, 10) || 0;
@@ -566,9 +569,13 @@ async function store(req, res) {
     const quantitiesInput = [].concat(body.product_quantity || []);
     const unitPricesInput = [].concat(body.product_unit_price || []);
     const quantityTbcInput = body.product_quantity_tbc || {};
+    const unitsInput = [].concat(body.product_unit || []);
+    const confirmInput = [].concat(body[`product_${quantityLimits.TICK}`] || []);
     for (let i = 0; i < descriptions.length; i++) {
       if (str(descriptions[i]) === '') continue;
-      const quantityError = orderLineValidator.checkLine(quantitiesInput[i], !!quantityTbcInput[i], unitPricesInput[i]);
+      const quantityError = orderLineValidator.checkLine(quantitiesInput[i], !!quantityTbcInput[i], unitPricesInput[i])
+        // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+        || await quantityLimits.check(str(quantitiesInput[i]), str(unitsInput[i]), !!quantityTbcInput[i], str(confirmInput[i]) === '1');
       if (quantityError) {
         flash.set(req, 'error', `Product line ${i + 1}: ${quantityError}`);
         flash.setOld(req, body);
@@ -649,6 +656,7 @@ async function store(req, res) {
   // property in general: any failure anywhere in this block rolls back the
   // order row itself along with everything else.
   const createdLineIds = [];
+  const createdLarge = [];
   const createdSpecs = [];
   const createdSizes = [];
   const createdPieces = []; // D-339
@@ -735,6 +743,8 @@ async function store(req, res) {
       await orderProductRepository.setCatalogProduct(lineId, pickedIds[i] || null, trx);
       if (str(unitPrices[i]) !== '') await orderProductRepository.setPriceSetBy(lineId, user.id, trx);
       createdLineIds.push(lineId);
+      // Owner decision item 10a: a confirmed large quantity is audited (after the order is saved).
+      if (await quantityLimits.isLarge(str(quantities[i]), str(units[i]), quantityIsTbc)) createdLarge.push([lineId, description, str(quantities[i]), str(units[i])]);
       createdSpecs.push(rowSels[i] !== undefined ? rowSels[i] : require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
       createdSizes.push(rowSizes[i] || {});
       createdPieces.push(rowPieces[i] || [null, null, null]);
@@ -752,6 +762,7 @@ async function store(req, res) {
     await orderProductRepository.setPieces(createdLineIds[k], (createdPieces[k] || [])[0] ?? null, (createdPieces[k] || [])[1] ?? null);
   }
   for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
+  for (const [lineId, lineText, qty, unit] of createdLarge) await quantityLimits.audit(user.id, 'order_products', lineId, lineText, qty, unit);
 
   // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
   if (await paymentTermsApprovalService.isPending(orderId)) {
@@ -1295,7 +1306,9 @@ async function addProduct(req, res) {
   }
 
   // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
-  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price));
+  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price))
+    // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+    || await quantityLimits.check(str(body.quantity), str(body.unit), !!body.quantity_is_tbc, !!body[quantityLimits.TICK]);
   if (lineError) {
     flash.set(req, 'error', `Product line: ${lineError}`);
     res.redirect(`/orders/${orderId}`);
@@ -1342,6 +1355,10 @@ async function addProduct(req, res) {
     hsCode
   );
   await orderProductRepository.setLineType(newLineId, lineType, sacCode);
+  // Owner decision item 10a: a confirmed large quantity is audited.
+  if (await quantityLimits.isLarge(str(body.quantity), str(body.unit), !!body.quantity_is_tbc)) {
+    await quantityLimits.audit(req.user.id, 'order_products', newLineId, description, str(body.quantity), str(body.unit));
+  }
   await require('../repositories/productCategoryRepository').setLineCategory(newLineId, categoryId, attributeValues);
   // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
   await orderProductRepository.setCatalogProduct(newLineId, await catalogProductInput(body.catalog_product_id));
@@ -1408,7 +1425,9 @@ async function updateProduct(req, res) {
   }
 
   // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
-  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price));
+  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price))
+    // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+    || await quantityLimits.check(str(body.quantity), str(body.unit), !!body.quantity_is_tbc, !!body[quantityLimits.TICK]);
   if (lineError) {
     flash.set(req, 'error', `Product line: ${lineError}`);
     res.redirect(`/orders/${orderId}`);
@@ -1468,6 +1487,11 @@ async function updateProduct(req, res) {
     hsCode
   );
   await orderProductRepository.setLineType(productId, lineType, sacCode);
+  // Owner decision item 10a: a confirmed large quantity is audited when the quantity or unit changed.
+  if (await quantityLimits.isLarge(str(body.quantity), str(body.unit), !!body.quantity_is_tbc)
+    && (Math.abs(Number(product.quantity || 0) - Number(str(body.quantity))) > 0.0005 || String(product.unit || '').toUpperCase() !== str(body.unit).toUpperCase() || !!product.quantity_is_tbc)) {
+    await quantityLimits.audit(req.user.id, 'order_products', productId, description, str(body.quantity), str(body.unit));
+  }
   await require('../repositories/productCategoryRepository').setLineCategory(productId, categoryId, attributeValues);
   // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
   if (Object.prototype.hasOwnProperty.call(body, 'catalog_product_id')) {
@@ -1841,6 +1865,8 @@ async function show(req, res) {
   res.renderView(
     'orders/show',
     {
+      qtyLevels: await quantityLimits.browserLevels(), // item 10a
+      qtyMessage: quantityLimits.MESSAGE,
       approvalBar, // D-310
       approvalWaiting, // D-310
       ciAnnexure: await require('../services/annexureChoice').ciStep(order), // D-336

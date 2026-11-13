@@ -33,6 +33,7 @@ async function index(req, res) {
     row.plainLabel = settingLabels.label(row.setting_key);
     row.plainHelp = settingLabels.help(row.setting_key, row.description);
     row.placeholder = settingLabels.placeholder(row.setting_key, row.value_type); // QA UI-012
+    row.range = settingValueValidator.RANGES[row.setting_key] || null; // item 10a: the browser's min / max
     (grouped[row.category] ||= []).push(row);
   }
   if (!zohoMailService.IN_USE) {

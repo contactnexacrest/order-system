@@ -30,6 +30,13 @@ final class SettingValueValidator
         'session_timeout_associate_minutes' => [5, 1440, 'minutes'],
         'session_absolute_staff_hours'      => [1, 24, 'hours'],
         'login_remember_browser_days'       => [0, 90, 'days'],
+        // Owner decision item 10a: the large-quantity levels (at most the 1,000,000 hard block).
+        'quantity_warning_level_sqm' => [1, 1000000, 'SQM'],
+        'quantity_warning_level_sqft' => [1, 1000000, 'SQFT'],
+        'quantity_warning_level_cbm' => [1, 1000000, 'CBM'],
+        'quantity_warning_level_ton' => [1, 1000000, 'TON'],
+        'quantity_warning_level_pcs' => [1, 1000000, 'PCS'],
+        'quantity_warning_level_rmt' => [1, 1000000, 'RMT'],
     ];
 
     /** @return string|null an error message if invalid, null if the value passes */

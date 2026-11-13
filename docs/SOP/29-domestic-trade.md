@@ -31,7 +31,7 @@ Staff working in Domestic Trade open **Orders › New order** and get the domest
 
 | Stage | What is done | To move on |
 |---|---|---|
-| **Enquiry** | Client, buyer's GSTIN and state, **place of supply** (the state the goods go to), delivery address, payment terms, buyer's PO. Add the lines: description, HSN, quantity, unit, rate in ₹, GST % (blank = from the GST rates). | At least one line |
+| **Enquiry** | Client, buyer's GSTIN and state, **place of supply** (the state the goods go to), delivery address, payment terms, buyer's PO. Add the lines: description, HSN, quantity, unit, rate in ₹, GST % (blank = from the GST rates). A line's quantity can be at most 10,00,000; above about 20 containers of its unit (SQM 30,000, SQFT 300,000, CBM 500, TON 600, PCS 600,000, RMT 60,000 — Settings › Orders) tick **I confirm this quantity** to add it (logged). | At least one line |
 | **Quotation** | *Generate quotation* (DOM/QT/26-27/0001). | Quotation generated |
 | **Order confirmation** | *Generate order confirmation* (DOM/OC/…). Payments can be recorded from here on. | Buyer's GSTIN entered (a reseller buys on its registration) and the confirmation generated |
 | **Purchase** | Supplier and supplier PO number (the purchase itself can use Procurement). | Supplier PO recorded |

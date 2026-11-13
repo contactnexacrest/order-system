@@ -355,15 +355,19 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         }
     }
 
-    /** HNT-011: a quantity above 10,000,000 is refused (99,999,999,999 x 10 was saved); 10,000,000 still passes. */
+    /**
+     * HNT-011: 99,999,999,999 x 10 was saved. Owner decision item 10a (13 Nov 2026) replaced the
+     * first cap of 10,000,000 with the hard block of 1,000,000 (QuantityLimitsItem10aTest has the
+     * per-unit confirmation): above 1,000,000 is refused, 1,000,000 still passes.
+     */
     public function testHnt011QuantitySanityLimit(): void
     {
-        self::assertStringContainsString('quantity can be at most 10,000,000', (string) \App\Helpers\OrderLineValidator::checkLine('99999999999', false, '10'));
-        self::assertNotNull(\App\Helpers\OrderLineValidator::checkLine('10000000.001', false, '1'));
-        self::assertNull(\App\Helpers\OrderLineValidator::checkLine('10000000', false, '1'));
+        self::assertStringContainsString('quantity can be at most 1,000,000', (string) \App\Helpers\OrderLineValidator::checkLine('99999999999', false, '10'));
+        self::assertNotNull(\App\Helpers\OrderLineValidator::checkLine('1000000.001', false, '1'));
+        self::assertNull(\App\Helpers\OrderLineValidator::checkLine('1000000', false, '1'));
         self::assertNull(\App\Helpers\OrderLineValidator::checkLine('', true, '10'));
         foreach (['orders/_products_table.php', 'orders/create.php'] as $view) {
-            self::assertStringContainsString('data-max-value="10000000"', (string) file_get_contents(__DIR__ . '/../../views/' . $view));
+            self::assertStringContainsString('data-max-value="1000000"', (string) file_get_contents(__DIR__ . '/../../views/' . $view));
         }
     }
 

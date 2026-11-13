@@ -80,12 +80,13 @@ final class DomesticOrderService
 
     /**
      * HNT-L03 (QA 13 Nov 2026): the limits of one line, as for export order lines
-     * (OrderLineValidator): quantity at most 1,00,00,000 (in thousandths here), and
+     * (OrderLineValidator): quantity at most 10,00,000 (in thousandths here; owner decision
+     * item 10a, 13 Nov 2026: the hard block is 1,000,000 in any unit), and
      * the line value and the invoice total at most 999999999999.99 (in paise). Without
      * them quantity × rate could pass what PHP's whole numbers hold and the GST maths
      * failed (HTTP 500) where Node worked it out.
      */
-    public const MAX_LINE_QUANTITY_MILLI = 10000000000;
+    public const MAX_LINE_QUANTITY_MILLI = 1000000000;
     public const MAX_AMOUNT_PAISE = 99999999999999;
 
     public static function divisionId(string $code = self::CODE): ?int
@@ -332,8 +333,10 @@ final class DomesticOrderService
             $description === '' || mb_strlen($description) > 500 => 'Enter what is sold (up to 500 characters).',
             strlen($hsn) < 4 || strlen($hsn) > 8 => 'Enter the HSN code (4 to 8 digits).',
             preg_match('/^\d{1,10}(\.\d{1,3})?$/', $qty) !== 1 || GstCalculator::scaled($qty, 3) <= 0 => 'Enter a quantity above zero (up to 3 decimals).',
-            GstCalculator::scaled($qty, 3) > self::MAX_LINE_QUANTITY_MILLI => 'The quantity can be at most 1,00,00,000.', // HNT-L03
+            GstCalculator::scaled($qty, 3) > self::MAX_LINE_QUANTITY_MILLI => 'The quantity can be at most 10,00,000.', // HNT-L03, item 10a
             $unit === '' || mb_strlen($unit) > 20 => 'Enter the unit (e.g. SQM, PCS).',
+            // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+            ($large = QuantityLimits::check($qty, $unit, false, !empty($in[QuantityLimits::TICK]))) !== null => $large,
             preg_match('/^\d{1,11}(\.\d{1,2})?$/', $rate) !== 1 || GstCalculator::scaled($rate, 2) <= 0 => 'Enter the rate in ₹ above zero (up to 2 decimals).',
             // HNT-L03: quantity × rate, rounded to the paisa, at most MAX_AMOUNT_PAISE — checked
             // as rate ≤ limit ÷ quantity, so the check itself never multiplies past PHP_INT_MAX.
@@ -366,6 +369,9 @@ final class DomesticOrderService
             'gst_rate_pct' => $gstPct,
         ], $userId);
         AuditLogRepository::log($userId, 'DOMESTIC_LINE_ADDED', 'orders', $orderId, 'line', null, $description);
+        if (QuantityLimits::isLarge($qty, $unit)) {
+            QuantityLimits::audit($userId, 'orders', $orderId, $description, $qty, mb_strtoupper($unit));
+        }
         return null;
     }
 

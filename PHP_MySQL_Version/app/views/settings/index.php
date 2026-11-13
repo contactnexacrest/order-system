@@ -136,7 +136,8 @@
             <?php else: ?>
               <input
                 type="<?= $row['value_type'] === 'number' ? 'number' : 'text' ?>"
-                <?= $row['value_type'] === 'number' ? 'min="0" step="any"' : '' ?>
+                <?php $__range = \App\Helpers\SettingValueValidator::RANGES[(string) $row['setting_key']] ?? null; // item 10a: the browser's min / max ?>
+                <?= $row['value_type'] === 'number' ? ($__range !== null ? 'min="' . $__range[0] . '" max="' . $__range[1] . '" step="1"' : 'min="0" step="any"') : '' ?>
                 name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
                 data-key="<?= htmlspecialchars($row['setting_key']) ?>"
                 value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"

@@ -127,7 +127,7 @@
             {% else %}
               <input
                 type="{{ 'number' if row.value_type == 'number' else 'text' }}"
-                {{ 'min="0" step="any"' | safe if row.value_type == 'number' }}
+                {% if row.value_type == 'number' %}{% if row.range %}min="{{ row.range[0] }}" max="{{ row.range[1] }}" step="1"{% else %}min="0" step="any"{% endif %}{% endif %}
                 name="settings[{{ row.setting_key }}]"
                 data-key="{{ row.setting_key }}"
                 value="{{ row.setting_value or '' }}"

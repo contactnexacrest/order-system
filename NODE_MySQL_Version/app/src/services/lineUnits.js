@@ -50,6 +50,11 @@ function canonical(unit) {
   return null;
 }
 
+/** Every way of writing a unit of this kind (item 10a: the browser's quantity levels). */
+function names(kind) {
+  return ALIASES[kind] ? ALIASES[kind].slice() : [];
+}
+
 /** "piece", "CBM" … for messages; the unit as written when it has no kind. */
 function label(unit) {
   const c = canonical(unit);
@@ -176,5 +181,5 @@ function size(v) {
 
 module.exports = {
   SQFT_PER_M2, CONTAINER_CBM, STONE_T_PER_CBM, SIZE_FIELDS,
-  canonical, label, factor, cbmPerUnit, containers, missingMessage, dimensionsText, num, readSize, size,
+  canonical, names, label, factor, cbmPerUnit, containers, missingMessage, dimensionsText, num, readSize, size,
 };

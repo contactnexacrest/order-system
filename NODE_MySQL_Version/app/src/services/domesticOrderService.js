@@ -7,6 +7,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const repo = require('../repositories/domesticOrderRepository');
 const G = require('./gstCalculator');
+const quantityLimits = require('./quantityLimits');
 
 const divisionService = () => require('./divisionService');
 const orderRepository = () => require('../repositories/orderRepository');
@@ -42,10 +43,11 @@ const orderRepository = () => require('../repositories/orderRepository');
 
 const CODE = 'DOM';
 // HNT-L03 (QA 13 Nov 2026): the limits of one line, as for export order lines
-// (orderLineValidator): quantity at most 1,00,00,000 (in thousandths here), and the
+// (orderLineValidator): quantity at most 10,00,000 (in thousandths here; owner decision item
+// 10a, 13 Nov 2026: the hard block is 1,000,000 in any unit), and the
 // line value and the invoice total at most 999999999999.99 (in paise). PHP's GST
 // maths failed (HTTP 500) past its whole-number range; both stacks now refuse alike.
-const MAX_LINE_QUANTITY_MILLI = 10000000000n;
+const MAX_LINE_QUANTITY_MILLI = 1000000000n;
 const MAX_AMOUNT_PAISE = 99999999999999n;
 
 /** D-257 Phase 3: the divisions that sell in India with this order (Domestic Trade, and Import & Distribution from stock). */
@@ -265,11 +267,14 @@ async function addLine(orderId, input, userId) {
   const rate = String(input.rate_inr === undefined || input.rate_inr === null ? '' : input.rate_inr).trim();
   const gst = String(input.gst_rate_pct === undefined || input.gst_rate_pct === null ? '' : input.gst_rate_pct).trim();
   let error = null;
+  let large = null;
   if (description === '' || len(description) > 500) error = 'Enter what is sold (up to 500 characters).';
   else if (hsn.length < 4 || hsn.length > 8) error = 'Enter the HSN code (4 to 8 digits).';
   else if (!/^\d{1,10}(\.\d{1,3})?$/.test(qty) || G.scaled(qty, 3) <= 0n) error = 'Enter a quantity above zero (up to 3 decimals).';
-  else if (G.scaled(qty, 3) > MAX_LINE_QUANTITY_MILLI) error = 'The quantity can be at most 1,00,00,000.'; // HNT-L03
+  else if (G.scaled(qty, 3) > MAX_LINE_QUANTITY_MILLI) error = 'The quantity can be at most 10,00,000.'; // HNT-L03, item 10a
   else if (unit === '' || len(unit) > 20) error = 'Enter the unit (e.g. SQM, PCS).';
+  // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+  else if ((large = await quantityLimits.check(qty, unit, false, !!input[quantityLimits.TICK])) !== null) error = large;
   else if (!/^\d{1,11}(\.\d{1,2})?$/.test(rate) || G.scaled(rate, 2) <= 0n) error = 'Enter the rate in ₹ above zero (up to 2 decimals).';
   // HNT-L03: quantity × rate, rounded to the paisa, at most MAX_AMOUNT_PAISE (the same test as PHP's).
   else if (G.scaled(rate, 2) > (MAX_AMOUNT_PAISE * 1000n + 499n) / G.scaled(qty, 3)) error = 'The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.';
@@ -295,6 +300,7 @@ async function addLine(orderId, input, userId) {
     gst_rate_pct: gstPct,
   }, userId);
   await auditLogRepository.log(userId, 'DOMESTIC_LINE_ADDED', 'orders', orderId, 'line', null, description);
+  if (await quantityLimits.isLarge(qty, unit)) await quantityLimits.audit(userId, 'orders', orderId, description, qty, unit.toUpperCase());
   return null;
 }
 

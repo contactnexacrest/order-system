@@ -406,28 +406,59 @@ final class DomesticTradeTest extends DbTestCase
     public function testHntL03ExtremeLineAmountsAreRefusedNotA500(): void
     {
         $orderId = $this->domOrder();
-        $line = static fn (string $qty, string $rate, string $gst = '18'): array => ['description' => 'Granite', 'hsn_code' => '6802', 'quantity' => $qty, 'unit' => 'SQM', 'rate_inr' => $rate, 'gst_rate_pct' => $gst];
+        // Item 10a: a unit without a large-quantity level (BOX), so only the hard limits apply here.
+        $line = static fn (string $qty, string $rate, string $gst = '18'): array => ['description' => 'Granite', 'hsn_code' => '6802', 'quantity' => $qty, 'unit' => 'BOX', 'rate_inr' => $rate, 'gst_rate_pct' => $gst];
 
         // The QA case: 99,99,99,999.999 × ₹99,99,999.99 — refused, nothing saved, the totals still work.
-        self::assertSame('The quantity can be at most 1,00,00,000.', DomesticOrderService::addLine($orderId, $line('99999999.999', '9999999.99'), $this->domStaff));
-        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('10000000', '99999999999'), $this->domStaff));
-        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('10000000', '100000'), $this->domStaff));
+        self::assertSame('The quantity can be at most 10,00,000.', DomesticOrderService::addLine($orderId, $line('99999999.999', '9999999.99'), $this->domStaff));
+        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('1000000', '99999999999'), $this->domStaff));
+        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('1000000', '1000000'), $this->domStaff));
         self::assertSame([], DomesticOrderRepository::lines($orderId));
         self::assertSame('0.00', DomesticOrderService::totals($orderId)['invoice_total']);
 
         // At the limits: accepted, and the GST maths works.
-        self::assertNull(DomesticOrderService::addLine($orderId, $line('10000000', '99999.99', '0'), $this->domStaff));
-        self::assertSame('999999900000.00', DomesticOrderService::totals($orderId)['invoice_total']);
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('1000000', '999999.99', '0'), $this->domStaff));
+        self::assertSame('999999990000.00', DomesticOrderService::totals($orderId)['invoice_total']);
         // The invoice total (with GST, rounded to the rupee) cannot pass the limit either.
         self::assertSame('With this line the invoice total would be more than ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('1', '100000'), $this->domStaff));
-        self::assertNull(DomesticOrderService::addLine($orderId, $line('1', '99999.49', '0'), $this->domStaff));
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('1', '9999.49', '0'), $this->domStaff));
         self::assertSame('999999999999.00', DomesticOrderService::totals($orderId)['invoice_total']);
         self::assertCount(2, DomesticOrderRepository::lines($orderId));
 
         // The browser checks the same limits before the form is sent.
         $this->actAs($this->domStaff);
         $page = $this->render(fn () => DomesticOrderController::show(OrderRepository::find($orderId)));
-        self::assertMatchesRegularExpression('/name="quantity"[^>]*max="10000000"/', $page);
+        self::assertMatchesRegularExpression('/name="quantity"[^>]*max="1000000"/', $page);
         self::assertMatchesRegularExpression('/name="rate_inr"[^>]*max="99999999999.99"[^>]*data-max-product="quantity"[^>]*data-max-product-value="999999999999.99"/', $page);
+    }
+
+    /**
+     * Owner decision item 10a (13 Nov 2026): a Domestic Trade line follows the same two levels
+     * as an export order line — refused above 10,00,000 in any unit, and above about 20
+     * containers of its unit (SQM 30,000 … settings) saved only with "I confirm this quantity"
+     * ticked, which is audited. Node: the same test in domesticTrade.test.js.
+     */
+    public function testItem10aQuantityLimits(): void
+    {
+        $orderId = $this->domOrder();
+        $line = static fn (string $qty, string $unit, array $more = []): array => array_merge(['description' => 'Granite item 10a', 'hsn_code' => '6802', 'quantity' => $qty, 'unit' => $unit, 'rate_inr' => '10', 'gst_rate_pct' => '18'], $more);
+        $from = (int) Database::connection()->query('SELECT COALESCE(MAX(id), 0) FROM audit_log')->fetchColumn();
+
+        self::assertSame('The quantity can be at most 10,00,000.', DomesticOrderService::addLine($orderId, $line('1000000.001', 'BOX', ['confirm_large_quantity' => '1']), $this->domStaff));
+        self::assertSame("This is unusually large for one line (more than about 20 containers of SQM). Check the quantity, or tick 'I confirm this quantity' to save it.", DomesticOrderService::addLine($orderId, $line('30000.5', 'sqm'), $this->domStaff));
+        self::assertSame("This is unusually large for one line (more than about 20 containers of CBM). Check the quantity, or tick 'I confirm this quantity' to save it.", DomesticOrderService::addLine($orderId, $line('501', 'CBM'), $this->domStaff));
+        self::assertSame([], DomesticOrderRepository::lines($orderId));
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('30000', 'SQM'), $this->domStaff), 'at the level: no tick needed');
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('1000000', 'BOX'), $this->domStaff), 'a unit without a level: only the hard block');
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('501', 'CBM', ['confirm_large_quantity' => '1']), $this->domStaff), 'with the tick: saved');
+        self::assertCount(3, DomesticOrderRepository::lines($orderId));
+        $audit = Database::connection()->query("SELECT entity_type, entity_id, new_value FROM audit_log WHERE action_type = 'LARGE_QUANTITY_CONFIRMED' AND id > {$from}")->fetchAll(\PDO::FETCH_ASSOC);
+        self::assertSame([['entity_type' => 'orders', 'entity_id' => $orderId, 'new_value' => '501 CBM']], array_map(static fn (array $a): array => ['entity_type' => $a['entity_type'], 'entity_id' => (int) $a['entity_id'], 'new_value' => $a['new_value']], $audit));
+
+        // The browser: the same hard block and per-unit confirmation on the add-line form.
+        $this->actAs($this->domStaff);
+        $page = $this->render(fn () => DomesticOrderController::show(OrderRepository::find($orderId)));
+        self::assertMatchesRegularExpression('/name="quantity"[^>]*max="1000000" data-max-value="1000000"[^>]*data-confirm-above="\{[^"]*&quot;SQM&quot;:30000[^"]*\}" data-confirm-unit="unit" data-confirm-message="This is unusually large/', $page);
+        self::assertStringContainsString('<input type="checkbox" name="confirm_large_quantity" value="1" data-confirm-tick=""> I confirm this quantity</label>', $page);
     }
 }

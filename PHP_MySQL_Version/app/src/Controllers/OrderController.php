@@ -521,6 +521,19 @@ final class OrderController
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
             }
+            // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+            $quantityError = \App\Services\QuantityLimits::check(
+                (string) ($_POST['product_quantity'][$i] ?? ''),
+                (string) ($_POST['product_unit'][$i] ?? ''),
+                !empty($_POST['product_quantity_tbc'][$i]),
+                (string) ($_POST['product_' . \App\Services\QuantityLimits::TICK][$i] ?? '') === '1'
+            );
+            if ($quantityError !== null) {
+                Flash::set('error', 'Product line ' . ($i + 1) . ": {$quantityError}");
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
             $priceError = OrderLineValidator::checkUnitPrice((string) ($_POST['product_unit_price'][$i] ?? ''));
             if ($priceError !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$priceError}");
@@ -694,6 +707,10 @@ final class OrderController
                     OrderLineValidator::priceInput($_POST['product_unit_price'][$i] ?? null),
                     trim((string) ($_POST['product_hs_code'][$i] ?? ''))
                 );
+                // Owner decision item 10a: a confirmed large quantity is audited.
+                if (\App\Services\QuantityLimits::isLarge((string) ($_POST['product_quantity'][$i] ?? ''), (string) ($_POST['product_unit'][$i] ?? ''), $quantityIsTbc)) {
+                    \App\Services\QuantityLimits::audit((int) $user['id'], 'order_products', $__lineId, $description, (string) $_POST['product_quantity'][$i], (string) ($_POST['product_unit'][$i] ?? ''));
+                }
                 // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
                 OrderProductRepository::setCatalogProduct($__lineId, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''));
                 if (trim((string) ($_POST['product_unit_price'][$i] ?? '')) !== '') {
@@ -1264,6 +1281,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+        if ($lineError = \App\Services\QuantityLimits::check((string) ($_POST['quantity'] ?? ''), (string) ($_POST['unit'] ?? ''), !empty($_POST['quantity_is_tbc']), !empty($_POST[\App\Services\QuantityLimits::TICK]))) {
+            Flash::set('error', 'Product line: ' . $lineError);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
 
         // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
         // D-255: with the chosen specification options. D-270 (point 25): in any unit, converted with the piece size.
@@ -1306,6 +1329,10 @@ final class OrderController
             $hsCode
         );
         OrderProductRepository::setLineType($newLineId, $lineType, $sacCode);
+        // Owner decision item 10a: a confirmed large quantity is audited.
+        if (\App\Services\QuantityLimits::isLarge((string) ($_POST['quantity'] ?? ''), (string) ($_POST['unit'] ?? ''), !empty($_POST['quantity_is_tbc']))) {
+            \App\Services\QuantityLimits::audit((int) $user['id'], 'order_products', $newLineId, $description, (string) $_POST['quantity'], (string) ($_POST['unit'] ?? ''));
+        }
         \App\Repositories\ProductCategoryRepository::setLineCategory($newLineId, $categoryId, $attributeValues);
         // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
         OrderProductRepository::setCatalogProduct($newLineId, self::catalogProductInput($_POST['catalog_product_id'] ?? ''));
@@ -1385,6 +1412,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision item 10a: above about 20 containers of its unit, only with "I confirm this quantity".
+        if ($lineError = \App\Services\QuantityLimits::check((string) ($_POST['quantity'] ?? ''), (string) ($_POST['unit'] ?? ''), !empty($_POST['quantity_is_tbc']), !empty($_POST[\App\Services\QuantityLimits::TICK]))) {
+            Flash::set('error', 'Product line: ' . $lineError);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
 
         // Owner decision D-245 P2: never below the product's minimum price.
         $__catalogId = array_key_exists('catalog_product_id', $_POST) ? self::catalogProductInput($_POST['catalog_product_id']) : (isset($product['catalog_product_id']) ? (int) $product['catalog_product_id'] : null);
@@ -1441,6 +1474,13 @@ final class OrderController
             $hsCode
         );
         OrderProductRepository::setLineType($productId, $lineType, $sacCode);
+        // Owner decision item 10a: a confirmed large quantity is audited when the quantity or unit changed.
+        $__qtyIn = trim((string) ($_POST['quantity'] ?? ''));
+        $__unitIn = trim((string) ($_POST['unit'] ?? ''));
+        if (\App\Services\QuantityLimits::isLarge($__qtyIn, $__unitIn, !empty($_POST['quantity_is_tbc']))
+            && (abs((float) ($product['quantity'] ?? 0) - (float) $__qtyIn) > 0.0005 || strcasecmp((string) ($product['unit'] ?? ''), $__unitIn) !== 0 || !empty($product['quantity_is_tbc']))) {
+            \App\Services\QuantityLimits::audit((int) $user['id'], 'order_products', $productId, $description, $__qtyIn, $__unitIn);
+        }
         \App\Repositories\ProductCategoryRepository::setLineCategory($productId, $categoryId, $attributeValues);
         // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
         if (array_key_exists('catalog_product_id', $_POST)) {

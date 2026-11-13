@@ -61,6 +61,12 @@ final class LineUnits
         return null;
     }
 
+    /** Every way of writing a unit of this kind (item 10a: the browser's quantity levels). @return list<string> */
+    public static function names(string $kind): array
+    {
+        return self::ALIASES[$kind] ?? [];
+    }
+
     /** "per piece", "per CBM" … for messages; the unit as written when it has no kind. */
     public static function label(?string $unit): string
     {

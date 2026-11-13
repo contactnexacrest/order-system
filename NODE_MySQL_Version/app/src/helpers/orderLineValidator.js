@@ -55,10 +55,12 @@ function checkUnitPrice(rawValue) {
 
 /** QA Round 6, R6-N14: DECIMAL(14,2) for price and line value, DECIMAL(14,3) for quantity. */
 const MAX_PRICE = 999999999999.99;
-// HNT-011 (QA 13 Nov 2026): a sanity limit on one line's quantity, well inside the column
-// (DECIMAL(14,3) holds 99,999,999,999.999) — 99,999,999,999 pieces is a typing slip, not an
-// order. The same number is the quantity fields' data-max-value in the browser and on PHP.
-const MAX_QUANTITY = 10000000;
+// HNT-011 (QA 13 Nov 2026), owner decision item 10a (13 Nov 2026): the hard block on one
+// line's quantity, in any unit — above 1,000,000 is a typing slip, not an order (the column,
+// DECIMAL(14,3), holds 99,999,999,999.999). The same number is the quantity fields'
+// data-max-value in the browser and on PHP. Below it, a quantity above about 20 containers
+// of its unit needs "I confirm this quantity" (services/quantityLimits.js).
+const MAX_QUANTITY = 1000000;
 
 function fmt(n, places) {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: places, maximumFractionDigits: places });
@@ -83,7 +85,7 @@ function checkLine(rawQuantity, isTbc, rawPrice) {
   const price = String(rawPrice ?? '').trim();
   if (quantity !== '' && !isTbc) {
     if (decimals(quantity) > 3) return `quantity can have at most 3 decimals (got "${rawQuantity}")`;
-    if (Number(quantity) > MAX_QUANTITY) return `quantity can be at most ${fmt(MAX_QUANTITY, 3)} (got "${rawQuantity}")`;
+    if (Number(quantity) > MAX_QUANTITY) return `quantity can be at most ${fmt(MAX_QUANTITY, 0)} (got "${rawQuantity}")`;
     if (price !== '' && Number(quantity) * Number(price) > MAX_PRICE) return `the line value (quantity x unit price) can be at most ${fmt(MAX_PRICE, 2)}`;
   }
   return null;

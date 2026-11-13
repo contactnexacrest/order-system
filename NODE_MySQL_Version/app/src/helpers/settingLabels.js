@@ -110,6 +110,13 @@ const LABELS = {
   default_estimated_total_cbm: ['New order: total CBM to start with', null],
   lead_time_display_unit: ['Show lead times in days or weeks', 'How the production and sailing lead times show on the order page. Only the display changes; they are always entered and kept in days.'],
   oc_ack_auto_confirm_hours: ['Order Confirmation: confirmed automatically after … hours', 'Hours after the Order Confirmation e-mail is sent before the order confirms itself if the buyer has not answered (48 on the live site).'],
+  // Owner decision item 10a (13 Nov 2026): the per-unit large-quantity levels.
+  quantity_warning_level_sqm: ['Large quantity: confirm a line above … SQM', 'One order line above this many SQM or M2 (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 30,000.'],
+  quantity_warning_level_sqft: ['Large quantity: confirm a line above … SQFT', 'One order line above this many SQFT (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 300,000.'],
+  quantity_warning_level_cbm: ['Large quantity: confirm a line above … CBM', 'One order line above this many CBM (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 500.'],
+  quantity_warning_level_ton: ['Large quantity: confirm a line above … TON', 'One order line above this many TON or MT (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 600.'],
+  quantity_warning_level_pcs: ['Large quantity: confirm a line above … PCS', 'One order line above this many PCS or NOS (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 600,000.'],
+  quantity_warning_level_rmt: ['Large quantity: confirm a line above … RMT', 'One order line above this many RMT (about 20 containers) saves only with "I confirm this quantity" ticked; the confirmation is logged. Any line above 1,000,000 is refused in every unit. 1 to 1,000,000; default 60,000.'],
   oc_ack_override_restricted: ['Only permitted roles may record the buyer\'s OC acknowledgement', 'Off (default) = anyone who manages orders can record the buyer\'s acknowledgement of the Order Confirmation by hand. On = only roles given the "Override buyer acknowledgement" permission.'],
   rbi_purpose_code_advance: ['Purpose code — advance payments', null],
   rbi_purpose_code_balance: ['Purpose code — balance payments', null],
@@ -165,6 +172,12 @@ const LABELS = {
  * (placeholder()). Same list in SettingLabels.php.
  */
 const PLACEHOLDERS = {
+  quantity_warning_level_sqm: 'e.g. 30000',
+  quantity_warning_level_sqft: 'e.g. 300000',
+  quantity_warning_level_cbm: 'e.g. 500',
+  quantity_warning_level_ton: 'e.g. 600',
+  quantity_warning_level_pcs: 'e.g. 600000',
+  quantity_warning_level_rmt: 'e.g. 60000',
   bank_account_no: 'e.g. 001234567890',
   bank_address: 'e.g. Branch building, street, city, PIN',
   bank_branch: 'e.g. Main branch',

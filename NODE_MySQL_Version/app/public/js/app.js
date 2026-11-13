@@ -1227,6 +1227,60 @@
     });
   }
 
+  // data-confirm-above='{"<unit>": level, …}' + data-confirm-unit="<unit field name>" (owner
+  // decision item 10a, 13 Nov 2026): the state of a quantity against the level of the unit typed
+  // or chosen in that field (same line row, else same form) — over the level, the line saves only
+  // with its "I confirm this quantity" box ([data-confirm-tick] in the same row / form) ticked.
+  // data-confirm-unless="<checkbox name>": never while that box is ticked (Qty To Be Confirmed).
+  function confirmAboveState(el) {
+    if (!el.dataset || el.dataset.confirmAbove === undefined) return null;
+    var scope = el.closest('.product-row') || el.form;
+    if (!scope) return null;
+    var levels = {};
+    try { levels = JSON.parse(el.dataset.confirmAbove) || {}; } catch (err) { levels = {}; }
+    var unitField = el.dataset.confirmUnit ? scope.querySelector('[name="' + el.dataset.confirmUnit + '"]') : null;
+    var unit = unitField ? String(unitField.value || '').trim() : '';
+    var level = Object.prototype.hasOwnProperty.call(levels, unit.toUpperCase()) ? Number(levels[unit.toUpperCase()]) : null;
+    var unless = el.dataset.confirmUnless ? scope.querySelector('input[type="checkbox"][name="' + el.dataset.confirmUnless + '"]') : null;
+    var value = String(el.value || '').trim();
+    var over = level !== null && value !== '' && !isNaN(Number(value)) && Number(value) > level && !(unless && unless.checked);
+    return { over: over, unit: unit, tick: scope.querySelector('input[type="checkbox"][data-confirm-tick]') };
+  }
+
+  // Item 10a: the "I confirm this quantity" box shows only while its quantity is above the level
+  // (or while it is ticked). A box with data-confirm-tick="<hidden field name>" copies its tick
+  // into that hidden field of its row (order create sends one value per line).
+  function initConfirmAbove() {
+    var refresh = function (scope) {
+      if (!scope || !scope.querySelectorAll) return;
+      Array.prototype.forEach.call(scope.querySelectorAll('[data-confirm-above]'), function (q) {
+        var st = confirmAboveState(q);
+        if (!st || !st.tick) return;
+        var box = st.tick.closest('[data-confirm-tick-box]') || st.tick.parentNode;
+        box.hidden = !st.over && !st.tick.checked;
+      });
+    };
+    refresh(document);
+    var handler = function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      var tScope = t.closest('.product-row') || t.form;
+      if (t.matches && t.matches('input[type="checkbox"][data-confirm-tick]') && tScope) {
+        if (t.dataset.confirmTick) {
+          var hidden = tScope.querySelector('input[type="hidden"][name="' + t.dataset.confirmTick + '"]');
+          if (hidden) hidden.value = t.checked ? '1' : '0';
+        }
+        // The tick clears the quantity's message at once.
+        Array.prototype.forEach.call(tScope.querySelectorAll('[data-confirm-above].field-invalid'), function (q) {
+          if (!fieldError(q)) clearFieldError(q);
+        });
+      }
+      refresh(tScope);
+    };
+    document.addEventListener('input', handler);
+    document.addEventListener('change', handler);
+  }
+
   function fieldError(el) {
     var value = el.value.trim();
     var name = (el.name || '').replace(/\[.*$/, '');
@@ -1417,6 +1471,13 @@
     }
     if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
+    }
+    // data-confirm-above (owner decision item 10a): above about 20 containers of its unit, a
+    // quantity needs its "I confirm this quantity" box ticked. Message: data-confirm-message,
+    // "{unit}" = the unit typed or chosen.
+    var confirmState = confirmAboveState(el);
+    if (confirmState && confirmState.over && !(confirmState.tick && confirmState.tick.checked)) {
+      return (el.dataset.confirmMessage || 'This is unusually large. Tick the confirmation to save it.').split('{unit}').join(confirmState.unit.toUpperCase());
     }
     // data-max-product="<field>" + data-max-product-value="x" (HNT-L03): this number
     // times another number field of the same form can be at most x — e.g. a Domestic
@@ -2772,6 +2833,7 @@
     initAddOffer(); // D-360
     initConfigure(); // D-361
     initShowAllColumns(); // D-365
+    initConfirmAbove(); // item 10a
   }
 
   if (document.readyState === 'loading') {

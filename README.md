@@ -104,7 +104,7 @@ Where to look:
 - **Database install and changes:** a new install = each stack's `docs/schema.sql`
   then `docs/seed.sql`, no migrations (D-241). An existing (live) database is
   brought up to date with the dated files in `docs/migrations/`, run in filename
-  order after a backup — for the 11–13 Nov 2026 build `2026-11-11a` … `2026-11-13c`,
+  order after a backup — for the 11–13 Nov 2026 build `2026-11-11a` … `2026-11-13e`,
   with two read-only checks before `2026-11-13a`
   (list, checks and rules: `docs/migrations/README.md`; live-site order of work:
   `docs/guides/GO_LIVE_CHECKLIST.md`). `docs/checks/` holds read-only checks for a
