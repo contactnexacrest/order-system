@@ -322,6 +322,40 @@ final class OrderLinePricingTest extends DbTestCase
         self::assertStringNotContainsString('data-required-when-message="Pick this goods line from Products', $page);
     }
 
+    /** SUI-005: a picked product that cannot be quoted is refused with the real reason, not "typed by hand". */
+    public function testSui005APickedProductThatIsNotQuotableIsRefusedWithTheRealReason(): void
+    {
+        $productId = $this->product();
+        $name = (string) ProductRepository::find($productId)['name'];
+        $sales = $this->createTestUser('Export Executive');
+        $this->actAs($sales);
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$sales]);
+        $post = ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'unit_price' => '1300.00',
+            'line_type' => 'goods', 'hs_code' => '25161100', 'spec_json' => self::baseSpecJson($productId)];
+
+        // The base price is no longer fixed (not configured) — e.g. changed after the page was opened.
+        Database::connection()->exec("UPDATE catalog_products SET configured_base_follows_supplier = 1, configured_base_price_inr = NULL WHERE id = {$productId}");
+        $_POST = $post;
+        $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
+        $msg = $this->flash();
+        self::assertStringContainsString("\"{$name}\" cannot be quoted yet: Not configured yet — ask the product manager.", $msg);
+        self::assertStringNotContainsString('typed by hand', $msg);
+        self::assertSame([], OrderProductRepository::forOrder($orderId), 'nothing saved');
+
+        // Configured again but switched Inactive.
+        self::configureProductForQuoting($productId, $this->createTestUser('Admin'));
+        Database::connection()->exec("UPDATE catalog_products SET is_active = 0 WHERE id = {$productId}");
+        $_POST = $post;
+        $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
+        self::assertStringContainsString("\"{$name}\" cannot be quoted yet: it is Inactive — ask the product manager to switch it Active.", $this->flash());
+
+        // Typed by hand (no product posted): the D-245 P2 message as before.
+        $_POST = ['catalog_product_id' => ''] + $post;
+        $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
+        self::assertStringContainsString('Pick this goods line from Products', $this->flash());
+        self::assertSame([], OrderProductRepository::forOrder($orderId));
+    }
+
     public function testOnlyTheMdChangesTheSettingAndAFormWithoutItKeepsIt(): void
     {
         $md = $this->createTestUser('Managing Director');

@@ -584,7 +584,7 @@ async function store(req, res) {
       }
       // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
       const currency = (await lookupRepository.currencies()).find((c) => Number(c.id) === currencyId);
-      const pick = await require('../services/orderLinePricing').pickRefusal(currency ? currency.code : '', await catalogProductInput([].concat(body.product_catalog_id || [])[i]), 'goods');
+      const pick = await require('../services/orderLinePricing').pickRefusal(currency ? currency.code : '', await catalogProductInput([].concat(body.product_catalog_id || [])[i]), 'goods', [].concat(body.product_catalog_id || [])[i]);
       if (pick !== null) {
         flash.set(req, 'error', `Product line ${i + 1}: ${pick}`);
         flash.setOld(req, body);
@@ -1310,7 +1310,7 @@ async function addProduct(req, res) {
   const [specSel, syncError] = sizeError === null
     ? await orderLinePricing.syncThickness(pickedId, orderLinePricing.selectionInput(body.spec_json ?? ''), lineSize.piece_thickness_cm)
     : [null, null];
-  const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
+  const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType, body.catalog_product_id))
     // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
     ?? (priceRequest ? null : await orderLinePricing.requiredSpecsRefusal(await orderProductRepository.nextLineNo(orderId), pickedId, lineType, specSel))
     ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
@@ -1435,7 +1435,7 @@ async function updateProduct(req, res) {
     && str(body.unit).toUpperCase() === String(product.unit ?? '').trim().toUpperCase();
   {
     const orderLinePricing = require('../services/orderLinePricing');
-    const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
+    const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType, Object.prototype.hasOwnProperty.call(body, 'catalog_product_id') ? body.catalog_product_id : null))
       // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
       ?? (specUnchanged && Number(product.catalog_product_id || 0) === Number(catalogId || 0) ? null
         : await orderLinePricing.requiredSpecsRefusal(Number(product.line_no), catalogId, lineType, specSel))

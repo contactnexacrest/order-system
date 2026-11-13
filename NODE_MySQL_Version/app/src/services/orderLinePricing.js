@@ -561,9 +561,23 @@ async function productPickRequired(currencyCode) {
 }
 
 /** The refusal for a goods line typed by hand when picking from Products is required, else null. */
-async function pickRefusal(currencyCode, catalogProductId, lineType) {
+/**
+ * SUI-005 (QA 13 Nov 2026): postedProductId is the product id the form posted. When it names a
+ * product that is not quotable (D-361: not configured, no active supplier, or Inactive — e.g.
+ * changed after the page was opened), the refusal says so instead of "typed by hand".
+ */
+async function pickRefusal(currencyCode, catalogProductId, lineType, postedProductId = null) {
   if (lineType !== 'goods' || catalogProductId || !(await productPickRequired(currencyCode))) return null;
-  return PICK_MESSAGE;
+  const posted = parseInt(postedProductId, 10) || 0;
+  const product = posted > 0 ? await require('../repositories/productRepository').find(posted) : null;
+  return product ? notQuotableMessage(product) : PICK_MESSAGE;
+}
+
+/** SUI-005: why a product picked on a line cannot be quoted now (D-361 plan rule 4). */
+async function notQuotableMessage(product) {
+  const st = await require('./supplierOffers').status(product);
+  const why = st.can_activate ? 'it is Inactive — ask the product manager to switch it Active.' : String(st.reason);
+  return `"${product.name}" cannot be quoted yet: ${why} Pick another product from Products.`;
 }
 
 /**
@@ -914,7 +928,7 @@ module.exports = {
   OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, NEEDS_SIZE, BLOCKING,
   CBM_CALCULATED, APPROVABLE, annexureSizeMessage, cbmCalculatedReason,
   weightPerCbm, lineSize, optionThicknessMm, syncThickness, conversionFor, scaleFigures, optionChips, summary, totals,
-  PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason, REQUIRED_SPEC_NAMES, requiredSpecsRefusal,
+  PICK_MESSAGE, productPickRequired, pickRefusal, notQuotableMessage, documentBlockReason, REQUIRED_SPEC_NAMES, requiredSpecsRefusal,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, snapshotLines, approveByAmendment, pickerPrices, pickerSpecs, clientKeys,
   selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey,

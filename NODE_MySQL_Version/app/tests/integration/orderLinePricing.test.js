@@ -288,6 +288,35 @@ describe('Order line pricing (D-245, P2)', () => {
     }
   });
 
+  // SUI-005: a picked product that cannot be quoted is refused with the real reason, not "typed by hand".
+  it('SUI-005: a picked product that is not quotable is refused with the real reason', async () => {
+    const productId = await product();
+    const name = (await productRepository.find(productId)).name;
+    const sales = await user('Export Executive');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [sales.id]);
+    const agent = await login(sales);
+    const body = { catalog_product_id: String(productId), description: 'Black Galaxy block', quantity: '10', unit: 'CBM', unit_price: '1300.00',
+      line_type: 'goods', hs_code: '25161100', spec_json: await baseSpecJson(productId) };
+
+    // The base price is no longer fixed (not configured) — e.g. changed after the page was opened.
+    await db.execute('UPDATE catalog_products SET configured_base_follows_supplier = 1, configured_base_price_inr = NULL WHERE id = :id', { id: productId });
+    let msg = await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, body);
+    expect(msg).toContain(`"${name}" cannot be quoted yet: Not configured yet — ask the product manager.`);
+    expect(msg).not.toContain('typed by hand');
+    expect(await orderProductRepository.forOrder(orderId)).toEqual([]);
+
+    // Configured again but switched Inactive.
+    await configureProductForQuoting(productId, (await user('Admin')).id);
+    await db.execute('UPDATE catalog_products SET is_active = 0 WHERE id = :id', { id: productId });
+    msg = await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, body);
+    expect(msg).toContain(`"${name}" cannot be quoted yet: it is Inactive — ask the product manager to switch it Active.`);
+
+    // Typed by hand (no product posted): the D-245 P2 message as before.
+    msg = await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { ...body, catalog_product_id: '' });
+    expect(msg).toContain('Pick this goods line from Products');
+    expect(await orderProductRepository.forOrder(orderId)).toEqual([]);
+  });
+
   it('only the MD changes the setting, and a form without it keeps it', async () => {
     const md = await login(await user('Managing Director'));
     const base = { margin_pct: '20.00', other_cost_pct: '2.50', pricing_fx_rate: '82.0000', buffer_pct: '3.00', incentive_mode: 'pct', incentive_value: '15', stale_days: '60' };

@@ -536,7 +536,7 @@ final class OrderController
                 }
             }
             // Owner decision D-245 P2: on a USD order goods lines come from Products (Admin → Pricing).
-            if (($__pick = \App\Services\OrderLinePricing::pickRefusal($__currencyCode, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods')) !== null) {
+            if (($__pick = \App\Services\OrderLinePricing::pickRefusal($__currencyCode, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods', $_POST['product_catalog_id'][$i] ?? null)) !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$__pick}");
                 Flash::setOld($_POST);
                 header('Location: /orders/create?client_id=' . $clientId);
@@ -1271,7 +1271,7 @@ final class OrderController
         [$__specSel, $__syncError] = $__sizeError === null
             ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['catalog_product_id'] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'] ?? ''), $__size['piece_thickness_cm'])
             : [null, null];
-        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
+        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $_POST['catalog_product_id'] ?? null)
             // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
             ?? ($__priceRequest !== null ? null : \App\Services\OrderLinePricing::requiredSpecsRefusal(OrderProductRepository::nextLineNo($orderId), self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $__specSel))
             ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
@@ -1406,7 +1406,7 @@ final class OrderController
         $__specUnchanged = json_encode($__specSel) === json_encode(\App\Services\OrderLinePricing::selectionInput((string) ($product['spec_selection'] ?? '')));
         $__sizeUnchanged = \App\Services\OrderLinePricing::lineSize($__size) === \App\Services\OrderLinePricing::lineSize($product)
             && strtoupper(trim((string) ($_POST['unit'] ?? ''))) === strtoupper(trim((string) ($product['unit'] ?? '')));
-        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
+        $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType, $_POST['catalog_product_id'] ?? null)
             // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
             ?? ($__specUnchanged && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0) ? null
                 : \App\Services\OrderLinePricing::requiredSpecsRefusal((int) $product['line_no'], $__catalogId, $lineType, $__specSel))

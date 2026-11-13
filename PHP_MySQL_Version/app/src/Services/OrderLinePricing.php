@@ -744,13 +744,28 @@ final class OrderLinePricing
         return strtoupper((string) $currencyCode) === 'USD' && PricingService::settings()['require_product_pick'];
     }
 
-    /** The refusal for a goods line typed by hand when picking from Products is required, else null. */
-    public static function pickRefusal(?string $currencyCode, ?int $catalogProductId, string $lineType): ?string
+    /**
+     * The refusal for a goods line typed by hand when picking from Products is required, else null.
+     * SUI-005 (QA 13 Nov 2026): $postedProductId is the product id the form posted. When it names a
+     * product that is not quotable (D-361: not configured, no active supplier, or Inactive — e.g.
+     * changed after the page was opened), the refusal says so instead of "typed by hand".
+     */
+    public static function pickRefusal(?string $currencyCode, ?int $catalogProductId, string $lineType, mixed $postedProductId = null): ?string
     {
         if ($lineType !== 'goods' || $catalogProductId !== null || !self::productPickRequired($currencyCode)) {
             return null;
         }
-        return self::PICK_MESSAGE;
+        $posted = is_scalar($postedProductId) ? (int) $postedProductId : 0;
+        $product = $posted > 0 ? ProductRepository::find($posted) : null;
+        return $product !== null ? self::notQuotableMessage($product) : self::PICK_MESSAGE;
+    }
+
+    /** SUI-005: why a product picked on a line cannot be quoted now (D-361 plan rule 4). */
+    public static function notQuotableMessage(array $product): string
+    {
+        $status = SupplierOffers::status($product);
+        $why = $status['can_activate'] ? 'it is Inactive — ask the product manager to switch it Active.' : (string) $status['reason'];
+        return '"' . $product['name'] . '" cannot be quoted yet: ' . $why . ' Pick another product from Products.';
     }
 
     public const PICK_MESSAGE = 'Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can). The MD can change this in Admin → Pricing.';
