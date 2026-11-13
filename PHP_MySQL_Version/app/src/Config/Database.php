@@ -86,7 +86,9 @@ final class Database
         } catch (PDOException $e) {
             // Never leak DSN/credentials in the exception surface to the client.
             error_log('[DB CONNECT FAILURE] ' . $e->getMessage());
-            throw new \RuntimeException('Database connection failed. Check server error log.');
+            // HNT-010: chained, so DbResilience::isTransient() can see the PDO error (e.g. 2002
+            // refused) and answer 503 "please try again" as Node does, not a 500.
+            throw new \RuntimeException('Database connection failed. Check server error log.', 0, $e);
         }
 
         return self::$connection;

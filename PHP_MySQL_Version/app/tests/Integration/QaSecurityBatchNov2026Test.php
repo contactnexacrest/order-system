@@ -296,4 +296,31 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         self::assertFalse(\App\Services\FileUploadService::imageContentMismatch("\x00\x00\x00\x18ftypheic", 'heic'));
         self::assertFalse(\App\Services\FileUploadService::imageContentMismatch('anything', 'pdf'));
     }
+
+    /** HNT-010: the database refusing connections answers 503 "please try again" (as Node), not 500. */
+    public function testHnt010DatabaseDownIs503(): void
+    {
+        $prop = new \ReflectionProperty(\App\Config\Database::class, 'connection');
+        $saved = $prop->getValue();
+        $savedHost = $_ENV['DB_HOST'] ?? null;
+        $savedPort = $_ENV['DB_PORT'] ?? null;
+        $prop->setValue(null, null);
+        $_ENV['DB_HOST'] = '127.0.0.1';
+        $_ENV['DB_PORT'] = '3399'; // nothing listens here
+        try {
+            \App\Config\Database::connection();
+            self::fail('connecting to a closed port must fail');
+        } catch (\RuntimeException $e) {
+            $response = \App\Helpers\DbResilience::errorResponse($e, false);
+            self::assertSame(503, $response['status']);
+            self::assertSame('10', $response['headers']['Retry-After'] ?? null);
+            self::assertStringNotContainsString('3399', $response['body']);
+        } finally {
+            $prop->setValue(null, $saved);
+            if ($savedHost === null) { unset($_ENV['DB_HOST']); } else { $_ENV['DB_HOST'] = $savedHost; }
+            if ($savedPort === null) { unset($_ENV['DB_PORT']); } else { $_ENV['DB_PORT'] = $savedPort; }
+        }
+        // An ordinary error stays a 500.
+        self::assertSame(500, \App\Helpers\DbResilience::errorResponse(new \RuntimeException('boom', 0, new \LogicException('x')), false)['status']);
+    }
 }

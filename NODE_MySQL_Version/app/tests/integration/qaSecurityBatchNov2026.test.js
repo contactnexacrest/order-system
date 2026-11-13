@@ -381,4 +381,20 @@ describe('QA Nov 2026 security batch', () => {
       expect(await count()).toBe(before + 1);
     });
   });
+
+  describe('HNT-010 database refusing connections (parity with PHP)', () => {
+    it('HNT-010: a refused connection is treated as "please try again" (503), an ordinary error is not', async () => {
+      const mysql = require('mysql2/promise');
+      const { isTransientDbError } = require('../../src/helpers/dbResilience');
+      let err = null;
+      try {
+        await mysql.createConnection({ host: '127.0.0.1', port: 3399, user: 'x', password: 'x' });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).not.toBeNull();
+      expect(isTransientDbError(err)).toBe(true);
+      expect(isTransientDbError(new Error('boom'))).toBe(false);
+    });
+  });
 });

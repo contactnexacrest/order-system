@@ -27,6 +27,10 @@ final class DbResilience
 
     public static function isTransient(?\Throwable $e): bool
     {
+        // HNT-010: Database::connection() wraps a failed connect in a RuntimeException; look through the chain.
+        while ($e !== null && !$e instanceof \PDOException) {
+            $e = $e->getPrevious();
+        }
         if (!$e instanceof \PDOException) {
             return false;
         }
