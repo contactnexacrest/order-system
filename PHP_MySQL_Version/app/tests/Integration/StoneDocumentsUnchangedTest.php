@@ -24,6 +24,8 @@ use App\Tests\Support\DbTestCase;
  * Owner decision D-343 (12 Nov 2026): the Word fixtures of the QT, PI, OC, CI and PL were captured again once,
  * deliberately — the Word copy now numbers its sections as the PDF (Buyer / Consignee / Notify Party sections,
  * Legal Terms & Definitions); the PDF fixtures did not change.
+ * Owner decision QA item 11 (13 Nov 2026, confirm 1 + confirm 2): the Word fixtures CIF_QT_docx, CIF_PI_docx and
+ * CIF_OC_docx were captured again once — "Freight Debit Note" became "Debit Note" (the PDF wording); nothing else changed.
  * Owner decision D-352 (12 Nov 2026): the mandatory-fields note and the red "*" (QT/PI payment terms, PI/OC estimated shipment,
  * CI money rows and amount in words) were removed from every PDF and Word fixture by hand; nothing else changed.
  * Owner decision D-353 (12 Nov 2026): the remaining plain "*" after field labels was removed from every PDF and Word

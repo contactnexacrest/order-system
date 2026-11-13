@@ -387,7 +387,7 @@ function renderQt(context) {
   const freightText = order.is_fob
     ? 'NIL'
     : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency})`, value: g(financial, 'fob_value') },
@@ -509,7 +509,7 @@ function renderPi(context) {
   const freightText = order.is_fob
     ? 'NIL'
     : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency})`, value: g(financial, 'fob_value') },
@@ -701,7 +701,7 @@ function renderOc(context) {
   if (!order.is_fob) {
     paymentRows.push({
       label: 'CFR / CIF Freight (if applicable)',
-      value: 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
+      value: 'A Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
       labelBg: C.RED_BG,
       valueBg: C.RED_BG,
     });

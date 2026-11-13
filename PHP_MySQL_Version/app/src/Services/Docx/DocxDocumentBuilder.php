@@ -479,7 +479,7 @@ final class DocxDocumentBuilder
         $freightText = !empty($order['is_fob'])
             ? 'NIL'
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
-        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
+        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
             ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
@@ -590,7 +590,7 @@ final class DocxDocumentBuilder
         $freightText = !empty($order['is_fob'])
             ? 'NIL'
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
-        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
+        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
             ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
@@ -751,7 +751,7 @@ final class DocxDocumentBuilder
         if (empty($order['is_fob'])) {
             $paymentRows[] = [
                 'label' => 'CFR / CIF Freight (if applicable)',
-                'value' => 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
+                'value' => 'A Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
                 'labelBg' => DocxComponents::RED_BG,
                 'valueBg' => DocxComponents::RED_BG,
             ];
