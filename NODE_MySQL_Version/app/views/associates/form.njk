@@ -8,12 +8,12 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <div class="field-grid">
       <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name }}" placeholder="e.g. Full name as on PAN card"></label>
-      <label>Based in *<select name="based_in" required><option value="india"{{ ' selected' if (a0.based_in or 'india') == 'india' else '' }}>India</option><option value="abroad"{{ ' selected' if a0.based_in == 'abroad' else '' }}>Abroad</option></select></label>
+      <label>Based in *<select name="based_in" required><option value="">Choose…</option><option value="india"{{ ' selected' if a0.based_in == 'india' else '' }}>India</option><option value="abroad"{{ ' selected' if a0.based_in == 'abroad' else '' }}>Abroad</option></select></label>
       <label>Country<input type="text" name="country" maxlength="80" value="{{ a0.country }}" placeholder="e.g. Netherlands"></label>
       {# D-264: India → always INR (no conversion, TDS in rupees); abroad → an active trading currency, USD by default. #}
       <label data-show-when="based_in=india">Paid in (currency) *<select name="currency_code" required><option value="INR" selected>INR — Indian rupee</option></select><span class="help-line">Fixed for associates based in India: always INR, by NEFT / RTGS / IMPS to the verified account. No currency conversion, TDS in rupees.</span></label>
       <label data-show-when="based_in=abroad">Paid in (currency) *<select name="currency_code" required><option value="">Choose…</option>
-        {% set __cur = a0.currency_code if (a0.based_in == 'abroad' and a0.currency_code and a0.currency_code != 'INR') else 'USD' %}
+        {% set __cur = a0.currency_code if (a0.based_in == 'abroad' and a0.currency_code and a0.currency_code != 'INR') else '' %}{# UI-013: chosen, no USD default #}
         {% for cur in currencies %}{% set __code = cur.code or cur.currency_code or '' %}{% if __code and __code != 'INR' %}
           <option value="{{ __code }}"{{ ' selected' if __cur == __code else '' }}>{{ __code }}</option>
         {% endif %}{% endfor %}
@@ -37,13 +37,14 @@
     </fieldset>
     {# Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. #}
     <fieldset><legend>Commission level (D-245)</legend>
-      {% set cmode = a0.commission_mode or 'ladder' %}{% set clid = (a0.commission_level_id or '') | string %}
+      {% set cmode = a0.commission_mode or '' %}{% set clid = (a0.commission_level_id or '') | string %}
       {% if a0.id %}{# D-291: an existing associate's rule is changed on their page, with a reason #}
         <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
       {% elif canPricing %}
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>
+              <option value="">Choose…</option>
               <option value="ladder"{{ ' selected' if cmode == 'ladder' }}>Standard ladder (moves up with counting orders)</option>
               <option value="fixed"{{ ' selected' if cmode == 'fixed' }}>Fixed % (one commission level, stays until the MD changes it)</option>
             </select></label>

@@ -82,7 +82,11 @@
     } else if (opt.dataset.prices && price) {
       var prices = JSON.parse(opt.dataset.prices);
       var pair = prices[priceKey(select)] || null;
-      if (orderCurrency(select) !== 'USD') {
+      if (orderCurrency(select) === '') {
+        // UI-013: the order currency starts at "Choose…" — no price until it is chosen.
+        text += (text ? ' · ' : '') + 'Choose the order currency first — prices are filled in for an order in USD.';
+        price.removeAttribute('data-floor');
+      } else if (orderCurrency(select) !== 'USD') {
         text += (text ? ' · ' : '') + 'Prices are built in USD — no price filled in on an order in another currency.';
         price.removeAttribute('data-floor');
       } else if (pair) {

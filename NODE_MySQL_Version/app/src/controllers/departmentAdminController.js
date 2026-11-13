@@ -110,7 +110,7 @@ async function createDesignation(req, res) {
   const dept = await departmentRepository.findDepartment(departmentId);
   const title = scalarString(req.body.title);
   const level = String(req.body.level ?? '');
-  const roleChoice = String(req.body.role_id ?? 'new');
+  const roleChoice = String(req.body.role_id ?? ''); // UI-013: "Choose…" first — an empty choice is refused below
   let error = null;
   if (!dept) error = 'Choose the department.';
   else if (len(title) < 2 || len(title) > 100) error = 'Enter the designation (2 to 100 characters), e.g. Quality Manager.';

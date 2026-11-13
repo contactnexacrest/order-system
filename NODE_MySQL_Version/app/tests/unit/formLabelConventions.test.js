@@ -124,6 +124,74 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     expect(text.match(new RegExp(`${escapeRe(opening)}\\s*<option value="">Choose…</option>`, 'g'))).toHaveLength(n);
   });
 
+  // Owner decision UI-013 (13 Nov 2026, Option A): on every create / add form a
+  // required drop-down starts at an empty "Choose…" option, so the user picks
+  // consciously. Edit forms and Settings pages that show the saved value, filters
+  // and price configurators stay as they are — listed here with the reason
+  // (file => { select name => reason }, or "name|marker" when the same name is also
+  // used on a create form in that file and the marker picks the edit one). A
+  // drop-down with one fixed option (nothing to choose) and a multi-select are not
+  // choices of this kind. Port of FormLabelConventionsTest::testUi013….
+  const UI013_EDIT_OR_SETTINGS = {
+    'associate_portal/get_price.njk': { 'spec[]': 'price configurator: each specification shows its base option (set aside, owner to confirm)' },
+    'ca/cafin_export.njk': { fy: 'export filter', status: 'export filter', scope: 'export filter' },
+    'departments/admin.njk': { 'level|aria-label="Designation level"': 'edits a saved designation' },
+    'logistics_partners/edit.njk': { service_type: 'edit form' },
+    'merchant/show.njk': { advance_backing: 'changes the saved backing of a deal' },
+    'orders/_compliance_tracking.njk': { claim_status: 'updates the saved claim status' },
+    'orders/edit_details.njk': { incoterm_id: 'edit form', currency_id: 'edit form' },
+    'orders/show.njk': { status: 'updates the saved quality-document status' },
+    'payment_presets/edit.njk': { payment_method: 'edit form', balance_trigger_option: 'edit form', currency_id: 'edit form' },
+    'compliance_task_types/edit.njk': { phase: 'edit form' },
+    'port_routes/edit.njk': { port_of_loading_id: 'edit form', port_of_discharge_id: 'edit form' },
+    'ports/edit.njk': { port_role: 'edit form' },
+    'products/edit_price.njk': { unit: 'edits a saved price', thickness_mm: 'edits a saved price' },
+    'products/link_supplier.njk': { unit: 'links a saved (legacy) price, prefilled from it' },
+    'pricing/commission_levels.njk': { kind: 'edits a saved commission level' },
+    'pricing/_spec_table.njk': { 'kind|required{{ ro }}': 'edits a saved specification' },
+    'products/specifications.njk': { category_id: "the product's saved category (product settings)" },
+    'pricing/settings.njk': { fx_mode: 'Settings page', incentive_mode: 'Settings page' },
+    'settings/document_cleanup.njk': { draft_days: 'Settings page', superseded_days: 'Settings page', cafin_mode: 'Settings page' },
+    'settings/remittance_reasons.njk': { 'treatment|aria-label="Treated as"': 'edits a saved reason' },
+  };
+
+  test('UI-013: every required drop-down on a create form starts with "Choose…"', () => {
+    const wrong = [];
+    const used = new Set();
+    for (const [rel, text] of views()) {
+      for (const m of text.matchAll(/<select\b/g)) {
+        const tag = openingTag(text, m.index);
+        const plain = tag.replace(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g, '');
+        if (!/\srequired(?=[\s>])/.test(plain) || /\smultiple\b/.test(plain)) continue;
+        const end = text.indexOf('</select>', m.index + tag.length);
+        const raw = text.slice(m.index + tag.length, end < 0 ? text.length : end);
+        const inner = raw.replace(/\{%[\s\S]*?%\}|\{#[\s\S]*?#\}/g, '');
+        if (count(raw, '<option') === 1 && !/\{%\s*for\b/.test(raw)) continue; // one fixed option: nothing to choose
+        if (/^\s*<option value=""[\s>]/.test(inner)) continue; // "Choose…" (or a prompt such as "Paid via…")
+        const nm = tag.match(/\sname="([^"]*)"/);
+        const name = nm ? nm[1].replace(/\[.*$/, '[]') : '?';
+        let allowed = null;
+        for (const key of Object.keys(UI013_EDIT_OR_SETTINGS[rel] || {})) {
+          const [kName, marker] = key.split('|');
+          if (kName === name && (marker === undefined || tag.includes(marker))) allowed = `${rel}::${key}`;
+        }
+        if (allowed) {
+          used.add(allowed);
+          continue;
+        }
+        wrong.push(`${rel}:${lineOf(text, m.index)} ${name}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+    const stale = Object.entries(UI013_EDIT_OR_SETTINGS).flatMap(([rel, names]) => Object.keys(names).map((k) => `${rel}::${k}`)).filter((k) => !used.has(k));
+    expect(stale).toEqual([]); // an allow-list entry that no longer matches a drop-down is removed
+  });
+
+  test('UI-013: the sitewide script asks to choose a required drop-down', () => {
+    const js = fs.readFileSync(APP_JS, 'utf8');
+    expect(js).toContain("if (el.required && el.tagName === 'SELECT' && !el.multiple && value === '') {\n      return 'Please choose ' + fieldLabelText(el) + '.';");
+  });
+
   // Every drop-down's empty first option reads "Choose…" (or "Choose a …"), on
   // any drop-down, required or not — never the older "Select…", "— Select —",
   // "— choose —" or "Please select". Checks the views (scripts included: an

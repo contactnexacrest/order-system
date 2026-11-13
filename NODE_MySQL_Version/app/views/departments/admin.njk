@@ -50,6 +50,7 @@
       </label>
       <label>Role (its permissions) *
         <select name="role_id" required>
+          <option value="">Choose…</option>
           <option value="new">A new role with the same name (set its permissions next)</option>
           {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
         </select>

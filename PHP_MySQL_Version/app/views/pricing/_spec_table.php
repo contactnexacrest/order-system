@@ -80,7 +80,7 @@ $__ro = $canManage ? '' : ' disabled';
             <form method="post" action="/pricing/specifications/<?= (int) $s['id'] ?>/options" class="field-grid">
               <?= Csrf::field() ?>
               <label>New option *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
-              <label>Change type *<select name="change_type" required><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
+              <label>Change type *<select name="change_type" required><option value="">Choose…</option><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
               <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00 or -8"></label>
               <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 60 (thickness options)"></label>
               <label>Order<input type="number" name="sort_order" min="0" max="999" step="1" value="<?= count($s['options']) + 1 ?>" placeholder="e.g. 7"></label>
@@ -109,7 +109,7 @@ $__ro = $canManage ? '' : ' disabled';
       <?= Csrf::field() ?>
       <input type="hidden" name="category_id" value="<?= (int) $categoryId ?>">
       <label>Name *<input type="text" name="name" required maxlength="80" placeholder="e.g. Water-jet inlay"></label>
-      <label>Kind *<select name="kind" required><?php foreach (ProductSpecs::KINDS as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
+      <label>Kind *<select name="kind" required><option value="">Choose…</option><?php foreach (ProductSpecs::KINDS as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
       <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="<?= count($specs) + 1 ?>" placeholder="e.g. 10"></label>
       <fieldset class="full"><legend>Applies to forms (none ticked = all)</legend>
         <?php foreach (ProductSpecs::FORMS as $k => $l): ?><label class="inline"><input type="checkbox" name="applies_to[]" value="<?= $k ?>"> <?= View::e($l) ?></label> <?php endforeach; ?>

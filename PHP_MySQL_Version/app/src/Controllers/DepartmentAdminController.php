@@ -108,7 +108,7 @@ final class DepartmentAdminController
         $dept = DepartmentRepository::findDepartment($departmentId);
         $title = Input::scalarString($_POST['title'] ?? '');
         $level = (string) ($_POST['level'] ?? '');
-        $roleChoice = (string) ($_POST['role_id'] ?? 'new');
+        $roleChoice = (string) ($_POST['role_id'] ?? ''); // UI-013: "Choose…" first — an empty choice is refused below
         $error = match (true) {
             $dept === null => 'Choose the department.',
             mb_strlen($title) < 2 || mb_strlen($title) > 100 => 'Enter the designation (2 to 100 characters), e.g. Quality Manager.',

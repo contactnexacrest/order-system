@@ -145,9 +145,9 @@ expense** (open by default while none are recorded). Each expense has:
   Travel — train / flight / bus, Local conveyance (taxi / auto), Hotel,
   Food, Courier, Samples, Other;
 - **Details** and **Amount (₹)**;
-- **Paid by** — Company account (chosen to start with, owner request
-  3 Nov 2026), Company card, or Staff (to reimburse), with the staff
-  member's name;
+- **Paid by** — Company account, Company card, or Staff (to reimburse),
+  with the staff member's name; it starts at "Choose…" (owner decision
+  13 Nov 2026 — nothing is preselected, you pick it each time);
 - **Bank reference (UTR / transaction ID)** — required when the
   **company account** paid (rule D-212, owner decision 13 Nov 2026): the
   form shows "Enter the bank reference (UTR / transaction ID): the expense
@@ -301,7 +301,7 @@ else in the system:
 
 Each entry records a category, amount (INR), date, what it was **paid
 from** (company account or company card — owner decision 2026-10-29;
-Company account is chosen to start with since 3 Nov 2026),
+it starts at "Choose…" since 13 Nov 2026, so you pick it each time),
 and a **description** — required since rule D-212 (2026-10-31): who was
 paid and for what, with their invoice / receipt no., 10 to 255
 characters — and the **Bank reference (UTR / transaction ID)**: required

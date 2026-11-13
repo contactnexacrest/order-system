@@ -111,7 +111,7 @@ foreach ($categories as $__c) {
           <form method="post" action="/products/<?= (int) $product['id'] ?>/specifications/<?= (int) $s['id'] ?>/options" class="field-grid">
             <?= Csrf::field() ?>
             <label>Add an option for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
-            <label>Change type *<select name="change_type" required><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
+            <label>Change type *<select name="change_type" required><option value="">Choose…</option><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
             <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00"></label>
             <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 25 (thickness options)"></label>
             <input type="hidden" name="sort_order" value="90">

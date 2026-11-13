@@ -197,6 +197,11 @@ final class PricingSetupTest extends DbTestCase
         $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $productId]));
         self::assertSame('The quoted date cannot be in the future.', $this->flash());
 
+        // UI-013 (13 Nov 2026): "Price for" starts at "Choose…" — the form sent without a choice is refused.
+        $_POST = ['supplier_id' => (string) $dir, 'supplier_name' => $dirName, 'price_inr' => '82000', 'quoted_on' => date('Y-m-d'), 'price_basis' => ''];
+        $this->render(fn () => (new PricingController())->addMarketPrice(['id' => (string) $productId]));
+        self::assertSame('Choose what the price is for.', $this->flash());
+
         $first = null;
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
             if ($s['supplier_name'] === 'Sri Balaji Granites') {

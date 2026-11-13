@@ -639,6 +639,12 @@ async function addMarketPrice(req, res) {
   }
   const s = await pricingService.settings();
   const rules = await thicknessPrices.rules(product, s);
+  // UI-013 (13 Nov 2026): the form's "Price for" starts at "Choose…" — a form sent without a choice is refused.
+  if (body.price_basis !== undefined && body.price_basis === '') {
+    flash.set(req, 'error', 'Choose what the price is for.');
+    res.redirect(back);
+    return;
+  }
   // D-300: for a category with thickness price rules the ordinary price is one row for every thickness.
   if (String(body.price_basis ?? '') === '') body.price_basis = rules.grid && body.price_inr === undefined ? 'grid' : 'unit';
   const grid = body.price_basis === 'grid';

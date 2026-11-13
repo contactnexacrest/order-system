@@ -7,8 +7,9 @@
     <label>Task Name * <input type="text" name="name" required placeholder="e.g. ECGC Cover, Pre-Shipment Inspection"></label>
     <label>When is it done? *
       <select name="phase" required>
+        <option value="">Choose…</option>
         <?php foreach (\App\Repositories\ComplianceTaskTypeRepository::PHASES as $key => $label): ?>
-          <option value="<?= htmlspecialchars($key) ?>" <?= $key === 'shipment' ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+          <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
         <?php endforeach; ?>
       </select>
     </label>

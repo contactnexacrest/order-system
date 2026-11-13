@@ -12,12 +12,12 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
     <?= Csrf::field() ?>
     <div class="field-grid">
       <label>Name *<input type="text" name="name" required maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Full name as on PAN card"></label>
-      <label>Based in *<select name="based_in" required><option value="india"<?= ($__a['based_in'] ?? 'india') === 'india' ? ' selected' : '' ?>>India</option><option value="abroad"<?= ($__a['based_in'] ?? '') === 'abroad' ? ' selected' : '' ?>>Abroad</option></select></label>
+      <label>Based in *<select name="based_in" required><option value="">Choose…</option><option value="india"<?= ($__a['based_in'] ?? '') === 'india' ? ' selected' : '' ?>>India</option><option value="abroad"<?= ($__a['based_in'] ?? '') === 'abroad' ? ' selected' : '' ?>>Abroad</option></select></label>
       <label>Country<input type="text" name="country" maxlength="80" value="<?= $__v('country') ?>" placeholder="e.g. Netherlands"></label>
       <?php // D-264: India → always INR (no conversion, TDS in rupees); abroad → an active trading currency, USD by default. ?>
       <label data-show-when="based_in=india">Paid in (currency) *<select name="currency_code" required><option value="INR" selected>INR — Indian rupee</option></select><span class="help-line">Fixed for associates based in India: always INR, by NEFT / RTGS / IMPS to the verified account. No currency conversion, TDS in rupees.</span></label>
       <label data-show-when="based_in=abroad">Paid in (currency) *<select name="currency_code" required><option value="">Choose…</option>
-        <?php $__cur = ($__a['based_in'] ?? 'india') === 'abroad' && ($__a['currency_code'] ?? '') !== 'INR' ? (string) $__a['currency_code'] : 'USD'; ?>
+        <?php $__cur = ($__a['based_in'] ?? '') === 'abroad' && ($__a['currency_code'] ?? '') !== 'INR' ? (string) $__a['currency_code'] : ''; // UI-013: chosen, no USD default ?>
         <?php foreach ($currencies as $cur): $__code = (string) ($cur['code'] ?? $cur['currency_code'] ?? ''); if ($__code === '' || $__code === 'INR') { continue; } ?>
           <option value="<?= htmlspecialchars($__code) ?>"<?= $__cur === $__code ? ' selected' : '' ?>><?= htmlspecialchars($__code) ?></option>
         <?php endforeach; ?>
@@ -41,13 +41,14 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
     </fieldset>
     <?php // Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. ?>
     <fieldset><legend>Commission level (D-245)</legend>
-      <?php $__mode = (string) ($__a['commission_mode'] ?? 'ladder'); $__lid = (string) ($__a['commission_level_id'] ?? ''); ?>
+      <?php $__mode = (string) ($__a['commission_mode'] ?? ''); $__lid = (string) ($__a['commission_level_id'] ?? ''); ?>
       <?php if (!empty($__a['id'])): // D-291: an existing associate's rule is changed on their page, with a reason ?>
         <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
       <?php elseif (!empty($canPricing)): ?>
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>
+              <option value="">Choose…</option>
               <option value="ladder"<?= $__mode === 'ladder' ? ' selected' : '' ?>>Standard ladder (moves up with counting orders)</option>
               <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed % (one commission level, stays until the MD changes it)</option>
             </select></label>

@@ -1311,6 +1311,10 @@
     if (el.required && el.tagName === 'SELECT' && value === '' && el.dataset.requiredMessage) {
       return el.dataset.requiredMessage;
     }
+    // UI-013 (13 Nov 2026): every other required drop-down still on "Choose…" names what to choose.
+    if (el.required && el.tagName === 'SELECT' && !el.multiple && value === '') {
+      return 'Please choose ' + fieldLabelText(el) + '.';
+    }
     var mismatch = matchError(el);
     if (mismatch) return mismatch;
     // data-allowed-from="<select name>": the value must be one of the units

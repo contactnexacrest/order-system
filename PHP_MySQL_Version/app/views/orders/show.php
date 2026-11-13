@@ -755,7 +755,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
                 <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
                 <label>Mode *
                   <select name="payment_mode" required>
-                    <?php foreach (\App\Repositories\OrderVendorBillRepository::PAYMENT_MODES as $__mode): ?><option><?= htmlspecialchars($__mode) ?></option><?php endforeach; ?>
+                    <option value="">Choose…</option><?php foreach (\App\Repositories\OrderVendorBillRepository::PAYMENT_MODES as $__mode): ?><option><?= htmlspecialchars($__mode) ?></option><?php endforeach; ?>
                   </select>
                 </label>
                 <label>UTR / reference *<input type="text" name="payment_ref" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="e.g. SBIN1234567890"></label>
@@ -800,14 +800,8 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
         }
     }
     $__pfAsked = isset($prefill['asked']) && (float) $prefill['asked'] > 0 ? round((float) $prefill['asked'], 2) : null;
-    $__pfRateUsed = $__pfRateKnown ? $__pfRate : null;
-    if ($__pfRateUsed === null) {
-        foreach ($gstRates as $__o) {
-            if ($__o['is_default']) {
-                $__pfRateUsed = (float) $__o['option_value'];
-            }
-        }
-    }
+    // UI-013 (13 Nov 2026): no default rate — the GST rate starts at "Choose…" unless the PO gives it.
+    $__pfRateUsed = $__pfRateKnown ? $__pfRate : 0.0;
     $__pfGst = $__pfTaxable !== null ? round($__pfTaxable * (float) $__pfRateUsed / 100, 2) : 0.0;
     ?>
     <fieldset class="full radio-row">
@@ -820,8 +814,9 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
     <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"<?= $__pfTaxable !== null ? ' value="' . number_format($__pfTaxable, 2, '.', '') . '"' : '' ?>><?php if (!empty($prefill['hint'])): ?><small class="muted bill-prefill-hint"><?= htmlspecialchars((string) $prefill['hint']) ?></small><?php endif; ?></label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
+        <option value="">Choose…</option>
         <?php foreach ($gstRates as $o): ?>
-          <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= ($__pfRateKnown ? abs((float) $o['option_value'] - $__pfRate) < 0.001 : $o['is_default']) ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
+          <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= $__pfRateKnown && abs((float) $o['option_value'] - $__pfRate) < 0.001 ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
         <?php endforeach; ?>
       </select>
     </label>
@@ -3425,15 +3420,17 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php // Owner decision (2026-10-27): an Advance can be paid any time; the Final bill waits for Step 9d on CFR/CIF. ?>
         <label>Payment *
           <select name="payment_kind" required>
+            <option value="">Choose…</option>
             <option value="advance">Advance — paid before the service</option>
-            <option value="final" selected>Final — against the completed service</option>
+            <option value="final">Final — against the completed service</option>
           </select>
           <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?> Advance = a Proforma / advance request; Final = the Tax invoice / final bill.</small>
         </label>
         <?php // Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge. ?>
         <label data-show-when="bill_for=transport">GST on this bill *
           <select name="gst_charge" required>
-            <option value="forward" selected>Charged on the bill</option>
+            <option value="">Choose…</option>
+            <option value="forward">Charged on the bill</option>
             <option value="reverse">Reverse charge — no GST on the bill</option>
           </select>
           <small class="muted">Reverse charge: the bill shows no GST; we pay 5% to the government and claim it back. Pick GST rate 0% below.</small>
@@ -4163,9 +4160,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             </label>
             <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
-              <?php // Owner request (3 Nov 2026): Company account is the default. ?>
+              <?php // Owner decision UI-013 (13 Nov 2026, replaces the 3 Nov default "Company account"): chosen, never preselected. ?>
               <select name="paid_by" required>
-                <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <option value="">Choose…</option><?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
@@ -4223,9 +4220,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Demo Traders, their invoice DT/45 dated 20 Oct"></label>
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
             <label>Paid from *
-              <?php // Owner request (3 Nov 2026): Company account is the default. ?>
+              <?php // Owner decision UI-013 (13 Nov 2026, replaces the 3 Nov default "Company account"): chosen, never preselected. ?>
               <select name="paid_from" required>
-                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <option value="">Choose…</option><?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <?php // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): required when the company account paid. ?>
@@ -4284,7 +4281,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
             <label data-show-when="fee_payer=nexacrest">Paid from *
               <select name="paid_from" required>
-                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= ($__feePaidFrom ?? 'company_account') === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <option value="">Choose…</option><?php // UI-013: "Choose…" until saved; editing shows the saved value. ?><?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__feePaidFrom === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <?php // Owner rule D-212: the cost line is described from the agency and its invoice. ?>

@@ -199,6 +199,14 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
         self::assertSame('Choose how GST is charged on the bill.', $this->lastFlash()['message']);
 
+        // UI-013 (13 Nov 2026): "GST on this bill" starts at "Choose…" — a transport bill sent without it is refused.
+        $_POST = ['gst_charge' => '', 'bill_for' => 'transport', 'gst_rate_pct' => '0'] + $base;
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Choose how GST is charged on the bill.', $this->lastFlash()['message']);
+        $_POST = ['payment_kind' => '', 'bill_for' => 'cha', 'gst_rate_pct' => '0'] + $base;
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Choose whether the bill is an Advance or the Final bill.', $this->lastFlash()['message']);
+
         $id = OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'transport', 'bill_no' => 'R-2', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 1000, 'gst_inr' => 0, 'gst_reverse_charge' => 1], $this->userId);
         self::assertSame(1, (int) OrderVendorBillRepository::find($id)['gst_reverse_charge']);
         self::assertSame(0, (int) OrderVendorBillRepository::find($this->logisticsBill($orderId, $partnerId, 'transport', 500))['gst_reverse_charge'], 'charged on the bill unless marked');

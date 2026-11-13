@@ -57,9 +57,11 @@
           </select>
         </label>
         <label>Currency *<small class="muted">(this order's foreign trade currency — everything priced below is in this currency unless marked INR)</small>
+          <?php // Owner decision UI-013 (13 Nov 2026): a required drop-down on a create form starts at "Choose…". ?>
           <select name="currency_id" id="order-currency-select" required onchange="updateFreightCurrencyLabels(this)">
+            <option value="">Choose…</option>
             <?php foreach ($currencies as $cur): ?>
-              <option value="<?= (int) $cur['id'] ?>" data-code="<?= htmlspecialchars($cur['code']) ?>" <?= isset($old['currency_id']) ? ((int) $cur['id'] === (int) $old['currency_id'] ? 'selected' : '') : ($cur['is_default'] ? 'selected' : '') ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
+              <option value="<?= (int) $cur['id'] ?>" data-code="<?= htmlspecialchars($cur['code']) ?>" <?= isset($old['currency_id']) && (int) $cur['id'] === (int) $old['currency_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cur['code']) ?> — <?= htmlspecialchars($cur['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </label>

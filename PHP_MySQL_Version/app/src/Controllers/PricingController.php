@@ -647,6 +647,12 @@ final class PricingController
         }
         $settings = PricingService::settings();
         $rules = ThicknessPrices::rules($product, $settings);
+        // UI-013 (13 Nov 2026): the form's "Price for" starts at "Choose…" — a form sent without a choice is refused.
+        if (isset($_POST['price_basis']) && $_POST['price_basis'] === '') {
+            Flash::set('error', 'Choose what the price is for.');
+            header("Location: {$back}");
+            return;
+        }
         // D-300: for a category with thickness price rules the ordinary price is one row for every thickness.
         if (($_POST['price_basis'] ?? '') === '') {
             $_POST['price_basis'] = $rules['grid'] && !isset($_POST['price_inr']) ? 'grid' : 'unit';

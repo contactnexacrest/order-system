@@ -165,6 +165,9 @@ describe('vendor bills and order expenses', () => {
     expect(await attempt({ bill_for: 'cha', gst_rate_pct: '0' })).toBe('Reverse charge applies only to a Transport bill.');
     expect(await attempt({ bill_for: 'transport', gst_rate_pct: '5' })).toBe('Under reverse charge the transporter charges no GST — pick GST rate 0%.');
     expect(await attempt({ gst_charge: 'sideways', bill_for: 'transport', gst_rate_pct: '0' })).toBe('Choose how GST is charged on the bill.');
+    // UI-013 (13 Nov 2026): "GST on this bill" starts at "Choose…" — a transport bill sent without it is refused.
+    expect(await attempt({ gst_charge: '', bill_for: 'transport', gst_rate_pct: '0' })).toBe('Choose how GST is charged on the bill.');
+    expect(await attempt({ payment_kind: '', bill_for: 'cha', gst_rate_pct: '0' })).toBe('Choose whether the bill is an Advance or the Final bill.');
 
     const id = await orderVendorBillRepository.create(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'transport', bill_no: 'R-2', bill_date: todayIst(), taxable_inr: 1000, gst_inr: 0, gst_reverse_charge: 1 }, adminId);
     expect(Number((await orderVendorBillRepository.find(id)).gst_reverse_charge)).toBe(1);

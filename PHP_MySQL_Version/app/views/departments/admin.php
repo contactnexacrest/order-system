@@ -51,6 +51,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
       </label>
       <label>Role (its permissions) *
         <select name="role_id" required>
+          <option value="">Choose…</option>
           <option value="new">A new role with the same name (set its permissions next)</option>
           <?php foreach ($roles as $r): ?><option value="<?= (int) $r['id'] ?>"><?= htmlspecialchars((string) $r['name']) ?></option><?php endforeach; ?>
         </select>

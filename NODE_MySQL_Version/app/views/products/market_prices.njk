@@ -69,6 +69,7 @@
       <label>Valid until<input type="date" name="valid_until" value="{{ prefill.valid_until if (prefill and prefill.valid_until) else '' }}"></label>
       <label>Price for *
         <select name="price_basis" required>
+          <option value="">Choose…</option>
           {% if rules.grid %}
             <option value="grid">Every thickness — the prices below</option>
           {% else %}

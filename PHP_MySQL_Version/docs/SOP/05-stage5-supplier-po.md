@@ -201,7 +201,8 @@ Each leg is **bill first, then payment**:
    correct them when the bill differs.
 
    Then the bill number, bill date, taxable value, **GST rate (%)** picked
-   from the GST Rate list (0, 5, 12, 18, 28 — 18% preselected), the bill
+   from the GST Rate list (0, 5, 12, 18, 28 — it starts at "Choose…" unless
+   the Supplier PO gives the rate, owner decision 13 Nov 2026), the bill
    file and an optional note. **GST (₹)** and **Bill total (₹)** fill in by
    themselves and can't be typed; the server works the GST out again on
    save and refuses a rate that isn't on the list.

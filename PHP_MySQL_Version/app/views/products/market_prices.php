@@ -79,6 +79,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
       <label>Valid until<input type="date" name="valid_until" value="<?= View::e($__pf['valid_until'] ?? '') ?>"></label>
       <label>Price for *
         <select name="price_basis" required>
+          <option value="">Choose…</option>
           <?php if ($rules['grid']): ?>
             <option value="grid">Every thickness — the prices below</option>
           <?php else: ?>

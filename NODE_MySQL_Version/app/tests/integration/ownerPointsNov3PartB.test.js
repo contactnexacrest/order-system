@@ -157,14 +157,16 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     expect(html).toContain('<p class="full to-pay-now"><strong>Buyer to pay now: USD 8,500.00</strong> <small class="muted">(balance due USD 12,500.00 − already received USD 4,000.00)</small></p>');
   });
 
-  it('7: Paid from / Paid by default to Company account', async () => {
+  // Point 7 (3 Nov: Company account by default) is replaced by owner decision UI-013 (13 Nov 2026, Option A): chosen, never preselected.
+  it('7: Paid from / Paid by start at "Choose…" since UI-013', async () => {
     const [orderId] = await orderWithSupplierPo();
     const html = await page(orderId);
     for (const name of ['paid_from', 'paid_by']) {
       const m = html.match(new RegExp(`<select name="${name}" required>([\\s\\S]*?)</select>`));
       expect(m).not.toBeNull();
-      expect(m[1]).not.toContain('Choose…');
-      expect(m[1]).toContain('<option value="company_account" selected>Company account</option>');
+      expect(m[1].trim().startsWith('<option value="">Choose…</option>')).toBe(true);
+      expect(m[1]).toContain('<option value="company_account">Company account</option>');
+      expect(m[1]).not.toContain(' selected');
     }
   });
 

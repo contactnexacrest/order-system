@@ -204,7 +204,11 @@ final class VendorBillController
         }
         // Owner decision 2026-10-29 (CA advice): reverse charge only for a
         // road transporter (GTA) that charges no GST — so the bill's GST is 0.
-        $gstCharge = (string) ($_POST['gst_charge'] ?? 'forward');
+        // UI-013 (13 Nov 2026): a transport bill says how GST is charged ("Choose…" first); the others are charged on the bill.
+        $gstCharge = (string) ($_POST['gst_charge'] ?? '');
+        if ($gstCharge === '' && $service !== 'transport') {
+            $gstCharge = 'forward';
+        }
         if (!in_array($gstCharge, ['forward', 'reverse'], true)) {
             $this->back($orderId, $anchor, 'error', 'Choose how GST is charged on the bill.');
             return;

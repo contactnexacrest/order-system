@@ -51,9 +51,11 @@
           </select>
         </label>
         <label>Currency *<small class="muted">(this order's foreign trade currency — everything priced below is in this currency unless marked INR)</small>
+          {# Owner decision UI-013 (13 Nov 2026): a required drop-down on a create form starts at "Choose…". #}
           <select name="currency_id" id="order-currency-select" required onchange="updateFreightCurrencyLabels(this)">
+            <option value="">Choose…</option>
             {% for cur in currencies %}
-              <option value="{{ cur.id }}" data-code="{{ cur.code }}" {{ ('selected' if cur.id == old.currency_id else '') if old.currency_id else ('selected' if cur.is_default else '') }}>{{ cur.code }} — {{ cur.name }}</option>
+              <option value="{{ cur.id }}" data-code="{{ cur.code }}" {{ 'selected' if (old.currency_id and cur.id == old.currency_id) else '' }}>{{ cur.code }} — {{ cur.name }}</option>
             {% endfor %}
           </select>
         </label>

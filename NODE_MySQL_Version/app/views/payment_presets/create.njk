@@ -24,8 +24,9 @@
         </label>
         <label>Payment Method *
           <select name="payment_method" required>
+            <option value="">Choose…</option>
             {% for key, label in paymentMethodOptions %}
-              <option value="{{ key }}" {{ 'selected' if key == 'CASH_ADVANCE' }}>{{ label }}</option>
+              <option value="{{ key }}">{{ label }}</option>
             {% endfor %}
           </select>
         </label>
@@ -63,8 +64,9 @@
       <legend>Currency</legend>
       <label>Currency *
         <select name="currency_id" required>
+          <option value="">Choose…</option>
           {% for c in currencies %}
-            <option value="{{ c.id }}" {{ 'selected' if c.is_default }}>{{ c.code }} — {{ c.name }}</option>
+            <option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>
           {% endfor %}
         </select>
       </label>

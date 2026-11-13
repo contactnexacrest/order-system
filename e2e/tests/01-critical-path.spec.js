@@ -185,6 +185,13 @@ async function addAndPayBill(page, stageNumber, cardSelector, fields, billNo, am
   await addForm.locator('input[name="bill_no"]').fill(billNo);
   await addForm.locator('input[name="bill_date"]').fill(new Date().toISOString().slice(0, 10));
   await addForm.locator('input[name="taxable_inr"]').fill(amount);
+  // UI-013 (13 Nov 2026): required drop-downs start at "Choose…" — pick Final and a GST rate when not given.
+  if ((await addForm.locator('select[name="payment_kind"]').count()) && (await addForm.locator('select[name="payment_kind"]').inputValue()) === '') {
+    await addForm.locator('select[name="payment_kind"]').selectOption('final');
+  }
+  if ((await addForm.locator('select[name="gst_rate_pct"]').inputValue()) === '') {
+    await addForm.locator('select[name="gst_rate_pct"]').selectOption({ index: 1 });
+  }
   // GST is a rate (%) from the dropdown; the amount and total fill themselves.
   const rate = Number(await addForm.locator('select[name="gst_rate_pct"]').inputValue());
   const gst = Math.round(Number(amount) * rate) / 100;
@@ -197,6 +204,7 @@ async function addAndPayBill(page, stageNumber, cardSelector, fields, billNo, am
   await openStage(page, stageNumber);
   const row = page.locator(cardSelector).locator('tr', { hasText: billNo });
   await row.locator('details.vendor-bill-pay > summary').click();
+  await row.locator('select[name="payment_mode"]').selectOption({ index: 1 }); // UI-013: "Choose…" first
   await row.locator('input[name="payment_ref"]').fill(`UTR-${billNo}`);
   await Promise.all([page.waitForEvent('load'), row.getByRole('button', { name: 'Save Payment' }).click()]);
   await expect(page.locator('.alert')).toContainText(`against bill ${billNo} recorded`);

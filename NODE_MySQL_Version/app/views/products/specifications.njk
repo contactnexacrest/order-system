@@ -94,7 +94,7 @@
           <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/options" class="field-grid">
             {{ csrf() }}
             <label>Add an option for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
-            <label>Change type *<select name="change_type" required>{% for k, l in changeTypes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+            <label>Change type *<select name="change_type" required><option value="">Choose…</option>{% for k, l in changeTypes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
             <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00"></label>
             <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 25 (thickness options)"></label>
             <input type="hidden" name="sort_order" value="90">

@@ -164,6 +164,8 @@ describe('Departments, Log in as and Preview as', () => {
 
     const body = { department_id: String(dept.id), title: `QC Manager ${tag}`, level: 'manager', role_id: 'new' };
     expect((await post(admin, page, '/admin/designations', { ...body, level: 'boss' })).message).toBe('Choose the level.');
+    // UI-013 (13 Nov 2026): "Role (its permissions)" starts at "Choose…" — an empty choice is refused, never a new role by default.
+    expect((await post(admin, page, '/admin/designations', { ...body, role_id: '' })).message).toBe('Choose the role.');
     expect((await post(admin, page, '/admin/designations', body)).message)
       .toBe(`"QC Manager ${tag}" added to Quality ${tag}. Its role has no permissions yet — set them with "Permissions".`);
     expect((await post(admin, page, '/admin/designations', body)).message).toBe(`"QC Manager ${tag}" already exists in Quality ${tag}.`);

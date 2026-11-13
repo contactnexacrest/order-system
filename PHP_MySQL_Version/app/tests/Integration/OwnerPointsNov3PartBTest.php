@@ -183,14 +183,16 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         self::assertStringContainsString('<p class="full to-pay-now"><strong>Buyer to pay now: USD 8,500.00</strong> <small class="muted">(balance due USD 12,500.00 − already received USD 4,000.00)</small></p>', $html);
     }
 
-    public function testPoint7PaidFromDefaultsToCompanyAccount(): void
+    /** Point 7 (3 Nov: Company account by default) is replaced by owner decision UI-013 (13 Nov 2026, Option A): chosen, never preselected. */
+    public function testPoint7PaidFromStartsAtChooseSinceUi013(): void
     {
         [$orderId] = $this->orderWithSupplierPo();
         $page = $this->render($orderId);
         foreach (['paid_from', 'paid_by'] as $name) {
             self::assertSame(1, preg_match('#<select name="' . $name . '" required>(.*?)</select>#s', $page, $m), $name . ' is on the page');
-            self::assertStringNotContainsString('Choose…', $m[1], $name . ': no blank choice');
-            self::assertStringContainsString('<option value="company_account" selected>Company account</option>', $m[1], $name . ': Company account by default');
+            self::assertStringStartsWith('<option value="">Choose…</option>', trim($m[1]), $name . ': starts at "Choose…"');
+            self::assertStringContainsString('<option value="company_account">Company account</option>', $m[1], $name . ': nothing preselected');
+            self::assertStringNotContainsString(' selected', $m[1]);
         }
     }
 

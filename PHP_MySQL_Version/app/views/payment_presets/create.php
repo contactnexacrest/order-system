@@ -25,8 +25,9 @@
         </label>
         <label>Payment Method *
           <select name="payment_method" required>
+            <option value="">Choose…</option>
             <?php foreach ($paymentMethodOptions as $key => $label): ?>
-              <option value="<?= htmlspecialchars($key) ?>" <?= $key === 'CASH_ADVANCE' ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
             <?php endforeach; ?>
           </select>
         </label>
@@ -64,8 +65,9 @@
       <legend>Currency</legend>
       <label>Currency *
         <select name="currency_id" required>
+          <option value="">Choose…</option>
           <?php foreach ($currencies as $c): ?>
-            <option value="<?= (int) $c['id'] ?>" <?= $c['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($c['code']) ?> — <?= htmlspecialchars($c['name']) ?></option>
+            <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['code']) ?> — <?= htmlspecialchars($c['name']) ?></option>
           <?php endforeach; ?>
         </select>
       </label>

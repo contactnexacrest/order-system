@@ -41,6 +41,12 @@ final class ComplianceTaskTypeController
             header('Location: /compliance-task-types/create');
             return;
         }
+        // UI-013 (13 Nov 2026): "When is it done?" starts at "Choose…" — never a silent default on a new task.
+        if (!array_key_exists(Input::scalarString($_POST['phase'] ?? ''), ComplianceTaskTypeRepository::PHASES)) {
+            Flash::set('error', 'Choose when the task is done.');
+            header('Location: /compliance-task-types/create');
+            return;
+        }
 
         $user = AuthService::currentUser();
         $id = ComplianceTaskTypeRepository::create($name, (int) $user['id'], self::phaseFromPost());

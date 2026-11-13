@@ -426,6 +426,13 @@ final class OrderController
         $incotermId = (int) ($_POST['incoterm_id'] ?? 0);
         $currencyId = (int) ($_POST['currency_id'] ?? 0);
         $paymentPresetId = (int) ($_POST['payment_preset_id'] ?? 0);
+        if ($incotermId && $paymentPresetId && !$currencyId) {
+            // UI-013 (13 Nov 2026): the currency starts at "Choose…" on the New Order form.
+            Flash::set('error', 'Choose the order currency.');
+            Flash::setOld($_POST);
+            header('Location: /orders/create?client_id=' . $clientId);
+            return;
+        }
         if (!$incotermId || !$currencyId || !$paymentPresetId) {
             Flash::set('error', 'Incoterm, currency, and a payment preset are all required.');
             Flash::setOld($_POST);

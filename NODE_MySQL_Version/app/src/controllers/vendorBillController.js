@@ -171,7 +171,8 @@ async function addLogisticsBill(req, res) {
   }
   // Owner decision 2026-10-29 (CA advice): reverse charge only for a
   // road transporter (GTA) that charges no GST — so the bill's GST is 0.
-  const gstCharge = str(req.body.gst_charge) || 'forward';
+  // UI-013 (13 Nov 2026): a transport bill says how GST is charged ("Choose…" first); the others are charged on the bill.
+  const gstCharge = str(req.body.gst_charge) || (service !== 'transport' ? 'forward' : '');
   if (!['forward', 'reverse'].includes(gstCharge)) {
     back(req, res, orderId, anchor, 'error', 'Choose how GST is charged on the bill.');
     return;

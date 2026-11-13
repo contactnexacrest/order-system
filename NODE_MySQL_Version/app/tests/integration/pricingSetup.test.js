@@ -197,6 +197,12 @@ describe('Pricing setup (D-245, P1)', () => {
     });
     expect(msg).toBe('The quoted date cannot be in the future.');
 
+    // UI-013 (13 Nov 2026): "Price for" starts at "Choose…" — the form sent without a choice is refused.
+    msg = await post(agent, `/products/${productId}/market-prices`, `/products/${productId}/market-prices`, {
+      supplier_id: String(dir), supplier_name: dirName, price_inr: '82000', quoted_on: old, price_basis: '',
+    });
+    expect(msg).toBe('Choose what the price is for.');
+
     const first = (await productSupplierRepository.forProduct(productId)).find((s) => s.supplier_name === 'Sri Balaji Granites');
     await post(agent, `/products/${productId}/market-prices`, `/products/suppliers/${first.id}/use-for-pricing`, {});
     expect((await pricingService.forProduct(await productRepository.find(productId))).supplier_inr).toBe(80000);

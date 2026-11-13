@@ -163,6 +163,94 @@ final class FormLabelConventionsTest extends TestCase
     }
 
     /**
+     * Owner decision UI-013 (13 Nov 2026, Option A): on every create / add form a
+     * required drop-down starts at an empty "Choose…" option, so the user picks
+     * consciously. Edit forms and Settings pages that show the saved value, filters
+     * and price configurators stay as they are — listed here with the reason
+     * (file => [select name => reason], or "name|marker" when the same name is also
+     * used on a create form in that file and the marker picks the edit one). A
+     * drop-down with one fixed option (nothing to choose) and a multi-select are
+     * not choices of this kind. Node twin: formLabelConventions.test.js.
+     */
+    private const UI013_EDIT_OR_SETTINGS = [
+        'associate_portal/get_price.php' => ['spec[]' => 'price configurator: each specification shows its base option (set aside, owner to confirm)'],
+        'ca/cafin_export.php' => ['fy' => 'export filter', 'status' => 'export filter', 'scope' => 'export filter'],
+        'departments/admin.php' => ['level|aria-label="Designation level"' => 'edits a saved designation'],
+        'logistics_partners/edit.php' => ['service_type' => 'edit form'],
+        'merchant/show.php' => ['advance_backing' => 'changes the saved backing of a deal'],
+        'orders/_compliance_tracking.php' => ['claim_status' => 'updates the saved claim status'],
+        'orders/edit_details.php' => ['incoterm_id' => 'edit form', 'currency_id' => 'edit form'],
+        'orders/show.php' => ['status' => 'updates the saved quality-document status'],
+        'payment_presets/edit.php' => ['payment_method' => 'edit form', 'balance_trigger_option' => 'edit form', 'currency_id' => 'edit form'],
+        'compliance_task_types/edit.php' => ['phase' => 'edit form'],
+        'port_routes/edit.php' => ['port_of_loading_id' => 'edit form', 'port_of_discharge_id' => 'edit form'],
+        'ports/edit.php' => ['port_role' => 'edit form'],
+        'products/edit_price.php' => ['unit' => 'edits a saved price', 'thickness_mm' => 'edits a saved price'],
+        'products/link_supplier.php' => ['unit' => 'links a saved (legacy) price, prefilled from it'],
+        'pricing/commission_levels.php' => ['kind' => 'edits a saved commission level'],
+        'pricing/_spec_table.php' => ['kind|required<?= $__ro ?>' => 'edits a saved specification'],
+        'products/specifications.php' => ['category_id' => "the product's saved category (product settings)"],
+        'pricing/settings.php' => ['fx_mode' => 'Settings page', 'incentive_mode' => 'Settings page'],
+        'settings/document_cleanup.php' => ['draft_days' => 'Settings page', 'superseded_days' => 'Settings page', 'cafin_mode' => 'Settings page'],
+        'settings/remittance_reasons.php' => ['treatment|aria-label="Treated as"' => 'edits a saved reason'],
+    ];
+
+    public function testUi013EveryRequiredDropDownOnACreateFormStartsWithChoose(): void
+    {
+        $wrong = [];
+        $used = [];
+        foreach (self::views() as $rel => $text) {
+            preg_match_all('/<select\b/', $text, $m, PREG_OFFSET_CAPTURE);
+            foreach ($m[0] as [, $at]) {
+                $tag = self::openingTag($text, $at);
+                $plain = (string) preg_replace('/<\?.*?\?>/s', '', $tag);
+                if (!preg_match('/\srequired(?=[\s>])/', $plain) || preg_match('/\smultiple\b/', $plain)) {
+                    continue;
+                }
+                $end = strpos($text, '</select>', $at + strlen($tag));
+                $inner = substr($text, $at + strlen($tag), ($end === false ? strlen($text) : $end) - $at - strlen($tag));
+                $raw = $inner;
+                $inner = (string) preg_replace('/<\?php\b.*?\?>/s', '', $inner);
+                if (preg_match_all('/<option\b/', $raw) === 1 && !preg_match('/foreach/', $raw)) {
+                    continue; // one fixed option: nothing to choose
+                }
+                if (preg_match('/^\s*<option value=""[\s>]/u', $inner)) { // "Choose…" (or a prompt such as "Paid via…")
+                    continue;
+                }
+                $name = preg_match('/\sname="([^"<]*)/', $tag, $n) ? (string) preg_replace('/\[.*$/', '[]', $n[1]) : '?';
+                $allowed = null;
+                foreach (self::UI013_EDIT_OR_SETTINGS[$rel] ?? [] as $key => $reason) {
+                    [$kName, $marker] = array_pad(explode('|', $key, 2), 2, null);
+                    if ($kName === $name && ($marker === null || str_contains($tag, $marker))) {
+                        $allowed = "{$rel}::{$key}";
+                    }
+                }
+                if ($allowed !== null) {
+                    $used[$allowed] = true;
+                    continue;
+                }
+                $wrong[] = $rel . ':' . (substr_count($text, "\n", 0, $at) + 1) . ' ' . $name;
+            }
+        }
+        self::assertSame([], $wrong, 'UI-013: a required drop-down on a create / add form starts with <option value="">Choose…</option> (or is listed as an edit / Settings page).');
+        $stale = [];
+        foreach (self::UI013_EDIT_OR_SETTINGS as $rel => $names) {
+            foreach (array_keys($names) as $key) {
+                if (!isset($used["{$rel}::{$key}"])) {
+                    $stale[] = "{$rel}::{$key}";
+                }
+            }
+        }
+        self::assertSame([], $stale, 'UI-013: an allow-list entry no longer matches a drop-down — remove it.');
+    }
+
+    public function testUi013TheSitewideScriptAsksToChooseARequiredDropDown(): void
+    {
+        $js = (string) file_get_contents(self::APP_JS);
+        self::assertStringContainsString("if (el.required && el.tagName === 'SELECT' && !el.multiple && value === '') {\n      return 'Please choose ' + fieldLabelText(el) + '.';", $js);
+    }
+
+    /**
      * Every drop-down's empty first option reads "Choose…" (or "Choose a …"), on
      * any drop-down, required or not — never the older "Select…", "— Select —",
      * "— choose —" or "Please select". Checks the views (scripts included: an

@@ -489,6 +489,13 @@ async function store(req, res) {
   const incotermId = parseInt(body.incoterm_id || 0, 10);
   const currencyId = parseInt(body.currency_id || 0, 10);
   const paymentPresetId = parseInt(body.payment_preset_id || 0, 10);
+  if (incotermId && paymentPresetId && !currencyId) {
+    // UI-013 (13 Nov 2026): the currency starts at "Choose…" on the New Order form.
+    flash.set(req, 'error', 'Choose the order currency.');
+    flash.setOld(req, body);
+    res.redirect(`/orders/create?client_id=${clientId}`);
+    return;
+  }
   if (!incotermId || !currencyId || !paymentPresetId) {
     flash.set(req, 'error', 'Incoterm, currency, and a payment preset are all required.');
     flash.setOld(req, body);

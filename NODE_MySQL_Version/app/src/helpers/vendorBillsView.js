@@ -138,14 +138,14 @@ function prefillFigures(gstRates, prefill) {
   const taxable = p.taxable !== null && p.taxable !== undefined && Number(p.taxable) > 0 ? round2(Number(p.taxable)) : null;
   const wanted = p.gst_rate !== null && p.gst_rate !== undefined && p.gst_rate !== '' && Number.isFinite(Number(p.gst_rate)) ? Number(p.gst_rate) : null;
   const known = wanted !== null && (gstRates || []).some((o) => Math.abs(Number(o.option_value) - wanted) < 0.001);
-  let rateUsed = known ? wanted : null;
-  if (rateUsed === null) for (const o of gstRates || []) if (o.is_default) rateUsed = Number(o.option_value);
+  // UI-013 (13 Nov 2026): no default rate — the GST rate starts at "Choose…" unless the PO gives it.
+  const rateUsed = known ? wanted : 0;
   const gst = taxable !== null ? require('./money').phpRound(taxable * Number(rateUsed || 0), 0) / 100 : 0; // HNT-L01: PHP round()
   const asked = p.asked !== null && p.asked !== undefined && Number(p.asked) > 0 ? round2(Number(p.asked)) : null;
   return {
     taxable: taxable !== null ? taxable.toFixed(2) : null,
     rateKnown: known,
-    isSelected: (o) => (known ? Math.abs(Number(o.option_value) - wanted) < 0.001 : !!o.is_default),
+    isSelected: (o) => known && Math.abs(Number(o.option_value) - wanted) < 0.001,
     gst: gst.toFixed(2),
     total: round2((taxable || 0) + gst).toFixed(2), // HNT-L01: PHP round()
     asked: asked !== null ? asked.toFixed(2) : null,

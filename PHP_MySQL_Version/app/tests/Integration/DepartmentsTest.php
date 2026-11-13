@@ -199,6 +199,8 @@ final class DepartmentsTest extends DbTestCase
 
         $body = ['department_id' => (string) $deptId, 'title' => "QC Manager {$tag}", 'level' => 'manager', 'role_id' => 'new'];
         self::assertSame('Choose the level.', $this->post($c, 'createDesignation', ['level' => 'boss'] + $body)['message']);
+        // UI-013 (13 Nov 2026): "Role (its permissions)" starts at "Choose…" — an empty choice is refused, never a new role by default.
+        self::assertSame('Choose the role.', $this->post($c, 'createDesignation', ['role_id' => ''] + $body)['message']);
         self::assertSame("\"QC Manager {$tag}\" added to Quality {$tag}. Its role has no permissions yet — set them with \"Permissions\".",
             $this->post($c, 'createDesignation', $body)['message']);
         self::assertSame("\"QC Manager {$tag}\" already exists in Quality {$tag}.", $this->post($c, 'createDesignation', $body)['message']);

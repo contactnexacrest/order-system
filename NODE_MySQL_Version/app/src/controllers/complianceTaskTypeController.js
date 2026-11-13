@@ -37,6 +37,12 @@ async function create(req, res) {
     res.redirect('/compliance-task-types/create');
     return;
   }
+  // UI-013 (13 Nov 2026): "When is it done?" starts at "Choose…" — never a silent default on a new task.
+  if (!Object.prototype.hasOwnProperty.call(complianceTaskTypeRepository.PHASES, scalarString(req.body.phase))) {
+    flash.set(req, 'error', 'Choose when the task is done.');
+    res.redirect('/compliance-task-types/create');
+    return;
+  }
 
   const id = await complianceTaskTypeRepository.create(name, req.user.id, phaseFromBody(req));
   await auditLogRepository.log(req.user.id, 'COMPLIANCE_TASK_TYPE_ADDED', 'compliance_task_types', id, null, null, name);
