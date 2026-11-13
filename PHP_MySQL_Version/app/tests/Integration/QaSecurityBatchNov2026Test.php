@@ -152,4 +152,23 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         self::assertSame(404, http_response_code());
         self::assertStringNotContainsString('TEST-QA granite slab', $html);
     }
+
+    /** HNT-008 / PLN-001: {pid} is a record id too (as every {...Id}); "1abc" matches no route on either stack. */
+    public function testHnt008PidIsAnIdParam(): void
+    {
+        self::assertTrue(\App\Helpers\Router::isIdParam('pid'));
+        foreach (['milestoneId', 'lineId', 'specId', 'offerId', 'changeId', 'id'] as $n) {
+            self::assertTrue(\App\Helpers\Router::isIdParam($n), $n);
+        }
+        $router = new \App\Helpers\Router();
+        $hit = false;
+        $router->post('/products/{pid}/own-specs/{id}/delete', function () use (&$hit): void {
+            $hit = true;
+        });
+        ob_start();
+        $router->dispatch('POST', '/products/1abc/own-specs/2/delete');
+        ob_end_clean();
+        self::assertFalse($hit, 'a non-numeric product id reaches no handler');
+        self::assertSame(404, http_response_code());
+    }
 }

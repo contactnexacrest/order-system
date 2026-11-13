@@ -72,7 +72,8 @@ final class Router
 
     public static function isIdParam(string $name): bool
     {
-        return $name === 'id' || str_ends_with($name, 'Id');
+        // HNT-008: {pid} (a product id on the product-specification routes) is a record id too, as on Node.
+        return $name === 'id' || $name === 'pid' || str_ends_with($name, 'Id');
     }
 
     /** @var (callable(string): bool)|null runs after a route's middleware, before its handler; false stops the request */

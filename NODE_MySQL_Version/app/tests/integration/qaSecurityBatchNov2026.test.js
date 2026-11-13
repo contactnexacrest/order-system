@@ -167,4 +167,24 @@ describe('QA Nov 2026 security batch', () => {
       expect((await md.agent.get(`/orders/${orderId}/products/${lineId}/price-approval`)).status).toBe(200);
     });
   });
+
+  describe('HNT-008 / PLN-001 every record-id route parameter is checked', () => {
+    it('HNT-008: changeId, specId, lineId, milestoneId, offerId and pid are validated like :id', () => {
+      const names = app.routeIdParams();
+      for (const n of ['id', 'changeId', 'specId', 'lineId', 'milestoneId', 'offerId', 'pid', 'productId', 'supplierId']) expect(names).toContain(n);
+      const fromSource = new Set([...fs.readFileSync(path.join(__dirname, '../../src/server.js'), 'utf8').matchAll(/\/:(\w+)/g)].map((m) => m[1]).filter((n) => n === 'id' || n === 'pid' || n.endsWith('Id')));
+      expect([...fromSource].filter((n) => !names.includes(n))).toEqual([]);
+    });
+
+    it('HNT-008: "/orders/2/payment/milestones/1abc", "1.5" and "1x9" answer 404 and reach no handler', async () => {
+      const md = await user('Managing Director');
+      for (const bad of ['1abc', '1.5', '1x9', '0']) {
+        const r = await md.agent.post(`/orders/2/payment/milestones/${bad}`).type('form').send({ amount: '1' });
+        expect([bad, r.status]).toEqual([bad, 404]);
+      }
+      expect((await md.agent.post('/domestic/orders/5/lines/7abc/delete').type('form').send({})).status).toBe(404);
+      expect((await md.agent.post('/suppliers/offers/3abc/active').type('form').send({})).status).toBe(404);
+      expect((await md.agent.post('/products/1abc/own-specs/2/delete').type('form').send({})).status).toBe(404);
+    });
+  });
 });

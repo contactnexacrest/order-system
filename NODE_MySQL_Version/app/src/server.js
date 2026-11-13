@@ -590,15 +590,37 @@ function orderMessageFiles() {
 // 20-digit id skip the route (404) instead of reaching a query. Port of
 // Router::ID_PATTERN.
 const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
-const ID_PARAMS = ['id', 'membershipId', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
-  'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
-  'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId', 'bankId', 'docId'];
+// HNT-008 / PLN-001 (QA 13 Nov 2026): the list is no longer typed by hand (it
+// had missed changeId, specId, lineId, milestoneId and offerId, so
+// "/milestones/1abc" acted on milestone 1). As PHP's Router::isIdParam():
+// every route parameter named "id", "pid" or ending in "Id" is a record id.
+// The names are collected from the registered routes (see registerIdParams()
+// below the last route) — a new route needs nothing more.
+function isIdParam(name) {
+  return name === 'id' || name === 'pid' || name.endsWith('Id');
+}
 // QA ACC-1: Express decodes params but the access checks read the raw path,
 // so "/orders/%31/edit" would reach order 1 while every path-based check
 // (division, assignment, archive, client, associate) saw no order id at all.
 // An id must also appear literally in the raw path, as PHP's router requires
 // (it matches the raw path, so "%31" is a 404 there).
-app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) && req.path.split('/').includes(String(value)) ? next() : next('route')));
+function idParamGuard(req, res, next, value) {
+  return ID_PATTERN.test(String(value)) && req.path.split('/').includes(String(value)) ? next() : next('route');
+}
+/** Every id-like parameter name used by a registered route (HNT-008). */
+function routeIdParams() {
+  const names = new Set(['id']);
+  for (const layer of app._router.stack) {
+    const routePath = layer.route && layer.route.path;
+    for (const p of (Array.isArray(routePath) ? routePath : [routePath])) {
+      for (const m of String(p || '').matchAll(/:(\w+)/g)) if (isIdParam(m[1])) names.add(m[1]);
+    }
+  }
+  return [...names];
+}
+function registerIdParams() {
+  app.param(routeIdParams(), idParamGuard);
+}
 
 // QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
 // order, document or order-linked record that does not exist answers 404 —
@@ -1885,6 +1907,10 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// HNT-008: every id-like parameter of every route above is validated (registered after the last route).
+registerIdParams();
+app.routeIdParams = routeIdParams;
 
 const port = env.getInt('PORT', 3000);
 app.listen(port, () => {
