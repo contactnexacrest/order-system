@@ -202,12 +202,13 @@ final class PriceFreezeAtPiD370Test extends DbTestCase
         $pdo->exec("UPDATE pricing_settings SET setting_value = '88.1200' WHERE setting_key = 'pricing_fx_rate'");
 
         $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-13g-freeze-prices-at-pi.sql');
-        // phpMyAdmin may switch to information_schema after a query: every statement names the database.
-        $viaInfoSchema = str_replace("SET @db := DATABASE();\n", "SET @db := DATABASE();\nUSE information_schema;\n", $sql);
-        self::assertNotSame($sql, $viaInfoSchema);
+        // phpMyAdmin (shared hosting) switches database after an information_schema query and then refuses
+        // PREPAREd statements (#1044, 13 Nov 2026): the file must be plain statements only.
+        self::assertStringNotContainsString('PREPARE', $sql);
+        self::assertStringNotContainsStringIgnoringCase('information_schema', preg_replace('/^--.*$/m', '', $sql));
         $cmd = ['mysql', '-h', Env::get('DB_HOST', '127.0.0.1'), '-P', Env::get('DB_PORT', '3306'), '-u', Env::get('DB_USERNAME'),
             '-p' . Env::get('DB_PASSWORD', ''), Env::get('DB_DATABASE')];
-        foreach ([$sql, $sql, $viaInfoSchema, $viaInfoSchema] as $run => $text) {
+        foreach ([$sql, $sql] as $run => $text) {
             $p = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             fwrite($pipes[0], $text);
             fclose($pipes[0]);
