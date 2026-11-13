@@ -162,4 +162,45 @@ final class PermittedLinksTest extends DbTestCase
         self::assertStringContainsString('Incentive payouts', $settings);
         self::assertStringNotContainsString('href="/incentives/payouts"', $settings, 'paying incentives needs pay_incentives');
     }
+
+    /** UI-006: the Investor (view_reports, no selling prices / buyer payments) is not offered the 9 money reports that refuse it. */
+    public function testUi006TheReportsPageOffersOnlyReportsThatShowMoneyThePersonMaySee(): void
+    {
+        $clientId = $this->createTestClient();
+        $moneyReports = ['/reports/aggregate', '/reports/payments', '/reports/todays-payments', '/reports/ageing', '/reports/amendments',
+            '/reports/trends', '/reports/performance', '/reports/products', '/reports/client/' . $clientId];
+
+        $this->actAs($this->createTestUser('Investor (view only)'));
+        $investor = $this->render(fn () => (new \App\Controllers\ReportController())->index([]));
+        foreach ($moneyReports as $path) {
+            self::assertStringNotContainsString('href="' . $path . '"', $investor, $path);
+        }
+        self::assertStringContainsString('href="/reports/queues"', $investor, 'a report without amounts stays');
+        self::assertStringNotContainsString('Open Ageing Report', $investor, 'the section is left out, not shown as dead text');
+        // Wherever such a link appears (any staff page), it is plain text for this person.
+        $html = PermittedLinks::filterHtml('<a href="/reports/ageing?as_of=2026-11-01">A</a> <a href="/reports/client/' . $clientId . '">B</a> <a href="/reports/queues">C</a>');
+        self::assertSame('<span class="link-not-permitted">A</span> <span class="link-not-permitted">B</span> <a href="/reports/queues">C</a>', $html);
+
+        $this->actAs($this->createTestUser('Managing Director'));
+        $md = $this->render(fn () => (new \App\Controllers\ReportController())->index([]));
+        foreach ($moneyReports as $path) {
+            self::assertStringContainsString('href="' . $path . '"', $md, $path);
+        }
+    }
+
+    /** UI-007: the System Administrator's Setup checklist does not link to product / pricing pages it cannot open. */
+    public function testUi007TheSetupChecklistLinksOnlyToPagesThePersonMayOpen(): void
+    {
+        $this->actAs($this->createTestUser('System Administrator'));
+        $checklist = $this->render(fn () => (new \App\Controllers\SetupChecklistController())->index([]));
+        self::assertStringContainsString('Commission levels', $checklist);
+        self::assertStringNotContainsString('href="/products"', $checklist);
+        self::assertStringNotContainsString('href="/pricing/commission-levels"', $checklist);
+        self::assertSame('<span class="link-not-permitted">set it</span>', PermittedLinks::filterHtml('<a href="/products/categories/3?tab=options&amp;edit=4#spec-4">set it</a>'));
+
+        $this->actAs($this->createTestUser('Managing Director'));
+        $checklist = $this->render(fn () => (new \App\Controllers\SetupChecklistController())->index([]));
+        self::assertStringContainsString('href="/products"', $checklist);
+        self::assertStringContainsString('href="/pricing/commission-levels"', $checklist);
+    }
 }

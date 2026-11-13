@@ -667,7 +667,7 @@ $router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'],
 
 **Database errors at the chokepoint:** `Router::dispatch` turns MySQL SQLSTATE `22001` (too long), `22007` (bad date/number) and `23000` (duplicate / missing reference) into a friendly flash message instead of a 500. A briefly unreachable database answers **503** (`DbResilience`, R7-N04). Node has matching error handlers at the end of `server.js`.
 
-**Links and buttons:** `Helpers/PermittedLinks` renders a link only where the viewer can open its target. `View::asset()` adds `?v=` to `app.js` / `app.css` so a deploy is picked up at once.
+**Links and buttons:** `Helpers/PermittedLinks` renders a link only where the viewer can open its target (QA UI-006/UI-007, 13 Nov 2026: also the money reports a person may not see, `/products`, a product category and Commission levels). `View::asset()` adds `?v=` to `app.js` / `app.css` so a deploy is picked up at once.
 
 ### 3.5 Templates: Standard and Kanban
 
@@ -1443,7 +1443,10 @@ four money permissions (4.7). `ReportController::refusedForMoney()` refuses
 every report that prints selling prices or buyer payments (per-client,
 aggregate, payments, today's payments, amendments, trends, ageing, products,
 performance) with "You do not have permission to see the amounts in this
-report.", and Order Profitability needs `manage_order_financials`. With the
+report.", and Order Profitability needs `manage_order_financials`. The
+Reports page does not offer those reports to someone who would be refused
+(QA UI-006, 13 Nov 2026), and a link to one anywhere else on a staff page is
+plain text (`PermittedLinks::MONEY_REPORTS`). With the
 seed set-up an Investor can open the dashboard, the cockpit, Operations
 Queues, Conversion and Disputes — counts and status only. If the owner wants
 investors to see revenue or profit, add `view_selling_prices` (and perhaps
@@ -1658,7 +1661,7 @@ Owner decision D-266 (7 Nov 2026). The SOP / Operations Guide (`/sop`) shows eac
 | **Always visible** | `00-getting-started`, to every staff member, even with the library off. |
 | **CA chapters** | A `ca-` chapter still also needs `ca_module_view`. |
 | **New chapter** | A chapter file with no `sop_chapters` row is **New**: only the people who always see everything see it until it is ticked for a role or a person, or switched on. |
-| **Links and screenshots** | A link to a chapter the person cannot open is shown as plain text. A screenshot (`/sop-assets/…`) is served only when a chapter the person may open (or the SOP home page) shows it, else 403 "Not permitted.". |
+| **Links and screenshots** | A link to a chapter the person cannot open is shown as plain text. A screenshot (`/sop-assets/…`) is served only when a chapter the person may open (or the SOP home page) shows it, else 403 "Not permitted.". The Getting Started tour (`/getting-started`) follows the same rules (QA UI-005, 13 Nov 2026): its quick-reference chapter links are plain text for chapters the person may not open, and a screenshot they may not load is left out with its caption (e.g. the dashboard screenshot, which no chapter shows, appears only for the people who see every chapter). |
 | **Refusal** | Opening a hidden chapter shows, in the normal layout with HTTP 403: "This SOP chapter isn't available for your role. Ask your Admin to add it if you need it." with "Back to your SOP chapters". With the library off: "The SOP library is switched off. Ask your Admin if you need it." with "Open Getting Started". |
 | **Audit** | `SOP_LIBRARY_SWITCHED`, `SOP_CHAPTER_SWITCHED`, `SOP_ROLE_CHAPTERS_SAVED`, `SOP_USER_CHAPTER_ADDED`, `SOP_USER_CHAPTER_REMOVED`. |
 

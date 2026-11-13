@@ -8,11 +8,14 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   <h1>Reports</h1>
   <p class="muted">Per-client and per-order reports are one click from that client's or order's own screen. This page covers the aggregate report and your saved report definitions.</p>
 
+  <?php // UI-006: a report that shows amounts is offered only to people who may see them (the page answers 403 otherwise). ?>
+  <?php if (!empty($sees['selling'])): ?>
   <div class="section">
     <h2>Aggregate Report</h2>
     <p class="muted">Filter orders by date range, stage, Incoterm, or country.</p>
     <a class="btn-sm" href="/reports/aggregate">Open Aggregate Report</a>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Operations Queues</h2>
@@ -20,23 +23,29 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <a class="btn-sm" href="/reports/queues">Open Operations Queues</a>
   </div>
 
+  <?php if (!empty($sees['buyer_payments'])): ?>
   <div class="section">
     <h2>Payments Report</h2>
     <p class="muted">Total collected vs. outstanding across the whole business, by currency — advance, balance, and freight.</p>
     <a class="btn-sm" href="/reports/payments">Open Payments Report</a>
   </div>
+  <?php endif; ?>
 
+  <?php if (!empty($sees['buyer_payments'])): ?>
   <div class="section">
     <h2>Today's Payments</h2>
     <p class="muted">What actually cleared/was paid on a specific day, both incoming (buyer) and outgoing (supplier).</p>
     <a class="btn-sm" href="/reports/todays-payments">Open Today's Payments</a>
   </div>
+  <?php endif; ?>
 
+  <?php if (!empty($sees['buyer_payments'])): ?>
   <div class="section">
     <h2>Debtors / Receivables Ageing</h2>
     <p class="muted">Every outstanding leg, bucketed by how overdue it is — Current, 1-30, 31-60, 61-90, 90+ days.</p>
     <a class="btn-sm" href="/reports/ageing">Open Ageing Report</a>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Missing eBRC / FIRC</h2>
@@ -49,7 +58,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <p class="muted">Status/aging breakdown for disputes, and status/requested-by breakdown for amendments — across all orders.</p>
     <div class="btn-row">
       <a class="btn-sm" href="/reports/disputes">Open Dispute Report</a>
-      <a class="btn-sm" href="/reports/amendments">Open Amendment Report</a>
+      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/amendments">Open Amendment Report</a><?php endif; ?>
     </div>
   </div>
 
@@ -57,9 +66,9 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <h2>Trends &amp; Conversion</h2>
     <p class="muted">Orders created, quotations/PI sent, lost, and FOB value month over month; plus the funnel shown as conversion percentages.</p>
     <div class="btn-row">
-      <a class="btn-sm" href="/reports/trends">Open Trends</a>
+      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/trends">Open Trends</a><?php endif; ?>
       <a class="btn-sm" href="/reports/conversion">Open Conversion Rate Report</a>
-      <a class="btn-sm" href="/reports/performance">Open Sales Performance Report</a>
+      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/performance">Open Sales Performance Report</a><?php endif; ?>
     </div>
   </div>
 
@@ -68,7 +77,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <p class="muted">Freight cost by forwarder, sales by product/HS code, and supplier signing/delivery performance.</p>
     <div class="btn-row">
       <?php if ($sees['logistics']): ?><a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a><?php endif; ?>
-      <a class="btn-sm" href="/reports/products">Open Product Sales Report</a>
+      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/products">Open Product Sales Report</a><?php endif; ?>
       <?php if ($sees['purchase'] ?? false): ?><a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a><?php endif; ?>
     </div>
   </div>
@@ -132,6 +141,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <?php endif; ?>
   </div>
 
+  <?php if (!empty($sees['selling']) && !empty($sees['buyer_payments'])): ?>
   <div class="section">
     <h2>Per-Client Report</h2>
     <table class="list">
@@ -146,6 +156,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
       <?php if (empty($clients)): ?><tr><td colspan="3" class="muted">No clients yet.</td></tr><?php endif; ?>
     </table>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Per-Order Report</h2>

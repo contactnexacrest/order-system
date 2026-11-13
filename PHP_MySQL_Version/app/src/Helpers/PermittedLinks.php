@@ -38,6 +38,10 @@ final class PermittedLinks
         '#^/admin/backups(?:[/?\#]|$)#'                             => ['manage_company_settings'], // D-260
         '#^/admin/email-settings(?:[/?\#]|$)#'                      => ['manage_company_settings'], // D-280
         '#^/admin/setup-checklist(?:[/?\#]|$)#'                     => ['manage_company_settings'], // D-312
+        // UI-007: the Setup checklist and Lists › Dropdown options link to product and pricing pages.
+        '#^/products(?:[?\#]|$)#'                                  => ['view_product_catalog'],
+        '#^/products/categories/\d+(?:[?\#]|$)#'                  => ['manage_product_catalog', 'manage_pricing', 'view_price_buildup'],
+        '#^/pricing/commission-levels(?:[?\#]|$)#'                 => ['view_price_buildup', 'manage_pricing'],
         '#^/audit-log(?:[/?\#]|$)#'                                 => ['view_audit_log'],
         '#^/ca/cafin-export(?:[/?\#]|$)#'                           => ['view_cafin'],
         '#^/ca/(?:zoho-sync|fy-locks)(?:[/?\#]|$)#'                 => ['ca_module_manage'],
@@ -86,6 +90,29 @@ final class PermittedLinks
         '#^/(?:import|merchant)(?:[/?\#]|$)#'                      => ['view_purchase_prices'],
     ];
 
+    /**
+     * UI-006: report pages whose route needs only view_reports but which answer
+     * 403 without the money they print (ReportController::refusedForMoney) —
+     * every money class listed is needed (MoneyVisibility). Kept apart from
+     * RULES, which mirror the route permissions exactly.
+     */
+    public const MONEY_REPORTS = [
+        '#^/reports/client/\d+(?:[/?\#]|$)#'                                         => ['selling', 'buyer_payments'],
+        '#^/reports/(?:aggregate|amendments|trends|products|performance)(?:[/?\#]|$)#' => ['selling'],
+        '#^/reports/(?:payments|todays-payments|ageing)(?:[/?\#]|$)#'                 => ['buyer_payments'],
+    ];
+
+    /** @return list<string>|null the money classes (all of them) the report page needs, or null */
+    public static function moneyRequiredFor(string $path): ?array
+    {
+        foreach (self::MONEY_REPORTS as $pattern => $classes) {
+            if (preg_match($pattern, $path)) {
+                return $classes;
+            }
+        }
+        return null;
+    }
+
     /** QA Round 6, R6-N02: pages of one order also need that order to be visible to the user (D-118). */
     private const ORDER_PAGE = '#^/(?:orders|reports/order)/(\d+)(?:[/?\#]|$)#';
 
@@ -108,6 +135,11 @@ final class PermittedLinks
         }
         if (preg_match(self::ORDER_PAGE, $path, $m) && !\App\Services\OrderAccessService::currentUserMaySeeOrderId((int) $m[1])) {
             return false;
+        }
+        foreach (self::moneyRequiredFor($path) ?? [] as $class) {
+            if (!\App\Services\MoneyVisibility::can($class)) {
+                return false;
+            }
         }
         $required = self::requiredFor($path);
         if ($required === null) {

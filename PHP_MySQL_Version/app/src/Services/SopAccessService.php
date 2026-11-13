@@ -188,6 +188,31 @@ final class SopAccessService
         return false;
     }
 
+    /**
+     * UI-005: a page outside the SOP viewer (Getting started) that shows SOP
+     * screenshots drops each screenshot this person may not load (with its
+     * caption), so nobody sees a broken image answered 403 by /sop-assets.
+     *
+     * @param list<string> $visible
+     */
+    public static function filterScreenshots(string $html, int $userId, ?int $roleId, array $visible): string
+    {
+        $ok = [];
+        $allowed = static function (string $file) use (&$ok, $userId, $roleId, $visible): bool {
+            return $ok[$file] ??= self::imageVisible(basename($file), $userId, $roleId, $visible);
+        };
+        $html = preg_replace_callback(
+            '#<div class="gs-shot"[^>]*>\s*<img\b[^>]*\bsrc="/sop-assets/([^"]+)"[^>]*>\s*</div>(?:\s*<div class="gs-shot-cap">.*?</div>)?#s',
+            static fn (array $m): string => $allowed($m[1]) ? $m[0] : '',
+            $html
+        ) ?? $html;
+        return preg_replace_callback(
+            '#<img\b[^>]*\bsrc="/sop-assets/([^"]+)"[^>]*>#',
+            static fn (array $m): string => $allowed($m[1]) ? $m[0] : '',
+            $html
+        ) ?? $html;
+    }
+
     // ---------------------------------------------------------------- Admin changes (all audited)
 
     /** A chapter becomes "configured" (no longer New) the first time it is ticked or switched. */

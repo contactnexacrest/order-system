@@ -113,6 +113,22 @@ async function imageVisible(filename, userId, permissions, visible) {
   return false;
 }
 
+/**
+ * UI-005: a page outside the SOP viewer (Getting started) that shows SOP
+ * screenshots drops each screenshot this person may not load (with its
+ * caption), so nobody sees a broken image answered 403 by /sop-assets.
+ */
+async function filterScreenshots(html, userId, permissions, visible) {
+  const text = String(html);
+  const ok = {};
+  for (const m of text.matchAll(/<img\b[^>]*\bsrc="\/sop-assets\/([^"]+)"[^>]*>/g)) {
+    if (!(m[1] in ok)) ok[m[1]] = await imageVisible(path.basename(m[1]), userId, permissions, visible);
+  }
+  return text
+    .replace(/<div class="gs-shot"[^>]*>\s*<img\b[^>]*\bsrc="\/sop-assets\/([^"]+)"[^>]*>\s*<\/div>(?:\s*<div class="gs-shot-cap">[\s\S]*?<\/div>)?/g, (whole, file) => (ok[file] ? whole : ''))
+    .replace(/<img\b[^>]*\bsrc="\/sop-assets\/([^"]+)"[^>]*>/g, (whole, file) => (ok[file] ? whole : ''));
+}
+
 /** @returns {Object<string, string>} slug => title (the chapter's first "# " heading) */
 function titles() {
   const out = {};
@@ -182,6 +198,6 @@ async function removeUserExtra(userId, slug, byUserId) {
 module.exports = {
   ALWAYS_VISIBLE, SETTING, SETTING_CATEGORY, CHAPTER_NOT_AVAILABLE, LIBRARY_OFF,
   allSlugs, libraryEnabled, isPrivileged, chapterStates, roleIdsFor, roleSlugs, userExtras, visibleSlugs,
-  libraryVisibleTo, filterChapterLinks, imageVisible, titles,
+  libraryVisibleTo, filterChapterLinks, imageVisible, filterScreenshots, titles,
   setLibraryEnabled, setChapterEnabled, saveRoleSlugs, addUserExtra, removeUserExtra,
 };

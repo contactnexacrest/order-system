@@ -10,6 +10,8 @@
  * of the listed keys); permittedLinks.test.js checks they match. More
  * specific paths come first. Port of App\Helpers\PermittedLinks.
  */
+const moneyVisibility = require('../services/moneyVisibility');
+
 const RULES = [
   [/^\/orders\/\d+\/(?:dossier|edit|annexure|amendments|additional-documents\/removed)(?:[/?#]|$)/, ['manage_orders']],
   [/^\/orders\/\d+\/zoho-check(?:[/?#]|$)/, ['ca_module_manage']],
@@ -29,6 +31,10 @@ const RULES = [
   [/^\/admin\/backups(?:[/?#]|$)/, ['manage_company_settings']], // D-260
   [/^\/admin\/email-settings(?:[/?#]|$)/, ['manage_company_settings']], // D-280
   [/^\/admin\/setup-checklist(?:[/?#]|$)/, ['manage_company_settings']], // D-312
+  // UI-007: the Setup checklist and Lists › Dropdown options link to product and pricing pages.
+  [/^\/products(?:[?#]|$)/, ['view_product_catalog']],
+  [/^\/products\/categories\/\d+(?:[?#]|$)/, ['manage_product_catalog', 'manage_pricing', 'view_price_buildup']],
+  [/^\/pricing\/commission-levels(?:[?#]|$)/, ['view_price_buildup', 'manage_pricing']],
   [/^\/audit-log(?:[/?#]|$)/, ['view_audit_log']],
   [/^\/ca\/cafin-export(?:[/?#]|$)/, ['view_cafin']],
   [/^\/ca\/(?:zoho-sync|fy-locks)(?:[/?#]|$)/, ['ca_module_manage']],
@@ -77,6 +83,24 @@ const RULES = [
   [/^\/(?:import|merchant)(?:[/?#]|$)/, ['view_purchase_prices']],
 ];
 
+/**
+ * UI-006: report pages whose route needs only view_reports but which answer
+ * 403 without the money they print (reportController refusedForMoney) —
+ * every money class listed is needed (moneyVisibility). Kept apart from
+ * RULES, which mirror the route permissions exactly.
+ */
+const MONEY_REPORTS = [
+  [/^\/reports\/client\/\d+(?:[/?#]|$)/, ['selling', 'buyer_payments']],
+  [/^\/reports\/(?:aggregate|amendments|trends|products|performance)(?:[/?#]|$)/, ['selling']],
+  [/^\/reports\/(?:payments|todays-payments|ageing)(?:[/?#]|$)/, ['buyer_payments']],
+];
+
+/** @returns {string[]|null} the money classes (all of them) the report page needs, or null */
+function moneyRequiredFor(path) {
+  const rule = MONEY_REPORTS.find(([pattern]) => pattern.test(path));
+  return rule ? rule[1] : null;
+}
+
 /** QA Round 6, R6-N02: pages of one order also need that order to be visible to the user (D-118). */
 const ORDER_PAGE = /^\/(?:orders|reports\/order)\/(\d+)(?:[/?#]|$)/;
 
@@ -95,6 +119,7 @@ function mayOpen(path, permissions, canSeeOrder = null, isDisabledPath = null) {
   if (isDisabledPath && isDisabledPath(path.split(/[?#]/)[0])) return false;
   const order = canSeeOrder ? path.match(ORDER_PAGE) : null;
   if (order && !canSeeOrder(Number(order[1]))) return false;
+  if ((moneyRequiredFor(path) || []).some((cls) => !moneyVisibility.can(permissions, cls))) return false;
   const required = requiredFor(path);
   return required === null || required.some((key) => !!(permissions && permissions[key]));
 }
@@ -106,4 +131,4 @@ function filterHtml(html, permissions, canSeeOrder = null, isDisabledPath = null
   ));
 }
 
-module.exports = { RULES, ORDER_PAGE, requiredFor, mayOpen, filterHtml };
+module.exports = { RULES, MONEY_REPORTS, ORDER_PAGE, requiredFor, moneyRequiredFor, mayOpen, filterHtml };

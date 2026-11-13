@@ -126,4 +126,62 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
     expect(settings).toContain('Incentive payouts');
     expect(settings).not.toContain('href="/incentives/payouts"');
   });
+
+  it('UI-006: the Reports page offers only reports that show money the person may see', async () => {
+    const clientId = await createTestClient();
+    const moneyReports = ['/reports/aggregate', '/reports/payments', '/reports/todays-payments', '/reports/ageing', '/reports/amendments',
+      '/reports/trends', '/reports/performance', '/reports/products', `/reports/client/${clientId}`];
+
+    const investor = await loginAs('Investor (view only)');
+    const page = (await investor.get('/reports')).text;
+    for (const p of moneyReports) expect([p, page.includes(`href="${p}"`)]).toEqual([p, false]);
+    expect(page).toContain('href="/reports/queues"');
+    expect(page).not.toContain('Open Ageing Report');
+    // Wherever such a link appears (any staff page), it is plain text for this person.
+    expect(permittedLinks.filterHtml(`<a href="/reports/ageing?as_of=2026-11-01">A</a> <a href="/reports/client/${clientId}">B</a> <a href="/reports/queues">C</a>`, { view_reports: true }))
+      .toBe('<span class="link-not-permitted">A</span> <span class="link-not-permitted">B</span> <a href="/reports/queues">C</a>');
+
+    const md = await loginAs('Managing Director');
+    const mdPage = (await md.get('/reports')).text;
+    for (const p of moneyReports) expect([p, mdPage.includes(`href="${p}"`)]).toEqual([p, true]);
+  });
+
+  it('UI-007: the Setup checklist links only to pages the person may open', async () => {
+    const sysadmin = await loginAs('System Administrator');
+    const checklist = (await sysadmin.get('/admin/setup-checklist')).text;
+    expect(checklist).toContain('Commission levels');
+    expect(checklist).not.toContain('href="/products"');
+    expect(checklist).not.toContain('href="/pricing/commission-levels"');
+    expect(permittedLinks.filterHtml('<a href="/products/categories/3?tab=options&amp;edit=4#spec-4">set it</a>', { manage_dropdown_options: true }))
+      .toBe('<span class="link-not-permitted">set it</span>');
+
+    const md = await loginAs('Managing Director');
+    const mdChecklist = (await md.get('/admin/setup-checklist')).text;
+    expect(mdChecklist).toContain('href="/products"');
+    expect(mdChecklist).toContain('href="/pricing/commission-levels"');
+  });
+
+  it('UI-005 / D-266: Getting started shows only the screenshots and SOP chapters the role may open', async () => {
+    const sopAccess = require('../../src/services/sopAccessService');
+    const permissionService = require('../../src/services/permissionService');
+    for (const role of ['Export Executive', 'Logistics Executive', 'Investor (view only)', 'Viewer / Auditor']) {
+      const agent = await loginAs(role);
+      const user = await db.queryOne('SELECT id, role_id FROM users WHERE id = :id', { id: agent.userId });
+      const perms = await permissionService.load(Number(user.id), Number(user.role_id), false);
+      const visible = await sopAccess.visibleSlugs(Number(user.id), Number(user.role_id), perms);
+      const html = (await agent.get('/getting-started')).text;
+
+      const images = [...html.matchAll(/src="\/sop-assets\/([^"]+)"/g)].map((m) => m[1]);
+      for (const file of images) expect([role, file, await sopAccess.imageVisible(file, Number(user.id), perms, visible)]).toEqual([role, file, true]);
+      expect(images).toContain('login_screen.png');
+      expect(images).not.toContain('staff_dashboard.png');
+      expect(html).not.toContain('Dashboard — search, approvals');
+
+      for (const m of html.matchAll(/href="\/sop\/([A-Za-z0-9_-]+)/g)) expect([role, visible.includes(m[1])]).toEqual([role, true]);
+      expect(html).not.toContain('href="/sop/15-admin-settings"');
+      expect(html).toContain('Ch. 15');
+      // Every screenshot left on the page loads for this person.
+      for (const file of images) expect([role, file, (await agent.get(`/sop-assets/${file}`)).status]).toEqual([role, file, 200]);
+    }
+  });
 });

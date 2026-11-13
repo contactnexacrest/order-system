@@ -6,6 +6,8 @@ namespace App\Controllers;
 
 use App\Helpers\View;
 use App\Services\AuthService;
+use App\Services\PermissionService;
+use App\Services\SopAccessService;
 
 /**
  * A first-day "Getting Started" tour for brand-new staff — deliberately
@@ -31,6 +33,13 @@ final class GettingStartedController
         View::render('getting-started/show', [
             'userName' => $user['name'] ?? null,
         ], null);
-        echo \App\Helpers\PermittedLinks::filterHtml((string) ob_get_clean());
+        $html = \App\Helpers\PermittedLinks::filterHtml((string) ob_get_clean());
+        // UI-005 / D-266: links to SOP chapters this person may not open become plain text,
+        // and screenshots they may not load are left out (no broken image).
+        $userId = (int) ($user['id'] ?? 0);
+        $roleId = isset($user['role_id']) && $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $visible = SopAccessService::visibleSlugs($userId, $roleId, PermissionService::can($userId, $roleId, 'ca_module_view'));
+        $html = SopAccessService::filterChapterLinks($html, $visible);
+        echo SopAccessService::filterScreenshots($html, $userId, $roleId, $visible);
     }
 }
