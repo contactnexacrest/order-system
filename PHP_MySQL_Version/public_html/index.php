@@ -966,7 +966,7 @@ $router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask']
 $router->post('/orders/{id}/compliance-tasks/mark-all-na', [$orders, 'markAllComplianceTasksNotApplicable'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_checklist'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requiresAny(['generate_documents', 'generate_compliance_documents']), CsrfCheck::verify()]);
-$router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['download_pdf', 'view_cafin'])]);
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
 $router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders', 'view_clients'])]);

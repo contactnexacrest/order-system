@@ -29,9 +29,11 @@ use App\Services\PermissionService;
  * duplicate (reads the locked order to seed a NEW one — never writes to
  * it), comments (a note/chat entry, not a data field), disputes (raising
  * a dispute about an already-closed order is a real, expected workflow —
- * that's what Disputes is for), and the four document-generate/delete/
- * send routes (DocumentGenerationService::generate() already enforces
- * this exact permission internally — see OrderEditGuard's docblock).
+ * that's what Disputes is for), and the document-generate/send routes
+ * (DocumentGenerationService::generate() already enforces this exact
+ * permission internally — see OrderEditGuard's docblock). The draft
+ * document delete route IS guarded (QA HNT-002: delete never went through
+ * that service, so a draft could be deleted on a lost order).
  */
 final class OrderLockGuard
 {

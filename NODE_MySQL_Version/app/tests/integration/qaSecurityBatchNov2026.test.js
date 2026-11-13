@@ -187,4 +187,20 @@ describe('QA Nov 2026 security batch', () => {
       expect((await md.agent.post('/products/1abc/own-specs/2/delete').type('form').send({})).status).toBe(404);
     });
   });
+
+  describe('HNT-002 draft documents on a locked order', () => {
+    it('HNT-002: deleting a draft document on a lost (locked) order needs "Override locked data"', async () => {
+      const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
+      const orderId = await createTestOrder(await createTestClient());
+      const docId = await createTestDocument(orderId, 'QT', 'draft');
+      await db.execute("UPDATE orders SET is_locked = 1, status = 'lost' WHERE id = :id", { id: orderId });
+      const exec = await user('Export Executive');
+      await db.execute('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)', { o: orderId, u: exec.id });
+      const page = await exec.agent.get(`/orders/${orderId}`);
+      const csrf = (page.text.match(/name="_csrf" value="([^"]+)"/) || [])[1];
+      const r = await exec.agent.post(`/orders/${orderId}/documents/${docId}/delete`).type('form').send({ _csrf: csrf, reason: 'TEST-QA deleting a draft on a lost order' });
+      expect(r.status).toBe(302);
+      expect(await db.queryOne('SELECT id FROM documents WHERE id = :id', { id: docId })).toBeTruthy();
+    });
+  });
 });

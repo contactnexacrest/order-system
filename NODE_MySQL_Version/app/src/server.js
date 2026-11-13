@@ -1431,7 +1431,7 @@ app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('manage_
 app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermission('manage_compliance_checklist'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markAllComplianceTasksNotApplicable));
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermissionAny(['generate_documents', 'generate_compliance_documents']), verifyCsrf, asyncHandler(documentController.generate));
-app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
+app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), checkOrderLock, verifyCsrf, asyncHandler(documentController.deleteDraft));
 app.get('/documents/:documentId/download', requireAuth, requirePermissionAny(['download_pdf', 'view_cafin']), asyncHandler(documentController.download));
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
 app.get('/file-store/:id/download', requireAuth, requirePermissionAny(['manage_orders', 'view_orders', 'view_clients']), asyncHandler(fileStoreController.download));

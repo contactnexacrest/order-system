@@ -7,8 +7,9 @@ const flash = require('../helpers/flash');
  * Port of App\Middleware\OrderLockGuard — see its own docblock for the
  * full rationale (External QA report L-28) and the exact list of routes
  * deliberately left unguarded (override-status-lock, close/mark-lost,
- * archive/unarchive, duplicate, comments, disputes, and the 4 document-
- * generate/delete/send routes).
+ * archive/unarchive, duplicate, comments, disputes, and the document-
+ * generate/send routes). The draft document delete route IS guarded (QA
+ * HNT-002).
  */
 function check() {
   return async function orderLockGuardCheck(req, res, next) {
