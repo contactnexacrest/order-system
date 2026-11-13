@@ -29,9 +29,8 @@ const fs = require('fs');
  * started it somewhere else.
  */
 
-function isNodeStack() {
-  return (process.env.BASE_URL || '').includes(':3000');
-}
+// E2E_STACK=php|node (fallback: ':3000' in BASE_URL) — see support/stack.js.
+const { isNodeStack } = require('./stack');
 
 function logPath() {
   if (isNodeStack()) {

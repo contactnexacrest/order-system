@@ -128,7 +128,17 @@ involved) don't. It is not a substitute for those — see
 
 Settings the suite reads from the environment (QA Round 5, R5-13):
 
-- `BASE_URL` — which stack to drive (`http://127.0.0.1:8080` PHP, `:3000` Node).
+- `BASE_URL` — which server to drive (`http://127.0.0.1:8080` PHP, `:3000` Node).
+- `E2E_STACK` — `php` or `node`: which stack that server is. It picks the password-hash
+  flavour the DB helpers write (Node's bcrypt package does not accept PHP's `$2y$` hashes),
+  the default database name and the server log the mail checks read. Set it whenever the
+  server is not on the usual port; without it, a `BASE_URL` containing `:3000` means Node
+  and anything else PHP (QA 13 Nov 2026). Any other value stops the run with an error.
+- `E2E_LOGIN_TIMEOUT` — how long (ms, default 30000) each sign-in step may take. An error
+  page (HTTP 5xx) on the sign-in or code form fails the test at once with the page text,
+  instead of waiting until the test's own time limit.
+- `NODE_SERVER_LOG` / `PHP_ERROR_LOG` — the server log files the e-mail specs read (see
+  "Email functionality tests" below).
 - `PW_CHROMIUM_PATH` — a specific Chromium binary; leave unset to use
   Playwright's own installed browser (`npx playwright install chromium`).
 - `E2E_DB_USER` / `E2E_DB_PASSWORD` / `E2E_DB_NAME` — the dev database the
@@ -137,7 +147,12 @@ Settings the suite reads from the environment (QA Round 5, R5-13):
 
 The two email specs (05, 08) switch the "Email sending" setting to what
 each test needs and restore it afterwards, so the suite passes on a fresh
-seed (which ships with email sending off).
+seed (which ships with Testing mode on, D-347). Both create their order from
+"E2E Priced Granite Block", which `ensurePricedProduct()` (tests/support/db.js)
+makes ready for quoting before the New Order form opens: an active directory
+supplier "E2E Quarry", its offer linked and switched on, and the product's base
+price configured (D-361); the form's Thickness and Size / format are then chosen
+(D-348, tests/support/orderForm.js).
 
 Both stacks need their own real dev database, schema+seed applied, and a
 known-working login. One-time setup, per stack:
@@ -226,10 +241,10 @@ cd NODE_MySQL_Version/app && npm start > /tmp/claude-0/node-server.log 2>&1 &
 ```bash
 cd e2e
 npm install          # once
-npm run test:php     # BASE_URL=http://127.0.0.1:8080
-npm run test:node    # BASE_URL=http://127.0.0.1:3000
-# or point at anything else:
-BASE_URL=http://127.0.0.1:9000 npx playwright test
+npm run test:php     # BASE_URL=http://127.0.0.1:8080 E2E_STACK=php
+npm run test:node    # BASE_URL=http://127.0.0.1:3000 E2E_STACK=node
+# or point at anything else — say which stack it is:
+BASE_URL=http://127.0.0.1:9000 E2E_STACK=node E2E_DB_NAME=my_node_db npx playwright test
 ```
 
 The same spec runs unmodified against either stack — the two apps are

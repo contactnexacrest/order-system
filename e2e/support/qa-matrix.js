@@ -27,7 +27,8 @@ const PASSWORD = 'QaMatrix#2026';
 const MAIL_DOMAIN = 'qa-matrix.test';
 
 function baseUrl() { return process.env.BASE_URL || 'http://127.0.0.1:8080'; }
-function isNode() { return baseUrl().includes(':3000'); }
+// E2E_STACK=php|node (fallback: ':3000' in BASE_URL) — see tests/support/stack.js.
+function isNode() { return require('../tests/support/stack').isNodeStack(); }
 function dbName() { return process.env.E2E_DB_NAME || (isNode() ? 'nexacrest_node_dev' : 'nexacrest_php_dev'); }
 
 function sql(query) {

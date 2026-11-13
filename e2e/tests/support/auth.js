@@ -29,6 +29,32 @@ const ROLES = {
 };
 
 /**
+ * QA 13 Nov 2026 (SUI e2e): every wait in the sign-in steps has a timeout (E2E_LOGIN_TIMEOUT ms,
+ * default 30 s) and an error page (HTTP 5xx) on the form post fails at once with the page text —
+ * before, a 500 on /login left waitForURL waiting until a long test's own limit (hours).
+ */
+const LOGIN_TIMEOUT = Number(process.env.E2E_LOGIN_TIMEOUT) || 30_000;
+
+async function pageText(page) {
+  return ((await page.locator('body').innerText({ timeout: 2_000 }).catch(() => '')) || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+/** Clicks the submit button of the form on fromPath and waits until the browser has left fromPath. */
+async function submitAndLeave(page, button, fromPath) {
+  const left = page.waitForURL((url) => url.pathname !== fromPath, { timeout: LOGIN_TIMEOUT }).then(() => 'left', () => 'timeout');
+  const failed = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === fromPath && r.status() >= 500, { timeout: LOGIN_TIMEOUT })
+    .then((r) => r, () => null);
+  await button.click();
+  // Whichever comes first: the browser leaves the page, an error page comes back, or the timeout.
+  const outcome = await Promise.race([left, failed.then((r) => (r ? r : left))]);
+  if (outcome === 'left') return;
+  if (outcome === 'timeout') {
+    throw new Error(`Sign-in did not leave ${fromPath} within ${LOGIN_TIMEOUT} ms — page shows: ${await pageText(page)}`);
+  }
+  throw new Error(`Sign-in failed: POST ${fromPath} answered HTTP ${outcome.status()} — ${await pageText(page)}`);
+}
+
+/**
  * D-265: after the password every staff member and buyer gets a 6-digit code by
  * e-mail. The dev servers run with APP_ENV=local, which shows the code on the code
  * page; this reads it and submits it, the way a person types it from the e-mail.
@@ -38,8 +64,7 @@ async function enterLoginCode(page, codePath) {
   if (new URL(page.url()).pathname !== codePath) return;
   const code = ((await page.locator('.alert-dev strong').first().innerText()) || '').trim();
   await page.locator('input[name="code"]').fill(code);
-  await page.getByRole('button', { name: 'Verify' }).click();
-  await page.waitForURL((url) => url.pathname !== codePath);
+  await submitAndLeave(page, page.getByRole('button', { name: 'Verify' }), codePath);
 }
 
 async function login(page, role = 'admin') {
@@ -55,8 +80,7 @@ async function loginAs(page, email, password = PASSWORD) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL((url) => url.pathname !== '/login');
+  await submitAndLeave(page, page.getByRole('button', { name: 'Sign in' }), '/login');
   await enterLoginCode(page, '/2fa');
 }
 
@@ -68,12 +92,11 @@ async function loginClient(page, email, password) {
   await page.goto('/client/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL((url) => url.pathname !== '/client/login');
+  await submitAndLeave(page, page.getByRole('button', { name: 'Sign in' }), '/client/login');
   await enterLoginCode(page, '/client/login/code');
   // Final QA run: wait until the portal page has replaced the login page, so a check made right after
   // (e.g. the phone-width overflow check) never measures a page that is still navigating.
-  await page.waitForURL((url) => !/\/client\/login/.test(url.pathname));
+  await page.waitForURL((url) => !/\/client\/login/.test(url.pathname), { timeout: LOGIN_TIMEOUT });
   await page.waitForLoadState('load');
 }
 

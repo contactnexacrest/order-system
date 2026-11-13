@@ -9,9 +9,8 @@ const { spawnSync } = require('child_process');
 const DB_USER = process.env.E2E_DB_USER || 'nexacrest_app';
 const DB_PASSWORD = process.env.E2E_DB_PASSWORD || 'DevPass123!';
 
-function isNodeStack() {
-  return (process.env.BASE_URL || '').includes(':3000');
-}
+// E2E_STACK=php|node (fallback: ':3000' in BASE_URL) — see support/stack.js.
+const { isNodeStack } = require('./stack');
 
 function dbName() {
   if (process.env.E2E_DB_NAME) return process.env.E2E_DB_NAME;
@@ -148,13 +147,25 @@ function ensurePricedProduct() {
     runSql(`INSERT INTO catalog_products (name, specifications, hs_code, is_active) VALUES ('${name}', 'Granite block, polished', '68022310', 1)`, 'priced product insert');
     id = runSql(`SELECT id FROM catalog_products WHERE name = '${name}' LIMIT 1`, 'priced product lookup');
   }
-  runSql(`UPDATE catalog_products SET is_active = 1 WHERE id = ${Number(id)}`, 'priced product activate');
+  // D-361: only a CONFIGURED product with an active supplier offer is offered on orders — an active
+  // directory supplier, its offer linked (supplier_id) and switched on, and the product's base price
+  // fixed at that offer's price (₹80,000 per unit, so the figures stay those of the D-245 example).
+  let directory = runSql("SELECT id FROM suppliers WHERE supplier_legal_name = 'E2E Quarry' LIMIT 1", 'priced product directory supplier lookup');
+  if (!directory) {
+    runSql("INSERT INTO suppliers (supplier_legal_name, is_active) VALUES ('E2E Quarry', 1)", 'priced product directory supplier insert');
+    directory = runSql("SELECT id FROM suppliers WHERE supplier_legal_name = 'E2E Quarry' LIMIT 1", 'priced product directory supplier lookup');
+  }
+  runSql(`UPDATE suppliers SET is_active = 1 WHERE id = ${Number(directory)}`, 'priced product directory supplier activate');
   const supplier = runSql(`SELECT id FROM catalog_product_suppliers WHERE product_id = ${Number(id)} AND is_primary = 1 LIMIT 1`, 'priced product supplier lookup');
   if (!supplier) {
-    runSql(`INSERT INTO catalog_product_suppliers (product_id, supplier_name, fob_source, fob_value, is_primary, quoted_on) VALUES (${Number(id)}, 'E2E Quarry', 'direct', 80000, 1, CURDATE())`, 'priced product supplier insert');
+    runSql(`INSERT INTO catalog_product_suppliers (product_id, supplier_id, supplier_name, fob_source, fob_value, is_primary, quoted_on, offer_active)
+      VALUES (${Number(id)}, ${Number(directory)}, 'E2E Quarry', 'direct', 80000, 1, CURDATE(), 1)`, 'priced product supplier insert');
   } else {
-    runSql(`UPDATE catalog_product_suppliers SET fob_source = 'direct', fob_value = 80000, quoted_on = CURDATE(), valid_until = NULL WHERE id = ${Number(supplier)}`, 'priced product supplier refresh');
+    runSql(`UPDATE catalog_product_suppliers SET supplier_id = ${Number(directory)}, price_basis = 'unit', fob_source = 'direct', fob_value = 80000, quoted_on = CURDATE(),
+      valid_until = NULL, offer_active = 1 WHERE id = ${Number(supplier)}`, 'priced product supplier refresh');
   }
+  runSql(`UPDATE catalog_products SET is_active = 1, legacy_no_supplier = 0, configured_base_follows_supplier = 0, configured_base_price_inr = 80000,
+    configured_base_thickness_mm = NULL, configured_base_unit = COALESCE(NULLIF(reference_unit, ''), 'unit'), configured_at = NOW() WHERE id = ${Number(id)}`, 'priced product configure');
   return Number(id);
 }
 

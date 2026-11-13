@@ -7,6 +7,7 @@ const { defineConfig } = require('@playwright/test');
  * against whichever stack's dev server is already up, via BASE_URL:
  *   BASE_URL=http://127.0.0.1:8080 npx playwright test   (PHP)
  *   BASE_URL=http://127.0.0.1:3000 npx playwright test   (Node)
+ * On any other port also set E2E_STACK=php|node (tests/support/stack.js).
  * Does not start either server itself — both stacks need their own real
  * MySQL-backed dev DB (schema + seed data), which a Playwright-managed
  * webServer can't set up, so bringing the server up is left to the

@@ -6,6 +6,7 @@ const { login, logout, ROLES } = require('./support/auth');
 const { assignSecondPersonAndApprove } = require('./support/review');
 const { resetClientPassword, getMailSending, setMailSending, lastEmailSentWithDocument, ensurePricedProduct } = require('./support/db');
 const { mark, sinceMark } = require('./support/mail');
+const { chooseRequiredSpecs } = require('./support/orderForm');
 
 const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
 
@@ -236,6 +237,8 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await expect(page).toHaveURL(/\/clients\/\d+$/);
     const clientId = Number(page.url().match(/\/clients\/(\d+)$/)[1]);
 
+    // The product must be ready (D-361) before the form loads its "Pick from Products" list.
+    const pricedProductId = ensurePricedProduct();
     await page.goto('/orders/create');
     await page.locator('select[name="client_id"]').selectOption(String(clientId));
     await page.locator('select[name="incoterm_id"]').selectOption({ label: 'FOB' });
@@ -252,7 +255,8 @@ test.describe('Email functionality — real attempts, right recipient, right att
     // FOB: the Indicative Freight / Insurance fields are hidden (buyer's own).
     // D-245 P2: on a USD order the goods line is picked from Products — the picker fills the
     // description, HS code and the quote price (at or above the floor).
-    await page.locator('select[name="product_catalog_id[]"]').first().selectOption(String(ensurePricedProduct()));
+    await page.locator('select[name="product_catalog_id[]"]').first().selectOption(String(pricedProductId));
+    await chooseRequiredSpecs(page); // D-348: Thickness and Size / format
     await page.locator('input[name="product_quantity[]"]').first().fill('50');
     await page.getByRole('button', { name: 'Create Order' }).click();
     await expect(page).toHaveURL(/\/orders\/\d+$/);

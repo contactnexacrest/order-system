@@ -5,8 +5,8 @@
   "description": "Playwright critical-path UI smoke suite, run against both the PHP and Node stacks of the NexaCrest order system.",
   "scripts": {
     "test": "playwright test",
-    "test:php": "BASE_URL=http://127.0.0.1:8080 playwright test",
-    "test:node": "BASE_URL=http://127.0.0.1:3000 playwright test"
+    "test:php": "BASE_URL=http://127.0.0.1:8080 E2E_STACK=php playwright test",
+    "test:node": "BASE_URL=http://127.0.0.1:3000 E2E_STACK=node playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1"
