@@ -454,8 +454,20 @@ final class OrderFinancialsController
             header("Location: /orders/{$orderId}#order-financials");
             return;
         }
+        // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): money out of the company account carries its bank reference.
+        $bankReference = trim((string) ($_POST['bank_reference'] ?? ''));
+        if ($paidFrom === 'company_account' && $bankReference === '') {
+            Flash::set('error', OrderCostEntryRepository::BANK_REFERENCE_REQUIRED);
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        if (mb_strlen($bankReference) > 150) {
+            Flash::set('error', 'The bank reference (UTR / transaction ID) can be at most 150 characters.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
 
-        $id = OrderCostEntryRepository::create($orderId, $category, $description, (float) $amount, $incurredAt, (int) $user['id'], $paidFrom);
+        $id = OrderCostEntryRepository::create($orderId, $category, $description, (float) $amount, $incurredAt, (int) $user['id'], $paidFrom, $bankReference !== '' ? $bankReference : null);
         AuditLogRepository::log((int) $user['id'], 'ORDER_COST_ENTRY_RECORDED', 'order_cost_entries', $id, null, null, $category);
         Flash::set('success', 'Cost entry recorded.');
         header("Location: /orders/{$orderId}#order-financials");

@@ -3325,7 +3325,7 @@
               <td>{{ c.description or '—' }}
                 {% if costEntryNotInZoho[c.category] %}<br><small class="muted">{{ costEntryNotInZoho[c.category] }}</small>{% elif c.zoho_expense_id %}<br><small class="muted">In Zoho Books</small>{% endif %}</td>
               <td>{{ c.amount_inr | money }}</td>
-              <td>{{ costEntryPaidFrom[c.paid_from] or '—' }}</td>
+              <td>{{ costEntryPaidFrom[c.paid_from] or '—' }}{% set bankRefText = moneyBankRef(c.paid_from or '', c.bank_reference) %}{% if bankRefText %}<br><small class="muted">{{ bankRefText }}</small>{% endif %}</td>{# QA ZOH-005 (rule D-212) #}
               <td>{{ c.recorded_by_name }}</td>
               <td>
                 {% if c.incentive_kind %}
@@ -3366,7 +3366,7 @@
             <td>{{ expenseCategories[e.category] or e.category }}</td>
             <td>{{ e.details }}</td>
             <td style="text-align:right">{{ e.amount_inr | money }}</td>
-            <td>{{ expensePaidBy[e.paid_by] or e.paid_by }}{% if e.paid_by == 'staff' and e.staff_name %} — {{ e.staff_name }}{% endif %}</td>
+            <td>{{ expensePaidBy[e.paid_by] or e.paid_by }}{% if e.paid_by == 'staff' and e.staff_name %} — {{ e.staff_name }}{% endif %}{% set bankRefText = moneyBankRef(e.paid_by, e.bank_reference) %}{% if bankRefText %}<br><small class="muted">{{ bankRefText }}</small>{% endif %}</td>{# QA ZOH-005 (rule D-212) #}
             <td>{% if e.receipt_file_id %}{% if fileAllowed[e.receipt_file_id] !== false %}<a href="/file-store/{{ e.receipt_file_id }}/download">receipt</a>{% else %}receipt{% endif %}{# QA R7-N06 #}{% else %}<span class="vendor-bill-due">No bill — {{ e.no_receipt_reason }}</span>{% endif %}</td>
             <td>
               <form method="post" action="/orders/{{ order.id }}/expenses/{{ e.id }}/delete" data-confirm="{{ 'Remove this expense? It is in Zoho Books too, and is removed there as well.' if e.zoho_expense_id else 'Remove this expense?' }}">
@@ -3397,6 +3397,8 @@
               </select>
             </label>
             <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
+            {# Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): required when the company account paid. #}
+            <label>Bank reference (UTR / transaction ID) <small class="muted">(required when paid from the company account)</small><input type="text" name="bank_reference" maxlength="150" data-required-if="paid_by=company_account" data-required-if-message="{{ expenseBankRefRequired }}" placeholder="e.g. HDFCN26304123456"></label>
             <label class="full">Details *<input type="text" name="details" required maxlength="255" placeholder="e.g. Factory visit 2 — Kota"></label>
             <label>Receipt / bill<input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png"></label>
             <label>No receipt? Reason<input type="text" name="no_receipt_reason" maxlength="255" minlength="10" data-required-unless="receipt" placeholder="only if no bill exists"></label>
@@ -3454,6 +3456,8 @@
                 {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if key == 'company_account' }}>{{ label }}</option>{% endfor %}
               </select>
             </label>
+            {# Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): required when the company account paid. #}
+            <label>Bank reference (UTR / transaction ID) <small class="muted">(required when paid from the company account)</small><input type="text" name="bank_reference" maxlength="150" data-required-if="paid_from=company_account" data-required-if-message="{{ costEntryBankRefRequired }}" placeholder="e.g. HDFCN26304123456"></label>
             <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
             <button type="submit" class="btn-sm">Record Cost</button>
           </form>

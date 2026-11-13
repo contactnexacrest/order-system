@@ -103,7 +103,7 @@ describe('Rule D-212 — money records need the reference their description is b
 
   it('a cost needs a description', async () => {
     const orderId = await createTestOrder(await createTestClient());
-    const fields = { category: 'commission', amount_inr: '9000', incurred_at: todayIst(), paid_from: 'company_account', description: 'Agent' };
+    const fields = { category: 'commission', amount_inr: '9000', incurred_at: todayIst(), paid_from: 'company_account', bank_reference: 'HDFCN26304123456', description: 'Agent' };
     const page = `/orders/${orderId}`;
     expect((await flashAfter(await post(`/orders/${orderId}/cost-entries`, fields, page))).message).toContain('who was paid and for what');
     expect(Number(await value('SELECT COUNT(*) AS n FROM order_cost_entries WHERE order_id = :o', { o: orderId }))).toBe(0);

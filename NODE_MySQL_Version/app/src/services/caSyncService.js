@@ -446,12 +446,14 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
     }
   }
 
+  // QA ZOH-005: an expense already in Books is updated when what it sends changed (e.g. its description).
   for (const expense of await zohoPurchaseRepository.expensesToSync(startDate)) {
     if (!inScope(onlyOrderId, expense.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     try {
-      const zohoExpenseId = await zohoBooksService.pushExpense(expense);
-      await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId);
-      await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `${zohoRestoreService.note(`exp:${expense.id}`)}Sent expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
+      const inBooks = expense.zoho_expense_id ? String(expense.zoho_expense_id) : null;
+      const zohoExpenseId = await zohoBooksService.pushExpense(expense, inBooks);
+      await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId, zohoBooksService.expenseHash(expense));
+      await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `${zohoRestoreService.note(`exp:${expense.id}`)}${inBooks !== null ? 'Updated' : 'Sent'} expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
       result.expenses += 1;
     } catch (e) {
       zohoApiBudget.rethrow(e, result); // D-239: a spent allowance / rate limit stops the whole run
@@ -465,7 +467,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
   // changes afterwards. Counted with the expenses.
   for (const cost of await zohoPurchaseRepository.costEntriesToSync(startDate)) {
     if (!inScope(onlyOrderId, cost.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
-    const hash = crypto.createHash('sha256').update(JSON.stringify([cost.category, round2(Number(cost.amount_inr)), String(cost.cost_date), cost.paid_from, cost.description])).digest('hex');
+    const hash = zohoBooksService.costEntryHash(cost); // QA ZOH-005: the description sent is part of it
     if (cost.zoho_expense_id !== null && cost.zoho_pushed_hash === hash) {
       continue;
     }

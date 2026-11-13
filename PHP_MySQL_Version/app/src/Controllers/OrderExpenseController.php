@@ -67,6 +67,16 @@ final class OrderExpenseController
             $this->back($orderId, 'error', 'Enter the name of the staff member to reimburse.');
             return;
         }
+        // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): money out of the company account carries its bank reference.
+        $bankReference = trim((string) ($_POST['bank_reference'] ?? ''));
+        if ($paidBy === 'company_account' && $bankReference === '') {
+            $this->back($orderId, 'error', OrderExpenseRepository::BANK_REFERENCE_REQUIRED);
+            return;
+        }
+        if (mb_strlen($bankReference) > 150) {
+            $this->back($orderId, 'error', 'The bank reference (UTR / transaction ID) can be at most 150 characters.');
+            return;
+        }
         $hasReceipt = !empty($_FILES['receipt']['name']);
         $noReceiptReason = trim((string) ($_POST['no_receipt_reason'] ?? ''));
         if (!$hasReceipt && mb_strlen($noReceiptReason) < ReasonValidator::MIN_LENGTH) {
@@ -95,6 +105,7 @@ final class OrderExpenseController
             'amount_inr' => round((float) $amount, 2),
             'paid_by' => $paidBy,
             'staff_name' => $paidBy === 'staff' ? mb_substr($staffName, 0, 150) : null,
+            'bank_reference' => $bankReference !== '' ? $bankReference : null,
             'receipt_file_id' => $receiptId,
             'no_receipt_reason' => $hasReceipt ? null : mb_substr($noReceiptReason, 0, 255),
         ], (int) $user['id']);

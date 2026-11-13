@@ -104,7 +104,7 @@ final class PaymentDescriptionRuleTest extends DbTestCase
     public function testACostNeedsADescription(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
-        $_POST = ['category' => 'commission', 'amount_inr' => '9000', 'incurred_at' => date('Y-m-d'), 'paid_from' => 'company_account', 'description' => 'Agent'];
+        $_POST = ['category' => 'commission', 'amount_inr' => '9000', 'incurred_at' => date('Y-m-d'), 'paid_from' => 'company_account', 'bank_reference' => 'HDFCN26304123456', 'description' => 'Agent'];
         (new OrderFinancialsController())->addCostEntry(['id' => (string) $orderId]);
         self::assertStringContainsString('who was paid and for what', (string) $this->flash()['message']);
         self::assertSame(0, (int) $this->value("SELECT COUNT(*) FROM order_cost_entries WHERE order_id = {$orderId}"));

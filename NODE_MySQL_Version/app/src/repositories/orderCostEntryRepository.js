@@ -47,10 +47,13 @@ const NOT_IN_ZOHO = {
 /** What a cost was paid from (owner decision 2026-10-29). */
 const PAID_FROM = { company_account: 'Company account', company_card: 'Company card' };
 
-async function create(orderId, category, description, amountInr, incurredAt, recordedBy, paidFrom = null) {
+/** Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): shown when a cost paid from the company account has no bank reference. */
+const BANK_REFERENCE_REQUIRED = 'Enter the bank reference (UTR / transaction ID): the cost was paid from the company account.';
+
+async function create(orderId, category, description, amountInr, incurredAt, recordedBy, paidFrom = null, bankReference = null) {
   const result = await db.execute(
-    `INSERT INTO order_cost_entries (order_id, category, description, amount_inr, incurred_at, paid_from, recorded_by)
-     VALUES (:order_id, :category, :description, :amount_inr, :incurred_at, :paid_from, :recorded_by)`,
+    `INSERT INTO order_cost_entries (order_id, category, description, amount_inr, incurred_at, paid_from, bank_reference, recorded_by)
+     VALUES (:order_id, :category, :description, :amount_inr, :incurred_at, :paid_from, :bank_reference, :recorded_by)`,
     {
       order_id: orderId,
       category,
@@ -58,6 +61,7 @@ async function create(orderId, category, description, amountInr, incurredAt, rec
       amount_inr: amountInr,
       incurred_at: incurredAt,
       paid_from: paidFrom,
+      bank_reference: bankReference,
       recorded_by: recordedBy,
     }
   );
@@ -110,4 +114,4 @@ async function setPaidFrom(id, paidFrom) {
   await db.execute('UPDATE order_cost_entries SET paid_from = :paid_from WHERE id = :id', { paid_from: paidFrom, id });
 }
 
-module.exports = { CATEGORIES, ZOHO_CATEGORIES, NOT_IN_ZOHO, PAID_FROM, create, forOrder, totalForOrder, find, remove, updateAmount, setPaidFrom };
+module.exports = { CATEGORIES, ZOHO_CATEGORIES, NOT_IN_ZOHO, PAID_FROM, BANK_REFERENCE_REQUIRED, create, forOrder, totalForOrder, find, remove, updateAmount, setPaidFrom };

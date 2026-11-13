@@ -66,6 +66,16 @@ async function add(req, res) {
     back(req, res, orderId, 'error', 'Enter the name of the staff member to reimburse.');
     return;
   }
+  // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): money out of the company account carries its bank reference.
+  const bankReference = str(req.body.bank_reference);
+  if (paidBy === 'company_account' && bankReference === '') {
+    back(req, res, orderId, 'error', orderExpenseRepository.BANK_REFERENCE_REQUIRED);
+    return;
+  }
+  if ([...bankReference].length > 150) {
+    back(req, res, orderId, 'error', 'The bank reference (UTR / transaction ID) can be at most 150 characters.');
+    return;
+  }
   const hasReceipt = !!req.file;
   const noReceiptReason = str(req.body.no_receipt_reason);
   if (!hasReceipt && noReceiptReason.length < reasonValidator.MIN_LENGTH) {
@@ -93,6 +103,7 @@ async function add(req, res) {
     amount_inr: rounded,
     paid_by: paidBy,
     staff_name: paidBy === 'staff' ? staffName.slice(0, 150) : null,
+    bank_reference: bankReference !== '' ? bankReference : null,
     receipt_file_id: receiptId,
     no_receipt_reason: hasReceipt ? null : noReceiptReason.slice(0, 255),
   }, req.user.id);

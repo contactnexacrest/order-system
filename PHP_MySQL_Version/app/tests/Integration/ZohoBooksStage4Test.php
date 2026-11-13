@@ -226,7 +226,7 @@ final class ZohoBooksStage4Test extends DbTestCase
         self::assertSame(2, CaSyncService::syncPurchases('manual', null)['expenses']);
 
         self::assertSame(['account_id' => 'AC-INS', 'paid_through_account_id' => 'SBI-1', 'amount' => 4200.0, 'date' => '2026-10-20', 'reference_number' => "NX-{$orderId}-COST-{$ecgc}",
-            'description' => "TEST-Stage4 Buyer / NX-{$orderId}: ECGC Insurance — ECGC cover", 'expense_id' => 'EX-1'], $this->expenses['EX-1']);
+            'description' => "TEST-Stage4 Buyer / NX-{$orderId}: ECGC Insurance — ECGC cover · order cost paid from the company account", 'expense_id' => 'EX-1'], $this->expenses['EX-1']);
         self::assertSame(['AC-COMM', 'AC-CARD', 9000.0], [$this->expenses['EX-2']['account_id'], $this->expenses['EX-2']['paid_through_account_id'], $this->expenses['EX-2']['amount']]);
         self::assertSame(0, CaSyncService::syncPurchases('manual', null)['expenses'], 'nothing is sent twice');
     }

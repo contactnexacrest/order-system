@@ -582,6 +582,74 @@ final class ZohoBooksService
     }
 
     /**
+     * Owner decision 13 Nov 2026 (QA ZOH-005, Option A; rule D-212): the Books
+     * description of an order expense — buyer and order first (the TEST-
+     * clean-up script finds them by it), what it is, what it was paid from or
+     * by, and the bank reference: "UTR …" from the company account, else
+     * "transaction ref …". Port: zohoBooksService.expenseDescription (same wording).
+     */
+    public static function expenseDescription(array $expense): string
+    {
+        $label = \App\Repositories\OrderExpenseRepository::CATEGORIES[$expense['category']] ?? 'Expense';
+        $paidBy = (string) ($expense['paid_by'] ?? '');
+        $parts = ["{$expense['buyer_name']} / {$expense['buyer_inquiry_ref']}: {$label} — " . trim((string) $expense['details'])];
+        $parts[] = match ($paidBy) {
+            'company_account' => 'order expense paid from the company account',
+            'company_card'    => 'order expense paid by company card',
+            default           => 'order expense paid by staff' . (trim((string) ($expense['staff_name'] ?? '')) !== '' ? ' (' . trim((string) $expense['staff_name']) . ')' : '') . ', to reimburse',
+        };
+        $ref = self::moneyBankRef($paidBy, $expense['bank_reference'] ?? null);
+        if ($ref !== null) {
+            $parts[] = $ref;
+        }
+        return implode(' · ', $parts);
+    }
+
+    /** QA ZOH-005 (rule D-212): the Books description of an order cost — as expenseDescription(). Port: zohoBooksService.costEntryDescription. */
+    public static function costEntryDescription(array $cost): string
+    {
+        $label = \App\Repositories\OrderCostEntryRepository::CATEGORIES[$cost['category']] ?? 'Order cost';
+        $paidFrom = (string) ($cost['paid_from'] ?? '');
+        $parts = ["{$cost['buyer_name']} / {$cost['buyer_inquiry_ref']}: {$label}" . (trim((string) ($cost['description'] ?? '')) !== '' ? ' — ' . trim((string) $cost['description']) : '')];
+        if (isset(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$paidFrom])) {
+            $parts[] = $paidFrom === 'company_account' ? 'order cost paid from the company account' : 'order cost paid by company card';
+        }
+        $ref = self::moneyBankRef($paidFrom, $cost['bank_reference'] ?? null);
+        if ($ref !== null) {
+            $parts[] = $ref;
+        }
+        return implode(' · ', $parts);
+    }
+
+    /** "UTR …" for money from the company account, "transaction ref …" for a card or staff payment; null when none was given. */
+    public static function moneyBankRef(string $paidFrom, mixed $reference): ?string
+    {
+        $reference = trim((string) ($reference ?? ''));
+        if ($reference === '') {
+            return null;
+        }
+        return ($paidFrom === 'company_account' ? 'UTR ' : 'transaction ref ') . $reference;
+    }
+
+    /**
+     * QA ZOH-005: what decides an order expense's Books record — sent again
+     * (updated) when it changes, e.g. the new description after 2026-11-13d.
+     */
+    public static function expenseHash(array $expense): string
+    {
+        return hash('sha256', (string) json_encode([(string) $expense['category'], number_format((float) $expense['amount_inr'], 2, '.', ''), (string) $expense['expense_date'], (string) $expense['paid_by'], self::expenseDescription($expense)], JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Owner decision 2026-10-29 / QA ZOH-005: what decides an order cost's Books
+     * record — category, amount, date, paid from and the description sent.
+     */
+    public static function costEntryHash(array $cost): string
+    {
+        return hash('sha256', (string) json_encode([(string) $cost['category'], number_format((float) $cost['amount_inr'], 2, '.', ''), (string) $cost['cost_date'], (string) ($cost['paid_from'] ?? ''), self::costEntryDescription($cost)], JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
      * Stage 3: one order expense as a Books expense, paid through the
      * deposit account (company account), "Company Card" or "Employee
      * Reimbursements" (paid by staff). Its description starts with the
@@ -602,14 +670,13 @@ final class ZohoBooksService
         $paidThrough = $expense['paid_by'] === 'company_account'
             ? $config['depositAccountId']
             : self::accountId($config, $accessToken, self::PAID_THROUGH_ACCOUNTS[$expense['paid_by']] ?? 'Employee Reimbursements');
-        $label = \App\Repositories\OrderExpenseRepository::CATEGORIES[$expense['category']] ?? 'Expense';
         $payload = [
             'account_id' => self::accountId($config, $accessToken, self::EXPENSE_ACCOUNTS[$expense['category']] ?? self::EXPENSE_ACCOUNTS['other']),
             'paid_through_account_id' => $paidThrough,
             'amount' => round((float) $expense['amount_inr'], 2),
             'date' => (string) $expense['expense_date'],
             'reference_number' => "{$expense['buyer_inquiry_ref']}-EXP-{$expense['id']}",
-            'description' => "{$expense['buyer_name']} / {$expense['buyer_inquiry_ref']}: {$label} — {$expense['details']}" . ($expense['paid_by'] === 'staff' && !empty($expense['staff_name']) ? " (paid by {$expense['staff_name']})" : ''),
+            'description' => self::expenseDescription($expense),
         ];
         // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
         $zohoExpenseId ??= self::findExistingByReference($config, $accessToken, 'expenses', 'expenses', 'expense_id', $payload['reference_number'], [],
@@ -649,7 +716,7 @@ final class ZohoBooksService
             'amount' => round((float) $cost['amount_inr'], 2),
             'date' => (string) $cost['cost_date'],
             'reference_number' => "{$cost['buyer_inquiry_ref']}-COST-{$cost['id']}",
-            'description' => "{$cost['buyer_name']} / {$cost['buyer_inquiry_ref']}: {$label}" . (!empty($cost['description']) ? " — {$cost['description']}" : ''),
+            'description' => self::costEntryDescription($cost),
         ];
         // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
         $zohoExpenseId ??= self::findExistingByReference($config, $accessToken, 'expenses', 'expenses', 'expense_id', $payload['reference_number'], [],

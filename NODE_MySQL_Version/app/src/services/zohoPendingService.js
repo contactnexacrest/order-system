@@ -96,7 +96,7 @@ async function counts(orderId = null) {
       n += cost.zoho_expense_id === null ? 1 : 0;
       continue;
     }
-    const hash = sha([cost.category, round2(cost.amount_inr), String(cost.cost_date), cost.paid_from, cost.description]);
+    const hash = zohoBooksService.costEntryHash(cost); // QA ZOH-005
     if (cost.zoho_expense_id === null || cost.zoho_pushed_hash !== hash) n += 1;
   }
   add('order_cost', n);

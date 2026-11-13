@@ -2710,6 +2710,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-12j-surface-finish-one-l
 mysql -u <user> -p <database> < docs/migrations/2026-11-13a-suppliers-products-configure.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13b-products-fixed-base-and-link-legacy.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13c-permission-descriptions.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-13d-expense-cost-bank-reference.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-13e-quantity-warning-levels.sql
 ```
 

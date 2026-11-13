@@ -148,6 +148,12 @@ expense** (open by default while none are recorded). Each expense has:
 - **Paid by** — Company account (chosen to start with, owner request
   3 Nov 2026), Company card, or Staff (to reimburse), with the staff
   member's name;
+- **Bank reference (UTR / transaction ID)** — required when the
+  **company account** paid (rule D-212, owner decision 13 Nov 2026): the
+  form shows "Enter the bank reference (UTR / transaction ID): the expense
+  was paid from the company account." beside the field and does not save
+  without it. Optional for the company card or staff (type the card
+  transaction ID if you have it). Example: HDFCN26304123456;
 - the **receipt / bill** — or, only when no bill exists, a reason of at
   least 10 characters.
 
@@ -157,7 +163,11 @@ expense keeps its real date and is marked "added later". Staff-paid
 amounts are totalled as "to reimburse".
 
 Once Zoho Books is switched on, each expense goes to Books on the next
-sync. **Removing** one that is already in Books removes it from Books too
+sync, described from its facts, e.g. "TEST-Buyer / NX-12: Courier —
+Samples to buyer · order expense paid from the company account · UTR
+HDFCN26304123456" (company card: "… · order expense paid by company card
+· transaction ref …"; staff: "… · order expense paid by staff (name), to
+reimburse"). The list shows the reference under **Paid by**. **Removing** one that is already in Books removes it from Books too
 (owner decision 2026-10-29): the confirmation says so, and if Books cannot
 be reached at that moment nothing is removed and the message says why. An
 expense changed or deleted directly in Books is put back from the app on
@@ -294,7 +304,11 @@ from** (company account or company card — owner decision 2026-10-29;
 Company account is chosen to start with since 3 Nov 2026),
 and a **description** — required since rule D-212 (2026-10-31): who was
 paid and for what, with their invoice / receipt no., 10 to 255
-characters — and can be removed with a
+characters — and the **Bank reference (UTR / transaction ID)**: required
+when paid from the **company account**, optional for the company card
+(owner decision 13 Nov 2026; the table shows it under **Paid from**, and
+the Zoho expense reads "… · order cost paid from the company account ·
+UTR …") — and can be removed with a
 **Remove** button (a
 correction, not a routine action — same reasoning as INR-actual delete
 being its own permission elsewhere in this module). The three

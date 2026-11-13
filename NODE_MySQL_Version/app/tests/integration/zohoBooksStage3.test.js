@@ -85,6 +85,11 @@ describe('Zoho Books Stage 3', () => {
       expenses[id] = { ...payload, expense_id: id };
       return json({ code: 0, expense: { expense_id: id } }, 201);
     }
+    const putExpense = p.match(/^\/books\/v3\/expenses\/(.+)$/);
+    if (putExpense && method === 'PUT') {
+      expenses[putExpense[1]] = { ...payload, expense_id: putExpense[1] };
+      return json({ code: 0, expense: { expense_id: putExpense[1] } });
+    }
     if (p === '/books/v3/expenses' && method === 'GET') {
       return json({ code: 0, expenses: Object.values(expenses).map((e) => ({ expense_id: e.expense_id, account_name: 'Travel Expense', description: e.description, total: e.amount, currency_code: 'INR', date: e.date })), page_context: { has_more_page: false } });
     }
@@ -224,13 +229,49 @@ describe('Zoho Books Stage 3', () => {
     expect((await sync()).expenses).toBe(2);
     expect(expenses['EX-1']).toEqual({
       account_id: 'AC-TRAVEL', paid_through_account_id: 'AC-EMP', amount: 2450, date: '2026-10-22', reference_number: `NX-${o.order}-EXP-${staff}`,
-      description: `TEST-Stage3 Buyer / NX-${o.order}: Travel — train / flight / bus — Train to the factory (paid by Export Executive)`, expense_id: 'EX-1',
+      description: `TEST-Stage3 Buyer / NX-${o.order}: Travel — train / flight / bus — Train to the factory · order expense paid by staff (Export Executive), to reimburse`, expense_id: 'EX-1',
     });
     expect([expenses['EX-2'].account_id, expenses['EX-2'].paid_through_account_id]).toEqual(['AC-POST', 'SBI-1']);
 
     const imported = await caSyncService.importPendingExpenses('manual', null);
     expect(imported.imported).toBe(0); // the expense import skips what this app sent
     expect(await zohoPurchaseRepository.isPushedExpense('EX-1')).toBe(true);
+  });
+
+  // QA ZOH-005 (owner decision 13 Nov 2026, rule D-212): the expense and the order cost reach Books saying
+  // what was paid from and the UTR; an expense or cost already in Books before the upgrade is updated once
+  // with the new description (same Books record, amount unchanged), then left alone.
+  it('ZOH-005: expenses and costs carry paid-from and the UTR, and old ones are updated once', async () => {
+    const orderCostEntryRepository = require('../../src/repositories/orderCostEntryRepository');
+    const zohoPendingService = require('../../src/services/zohoPendingService');
+    const crypto = require('crypto');
+    accounts.push({ account_id: 'AC-INS', account_name: 'Insurance Expense' }, { account_id: 'AC-CARD', account_name: 'Company Card' });
+    const o = await createOrder();
+    await orderExpenseRepository.create(o.order, { expense_date: '2026-10-23', category: 'courier', details: 'Samples to buyer', amount_inr: 1800, paid_by: 'company_account', bank_reference: 'HDFCN26304123456', no_receipt_reason: 'test' }, userId);
+    const cost = await orderCostEntryRepository.create(o.order, 'ecgc_insurance', 'ECGC cover', 4200, '2026-10-24', userId, 'company_account', 'HDFCN26304999999');
+
+    expect((await sync()).expenses).toBe(2);
+    expect(Object.values(expenses).map((e) => e.description)).toEqual([
+      `TEST-Stage3 Buyer / NX-${o.order}: Courier — Samples to buyer · order expense paid from the company account · UTR HDFCN26304123456`,
+      `TEST-Stage3 Buyer / NX-${o.order}: ECGC Insurance — ECGC cover · order cost paid from the company account · UTR HDFCN26304999999`,
+    ]);
+    expect((await sync()).expenses || 0).toBe(0); // nothing changed, nothing sent again
+
+    // An expense and a cost sent before 2026-11-13d: old description in Books, no stored hash for the expense.
+    const old = await orderExpenseRepository.create(o.order, { expense_date: '2026-10-25', category: 'hotel', details: 'Hotel Kota', amount_inr: 3540, paid_by: 'company_card', no_receipt_reason: 'test' }, userId);
+    await db.execute("UPDATE order_expenses SET zoho_expense_id = 'EX-OLD', zoho_synced_at = NOW(), zoho_pushed_hash = NULL WHERE id = :id", { id: old });
+    expenses['EX-OLD'] = { expense_id: 'EX-OLD', amount: 3540, date: '2026-10-25', description: `TEST-Stage3 Buyer / NX-${o.order}: Hotel — Hotel Kota` };
+    await db.execute('UPDATE order_cost_entries SET zoho_pushed_hash = :h WHERE id = :id', { h: crypto.createHash('sha256').update('pre-13d').digest('hex'), id: cost });
+    requests = [];
+
+    expect((await sync()).expenses).toBe(2);
+    expect(requestsTo('POST', '/books/v3/expenses')).toEqual([]); // the same Books records are updated, never a second one
+    expect(requestsTo('PUT', '/books/v3/expenses/')).toHaveLength(2);
+    expect(expenses['EX-OLD'].description).toBe(`TEST-Stage3 Buyer / NX-${o.order}: Hotel — Hotel Kota · order expense paid by company card`);
+    expect(expenses['EX-OLD'].amount).toBe(3540);
+    expect(await messages(o.order, 'order_expense')).toContain('Updated expense "Hotel Kota" (INR 3540.00) as Zoho Books expense.');
+    expect((await sync()).expenses || 0).toBe(0); // updated once, then left alone
+    expect((await zohoPendingService.counts(o.order)).total).toBe(0);
   });
 
   // Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" sends only that order's records, once.
@@ -242,7 +283,7 @@ describe('Zoho Books Stage 3', () => {
 
     const first = await caSyncService.runForOrder(a.order, userId);
     expect(first.purchases.expenses).toBe(1);
-    expect(Object.values(expenses).map((e) => e.description.slice(-13))).toEqual(['Courier for A']);
+    expect(Object.values(expenses).map((e) => e.description)).toEqual([`TEST-Stage3 Buyer A / NX-${a.order}: Courier — Courier for A · order expense paid from the company account`]);
     expect(first.expenses.imported).toBe(0); // the import from Books waits for the full sync
 
     expect((await caSyncService.runForOrder(a.order, userId)).purchases.expenses).toBe(0); // never sent twice

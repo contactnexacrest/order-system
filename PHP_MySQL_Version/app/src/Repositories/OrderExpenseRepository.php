@@ -35,6 +35,9 @@ final class OrderExpenseRepository
         'staff'           => 'Staff (to reimburse)',
     ];
 
+    /** Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): shown when an expense paid from the company account has no bank reference. */
+    public const BANK_REFERENCE_REQUIRED = 'Enter the bank reference (UTR / transaction ID): the expense was paid from the company account.';
+
     /** A voucher entered more than this many days after the expense shows as "added later". */
     public const LATE_AFTER_DAYS = 30;
 
@@ -43,8 +46,8 @@ final class OrderExpenseRepository
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO order_expenses (order_id, expense_date, category, details, amount_inr, paid_by, staff_name, receipt_file_id, no_receipt_reason, created_by)
-             VALUES (:order_id, :expense_date, :category, :details, :amount_inr, :paid_by, :staff_name, :receipt_file_id, :no_receipt_reason, :created_by)'
+            'INSERT INTO order_expenses (order_id, expense_date, category, details, amount_inr, paid_by, staff_name, bank_reference, receipt_file_id, no_receipt_reason, created_by)
+             VALUES (:order_id, :expense_date, :category, :details, :amount_inr, :paid_by, :staff_name, :bank_reference, :receipt_file_id, :no_receipt_reason, :created_by)'
         )->execute([
             'order_id'          => $orderId,
             'expense_date'      => $data['expense_date'],
@@ -53,6 +56,7 @@ final class OrderExpenseRepository
             'amount_inr'        => $data['amount_inr'],
             'paid_by'           => $data['paid_by'],
             'staff_name'        => $data['staff_name'] ?? null,
+            'bank_reference'    => $data['bank_reference'] ?? null,
             'receipt_file_id'   => $data['receipt_file_id'] ?? null,
             'no_receipt_reason' => $data['no_receipt_reason'] ?? null,
             'created_by'        => $userId,

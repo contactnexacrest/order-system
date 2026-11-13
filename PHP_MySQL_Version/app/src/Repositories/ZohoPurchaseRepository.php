@@ -141,7 +141,11 @@ final class ZohoPurchaseRepository
         return $out;
     }
 
-    /** @return list<array<string,mixed>> order expenses not yet in Books (dated on or after $startDate, when given) */
+    /**
+     * @return list<array<string,mixed>> order expenses not yet in Books, or in Books but changed since
+     * they were sent (QA ZOH-005: e.g. the description with the bank reference) — dated on or after
+     * $startDate, when given
+     */
     public static function expensesToSync(?string $startDate = null): array
     {
         $rows = Database::connection()->query(
@@ -150,10 +154,10 @@ final class ZohoPurchaseRepository
              FROM order_expenses e
              JOIN orders o ON o.id = e.order_id
              JOIN clients c ON c.id = o.client_id
-             WHERE e.zoho_expense_id IS NULL
              ORDER BY e.expense_date, e.id'
         )->fetchAll();
         return array_values(array_filter($rows, static fn (array $r): bool => ($startDate === null || (string) $r['expense_date'] >= $startDate)
+            && ($r['zoho_expense_id'] === null || $r['zoho_pushed_hash'] !== \App\Services\ZohoBooksService::expenseHash($r))
             && (ZohoGuard::isProduction()
                 ? (int) $r['is_test_or_sample'] !== 1
                 : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX))));
@@ -224,9 +228,9 @@ final class ZohoPurchaseRepository
         Database::connection()->prepare('UPDATE order_vendor_bill_payments SET zoho_applied_at = NOW() WHERE id = :id')->execute(['id' => $paymentId]);
     }
 
-    public static function setExpenseSynced(int $expenseId, string $zohoExpenseId): void
+    public static function setExpenseSynced(int $expenseId, string $zohoExpenseId, ?string $hash = null): void
     {
-        Database::connection()->prepare('UPDATE order_expenses SET zoho_expense_id = :zoho, zoho_synced_at = NOW() WHERE id = :id')->execute(['zoho' => $zohoExpenseId, 'id' => $expenseId]);
+        Database::connection()->prepare('UPDATE order_expenses SET zoho_expense_id = :zoho, zoho_synced_at = NOW(), zoho_pushed_hash = :hash WHERE id = :id')->execute(['zoho' => $zohoExpenseId, 'hash' => $hash, 'id' => $expenseId]);
     }
 
     /** The clean-up script removed this record from Books: forget it here too. */
@@ -236,7 +240,7 @@ final class ZohoPurchaseRepository
             'contact' => ['UPDATE suppliers SET zoho_contact_id = NULL WHERE zoho_contact_id = :id', 'UPDATE logistics_partners SET zoho_contact_id = NULL WHERE zoho_contact_id = :id'],
             'bill' => ['UPDATE order_vendor_bills SET zoho_bill_id = NULL, zoho_synced_at = NULL WHERE zoho_bill_id = :id'],
             'vendorpayment' => ['UPDATE order_vendor_bill_payments SET zoho_payment_id = NULL, zoho_synced_at = NULL, zoho_applied_at = NULL WHERE zoho_payment_id = :id'],
-            'expense' => ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
+            'expense' => ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
         ][$kind] ?? [];
         foreach ($sql as $statement) {
             Database::connection()->prepare($statement)->execute(['id' => $zohoId]);

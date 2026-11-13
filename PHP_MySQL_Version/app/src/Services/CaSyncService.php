@@ -700,14 +700,16 @@ final class CaSyncService
             }
         }
 
+        // QA ZOH-005: an expense already in Books is updated when what it sends changed (e.g. its description).
         foreach (ZohoPurchaseRepository::expensesToSync($startDate) as $expense) {
             if (!self::inScope($expense['order_id'])) {
                 continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
             }
             try {
-                $zohoExpenseId = ZohoBooksService::pushExpense($expense);
-                ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoExpenseId);
-                $log('order_expense', (int) $expense['order_id'], 'expense', 'success', $zohoExpenseId, ZohoRestoreService::note("exp:{$expense['id']}") . "Sent expense \"{$expense['details']}\" (INR " . number_format((float) $expense['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
+                $inBooks = !empty($expense['zoho_expense_id']) ? (string) $expense['zoho_expense_id'] : null;
+                $zohoExpenseId = ZohoBooksService::pushExpense($expense, $inBooks);
+                ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoExpenseId, ZohoBooksService::expenseHash($expense));
+                $log('order_expense', (int) $expense['order_id'], 'expense', 'success', $zohoExpenseId, ZohoRestoreService::note("exp:{$expense['id']}") . ($inBooks !== null ? 'Updated' : 'Sent') . " expense \"{$expense['details']}\" (INR " . number_format((float) $expense['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
                 $result['expenses']++;
             } catch (\Throwable $e) {
                 ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
@@ -723,7 +725,7 @@ final class CaSyncService
             if (!self::inScope($cost['order_id'])) {
                 continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
             }
-            $hash = hash('sha256', (string) json_encode([$cost['category'], round((float) $cost['amount_inr'], 2), (string) $cost['cost_date'], $cost['paid_from'], $cost['description']]));
+            $hash = ZohoBooksService::costEntryHash($cost); // QA ZOH-005: the description sent is part of it
             if ($cost['zoho_expense_id'] !== null && $cost['zoho_pushed_hash'] === $hash) {
                 continue;
             }

@@ -95,7 +95,7 @@ final class ZohoPendingService
                 $n += $cost['zoho_expense_id'] === null ? 1 : 0;
                 continue;
             }
-            $hash = hash('sha256', (string) json_encode([$cost['category'], round((float) $cost['amount_inr'], 2), (string) $cost['cost_date'], $cost['paid_from'], $cost['description']]));
+            $hash = ZohoBooksService::costEntryHash($cost); // QA ZOH-005
             if ($cost['zoho_expense_id'] === null || $cost['zoho_pushed_hash'] !== $hash) {
                 $n++;
             }

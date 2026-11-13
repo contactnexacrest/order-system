@@ -153,6 +153,16 @@ What the order pays out goes to Zoho Books too, on the same sync:
   named *Company Card* (add it in Books before the first card expense).
   The expense import (chapter CA-04) **skips** these, so an order expense
   is never brought back in a second time.
+- **Descriptions of order expenses and costs (rule D-212, owner decision
+  13 Nov 2026).** The Books description names the buyer and order, what
+  it is, what it was paid from / by and the bank reference: "<Buyer> /
+  <order ref>: Courier — Samples to buyer · order expense paid from the
+  company account · UTR HDFCN26304123456" (an order cost: "… · order cost
+  paid from the company account · UTR …"; company card: "… · transaction
+  ref …"). After the upgrade (migration 2026-11-13d) the next sync updates
+  every order expense and order cost already in Books **once** with this
+  description — same Books record, amount, date and accounts unchanged;
+  their Sync Log rows say "Updated expense …" / "Updated order cost …".
 - **Order costs (owner decision 2026-10-29).** The real paid costs in
   the order's cost lines (Step 12a) go as Books **expenses** too, from
   what they were paid from (a new **Paid from** field: company account =

@@ -37,6 +37,7 @@ final class ZohoBooksStage3Test extends DbTestCase
         ['account_id' => 'AC-TRAVEL', 'account_name' => 'Travel Expense'],
         ['account_id' => 'AC-POST', 'account_name' => 'Postage'],
         ['account_id' => 'AC-EMP', 'account_name' => 'Employee Reimbursements'],
+        ['account_id' => 'AC-INS', 'account_name' => 'Insurance Expense'],
     ];
     private int $userId;
 
@@ -133,6 +134,10 @@ final class ZohoBooksStage3Test extends DbTestCase
             $id = 'EX-' . (count($this->expenses) + 1);
             $this->expenses[$id] = $payload + ['expense_id' => $id];
             return $json(['code' => 0, 'expense' => ['expense_id' => $id]], 201);
+        }
+        if (preg_match('#^/books/v3/expenses/(.+)$#', $path, $m) === 1 && $method === 'PUT') {
+            $this->expenses[$m[1]] = $payload + ['expense_id' => $m[1]];
+            return $json(['code' => 0, 'expense' => ['expense_id' => $m[1]]]);
         }
         if ($path === '/books/v3/expenses' && $method === 'GET') {
             return $json(['code' => 0, 'expenses' => array_map(static fn (array $e): array => ['expense_id' => $e['expense_id'], 'account_name' => 'Travel Expense', 'description' => $e['description'], 'total' => $e['amount'], 'currency_code' => 'INR', 'date' => $e['date']], array_values($this->expenses)), 'page_context' => ['has_more_page' => false]]);
@@ -256,12 +261,50 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame(2, $this->sync()['expenses']);
         $staffExpense = $this->expenses['EX-1'];
         self::assertSame(['account_id' => 'AC-TRAVEL', 'paid_through_account_id' => 'AC-EMP', 'amount' => 2450.0, 'date' => '2026-10-22', 'reference_number' => "NX-{$o['order']}-EXP-{$staff}",
-            'description' => "TEST-Stage3 Buyer / NX-{$o['order']}: Travel — train / flight / bus — Train to the factory (paid by Export Executive)", 'expense_id' => 'EX-1'], $staffExpense);
+            'description' => "TEST-Stage3 Buyer / NX-{$o['order']}: Travel — train / flight / bus — Train to the factory · order expense paid by staff (Export Executive), to reimburse", 'expense_id' => 'EX-1'], $staffExpense);
         self::assertSame(['AC-POST', 'SBI-1'], [$this->expenses['EX-2']['account_id'], $this->expenses['EX-2']['paid_through_account_id']]);
 
         $import = CaSyncService::importPendingExpenses('manual', null);
         self::assertSame(0, $import['imported'], 'the expense import skips what this app sent');
         self::assertTrue(ZohoPurchaseRepository::isPushedExpense('EX-1'));
+    }
+
+    /**
+     * QA ZOH-005 (owner decision 13 Nov 2026, rule D-212): the expense and the
+     * order cost reach Books saying what was paid from and the UTR; an expense
+     * or cost already in Books before the upgrade is updated once with the new
+     * description (same Books record, amount unchanged), then left alone.
+     */
+    public function testZoh005ExpensesAndCostsCarryPaidFromAndUtrAndOldOnesAreUpdatedOnce(): void
+    {
+        $this->accounts[] = ['account_id' => 'AC-CARD', 'account_name' => 'Company Card'];
+        $o = $this->createOrder();
+        $pdo = Database::connection();
+        OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-23', 'category' => 'courier', 'details' => 'Samples to buyer', 'amount_inr' => 1800, 'paid_by' => 'company_account', 'bank_reference' => 'HDFCN26304123456', 'no_receipt_reason' => 'test'], $this->userId);
+        $cost = \App\Repositories\OrderCostEntryRepository::create($o['order'], 'ecgc_insurance', 'ECGC cover', 4200.0, '2026-10-24', $this->userId, 'company_account', 'HDFCN26304999999');
+
+        self::assertSame(2, $this->sync()['expenses']);
+        self::assertSame([
+            "TEST-Stage3 Buyer / NX-{$o['order']}: Courier — Samples to buyer · order expense paid from the company account · UTR HDFCN26304123456",
+            "TEST-Stage3 Buyer / NX-{$o['order']}: ECGC Insurance — ECGC cover · order cost paid from the company account · UTR HDFCN26304999999",
+        ], array_column(array_values($this->expenses), 'description'));
+        self::assertSame(0, $this->sync()['expenses'] ?? 0, 'nothing changed, nothing sent again');
+
+        // An expense and a cost sent before 2026-11-13d: old description in Books, no stored hash for the expense.
+        $old = OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-25', 'category' => 'hotel', 'details' => 'Hotel Kota', 'amount_inr' => 3540, 'paid_by' => 'company_card', 'no_receipt_reason' => 'test'], $this->userId);
+        $pdo->prepare("UPDATE order_expenses SET zoho_expense_id = 'EX-OLD', zoho_synced_at = NOW(), zoho_pushed_hash = NULL WHERE id = :id")->execute(['id' => $old]);
+        $this->expenses['EX-OLD'] = ['expense_id' => 'EX-OLD', 'amount' => 3540.0, 'date' => '2026-10-25', 'description' => "TEST-Stage3 Buyer / NX-{$o['order']}: Hotel — Hotel Kota"];
+        $pdo->prepare('UPDATE order_cost_entries SET zoho_pushed_hash = :h WHERE id = :id')->execute(['h' => hash('sha256', 'pre-13d'), 'id' => $cost]);
+        $this->requests = [];
+
+        self::assertSame(2, $this->sync()['expenses']);
+        self::assertSame([], $this->requestsTo('POST', '/books/v3/expenses'), 'the same Books records are updated, never a second one');
+        self::assertCount(2, $this->requestsTo('PUT', '/books/v3/expenses/'));
+        self::assertSame("TEST-Stage3 Buyer / NX-{$o['order']}: Hotel — Hotel Kota · order expense paid by company card", $this->expenses['EX-OLD']['description']);
+        self::assertSame(3540.0, $this->expenses['EX-OLD']['amount']);
+        self::assertContains('Updated expense "Hotel Kota" (INR 3540.00) as Zoho Books expense.', $this->messages($o['order'], 'order_expense'));
+        self::assertSame(0, $this->sync()['expenses'] ?? 0, 'updated once, then left alone');
+        self::assertSame(0, \App\Services\ZohoPendingService::counts($o['order'])['total']);
     }
 
     /** Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" sends only that order's records, once. */
@@ -274,7 +317,7 @@ final class ZohoBooksStage3Test extends DbTestCase
 
         $first = CaSyncService::runForOrder($a['order'], $this->userId);
         self::assertSame(1, $first['purchases']['expenses']);
-        self::assertSame(['Courier for A'], array_map(static fn (array $e): string => substr($e['description'], -13), array_values($this->expenses)));
+        self::assertSame(["TEST-Stage3 Buyer A / NX-{$a['order']}: Courier — Courier for A · order expense paid from the company account"], array_column(array_values($this->expenses), 'description'));
         self::assertSame(0, $first['expenses']['imported'], 'the import from Books waits for the full sync');
 
         self::assertSame(0, CaSyncService::runForOrder($a['order'], $this->userId)['purchases']['expenses'], 'never sent twice');

@@ -4092,7 +4092,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <td><?= htmlspecialchars($c['description'] ?? '—') ?>
                 <?php if (isset(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']])): ?><br><small class="muted"><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']]) ?></small><?php elseif (!empty($c['zoho_expense_id'])): ?><br><small class="muted">In Zoho Books</small><?php endif; ?></td>
               <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
-              <td><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$c['paid_from'] ?? ''] ?? '—') ?></td>
+              <td><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$c['paid_from'] ?? ''] ?? '—') ?><?php if (($__ref = \App\Services\ZohoBooksService::moneyBankRef((string) ($c['paid_from'] ?? ''), $c['bank_reference'] ?? null)) !== null): // QA ZOH-005 (rule D-212) ?><br><small class="muted"><?= htmlspecialchars($__ref) ?></small><?php endif; ?></td>
               <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
               <td>
                 <?php if (!empty($c['incentive_kind'])): ?>
@@ -4138,7 +4138,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::CATEGORIES[$e['category']] ?? (string) $e['category']) ?></td>
             <td><?= htmlspecialchars((string) $e['details']) ?></td>
             <td style="text-align:right"><?= number_format((float) $e['amount_inr'], 2) ?></td>
-            <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?></td>
+            <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?><?php if (($__ref = \App\Services\ZohoBooksService::moneyBankRef((string) $e['paid_by'], $e['bank_reference'] ?? null)) !== null): // QA ZOH-005 (rule D-212) ?><br><small class="muted"><?= htmlspecialchars($__ref) ?></small><?php endif; ?></td>
             <td><?php if (!empty($e['receipt_file_id'])): ?><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $e['receipt_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?>receipt<?php endif; ?><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
             <td>
               <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses/<?= (int) $e['id'] ?>/delete" data-confirm="<?= !empty($e['zoho_expense_id']) ? 'Remove this expense? It is in Zoho Books too, and is removed there as well.' : 'Remove this expense?' ?>">
@@ -4169,6 +4169,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               </select>
             </label>
             <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
+            <?php // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): required when the company account paid. ?>
+            <label>Bank reference (UTR / transaction ID) <small class="muted">(required when paid from the company account)</small><input type="text" name="bank_reference" maxlength="150" data-required-if="paid_by=company_account" data-required-if-message="<?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::BANK_REFERENCE_REQUIRED) ?>" placeholder="e.g. HDFCN26304123456"></label>
             <label class="full">Details *<input type="text" name="details" required maxlength="255" placeholder="e.g. Factory visit 2 — Kota"></label>
             <label>Receipt / bill<input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png"></label>
             <label>No receipt? Reason<input type="text" name="no_receipt_reason" maxlength="255" minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" data-required-unless="receipt" placeholder="only if no bill exists"></label>
@@ -4226,6 +4228,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
+            <?php // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): required when the company account paid. ?>
+            <label>Bank reference (UTR / transaction ID) <small class="muted">(required when paid from the company account)</small><input type="text" name="bank_reference" maxlength="150" data-required-if="paid_from=company_account" data-required-if-message="<?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::BANK_REFERENCE_REQUIRED) ?>" placeholder="e.g. HDFCN26304123456"></label>
             <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
             <button type="submit" class="btn-sm">Record Cost</button>
           </form>

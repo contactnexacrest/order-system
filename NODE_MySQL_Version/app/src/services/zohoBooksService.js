@@ -540,6 +540,56 @@ async function applyVendorPayment(payment, bill, targetBill) {
  * @throws on any failure
  * @return {Promise<string>} the Zoho expense_id
  */
+/**
+ * Owner decision 13 Nov 2026 (QA ZOH-005, Option A; rule D-212): the Books
+ * description of an order expense — buyer and order first (the TEST- clean-up
+ * script finds them by it), what it is, what it was paid from or by, and the
+ * bank reference: "UTR …" from the company account, else "transaction ref …".
+ * Port of ZohoBooksService::expenseDescription() (same wording).
+ */
+function expenseDescription(expense) {
+  const label = EXPENSE_CATEGORIES[expense.category] || 'Expense';
+  const paidBy = String(expense.paid_by || '');
+  const staff = String(expense.staff_name || '').trim();
+  const parts = [`${expense.buyer_name} / ${expense.buyer_inquiry_ref}: ${label} — ${String(expense.details || '').trim()}`];
+  if (paidBy === 'company_account') parts.push('order expense paid from the company account');
+  else if (paidBy === 'company_card') parts.push('order expense paid by company card');
+  else parts.push(`order expense paid by staff${staff !== '' ? ` (${staff})` : ''}, to reimburse`);
+  const ref = moneyBankRef(paidBy, expense.bank_reference);
+  if (ref !== null) parts.push(ref);
+  return parts.join(' · ');
+}
+
+/** QA ZOH-005 (rule D-212): the Books description of an order cost — as expenseDescription(). Port of ZohoBooksService::costEntryDescription(). */
+function costEntryDescription(cost) {
+  const { CATEGORIES, PAID_FROM } = require('../repositories/orderCostEntryRepository');
+  const label = CATEGORIES[cost.category] || 'Order cost';
+  const paidFrom = String(cost.paid_from || '');
+  const own = String(cost.description || '').trim();
+  const parts = [`${cost.buyer_name} / ${cost.buyer_inquiry_ref}: ${label}${own !== '' ? ` — ${own}` : ''}`];
+  if (PAID_FROM[paidFrom]) parts.push(paidFrom === 'company_account' ? 'order cost paid from the company account' : 'order cost paid by company card');
+  const ref = moneyBankRef(paidFrom, cost.bank_reference);
+  if (ref !== null) parts.push(ref);
+  return parts.join(' · ');
+}
+
+/** "UTR …" for money from the company account, "transaction ref …" for a card or staff payment; null when none was given. */
+function moneyBankRef(paidFrom, reference) {
+  const ref = String(reference ?? '').trim();
+  if (ref === '') return null;
+  return `${paidFrom === 'company_account' ? 'UTR ' : 'transaction ref '}${ref}`;
+}
+
+/** QA ZOH-005: what decides an order expense's Books record — sent again (updated) when it changes, e.g. the new description after 2026-11-13d. */
+function expenseHash(expense) {
+  return crypto.createHash('sha256').update(JSON.stringify([String(expense.category), Number(expense.amount_inr).toFixed(2), String(expense.expense_date), String(expense.paid_by), expenseDescription(expense)])).digest('hex');
+}
+
+/** Owner decision 2026-10-29 / QA ZOH-005: what decides an order cost's Books record — category, amount, date, paid from and the description sent. */
+function costEntryHash(cost) {
+  return crypto.createHash('sha256').update(JSON.stringify([String(cost.category), Number(cost.amount_inr).toFixed(2), String(cost.cost_date), String(cost.paid_from || ''), costEntryDescription(cost)])).digest('hex');
+}
+
 async function pushExpense(expense, zohoExpenseId = null) {
   zohoGuard.assertCustomerAllowed(String(expense.buyer_name));
   const config = await loadConfig();
@@ -547,14 +597,13 @@ async function pushExpense(expense, zohoExpenseId = null) {
   const paidThrough = expense.paid_by === 'company_account'
     ? config.depositAccountId
     : await accountId(config, accessToken, PAID_THROUGH_ACCOUNTS[expense.paid_by] || 'Employee Reimbursements');
-  const label = EXPENSE_CATEGORIES[expense.category] || 'Expense';
   const payload = {
     account_id: await accountId(config, accessToken, EXPENSE_ACCOUNTS[expense.category] || EXPENSE_ACCOUNTS.other),
     paid_through_account_id: paidThrough,
     amount: round(Number(expense.amount_inr), 2),
     date: String(expense.expense_date),
     reference_number: `${expense.buyer_inquiry_ref}-EXP-${expense.id}`,
-    description: `${expense.buyer_name} / ${expense.buyer_inquiry_ref}: ${label} — ${expense.details}${expense.paid_by === 'staff' && expense.staff_name ? ` (paid by ${expense.staff_name})` : ''}`,
+    description: expenseDescription(expense),
   };
   // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
   if (zohoExpenseId === null || zohoExpenseId === undefined) {
@@ -594,7 +643,7 @@ async function pushCostEntry(cost, zohoExpenseId = null) {
     amount: round(Number(cost.amount_inr), 2),
     date: String(cost.cost_date),
     reference_number: `${cost.buyer_inquiry_ref}-COST-${cost.id}`,
-    description: `${cost.buyer_name} / ${cost.buyer_inquiry_ref}: ${label}${cost.description ? ` — ${cost.description}` : ''}`,
+    description: costEntryDescription(cost),
   };
   // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
   if (zohoExpenseId === null || zohoExpenseId === undefined) {
@@ -2564,7 +2613,7 @@ module.exports = {
   // Owner 2 Nov 2026: exported for the bank-charges payload test (remittanceDifference.test.js).
   paymentPayload,
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal, payoutCostJournalPayload, pushPayoutCostJournal,
-  isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
+  isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense, expenseDescription, costEntryDescription, moneyBankRef, expenseHash, costEntryHash,
   pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport, forgetTokensInMemoryForTests,

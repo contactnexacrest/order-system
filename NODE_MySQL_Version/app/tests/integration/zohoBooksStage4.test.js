@@ -188,7 +188,7 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
 
     expect(expenses['EX-1']).toEqual({
       account_id: 'AC-INS', paid_through_account_id: 'SBI-1', amount: 4200, date: '2026-10-20', reference_number: `NX-${orderId}-COST-${ecgc}`,
-      description: `TEST-Stage4 Buyer / NX-${orderId}: ECGC Insurance — ECGC cover`, expense_id: 'EX-1',
+      description: `TEST-Stage4 Buyer / NX-${orderId}: ECGC Insurance — ECGC cover · order cost paid from the company account`, expense_id: 'EX-1',
     });
     expect([expenses['EX-2'].account_id, expenses['EX-2'].paid_through_account_id, expenses['EX-2'].amount]).toEqual(['AC-COMM', 'AC-CARD', 9000]);
     expect((await caSyncService.syncPurchases('manual', null)).expenses).toBe(0); // nothing is sent twice

@@ -107,7 +107,11 @@ async function resetPaymentsAppliedTo(billId) {
   await db.execute(`UPDATE order_vendor_bill_payments SET zoho_applied_at = NULL WHERE zoho_payment_id IS NOT NULL AND bill_id IN (${ids.join(',')})`);
 }
 
-/** Order expenses not yet in Books (dated on or after startDate, when given). */
+/**
+ * Order expenses not yet in Books, or in Books but changed since they were sent
+ * (QA ZOH-005: e.g. the description with the bank reference) — dated on or after
+ * startDate, when given.
+ */
 async function expensesToSync(startDate = null) {
   const rows = await db.query(
     `SELECT e.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
@@ -115,10 +119,11 @@ async function expensesToSync(startDate = null) {
      FROM order_expenses e
      JOIN orders o ON o.id = e.order_id
      JOIN clients c ON c.id = o.client_id
-     WHERE e.zoho_expense_id IS NULL
      ORDER BY e.expense_date, e.id`
   );
+  const { expenseHash } = require('../services/zohoBooksService');
   return rows.filter((r) => (startDate === null || String(r.expense_date) >= startDate)
+    && (r.zoho_expense_id === null || r.zoho_pushed_hash !== expenseHash(r))
     && (zohoGuard.isProduction()
       ? Number(r.is_test_or_sample) !== 1
       : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
@@ -177,8 +182,8 @@ async function setPaymentApplied(paymentId) {
   await db.execute('UPDATE order_vendor_bill_payments SET zoho_applied_at = NOW() WHERE id = :id', { id: paymentId });
 }
 
-async function setExpenseSynced(expenseId, zohoExpenseId) {
-  await db.execute('UPDATE order_expenses SET zoho_expense_id = :zoho, zoho_synced_at = NOW() WHERE id = :id', { zoho: zohoExpenseId, id: expenseId });
+async function setExpenseSynced(expenseId, zohoExpenseId, hash = null) {
+  await db.execute('UPDATE order_expenses SET zoho_expense_id = :zoho, zoho_synced_at = NOW(), zoho_pushed_hash = :hash WHERE id = :id', { zoho: zohoExpenseId, hash, id: expenseId });
 }
 
 /** The clean-up script removed this record from Books: forget it here too. */
@@ -187,7 +192,7 @@ async function forgetZohoRecord(kind, zohoId) {
     contact: ['UPDATE suppliers SET zoho_contact_id = NULL WHERE zoho_contact_id = :id', 'UPDATE logistics_partners SET zoho_contact_id = NULL WHERE zoho_contact_id = :id'],
     bill: ['UPDATE order_vendor_bills SET zoho_bill_id = NULL, zoho_synced_at = NULL WHERE zoho_bill_id = :id'],
     vendorpayment: ['UPDATE order_vendor_bill_payments SET zoho_payment_id = NULL, zoho_synced_at = NULL, zoho_applied_at = NULL WHERE zoho_payment_id = :id'],
-    expense: ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
+    expense: ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
   }[kind] || [];
   for (const statement of sql) await db.execute(statement, { id: zohoId });
 }

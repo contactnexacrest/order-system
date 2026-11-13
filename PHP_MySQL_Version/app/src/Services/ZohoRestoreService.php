@@ -304,6 +304,7 @@ final class ZohoRestoreService
                         continue;
                     }
                     ZohoBooksService::pushExpense($expense, $zohoId);
+                    ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoId, ZohoBooksService::expenseHash($expense)); // QA ZOH-005: not sent twice
                     $log('order_expense', (int) $expense['order_id'], 'expense', 'success', $zohoId, self::RESTORED . "{$what} put back to INR " . number_format((float) $expense['amount_inr'], 2, '.', '') . ' (Books had ' . number_format($total, 2, '.', '') . ').');
                     $out['expenses']++;
                 }

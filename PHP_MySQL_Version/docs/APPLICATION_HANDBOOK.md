@@ -2081,7 +2081,13 @@ Guided sub-steps (D-097), `manage_order_financials`:
 - 12a **Order Costs** (`order_cost_entries`, `order_expenses`,
   `order_travel_expenses`, inspection fee, LC & bank-loan costs, courier).
   Each cost says what it was paid from (D-103) and carries a D-212
-  description.
+  description. An order cost (Other cost form) and an order expense carry a
+  **Bank reference (UTR / transaction ID)** (`bank_reference`, up to 150
+  characters): required when paid from / paid by the **company account**
+  (browser `data-required-if` + server refusal), optional for the company
+  card or staff; the order page lists show it under Paid from / Paid by
+  ("UTR …" / "transaction ref …") (QA ZOH-005, owner decision 13 Nov 2026,
+  migration `2026-11-13d`).
 - 12b **Export Benefit Eligibility** — answer every scheme (Eligible / Not
   eligible) (`order_export_benefit_schemes`).
 - 12c **Review Profit & Complete Step 12** (`OrderProfitabilityService`).
@@ -3342,7 +3348,10 @@ the same filters, counts, fields, actions and money rules on both templates
 - **What goes.** CI and Debit Note as export invoices (same number and
   date, at the shipping-bill customs rate, D-165/D-166); buyer payments as
   customer payments (foreign amount at the actual rate); supplier and
-  logistics bills and vendor payments (with UTR); paid order expenses;
+  logistics bills and vendor payments (with UTR); paid order expenses and
+  order costs (description with paid from / by and the UTR, QA ZOH-005 —
+  one already in Books is updated when its description changes:
+  `order_expenses.zoho_pushed_hash` / `order_cost_entries.zoho_pushed_hash`);
   export benefits as journals; associate commission and team incentive as
   expenses; Domestic/Import/Merchant records (6.15).
 - **Key rules.**
@@ -4545,6 +4554,8 @@ The app **builds** it from the facts, so it is never blank or wrong. Staff notes
 | Associate payment (`AssociateTds::paymentDescription`) | `Associate commission for <Associate> — order <ref> — gross ₹84,000.00, TDS u/s 194H ₹1,680.00 (2%), net paid ₹82,320.00 + GST ₹15,120.00 on the associate's tax invoice (input credit), total paid ₹97,440.00 · UTR <ref>` (an associate abroad: `· SWIFT ref <ref>`) |
 | Associate payout cost | `Associate commission to <Associate> on order <ref> (payout no. <n>, settles their commission invoice for this order): ₹84,000.00 + GST ₹15,120.00, TDS ₹1,680.00 · bank ref <ref>` |
 | Supplier advance on a proforma | `Supplier advance payment for order <ref> · Supplier PO <no.> · against Proforma <PI no.> · bank ref <UTR>`; once applied in Books to the tax invoice that replaced it (QA ZOH-006): `… · against Tax invoice <no.> (advance paid on Proforma <PI no.>) · bank ref <UTR>` |
+| Order expense (QA ZOH-005, `ZohoBooksService::expenseDescription`) | `<Buyer> / <ref>: Courier — Samples to buyer · order expense paid from the company account · UTR <UTR>`; company card: `… · order expense paid by company card · transaction ref <ref>` (reference optional); staff: `… · order expense paid by staff (<staff member>), to reimburse` |
+| Order cost (QA ZOH-005, `ZohoBooksService::costEntryDescription`) | `<Buyer> / <ref>: ECGC Insurance — <staff description> · order cost paid from the company account · UTR <UTR>`; company card: `… · order cost paid by company card · transaction ref <ref>` (reference optional) |
 | Inspection fee | `Pre-shipment inspection fee — <agency>, invoice <no.>` |
 | LC loan interest | `Bank loan interest (LC order) · LC <no.> · loan ₹1,000,000.00 at 9.5%` |
 | Travel % | `Travel expenses (factory visits) — 350 km to the factory, 1.5% of the order value USD 20,000.00 at ₹84.00` |
@@ -4552,7 +4563,7 @@ The app **builds** it from the facts, so it is never blank or wrong. Staff notes
 | Import supplier | `Import supplier advance of USD 5,000.00 (₹420,000.00 at 84.0000) to <Supplier> (<Country>) against import PO <ref>, SWIFT/UTR ref <ref>` |
 | Merchant trade | `Merchant trade supplier advance of USD … (₹… at …) to <Supplier> (<Country>) against merchant trade deal <ref>, PO <no.>, backed by letter of credit <ref>, SWIFT/UTR ref <ref>` |
 
-Incentive payouts need **Paid via** + **reference** (added to the Commission cost line and so to the Zoho expense). A staff-added cost needs a description of 10+ characters. An export benefit received needs its UTR / e-scrip no. A refund needs its paid date and bank reference. An expense typed in Zoho without a description is flagged red in the app.
+Incentive payouts need **Paid via** + **reference** (added to the Commission cost line and so to the Zoho expense). A staff-added cost needs a description of 10+ characters. An order expense or an order cost (Other cost form) paid from the **company account** needs its **Bank reference (UTR / transaction ID)** (QA ZOH-005, 13 Nov 2026); the inspection fee, LC loan interest and courier-charge cost forms do not ask for one yet. An export benefit received needs its UTR / e-scrip no. A refund needs its paid date and bank reference. An expense typed in Zoho without a description is flagged red in the app.
 
 ---
 

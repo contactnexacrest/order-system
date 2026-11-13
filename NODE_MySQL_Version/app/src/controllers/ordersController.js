@@ -1941,6 +1941,8 @@ async function show(req, res) {
       paymentModes: orderVendorBillRepository.PAYMENT_MODES,
       expenseCategories: orderExpenseRepository.CATEGORIES,
       expensePaidBy: orderExpenseRepository.PAID_BY,
+      expenseBankRefRequired: orderExpenseRepository.BANK_REFERENCE_REQUIRED, // QA ZOH-005
+      moneyBankRef: require('../services/zohoBooksService').moneyBankRef, // QA ZOH-005: "UTR …" / "transaction ref …"
       order,
       canAssignOwner,
       seesAllOrders,
@@ -2114,6 +2116,7 @@ async function show(req, res) {
       orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
       costEntryCategories: orderCostEntryRepository.CATEGORIES,
       costEntryPaidFrom: orderCostEntryRepository.PAID_FROM,
+      costEntryBankRefRequired: orderCostEntryRepository.BANK_REFERENCE_REQUIRED, // QA ZOH-005
       costEntryNotInZoho: orderCostEntryRepository.NOT_IN_ZOHO,
       // Not gated on manage_order_financials like the cost-entry fields
       // above — Step 5d/5e (LC payment leg) needs this for anyone viewing

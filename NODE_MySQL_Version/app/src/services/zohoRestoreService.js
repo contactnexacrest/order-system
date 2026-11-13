@@ -292,6 +292,7 @@ async function purchases(startDate, triggeredBy, userId) {
       } else if (Math.abs(total - Number(expense.amount_inr)) > 0.01) {
         if (await locked(String(expense.expense_date), 'order_expense', orderId, 'expense', zohoId, `${what} was changed in Zoho Books`, triggeredBy, userId)) continue;
         await zohoBooksService.pushExpense(expense, zohoId);
+        await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoId, zohoBooksService.expenseHash(expense)); // QA ZOH-005: not sent twice
         await log('order_expense', orderId, 'expense', 'success', zohoId, `${RESTORED}${what} put back to INR ${fmt(expense.amount_inr)} (Books had ${fmt(total)}).`);
         out.expenses += 1;
       }

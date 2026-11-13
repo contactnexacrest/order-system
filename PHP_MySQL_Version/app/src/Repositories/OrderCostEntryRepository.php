@@ -53,12 +53,15 @@ final class OrderCostEntryRepository
     /** What a cost was paid from (owner decision 2026-10-29). */
     public const PAID_FROM = ['company_account' => 'Company account', 'company_card' => 'Company card'];
 
-    public static function create(int $orderId, string $category, ?string $description, float $amountInr, ?string $incurredAt, int $recordedBy, ?string $paidFrom = null): int
+    /** Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): shown when a cost paid from the company account has no bank reference. */
+    public const BANK_REFERENCE_REQUIRED = 'Enter the bank reference (UTR / transaction ID): the cost was paid from the company account.';
+
+    public static function create(int $orderId, string $category, ?string $description, float $amountInr, ?string $incurredAt, int $recordedBy, ?string $paidFrom = null, ?string $bankReference = null): int
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO order_cost_entries (order_id, category, description, amount_inr, incurred_at, paid_from, recorded_by)
-             VALUES (:order_id, :category, :description, :amount_inr, :incurred_at, :paid_from, :recorded_by)'
+            'INSERT INTO order_cost_entries (order_id, category, description, amount_inr, incurred_at, paid_from, bank_reference, recorded_by)
+             VALUES (:order_id, :category, :description, :amount_inr, :incurred_at, :paid_from, :bank_reference, :recorded_by)'
         )->execute([
             'order_id'    => $orderId,
             'category'    => $category,
@@ -66,6 +69,7 @@ final class OrderCostEntryRepository
             'amount_inr'  => $amountInr,
             'incurred_at' => $incurredAt,
             'paid_from'   => $paidFrom,
+            'bank_reference' => $bankReference,
             'recorded_by' => $recordedBy,
         ]);
         return (int) $pdo->lastInsertId();

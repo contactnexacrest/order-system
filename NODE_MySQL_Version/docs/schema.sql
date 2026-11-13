@@ -6712,3 +6712,12 @@ ALTER TABLE catalog_products ADD COLUMN legacy_no_supplier TINYINT(1) NOT NULL D
 ALTER TABLE order_supplier_po ADD COLUMN supplier_offer_id BIGINT UNSIGNED NULL;        -- catalog_product_suppliers.id chosen on the PO terms form
 ALTER TABLE order_supplier_po ADD COLUMN quoted_unit_price_inr DECIMAL(14,2) NULL;      -- that offer's quoted price per unit
 ALTER TABLE order_supplier_po ADD COLUMN price_override_reason VARCHAR(500) NULL;      -- why the agreed price differs from the quote
+
+-- Owner decision 13 Nov 2026 (QA ZOH-005, Option A; rule D-212; migration 2026-11-13d): order
+-- expenses and order costs carry the bank reference (UTR / transaction ID) — required on the form
+-- when the money went out of the company account, optional for the company card or staff — and
+-- their Zoho Books description names it. order_expenses.zoho_pushed_hash is what was last sent to
+-- Books, so an expense already there is updated when its description changes.
+ALTER TABLE order_expenses ADD COLUMN bank_reference VARCHAR(150) NULL;
+ALTER TABLE order_expenses ADD COLUMN zoho_pushed_hash CHAR(64) NULL;
+ALTER TABLE order_cost_entries ADD COLUMN bank_reference VARCHAR(150) NULL;

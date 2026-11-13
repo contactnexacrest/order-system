@@ -421,8 +421,20 @@ async function addCostEntry(req, res) {
     res.redirect(`/orders/${orderId}#order-financials`);
     return;
   }
+  // Owner decision 13 Nov 2026 (QA ZOH-005, rule D-212): money out of the company account carries its bank reference.
+  const bankReference = String(req.body.bank_reference || '').trim();
+  if (paidFrom === 'company_account' && bankReference === '') {
+    flash.set(req, 'error', orderCostEntryRepository.BANK_REFERENCE_REQUIRED);
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  if ([...bankReference].length > 150) {
+    flash.set(req, 'error', 'The bank reference (UTR / transaction ID) can be at most 150 characters.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
 
-  const id = await orderCostEntryRepository.create(orderId, category, description, parseFloat(amount), incurredAt, user.id, paidFrom);
+  const id = await orderCostEntryRepository.create(orderId, category, description, parseFloat(amount), incurredAt, user.id, paidFrom, bankReference !== '' ? bankReference : null);
   await auditLogRepository.log(user.id, 'ORDER_COST_ENTRY_RECORDED', 'order_cost_entries', id, null, null, category);
   flash.set(req, 'success', 'Cost entry recorded.');
   res.redirect(`/orders/${orderId}#order-financials`);
