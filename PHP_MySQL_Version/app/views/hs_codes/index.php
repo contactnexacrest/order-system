@@ -16,7 +16,7 @@
           <form method="post" action="/hs-codes/<?= (int) $c['id'] ?>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <?= Csrf::field() ?>
             <input type="text" name="description" value="<?= htmlspecialchars($c['description']) ?>" placeholder="Description" required style="width:280px" aria-label="Description">
-            <input type="text" name="usage_note" value="<?= htmlspecialchars($c['usage_note'] ?? '') ?>" placeholder="When to use this one (optional, for freshers)" style="width:320px" aria-label="When to use this one (optional, for freshers)">
+            <input type="text" name="usage_note" value="<?= htmlspecialchars($c['usage_note'] ?? '') ?>" placeholder="When to use this one (optional, for freshers)" style="width:320px" aria-label="When to use this one (optional, for freshers)" maxlength="500">
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </td>

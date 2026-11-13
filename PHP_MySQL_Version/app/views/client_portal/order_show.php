@@ -75,7 +75,7 @@
     <?php else: ?>
       <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">
         <?= Csrf::field() ?>
-        <label>Your PO number <small class="muted">(needed the first time you upload)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142"></label>
+        <label>Your PO number <small class="muted">(needed the first time you upload)</small><input type="text" name="buyers_po_ref" placeholder="e.g., PO-2026-0142" maxlength="100"></label>
         <label>Your signed purchase order (file) <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg" required></label>
         <button type="submit" class="btn-sm">Upload</button>
       </form>
@@ -146,10 +146,10 @@
             <option value="freight">Freight Payment</option>
           </select>
         </label>
-        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456" maxlength="150"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
-        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321" maxlength="255"></label>
         <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>
       <button type="submit">Submit Payment Details</button>

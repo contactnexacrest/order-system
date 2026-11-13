@@ -110,9 +110,9 @@ final class ClientBillingAddressPartsTest extends DbTestCase
 
         self::assertStringContainsString('Address on file (old single box): 1 Test Street, Test City — copy it into the boxes above.', $html);
         self::assertStringNotContainsString('name="billing_address"', $html);
-        self::assertMatchesRegularExpression('/<input type="text" name="billing_address_line1"[^>]*required>/', $html);
-        self::assertMatchesRegularExpression('/<input type="text" name="billing_city"[^>]*required>/', $html);
-        self::assertMatchesRegularExpression('/<input type="text" name="billing_country"[^>]*required>/', $html);
+        self::assertMatchesRegularExpression('/<input type="text" name="billing_address_line1"[^>]*required[^>]*>/', $html);
+        self::assertMatchesRegularExpression('/<input type="text" name="billing_city"[^>]*required[^>]*>/', $html);
+        self::assertMatchesRegularExpression('/<input type="text" name="billing_country"[^>]*required[^>]*>/', $html);
     }
 
     public function testEditOfAClientWithItsPartsHasNoOldAddressNote(): void

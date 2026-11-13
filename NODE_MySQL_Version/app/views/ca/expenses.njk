@@ -31,7 +31,7 @@
             {% elif canEditTds %}
               <form method="post" action="/ca/expenses/{{ e.id }}/link-order" style="display:flex;gap:4px;">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref">
+                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref" maxlength="60">
                 <button type="submit" class="btn-sm">Link</button>
               </form>
             {% else %}

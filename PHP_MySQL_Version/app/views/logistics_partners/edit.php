@@ -8,7 +8,7 @@
       <legend>Partner Details</legend>
       <div class="field-grid">
         <label class="full">Partner / Company Name *
-          <input type="text" name="partner_name" value="<?= htmlspecialchars($partner['partner_name']) ?>" placeholder="e.g., Swift Cargo Logistics Pvt Ltd" required>
+          <input type="text" name="partner_name" value="<?= htmlspecialchars($partner['partner_name']) ?>" placeholder="e.g., Swift Cargo Logistics Pvt Ltd" required maxlength="255">
         </label>
         <label class="full">Address
           <input type="text" name="address" value="<?= htmlspecialchars($partner['address'] ?? '') ?>" placeholder="e.g., 123 Example Street, Test City, Country">
@@ -24,31 +24,31 @@
           <input type="text" name="city" value="<?= htmlspecialchars($partner['city'] ?? '') ?>" placeholder="e.g., Mumbai">
         </label>
         <label>State
-          <input type="text" name="state" value="<?= htmlspecialchars($partner['state'] ?? '') ?>" placeholder="e.g., Maharashtra">
+          <input type="text" name="state" value="<?= htmlspecialchars($partner['state'] ?? '') ?>" placeholder="e.g., Maharashtra" maxlength="120">
         </label>
         <label>Phone
           <input type="text" name="phone" value="<?= htmlspecialchars($partner['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>WhatsApp Number
-          <input type="text" name="whatsapp_number" value="<?= htmlspecialchars($partner['whatsapp_number'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="whatsapp_number" value="<?= htmlspecialchars($partner['whatsapp_number'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= htmlspecialchars($partner['email'] ?? '') ?>" placeholder="e.g., name@example.com">
         </label>
         <label>Contact Person — Name
-          <input type="text" name="contact_person_name" value="<?= htmlspecialchars($partner['contact_person_name'] ?? '') ?>" placeholder="e.g., Operations Manager">
+          <input type="text" name="contact_person_name" value="<?= htmlspecialchars($partner['contact_person_name'] ?? '') ?>" placeholder="e.g., Operations Manager" maxlength="150">
         </label>
         <label>Contact Person — Phone
-          <input type="text" name="contact_person_phone" value="<?= htmlspecialchars($partner['contact_person_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="contact_person_phone" value="<?= htmlspecialchars($partner['contact_person_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Contact Person — WhatsApp
-          <input type="text" name="contact_person_whatsapp" value="<?= htmlspecialchars($partner['contact_person_whatsapp'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="contact_person_whatsapp" value="<?= htmlspecialchars($partner['contact_person_whatsapp'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>GSTIN
           <input type="text" name="gstin" value="<?= htmlspecialchars($partner['gstin'] ?? '') ?>" placeholder="e.g., 22AAAAA0000A1Z5">
         </label>
         <label>PAN
-          <input type="text" name="pan" value="<?= htmlspecialchars($partner['pan'] ?? '') ?>" placeholder="e.g., AAAAA0000A">
+          <input type="text" name="pan" value="<?= htmlspecialchars($partner['pan'] ?? '') ?>" placeholder="e.g., AAAAA0000A" maxlength="20">
         </label>
       </div>
     </fieldset>

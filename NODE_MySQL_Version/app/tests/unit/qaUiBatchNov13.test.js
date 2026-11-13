@@ -145,6 +145,79 @@ describe('UI-012: Settings placeholders', () => {
 });
 
 /**
+ * UI-010: a typed field saved to a VARCHAR column carries a maxlength no larger than
+ * the column's length (docs/schema.sql), so a too-long value is stopped in the browser
+ * beside the field (a stricter format limit, e.g. PAN 10, is fine). The list holds
+ * every field name that is one VARCHAR column of one length in the schema (names used for columns of different lengths, e.g. name / email /
+ * reason / notes, are not checked here).
+ */
+const MAXLENGTH_COLUMNS = `acknowledged_note advance_trigger_text amended_balance_terms amendment_reference bank_account_name bank_branch
+  bank_name bank_upi_id billing_address_line1 billing_address_line2 billing_city billing_country billing_postcode bl_number buyer_own_reference
+  buyers_po_ref clause_title client_unique_number colour_reference company_legal_name consignee_address_line1 consignee_address_line2
+  consignee_city consignee_contact_person consignee_country consignee_email consignee_name consignee_phone consignee_postcode
+  consignee_vat_eori_tax_no contact_email contact_person contact_person_name contact_person_phone contact_person_whatsapp contact_phone
+  container_no container_type_text country_of_destination courier_tracking_number crate_no decision_notes delivery_location dimensions
+  est_lead_time_text est_shipment_date_text estimated_package_count finish from_party grade hs_code incoterm_confirmed incoterm_preference
+  lc_bank_name lc_number location material_stone_type notify_party notify_party_address_line1 notify_party_address_line2 notify_party_city
+  notify_party_contact_person notify_party_country notify_party_email notify_party_phone notify_party_postcode order_reference origin
+  packing_requirement pan partner_name payer_bank_details port_of_discharge_text preset_name production_status_text ref_format
+  reference_number refund_notes resolved_reason seal_no shipping_line state supplier_legal_name supplier_name transaction_ref unlock_reason
+  usage_note vat_eori_tax_no vessel_name vessel_voyage voyage_number whatsapp_number`.split(/\s+/);
+
+describe('UI-010: text fields carry the maxlength of their database column', () => {
+  const schema = read(__dirname, '..', '..', '..', 'docs', 'schema.sql');
+  function columnLength(name) {
+    const lens = new Set([...schema.matchAll(new RegExp(`^\\s*(?:(?:ADD|MODIFY) COLUMN\\s+)?\`?${name}\`?\\s+(VARCHAR\\((\\d+)\\)|TEXT|MEDIUMTEXT|LONGTEXT)`, 'gmi'))].map((m) => m[2] || m[1].toUpperCase()));
+    expect([name, lens.size]).toEqual([name, 1]);
+    return Number([...lens][0]);
+  }
+  /** Each opening <input>/<textarea> tag, reading past Nunjucks blocks that contain ">". */
+  function tags(text) {
+    const out = [];
+    for (const m of text.matchAll(/<(input|textarea)\b/g)) {
+      let j = m.index + m[0].length;
+      while (j < text.length) {
+        if (text.startsWith('{{', j) || text.startsWith('{%', j) || text.startsWith('{#', j)) {
+          const k = text.indexOf({ '{': '}}', '%': '%}', '#': '#}' }[text[j + 1]], j);
+          j = k < 0 ? text.length : k + 2;
+          continue;
+        }
+        if (text[j] === '>') break;
+        j++;
+      }
+      out.push([m.index, text.slice(m.index, j + 1)]);
+    }
+    return out;
+  }
+
+  it('every such field on every view (and the client form\'s company name is 255)', () => {
+    const lengths = Object.fromEntries(MAXLENGTH_COLUMNS.map((n) => [n, columnLength(n)]));
+    expect(lengths.company_legal_name).toBe(255);
+    const wrong = [];
+    let checked = 0;
+    (function walk(dir) {
+      for (const f of fs.readdirSync(dir)) {
+        const p = path.join(dir, f);
+        if (fs.statSync(p).isDirectory()) { walk(p); continue; }
+        if (!p.endsWith('.njk')) continue;
+        const text = fs.readFileSync(p, 'utf8');
+        for (const [offset, tag] of tags(text)) {
+          const type = (tag.match(/\btype\s*=\s*["']([a-zA-Z-]+)["']/) || [null, 'text'])[1].toLowerCase();
+          if (tag.startsWith('<input') && !['text', 'email', 'tel', 'url', 'search', 'password'].includes(type)) continue;
+          const name = (tag.match(/\bname\s*=\s*["']([A-Za-z0-9_]+)/) || [])[1];
+          if (!name || !(name in lengths)) continue;
+          checked++;
+          const max = (tag.match(/\bmaxlength\s*=\s*["'](\d+)["']/) || [])[1];
+          if (!max || Number(max) > lengths[name]) wrong.push(`${path.relative(VIEWS, p)}:${text.slice(0, offset).split('\n').length} ${name} maxlength=${max} (column ${lengths[name]})`);
+        }
+      }
+    })(VIEWS);
+    expect(checked).toBeGreaterThan(200);
+    expect(wrong).toEqual([]);
+  });
+});
+
+/**
  * UI-008: every fixed internal link in a view leads to a page route (the TDS
  * register linked to /associates/report, which does not exist). A route
  * parameter named …id only takes digits, as the controllers expect.

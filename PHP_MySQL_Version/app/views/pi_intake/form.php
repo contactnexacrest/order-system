@@ -22,25 +22,25 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
       <legend><span class="intake-step-num">1</span> Your Details</legend>
       <div class="field-grid">
         <label class="full">Company name, as registered *
-          <input type="text" name="company_legal_name" value="<?= htmlspecialchars($submission['company_legal_name'] ?? '') ?>" placeholder="Exact legal name, no abbreviations" required>
+          <input type="text" name="company_legal_name" value="<?= htmlspecialchars($submission['company_legal_name'] ?? '') ?>" placeholder="Exact legal name, no abbreviations" required maxlength="255">
         </label>
         <label class="full">Billing Address Line 1 *
-          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($submission['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required>
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($submission['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($submission['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($submission['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town *
-          <input type="text" name="billing_city" value="<?= htmlspecialchars($submission['billing_city'] ?? '') ?>" placeholder="e.g., Rotterdam" required>
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($submission['billing_city'] ?? '') ?>" placeholder="e.g., Rotterdam" required maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="billing_postcode" value="<?= htmlspecialchars($submission['billing_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+          <input type="text" name="billing_postcode" value="<?= htmlspecialchars($submission['billing_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country *
-          <input type="text" name="billing_country" value="<?= htmlspecialchars($submission['billing_country'] ?? '') ?>" placeholder="e.g., Netherlands" required>
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($submission['billing_country'] ?? '') ?>" placeholder="e.g., Netherlands" required maxlength="100">
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., Purchasing Manager" required>
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., Purchasing Manager" required maxlength="150">
         </label>
         <label>Email *
           <input type="email" name="email" value="<?= htmlspecialchars($submission['email'] ?? '') ?>" placeholder="e.g., name@example.com" required>
@@ -49,7 +49,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <input type="text" name="phone" value="<?= htmlspecialchars($submission['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" required>
         </label>
         <label>Company tax number (VAT, EORI or tax registration) *
-          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number" required>
+          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($submission['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number" required maxlength="100">
         </label>
       </div>
     </fieldset>
@@ -61,34 +61,34 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= $consigneeSame ? 'checked' : '' ?>> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Legal Name
-          <input type="text" name="consignee_name" value="<?= htmlspecialchars($submission['consignee_name'] ?? '') ?>" placeholder="e.g., ABC Memorial Stones Ltd">
+          <input type="text" name="consignee_name" value="<?= htmlspecialchars($submission['consignee_name'] ?? '') ?>" placeholder="e.g., ABC Memorial Stones Ltd" maxlength="255">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($submission['consignee_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+          <input type="text" name="consignee_address_line1" value="<?= htmlspecialchars($submission['consignee_address_line1'] ?? '') ?>" placeholder="Street number and street name" maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($submission['consignee_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="consignee_address_line2" value="<?= htmlspecialchars($submission['consignee_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city" value="<?= htmlspecialchars($submission['consignee_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
+          <input type="text" name="consignee_city" value="<?= htmlspecialchars($submission['consignee_city'] ?? '') ?>" placeholder="e.g., Rotterdam" maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($submission['consignee_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+          <input type="text" name="consignee_postcode" value="<?= htmlspecialchars($submission['consignee_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country
-          <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>" placeholder="e.g., Netherlands">
+          <input type="text" name="consignee_country" value="<?= htmlspecialchars($submission['consignee_country'] ?? '') ?>" placeholder="e.g., Netherlands" maxlength="100">
         </label>
         <label>Company tax number (VAT, EORI or tax registration)
-          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number">
+          <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: your EORI number. Other countries: your company tax number" maxlength="100">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager" maxlength="150">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
-          <input type="email" name="consignee_email" value="<?= htmlspecialchars($submission['consignee_email'] ?? '') ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="consignee_email" value="<?= htmlspecialchars($submission['consignee_email'] ?? '') ?>" placeholder="e.g., name@example.com" maxlength="190">
         </label>
       </div>
     </fieldset>
@@ -100,31 +100,31 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= $notifySame ? 'checked' : '' ?>> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
-          <input type="text" name="notify_party" value="<?= htmlspecialchars($submission['notify_party'] ?? '') ?>" placeholder="e.g., ABC Freight Forwarders Ltd">
+          <input type="text" name="notify_party" value="<?= htmlspecialchars($submission['notify_party'] ?? '') ?>" placeholder="e.g., ABC Freight Forwarders Ltd" maxlength="255">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($submission['notify_party_address_line1'] ?? '') ?>" placeholder="Street number and street name">
+          <input type="text" name="notify_party_address_line1" value="<?= htmlspecialchars($submission['notify_party_address_line1'] ?? '') ?>" placeholder="Street number and street name" maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($submission['notify_party_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="notify_party_address_line2" value="<?= htmlspecialchars($submission['notify_party_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town
-          <input type="text" name="notify_party_city" value="<?= htmlspecialchars($submission['notify_party_city'] ?? '') ?>" placeholder="e.g., Rotterdam">
+          <input type="text" name="notify_party_city" value="<?= htmlspecialchars($submission['notify_party_city'] ?? '') ?>" placeholder="e.g., Rotterdam" maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($submission['notify_party_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD">
+          <input type="text" name="notify_party_postcode" value="<?= htmlspecialchars($submission['notify_party_postcode'] ?? '') ?>" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country
-          <input type="text" name="notify_party_country" value="<?= htmlspecialchars($submission['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands">
+          <input type="text" name="notify_party_country" value="<?= htmlspecialchars($submission['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands" maxlength="100">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
+          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager" maxlength="150">
         </label>
         <label>Phone
-          <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($submission['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($submission['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
-          <input type="email" name="notify_party_email" value="<?= htmlspecialchars($submission['notify_party_email'] ?? '') ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="notify_party_email" value="<?= htmlspecialchars($submission['notify_party_email'] ?? '') ?>" placeholder="e.g., name@example.com" maxlength="190">
         </label>
       </div>
     </fieldset>
@@ -133,10 +133,10 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
       <legend><span class="intake-step-num">4</span> Shipping Details</legend>
       <div class="field-grid">
         <label>Port where the goods arrive *
-          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" placeholder="e.g. Rotterdam" required>
+          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($submission['port_of_discharge_text'] ?? '') ?>" placeholder="e.g. Rotterdam" required maxlength="150">
         </label>
         <label>Country of Final Destination *
-          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required>
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required maxlength="100">
         </label>
         <label>Delivery terms (Incoterm) *
           <select id="incoterm_select" required>
@@ -146,11 +146,11 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
             <?php endforeach; ?>
             <option value="__other__" <?= $incotermIsOther ? 'selected' : '' ?>>Other (not listed) — specify</option>
           </select>
-          <input type="text" id="incoterm_confirmed_input" name="incoterm_confirmed" value="<?= htmlspecialchars($incotermValue) ?>" placeholder="Type the delivery terms, e.g. DAP" style="<?= $incotermIsOther ? '' : 'display:none' ?>" <?= $incotermIsOther ? '' : 'readonly' ?>>
+          <input type="text" id="incoterm_confirmed_input" name="incoterm_confirmed" value="<?= htmlspecialchars($incotermValue) ?>" placeholder="Type the delivery terms, e.g. DAP" style="<?= $incotermIsOther ? '' : 'display:none' ?>" <?= $incotermIsOther ? '' : 'readonly' ?> maxlength="100">
           <small class="muted">For example FOB: you book the sea freight. CIF: we book freight and insurance to your port.</small>
         </label>
         <label>Container Type
-          <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Leave empty to keep the one in your quotation">
+          <input type="text" name="container_type_text" value="<?= htmlspecialchars($submission['container_type_text'] ?? '') ?>" placeholder="Leave empty to keep the one in your quotation" maxlength="100">
         </label>
       </div>
     </fieldset>

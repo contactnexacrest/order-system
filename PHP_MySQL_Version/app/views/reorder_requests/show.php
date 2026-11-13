@@ -22,10 +22,10 @@
                 <input type="text" name="description[<?= $i ?>]" required value="<?= htmlspecialchars($l['description']) ?>" placeholder="e.g. Granite Memorial Headstone">
               </label>
               <label>Dimensions
-                <input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches" data-annexure-size>
+                <input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches" data-annexure-size maxlength="150">
               </label>
               <label>Finish
-                <input type="text" name="finish[<?= $i ?>]" value="<?= htmlspecialchars($l['finish'] ?? '') ?>" placeholder="e.g. Polished">
+                <input type="text" name="finish[<?= $i ?>]" value="<?= htmlspecialchars($l['finish'] ?? '') ?>" placeholder="e.g. Polished" maxlength="150">
               </label>
               <label>Qty
                 <input type="text" name="quantity[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['quantity'] ?? '')) ?>" placeholder="e.g. 100" data-annexure-qty>
@@ -45,7 +45,7 @@
                 <input type="text" name="unit_price[<?= $i ?>]" required value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">
               </label>
               <label>HS Code *
-                <input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" placeholder="Type to search…" required>
+                <input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" placeholder="Type to search…" required maxlength="20">
               </label>
             </div>
           </div>

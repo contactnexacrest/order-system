@@ -50,7 +50,7 @@
                 <form method="post" action="/ca/fy-locks/unlock" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                   <?= \App\Helpers\Csrf::field() ?>
                   <input type="hidden" name="financial_year" value="<?= htmlspecialchars($fy) ?>">
-                  <input type="text" name="unlock_reason" placeholder="Reason for reopening *" required style="min-width:220px;" aria-label="Reason for reopening">
+                  <input type="text" name="unlock_reason" placeholder="Reason for reopening *" required style="min-width:220px;" aria-label="Reason for reopening" maxlength="500">
                   <button type="submit" class="btn-sm btn-secondary" onclick="return confirm('Reopen FY <?= htmlspecialchars($fy) ?> for CA data entry?');">Unlock</button>
                 </form>
               <?php else: ?>

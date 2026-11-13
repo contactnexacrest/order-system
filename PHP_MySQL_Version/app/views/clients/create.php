@@ -18,28 +18,28 @@
       <legend>Buyer Details</legend>
       <div class="field-grid">
         <label class="full">Company Legal Name *
-          <input type="text" name="company_legal_name" value="<?= htmlspecialchars((string) ($old['company_legal_name'] ?? '')) ?>" placeholder="e.g., Test Company Ltd" required>
+          <input type="text" name="company_legal_name" value="<?= htmlspecialchars((string) ($old['company_legal_name'] ?? '')) ?>" placeholder="e.g., Test Company Ltd" required maxlength="255">
         </label>
         <label>Billing Address Line 1 *
-          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars((string) ($old['billing_address_line1'] ?? '')) ?>" placeholder="Street number and street name" required>
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars((string) ($old['billing_address_line1'] ?? '')) ?>" placeholder="Street number and street name" required maxlength="255">
         </label>
         <label>Billing Address Line 2
-          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars((string) ($old['billing_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="billing_address_line2" value="<?= htmlspecialchars((string) ($old['billing_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town *
-          <input type="text" name="billing_city" value="<?= htmlspecialchars((string) ($old['billing_city'] ?? '')) ?>" placeholder="e.g., Birmingham" required>
+          <input type="text" name="billing_city" value="<?= htmlspecialchars((string) ($old['billing_city'] ?? '')) ?>" placeholder="e.g., Birmingham" required maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="billing_postcode" value="<?= htmlspecialchars((string) ($old['billing_postcode'] ?? '')) ?>" placeholder="e.g., B1 1AA">
+          <input type="text" name="billing_postcode" value="<?= htmlspecialchars((string) ($old['billing_postcode'] ?? '')) ?>" placeholder="e.g., B1 1AA" maxlength="30">
         </label>
         <label>Billing Country *
-          <input type="text" name="billing_country" value="<?= htmlspecialchars((string) ($old['billing_country'] ?? '')) ?>" placeholder="e.g., United Kingdom" required>
+          <input type="text" name="billing_country" value="<?= htmlspecialchars((string) ($old['billing_country'] ?? '')) ?>" placeholder="e.g., United Kingdom" required maxlength="100">
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars((string) ($old['vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+          <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars((string) ($old['vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." maxlength="100">
         </label>
         <label>Country of Destination
-          <input type="text" name="country_of_destination" value="<?= htmlspecialchars((string) ($old['country_of_destination'] ?? '')) ?>" placeholder="e.g., Hungary / UK / France">
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars((string) ($old['country_of_destination'] ?? '')) ?>" placeholder="e.g., Hungary / UK / France" maxlength="100">
         </label>
         <label>Certificate of Origin Type
           <select name="coo_type">
@@ -57,34 +57,34 @@
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" <?= (!array_key_exists('consignee_same_as_buyer', $old) || $old['consignee_same_as_buyer']) ? 'checked' : '' ?>> Same as Buyer</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Name
-          <input type="text" name="consignee_name" disabled value="<?= htmlspecialchars((string) ($old['consignee_name'] ?? '')) ?>" placeholder="e.g., ABC Memorial Stones Ltd">
+          <input type="text" name="consignee_name" disabled value="<?= htmlspecialchars((string) ($old['consignee_name'] ?? '')) ?>" placeholder="e.g., ABC Memorial Stones Ltd" maxlength="255">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="consignee_address_line1" disabled value="<?= htmlspecialchars((string) ($old['consignee_address_line1'] ?? '')) ?>" placeholder="Street number and street name">
+          <input type="text" name="consignee_address_line1" disabled value="<?= htmlspecialchars((string) ($old['consignee_address_line1'] ?? '')) ?>" placeholder="Street number and street name" maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="consignee_address_line2" disabled value="<?= htmlspecialchars((string) ($old['consignee_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="consignee_address_line2" disabled value="<?= htmlspecialchars((string) ($old['consignee_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city" disabled value="<?= htmlspecialchars((string) ($old['consignee_city'] ?? '')) ?>" placeholder="e.g., Rotterdam">
+          <input type="text" name="consignee_city" disabled value="<?= htmlspecialchars((string) ($old['consignee_city'] ?? '')) ?>" placeholder="e.g., Rotterdam" maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode" disabled value="<?= htmlspecialchars((string) ($old['consignee_postcode'] ?? '')) ?>" placeholder="e.g., 3011 AD">
+          <input type="text" name="consignee_postcode" disabled value="<?= htmlspecialchars((string) ($old['consignee_postcode'] ?? '')) ?>" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country
-          <input type="text" name="consignee_country" disabled value="<?= htmlspecialchars((string) ($old['consignee_country'] ?? '')) ?>" placeholder="e.g., Netherlands">
+          <input type="text" name="consignee_country" disabled value="<?= htmlspecialchars((string) ($old['consignee_country'] ?? '')) ?>" placeholder="e.g., Netherlands" maxlength="100">
         </label>
         <label>VAT / EORI / Tax Reg. No.
-          <input type="text" name="consignee_vat_eori_tax_no" disabled value="<?= htmlspecialchars((string) ($old['consignee_vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
+          <input type="text" name="consignee_vat_eori_tax_no" disabled value="<?= htmlspecialchars((string) ($old['consignee_vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." maxlength="100">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" disabled value="<?= htmlspecialchars((string) ($old['consignee_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager">
+          <input type="text" name="consignee_contact_person" disabled value="<?= htmlspecialchars((string) ($old['consignee_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager" maxlength="150">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone" disabled value="<?= htmlspecialchars((string) ($old['consignee_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="consignee_phone" disabled value="<?= htmlspecialchars((string) ($old['consignee_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
-          <input type="email" name="consignee_email" disabled value="<?= htmlspecialchars((string) ($old['consignee_email'] ?? '')) ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="consignee_email" disabled value="<?= htmlspecialchars((string) ($old['consignee_email'] ?? '')) ?>" placeholder="e.g., name@example.com" maxlength="190">
         </label>
       </div>
     </fieldset>
@@ -94,31 +94,31 @@
       <label><input type="checkbox" id="notify_party_same_as_consignee" name="notify_party_same_as_consignee" value="1" <?= (!array_key_exists('notify_party_same_as_consignee', $old) || $old['notify_party_same_as_consignee']) ? 'checked' : '' ?>> Same as Consignee</label>
       <div id="notify_party_fields" class="field-grid" style="display:none">
         <label class="full">Notify Party Name
-          <input type="text" name="notify_party" disabled value="<?= htmlspecialchars((string) ($old['notify_party'] ?? '')) ?>" placeholder="e.g., ABC Freight Forwarders Ltd">
+          <input type="text" name="notify_party" disabled value="<?= htmlspecialchars((string) ($old['notify_party'] ?? '')) ?>" placeholder="e.g., ABC Freight Forwarders Ltd" maxlength="255">
         </label>
         <label class="full">Address Line 1
-          <input type="text" name="notify_party_address_line1" disabled value="<?= htmlspecialchars((string) ($old['notify_party_address_line1'] ?? '')) ?>" placeholder="Street number and street name">
+          <input type="text" name="notify_party_address_line1" disabled value="<?= htmlspecialchars((string) ($old['notify_party_address_line1'] ?? '')) ?>" placeholder="Street number and street name" maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="notify_party_address_line2" disabled value="<?= htmlspecialchars((string) ($old['notify_party_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable">
+          <input type="text" name="notify_party_address_line2" disabled value="<?= htmlspecialchars((string) ($old['notify_party_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town
-          <input type="text" name="notify_party_city" disabled value="<?= htmlspecialchars((string) ($old['notify_party_city'] ?? '')) ?>" placeholder="e.g., Rotterdam">
+          <input type="text" name="notify_party_city" disabled value="<?= htmlspecialchars((string) ($old['notify_party_city'] ?? '')) ?>" placeholder="e.g., Rotterdam" maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="notify_party_postcode" disabled value="<?= htmlspecialchars((string) ($old['notify_party_postcode'] ?? '')) ?>" placeholder="e.g., 3011 AD">
+          <input type="text" name="notify_party_postcode" disabled value="<?= htmlspecialchars((string) ($old['notify_party_postcode'] ?? '')) ?>" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country
-          <input type="text" name="notify_party_country" disabled value="<?= htmlspecialchars((string) ($old['notify_party_country'] ?? '')) ?>" placeholder="e.g., Netherlands">
+          <input type="text" name="notify_party_country" disabled value="<?= htmlspecialchars((string) ($old['notify_party_country'] ?? '')) ?>" placeholder="e.g., Netherlands" maxlength="100">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" disabled value="<?= htmlspecialchars((string) ($old['notify_party_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager">
+          <input type="text" name="notify_party_contact_person" disabled value="<?= htmlspecialchars((string) ($old['notify_party_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager" maxlength="150">
         </label>
         <label>Phone
-          <input type="text" name="notify_party_phone" disabled value="<?= htmlspecialchars((string) ($old['notify_party_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="notify_party_phone" disabled value="<?= htmlspecialchars((string) ($old['notify_party_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
-          <input type="email" name="notify_party_email" disabled value="<?= htmlspecialchars((string) ($old['notify_party_email'] ?? '')) ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="notify_party_email" disabled value="<?= htmlspecialchars((string) ($old['notify_party_email'] ?? '')) ?>" placeholder="e.g., name@example.com" maxlength="190">
         </label>
       </div>
     </fieldset>
@@ -127,7 +127,7 @@
       <legend>Contact</legend>
       <div class="field-grid">
         <label>Contact Person
-          <input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>" placeholder="e.g., Purchasing Manager">
+          <input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>" placeholder="e.g., Purchasing Manager" maxlength="150">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= htmlspecialchars((string) ($old['email'] ?? '')) ?>" placeholder="e.g., name@example.com">

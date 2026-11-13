@@ -197,7 +197,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
           <summary>More <small class="muted">(description text, Dimensions, finish, line type, HS / SAC code, category)</small></summary>
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" value="<?= htmlspecialchars((string) ($__p['description'] ?? '')) ?>" required placeholder="e.g. Absolute black granite — Premium, Polished"></label>
-            <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="<?= !$__isNew && ($__p['dimensions'] ?? '') !== '' ? '0' : '1' ?>" value="<?= htmlspecialchars((string) ($__p['dimensions'] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
+            <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="<?= !$__isNew && ($__p['dimensions'] ?? '') !== '' ? '0' : '1' ?>" value="<?= htmlspecialchars((string) ($__p['dimensions'] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm" maxlength="150"></label>
             <?php // D-357: a line picked from Products takes its finish from Options › Surface finish — this box is for lines typed by hand.
             $__finishFromOption = !$__isNew && \App\Services\SurfaceFinishList::finishForSelection(!empty($__p['catalog_product_id']) ? (int) $__p['catalog_product_id'] : null, OrderLinePricing::lineSelection($__p)) !== null; ?>
             <p class="muted small finish-from-option" data-finish-note<?= $__finishFromOption ? '' : ' hidden' ?>>Finish: the one chosen in step 2, Options › Surface finish.</p>
@@ -215,7 +215,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
                 <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($__p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($__p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
             <label>Category

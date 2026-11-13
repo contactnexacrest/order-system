@@ -104,9 +104,9 @@ describe('Client billing address from its parts (D-346)', () => {
     const html = (await admin.get(`/clients/${clientId}/edit`)).text;
     expect(html).toContain('Address on file (old single box): 1 Test Street, Test City — copy it into the boxes above.');
     expect(html).not.toContain('name="billing_address"');
-    expect(html).toMatch(/<input type="text" name="billing_address_line1"[^>]*required>/);
-    expect(html).toMatch(/<input type="text" name="billing_city"[^>]*required>/);
-    expect(html).toMatch(/<input type="text" name="billing_country"[^>]*required>/);
+    expect(html).toMatch(/<input type="text" name="billing_address_line1"[^>]*required[^>]*>/);
+    expect(html).toMatch(/<input type="text" name="billing_city"[^>]*required[^>]*>/);
+    expect(html).toMatch(/<input type="text" name="billing_country"[^>]*required[^>]*>/);
   });
 
   it('shows no old-address note for a client with its parts', async () => {

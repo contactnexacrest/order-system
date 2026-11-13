@@ -32,10 +32,10 @@ $legName = $legInfo['label'] ?? '';
     <form method="post" action="/payment-action/<?= htmlspecialchars($token) ?>/report" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Bank reference number (transaction ID, UTR or SWIFT reference) *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456" maxlength="150"></label>
         <label>Amount Paid (<?= htmlspecialchars($currency) ?>) *<input type="number" step="0.01" min="0.01" name="amount" required value="<?= $amountDue !== null ? number_format($amountDue, 2, '.', '') : '' ?>" placeholder="e.g. 1500.00"></label>
         <label>Date Paid *<input type="date" name="payment_date" required value="<?= date('Y-m-d') ?>"></label>
-        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
+        <label>Paid from (bank and account)<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321" maxlength="255"></label>
         <label class="full">Screenshot or bank receipt of your payment *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>
       </div>
       <button type="submit">Send Payment Details</button>

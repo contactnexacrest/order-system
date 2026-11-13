@@ -132,11 +132,11 @@
                 <div class="card-nested">
                   <form method="post" action="/products/suppliers/<?= (int) $s['id'] ?>/update">
                     <?= Csrf::field() ?>
-                    <label>Supplier Name *<input type="text" name="supplier_name" value="<?= View::e($s['supplier_name']) ?>" required placeholder="e.g. Sri Balaji Granites"></label>
-                    <label>Location<input type="text" name="location" value="<?= View::e($s['location'] ?? '') ?>" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
-                    <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>" placeholder="e.g., Sales Manager"></label>
-                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91-0000000000"></label>
-                    <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>" placeholder="e.g. name@company.com"></label>
+                    <label>Supplier Name *<input type="text" name="supplier_name" value="<?= View::e($s['supplier_name']) ?>" required placeholder="e.g. Sri Balaji Granites" maxlength="255"></label>
+                    <label>Location<input type="text" name="location" value="<?= View::e($s['location'] ?? '') ?>" placeholder="e.g. Krishnagiri, Tamil Nadu" maxlength="150"></label>
+                    <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>" placeholder="e.g., Sales Manager" maxlength="150"></label>
+                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91-0000000000" maxlength="50"></label>
+                    <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>" placeholder="e.g. name@company.com" maxlength="150"></label>
                     <?php // Owner decision D-338 (2a): "add up the cost parts" (Computed) only for a price already saved that way — it can be turned into one typed price. ?>
                     <?php if ($s['fob_source'] === 'computed'): ?>
                     <label>FOB Source
@@ -177,11 +177,11 @@
         <div class="card-nested">
           <form method="post" action="/products/<?= (int) $product['id'] ?>/suppliers/add">
             <?= Csrf::field() ?>
-            <label>Supplier Name *<input type="text" name="supplier_name" required placeholder="e.g. Sri Balaji Granites"></label>
-            <label>Location<input type="text" name="location" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
-            <label>Contact Person<input type="text" name="contact_person" placeholder="e.g., Sales Manager"></label>
-            <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91-0000000000"></label>
-            <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com"></label>
+            <label>Supplier Name *<input type="text" name="supplier_name" required placeholder="e.g. Sri Balaji Granites" maxlength="255"></label>
+            <label>Location<input type="text" name="location" placeholder="e.g. Krishnagiri, Tamil Nadu" maxlength="150"></label>
+            <label>Contact Person<input type="text" name="contact_person" placeholder="e.g., Sales Manager" maxlength="150"></label>
+            <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91-0000000000" maxlength="50"></label>
+            <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com" maxlength="150"></label>
             <?php // Owner decision D-338 (2a): a new price is one typed price — "add up the cost parts" is no longer offered. ?>
             <input type="hidden" name="fob_source" value="direct">
             <label>FOB Value (₹)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>

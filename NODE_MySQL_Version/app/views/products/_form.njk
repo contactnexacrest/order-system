@@ -12,7 +12,7 @@
       value="{{ product.hs_code if (product and product.hs_code) else (categoryDefaultHs or '') }}" placeholder="e.g. 68022310 — type the code or words" required>
       {% if not isEdit and categoryDefaultHs %}<small class="muted">Pre-filled with the default of {{ categoryName }}.</small>{% endif %}</label>
     <datalist id="product_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description }}{{ ' · category default' if h.code == categoryDefaultHs else '' }}</option>{% endfor %}</datalist>
-    <label>Origin<input type="text" name="origin" value="{{ product.origin or '' }}" placeholder="e.g., Rajasthan, India"></label>
+    <label>Origin<input type="text" name="origin" value="{{ product.origin or '' }}" placeholder="e.g., Rajasthan, India" maxlength="150"></label>
   </div>
 
   {# Owner decision D-335 (12 Nov 2026): "Costs to FOB" — the only place for CHA + transport; packing + loading only when a supplier price does not include them. #}

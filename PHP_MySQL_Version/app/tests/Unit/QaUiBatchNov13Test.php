@@ -95,6 +95,70 @@ final class QaUiBatchNov13Test extends TestCase
         }
     }
 
+    /** UI-010: the field names checked (each one VARCHAR column of one length in docs/schema.sql); same list as the Jest twin. */
+    private const MAXLENGTH_COLUMNS = 'acknowledged_note advance_trigger_text amended_balance_terms amendment_reference bank_account_name bank_branch
+        bank_name bank_upi_id billing_address_line1 billing_address_line2 billing_city billing_country billing_postcode bl_number buyer_own_reference
+        buyers_po_ref clause_title client_unique_number colour_reference company_legal_name consignee_address_line1 consignee_address_line2
+        consignee_city consignee_contact_person consignee_country consignee_email consignee_name consignee_phone consignee_postcode
+        consignee_vat_eori_tax_no contact_email contact_person contact_person_name contact_person_phone contact_person_whatsapp contact_phone
+        container_no container_type_text country_of_destination courier_tracking_number crate_no decision_notes delivery_location dimensions
+        est_lead_time_text est_shipment_date_text estimated_package_count finish from_party grade hs_code incoterm_confirmed incoterm_preference
+        lc_bank_name lc_number location material_stone_type notify_party notify_party_address_line1 notify_party_address_line2 notify_party_city
+        notify_party_contact_person notify_party_country notify_party_email notify_party_phone notify_party_postcode order_reference origin
+        packing_requirement pan partner_name payer_bank_details port_of_discharge_text preset_name production_status_text ref_format
+        reference_number refund_notes resolved_reason seal_no shipping_line state supplier_legal_name supplier_name transaction_ref unlock_reason
+        usage_note vat_eori_tax_no vessel_name vessel_voyage voyage_number whatsapp_number';
+
+    /**
+     * UI-010: a typed field saved to a VARCHAR column carries a maxlength no larger than
+     * the column's length, so a too-long value (a 600-character company name) is stopped
+     * in the browser beside the field (a stricter format limit, e.g. PAN 10, is fine).
+     */
+    public function testUi010TextFieldsCarryTheMaxlengthOfTheirColumn(): void
+    {
+        $schema = (string) file_get_contents(__DIR__ . '/../../../docs/schema.sql');
+        $lengths = [];
+        foreach (preg_split('/\s+/', trim(self::MAXLENGTH_COLUMNS)) as $name) {
+            preg_match_all('/^\s*(?:(?:ADD|MODIFY) COLUMN\s+)?`?' . $name . '`?\s+(VARCHAR\((\d+)\)|TEXT|MEDIUMTEXT|LONGTEXT)/mi', $schema, $m, PREG_SET_ORDER);
+            $found = array_values(array_unique(array_map(static fn (array $x): string => ($x[2] ?? '') !== '' ? $x[2] : strtoupper($x[1]), $m)));
+            self::assertCount(1, $found, $name);
+            $lengths[$name] = (int) $found[0];
+        }
+        self::assertSame(255, $lengths['company_legal_name']);
+        $wrong = [];
+        $checked = 0;
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::VIEWS));
+        foreach ($files as $file) {
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+            $text = (string) file_get_contents($file->getPathname());
+            preg_match_all('/<(input|textarea)\b/', $text, $opens, PREG_OFFSET_CAPTURE);
+            foreach ($opens[0] as [$open, $start]) {
+                $j = $start + strlen($open);
+                $len = strlen($text);
+                while ($j < $len && $text[$j] !== '>') {
+                    $j = substr($text, $j, 2) === '<?' ? (strpos($text, '?>', $j) === false ? $len : strpos($text, '?>', $j) + 2) : $j + 1;
+                }
+                $tag = substr($text, $start, $j - $start + 1);
+                $type = preg_match('/\btype\s*=\s*["\']([a-zA-Z-]+)["\']/', $tag, $t) ? strtolower($t[1]) : 'text';
+                if (str_starts_with($tag, '<input') && !in_array($type, ['text', 'email', 'tel', 'url', 'search', 'password'], true)) {
+                    continue;
+                }
+                if (!preg_match('/\bname\s*=\s*["\']([A-Za-z0-9_]+)/', $tag, $n) || !isset($lengths[$n[1]])) {
+                    continue;
+                }
+                $checked++;
+                $max = preg_match('/\bmaxlength\s*=\s*["\'](\d+)["\']/', $tag, $x) ? (int) $x[1] : null;
+                if ($max === null || $max > $lengths[$n[1]]) {
+                    $wrong[] = substr($file->getPathname(), strlen(self::VIEWS) + 1) . ':' . (substr_count($text, "\n", 0, $start) + 1) . " {$n[1]} maxlength=" . ($max ?? 'none') . " (column {$lengths[$n[1]]})";
+                }
+            }
+        }
+        self::assertGreaterThan(200, $checked);
+        self::assertSame([], $wrong);
+    }
+
     /**
      * UI-008: every fixed internal link in a view leads to a page route (the TDS
      * register linked to /associates/report, which does not exist). A route

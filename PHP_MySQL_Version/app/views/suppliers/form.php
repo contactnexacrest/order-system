@@ -18,7 +18,7 @@ $selectedTypes = $supplier['types'] ?? [];
       <legend>Supplier Details</legend>
       <div class="field-grid">
         <label class="full">Supplier Legal Name *
-          <input type="text" name="supplier_legal_name" value="<?= $v('supplier_legal_name') ?>" placeholder="e.g., Shree Granite Quarries Pvt Ltd" required>
+          <input type="text" name="supplier_legal_name" value="<?= $v('supplier_legal_name') ?>" placeholder="e.g., Shree Granite Quarries Pvt Ltd" required maxlength="255">
         </label>
         <div class="full">
           <span class="field-label">Supplier Type(s) * <small class="muted">— tick every type that applies</small></span>
@@ -38,31 +38,31 @@ $selectedTypes = $supplier['types'] ?? [];
           <input type="text" name="city" value="<?= $v('city') ?>" placeholder="e.g., Udaipur">
         </label>
         <label>State
-          <input type="text" name="state" value="<?= $v('state') ?>" placeholder="e.g., Rajasthan">
+          <input type="text" name="state" value="<?= $v('state') ?>" placeholder="e.g., Rajasthan" maxlength="120">
         </label>
         <label>Phone
           <input type="text" name="phone" value="<?= $v('phone') ?>" placeholder="e.g., +91-0000000000">
         </label>
         <label>WhatsApp Number
-          <input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g., +91-0000000000">
+          <input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g., +91-0000000000" maxlength="30">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= $v('email') ?>" placeholder="e.g., name@example.com">
         </label>
         <label>Contact Person — Name
-          <input type="text" name="contact_person" value="<?= $v('contact_person') ?>" placeholder="e.g., Sales Manager">
+          <input type="text" name="contact_person" value="<?= $v('contact_person') ?>" placeholder="e.g., Sales Manager" maxlength="150">
         </label>
         <label>Contact Person — Phone
-          <input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g., +91-0000000000">
+          <input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g., +91-0000000000" maxlength="30">
         </label>
         <label>Contact Person — WhatsApp
-          <input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g., +91-0000000000">
+          <input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g., +91-0000000000" maxlength="30">
         </label>
         <label>GSTIN
           <input type="text" name="gstin" value="<?= $v('gstin') ?>" placeholder="e.g., 08AAAAA0000A1Z5">
         </label>
         <label>PAN
-          <input type="text" name="pan" value="<?= $v('pan') ?>" placeholder="e.g., AAAAA0000A">
+          <input type="text" name="pan" value="<?= $v('pan') ?>" placeholder="e.g., AAAAA0000A" maxlength="20">
         </label>
       </div>
     </fieldset>

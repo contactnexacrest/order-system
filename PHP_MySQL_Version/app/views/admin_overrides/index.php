@@ -15,7 +15,7 @@
         <tr>
           <td><?= htmlspecialchars($dt['code']) ?></td>
           <td><?= htmlspecialchars($dt['name']) ?></td>
-          <td><input type="text" name="ref_format[<?= (int) $dt['id'] ?>]" value="<?= htmlspecialchars($dt['ref_format'] ?? '') ?>" placeholder="(none)" aria-label="Ref format"></td>
+          <td><input type="text" name="ref_format[<?= (int) $dt['id'] ?>]" value="<?= htmlspecialchars($dt['ref_format'] ?? '') ?>" placeholder="(none)" aria-label="Ref format" maxlength="100"></td>
           <td><input type="text" name="min_reviewers[<?= (int) $dt['id'] ?>]" value="<?= (int) $dt['min_reviewers_default'] ?>" placeholder="e.g., 2" style="width:4rem" aria-label="Min reviewers"></td>
         </tr>
         <?php endforeach; ?>
@@ -43,7 +43,7 @@
           </legend>
           <div class="field-grid">
             <label>Title
-              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?> maxlength="255">
             </label>
             <label class="full">Text
               <div class="md-toolbar">
@@ -74,7 +74,7 @@
           </legend>
           <div class="field-grid">
             <label>Title
-              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Force Majeure" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?> maxlength="255">
             </label>
             <label class="full">Text
               <div class="md-toolbar">
@@ -114,7 +114,7 @@
           </legend>
           <div class="field-grid">
             <label>Term
-              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Shipment" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?>>
+              <input type="text" name="clause_title[<?= (int) $c['id'] ?>]" value="<?= htmlspecialchars($c['clause_title']) ?>" placeholder="e.g., Shipment" data-protected="<?= $c['is_protected'] ? '1' : '0' ?>" <?= $c['is_protected'] ? 'readonly' : '' ?> maxlength="255">
             </label>
             <label class="full">Definition
               <div class="md-toolbar">
@@ -154,7 +154,7 @@
               <input type="text" name="advance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_pct']) ?>" placeholder="e.g., 30" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
             </label>
             <label>Advance Trigger Text
-              <input type="text" name="advance_trigger_text[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_trigger_text']) ?>" placeholder="e.g., On order confirmation" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>
+              <input type="text" name="advance_trigger_text[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['advance_trigger_text']) ?>" placeholder="e.g., On order confirmation" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?> maxlength="255">
             </label>
             <label>Balance %
               <input type="text" name="balance_pct[<?= (int) $p['id'] ?>]" value="<?= htmlspecialchars($p['balance_pct']) ?>" placeholder="e.g., 70" data-protected="<?= $p['is_protected'] ? '1' : '0' ?>" <?= $p['is_protected'] ? 'readonly' : '' ?>>

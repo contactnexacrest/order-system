@@ -125,7 +125,7 @@
           <summary>More <small class="muted">(description text, Dimensions, finish, line type, HS / SAC code, category)</small></summary>
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" value="{{ lp.description or '' }}" required placeholder="e.g. Absolute black granite — Premium, Polished"></label>
-            <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="{{ '0' if (not isNew and lp.dimensions) else '1' }}" value="{{ lp.dimensions or '' }}" placeholder="e.g. 180 × 80 × 13 cm"></label>
+            <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="{{ '0' if (not isNew and lp.dimensions) else '1' }}" value="{{ lp.dimensions or '' }}" placeholder="e.g. 180 × 80 × 13 cm" maxlength="150"></label>
             {# D-357: a line picked from Products takes its finish from Options › Surface finish — this box is for lines typed by hand. #}
             {% set finishFromOpt = (not isNew) and finishFromOption and finishFromOption[lp.id] %}
             <p class="muted small finish-from-option" data-finish-note{{ '' if finishFromOpt else ' hidden' }}>Finish: the one chosen in step 2, Options › Surface finish.</p>
@@ -142,7 +142,7 @@
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (lp.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ lp.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
             <label>Category

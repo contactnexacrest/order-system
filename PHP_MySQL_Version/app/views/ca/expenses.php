@@ -45,7 +45,7 @@ $canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'
             <?php elseif ($canEditTds): ?>
               <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:flex;gap:4px;">
                 <?= \App\Helpers\Csrf::field() ?>
-                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref">
+                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref" maxlength="60">
                 <button type="submit" class="btn-sm">Link</button>
               </form>
             <?php else: ?>

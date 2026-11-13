@@ -22,25 +22,25 @@
       <legend><span class="intake-step-num">1</span> Your Details</legend>
       <div class="field-grid">
         <label class="full">Company name, as registered *
-          <input type="text" name="company_legal_name" value="{{ submission.company_legal_name }}" placeholder="e.g., Test Company Ltd" required>
+          <input type="text" name="company_legal_name" value="{{ submission.company_legal_name }}" placeholder="e.g., Test Company Ltd" required maxlength="255">
         </label>
         <label class="full">Billing Address Line 1 *
-          <input type="text" name="billing_address_line1" value="{{ submission.billing_address_line1 or '' }}" placeholder="Street number and street name" required>
+          <input type="text" name="billing_address_line1" value="{{ submission.billing_address_line1 or '' }}" placeholder="Street number and street name" required maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="billing_address_line2" value="{{ submission.billing_address_line2 or '' }}" placeholder="Area / district — if applicable">
+          <input type="text" name="billing_address_line2" value="{{ submission.billing_address_line2 or '' }}" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town *
-          <input type="text" name="billing_city" value="{{ submission.billing_city or '' }}" placeholder="e.g., Rotterdam" required>
+          <input type="text" name="billing_city" value="{{ submission.billing_city or '' }}" placeholder="e.g., Rotterdam" required maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="billing_postcode" value="{{ submission.billing_postcode or '' }}" placeholder="e.g., 3011 AD">
+          <input type="text" name="billing_postcode" value="{{ submission.billing_postcode or '' }}" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country *
           {{ countryField('billing_country', 'billing_country', true, submission.billing_country or '', billingCountryIsOther) }}
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="{{ submission.contact_person }}" placeholder="e.g., Purchasing Manager" required>
+          <input type="text" name="contact_person" value="{{ submission.contact_person }}" placeholder="e.g., Purchasing Manager" required maxlength="150">
         </label>
         <label>Email *
           <input type="email" name="email" value="{{ submission.email }}" placeholder="e.g., name@example.com" required>
@@ -49,14 +49,14 @@
           <input type="text" name="phone" value="{{ submission.phone or '' }}" placeholder="e.g., +1 555 123 4567">
         </label>
         <label>Company tax number (VAT, EORI or tax registration) *
-          <input type="text" name="vat_eori_tax_no" value="{{ submission.vat_eori_tax_no or '' }}" placeholder="e.g., GB123456789" required>
+          <input type="text" name="vat_eori_tax_no" value="{{ submission.vat_eori_tax_no or '' }}" placeholder="e.g., GB123456789" required maxlength="100">
           <small class="muted">In the UK, give your EORI number. In other countries, give your company tax or VAT number.</small>
         </label>
         <label>Country the goods go to *
           {{ countryField('country_of_destination', 'country_of_destination', true, submission.country_of_destination or '', countryOfDestinationIsOther) }}
         </label>
         <label>Port where the goods arrive
-          <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" placeholder="Optional — we can suggest one">
+          <input type="text" name="port_of_discharge_text" value="{{ submission.port_of_discharge_text or '' }}" placeholder="Optional — we can suggest one" maxlength="150">
         </label>
         <label class="full">Certificate of origin you need
           {# Owner report (2026-10-26): a dropdown of the real options, so what the client picks is kept exactly. #}
@@ -79,35 +79,35 @@
       <label><input type="checkbox" id="consignee_same_as_buyer" name="consignee_same_as_buyer" value="1" {{ 'checked' if consigneeSame }}> Same as Buyer (my own company above)</label>
       <div id="consignee_fields" class="field-grid" style="display:none">
         <label class="full">Consignee Company Legal Name
-          <input type="text" name="consignee_name" value="{{ submission.consignee_name or '' }}" placeholder="e.g., ABC Memorial Stones Ltd">
+          <input type="text" name="consignee_name" value="{{ submission.consignee_name or '' }}" placeholder="e.g., ABC Memorial Stones Ltd" maxlength="255">
         </label>
         <label class="full">Consignee Address Line 1
-          <input type="text" name="consignee_address_line1" value="{{ submission.consignee_address_line1 or '' }}" placeholder="Street number and street name">
+          <input type="text" name="consignee_address_line1" value="{{ submission.consignee_address_line1 or '' }}" placeholder="Street number and street name" maxlength="255">
         </label>
         <label>Address Line 2
-          <input type="text" name="consignee_address_line2" value="{{ submission.consignee_address_line2 or '' }}" placeholder="Area / district — if applicable">
+          <input type="text" name="consignee_address_line2" value="{{ submission.consignee_address_line2 or '' }}" placeholder="Area / district — if applicable" maxlength="255">
         </label>
         <label>City / Town
-          <input type="text" name="consignee_city" value="{{ submission.consignee_city or '' }}" placeholder="e.g., Rotterdam">
+          <input type="text" name="consignee_city" value="{{ submission.consignee_city or '' }}" placeholder="e.g., Rotterdam" maxlength="100">
         </label>
         <label>Postcode
-          <input type="text" name="consignee_postcode" value="{{ submission.consignee_postcode or '' }}" placeholder="e.g., 3011 AD">
+          <input type="text" name="consignee_postcode" value="{{ submission.consignee_postcode or '' }}" placeholder="e.g., 3011 AD" maxlength="30">
         </label>
         <label>Country
           {{ countryField('consignee_country', 'consignee_country', false, submission.consignee_country or '', consigneeCountryIsOther) }}
         </label>
         <label>Company tax number (VAT, EORI or tax registration)
-          <input type="text" name="consignee_vat_eori_tax_no" value="{{ submission.consignee_vat_eori_tax_no or '' }}" placeholder="e.g., GB123456789">
+          <input type="text" name="consignee_vat_eori_tax_no" value="{{ submission.consignee_vat_eori_tax_no or '' }}" placeholder="e.g., GB123456789" maxlength="100">
           <small class="muted">In the UK, give your EORI number. In other countries, give your company tax or VAT number.</small>
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}" placeholder="e.g., Logistics Manager">
+          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}" placeholder="e.g., Logistics Manager" maxlength="150">
         </label>
         <label>Phone
-          <input type="text" name="consignee_phone" value="{{ submission.consignee_phone or '' }}" placeholder="e.g., +1 555 123 4567">
+          <input type="text" name="consignee_phone" value="{{ submission.consignee_phone or '' }}" placeholder="e.g., +1 555 123 4567" maxlength="30">
         </label>
         <label>Email
-          <input type="email" name="consignee_email" value="{{ submission.consignee_email or '' }}" placeholder="e.g., name@example.com">
+          <input type="email" name="consignee_email" value="{{ submission.consignee_email or '' }}" placeholder="e.g., name@example.com" maxlength="190">
         </label>
       </div>
     </fieldset>
@@ -123,7 +123,7 @@
             {% endfor %}
             <option value="__other__" {% if incotermIsOther %}selected{% endif %}>Other (not listed) — specify</option>
           </select>
-          <input type="text" id="incoterm_preference_input" name="incoterm_preference" value="{{ submission.incoterm_preference or '' }}" placeholder="Type the delivery terms, e.g. DAP" style="{% if not incotermIsOther %}display:none{% endif %}" {% if not incotermIsOther %}readonly{% endif %}>
+          <input type="text" id="incoterm_preference_input" name="incoterm_preference" value="{{ submission.incoterm_preference or '' }}" placeholder="Type the delivery terms, e.g. DAP" style="{% if not incotermIsOther %}display:none{% endif %}" {% if not incotermIsOther %}readonly{% endif %} maxlength="100">
           <small class="muted">For example FOB: you book the sea freight. CIF: we book freight and insurance to your port.</small>
         </label>
         <label>Container Type
@@ -135,7 +135,7 @@
           </select>
         </label>
         <label class="full">Your reference number
-          <input type="text" name="buyer_own_reference" value="{{ submission.buyer_own_reference or '' }}" placeholder="Your own reference for this request. If you have none, write NIL.">
+          <input type="text" name="buyer_own_reference" value="{{ submission.buyer_own_reference or '' }}" placeholder="Your own reference for this request. If you have none, write NIL." maxlength="100">
         </label>
         <label class="full">Anything else we should know?
           <textarea name="notes" placeholder="Product details, quantities, timeline, etc.">{{ submission.notes or '' }}</textarea>

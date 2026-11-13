@@ -61,7 +61,7 @@
           </select>
         </label>
         <label>Buyer's Own PO Ref <small class="muted">("NIL" if none)</small>
-          <input type="text" name="buyers_po_ref" value="<?= htmlspecialchars($order['buyers_po_ref'] ?? '') ?>" placeholder="Write NIL if none">
+          <input type="text" name="buyers_po_ref" value="<?= htmlspecialchars($order['buyers_po_ref'] ?? '') ?>" placeholder="Write NIL if none" maxlength="100">
         </label>
       </div>
     </fieldset>
@@ -86,7 +86,7 @@
           </select>
         </label>
         <label>Port of Discharge (new / not listed)
-          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($order['port_of_discharge_text'] ?? '') ?>" placeholder="Buyer's nominated discharge port">
+          <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($order['port_of_discharge_text'] ?? '') ?>" placeholder="Buyer's nominated discharge port" maxlength="150">
         </label>
         <label>Container Type
           <select name="container_type">
@@ -97,7 +97,7 @@
           </select>
         </label>
         <label class="full">Est. Lead Time <small class="muted">(free text, shown on the Quotation)</small>
-          <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars($order['est_lead_time_text'] ?? '') ?>" placeholder="e.g. 45-60 days from advance receipt">
+          <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars($order['est_lead_time_text'] ?? '') ?>" placeholder="e.g. 45-60 days from advance receipt" maxlength="255">
         </label>
         <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" value="<?= htmlspecialchars((string) ($order['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
@@ -118,7 +118,7 @@
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
         <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($order['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g. 28.5"></label>
-        <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($order['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
+        <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($order['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates" maxlength="50"></label>
         <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 24000"></label>
         <label>Net Weight (kg)<input type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 23500"></label>
         <label class="full">Package Type

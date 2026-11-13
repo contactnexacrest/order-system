@@ -14,7 +14,7 @@
         <tr>
           <td>{{ dt.code }}</td>
           <td>{{ dt.name }}</td>
-          <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)" aria-label="Ref format"></td>
+          <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)" aria-label="Ref format" maxlength="100"></td>
           <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" placeholder="e.g., 2" style="width:4rem" aria-label="Min reviewers"></td>
         </tr>
         {% endfor %}
@@ -42,7 +42,7 @@
           </legend>
           <div class="field-grid">
             <label>Title
-              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }} maxlength="255">
             </label>
             <label class="full">Text
               <div class="md-toolbar">
@@ -73,7 +73,7 @@
           </legend>
           <div class="field-grid">
             <label>Title
-              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Force Majeure" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }} maxlength="255">
             </label>
             <label class="full">Text
               <div class="md-toolbar">
@@ -113,7 +113,7 @@
           </legend>
           <div class="field-grid">
             <label>Term
-              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Shipment" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }}>
+              <input type="text" name="clause_title[f{{ c.id }}]" value="{{ c.clause_title }}" placeholder="e.g., Shipment" data-protected="{{ '1' if c.is_protected else '0' }}" {{ 'readonly' if c.is_protected }} maxlength="255">
             </label>
             <label class="full">Definition
               <div class="md-toolbar">
@@ -153,7 +153,7 @@
               <input type="text" name="advance_pct[f{{ p.id }}]" value="{{ p.advance_pct }}" placeholder="e.g., 30" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
             </label>
             <label>Advance Trigger Text
-              <input type="text" name="advance_trigger_text[f{{ p.id }}]" value="{{ p.advance_trigger_text }}" placeholder="e.g., On order confirmation" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>
+              <input type="text" name="advance_trigger_text[f{{ p.id }}]" value="{{ p.advance_trigger_text }}" placeholder="e.g., On order confirmation" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }} maxlength="255">
             </label>
             <label>Balance %
               <input type="text" name="balance_pct[f{{ p.id }}]" value="{{ p.balance_pct }}" placeholder="e.g., 70" data-protected="{{ '1' if p.is_protected else '0' }}" {{ 'readonly' if p.is_protected }}>

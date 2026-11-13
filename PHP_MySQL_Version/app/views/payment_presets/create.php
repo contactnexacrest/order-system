@@ -6,7 +6,7 @@
     <?= Csrf::field() ?>
     <fieldset>
       <legend>Preset</legend>
-      <label>Preset Name *<input type="text" name="preset_name" required placeholder="e.g. Trial Order — 20% Advance"></label>
+      <label>Preset Name *<input type="text" name="preset_name" required placeholder="e.g. Trial Order — 20% Advance" maxlength="100"></label>
       <label><input type="checkbox" name="is_default" value="1"> Default preset (pre-selected on the order-creation form)</label>
       <label><input type="checkbox" name="requires_md_approval" value="1"> Requires MD approval — MD/ED approve an order's terms before its Quotation can be generated or sent</label>
       <label><input type="checkbox" name="show_bl_instructions" value="1" checked> Include BL Type / BL Consignee Instruction on the generated BL Instruction Sheet <small class="muted">(uncheck for payment terms that don't need NexaCrest to retain the BL as leverage, e.g. balance paid before shipment)</small></label>
@@ -18,7 +18,7 @@
       <div class="field-grid">
         <label class="full">Advance Trigger Text *
           <input type="text" name="advance_trigger_text" required value="against Proforma Invoice before production commences"
-            placeholder="against Proforma Invoice before production commences">
+            placeholder="against Proforma Invoice before production commences" maxlength="255">
         </label>
         <label>Advance % *
           <input type="number" name="advance_pct" step="0.01" min="0.01" max="99.99" required value="40.00" placeholder="e.g., 40.00">

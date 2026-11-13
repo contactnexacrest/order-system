@@ -682,7 +682,7 @@ $router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'],
 
 ### 3.6 `app.js` — sitewide browser behaviour and validation
 
-One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/assets/js/app.js` and `NODE_MySQL_Version/app/public/js/app.js` (about 1,490 lines each, kept identical in behaviour). CLAUDE.md rule: **every form is checked in the browser before submit, message beside the field; server checks stay too** (`Helpers/FieldValidator`). Extend `fieldError()` for a new rule; do not write per-page scripts.
+One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/assets/js/app.js` and `NODE_MySQL_Version/app/public/js/app.js` (about 1,490 lines each, kept identical in behaviour). CLAUDE.md rule: **every form is checked in the browser before submit, message beside the field; server checks stay too** (`Helpers/FieldValidator`). Extend `fieldError()` for a new rule; do not write per-page scripts. **Lengths (QA UI-010, 13 Nov 2026):** a typed field saved to a VARCHAR column carries `maxlength` no larger than the column (e.g. Company legal name 255, consignee phone 30, BL number 60), so the browser stops a too-long value at the field; `QaUiBatchNov13Test` / `qaUiBatchNov13.test.js` check every view against `docs/schema.sql` for the field names that are one column of one length (name / e-mail / reason / notes fields, used for columns of different lengths, are not covered by that check).
 
 | Function | What it does |
 |---|---|

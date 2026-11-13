@@ -25,9 +25,9 @@ $__bv = static fn(string $k): string => htmlspecialchars((string) ($__b[$k] ?? '
         <p class="muted small">No bank details yet — fill them in here, or send the Vendor Details Link so they fill them in themselves.</p>
       <?php endif; ?>
       <div class="field-grid">
-        <label>Account Holder Name<input type="text" name="bank_account_name" value="<?= $__bv('bank_account_name') ?>" placeholder="As printed on the cheque"></label>
-        <label>Bank Name<input type="text" name="bank_name" value="<?= $__bv('bank_name') ?>" placeholder="e.g., State Bank of India"></label>
-        <label>Branch<input type="text" name="bank_branch" value="<?= $__bv('bank_branch') ?>" placeholder="e.g., Udaipur Main"></label>
+        <label>Account Holder Name<input type="text" name="bank_account_name" value="<?= $__bv('bank_account_name') ?>" placeholder="As printed on the cheque" maxlength="255"></label>
+        <label>Bank Name<input type="text" name="bank_name" value="<?= $__bv('bank_name') ?>" placeholder="e.g., State Bank of India" maxlength="150"></label>
+        <label>Branch<input type="text" name="bank_branch" value="<?= $__bv('bank_branch') ?>" placeholder="e.g., Udaipur Main" maxlength="150"></label>
         <label>IFSC Code<input type="text" name="bank_ifsc" value="<?= $__bv('bank_ifsc') ?>" placeholder="e.g., SBIN0001234" maxlength="11" style="text-transform:uppercase"></label>
         <label>Account Number<input type="text" name="bank_account_number" data-bank-on-file="<?= $__b['has_bank'] ? '1' : '0' ?>" inputmode="numeric" autocomplete="off" placeholder="<?= $__b['has_bank'] ? 'Leave blank to keep ' . htmlspecialchars(VendorDetailsRepository::maskAccount($__b['bank_account_number'])) : 'Digits only' ?>"></label>
         <label>Re-enter Account Number<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off" placeholder="Type it again to confirm"></label>
@@ -39,7 +39,7 @@ $__bv = static fn(string $k): string => htmlspecialchars((string) ($__b[$k] ?? '
             <?php endforeach; ?>
           </select>
         </label>
-        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="<?= $__bv('bank_upi_id') ?>" placeholder="e.g., name@sbi"></label>
+        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="<?= $__bv('bank_upi_id') ?>" placeholder="e.g., name@sbi" maxlength="100"></label>
       </div>
       <p class="muted small" data-bank-change-note>New or changed bank details do not replace the account above straight away: a confirmation link goes to their registered e-mail; once they confirm, someone other than the person who typed them verifies them (Bank details changes, below the form). The account is then used after the waiting days in Associates › Commission settings.</p>
     </fieldset>

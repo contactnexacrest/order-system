@@ -48,7 +48,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
           <input type="text" name="amended_advance_amount" placeholder="e.g., 15000.00">
         </label>
         <label class="full">Amended Balance Terms — legal document wording (free text, leave blank if unchanged)
-          <input type="text" name="amended_balance_terms" placeholder="e.g., Balance payable within 30 days of BL date" style="width:100%">
+          <input type="text" name="amended_balance_terms" placeholder="e.g., Balance payable within 30 days of BL date" style="width:100%" maxlength="500">
         </label>
         <label>Amended Balance Trigger (leave blank if unchanged — this is what actually changes future PI/CI documents)
           <select name="amended_balance_trigger_option">
@@ -118,7 +118,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               <summary class="muted small">Admin override reference</summary>
               <form method="post" action="/amendments/<?= (int) $a['id'] ?>/override-reference" onsubmit="return confirmFieldOverride(this, 'this amendment\'s reference number');">
                 <?= Csrf::field() ?>
-                <input type="text" name="amendment_reference" value="<?= htmlspecialchars($a['amendment_reference']) ?>" placeholder="e.g., AMD-2026-0007" aria-label="Amendment reference">
+                <input type="text" name="amendment_reference" value="<?= htmlspecialchars($a['amendment_reference']) ?>" placeholder="e.g., AMD-2026-0007" aria-label="Amendment reference" maxlength="60">
                 <textarea class="override-reason" name="reason" rows="2" placeholder="Reason for this change *" required aria-label="Reason for this change"></textarea>
                 <button type="submit" class="btn-sm btn-danger">Override</button>
               </form>

@@ -23,10 +23,10 @@
           </select>
         </label>
         <label>Order Reference (optional)
-          <input type="text" name="order_reference" placeholder="e.g. NC/2026/0042">
+          <input type="text" name="order_reference" placeholder="e.g. NC/2026/0042" maxlength="60">
         </label>
         <label>Shipping Bill / Scroll No. (optional)
-          <input type="text" name="reference_number" placeholder="e.g., SB-2026-00417">
+          <input type="text" name="reference_number" placeholder="e.g., SB-2026-00417" maxlength="100">
         </label>
         <label>Claimed Amount
           <input type="number" step="0.01" min="0.01" name="claimed_amount" placeholder="e.g., 15000.00" required>

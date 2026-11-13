@@ -16,7 +16,7 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
       value="<?= View::e($product['hs_code'] ?? ($categoryDefaultHs ?? '')) ?>" placeholder="e.g. 68022310 — type the code or words" required>
       <?php if (!$isEdit && ($categoryDefaultHs ?? '') !== ''): ?><small class="muted">Pre-filled with the default of <?= View::e((string) $categoryName) ?>.</small><?php endif; ?></label>
     <datalist id="product_hs_codes"><?php foreach ($hsCodes ?? [] as $__h): ?><option value="<?= View::e((string) $__h['code']) ?>"><?= View::e((string) $__h['description']) ?><?= (string) $__h['code'] === (string) ($categoryDefaultHs ?? '') ? ' · category default' : '' ?></option><?php endforeach; ?></datalist>
-    <label>Origin<input type="text" name="origin" value="<?= View::e($product['origin'] ?? '') ?>" placeholder="e.g., Rajasthan, India"></label>
+    <label>Origin<input type="text" name="origin" value="<?= View::e($product['origin'] ?? '') ?>" placeholder="e.g., Rajasthan, India" maxlength="150"></label>
   </div>
 
   <?php // Owner decision D-335 (12 Nov 2026): "Costs to FOB" — the only place for CHA + transport; packing + loading only when a supplier price does not include them.

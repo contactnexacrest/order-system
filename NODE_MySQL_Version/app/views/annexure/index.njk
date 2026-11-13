@@ -204,8 +204,8 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="which" value="{{ which }}">
       <div class="field-grid">
         <label>Name *<input type="text" name="name" placeholder="e.g. Granite Countertop Slab" required></label>
-        <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 210 x 528 cm"></label>
-        <label>Finish<input type="text" name="finish" placeholder="e.g. Mirror Polished"></label>
+        <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 210 x 528 cm" maxlength="150"></label>
+        <label>Finish<input type="text" name="finish" placeholder="e.g. Mirror Polished" maxlength="150"></label>
         <label>Image <small class="muted">(optional — can also be added after saving)</small><input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" data-max-bytes="{{ imageMaxBytes }}"></label>
         <label class="full">Description<textarea name="description" rows="2" placeholder="e.g. Premium grade polished slab for kitchen countertop use"></textarea></label>
         <label class="full">Components<textarea name="components" rows="2" placeholder="e.g. 1. Left frame&#10;2. Right frame&#10;3. Base"></textarea></label>

@@ -21,10 +21,10 @@
                 <input type="text" name="description[{{ loop.index0 }}]" required value="{{ l.description }}" placeholder="e.g. Granite Memorial Headstone">
               </label>
               <label>Dimensions
-                <input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}" placeholder="e.g. 24x12x3 inches" data-annexure-size>
+                <input type="text" name="dimensions[{{ loop.index0 }}]" value="{{ l.dimensions or '' }}" placeholder="e.g. 24x12x3 inches" data-annexure-size maxlength="150">
               </label>
               <label>Finish
-                <input type="text" name="finish[{{ loop.index0 }}]" value="{{ l.finish or '' }}" placeholder="e.g. Polished">
+                <input type="text" name="finish[{{ loop.index0 }}]" value="{{ l.finish or '' }}" placeholder="e.g. Polished" maxlength="150">
               </label>
               <label>Qty
                 <input type="text" name="quantity[{{ loop.index0 }}]" value="{{ l.quantity or '' }}" placeholder="e.g. 100" data-annexure-qty>
@@ -43,7 +43,7 @@
                 <input type="text" name="unit_price[{{ loop.index0 }}]" required value="{{ l.unit_price or '' }}" placeholder="e.g. 45.00">
               </label>
               <label>HS Code *
-                <input type="text" name="hs_code[{{ loop.index0 }}]" value="{{ l.hs_code or '' }}" list="hs_code_list" placeholder="Type to search…" required>
+                <input type="text" name="hs_code[{{ loop.index0 }}]" value="{{ l.hs_code or '' }}" list="hs_code_list" placeholder="Type to search…" required maxlength="20">
               </label>
             </div>
           </div>
