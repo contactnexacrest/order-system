@@ -44,14 +44,20 @@ $__ro = $canManage ? '' : ' disabled';
             </fieldset>
             <?php if ($canManage): ?><div><button type="submit" class="btn-sm">Save specification</button></div><?php endif; ?>
           </form>
+          <?php $__linked = \App\Services\SurfaceFinishList::isLinkedSpec($s); // D-357: the names come from Settings › Lists › surface_finish ?>
+          <?php if ($__linked): ?><p class="notice notice-info small" data-testid="finish-linked-note">Price only here — the names, their order and on/off come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a>. A finish added in Settings appears here automatically at no price change; a finish switched off in Settings disappears from Pick from Products.</p><?php endif; ?>
           <table class="list">
-            <tr><th>Option</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
+            <tr><th><?= $__linked ? 'Option (name from Settings › Lists)' : 'Option' ?></th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
             <?php foreach ($s['options'] as $o): ?>
               <tr>
                 <td colspan="5">
                   <form method="post" action="/pricing/spec-options/<?= (int) $o['id'] ?>" class="inline-form">
                     <?= Csrf::field() ?>
+                    <?php if (!empty($o['dropdown_option_id'])): ?>
+                      <input type="text" name="name" readonly class="input-readonly" maxlength="80" value="<?= View::e($o['name']) ?>" aria-label="Option name (from Settings › Lists)" placeholder="e.g. Natural Polish"> <a class="small" href="/admin/dropdown-options#list-surface_finish">Rename in Settings › Lists</a>
+                    <?php else: ?>
                     <input type="text" name="name" required maxlength="80" value="<?= View::e($o['name']) ?>" aria-label="Option name" placeholder="e.g. Leather"<?= $__ro ?>>
+                    <?php endif; ?>
                     <select name="change_type" aria-label="Change type"<?= $__ro ?>><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"<?= $o['change_type'] === $k ? ' selected' : '' ?>><?= View::e($l) ?></option><?php endforeach; ?></select>
                     <input type="number" name="value" step="0.0001" value="<?= $o['value'] !== null ? View::e(rtrim(rtrim((string) $o['value'], '0'), '.')) : '' ?>" aria-label="Value" placeholder="e.g. 4.00 or -8"<?= $__ro ?>>
                     <input type="number" name="thickness_mm" min="1" max="2000" step="1" value="<?= $o['thickness_mm'] !== null ? (int) $o['thickness_mm'] : '' ?>" aria-label="Thickness in mm" placeholder="e.g. 30"<?= $__ro ?>>
@@ -60,15 +66,17 @@ $__ro = $canManage ? '' : ' disabled';
                     <?php if ($canManage): ?><button type="submit" class="btn-sm">Save</button><?php endif; ?>
                   </form>
                 </td>
-                <td><?= (int) $o['is_active'] === 1 ? '<span class="badge badge-active">Active</span>' : '<span class="badge">Inactive</span>' ?></td>
-                <td><?php if ($canManage): ?>
+                <td><?= (int) $o['is_active'] === 1 ? '<span class="badge badge-active">Active</span>' : '<span class="badge">Inactive</span>' ?><?php if (!empty($o['dropdown_option_id']) && \App\Services\SurfaceFinishList::priceText($o)[1]): ?> <span class="tag tag-gold">no price change yet</span><?php endif; ?></td>
+                <td><?php if (!empty($o['dropdown_option_id'])): ?><small class="muted">on / off in Settings › Lists</small><?php elseif ($canManage): ?>
                   <form method="post" action="/pricing/spec-options/<?= (int) $o['id'] ?>/active" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary"><?= (int) $o['is_active'] === 1 ? 'Deactivate' : 'Activate' ?></button></form>
                   <?php if (!$o['used']): ?><form method="post" action="/pricing/spec-options/<?= (int) $o['id'] ?>/delete" style="display:inline" data-confirm="Remove this option?"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Remove</button></form><?php endif; ?>
                 <?php endif; ?></td>
               </tr>
             <?php endforeach; ?>
           </table>
-          <?php if ($canManage): ?>
+          <?php if ($canManage && $__linked): ?>
+            <p class="small muted">To add a finish, add it in <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a> — it appears here with no price change; then set its price above.</p>
+          <?php elseif ($canManage): ?>
             <form method="post" action="/pricing/specifications/<?= (int) $s['id'] ?>/options" class="field-grid">
               <?= Csrf::field() ?>
               <label>New option *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>

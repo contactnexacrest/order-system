@@ -5379,6 +5379,7 @@ CREATE TABLE spec_definitions (
   updated_by  BIGINT UNSIGNED NULL,
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  list_key    VARCHAR(100) NULL,                    -- D-357: 'surface_finish' = the option names come from Settings › Lists (dropdown_options); only the Surface finish specification
   KEY idx_spec_definitions_category (category_id),
   KEY idx_spec_definitions_product (product_id),
   CONSTRAINT fk_spec_definitions_category FOREIGN KEY (category_id) REFERENCES product_categories(id),
@@ -5399,7 +5400,9 @@ CREATE TABLE spec_options (
   updated_by   BIGINT UNSIGNED NULL,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  dropdown_option_id BIGINT UNSIGNED NULL,          -- D-357: the Settings › Lists row this option is (its name, order and on/off come from there; the price stays here)
   KEY idx_spec_options_spec (spec_id),
+  KEY idx_spec_options_dropdown_option (dropdown_option_id),
   CONSTRAINT fk_spec_options_spec FOREIGN KEY (spec_id) REFERENCES spec_definitions(id) ON DELETE CASCADE,
   CONSTRAINT fk_spec_options_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
   CONSTRAINT fk_spec_options_user FOREIGN KEY (updated_by) REFERENCES users(id)

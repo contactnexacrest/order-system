@@ -150,14 +150,14 @@ async function load(userId) {
     userId
   );
   await createSampleOrder(clientAId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
-    ['Hand-carved decorative planter, Model A', '30 x 30 x 45 cm', 'Polished'],
+    ['Hand-carved decorative planter, Model A', '30 x 30 x 45 cm', 'Natural Polish'],
     ['Hand-carved decorative planter, Model B', '25 x 25 x 40 cm', 'Matte'],
   ]);
   // Left exactly here — Stage 1, no documents yet — the
   // "start from scratch" sample order.
 
   const orderA2Id = await createSampleOrder(clientAId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
-    ['Hand-carved decorative planter, Model C', '35 x 35 x 50 cm', 'Polished'],
+    ['Hand-carved decorative planter, Model C', '35 x 35 x 50 cm', 'Natural Polish'],
   ]);
   await advanceSampleOrderToStage2Pending(orderA2Id, userId);
   await submitSamplePiIntakePendingReview(orderA2Id, userId);
@@ -214,8 +214,8 @@ async function load(userId) {
 
   // Order E1: same product, two sizes, Annexure A with a written spec per size (no images needed).
   const orderE1Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
-    { description: 'Granite Monument Slab', dimensions: '120 x 80 x 3 cm', finish: 'Polished', quantity: '25', unit: 'pcs', unit_price: '180.00' },
-    { description: 'Granite Monument Slab', dimensions: '60 x 60 x 2 cm', finish: 'Polished', quantity: '40', unit: 'pcs', unit_price: '95.00' },
+    { description: 'Granite Monument Slab', dimensions: '120 x 80 x 3 cm', finish: 'Natural Polish', quantity: '25', unit: 'pcs', unit_price: '180.00' },
+    { description: 'Granite Monument Slab', dimensions: '60 x 60 x 2 cm', finish: 'Natural Polish', quantity: '40', unit: 'pcs', unit_price: '95.00' },
   ], true);
   await orderAnnexureRepository.createProduct(orderE1Id, {
     name: 'Granite Monument Slab — 120 x 80 x 3 cm',
@@ -297,8 +297,8 @@ async function load(userId) {
 
   // Order E4: same kind of product, two set sizes (10-piece vs 12-piece) — no Annexure A, a quantity distinction, not a technical one.
   const orderE4Id = await createSampleOrderCustomLines(clientEId, fobIncoterm, currency, loadingPort, standardPreset, userId, [
-    { description: 'Granite Flower Vase — 10-Piece Set', dimensions: '20 x 20 x 30 cm each', finish: 'Polished', quantity: '10', unit: 'pcs', unit_price: '45.00' },
-    { description: 'Granite Flower Vase — 12-Piece Set', dimensions: '18 x 18 x 28 cm each', finish: 'Polished', quantity: '12', unit: 'pcs', unit_price: '38.00' },
+    { description: 'Granite Flower Vase — 10-Piece Set', dimensions: '20 x 20 x 30 cm each', finish: 'Natural Polish', quantity: '10', unit: 'pcs', unit_price: '45.00' },
+    { description: 'Granite Flower Vase — 12-Piece Set', dimensions: '18 x 18 x 28 cm each', finish: 'Natural Polish', quantity: '12', unit: 'pcs', unit_price: '38.00' },
   ]);
   await advanceSampleOrderPastQuotation(orderE4Id, userId, false);
 
@@ -671,7 +671,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
     supplier_type: 'Quarry Owner',
     material_stone_type: 'Natural Granite, Absolute Black',
     grade: 'Grade A',
-    surface_finish: 'Natural/Sandblasted',
+    surface_finish: 'Sandblasted',
     dimensions: 'Per order — see Annexure',
     dimensional_tolerance: '+/- 2mm',
     quantity: '30',

@@ -42,7 +42,7 @@ final class ProductFinishDropdownTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         StageGateService::passAndUnlockNext($orderId, 1, null);
         StageGateService::passAndUnlockNext($orderId, 2, null);
-        OrderProductRepository::add($orderId, 1, 'Granite Slab', null, 'Polished', '10', false, 'PCS', '100', '68022310');
+        OrderProductRepository::add($orderId, 1, 'Granite Slab', null, 'Natural Polish', '10', false, 'PCS', '100', '68022310');
 
         $output = $this->renderOrderShow($orderId);
 
@@ -67,7 +67,7 @@ final class ProductFinishDropdownTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
-        OrderProductRepository::add($orderId, 1, 'Granite Slab', null, 'Polished', '10', false, 'PCS', '100', '68022310');
+        OrderProductRepository::add($orderId, 1, 'Granite Slab', null, 'Natural Polish', '10', false, 'PCS', '100', '68022310');
 
         $_SESSION['_client_portal_client_id'] = $clientId;
         ob_start();

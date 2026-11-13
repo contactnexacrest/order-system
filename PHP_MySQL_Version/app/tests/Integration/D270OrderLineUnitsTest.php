@@ -34,7 +34,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
     private int $associate;
     private int $client;
 
-    private const THICK = ['Grade / quality' => 'Standard', 'Surface finish' => 'Polished'];
+    private const THICK = ['Grade / quality' => 'Standard', 'Surface finish' => 'Natural Polish'];
 
     protected function setUp(): void
     {

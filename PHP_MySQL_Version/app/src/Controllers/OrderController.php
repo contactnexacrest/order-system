@@ -1448,6 +1448,8 @@ final class OrderController
             // A changed product or options: the line no longer follows its price request.
             \App\Services\OrderLinePricing::saveSelection($productId, $__specSel, null);
         }
+        // D-357: a picked line's finish is its chosen Surface finish option (the "More › finish" box is hidden for it).
+        \App\Services\SurfaceFinishList::applyToLine($productId);
         OrderProductRepository::setPieceSize($productId, $__size);
         OrderProductRepository::setAsPerAnnexure($productId, $__perAnnexure);
         if ($__piecesForm) {

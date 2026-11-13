@@ -211,7 +211,7 @@ final class D256PricingUsabilityTest extends DbTestCase
         // Options it does not name still apply: Standard −8%.
         self::assertEqualsWithDelta(61.25 * 0.92 * 0.98, $this->price(self::SQM)['build']['raw']['cost'], 0.0001);
         // A combination it does not match: the ordinary price.
-        $polished = $this->price(['Grade / quality' => 'Premium', 'Thickness' => '30 mm', 'Surface finish' => 'Polished']);
+        $polished = $this->price(['Grade / quality' => 'Premium', 'Thickness' => '30 mm', 'Surface finish' => 'Natural Polish']);
         self::assertNull($polished['exact']);
         self::assertSame(3200.0, (float) $polished['supplier_inr']);
     }

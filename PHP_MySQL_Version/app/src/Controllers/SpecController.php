@@ -13,6 +13,7 @@ use App\Repositories\SpecRepository;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 use App\Services\ProductSpecs;
+use App\Services\SurfaceFinishList;
 
 /**
  * Owner decision D-255 (5 Nov 2026): the specifications that change the price.
@@ -111,6 +112,14 @@ final class SpecController
         $d['category_id'] = $categoryId;
         $id = SpecRepository::createSpec($d, (int) self::user()['id']);
         AuditLogRepository::log((int) self::user()['id'], 'SPEC_ADDED', 'spec_definitions', $id, null, null, "{$d['name']} (category #{$categoryId})");
+        // D-357: a category's "Surface finish" takes its options from Settings › Lists › surface_finish.
+        if (mb_strtolower(trim($d['name'])) === 'surface finish') {
+            SpecRepository::setListKey($id, SurfaceFinishList::LIST_KEY);
+            SurfaceFinishList::sync([], (int) self::user()['id']);
+            Flash::set('success', "Specification \"{$d['name']}\" added with the finishes of Settings › Lists › surface_finish, at no price change — set each finish's price below.");
+            self::back("/pricing/specifications?category={$categoryId}&edit={$id}#spec-{$id}");
+            return;
+        }
         Flash::set('success', "Specification \"{$d['name']}\" added — add its options below.");
         self::back("/pricing/specifications?category={$categoryId}&edit={$id}#spec-{$id}");
     }
@@ -211,6 +220,12 @@ final class SpecController
         }
         [$d, $errors] = ProductSpecs::readOptionForm($_POST);
         $to = $productOnly ? "/products/{$spec['product_id']}/specifications" : "/pricing/specifications?category={$spec['category_id']}&edit={$spec['id']}#spec-{$spec['id']}";
+        if (SurfaceFinishList::isLinkedSpec($spec)) {
+            // D-357: finish names are added in Settings › Lists; they appear here at no price change.
+            Flash::set('error', 'Add a surface finish in Settings › Lists › surface_finish — it appears here at once with no price change; then set its price here.');
+            self::back($to);
+            return;
+        }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             self::back($to);
@@ -247,7 +262,12 @@ final class SpecController
             self::back("/products/{$ownerProduct}/specifications");
             return;
         }
-        [$d, $errors] = ProductSpecs::readOptionForm($_POST);
+        // D-357: a linked option's name comes from Settings › Lists — only its price is saved here.
+        $post = $_POST;
+        if (!empty($o['dropdown_option_id'])) {
+            $post['name'] = (string) $o['name'];
+        }
+        [$d, $errors] = ProductSpecs::readOptionForm($post);
         $to = $ownerProduct !== null ? "/products/{$ownerProduct}/specifications" : "/pricing/specifications?category={$spec['category_id']}&edit={$spec['id']}#spec-{$spec['id']}";
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
@@ -272,6 +292,11 @@ final class SpecController
         if ($o === null || $spec === null || $o['product_id'] !== null) {
             Flash::set('error', 'That option no longer exists.');
             self::back('/pricing/specifications');
+            return;
+        }
+        if (!empty($o['dropdown_option_id'])) {
+            Flash::set('error', "\"{$o['name']}\" is switched on or off in Settings › Lists › surface_finish (D-357) — the one list of finish names.");
+            self::back("/pricing/specifications?category={$spec['category_id']}&edit={$spec['id']}#spec-{$spec['id']}");
             return;
         }
         $active = (int) $o['is_active'] !== 1;
@@ -301,6 +326,11 @@ final class SpecController
             return;
         }
         $to = $ownerProduct !== null ? "/products/{$ownerProduct}/specifications" : "/pricing/specifications?category={$spec['category_id']}&edit={$spec['id']}#spec-{$spec['id']}";
+        if (!empty($o['dropdown_option_id']) && $o['product_id'] === null) {
+            Flash::set('error', "\"{$o['name']}\" comes from Settings › Lists › surface_finish (D-357) — switch it off there.");
+            self::back($to);
+            return;
+        }
         if (SpecRepository::optionUsed((int) $o['id'])) {
             SpecRepository::setOptionActive((int) $o['id'], false, (int) self::user()['id']);
             Flash::set('success', "\"{$o['name']}\" has been used on orders or price requests, so it was deactivated instead of deleted.");
@@ -553,6 +583,17 @@ final class SpecController
             Flash::set('error', implode(' ', $errors));
             self::back("/products/{$product['id']}/specifications?edit={$spec['id']}");
             return;
+        }
+        if (SurfaceFinishList::isLinkedSpec($spec)) {
+            // D-357: a product's own finish is one of the Settings list's names.
+            $row = SurfaceFinishList::settingsRowByName($d['name']);
+            if ($row === null) {
+                Flash::set('error', "\"{$d['name']}\" is not in Settings › Lists › surface_finish — add it there first (the one list of finish names).");
+                self::back("/products/{$product['id']}/specifications?edit={$spec['id']}");
+                return;
+            }
+            $d['name'] = mb_substr((string) $row['option_value'], 0, SurfaceFinishList::MAX_NAME);
+            $d['dropdown_option_id'] = (int) $row['id'];
         }
         $d['spec_id'] = (int) $spec['id'];
         $d['product_id'] = (int) $product['id'];

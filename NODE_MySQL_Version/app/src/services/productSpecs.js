@@ -144,6 +144,7 @@ async function tree(product, includeHidden = false) {
     out.push({
       id: sid, name: String(s.name), kind: String(s.kind), applies_to: s.applies_to,
       source: String(s.source), hidden, changed: changed || hidden, options: opts,
+      list_key: s.list_key ?? null, // D-357: 'surface_finish' = the names come from Settings › Lists
     });
   }
   return out;

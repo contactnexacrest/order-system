@@ -213,6 +213,15 @@ every option keeps the margin. Worked example (₹3,280 per m², ₹82 = USD 1, 
 costs 0%, margin 20%, incentive 15% on, buffer 3%, Level 2 = 5%): Standard · 30 mm ·
 Leather · 2–4 containers → quote **USD 73.43**, lowest **USD 71.30** per m².
 
+**Surface finish — names come from Settings (D-357, 12 Nov 2026).** The finish
+names, their order and on/off are set in **Settings › Lists › surface_finish**, the
+one list of finish names. Here you set only each finish's price change: the name is
+shown greyed with a link **Rename in Settings › Lists**, and there is no Deactivate,
+Remove or "+ Add option" for a finish. A finish added in Settings appears here at
+once with no price change (marked "no price change yet") — set its price here; a
+finish switched off in Settings disappears from Pick from Products. A product's own
+finish option must be one of the Settings names.
+
 **Thick stone — per CBM.** From **50 mm** (setting "Price per CBM from (mm)"; a
 product can set its own) the price is per CBM and starts from the product's
 **per-CBM supplier price** (Products › Market prices › "Price per: CBM — thick

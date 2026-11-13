@@ -3,27 +3,42 @@
   <p class="muted">Admin-editable option lists used across the app — e.g. Container Type on the Quotation form, Certificate of Origin Type. An option is never deleted outright; deactivate one you no longer want instead, since an older order or submission may still carry its exact text.</p>
 
   {% for listKey, options in grouped %}
-    <div class="section">
+    {% set finish = listKey == finishListKey %}{# D-357: the one list of surface-finish names #}
+    <div class="section" id="list-{{ listKey }}">
       <h2>{{ listKey }}</h2>
+      {% if finish %}
+        <p class="notice notice-info small" data-testid="finish-used-in">Used in: <b>Pick from Products</b> (price per finish in Pricing › Specifications), <b>order lines</b>, the <b>Supplier PO</b>, the <b>buyer's quotation form</b> and every <b>document</b>. This is the one place to name a finish — a rename here reaches Pick from Products, Pricing › Specifications and the lines of orders whose quotation is not approved yet.</p>
+      {% endif %}
       <form method="post" action="/admin/dropdown-options/{{ listKey }}/update">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <table class="list">
-          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th></tr>
+          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th>{% if finish %}<th>Price change (from Pricing › Specifications)</th>{% endif %}</tr>
           {% for o in options %}
             <tr>
-              <td><input type="text" name="option_value[{{ o.id }}]" required value="{{ o.option_value }}" placeholder="e.g., 20ft Standard" aria-label="Option value"></td>
+              <td><input type="text" name="option_value[{{ o.id }}]" required{% if finish %} maxlength="{{ finishMaxName }}"{% endif %} value="{{ o.option_value }}" placeholder="{{ 'e.g., Natural Polish' if finish else 'e.g., 20ft Standard' }}" aria-label="Option value">{% if finish and finishSaved and finishSaved.renamed and finishSaved.renamed[o.id] %} <small class="muted">was "{{ finishSaved.renamed[o.id] }}"</small>{% endif %}</td>
               <td><input type="number" min="0" step="1" required name="sort_order[{{ o.id }}]" value="{{ o.sort_order }}" placeholder="e.g., 1" style="width:4rem" aria-label="Sort order"></td>
               <td><input type="radio" name="default_id" value="{{ o.id }}" {{ 'checked' if o.is_default }} aria-label="Default option"></td>
               <td><input type="checkbox" name="is_active[{{ o.id }}]" value="1" {{ 'checked' if o.is_active }} aria-label="Is active"></td>
+              {% if finish %}
+                <td class="finish-price">{% for fp in finishPrices[o.id] or [] %}<div>{% if fp.category %}{{ fp.category }}: {% endif %}{{ fp.text }}{% if fp.unset %} <a class="tag tag-gold" href="{{ fp.link }}">set it in Pricing › Specifications</a>{% endif %}</div>{% endfor %}{% if not (finishPrices[o.id] and finishPrices[o.id].length) %}<span class="muted">—</span>{% endif %}</td>
+              {% endif %}
             </tr>
           {% endfor %}
         </table>
         <button type="submit" class="btn-sm">Save {{ listKey }} Changes</button>
       </form>
+      {% if finish and finishSaved and finishSaved.messages and finishSaved.messages.length %}
+        <div class="alert alert-success finish-saved" data-testid="finish-saved">
+          {% for m in finishSaved.messages %}
+            <div><b>Saved.</b> {{ m.saved }}</div>
+            <div class="small muted">{{ m.kept }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
 
       <form method="post" action="/admin/dropdown-options/{{ listKey }}/create" class="btn-row">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <input type="text" name="option_value" required placeholder="Add a new option to this list" aria-label="Add a new option to this list">
+        <input type="text" name="option_value" required{% if finish %} maxlength="{{ finishMaxName }}"{% endif %} placeholder="{{ 'e.g., Antique — added at no price change' if finish else 'Add a new option to this list' }}" aria-label="Add a new option to this list">
         <button type="submit" class="btn-sm btn-secondary">Add Option</button>
       </form>
     </div>

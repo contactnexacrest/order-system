@@ -126,7 +126,10 @@
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" value="{{ lp.description or '' }}" required placeholder="e.g. Absolute black granite — Premium, Polished"></label>
             <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="{{ '0' if (not isNew and lp.dimensions) else '1' }}" value="{{ lp.dimensions or '' }}" placeholder="e.g. 180 × 80 × 13 cm"></label>
-            <label>Finish
+            {# D-357: a line picked from Products takes its finish from Options › Surface finish — this box is for lines typed by hand. #}
+            {% set finishFromOpt = (not isNew) and finishFromOption and finishFromOption[lp.id] %}
+            <p class="muted small finish-from-option" data-finish-note{{ '' if finishFromOpt else ' hidden' }}>Finish: the one chosen in step 2, Options › Surface finish.</p>
+            <label data-finish-box{{ ' hidden' if finishFromOpt else '' }}>Finish
               <select name="finish">
                 <option value="">—</option>
                 {% for o in surfaceFinishes %}

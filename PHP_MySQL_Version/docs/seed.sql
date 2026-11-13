@@ -559,13 +559,16 @@ INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is
   -- 90-item backlog #51a: Supplier PO's Surface Finish field was plain
   -- free text with no standard list — same dropdown_options treatment,
   -- same manage_dropdown_options admin screen.
-  ('surface_finish', 'Polished', 1, 1, 1),
+  -- D-357 (12 Nov 2026): the ONE list of finish names — Pick from Products and
+  -- Pricing › Specifications › Surface finish take their names from here.
+  ('surface_finish', 'Natural Polish', 1, 1, 1),
   ('surface_finish', 'Honed', 2, 0, 1),
   ('surface_finish', 'Flamed', 3, 0, 1),
-  ('surface_finish', 'Natural/Sandblasted', 4, 0, 1),
-  ('surface_finish', 'Rock-Pitched', 5, 0, 1),
-  ('surface_finish', 'Bush-Hammered', 6, 0, 1),
-  ('surface_finish', 'Leather/Satin', 7, 0, 1),
+  ('surface_finish', 'Sandblasted', 4, 0, 1),
+  ('surface_finish', 'Leather', 5, 0, 1),
+  ('surface_finish', 'Brushed', 6, 0, 1),
+  ('surface_finish', 'Rock-Pitched', 7, 0, 1),
+  ('surface_finish', 'Bush-Hammered', 8, 0, 1),
   -- 90-item backlog #51a: Supplier PO's GST Rate field was plain free
   -- text — standard Indian GST slabs as a dropdown instead. 18% is the
   -- default to match the rate every existing sample Supplier PO already
@@ -2345,12 +2348,14 @@ JOIN (SELECT 'Grade / quality' AS sn, 'Premium' AS n, 1 AS b, 'none' AS t, NULL 
       SELECT 'Thickness', '80 mm', 0, 'cbm', NULL, 80, 8 UNION ALL
       SELECT 'Thickness', '100 mm', 0, 'cbm', NULL, 100, 9 UNION ALL
       SELECT 'Thickness', 'Other, 50 mm or more', 0, 'cbm', NULL, NULL, 10 UNION ALL
-      SELECT 'Surface finish', 'Polished', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Surface finish', 'Natural Polish', 1, 'none', NULL, NULL, 1 UNION ALL
       SELECT 'Surface finish', 'Honed', 0, 'usd_m2', 1, NULL, 2 UNION ALL
       SELECT 'Surface finish', 'Flamed', 0, 'usd_m2', 2, NULL, 3 UNION ALL
       SELECT 'Surface finish', 'Sandblasted', 0, 'usd_m2', 3, NULL, 4 UNION ALL
       SELECT 'Surface finish', 'Leather', 0, 'usd_m2', 4, NULL, 5 UNION ALL
       SELECT 'Surface finish', 'Brushed', 0, 'usd_m2', 4.5, NULL, 6 UNION ALL
+      SELECT 'Surface finish', 'Rock-Pitched', 0, 'none', NULL, NULL, 7 UNION ALL
+      SELECT 'Surface finish', 'Bush-Hammered', 0, 'none', NULL, NULL, 8 UNION ALL
       SELECT 'Size / format', 'Gangsaw slab', 1, 'none', NULL, NULL, 1 UNION ALL
       SELECT 'Size / format', 'Cutter slab', 0, 'pct', -10, NULL, 2 UNION ALL
       SELECT 'Size / format', 'Tiles 30×30', 0, 'pct', 5, NULL, 3 UNION ALL
@@ -2376,6 +2381,15 @@ JOIN (SELECT 'Grade / quality' AS sn, 'Premium' AS n, 1 AS b, 'none' AS t, NULL 
       SELECT 'Calibration', 'Calibrated', 0, 'pct', 4, NULL, 2) d ON d.sn = s.name
 WHERE s.product_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM spec_options o WHERE o.spec_id = s.id AND o.name = d.n AND o.product_id IS NULL);
+
+-- Owner decision D-357 (12 Nov 2026): one list of surface-finish names. The Surface finish
+-- specification takes its names, order and on/off from Settings › Lists › surface_finish
+-- (dropdown_options); Pricing › Specifications keeps the price only.
+UPDATE spec_definitions SET list_key = 'surface_finish' WHERE name = 'Surface finish' AND product_id IS NULL AND list_key IS NULL;
+UPDATE spec_options o JOIN spec_definitions s ON s.id = o.spec_id AND s.list_key = 'surface_finish'
+  JOIN dropdown_options d ON d.list_key = 'surface_finish' AND d.option_value = o.name
+   SET o.dropdown_option_id = d.id
+ WHERE o.product_id IS NULL AND o.dropdown_option_id IS NULL;
 
 -- ================================================================
 -- Owner decision D-257 (5 Nov 2026): divisions. Export uses every module; the

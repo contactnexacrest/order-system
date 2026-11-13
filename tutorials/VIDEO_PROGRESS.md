@@ -146,6 +146,22 @@ D-353 (12 Nov 2026: the plain "*" after field labels removed from every generate
 checked against every script: no recorded video opens a generated document (they attach or name the PDF
 file only), and no narration mentions the label stars. No video is affected.
 
+D-357 (12 Nov 2026: one list of surface-finish names — Settings › Lists › surface_finish names every
+finish; "Polished" / "Mirror Finish" is now **"Natural Polish"**, "Natural/Sandblasted" → "Sandblasted",
+"Leather/Satin" → "Leather", "Brushed" added; Pricing › Specifications keeps the price only; the "More ›
+finish" box is hidden for a line picked from Products) — listed only, **no video or script changed, nothing
+re-recorded; the owner decides when the videos restart**:
+
+| Video | What now differs | Decision |
+|---|---|---|
+| B01 Part 1 (Export Executive) | New Order: after "Pick from Products" the line's **Finish** box (on camera with "Polished" selected) gives way to the note "Finish: the one chosen in the options above (Surface finish)"; the Surface finish option reads "Natural Polish". Demo line data (`_b01.js`) still writes "Polished". | Owner to decide when videos restart |
+| B01 Part 2, B02 | Order page products table / line panel: demo lines show finish "Polished" (`_b01.js`, `_b02.js` data); the side panel's More › Finish box is hidden for a picked line. | Owner to decide when videos restart |
+| A02-1, A02-2 | Demo order lines and the Supplier PO finish are "Polished" (`_a02.js`); the Settings list and Pick from Products now say "Natural Polish". | Owner to decide when videos restart |
+| C04 (Get price part) | The Surface finish choices on Get price: the base option is "Natural Polish" (was "Polished"), plus "Rock-Pitched" and "Bush-Hammered" (no price change yet). The chosen "Leather" is unchanged. | Owner to decide when videos restart |
+| D01 – D05 (buyer) | Demo lines (`_buyer.js`) show finish "Polished" on portal pages; D04's Reorder This form shows a Finish drop-down fed by the Settings list, which no longer has "Polished". | Owner to decide when videos restart |
+
+Not affected: A01, C01 – C03, C05, C06 (no finish shown or said).
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

@@ -122,6 +122,12 @@ final class SpecRepository
         )->execute(['n' => $d['name'], 'k' => $d['kind'], 'a' => $d['applies_to'], 'o' => $d['sort_order'], 'u' => $userId, 'id' => $id]);
     }
 
+    /** D-357: links a specification's options to a Settings list (only 'surface_finish' is used). */
+    public static function setListKey(int $id, ?string $listKey): void
+    {
+        Database::connection()->prepare('UPDATE spec_definitions SET list_key = :k WHERE id = :id')->execute(['k' => $listKey, 'id' => $id]);
+    }
+
     public static function setSpecActive(int $id, bool $active, int $userId): void
     {
         Database::connection()->prepare('UPDATE spec_definitions SET is_active = :a, updated_by = :u WHERE id = :id')
@@ -137,10 +143,10 @@ final class SpecRepository
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO spec_options (spec_id, product_id, name, is_base, change_type, value, thickness_mm, sort_order, is_active, updated_by)
-             VALUES (:s, :p, :n, :b, :t, :v, :mm, :o, 1, :u)'
+            'INSERT INTO spec_options (spec_id, product_id, name, is_base, change_type, value, thickness_mm, sort_order, is_active, updated_by, dropdown_option_id)
+             VALUES (:s, :p, :n, :b, :t, :v, :mm, :o, 1, :u, :dd)'
         )->execute(['s' => $d['spec_id'], 'p' => $d['product_id'] ?? null, 'n' => $d['name'], 'b' => $d['is_base'], 't' => $d['change_type'],
-            'v' => $d['value'], 'mm' => $d['thickness_mm'], 'o' => $d['sort_order'], 'u' => $userId]);
+            'v' => $d['value'], 'mm' => $d['thickness_mm'], 'o' => $d['sort_order'], 'u' => $userId, 'dd' => $d['dropdown_option_id'] ?? null]);
         return (int) $pdo->lastInsertId();
     }
 

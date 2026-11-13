@@ -165,6 +165,7 @@ final class ProductSpecs
             $out[] = [
                 'id' => $sid, 'name' => (string) $s['name'], 'kind' => (string) $s['kind'], 'applies_to' => $s['applies_to'],
                 'source' => (string) $s['source'], 'hidden' => $hidden, 'changed' => $changed || $hidden, 'options' => $opts,
+                'list_key' => $s['list_key'] ?? null, // D-357: 'surface_finish' = the names come from Settings › Lists
             ];
         }
         return $out;

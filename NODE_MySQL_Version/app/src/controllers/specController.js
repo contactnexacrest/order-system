@@ -6,6 +6,7 @@ const productCategoryRepository = require('../repositories/productCategoryReposi
 const productRepository = require('../repositories/productRepository');
 const specRepository = require('../repositories/specRepository');
 const productSpecs = require('../services/productSpecs');
+const surfaceFinishList = require('../services/surfaceFinishList');
 const pricingService = require('../services/pricingService');
 
 /**
@@ -78,6 +79,7 @@ async function categoryData(categoryId) {
     for (const o of sp.options) {
       o.used = await specRepository.optionUsed(Number(o.id));
       o.change_label = productSpecs.changeLabel(String(o.change_type), valueOrNull(o.value));
+      o.price_unset = surfaceFinishList.priceText(o)[1]; // D-357: no price change set yet
     }
     sp.forms_label = productSpecs.formsLabel(sp.applies_to);
     sp.applies_list = productSpecs.splitForms(sp.applies_to);
@@ -98,6 +100,14 @@ async function addSpec(req, res) {
   d.category_id = categoryId;
   const newId = await specRepository.createSpec(d, uid(req));
   await auditLogRepository.log(uid(req), 'SPEC_ADDED', 'spec_definitions', newId, null, null, `${d.name} (category #${categoryId})`);
+  // D-357: a category's "Surface finish" takes its options from Settings › Lists › surface_finish.
+  if (String(d.name).trim().toLowerCase() === 'surface finish') {
+    await specRepository.setListKey(newId, surfaceFinishList.LIST_KEY);
+    await surfaceFinishList.sync([], uid(req));
+    flash.set(req, 'success', `Specification "${d.name}" added with the finishes of Settings › Lists › surface_finish, at no price change — set each finish's price below.`);
+    await go(res, `/pricing/specifications?category=${categoryId}&edit=${newId}#spec-${newId}`);
+    return;
+  }
   flash.set(req, 'success', `Specification "${d.name}" added — add its options below.`);
   await go(res, `/pricing/specifications?category=${categoryId}&edit=${newId}#spec-${newId}`);
 }
@@ -184,6 +194,12 @@ async function addOption(req, res) {
   }
   const [d, errors] = productSpecs.readOptionForm(req.body || {});
   const to = productOnly ? `/products/${spec.product_id}/specifications` : `/pricing/specifications?category=${spec.category_id}&edit=${spec.id}#spec-${spec.id}`;
+  if (surfaceFinishList.isLinkedSpec(spec)) {
+    // D-357: finish names are added in Settings › Lists; they appear here at no price change.
+    flash.set(req, 'error', 'Add a surface finish in Settings › Lists › surface_finish — it appears here at once with no price change; then set its price here.');
+    await go(res, to);
+    return;
+  }
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
     await go(res, to);
@@ -213,7 +229,10 @@ async function updateOption(req, res) {
     refuseProduct(req, res, `/products/${ownerProduct}/specifications`);
     return;
   }
-  const [d, errors] = productSpecs.readOptionForm(req.body || {});
+  // D-357: a linked option's name comes from Settings › Lists — only its price is saved here.
+  const post = { ...(req.body || {}) };
+  if (o.dropdown_option_id) post.name = String(o.name);
+  const [d, errors] = productSpecs.readOptionForm(post);
   const to = ownerProduct !== null ? `/products/${ownerProduct}/specifications` : `/pricing/specifications?category=${spec.category_id}&edit=${spec.id}#spec-${spec.id}`;
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
@@ -235,6 +254,11 @@ async function toggleOption(req, res) {
   if (!o || !spec || o.product_id !== null) {
     flash.set(req, 'error', 'That option no longer exists.');
     await go(res, '/pricing/specifications');
+    return;
+  }
+  if (o.dropdown_option_id) {
+    flash.set(req, 'error', `"${o.name}" is switched on or off in Settings › Lists › surface_finish (D-357) — the one list of finish names.`);
+    await go(res, `/pricing/specifications?category=${spec.category_id}&edit=${spec.id}#spec-${spec.id}`);
     return;
   }
   const active = Number(o.is_active) !== 1;
@@ -259,6 +283,11 @@ async function deleteOption(req, res) {
     return;
   }
   const to = ownerProduct !== null ? `/products/${ownerProduct}/specifications` : `/pricing/specifications?category=${spec.category_id}&edit=${spec.id}#spec-${spec.id}`;
+  if (o.dropdown_option_id && o.product_id === null) {
+    flash.set(req, 'error', `"${o.name}" comes from Settings › Lists › surface_finish (D-357) — switch it off there.`);
+    await go(res, to);
+    return;
+  }
   if (await specRepository.optionUsed(Number(o.id))) {
     await specRepository.setOptionActive(Number(o.id), false, uid(req));
     flash.set(req, 'success', `"${o.name}" has been used on orders or price requests, so it was deactivated instead of deleted.`);
@@ -473,6 +502,17 @@ async function addProductOption(req, res) {
     flash.set(req, 'error', errors.join(' '));
     await go(res, `/products/${p.id}/specifications?edit=${spec.id}`);
     return;
+  }
+  if (surfaceFinishList.isLinkedSpec(spec)) {
+    // D-357: a product's own finish is one of the Settings list's names.
+    const row = await surfaceFinishList.settingsRowByName(d.name);
+    if (!row) {
+      flash.set(req, 'error', `"${d.name}" is not in Settings › Lists › surface_finish — add it there first (the one list of finish names).`);
+      await go(res, `/products/${p.id}/specifications?edit=${spec.id}`);
+      return;
+    }
+    d.name = [...String(row.option_value)].slice(0, surfaceFinishList.MAX_NAME).join('');
+    d.dropdown_option_id = Number(row.id);
   }
   d.spec_id = Number(spec.id);
   d.product_id = Number(p.id);

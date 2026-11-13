@@ -36,14 +36,20 @@
             </fieldset>
             {% if canManage %}<div><button type="submit" class="btn-sm">Save specification</button></div>{% endif %}
           </form>
+          {% set linked = s.list_key == 'surface_finish' %}{# D-357: the names come from Settings › Lists › surface_finish #}
+          {% if linked %}<p class="notice notice-info small" data-testid="finish-linked-note">Price only here — the names, their order and on/off come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a>. A finish added in Settings appears here automatically at no price change; a finish switched off in Settings disappears from Pick from Products.</p>{% endif %}
           <table class="list">
-            <tr><th>Option</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
+            <tr><th>{{ 'Option (name from Settings › Lists)' if linked else 'Option' }}</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
             {% for o in s.options %}
               <tr>
                 <td colspan="5">
                   <form method="post" action="/pricing/spec-options/{{ o.id }}" class="inline-form">
                     {{ csrf() }}
+                    {% if o.dropdown_option_id %}
+                      <input type="text" name="name" readonly class="input-readonly" maxlength="80" value="{{ o.name }}" aria-label="Option name (from Settings › Lists)" placeholder="e.g. Natural Polish"> <a class="small" href="/admin/dropdown-options#list-surface_finish">Rename in Settings › Lists</a>
+                    {% else %}
                     <input type="text" name="name" required maxlength="80" value="{{ o.name }}" aria-label="Option name" placeholder="e.g. Leather"{{ ro }}>
+                    {% endif %}
                     <select name="change_type" aria-label="Change type"{{ ro }}>{% for k, l in changeTypes %}<option value="{{ k }}"{% if o.change_type == k %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
                     <input type="number" name="value" step="0.0001" value="{{ (o.value | string) | replace(r/0+$/, '') | replace(r/\.$/, '') if o.value !== null else '' }}" aria-label="Value" placeholder="e.g. 4.00 or -8"{{ ro }}>
                     <input type="number" name="thickness_mm" min="1" max="2000" step="1" value="{{ o.thickness_mm if o.thickness_mm !== null else '' }}" aria-label="Thickness in mm" placeholder="e.g. 30"{{ ro }}>
@@ -52,15 +58,17 @@
                     {% if canManage %}<button type="submit" class="btn-sm">Save</button>{% endif %}
                   </form>
                 </td>
-                <td>{% if o.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
-                <td>{% if canManage %}
+                <td>{% if o.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}{% if o.dropdown_option_id and o.price_unset %} <span class="tag tag-gold">no price change yet</span>{% endif %}</td>
+                <td>{% if o.dropdown_option_id %}<small class="muted">on / off in Settings › Lists</small>{% elif canManage %}
                   <form method="post" action="/pricing/spec-options/{{ o.id }}/active" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">{{ 'Deactivate' if o.is_active == 1 else 'Activate' }}</button></form>
                   {% if not o.used %}<form method="post" action="/pricing/spec-options/{{ o.id }}/delete" style="display:inline" data-confirm="Remove this option?">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form>{% endif %}
                 {% endif %}</td>
               </tr>
             {% endfor %}
           </table>
-          {% if canManage %}
+          {% if canManage and linked %}
+            <p class="small muted">To add a finish, add it in <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a> — it appears here with no price change; then set its price above.</p>
+          {% elif canManage %}
             <form method="post" action="/pricing/specifications/{{ s.id }}/options" class="field-grid">
               {{ csrf() }}
               <label>New option *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>

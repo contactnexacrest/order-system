@@ -733,6 +733,12 @@ For a second size, use **Duplicate** on the line and change the sizes and price.
   1 Product · 2 Options · 3 Size and quantity · 4 Price (with the reference box). The
   description, Dimensions text, finish, line type, HS / SAC code and category are under
   **More**. Charges and services are listed below the products in the same style.
+- **Finish (D-357).** A line picked from Products takes its finish from the **Surface
+  finish** chosen in step 2 (Options); the Finish box under **More** is hidden for it
+  ("Finish: the one chosen in step 2, Options › Surface finish."). On the New Order
+  form it is the same: pick a product and the Finish box gives way to the Surface
+  finish option. A line typed by hand keeps the Finish box. Both use the one list of
+  finish names in Settings › Lists › surface_finish.
 - **Duplicate** makes an exact copy right below, marked "copy of line N" — every
   option, the size, product, material and price-request link. The MD's approval is not
   copied: the copy is checked at once and, if below your lowest price, goes to the MD.

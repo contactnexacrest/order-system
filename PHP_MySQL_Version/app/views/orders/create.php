@@ -160,7 +160,9 @@
           <label>Width (cm)<input type="text" inputmode="decimal" name="product_piece_width_cm[]" data-piece-size="width" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_width_cm'][$__i] ?? '')) ?>" placeholder="e.g. 80"></label>
           <label>Thickness (cm)<input type="text" inputmode="decimal" name="product_piece_thickness_cm[]" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_thickness_cm'][$__i] ?? '')) ?>" placeholder="e.g. 13"></label>
           <label>Dimensions <small class="muted">(prints on the documents)</small><input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
-          <label>Finish
+          <?php // D-357: a line picked from Products takes its finish from the Surface finish option above — this box is for lines typed by hand. ?>
+          <p class="muted small finish-from-option" data-finish-note hidden>Finish: the one chosen in the options above (Surface finish).</p>
+          <label data-finish-box>Finish
             <select name="product_finish[]">
               <?php $__finishVal = (string) ($old['product_finish'][$__i] ?? ''); ?>
               <option value="">—</option>
@@ -313,6 +315,9 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   clone.querySelectorAll('.qty-auto').forEach(function (el) { el.readOnly = false; el.classList.remove('qty-auto'); });
   clone.querySelectorAll('.qty-worked-out, .line-pieces-summary, .floor-note').forEach(function (el) { el.textContent = ''; });
   clone.querySelectorAll('.line-pieces-summary').forEach(function (el) { el.hidden = true; });
+  // D-357: a new row is typed by hand until a product is picked — the Finish box shows again.
+  clone.querySelectorAll('[data-finish-box]').forEach(function (el) { el.hidden = false; });
+  clone.querySelectorAll('[data-finish-note]').forEach(function (el) { el.hidden = true; });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

@@ -161,7 +161,7 @@ describe('D-256 pricing usability', () => {
     expect(w.breakdown).toContainEqual({ label: 'Exact price for 30 mm · Leather', change: 'used' });
     expect(w.breakdown).toContainEqual({ label: 'Leather (surface finish)', change: 'Included (in the exact price)' });
     expect((await price(SQM)).build.raw.cost).toBeCloseTo(61.25 * 0.92 * 0.98, 4);
-    const polished = await price({ 'Grade / quality': 'Premium', Thickness: '30 mm', 'Surface finish': 'Polished' });
+    const polished = await price({ 'Grade / quality': 'Premium', Thickness: '30 mm', 'Surface finish': 'Natural Polish' });
     expect(polished.exact).toBeNull();
     expect(Number(polished.supplier_inr)).toBe(3200);
   });

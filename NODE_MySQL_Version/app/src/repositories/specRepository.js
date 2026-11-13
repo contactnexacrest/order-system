@@ -76,6 +76,11 @@ async function updateSpec(id, d, userId) {
     { n: d.name, k: d.kind, a: d.applies_to, o: d.sort_order, u: userId, id });
 }
 
+/** D-357: links a specification's options to a Settings list (only 'surface_finish' is used). */
+async function setListKey(id, listKey) {
+  await db.execute('UPDATE spec_definitions SET list_key = :k WHERE id = :id', { k: listKey ?? null, id });
+}
+
 async function setSpecActive(id, active, userId) {
   await db.execute('UPDATE spec_definitions SET is_active = :a, updated_by = :u WHERE id = :id', { a: active ? 1 : 0, u: userId, id });
 }
@@ -86,9 +91,9 @@ async function deleteSpec(id) {
 
 async function createOption(d, userId) {
   const r = await db.execute(
-    `INSERT INTO spec_options (spec_id, product_id, name, is_base, change_type, value, thickness_mm, sort_order, is_active, updated_by)
-     VALUES (:s, :p, :n, :b, :t, :v, :mm, :o, 1, :u)`,
-    { s: d.spec_id, p: d.product_id ?? null, n: d.name, b: d.is_base, t: d.change_type, v: d.value ?? null, mm: d.thickness_mm ?? null, o: d.sort_order, u: userId }
+    `INSERT INTO spec_options (spec_id, product_id, name, is_base, change_type, value, thickness_mm, sort_order, is_active, updated_by, dropdown_option_id)
+     VALUES (:s, :p, :n, :b, :t, :v, :mm, :o, 1, :u, :dd)`,
+    { s: d.spec_id, p: d.product_id ?? null, n: d.name, b: d.is_base, t: d.change_type, v: d.value ?? null, mm: d.thickness_mm ?? null, o: d.sort_order, u: userId, dd: d.dropdown_option_id ?? null }
   );
   return Number(r.insertId);
 }
@@ -159,6 +164,7 @@ async function specUsed(specId) {
 }
 
 module.exports = {
+  setListKey,
   systemCategoryId, categorySpecs, productOnlySpecs, findSpec, findOption, optionsFor, hiddenSpecs, optionOverrides,
   createSpec, updateSpec, setSpecActive, deleteSpec, createOption, updateOption, clearBase, setOptionActive, deleteOption,
   setSpecHidden, setOptionOverride, resetSpecForProduct, setProductFields, optionUsed, specUsed,

@@ -874,6 +874,25 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   forward without touching any status already recorded against it;
   deleting one outright only works if no order has ever recorded a status
   against it, otherwise the screen asks you to deactivate instead.
+- **Surface finish — the one list of finish names (D-357, 12 Nov 2026).**
+  Settings › Lists › **surface_finish** is the only place to name a finish:
+  its name, sort order, default and Active tick. Pick from Products and
+  Pricing › Specifications › Surface finish take their names from it;
+  Pricing keeps only each finish's price change.
+  - The list shows "Used in: …" and a read-only column **Price change (from
+    Pricing › Specifications)** — base price, +1.00 USD / m², or "no price
+    change yet" with a link "set it in Pricing › Specifications".
+  - **Add a finish** here: it appears in Pick from Products and in Pricing ›
+    Specifications at once, with no price change. Then set its price there.
+  - **Untick Active**: the finish disappears from Pick from Products.
+  - **Rename** a finish and press Save: the new name reaches Pick from
+    Products, Pricing › Specifications and the lines of orders whose
+    Quotation is not approved yet. The page then says, e.g. "Saved.
+    "Polished" is now "Natural Polish" everywhere: … 4 lines on 2 draft
+    orders (quotation not yet approved)" and "Not changed: 9 orders with an
+    approved quotation or later, and every document already issued — they
+    keep "Polished"." Every rename and every changed line is in the audit log.
+  - A finish name is at most 80 characters and can be in the list only once.
 - **Dropdown Option Lists** (`/admin/dropdown-options`) — the admin screen
   for `dropdown_options`, the generic small-option-list table several
   dropdowns elsewhere in the app already read from (Container Type,

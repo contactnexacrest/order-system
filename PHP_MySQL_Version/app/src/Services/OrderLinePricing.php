@@ -429,6 +429,8 @@ final class OrderLinePricing
     {
         Database::connection()->prepare('UPDATE order_products SET spec_selection = :s, price_request_id = :pr WHERE id = :id')
             ->execute(['s' => $selection !== null ? json_encode((object) $selection) : null, 'pr' => $priceRequestId, 'id' => $lineId]);
+        // D-357: a line picked from Products takes its finish from the chosen Surface finish option.
+        SurfaceFinishList::applyToLine($lineId);
     }
 
     /** D-255: a line's options as stored (null = none). */
@@ -1158,7 +1160,8 @@ final class OrderLinePricing
             $from = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $cbmFrom;
             $specs = [];
             foreach (ProductSpecs::offered($product) as $s) {
-                $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'thickness' => $s['kind'] === 'thickness', 'cbm_from' => $from, 'options' => array_map(static fn (array $o): array => [
+                // D-357: 'finish' — the Surface finish (names from Settings › Lists); a picked line takes its finish from it.
+                $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'thickness' => $s['kind'] === 'thickness', 'finish' => ($s['list_key'] ?? null) === SurfaceFinishList::LIST_KEY, 'cbm_from' => $from, 'options' => array_map(static fn (array $o): array => [
                     'id' => $o['id'], 'name' => $o['name'], 'base' => $o['is_base'],
                     'cbm' => $s['kind'] === 'thickness' && ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $from)),
                     'mm' => $s['kind'] === 'thickness' ? $o['thickness_mm'] : null,

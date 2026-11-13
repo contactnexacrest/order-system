@@ -147,6 +147,7 @@ The complete description of the NexaCrest export order system: what it is for, h
     - [Global settings and per-product overrides](#global-settings-and-per-product-overrides)
     - [Who sees what](#who-sees-what)
     - [Specifications and options (D-255)](#specifications-and-options-d-255)
+    - [One list of surface-finish names (D-357)](#one-list-of-surface-finish-names-d-357)
     - [CBM at 50 mm and above](#cbm-at-50-mm-and-above)
     - [Exact supplier prices (D-256)](#exact-supplier-prices-d-256)
     - ["Included in base price" (D-256)](#included-in-base-price-d-256)
@@ -180,6 +181,7 @@ The complete description of the NexaCrest export order system: what it is for, h
     - [Team incentive (incentive_settings, incentive_roles; Finance & accounts › Team incentive settings, MD)](#team-incentive-incentive_settings-incentive_roles-finance--accounts--team-incentive-settings-md)
     - [Associate commission and TDS (incentive_settings)](#associate-commission-and-tds-incentive_settings)
     - [Divisions (divisions, division_modules, division_settings; Settings › Divisions, MD, manage_divisions)](#divisions-divisions-division_modules-division_settings-settings--divisions-md-manage_divisions)
+    - [Lists (dropdown_options, Settings › Lists, manage_dropdown_options)](#lists-dropdown_options-settings--lists-manage_dropdown_options)
     - [GST and duty rates](#gst-and-duty-rates)
     - [Document copies clean-up (company_settings, category document_cleanup)](#document-copies-clean-up-company_settings-category-document_cleanup)
     - [Watermarks and DOCX](#watermarks-and-docx)
@@ -3515,6 +3517,24 @@ If the options bring the cost to 0 or below, the engine refuses.
 
 A product follows its category. It can hide a specification or option, type its own value (empty = follow the category, so later category changes flow through), or add options or whole specifications for itself. That needs the permission "Manage a product's specifications" (Admin and MD at seed). Used options can only be deactivated.
 
+#### One list of surface-finish names (D-357)
+
+Owner decision D-357 (12 Nov 2026, owner confirm 1 + confirm 2; mockup approved). **Settings › Lists › surface_finish** (`dropdown_options`, `list_key = 'surface_finish'`) is the one place to **name** a finish: name, sort order, default and on/off. **Pricing › Specifications › Surface finish** keeps the **price** only (base, change type, value); there each name is read-only with a "Rename in Settings › Lists" link, and Deactivate / Remove / "+ Add option" are replaced by notes pointing to Settings. Code: `SurfaceFinishList` (PHP `app/src/Services/SurfaceFinishList.php`, Node `src/services/surfaceFinishList.js`).
+
+| Data | Meaning |
+|---|---|
+| `spec_definitions.list_key` | `'surface_finish'` on the Surface finish specification of a category (the only linked specification; NULL on every other). A category specification added later with the name "Surface finish" is linked at once and gets every finish at no price change. |
+| `spec_options.dropdown_option_id` | The Settings row the option is. Name and sort order always follow that row; on/off follows it when it is switched in Settings. |
+
+- **Added in Settings** → an option in every linked specification with no price change (change type none); the Settings page shows "no price change yet — set it in Pricing › Specifications".
+- **Switched off in Settings** → the linked options are switched off, so the finish leaves Pick from Products (saved lines keep it, shown as "no longer offered").
+- **Renamed in Settings** (on save) → the linked options are renamed, and `order_products.finish` changes on lines of orders whose first Quotation is not approved yet (`orders.prices_fixed_at IS NULL`, the D-342 rule) whose finish is exactly the old name. Orders with an approved Quotation or later, and every `documents` row and issued file, keep the old name. Audit: `DROPDOWN_OPTION_UPDATED`, `SURFACE_FINISH_RENAMED` (with the counts) and one `ORDER_LINE_FINISH_RENAMED` per line. The page shows: "Saved. "Polished" is now "Natural Polish" everywhere: Pick from Products, Pricing › Specifications, and N lines on M draft orders (quotation not yet approved)." and "Not changed: K orders with an approved quotation or later, and every document already issued — they keep "Polished"."
+- A finish name is at most 80 characters and appears once in the list (any letter case); otherwise nothing is saved.
+- The Settings list shows "Used in: Pick from Products …, order lines, the Supplier PO, the buyer's quotation form and every document" and a read-only column "Price change (from Pricing › Specifications)" (base price / +1.00 USD / m² / no price change yet), one entry per category when more than one category has the specification.
+- **Order lines.** A line picked from Products takes its finish from its Surface finish option every time it is saved (`OrderLinePricing::saveSelection()` and the line update call `SurfaceFinishList::applyToLine()`); the "More › finish" box is hidden for such a line (New Order form and order page line panel; the picker data carries `finish: true` on the linked specification). A line typed by hand keeps the box, fed from the same Settings list.
+- **A product's own option** on the Surface finish specification must be a Settings name (it is linked to that row); the product page points to Settings instead of offering a free-text option there.
+- **Merge on a live site:** `docs/migrations/2026-11-12j-surface-finish-one-list.sql` (see `docs/migrations/README.md`; it also handles a base finish renamed "Mirror Finish"). Seed: Natural Polish (base, default) 1, Honed +1.00 2, Flamed +2.00 3, Sandblasted +3.00 4, Leather +4.00 5, Brushed +4.50 6, Rock-Pitched 7 and Bush-Hammered 8 (no price change), all USD per m².
+
 #### CBM at 50 mm and above
 
 From **50 mm** (setting `cbm_from_mm`, default 50; a product may set its own `cbm_from_mm`) the price is **per CBM** and starts from the product's separate **per-CBM supplier price** (`price_basis = 'cbm'`, `is_cbm_primary = 1`). On a CBM price:
@@ -4496,6 +4516,10 @@ EXP Export is active; DOM, MTT, IMP are planned. The switcher appears only when 
 | DOM | `dom_default_gst_rate` 18, `dom_eway_threshold_inr` 50000, `dom_e_invoice_applicable` 0, `dom_payment_terms_days` 30, pricing `pricing_fx_rate` 1.0000, incentive `program_enabled` 0 |
 | IMP | `imp_default_bcd_pct` 10, `imp_default_sws_pct` 10, `imp_default_igst_pct` 18, `imp_margin_pct` 20, `imp_lc_bank`, `imp_default_cha` (empty), pricing rate 1.0000, incentive off; module `import_stock` |
 | MTT | `mtt_max_months_total` 9, `mtt_max_outlay_months` 4, `mtt_advance_limit_usd` 500000, `mtt_usd_inr_rate` 84.0000, `mtt_bank_documents` (7-item list), `mtt_ad_bank_approval` (empty), incentive off; module `merchant_trade` |
+
+#### Lists (`dropdown_options`, Settings › Lists, `manage_dropdown_options`)
+
+Small option lists (container type, CoO type, unit, GST rate, surface finish …), one bulk-save form per list; options are deactivated, never deleted. **surface_finish** is the one list of finish names (D-357, §7.1 "One list of surface-finish names"): a rename there reaches Pick from Products, Pricing › Specifications and the lines of orders whose Quotation is not approved yet; it shows "Used in: …" and the read-only price column.
 
 #### GST and duty rates
 

@@ -321,6 +321,8 @@ function selectionInput(raw) {
 async function saveSelection(lineId, selection, priceRequestId) {
   await db.execute('UPDATE order_products SET spec_selection = :s, price_request_id = :pr WHERE id = :id',
     { s: selection !== null && selection !== undefined ? JSON.stringify(selection) : null, pr: priceRequestId ?? null, id: lineId });
+  // D-357: a line picked from Products takes its finish from the chosen Surface finish option.
+  await require('./surfaceFinishList').applyToLine(lineId);
 }
 
 /** D-255: a line's options as stored (null = none). */
@@ -872,7 +874,8 @@ async function pickerSpecs(pickerProducts) {
     if (!product) continue;
     const from = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : cbmFrom;
     const specs = (await productSpecs.offered(product)).map((s) => ({
-      id: s.id, name: s.name, thickness: s.kind === 'thickness', cbm_from: from, options: s.options.map((o) => ({
+      // D-357: 'finish' — the Surface finish (names from Settings › Lists); a picked line takes its finish from it.
+      id: s.id, name: s.name, thickness: s.kind === 'thickness', finish: (s.list_key ?? null) === 'surface_finish', cbm_from: from, options: s.options.map((o) => ({
         id: o.id, name: o.name, base: o.is_base,
         cbm: s.kind === 'thickness' && (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= from)),
         mm: s.kind === 'thickness' ? (o.thickness_mm ?? null) : null,

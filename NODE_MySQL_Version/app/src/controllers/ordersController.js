@@ -1474,6 +1474,8 @@ async function updateProduct(req, res) {
     // A changed product or options: the line no longer follows its price request.
     await olp.saveSelection(productId, specSel, null);
   }
+  // D-357: a picked line's finish is its chosen Surface finish option (the "More › finish" box is hidden for it).
+  await require('../services/surfaceFinishList').applyToLine(productId);
   await orderProductRepository.setPieceSize(productId, lineSize);
   await orderProductRepository.setAsPerAnnexure(productId, perAnnexure);
   if (piecesForm) await orderProductRepository.setPieces(productId, pieces, sizeNote);
@@ -1980,6 +1982,16 @@ async function show(req, res) {
       production: await orderProductionRepository.find(orderId),
       units: await lookupRepository.dropdownOptions('unit'),
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
+      // D-357: lines picked from Products whose finish is their Surface finish option (the "More › finish" box is hidden).
+      finishFromOption: await (async () => {
+        const sfl = require('../services/surfaceFinishList');
+        const olp = require('../services/orderLinePricing');
+        const out = {};
+        for (const p of await orderProductRepository.forOrder(orderId)) {
+          if ((await sfl.finishForSelection(p.catalog_product_id ? Number(p.catalog_product_id) : null, olp.lineSelection(p))) !== null) out[p.id] = true;
+        }
+        return out;
+      })(),
       gstRates: await lookupRepository.dropdownOptions('gst_rate'),
       dimensionalTolerances: await lookupRepository.dropdownOptions('dimensional_tolerance'),
       supplierFactoryAddressesBySupplier,

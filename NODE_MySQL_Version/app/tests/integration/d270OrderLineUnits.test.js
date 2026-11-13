@@ -35,7 +35,7 @@ describe('D-270 to D-273 order lines in any unit, full duplicate, products summa
   let client;
   const pad = (n) => String(n).padStart(2, '0');
   const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const THICK = { 'Grade / quality': 'Standard', 'Surface finish': 'Polished' };
+  const THICK = { 'Grade / quality': 'Standard', 'Surface finish': 'Natural Polish' };
 
   async function supplier(inr, basis) {
     const s = await productSupplierRepository.create({ product_id: product, supplier_name: `Test Quarry ${basis}`, location: 'Test location', fob_source: 'direct', fob_value: inr, is_primary: basis === 'unit' ? 1 : 0 }, admin);

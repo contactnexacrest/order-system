@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const dropdownOptionRepository = require('../repositories/dropdownOptionRepository');
+const surfaceFinishList = require('../services/surfaceFinishList');
 
 /**
  * Port of App\Controllers\DropdownOptionController — admin screen for
@@ -14,9 +15,35 @@ const dropdownOptionRepository = require('../repositories/dropdownOptionReposito
  */
 
 async function index(req, res) {
+  // D-357: the surface_finish list is the one list of finish names — its price column and
+  // the box shown after a save that renamed a finish.
+  const finishSaved = req.session ? req.session._finishSaved : null;
+  if (req.session) delete req.session._finishSaved;
   res.renderView('dropdown_options/index', {
     grouped: await dropdownOptionRepository.allGrouped(true),
+    finishPrices: await surfaceFinishList.priceColumn(),
+    finishSaved: finishSaved && typeof finishSaved === 'object' ? finishSaved : null,
+    finishListKey: surfaceFinishList.LIST_KEY,
+    finishMaxName: surfaceFinishList.MAX_NAME,
   }, 'layout/base');
+}
+
+/**
+ * D-357: a finish name is also an option name in Pricing › Specifications — up to 80
+ * characters, and each name once in the list (any letter case).
+ */
+function finishNameError(names, others) {
+  const seen = new Set();
+  for (const raw of [...others, ...names]) {
+    const n = String(raw).trim();
+    if ([...n].length > surfaceFinishList.MAX_NAME) {
+      return `A surface finish name can be at most ${surfaceFinishList.MAX_NAME} characters ("${[...n].slice(0, 30).join('')}…").`;
+    }
+    const k = n.toLowerCase();
+    if (seen.has(k)) return `"${n}" is in the surface_finish list twice — each finish name can be used once.`;
+    seen.add(k);
+  }
+  return null;
 }
 
 async function create(req, res) {
@@ -29,11 +56,25 @@ async function create(req, res) {
   }
 
   const existing = (await dropdownOptionRepository.allGrouped(true))[listKey] || [];
+  // D-357: a finish name is also the option name in Pricing › Specifications (up to 80 characters, once).
+  if (listKey === surfaceFinishList.LIST_KEY) {
+    const error = finishNameError([value], existing.map((o) => o.option_value));
+    if (error !== null) {
+      flash.set(req, 'error', error);
+      res.redirect('/admin/dropdown-options');
+      return;
+    }
+  }
   const nextSortOrder = existing.length > 0 ? Math.max(...existing.map((o) => o.sort_order)) + 1 : 1;
 
   const id = await dropdownOptionRepository.create(listKey, value, nextSortOrder);
   await auditLogRepository.log(req.user.id, 'DROPDOWN_OPTION_ADDED', 'dropdown_options', id, null, null, `${listKey}: ${value}`);
-  flash.set(req, 'success', `"${value}" added to ${listKey}.`);
+  if (listKey === surfaceFinishList.LIST_KEY) {
+    await surfaceFinishList.sync([], req.user.id);
+    flash.set(req, 'success', `"${value}" added to ${listKey} — it is in Pick from Products and Pricing › Specifications now, with no price change; set its price in Pricing › Specifications.`);
+  } else {
+    flash.set(req, 'success', `"${value}" added to ${listKey}.`);
+  }
   res.redirect('/admin/dropdown-options');
 }
 
@@ -64,8 +105,18 @@ async function update(req, res) {
       return;
     }
   }
+  if (listKey === surfaceFinishList.LIST_KEY) {
+    const error = finishNameError(rows.map((row) => String(valueInput[row.id] ?? row.option_value).trim()), []);
+    if (error !== null) {
+      flash.set(req, 'error', `${error} Nothing was saved.`);
+      res.redirect('/admin/dropdown-options');
+      return;
+    }
+  }
 
   let changedCount = 0;
+  const renames = [];
+  const activeChanged = [];
   for (const row of rows) {
     const id = row.id;
     const newValue = String(valueInput[id] ?? row.option_value).trim();
@@ -75,9 +126,11 @@ async function update(req, res) {
     if (newValue !== row.option_value || newSortOrder !== row.sort_order) {
       await dropdownOptionRepository.update(id, newValue, newSortOrder);
       await auditLogRepository.log(req.user.id, 'DROPDOWN_OPTION_UPDATED', 'dropdown_options', id, 'option_value', row.option_value, newValue);
+      if (newValue !== row.option_value) renames.push([id, String(row.option_value), newValue]);
       changedCount++;
     }
     if (newActive !== row.is_active) {
+      activeChanged.push(id);
       await dropdownOptionRepository.toggleActive(id);
       await auditLogRepository.log(req.user.id, newActive ? 'DROPDOWN_OPTION_REACTIVATED' : 'DROPDOWN_OPTION_DEACTIVATED', 'dropdown_options', id, 'is_active', String(row.is_active), String(newActive));
       changedCount++;
@@ -91,6 +144,26 @@ async function update(req, res) {
       await dropdownOptionRepository.setDefault(defaultId, listKey);
       await auditLogRepository.log(req.user.id, 'DROPDOWN_OPTION_DEFAULT_CHANGED', 'dropdown_options', defaultId, 'is_default', String(currentDefault), String(defaultId));
       changedCount++;
+    }
+  }
+
+  // D-357: the Surface finish options in Pricing › Specifications follow; a rename reaches
+  // the order lines of orders whose quotation is not approved yet.
+  if (listKey === surfaceFinishList.LIST_KEY && changedCount > 0) {
+    await surfaceFinishList.sync(activeChanged, req.user.id);
+    const box = { messages: [], renamed: {} };
+    for (const [id, old, neu] of renames) {
+      const r = await surfaceFinishList.renameOnDraftOrders(old, neu, req.user.id);
+      await auditLogRepository.log(req.user.id, 'SURFACE_FINISH_RENAMED', 'dropdown_options', id, 'option_value', old, neu,
+        `D-357: renamed everywhere — Pick from Products, Pricing › Specifications, ${r.lines} line(s) on ${r.orders} draft order(s); `
+        + `${r.kept_orders} order(s) with an approved quotation or later and every issued document keep the old name.`);
+      box.messages.push(surfaceFinishList.renameMessage(old, neu, r));
+      box.renamed[id] = old;
+    }
+    if (box.messages.length) {
+      req.session._finishSaved = box;
+      res.redirect(`/admin/dropdown-options#list-${listKey}`);
+      return;
     }
   }
 

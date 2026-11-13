@@ -105,6 +105,9 @@ foreach ($categories as $__c) {
               <?php endforeach; ?>
             </table>
           <?php endif; ?>
+          <?php if (($s['list_key'] ?? null) === \App\Services\SurfaceFinishList::LIST_KEY): // D-357 ?>
+          <p class="small muted">The finishes come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a> — add or rename a finish there; change its price for this product above.</p>
+          <?php else: ?>
           <form method="post" action="/products/<?= (int) $product['id'] ?>/specifications/<?= (int) $s['id'] ?>/options" class="field-grid">
             <?= Csrf::field() ?>
             <label>Add an option for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
@@ -115,6 +118,7 @@ foreach ($categories as $__c) {
             <label class="inline"><input type="checkbox" name="is_base" value="1"> base option</label>
             <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
           </form>
+          <?php endif; ?>
         </td></tr>
       <?php endif; ?>
     <?php endforeach; ?>

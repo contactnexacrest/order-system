@@ -88,6 +88,9 @@
               {% endfor %}
             </table>
           {% endif %}
+          {% if s.list_key == 'surface_finish' %}{# D-357 #}
+          <p class="small muted">The finishes come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a> — add or rename a finish there; change its price for this product above.</p>
+          {% else %}
           <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/options" class="field-grid">
             {{ csrf() }}
             <label>Add an option for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
@@ -98,6 +101,7 @@
             <label class="inline"><input type="checkbox" name="is_base" value="1"> base option</label>
             <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
           </form>
+          {% endif %}
         </td></tr>
       {% endif %}
     {% endfor %}

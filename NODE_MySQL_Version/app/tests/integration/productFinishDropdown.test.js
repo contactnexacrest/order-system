@@ -54,7 +54,7 @@ describe('Product Finish dropdown (90-item backlog "product Finish dropdown")', 
     const orderId = await createTestOrder(await createTestClient());
     await stageGateService.passAndUnlockNext(orderId, 1, null);
     await stageGateService.passAndUnlockNext(orderId, 2, null);
-    await orderProductRepository.add(orderId, 1, 'Granite Slab', null, 'Polished', '10', false, 'PCS', '100', '68022310');
+    await orderProductRepository.add(orderId, 1, 'Granite Slab', null, 'Natural Polish', '10', false, 'PCS', '100', '68022310');
 
     const res = await staffAgent.get(`/orders/${orderId}`);
     expect(res.status).toBe(200);
@@ -78,7 +78,7 @@ describe('Product Finish dropdown (90-item backlog "product Finish dropdown")', 
     const clientId = await createTestClient(email);
     await createTestClientLogin(clientId, 'JestFinishTest123!');
     const orderId = await createTestOrder(clientId);
-    await orderProductRepository.add(orderId, 1, 'Granite Slab', null, 'Polished', '10', false, 'PCS', '100', '68022310');
+    await orderProductRepository.add(orderId, 1, 'Granite Slab', null, 'Natural Polish', '10', false, 'PCS', '100', '68022310');
 
     const clientAgent = request.agent(app);
     const loginPage = await clientAgent.get('/client/login');

@@ -198,7 +198,10 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
           <div class="kv-grid">
             <label>Description *<input type="text" name="description" value="<?= htmlspecialchars((string) ($__p['description'] ?? '')) ?>" required placeholder="e.g. Absolute black granite — Premium, Polished"></label>
             <label>Dimensions <small class="muted">(prints on the documents — filled from the three sizes, you can still edit it)</small><input type="text" name="dimensions" data-dims-auto="<?= !$__isNew && ($__p['dimensions'] ?? '') !== '' ? '0' : '1' ?>" value="<?= htmlspecialchars((string) ($__p['dimensions'] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
-            <label>Finish
+            <?php // D-357: a line picked from Products takes its finish from Options › Surface finish — this box is for lines typed by hand.
+            $__finishFromOption = !$__isNew && \App\Services\SurfaceFinishList::finishForSelection(!empty($__p['catalog_product_id']) ? (int) $__p['catalog_product_id'] : null, OrderLinePricing::lineSelection($__p)) !== null; ?>
+            <p class="muted small finish-from-option" data-finish-note<?= $__finishFromOption ? '' : ' hidden' ?>>Finish: the one chosen in step 2, Options › Surface finish.</p>
+            <label data-finish-box<?= $__finishFromOption ? ' hidden' : '' ?>>Finish
               <select name="finish">
                 <?php $__finishVal = (string) ($__p['finish'] ?? ''); ?>
                 <option value="">—</option>

@@ -115,6 +115,13 @@
     var f = specJsonField(select);
     try { return f && f.value ? JSON.parse(f.value) : {}; } catch (err) { return {}; }
   }
+  // D-357: the "Finish" select is for lines typed by hand; a picked line's finish is its Surface finish option.
+  function finishBox(scope, fromOption) {
+    var box = scope.querySelector('[data-finish-box]');
+    var note = scope.querySelector('[data-finish-note]');
+    if (box) { box.hidden = fromOption; }
+    if (note) { note.hidden = !fromOption; }
+  }
   function renderSpecs(select, refresh) {
     var scope = specScope(select);
     var box = scope.querySelector('.spec-options');
@@ -124,8 +131,10 @@
     var opt = select.options[select.selectedIndex];
     box.innerHTML = '';
     if (emptyHint) { emptyHint.hidden = !!(opt && opt.value && opt.dataset.specOptions); }
-    if (!opt || !opt.value || !opt.dataset.specOptions) { json.value = ''; return; }
+    if (!opt || !opt.value || !opt.dataset.specOptions) { json.value = ''; finishBox(scope, false); return; }
     var specs = JSON.parse(opt.dataset.specOptions);
+    // D-357: a product with the Surface finish option takes the line's finish from it — the "More › finish" box is hidden.
+    finishBox(scope, specs.some(function (sp) { return sp.finish && sp.options.length > 0; }));
     var chosen = refresh ? {} : currentSelection(select);
     // D-348: a saved (or sent back) selection without Thickness / Size / format shows "Choose…";
     // a line saved with no options at all (before D-255) shows the base options as before.
