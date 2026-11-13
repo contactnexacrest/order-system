@@ -3,22 +3,30 @@
   be priced, each with a link to fix it — and "Try a price", a calculator for any combination of this
   product's options (nothing is saved). Only for people who may see the price build-up; Procurement
   sees the supplier-price lines of the checklist only. Port of views/products/_pricing_ready.php.
+  D-365 (owner go, 13 Nov 2026, mockups plist_r / plist2_t3): ✔ done · ✘ to fix (with a button that
+  opens the form to fix it; "Not sold at 50 mm+" too where it applies) · ℹ information only (never
+  counted as "to fix").
 #}
+{% set readyMarks = { ok: ['✔', 'done'], fix: ['✘', 'to fix'], info: ['ℹ', 'information only'] } %}
 {% if readiness or tryPrice %}
 <div class="pricing-two">
 {% if readiness %}
 <div class="section" id="pricing-ready">
-  <h2>Pricing ready? {% if readiness.to_fix > 0 %}<span class="badge badge-warning">{{ readiness.to_fix }} to fix</span>{% else %}<span class="badge badge-success">ready</span>{% endif %}</h2>
-  <table class="list ready-list">
-    {% for i in readiness.items %}
-      <tr>
-        <td class="{{ 'ok' if i.ok else 'no' }}" aria-label="{{ 'done' if i.ok else 'to fix' }}">{{ '✓' if i.ok else '✗' }}</td>
-        <td>{{ i.label }}{% if i.detail %}<br><small class="muted">{{ i.detail }}</small>{% endif %}</td>
-        <td><a href="{{ i.link }}">{{ i.link_text }}</a></td>
-      </tr>
+  <h2>Pricing ready? {% if readiness.to_fix > 0 %}<span class="badge badge-danger">{{ readiness.to_fix }} to fix</span>{% else %}<span class="badge badge-success">ready</span>{% endif %}</h2>
+  <ul class="ready-list">
+    {% for i in readiness.items %}{% set st = i.state or ('ok' if i.ok else 'fix') %}
+      <li class="ready-{{ st }}" data-ready="{{ i.key }}">
+        <span class="ready-mark" aria-label="{{ readyMarks[st][1] }}">{{ readyMarks[st][0] }}</span>
+        {{ i.label }}{% if i.detail %} <small class="ready-detail">— {{ i.detail }}</small>{% endif %}
+        {% if st == 'fix' %}
+          <span class="row-actions ready-actions"><a class="btn-sm" href="{{ i.link }}">{{ i.link_text }}</a>{% if i.link2 %}<a class="btn-sm btn-secondary" href="{{ i.link2 }}">{{ i.link2_text }}</a>{% endif %}</span>
+        {% else %}
+          <a class="ready-link" href="{{ i.link }}">{{ i.link_text }}</a>
+        {% endif %}
+      </li>
     {% endfor %}
-  </table>
-  <p class="small muted">Until every line is ✓, staff can still quote, but an associate's "Get price" for the missing part goes to staff for a manual price.</p>
+  </ul>
+  <p class="small muted">Until every ✘ line is fixed, staff can still quote, but an associate's "Get price" for the missing part goes to staff for a manual price. ℹ lines are information only.</p>
 </div>
 {% endif %}
 {% if tryPrice %}{% set tp = tryPrice.p %}{% set b = tp.build %}

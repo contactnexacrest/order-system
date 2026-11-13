@@ -3624,7 +3624,7 @@ A supplier price is **expired** after its `valid_until` date, and **stale** when
 
 #### Pricing ready? and Try a price (D-256)
 
-`PricingService::readiness()` lists what a product still needs: supplier price per unit used for pricing; per-CBM price if it is sold at the CBM threshold or above; specifications; prices current; exact prices current; open to associates. The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only). Its Thickness select starts on **"Supplier's base price (<base, e.g. 50 mm and above>)"** (empty value): the thickness is left out of the selection (`ProductSpecs::SUPPLIER_BASE`), so the supplier row's own BASE is priced (D-335) and the figure equals the product list and build-up; choosing a thickness prices that thickness. The selected option is always the one priced.
+`PricingService::readiness()` lists what a product still needs. Since D-365 (below): configured base price set ('base'); at least one active supplier ('suppliers'); prices current; specifications; per-CBM price if it is sold at the CBM threshold or above ('cbm'); exact prices current; open to associates. Each item has a `state` ✔ ok / ✘ fix / ℹ info; only `fix` counts (`countToFix`). The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only). Its Thickness select starts on **"Supplier's base price (<base, e.g. 50 mm and above>)"** (empty value): the thickness is left out of the selection (`ProductSpecs::SUPPLIER_BASE`), so the supplier row's own BASE is priced (D-335) and the figure equals the product list and build-up; choosing a thickness prices that thickness. The selected option is always the one priced.
 
 #### Products and pricing, 11 Nov 2026 (D-300 to D-306)
 
@@ -4050,6 +4050,46 @@ recommendation"; mockups ui3_u1–u4).**
   `products/edit_price`, `products/link_supplier`, `orders/_product_picker_js`; app.js `initSqftNote`, `initAddOffer`,
   `initEditPrice`; tests `SqftSupplierPriceTest` / `sqftSupplierPrice.test.js`. Kanban: none of these screens has a board
   view (no Kanban twin).
+
+**Products list short view and "Pricing ready?" rework (D-365, 13 Nov 2026, owner go; mockups plist2_t1, plist2_t2,
+plist2_t3, plist_r).** No database change, no migration, no price changes (snapshots identical on both stacks).
+- **Products list (default columns):** Name (link; grey line under it "HS code · origin · per <unit>"; the "Pricing: N
+  to fix" and override badges kept) · Suppliers ("N active", "N paused") · Supplier prices (₹) — lowest – highest, each a
+  link to the offer's Edit price, then "/ <unit> (<thickness>)" (`SupplierOffers::shortUnit`, e.g. "/ CBM (50 mm+)",
+  "/ SQM (20 mm)") · Base price "₹180,000 / CBM" (`productRow()['base']['amount' / 'short']`; "≈ USD" kept for product
+  editors) · Cost (USD) "our real cost" and Min price (USD) "never below" (highlighted, `col-key`) · Staff lowest (USD) ·
+  Staff quote (USD) "/ unit" · Status · Actions (D-363). Sales staff keep Quote price / Your lowest. The HS Code and
+  Origin columns moved under the name.
+- **"Show all columns"** adds Associate lowest (USD) and Latest supplier quote (`col-extra`, shaded; hidden by CSS unless
+  the table has `.show-all`). Remembered per user in the browser (localStorage key `products.showAllColumns.<user id>`,
+  wrapped in try/catch; there is no per-user preference table, `users.ui_template_preference_id` is the template only).
+  Without JavaScript the box submits `?cols=all` (server default = short view). app.js `initShowAllColumns`.
+- **Layout:** the table sits in `.table-scroll.product-list-scroll`; every cell `white-space: nowrap`; the Name column is
+  `position: sticky; left: 0` with a subtle shadow; narrow screens keep the page itself from scrolling sideways. CSS
+  D-365 block.
+- **Pricing ready? (`PricingService::readiness` / `pricingService.readiness`):** removed 'unit' ("Supplier price per
+  <unit> entered and used for pricing"). Added 'base' "Configured base price set (₹X / unit, thickness)" (fails when not
+  configured; button Configure, `SupplierOffers::configuredShort`) and 'suppliers' "At least one active supplier
+  (names)" (fails with no usable offer — button "Add a supplier price" → Market prices #add-price; ℹ for a "No supplier
+  yet" product — Link a supplier). Kept 'cbm', 'specs', 'current', 'exact'; 'cbm' when failing reads "No price for 50 mm
+  and above (per CBM)" with "Add a 50 mm+ price" (a grid offer → `/products/suppliers/{id}/edit-price?thickness_mm=0`,
+  which opens at 50 mm and above, unit CBM, price empty; otherwise `/products/{id}/market-prices?basis=cbm[&supplier_id=]
+  #add-price`, which picks "per CBM" or, in a grid category, the 50 mm and above thickness) and "Not sold at 50 mm+" →
+  the product's Thickness specification edit (`/products/{id}/specifications?edit={spec}`), the existing per-product
+  "offered" switch (`product_option_overrides.is_hidden`). 'current' when failing → Edit price of the offer used for
+  pricing. 'associates' is ℹ (not counted) while no associate is active — "Not open to associates yet — no associate in
+  the system", link Associates › Access levels; with one or more active associates it is ✘ as before ("Give price
+  access": that associate's Price access when there is one, else Associates). Items carry `state` ('ok' | 'fix' |
+  'info'), `info`, and for 'cbm' `link2` / `link2_text`; `to_fix` = `countToFix()` (Procurement's filtered list too).
+  Order: base, suppliers, current, specs, cbm, exact, associates. View `_pricing_ready` (✔ / ✘ / ℹ list,
+  `ul.ready-list`).
+- **Dev data, "to fix" before → after:** Absolute Black Granite Slab 0 → 0; MM Sentinel Product 3 (unit, cbm, current)
+  → 3 (base, current, cbm; suppliers ℹ "No supplier yet"); Black Galaxy Granite Block (P1) 0 → 0; E2E Priced Granite
+  Block 1 (cbm) → 1 (cbm); Black Galaxy Granite D-255 / D-256 demos 0 → 0; Tan Brown Granite 1 (current, stale) → 1.
+- **Code.** `PricingService::readiness` / `countToFix`, `SupplierOffers::shortUnit` / `configuredShort` / `productRow`,
+  `ProductController::index` / `show`, `EditPriceController::form` (`thickness_mm`), `PricingController::marketPrices`
+  (`prefillBasis`), views `products/index`, `_pricing_ready`, `edit_price`, `market_prices`, `_price_add` (`pickMm`),
+  Node twins; app.js `initShowAllColumns`; CSS D-365 block. The Products list has no board view (no Kanban twin).
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 

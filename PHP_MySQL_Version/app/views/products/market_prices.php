@@ -83,14 +83,14 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
             <option value="grid">Every thickness — the prices below</option>
           <?php else: ?>
             <option value="unit">The product's unit (<?= View::e($__unit) ?>)</option>
-            <option value="cbm">Thick stone, <?= (int) ($cbmFrom ?? 50) ?> mm and above (per CBM)</option>
+            <option value="cbm"<?= ($prefillBasis ?? null) === 'cbm' ? ' selected' : '' ?>>Thick stone, <?= (int) ($cbmFrom ?? 50) ?> mm and above (per CBM)</option>
           <?php endif; ?>
           <?php if (($offered ?? []) !== []): ?><option value="combo">A special combination (exact price)</option><?php endif; ?>
         </select>
         <small class="muted">Kept only for special combinations, e.g. "30 mm · Leather" quoted as one exact price<?= $rules['grid'] ? '; ordinary thickness prices always go in the grid' : '' ?>.</small></label>
       <?php if ($rules['grid']): ?>
         <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>
-          <?php $__af = ['grid' => null, 'card' => null, 'dateField' => '']; include __DIR__ . '/_price_add.php'; ?>
+          <?php $__af = ['grid' => null, 'card' => null, 'dateField' => '', 'pickMm' => ($prefillBasis ?? null) === 'cbm' ? ThicknessPrices::CBM : null]; include __DIR__ . '/_price_add.php'; ?>
         </fieldset>
         <label data-show-when="price_basis=combo">Exact price (₹) *<input type="text" inputmode="decimal" name="price_inr" data-max-decimals="2" data-max-value="999999999999.99" data-required-when="price_basis=combo" placeholder="e.g. 4900.00" value="<?= View::e($__pf['price_inr'] ?? '') ?>" disabled></label>
       <?php else: ?>

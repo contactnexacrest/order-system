@@ -266,21 +266,31 @@ most; typing the Thickness (cm) chooses the Thickness option for you (13 cm → 
 ## Pricing a new product in 5 steps (D-256, 5 Nov 2026)
 
 The product page shows **Pricing ready?** (MD, ED and Procurement) — a checklist of what
-the product still needs before it can be priced, each line with a link to fix it. The
-product list shows a red **Pricing: N to fix** badge on any product with something left.
+the product still needs before it can be priced. Since D-365 each line is **✔** (done),
+**✘** (to fix — with a button that opens the form to fix it) or **ℹ** (information only,
+never counted). The product list shows a red **Pricing: N to fix** badge on any product
+with a ✘ line.
 
-1. **Supplier price per unit** — Products › the product › **Market prices** › Add a price,
-   "Price for: Base", tick **Use this price for pricing**.
-2. **Supplier price per CBM** (only when the product is sold at 50 mm or more) — the same
-   form, "Price for: Thick stone … (per CBM)".
+1. **Configured base price set** — Products › the product › **Configure** (the line shows the
+   price, e.g. "₹2,000 / SQM, 20 mm"). **At least one active supplier** — the suppliers'
+   names; ✘ with **Add a supplier price** when none is active; ℹ for a "No supplier yet"
+   product (from before the Suppliers directory: it keeps working — **Link a supplier**).
+2. **A price for 50 mm and above (per CBM)** (only when the product is sold at 50 mm or
+   more) — ✘ shows **Add a 50 mm+ price** (opens Edit price at "50 mm and above" for a price
+   for every thickness, otherwise Market prices › Add a price set to 50 mm and above / per
+   CBM) and **Not sold at 50 mm+** (opens the product's Thickness specification, where you
+   untick "offered" for the 50 mm and above options).
 3. **Specifications** — check the product's options (Products › the product › Price options);
    most products simply follow their category.
 4. **Prices current** — both prices quoted within the stale setting (60 days) and not past
    their "valid until" date.
 5. **Open to associates** — Associates › an associate › Price access: tick the product's
-   category and forms.
+   category and forms. While there is **no active associate at all** this line is ℹ
+   ("Not open to associates yet — no associate in the system", link Associates › Access
+   levels) and does not count; once one associate is active it is ✘ again for a product
+   they cannot price (**Give price access**).
 
-Until every line is ✓ staff can still quote, but an associate's **Get price** for the missing
+Until every ✘ line is fixed staff can still quote, but an associate's **Get price** for the missing
 part goes to staff for a manual price. Procurement sees only the supplier-price lines; Sales
 and associates never see the checklist.
 
@@ -694,6 +704,21 @@ product** are small buttons side by side.
 - **Order lines** keep SQM / SQFT / CBM / PCS / TON. A price in another unit is compared with the product's price per
   SQM: per SQFT ÷ 10.7639, per CBM ÷ the thickness (20 mm: × 50), per piece × the piece area (60 × 40 cm = 0.24 SQM),
   per Ton = per CBM ÷ 2.70.
+
+## Products list: the short view and "Pricing ready?" (D-365, 13 Nov 2026)
+
+- **Products › All products** now shows the short view: **Name** (a link; under it in grey the HS code · origin ·
+  "per <unit>"; the **Pricing: N to fix** and override badges stay beside it), **Suppliers** ("2 active"), **Supplier
+  prices (₹)** — lowest – highest, each a link to that supplier's Edit price, with the unit and thickness, e.g.
+  "₹160,000 – ₹190,000 / CBM (50 mm+)" or "₹2,000 / SQM (20 mm)", **Base price** ("₹180,000 / CBM"), **Cost (USD)** — our
+  real cost, and **Min price (USD)** — never quote below it (both highlighted), **Staff lowest (USD)**, **Staff quote
+  (USD)** ("2,740.60 / CBM"), **Status** and **Actions**. Every figure stays on one line.
+- Tick **Show all columns** (top right) to add **Associate lowest (USD)** and **Latest supplier quote** (shaded). The app
+  remembers your choice in this browser; untick to go back. The **Name** column stays in place while you scroll the
+  table sideways, also on a phone.
+- **Pricing ready?** on the product page: "Supplier price per unit … used for pricing" is gone — **Configured base price
+  set** replaces it; **At least one active supplier** is new; every ✘ line has a button that opens the form to fix it;
+  ℹ lines are information only (see "Pricing a new product in 5 steps" above). No price changes.
 
 ## Duplicate a product (D-358, 13 Nov 2026)
 

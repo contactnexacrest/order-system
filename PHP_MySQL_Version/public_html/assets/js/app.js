@@ -2591,6 +2591,28 @@
   // select[data-sqft-thickness] (options with data-unit "CBM" or "SQM"): a "50 mm and above"
   // thickness is per CBM, a thinner one per SQM or SQFT — the unit follows the thickness and back.
   var SQFT_PER_SQM = 10.7639;
+  // D-365 (owner go, 13 Nov 2026): Products list "Show all columns" — adds the shaded columns
+  // (Associate lowest, Latest supplier quote); remembered per user in this browser. Without
+  // JavaScript the box submits ?cols=all (the server's default is the short view).
+  function initShowAllColumns() {
+    document.querySelectorAll('input[data-show-all-columns]').forEach(function (box) {
+      var table = document.getElementById(box.getAttribute('data-show-all-columns'));
+      if (!table) return;
+      var key = box.getAttribute('data-pref-key') || 'showAllColumns';
+      if (!/[?&]cols=all(&|$)/.test(window.location.search)) {
+        var saved = null;
+        try { saved = window.localStorage.getItem(key); } catch (err) { saved = null; }
+        if (saved === '1') box.checked = true;
+      }
+      function apply() { table.classList.toggle('show-all', box.checked); }
+      apply();
+      box.addEventListener('change', function () {
+        apply();
+        try { window.localStorage.setItem(key, box.checked ? '1' : '0'); } catch (err) { /* ignore */ }
+      });
+    });
+  }
+
   function initSqftNote() {
     document.querySelectorAll('select[data-sqft-unit]').forEach(function (unit) {
       var form = unit.form;
@@ -2729,6 +2751,7 @@
     initEditPrice(); // D-359
     initAddOffer(); // D-360
     initConfigure(); // D-361
+    initShowAllColumns(); // D-365
   }
 
   if (document.readyState === 'loading') {

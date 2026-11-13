@@ -122,6 +122,9 @@ async function index(req, res) {
     const row = await supplierOffers.productRow(product, s361);
     product.standing = row.status;
     if (canSeeHeadlineFob) product.offers_view = row;
+    // D-365: "per <unit>" under the name and "/ <unit>" after the staff quote.
+    product.unit_short = require('../services/lineUnits').label(String(product.reference_unit || '')) || 'unit';
+    product.name_sub = [String(product.hs_code || ''), String(product.origin || '')].filter((v) => v.trim() !== '').concat([`per ${product.unit_short}`]).join(' · ');
     // Not configured: no selling price is shown or offered yet (the USD columns show "—").
     if (!row.status.configured && !row.status.no_supplier_yet && product.pricing) {
       product.pricing.build = null;
@@ -167,6 +170,9 @@ async function index(req, res) {
     everCount: Number(((await require('../config/db').queryOne('SELECT COUNT(*) AS n FROM catalog_products')) || {}).n || 0),
     canPriceRules: canBuildup || !!(req.permissions || {}).manage_pricing,
     canPricingSettings: canBuildup || !!(req.permissions || {}).manage_pricing,
+    // D-365: "Show all columns" — ?cols=all without JavaScript; remembered per user in the browser.
+    showAll: String(req.query.cols || '') === 'all',
+    prefUser: Number((req.user || {}).id || 0),
     ...catalogueUnits(products),
   }, 'layout/base');
 }
@@ -334,7 +340,7 @@ async function show(req, res) {
     readiness = await pricingService.readiness(details.product);
     if (!canTry) {
       readiness.items = readiness.items.filter((i) => i.supplier);
-      readiness.to_fix = readiness.items.filter((i) => !i.ok).length;
+      readiness.to_fix = pricingService.countToFix(readiness.items); // D-365: information lines never count
     }
   }
   let tryPrice = null;

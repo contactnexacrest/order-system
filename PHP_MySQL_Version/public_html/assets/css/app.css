@@ -965,6 +965,19 @@ input.below-floor{border-color:#b42318}
 .badge-purple { background: #ecdff7; color: #5b2a86; }
 .ready-list td.ok { color: #245a24; font-weight: 700; }
 .ready-list td.no { color: #a32020; font-weight: 700; }
+/* D-365 (mockups plist_r / plist2_t3): the "Pricing ready?" checklist — ✔ done (green), ✘ to fix
+   (red, with the button that opens the form to fix it), ℹ information only (grey). */
+ul.ready-list { list-style: none; margin: 0 0 .6rem; padding: .8rem 1rem; border: 1px solid #e3dcc8; border-radius: 10px; background: #fff; }
+ul.ready-list li { margin: .3rem 0; line-height: 1.55; }
+ul.ready-list .ready-mark { font-weight: 700; margin-right: .3rem; }
+ul.ready-list li.ready-ok { color: #1b6e2d; }
+ul.ready-list li.ready-fix { color: #a12622; }
+ul.ready-list li.ready-info { color: #5c5c5c; }
+ul.ready-list .ready-detail { color: #7a7a7a; }
+ul.ready-list li.ready-fix .ready-detail { color: #a12622; }
+ul.ready-list .ready-link { font-size: .85em; margin-left: .35rem; }
+ul.ready-list li.ready-ok .ready-link { color: #6b7a6b; }
+ul.ready-list .ready-actions { display: inline-flex; flex-wrap: wrap; gap: .35rem; margin-left: .35rem; vertical-align: middle; }
 .help-line { display: block; font-size: .85em; color: #555; background: #f7f4ec; border-left: 3px solid #c9b98a; padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-weight: normal; }
 .pricing-two { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .pricing-two > .section { flex: 1 1 380px; min-width: 0; }
@@ -1218,3 +1231,29 @@ form.btn-row{align-items:flex-end;}
 form.btn-row > a.btn-sm, form.btn-row > button.btn-sm{margin-bottom:1rem;}
 /* D-364 (mockup sqm_sqft_mockup): the live "₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)" line under a supplier price. */
 .sqft-note{margin:0.25rem 0 0.75rem;padding:0.5rem 0.75rem;background:var(--navy-soft);border-left:4px solid var(--navy);border-radius:4px;font-size:0.9rem;color:var(--ink);}
+
+/* D-365 (owner go, 13 Nov 2026, mockups plist2_t1 / plist2_t2): the Products list — every figure on one
+   line, the Name column fixed while the table scrolls sideways (with a subtle shadow), Cost and Min
+   price highlighted, "Show all columns" adds the shaded columns. */
+.show-all-form { display: flex; justify-content: flex-end; align-items: center; gap: .5rem; margin: 0 0 .4rem; }
+.show-all-form label.inline { display: inline-flex; align-items: center; gap: .35rem; font-weight: 500; margin: 0; }
+.product-list-scroll { overflow-x: auto; max-width: 100%; margin-bottom: 1rem; }
+.product-list-scroll table.list { margin-bottom: 0; }
+table.product-list th, table.product-list td { white-space: nowrap; }
+table.product-list td.wrap { white-space: normal; min-width: 14rem; }
+table.product-list .name-col { position: sticky; left: 0; z-index: 2; background: var(--surface, #fff); box-shadow: 6px 0 6px -5px rgba(0,0,0,.22); white-space: normal; min-width: 13rem; max-width: 20rem; }
+table.product-list th.name-col { background: var(--navy-soft); z-index: 3; }
+table.product-list tr:hover td.name-col { background: var(--bg); }
+table.product-list .product-name { font-weight: 600; }
+table.product-list .name-sub { display: block; color: #7a7a7a; font-size: .82em; white-space: nowrap; }
+table.product-list .col-sub { display: block; font-weight: 500; font-size: .78em; color: #8a7f7f; }
+table.product-list th.col-key { background: #f9dede; }
+table.product-list td.col-key { background: #fdf2f2; }
+table.product-list .unit-tail { color: #8a8a8a; font-weight: 400; }
+table.product-list th.col-extra { background: #f8edc4; }
+table.product-list td.col-extra { background: #fdf8e6; }
+table.product-list:not(.show-all) .col-extra { display: none; }
+@media (max-width: 760px) {
+  table.product-list .name-col { min-width: 9.5rem; max-width: 12rem; }
+  .show-all-form { justify-content: flex-start; }
+}

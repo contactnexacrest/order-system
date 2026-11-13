@@ -58,61 +58,72 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
   <?php if (!$canBrowse && !$searched): ?>
     <p class="muted">Enter a search term above to find a product. You do not have permission to browse the full catalog list.</p>
   <?php else: ?>
-    <?php // D-304 (point 14): every column says its currency and unit — one unit in the header when all rows share it.
-      $__units = array_values(array_unique(array_map(static fn (array $p): string => (string) ($p['reference_unit'] ?? '') ?: 'unit', $products)));
-      $__hu = count($__units) === 1 ? $__units[0] : 'unit';
-      $__perRow = count($__units) > 1;
-      $__usdRate = !empty($fx) ? (float) $fx['rate'] : null; ?>
-    <table class="list">
+    <?php /* D-365 (owner go, 13 Nov 2026, mockups plist2_t1 / plist2_t2): the short view — Name (with
+       HS code · origin · "per <unit>" under it), Suppliers, Supplier prices (₹) and Base price with
+       their unit and thickness, Cost and Min price highlighted, Staff lowest, Staff quote "/ unit",
+       Status, Actions. "Show all columns" adds Associate lowest and Latest supplier quote (shaded),
+       remembered per user in this browser; without JavaScript ?cols=all. Every figure on one line;
+       the Name column stays put while the table scrolls sideways. */
+      $__unitOf = static fn (array $p): string => \App\Services\LineUnits::label((string) ($p['reference_unit'] ?? '')) ?: 'unit';
+      $__usdRate = !empty($fx) ? (float) $fx['rate'] : null;
+      $__hasExtra = !empty($canBuildup) || $canViewPricing; ?>
+    <?php if ($__hasExtra): ?>
+      <form method="get" action="/products" class="show-all-form">
+        <?php if ($status !== 'active'): ?><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php endif; ?>
+        <?php if ($searched): ?><input type="hidden" name="q" value="<?= View::e($query) ?>"><?php endif; ?>
+        <label class="inline"><input type="checkbox" name="cols" value="all"<?= !empty($showAll) ? ' checked' : '' ?> data-show-all-columns="product-list" data-pref-key="products.showAllColumns.<?= (int) ($prefUser ?? 0) ?>"> Show all columns</label>
+        <noscript><button type="submit" class="btn-sm btn-secondary">Apply</button></noscript>
+      </form>
+    <?php endif; ?>
+    <div class="table-scroll product-list-scroll">
+    <table class="list product-list<?= !empty($showAll) ? ' show-all' : '' ?>" id="product-list">
       <tr>
-        <th>Name</th>
-        <th>HS Code</th>
-        <th>Origin</th>
-        <?php if ($canViewPricing): ?><th>Suppliers</th><th>Lowest – highest<br>supplier price ₹</th><th>Base price ₹<br>(configured)</th><?php endif; ?>
+        <th class="name-col">Name</th>
+        <?php if ($canViewPricing): ?><th>Suppliers</th><th>Supplier prices (₹)</th><th>Base price</th><?php endif; ?>
         <?php // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. ?>
-        <?php if (!empty($canBuildup)): ?><th class="num">Cost<br>USD / <?= View::e($__hu) ?></th><th class="num">Min price<br>USD / <?= View::e($__hu) ?></th><th class="num">Staff lowest<br>USD / <?= View::e($__hu) ?></th><th class="num">Staff quote<br>USD / <?= View::e($__hu) ?></th><th class="num">Associate lowest<br>USD / <?= View::e($__hu) ?></th><?php endif; ?>
+        <?php if (!empty($canBuildup)): ?><th class="num col-key">Cost (USD)<span class="col-sub">our real cost</span></th><th class="num col-key">Min price (USD)<span class="col-sub">never below</span></th><th class="num">Staff lowest (USD)</th><th class="num">Staff quote (USD)</th><th class="num col-extra">Associate lowest (USD)</th><?php endif; ?>
         <?php // D-305 (point 19): staff see only the quote and their own lowest price. ?>
-        <?php if (!empty($canStaffPrice)): ?><th class="num">Quote price<br>USD / <?= View::e($__hu) ?></th><th class="num">Your lowest<br>USD / <?= View::e($__hu) ?></th><?php endif; ?>
-        <?php if ($canViewPricing || !empty($canBuildup)): ?><th>Latest supplier quote</th><?php endif; ?>
+        <?php if (!empty($canStaffPrice)): ?><th class="num">Quote price (USD)</th><th class="num">Your lowest (USD)</th><?php endif; ?>
+        <?php if ($canViewPricing || !empty($canBuildup)): ?><th class="col-extra">Latest supplier quote</th><?php endif; ?>
         <th>Status</th>
         <?php if ($status !== 'active'): ?><th>Used on</th><?php endif; ?>
-        <th></th>
+        <th>Actions</th>
       </tr>
       <?php if (empty($products)): ?>
         <tr><td colspan="16" class="muted">No products found.</td></tr>
       <?php endif; ?>
-      <?php foreach ($products as $p): $__st = $p['standing']; $__o = $p['offers_view'] ?? null; ?>
+      <?php foreach ($products as $p): $__st = $p['standing']; $__o = $p['offers_view'] ?? null; $__u = $__unitOf($p);
+        $__sub = array_values(array_filter([(string) ($p['hs_code'] ?? ''), (string) ($p['origin'] ?? '')], static fn (string $v): bool => trim($v) !== '')); $__sub[] = 'per ' . $__u; ?>
         <tr data-product-row="<?= (int) $p['id'] ?>">
-          <td><a href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?= $__perRow ? ' <small class="muted">per ' . View::e((string) ($p['reference_unit'] ?? '') ?: 'unit') . '</small>' : '' ?><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && ($p['pricing']['overrides'] ?? []) !== []): ?> <span class="badge badge-warning" title="This product overrides a pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?></td>
-          <td><?= View::e($p['hs_code'] !== '' ? $p['hs_code'] : '—') ?></td>
-          <td><?= View::e($p['origin'] ?? '—') ?></td>
+          <td class="name-col"><a class="product-name" href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && ($p['pricing']['overrides'] ?? []) !== []): ?> <span class="badge badge-warning" title="This product overrides a pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?>
+            <span class="name-sub"><?= View::e(implode(' · ', $__sub)) ?></span></td>
           <?php if ($canViewPricing): ?>
             <td><?= (int) $__st['usable'] ?> active<?php if ((int) $__st['paused'] > 0): ?><br><small class="muted"><?= (int) $__st['paused'] ?> paused</small><?php endif; ?></td>
             <td><?php if ($__o['lowest'] === null): ?>—<?php else: ?>
               <?php $__pair = (int) $__o['lowest']['id'] === (int) $__o['highest']['id'] ? [[$__o['lowest'], '']] : [[$__o['lowest'], 'price-low'], [$__o['highest'], 'price-high']]; ?>
               <?php foreach ($__pair as $__i => [$__r, $__cls]): ?><?= $__i > 0 ? ' – ' : '' ?><?php if (!empty($canEditPrice)): ?><a href="/products/suppliers/<?= (int) $__r['id'] ?>/edit-price?from=products" class="<?= $__cls ?>" title="<?= View::e((string) $__r['supplier_name']) ?> — Edit price">₹<?= View::e(\App\Services\ThicknessPrices::amount((float) $__r['base']['inr'])) ?></a><?php else: ?><span class="<?= $__cls ?>">₹<?= View::e(\App\Services\ThicknessPrices::amount((float) $__r['base']['inr'])) ?></span><?php endif; ?><?php endforeach; ?>
-              <br><small class="muted"><?= View::e((string) $__o['lowest']['base']['label']) ?></small><?php endif; ?></td>
-            <td><?php if ($__o['base'] === null): ?><span class="muted">not set</span><?php else: ?><?= $__money((float) $__o['base']['inr']) ?>
-              <?php if ($canManage && $__usdRate !== null && $__usdRate > 0): // D-304: product editors only ?><br><b class="usd-approx">≈ USD <?= number_format((float) $__o['base']['inr'] / $__usdRate, 2) ?></b><?php endif; ?>
-              <br><small class="muted"><?= View::e((string) $__o['base']['label']) ?></small><?php endif; ?></td>
+              <span class="unit-tail">/ <?= View::e((string) $__o['short']) ?></span><?php endif; ?></td>
+            <td><?php if ($__o['base'] === null): ?><span class="muted">not set</span><?php else: ?>₹<?= View::e($__o['base']['amount']) ?> <span class="unit-tail">/ <?= View::e($__o['base']['short']) ?></span>
+              <?php if ($canManage && $__usdRate !== null && $__usdRate > 0): // D-304: product editors only ?><br><b class="usd-approx">≈ USD <?= number_format((float) $__o['base']['inr'] / $__usdRate, 2) ?></b><?php endif; ?><?php endif; ?></td>
           <?php endif; ?>
           <?php if (!empty($canBuildup)): $__b = $p['pricing']['build']; ?>
             <?php if ($__b === null): ?>
-              <td colspan="5" class="muted small"><?= View::e((string) $p['pricing']['missing']) ?></td>
+              <td colspan="4" class="muted small wrap"><?= View::e((string) $p['pricing']['missing']) ?></td>
+              <td class="num col-extra">—</td>
             <?php else: ?>
-              <td class="num"><?= number_format($__b['cost'], 2) ?></td>
-              <td class="num"><?= number_format($__b['minimum'], 2) ?></td>
+              <td class="num col-key"><b><?= number_format($__b['cost'], 2) ?></b></td>
+              <td class="num col-key"><b><?= number_format($__b['minimum'], 2) ?></b></td>
               <td class="num"><?= number_format($__b['staff_floor'], 2) ?></td>
-              <td class="num"><?= number_format($__b['staff_quote'], 2) ?></td>
-              <td class="num"><?= $p['pricing']['lowest'] === null ? '—' : number_format($p['pricing']['lowest']['floor'], 2) ?></td>
+              <td class="num"><b><?= number_format($__b['staff_quote'], 2) ?></b> <span class="unit-tail">/ <?= View::e($__u) ?></span></td>
+              <td class="num col-extra"><?= $p['pricing']['lowest'] === null ? '—' : number_format($p['pricing']['lowest']['floor'], 2) ?></td>
             <?php endif; ?>
           <?php endif; ?>
           <?php if (!empty($canStaffPrice)): $__b = $p['pricing']['build']; ?>
-            <td class="num"><?= $__b === null ? '—' : number_format($__b['staff_quote'], 2) ?></td>
+            <td class="num"><?php if ($__b === null): ?>—<?php else: ?><b><?= number_format($__b['staff_quote'], 2) ?></b> <span class="unit-tail">/ <?= View::e($__u) ?></span><?php endif; ?></td>
             <td class="num"><?= $__b === null ? '—' : number_format($__b['staff_floor'], 2) ?></td>
           <?php endif; ?>
           <?php if ($canViewPricing || !empty($canBuildup)): ?>
-            <td><?= View::e((string) (($__o['latest_quote'] ?? null) ?? ($p['pricing']['price_date'] ?? null) ?? '—')) ?><?php if (!empty($canBuildup) && ($p['pricing']['staleness'] ?? null) !== null && $p['pricing']['build'] !== null): ?> <span class="badge <?= $p['pricing']['staleness'] === 'expired' ? 'badge-danger' : 'badge-warning' ?>"><?= $p['pricing']['staleness'] ?></span><?php endif; ?></td>
+            <td class="col-extra"><?= View::e((string) (($__o['latest_quote'] ?? null) ?? ($p['pricing']['price_date'] ?? null) ?? '—')) ?><?php if (!empty($canBuildup) && ($p['pricing']['staleness'] ?? null) !== null && $p['pricing']['build'] !== null): ?> <span class="badge <?= $p['pricing']['staleness'] === 'expired' ? 'badge-danger' : 'badge-warning' ?>"><?= $p['pricing']['staleness'] ?></span><?php endif; ?></td>
           <?php endif; ?>
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span>
             <br><span class="badge <?= View::e($__st['badge']) ?>" data-standing="<?= View::e($__st['key']) ?>"><?= View::e($__st['label']) ?></span></td>
@@ -145,7 +156,9 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
         </tr>
       <?php endforeach; ?>
     </table>
-    <p class="muted small">"Lowest – highest" are the active suppliers' prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>
+    </div>
+    <?php if (!empty($canBuildup)): ?><p class="muted small"><b>Cost</b> = the configured base price + CHA &amp; transport + other costs, in USD — what the stone really costs us at the port. <b>Min price</b> = cost + the minimum margin — never quote below it. "Show all columns" adds Associate lowest and the Latest supplier quote.</p><?php endif; ?>
+    <p class="muted small">"Supplier prices" are the active suppliers' lowest – highest prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>
   <?php endif; ?>
   <?php endif; ?>
 </div>

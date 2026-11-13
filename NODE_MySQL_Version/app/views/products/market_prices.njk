@@ -73,14 +73,14 @@
             <option value="grid">Every thickness — the prices below</option>
           {% else %}
             <option value="unit">The product's unit ({{ unitName }})</option>
-            <option value="cbm">Thick stone, {{ cbmFrom or 50 }} mm and above (per CBM)</option>
+            <option value="cbm"{% if prefillBasis == 'cbm' %} selected{% endif %}>Thick stone, {{ cbmFrom or 50 }} mm and above (per CBM)</option>
           {% endif %}
           {% if offered and offered.length %}<option value="combo">A special combination (exact price)</option>{% endif %}
         </select>
         <small class="muted">Kept only for special combinations, e.g. "30 mm · Leather" quoted as one exact price{% if rules.grid %}; ordinary thickness prices always go in the grid{% endif %}.</small></label>
       {% if rules.grid %}
         <fieldset class="full" data-show-when="price_basis=grid"><legend class="legend-sentence">The price the supplier quoted — type one thickness and tick the others to work out from it. It becomes the base for orders.</legend>
-          {% set av = newAddView %}{% set afCard = null %}{% set afDate = '' %}
+          {% set av = newAddView %}{% set afCard = null %}{% set afDate = '' %}{% set afPickMm = 0 if prefillBasis == 'cbm' else null %}{# D-365: "Add a 50 mm+ price" #}
           {% include "products/_price_add.njk" %}
         </fieldset>
         <label data-show-when="price_basis=combo">Exact price (₹) *<input type="text" inputmode="decimal" name="price_inr" data-max-decimals="2" data-max-value="999999999999.99" data-required-when="price_basis=combo" placeholder="e.g. 4900.00" value="{{ prefill.price_inr if (prefill and prefill.price_inr) else '' }}" disabled></label>

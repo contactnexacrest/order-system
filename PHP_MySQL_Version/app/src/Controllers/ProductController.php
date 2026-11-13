@@ -160,6 +160,9 @@ final class ProductController
             'everCount'      => (int) \App\Config\Database::connection()->query('SELECT COUNT(*) FROM catalog_products')->fetchColumn(),
             'canPriceRules'  => $canBuildup || $this->can('manage_pricing'),
             'canPricingSettings' => $canBuildup || $this->can('manage_pricing'),
+            // D-365: "Show all columns" — ?cols=all without JavaScript; remembered per user in the browser.
+            'showAll'        => (string) ($_GET['cols'] ?? '') === 'all',
+            'prefUser'       => (int) (AuthService::currentUser()['id'] ?? 0),
         ], 'layout/base');
     }
 
@@ -306,7 +309,7 @@ final class ProductController
             $readiness = \App\Services\PricingService::readiness($details['product']);
             if (!$canTry) {
                 $readiness['items'] = array_values(array_filter($readiness['items'], static fn (array $i): bool => $i['supplier']));
-                $readiness['to_fix'] = count(array_filter($readiness['items'], static fn (array $i): bool => !$i['ok']));
+                $readiness['to_fix'] = \App\Services\PricingService::countToFix($readiness['items']); // D-365: information lines never count
             }
         }
         $tryPrice = null;

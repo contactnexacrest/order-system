@@ -54,56 +54,68 @@
   {% if not canBrowse and not searched %}
     <p class="muted">Enter a search term above to find a product. You do not have permission to browse the full catalog list.</p>
   {% else %}
-    <table class="list">
+    {# D-365 (owner go, 13 Nov 2026, mockups plist2_t1 / plist2_t2): the short view — Name (with HS code ·
+       origin · "per <unit>" under it), Suppliers, Supplier prices (₹) and Base price with their unit and
+       thickness, Cost and Min price highlighted, Staff lowest, Staff quote "/ unit", Status, Actions.
+       "Show all columns" adds Associate lowest and Latest supplier quote (shaded), remembered per user in
+       this browser; without JavaScript ?cols=all. Every figure on one line; the Name column stays put
+       while the table scrolls sideways. #}
+    {% if canBuildup or canViewPricing %}
+      <form method="get" action="/products" class="show-all-form">
+        {% if status != 'active' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        {% if searched %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        <label class="inline"><input type="checkbox" name="cols" value="all"{% if showAll %} checked{% endif %} data-show-all-columns="product-list" data-pref-key="products.showAllColumns.{{ prefUser }}"> Show all columns</label>
+        <noscript><button type="submit" class="btn-sm btn-secondary">Apply</button></noscript>
+      </form>
+    {% endif %}
+    <div class="table-scroll product-list-scroll">
+    <table class="list product-list{% if showAll %} show-all{% endif %}" id="product-list">
       <tr>
-        <th>Name</th>
-        <th>HS Code</th>
-        <th>Origin</th>
-        {% if canViewPricing %}<th>Suppliers</th><th>Lowest – highest<br>supplier price ₹</th><th>Base price ₹<br>(configured)</th>{% endif %}
+        <th class="name-col">Name</th>
+        {% if canViewPricing %}<th>Suppliers</th><th>Supplier prices (₹)</th><th>Base price</th>{% endif %}
         {# Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. #}
-        {% if canBuildup %}<th class="num">Cost<br>USD / {{ headerUnit }}</th><th class="num">Min price<br>USD / {{ headerUnit }}</th><th class="num">Staff lowest<br>USD / {{ headerUnit }}</th><th class="num">Staff quote<br>USD / {{ headerUnit }}</th><th class="num">Associate lowest<br>USD / {{ headerUnit }}</th>{% endif %}
+        {% if canBuildup %}<th class="num col-key">Cost (USD)<span class="col-sub">our real cost</span></th><th class="num col-key">Min price (USD)<span class="col-sub">never below</span></th><th class="num">Staff lowest (USD)</th><th class="num">Staff quote (USD)</th><th class="num col-extra">Associate lowest (USD)</th>{% endif %}
         {# D-305 (point 19): staff see only the quote and their own lowest price. #}
-        {% if canStaffPrice %}<th class="num">Quote price<br>USD / {{ headerUnit }}</th><th class="num">Your lowest<br>USD / {{ headerUnit }}</th>{% endif %}
-        {% if canViewPricing or canBuildup %}<th>Latest supplier quote</th>{% endif %}
+        {% if canStaffPrice %}<th class="num">Quote price (USD)</th><th class="num">Your lowest (USD)</th>{% endif %}
+        {% if canViewPricing or canBuildup %}<th class="col-extra">Latest supplier quote</th>{% endif %}
         <th>Status</th>
         {% if status != 'active' %}<th>Used on</th>{% endif %}
-        <th></th>
+        <th>Actions</th>
       </tr>
       {% if not products.length %}
         <tr><td colspan="16" class="muted">No products found.</td></tr>
       {% endif %}
       {% for p in products %}{% set st = p.standing %}{% set o = p.offers_view %}
         <tr data-product-row="{{ p.id }}">
-          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if unitPerRow %} <small class="muted">per {{ p.reference_unit or 'unit' }}</small>{% endif %}{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
-          <td>{{ p.hs_code if p.hs_code else '—' }}</td>
-          <td>{{ p.origin or '—' }}</td>
+          <td class="name-col"><a class="product-name" href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}
+            <span class="name-sub">{{ p.name_sub }}</span></td>
           {% if canViewPricing %}
             <td>{{ st.usable }} active{% if st.paused > 0 %}<br><small class="muted">{{ st.paused }} paused</small>{% endif %}</td>
             <td>{% if not o.lowest %}—{% else %}
               {% if o.lowest.id == o.highest.id %}{% set pair = [[o.lowest, '']] %}{% else %}{% set pair = [[o.lowest, 'price-low'], [o.highest, 'price-high']] %}{% endif %}
               {% for pr in pair %}{% if not loop.first %} – {% endif %}{% if canEditPrice %}<a href="/products/suppliers/{{ pr[0].id }}/edit-price?from=products" class="{{ pr[1] }}" title="{{ pr[0].supplier_name }} — Edit price">₹{{ pr[0].base.amount }}</a>{% else %}<span class="{{ pr[1] }}">₹{{ pr[0].base.amount }}</span>{% endif %}{% endfor %}
-              <br><small class="muted">{{ o.lowest.base.label }}</small>{% endif %}</td>
-            <td>{% if not o.base %}<span class="muted">not set</span>{% else %}₹{{ o.base.inr | money }}
-              {% if canManage and fx and fx.rate > 0 %}<br><b class="usd-approx">≈ USD {{ (o.base.inr / fx.rate) | money }}</b>{% endif %}
-              <br><small class="muted">{{ o.base.label }}</small>{% endif %}</td>
+              <span class="unit-tail">/ {{ o.short }}</span>{% endif %}</td>
+            <td>{% if not o.base %}<span class="muted">not set</span>{% else %}₹{{ o.base.amount }} <span class="unit-tail">/ {{ o.base.short }}</span>
+              {% if canManage and fx and fx.rate > 0 %}<br><b class="usd-approx">≈ USD {{ (o.base.inr / fx.rate) | money }}</b>{% endif %}{% endif %}</td>
           {% endif %}
           {% if canBuildup %}{% set b = p.pricing.build %}
             {% if not b %}
-              <td colspan="5" class="muted small">{{ p.pricing.missing }}</td>
+              <td colspan="4" class="muted small wrap">{{ p.pricing.missing }}</td>
+              <td class="num col-extra">—</td>
             {% else %}
-              <td class="num">{{ b.cost | money }}</td>
-              <td class="num">{{ b.minimum | money }}</td>
+              <td class="num col-key"><b>{{ b.cost | money }}</b></td>
+              <td class="num col-key"><b>{{ b.minimum | money }}</b></td>
               <td class="num">{{ b.staff_floor | money }}</td>
-              <td class="num">{{ b.staff_quote | money }}</td>
-              <td class="num">{{ '—' if not p.pricing.lowest else (p.pricing.lowest.floor | money) }}</td>
+              <td class="num"><b>{{ b.staff_quote | money }}</b> <span class="unit-tail">/ {{ p.unit_short }}</span></td>
+              <td class="num col-extra">{{ '—' if not p.pricing.lowest else (p.pricing.lowest.floor | money) }}</td>
             {% endif %}
           {% endif %}
           {% if canStaffPrice %}{% set b = p.pricing.build %}
-            <td class="num">{{ '—' if not b else (b.staff_quote | money) }}</td>
+            <td class="num">{% if not b %}—{% else %}<b>{{ b.staff_quote | money }}</b> <span class="unit-tail">/ {{ p.unit_short }}</span>{% endif %}</td>
             <td class="num">{{ '—' if not b else (b.staff_floor | money) }}</td>
           {% endif %}
           {% if canViewPricing or canBuildup %}
-            <td>{{ (o.latest_quote if o and o.latest_quote else (p.pricing.price_date if p.pricing and p.pricing.price_date else '—')) }}{% if canBuildup and p.pricing.staleness and p.pricing.build %} <span class="badge {{ 'badge-danger' if p.pricing.staleness == 'expired' else 'badge-warning' }}">{{ p.pricing.staleness }}</span>{% endif %}</td>
+            <td class="col-extra">{{ (o.latest_quote if o and o.latest_quote else (p.pricing.price_date if p.pricing and p.pricing.price_date else '—')) }}{% if canBuildup and p.pricing.staleness and p.pricing.build %} <span class="badge {{ 'badge-danger' if p.pricing.staleness == 'expired' else 'badge-warning' }}">{{ p.pricing.staleness }}</span>{% endif %}</td>
           {% endif %}
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span>
             <br><span class="badge {{ st.badge }}" data-standing="{{ st.key }}">{{ st.label }}</span></td>
@@ -136,7 +148,9 @@
         </tr>
       {% endfor %}
     </table>
-    <p class="muted small">"Lowest – highest" are the active suppliers' prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>
+    </div>
+    {% if canBuildup %}<p class="muted small"><b>Cost</b> = the configured base price + CHA &amp; transport + other costs, in USD — what the stone really costs us at the port. <b>Min price</b> = cost + the minimum margin — never quote below it. "Show all columns" adds Associate lowest and the Latest supplier quote.</p>{% endif %}
+    <p class="muted small">"Supplier prices" are the active suppliers' lowest – highest prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>
   {% endif %}
   {% endif %}
 </div>

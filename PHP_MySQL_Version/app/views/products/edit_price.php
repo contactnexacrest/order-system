@@ -56,7 +56,7 @@ $__sell = $preview['selling'] ?? null;
             <label>New price (₹) *<input type="text" inputmode="decimal" name="price" required class="edit-price-big" data-max-decimals="2" data-max-value="999999999999.99"
                    placeholder="e.g. 185000" value="<?= View::e((string) ($old['price'] ?? ($base !== null ? rtrim(rtrim(number_format($base['inr'], 2, '.', ''), '0'), '.') : ''))) ?>" data-edit-price-input></label>
             <?php if ($grid): ?>
-              <?php $__unit = (string) ($old['unit'] ?? ''); $__unit = $fromMm === ThicknessPrices::CBM ? 'CBM' : (in_array($__unit, ['m2', 'SQFT'], true) ? $__unit : 'm2'); ?>
+              <?php $__unit = (string) ($old['unit'] ?? ''); $__unit = $fromMm === ThicknessPrices::CBM || (isset($old['thickness_mm']) && (string) $old['thickness_mm'] === (string) ThicknessPrices::CBM) ? 'CBM' : (in_array($__unit, ['m2', 'SQFT'], true) ? $__unit : 'm2'); ?>
               <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
                 <option value="m2"<?= $__unit === 'm2' ? ' selected' : '' ?>>SQM</option>
                 <option value="SQFT" data-sqft="1"<?= $__unit === 'SQFT' ? ' selected' : '' ?>>SQFT</option>

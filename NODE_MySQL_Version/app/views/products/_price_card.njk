@@ -44,7 +44,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="return_to" value="{{ pcReturn }}">
         <h3>Add / update a price — {{ pcRow.supplier_name }}</h3>
-        {% set afCard = card %}{% set afDate = 'price_quoted_on' %}
+        {% set afCard = card %}{% set afDate = 'price_quoted_on' %}{% set afPickMm = null %}
         {% include "products/_price_add.njk" %}
         <div><button type="submit" class="btn-sm btn-accent">Save price</button></div>
       </form>

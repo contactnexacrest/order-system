@@ -728,6 +728,26 @@ async function priceChange(product, lh = null) {
 }
 
 /** "per CBM (50 mm and above)", "per m² (20 mm)", "per Sq.Ft" for the configured base price. */
+/**
+ * D-365: a price's unit and thickness, short — "CBM (50 mm+)", "SQM (20 mm)", "SQM", "piece" — for
+ * the Products list ("₹160,000 – ₹190,000 / CBM (50 mm+)").
+ */
+function shortUnit(unit, mm, cbmFrom, withThickness = true) {
+  if (mm !== null && mm !== undefined) {
+    const u = Number(mm) === thicknessPrices.CBM ? 'CBM' : 'SQM';
+    return withThickness ? `${u} (${Number(mm) === thicknessPrices.CBM ? `${cbmFrom} mm+` : `${mm} mm`})` : u;
+  }
+  const u = String(unit ?? '');
+  return u === '' ? 'unit' : (lineUnits.label(u) || u);
+}
+
+/** D-365: the configured base price, short — "₹2,000 / SQM, 20 mm", "₹190,000 / CBM, 50 mm+", "₹80,000 / unit". */
+function configuredShort(product, cbmFrom) {
+  const mm = isSet(product.configured_base_thickness_mm) ? Number(product.configured_base_thickness_mm) : null;
+  const text = `₹${thicknessPrices.amount(Number(product.configured_base_price_inr))} / ${shortUnit(String(product.configured_base_unit || ''), mm, cbmFrom, false)}`;
+  return mm === null ? text : `${text}, ${mm === thicknessPrices.CBM ? `${cbmFrom} mm+` : `${mm} mm`}`;
+}
+
 async function baseLabel(product, s = null) {
   const mm = isSet(product.configured_base_thickness_mm) ? Number(product.configured_base_thickness_mm) : null;
   if (mm !== null) {
@@ -746,14 +766,23 @@ async function productRow(product, s = null) {
   const all = await offers(Number(product.id));
   const st = await status(product, all);
   const lh = await lowestHighest(product, s);
-  const cfg = isConfigured(product) ? { inr: Number(product.configured_base_price_inr), label: await baseLabel(product, s) } : null;
+  const cbmFrom = Number((await thicknessPrices.rules(product, s)).cbm_from);
+  const cfgMm = isSet(product.configured_base_thickness_mm) ? Number(product.configured_base_thickness_mm) : null;
+  const cfg = isConfigured(product) ? {
+    inr: Number(product.configured_base_price_inr), label: await baseLabel(product, s),
+    // D-365: "₹180,000 / CBM" on the Products list.
+    amount: thicknessPrices.amount(Number(product.configured_base_price_inr)),
+    short: shortUnit(String(product.configured_base_unit || ''), cfgMm, cbmFrom, false),
+  } : null;
+  // D-365: "/ CBM (50 mm+)" after the lowest – highest supplier price.
+  const lhShort = lh.lowest ? shortUnit(String(lh.lowest.base.unit), lh.lowest.base.mm, cbmFrom) : null;
   let latest = null;
   for (const o of all) {
     const d = o.quoted_on ? (o.quoted_on instanceof Date ? ymd(o.quoted_on) : String(o.quoted_on).slice(0, 10)) : null;
     if (o.usable && d !== null && (latest === null || d > latest)) latest = d;
   }
   for (const r of [lh.lowest, lh.highest]) if (r) r.base.amount = thicknessPrices.amount(r.base.inr);
-  return { status: st, lowest: lh.lowest, highest: lh.highest, base: cfg, latest_quote: latest };
+  return { status: st, lowest: lh.lowest, highest: lh.highest, base: cfg, latest_quote: latest, short: lhShort };
 }
 
 /** D-361 (owner decision 3): supplier prices typed before the Suppliers directory and still not linked to a supplier record. */
@@ -867,4 +896,6 @@ module.exports = {
   // D-361
   USABLE_SQL, CONFIGURED_SQL, NO_SUPPLIER_YET_SQL, quotableSql, isConfigured, status, supplierLinked, priceChange,
   baseLabel, productRow, unlinkedPrices, unlinkedCount, linkPrice, forOrderPo,
+  // D-365
+  shortUnit, configuredShort,
 };

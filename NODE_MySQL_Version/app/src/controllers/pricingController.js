@@ -321,6 +321,8 @@ async function marketPrices(req, res) {
     canQuickAdd: can(req, 'record_market_prices') || can(req, 'manage_suppliers'),
     canChangeRules: can(req, 'manage_pricing'),
     canSeeBuild: can(req, 'view_price_buildup'),
+    // D-365: "Add a 50 mm+ price" (Pricing ready?) opens Add a price at "per CBM".
+    prefillBasis: String(req.query.basis || '') === 'cbm' ? 'cbm' : null,
     newAddView: rules.grid ? addView(rules, null) : null,
     cha: chaView(rules, product, null),
   }, 'layout/base');

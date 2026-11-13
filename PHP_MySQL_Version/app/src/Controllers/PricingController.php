@@ -341,6 +341,8 @@ final class PricingController
             'canQuickAdd' => self::can('record_market_prices') || self::can('manage_suppliers'),
             'canChangeRules' => self::can('manage_pricing'),
             'canSeeBuild' => self::can('view_price_buildup'),
+            // D-365: "Add a 50 mm+ price" (Pricing ready?) opens Add a price at "per CBM".
+            'prefillBasis' => (string) ($_GET['basis'] ?? '') === 'cbm' ? 'cbm' : null,
         ], 'layout/base');
     }
 

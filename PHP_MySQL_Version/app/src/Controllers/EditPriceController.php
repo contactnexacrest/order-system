@@ -101,6 +101,11 @@ final class EditPriceController
         $saved = $_SESSION['edit_price_msg'][$id] ?? null;
         unset($_SESSION['edit_price_msg'][$id]);
         $old = Flash::pullOld();
+        // D-365: "Add a 50 mm+ price" (Pricing ready?) opens this form at that thickness, price empty.
+        $__pick = isset($_GET['thickness_mm']) && ctype_digit((string) $_GET['thickness_mm']) ? (int) $_GET['thickness_mm'] : null;
+        if ($grid && $__pick !== null && $__pick !== $fromMm && !isset($old['thickness_mm']) && in_array($__pick, SupplierOffers::formThicknesses($rules, $row), true)) {
+            $old += ['thickness_mm' => (string) $__pick, 'unit' => $__pick === ThicknessPrices::CBM ? 'CBM' : 'm2', 'price' => ''];
+        }
         View::render('products/edit_price', [
             'product' => $product, 'row' => $row, 'rules' => $rules, 'grid' => $grid, 'base' => $base,
             'thicknesses' => $grid ? array_map(static fn (int $mm): array => ['mm' => $mm, 'label' => ThicknessPrices::label($mm, (int) $rules['cbm_from']), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'SQM'],

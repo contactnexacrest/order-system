@@ -19,7 +19,7 @@
       <select name="thickness_mm" required data-calc-thickness>
         <option value="">Choose…</option>
         {% for o in av.rows %}
-          <option value="{{ o.mm }}"{% if o.cbm %} data-cbm="1"{% else %} data-pct="{{ o.pct }}"{% endif %}>{{ o.label }}</option>
+          <option value="{{ o.mm }}"{% if afPickMm !== undefined and afPickMm !== null and afPickMm == o.mm %} selected{% endif %}{% if o.cbm %} data-cbm="1"{% else %} data-pct="{{ o.pct }}"{% endif %}>{{ o.label }}</option>
         {% endfor %}
       </select></label>
     <label>Price (₹ per SQM, or per CBM for {{ av.cbmFrom }} mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price

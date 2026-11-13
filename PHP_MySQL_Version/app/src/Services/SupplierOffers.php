@@ -879,8 +879,15 @@ final class SupplierOffers
         $offers = self::offers((int) $product['id']);
         $status = self::status($product, $offers);
         $lh = self::lowestHighest($product, $settings);
+        $cbmFrom = (int) ThicknessPrices::rules($product, $settings)['cbm_from'];
+        $cfgMm = ($product['configured_base_thickness_mm'] ?? null) !== null ? (int) $product['configured_base_thickness_mm'] : null;
         $cfg = self::isConfigured($product) ? ['inr' => (float) $product['configured_base_price_inr'],
-            'label' => self::baseLabel($product, $settings)] : null;
+            'label' => self::baseLabel($product, $settings),
+            // D-365: "₹180,000 / CBM" on the Products list.
+            'amount' => ThicknessPrices::amount((float) $product['configured_base_price_inr']),
+            'short' => self::shortUnit((string) ($product['configured_base_unit'] ?? ''), $cfgMm, $cbmFrom, false)] : null;
+        // D-365: "/ CBM (50 mm+)" after the lowest – highest supplier price.
+        $lhShort = $lh['lowest'] !== null ? self::shortUnit((string) $lh['lowest']['base']['unit'], $lh['lowest']['base']['mm'], $cbmFrom) : null;
         $latest = null;
         foreach ($offers as $o) {
             $d = !empty($o['quoted_on']) ? substr((string) $o['quoted_on'], 0, 10) : null;
@@ -888,7 +895,29 @@ final class SupplierOffers
                 $latest = $d;
             }
         }
-        return ['status' => $status, 'lowest' => $lh['lowest'], 'highest' => $lh['highest'], 'base' => $cfg, 'latest_quote' => $latest];
+        return ['status' => $status, 'lowest' => $lh['lowest'], 'highest' => $lh['highest'], 'base' => $cfg, 'latest_quote' => $latest, 'short' => $lhShort];
+    }
+
+    /**
+     * D-365: a price's unit and thickness, short — "CBM (50 mm+)", "SQM (20 mm)", "SQM", "piece"
+     * — for the Products list ("₹160,000 – ₹190,000 / CBM (50 mm+)").
+     */
+    public static function shortUnit(?string $unit, ?int $mm, int $cbmFrom, bool $withThickness = true): string
+    {
+        if ($mm !== null) {
+            $u = $mm === ThicknessPrices::CBM ? 'CBM' : 'SQM';
+            return $withThickness ? $u . ' (' . ($mm === ThicknessPrices::CBM ? $cbmFrom . ' mm+' : $mm . ' mm') . ')' : $u;
+        }
+        $u = (string) $unit;
+        return $u === '' ? 'unit' : (LineUnits::label($u) ?: $u);
+    }
+
+    /** D-365: the configured base price, short — "₹2,000 / SQM, 20 mm", "₹190,000 / CBM, 50 mm+", "₹80,000 / unit". */
+    public static function configuredShort(array $product, int $cbmFrom): string
+    {
+        $mm = ($product['configured_base_thickness_mm'] ?? null) !== null ? (int) $product['configured_base_thickness_mm'] : null;
+        $text = '₹' . ThicknessPrices::amount((float) $product['configured_base_price_inr']) . ' / ' . self::shortUnit((string) ($product['configured_base_unit'] ?? ''), $mm, $cbmFrom, false);
+        return $mm === null ? $text : $text . ', ' . ($mm === ThicknessPrices::CBM ? $cbmFrom . ' mm+' : $mm . ' mm');
     }
 
     /** "per CBM (50 mm and above)", "per m² (20 mm)", "per Sq.Ft" for the configured base price. */

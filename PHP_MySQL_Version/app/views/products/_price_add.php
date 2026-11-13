@@ -15,7 +15,8 @@
  * "Change the % rules for this product", opens Configure › Thickness rules. Same fields and maths.
  *
  * In: $rules, $product, $__af = ['grid' => ThicknessPrices::values()|null, 'card' => price card|null,
- *     'dateField' => name of the date field ('' = the surrounding form has "Quoted on" already)].
+ *     'dateField' => name of the date field ('' = the surrounding form has "Quoted on" already),
+ *     'pickMm' => a thickness to pick at the start (D-365: "Add a 50 mm+ price"), optional].
  * Node twin: views/products/_price_add.njk.
  */
 use App\Helpers\View;
@@ -47,7 +48,7 @@ $__afBaseMm = (int) $rules['base_mm'];
       <select name="thickness_mm" required data-calc-thickness>
         <option value="">Choose…</option>
         <?php foreach ($__afMms as $__mm): ?>
-          <option value="<?= $__mm ?>"<?= $__mm === ThicknessPrices::CBM ? ' data-cbm="1"' : ' data-pct="' . View::e(ThicknessPrices::fmt($__afPct[$__mm] ?? 0.0)) . '"' ?>><?= View::e(ThicknessPrices::label($__mm, $__afCbmFrom)) ?></option>
+          <option value="<?= $__mm ?>"<?= ($__af['pickMm'] ?? null) === $__mm ? ' selected' : '' ?><?= $__mm === ThicknessPrices::CBM ? ' data-cbm="1"' : ' data-pct="' . View::e(ThicknessPrices::fmt($__afPct[$__mm] ?? 0.0)) . '"' ?>><?= View::e(ThicknessPrices::label($__mm, $__afCbmFrom)) ?></option>
         <?php endforeach; ?>
       </select></label>
     <label>Price (₹ per SQM, or per CBM for <?= $__afCbmFrom ?> mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price

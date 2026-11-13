@@ -241,16 +241,19 @@ final class D256PricingUsabilityTest extends DbTestCase
 
     public function testPricingReadyChecklist(): void
     {
+        // D-365: the configured base price replaces "supplier price per unit used for pricing".
+        Database::connection()->prepare("UPDATE catalog_products SET configured_base_follows_supplier = 0, configured_base_price_inr = 3200, configured_base_thickness_mm = NULL, configured_base_unit = 'SQM' WHERE id = :id")->execute(['id' => $this->product]);
         $r = PricingService::readiness(ProductRepository::find($this->product));
-        self::assertSame(0, $r['to_fix'], 'unit, CBM, specifications, current, open to associates');
-        self::assertSame(['unit', 'cbm', 'specs', 'current', 'associates'], array_column($r['items'], 'key'));
+        self::assertSame(0, $r['to_fix'], 'base price, active supplier, current, specifications, CBM, open to associates');
+        self::assertSame(['base', 'suppliers', 'current', 'specs', 'cbm', 'associates'], array_column($r['items'], 'key'));
+        self::assertSame('Configured base price set (₹3,200 / SQM)', $this->readyItem($r, 'base')['label']);
         // No CBM price, a stale unit price, no associate access.
         Database::connection()->prepare('DELETE FROM catalog_product_suppliers WHERE id = :id')->execute(['id' => $this->cbmSupplier]);
         PricingRepository::setSupplierDates($this->unitSupplier, date('Y-m-d', strtotime('-90 days')), null);
         Database::connection()->prepare('DELETE FROM associate_price_access WHERE category_id = :c')->execute(['c' => (int) SpecRepository::systemCategoryId()]);
         $r = PricingService::readiness(ProductRepository::find($this->product));
         self::assertFalse($this->readyItem($r, 'cbm')['ok']);
-        self::assertSame("/products/{$this->product}/market-prices", $this->readyItem($r, 'cbm')['link']);
+        self::assertSame("/products/{$this->product}/market-prices?basis=cbm#add-price", $this->readyItem($r, 'cbm')['link'], 'D-365: "Add a 50 mm+ price"');
         self::assertFalse($this->readyItem($r, 'current')['ok']);
         self::assertStringContainsString('stale', $this->readyItem($r, 'current')['detail']);
         self::assertFalse($this->readyItem($r, 'associates')['ok']);
@@ -267,7 +270,7 @@ final class D256PricingUsabilityTest extends DbTestCase
         $this->actAs($this->createTestUser('Procurement Executive'));
         $page = $this->render(fn () => (new ProductController())->show(['id' => (string) $this->product]));
         self::assertStringContainsString('Pricing ready?', $page);
-        self::assertStringContainsString('Supplier price per CBM', $page);
+        self::assertStringContainsString('No price for 50 mm and above (per CBM)', $page);
         foreach (['Product open to associates', 'Specifications checked', 'Try a price', 'Staff floor', 'Minimum price'] as $s) {
             self::assertStringNotContainsString($s, $page, "Procurement does not see {$s}");
         }

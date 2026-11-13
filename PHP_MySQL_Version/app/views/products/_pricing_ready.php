@@ -7,8 +7,12 @@ use App\Services\PricingService;
  * it can be priced, each with a link to fix it — and "Try a price", a calculator for any
  * combination of this product's options (nothing is saved). Only for people who may see the
  * price build-up; Procurement sees the supplier-price lines of the checklist only.
+ * D-365 (owner go, 13 Nov 2026, mockups plist_r / plist2_t3): ✔ done · ✘ to fix (with a button
+ * that opens the form to fix it; "Not sold at 50 mm+" too where it applies) · ℹ information only
+ * (never counted as "to fix").
  * Node twin: views/products/_pricing_ready.njk.
  */
+$__marks = ['ok' => ['✔', 'done'], 'fix' => ['✘', 'to fix'], 'info' => ['ℹ', 'information only']];
 $__usd = static fn (float $v): string => 'USD ' . number_format($v, 2);
 if ($readiness === null && $tryPrice === null) {
     return;
@@ -17,17 +21,21 @@ if ($readiness === null && $tryPrice === null) {
 <div class="pricing-two">
 <?php if ($readiness !== null): ?>
 <div class="section" id="pricing-ready">
-  <h2>Pricing ready? <?php if ($readiness['to_fix'] > 0): ?><span class="badge badge-warning"><?= (int) $readiness['to_fix'] ?> to fix</span><?php else: ?><span class="badge badge-success">ready</span><?php endif; ?></h2>
-  <table class="list ready-list">
-    <?php foreach ($readiness['items'] as $__i): ?>
-      <tr>
-        <td class="<?= $__i['ok'] ? 'ok' : 'no' ?>" aria-label="<?= $__i['ok'] ? 'done' : 'to fix' ?>"><?= $__i['ok'] ? '✓' : '✗' ?></td>
-        <td><?= View::e($__i['label']) ?><?php if ($__i['detail'] !== ''): ?><br><small class="muted"><?= View::e($__i['detail']) ?></small><?php endif; ?></td>
-        <td><a href="<?= View::e($__i['link']) ?>"><?= View::e($__i['link_text']) ?></a></td>
-      </tr>
+  <h2>Pricing ready? <?php if ($readiness['to_fix'] > 0): ?><span class="badge badge-danger"><?= (int) $readiness['to_fix'] ?> to fix</span><?php else: ?><span class="badge badge-success">ready</span><?php endif; ?></h2>
+  <ul class="ready-list">
+    <?php foreach ($readiness['items'] as $__i): $__s = $__i['state'] ?? ($__i['ok'] ? 'ok' : 'fix'); ?>
+      <li class="ready-<?= $__s ?>" data-ready="<?= View::e($__i['key']) ?>">
+        <span class="ready-mark" aria-label="<?= $__marks[$__s][1] ?>"><?= $__marks[$__s][0] ?></span>
+        <?= View::e($__i['label']) ?><?php if ($__i['detail'] !== ''): ?> <small class="ready-detail">— <?= View::e($__i['detail']) ?></small><?php endif; ?>
+        <?php if ($__s === 'fix'): ?>
+          <span class="row-actions ready-actions"><a class="btn-sm" href="<?= View::e($__i['link']) ?>"><?= View::e($__i['link_text']) ?></a><?php if (!empty($__i['link2'])): ?><a class="btn-sm btn-secondary" href="<?= View::e($__i['link2']) ?>"><?= View::e($__i['link2_text']) ?></a><?php endif; ?></span>
+        <?php else: ?>
+          <a class="ready-link" href="<?= View::e($__i['link']) ?>"><?= View::e($__i['link_text']) ?></a>
+        <?php endif; ?>
+      </li>
     <?php endforeach; ?>
-  </table>
-  <p class="small muted">Until every line is ✓, staff can still quote, but an associate's "Get price" for the missing part goes to staff for a manual price.</p>
+  </ul>
+  <p class="small muted">Until every ✘ line is fixed, staff can still quote, but an associate's "Get price" for the missing part goes to staff for a manual price. ℹ lines are information only.</p>
 </div>
 <?php endif; ?>
 <?php if ($tryPrice !== null && $tryPrice['p'] !== null): $__p = $tryPrice['p']; $__b = $__p['build']; ?>

@@ -228,6 +228,14 @@ Not yet recorded but will show these: **B05** (Procurement: Supplier performance
 price) and **B09** (MD / ED: Products list, Configure, Market prices with SQM / SQFT labels). Listed only — nothing
 re-recorded.
 
+D-365 (13 Nov 2026: Products list short view — Name with HS code · origin · unit under it, supplier prices and base
+price with unit and thickness, Cost and Min price highlighted, "Show all columns", fixed Name column; "Pricing ready?"
+reworked — configured base price and active supplier lines, ✔ / ✘ / ℹ, a fix button on every ✘ line, associates as
+information while none is active) — checked against every script: no recorded video opens the Products list, the
+product page or "Pricing ready?", and no narration names these columns or checks. No recorded video is affected. Not yet
+recorded but will show these: **B05** (Procurement: the supplier-price lines of "Pricing ready?") and **B09** (MD / ED:
+Products list short view and "Show all columns", "Pricing ready?"). Listed only — nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

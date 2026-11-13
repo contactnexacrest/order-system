@@ -186,15 +186,18 @@ describe('D-256 pricing usability', () => {
   });
 
   it('the "Pricing ready?" checklist, the list badge, and who sees it', async () => {
+    // D-365: the configured base price replaces "supplier price per unit used for pricing".
+    await db.execute("UPDATE catalog_products SET configured_base_follows_supplier = 0, configured_base_price_inr = 3200, configured_base_thickness_mm = NULL, configured_base_unit = 'SQM' WHERE id = :id", { id: product });
     let r = await pricingService.readiness(await p());
     expect(r.to_fix).toBe(0);
-    expect(r.items.map((i) => i.key)).toEqual(['unit', 'cbm', 'specs', 'current', 'associates']);
+    expect(r.items.map((i) => i.key)).toEqual(['base', 'suppliers', 'current', 'specs', 'cbm', 'associates']);
+    expect(readyItem(r, 'base').label).toBe('Configured base price set (₹3,200 / SQM)');
     await db.execute('DELETE FROM catalog_product_suppliers WHERE id = :id', { id: cbmSupplier });
     await pricingRepository.setSupplierDates(unitSupplier, daysAgo(90), null);
     await db.execute('DELETE FROM associate_price_access WHERE category_id = :c', { c: await specRepository.systemCategoryId() });
     r = await pricingService.readiness(await p());
     expect(readyItem(r, 'cbm').ok).toBe(false);
-    expect(readyItem(r, 'cbm').link).toBe(`/products/${product}/market-prices`);
+    expect(readyItem(r, 'cbm').link).toBe(`/products/${product}/market-prices?basis=cbm#add-price`); // D-365: "Add a 50 mm+ price"
     expect(readyItem(r, 'current').ok).toBe(false);
     expect(readyItem(r, 'current').detail).toContain('stale');
     expect(readyItem(r, 'associates').ok).toBe(false);
@@ -209,7 +212,7 @@ describe('D-256 pricing usability', () => {
     const procurement = await login('Procurement Executive');
     let page = (await procurement.get(`/products/${product}`)).text;
     expect(page).toContain('Pricing ready?');
-    expect(page).toContain('Supplier price per CBM');
+    expect(page).toContain('No price for 50 mm and above (per CBM)');
     for (const s of ['Product open to associates', 'Specifications checked', 'Try a price', 'Staff floor', 'Minimum price']) {
       expect([s, page.includes(s)]).toEqual([s, false]);
     }

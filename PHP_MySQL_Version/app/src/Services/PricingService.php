@@ -547,7 +547,13 @@ final class PricingService
 
     /**
      * D-256: "Pricing ready?" — what a product still needs before it can be priced.
-     * Each item: key, ok, label, detail, link, supplier (a supplier-price line Procurement may see).
+     * D-365 (owner go, 13 Nov 2026, mockups plist_r / plist2_t3): the "supplier price per unit …
+     * used for pricing" line is gone — the configured base price replaces it ('base'); "At least
+     * one active supplier" is added ('suppliers'; information only for a "No supplier yet"
+     * product); "Product open to associates" is information only while the system has no active
+     * associate at all. Every line that is not done has a button that opens the form to fix it.
+     * Each item: key, ok, state ('ok' | 'fix' | 'info'), label, detail, link, link_text, supplier
+     * (a line Procurement may see), and for 'cbm' the extra button (link2 / link2_text).
      *
      * @return array{items: list<array<string,mixed>>, to_fix: int}
      */
@@ -556,16 +562,48 @@ final class PricingService
         $settings ??= self::settings();
         $id = (int) $product['id'];
         $market = "/products/{$id}/market-prices";
-        $items = [];
+        $byKey = [];
         $unit = self::pricingSupplier($id);
-        $unitInr = $unit !== null ? (self::fobParts($product, $unit, 'unit', null, $settings)['total'] ?? null) : null; // D-300: grid prices too
-        $items[] = ['key' => 'unit', 'ok' => $unit !== null && $unitInr !== null && $unitInr > 0, 'supplier' => true,
-            'label' => 'Supplier price per ' . ((string) ($product['reference_unit'] ?? '') ?: 'unit') . ' entered and "used for pricing"',
-            'detail' => $unit !== null && $unitInr !== null ? '₹' . number_format($unitInr, 2) . (self::priceDate($unit) !== null ? ' · ' . date('d M', (int) strtotime((string) self::priceDate($unit))) : '') : 'none yet',
-            'link' => $market, 'link_text' => $unit === null ? 'Add in Market prices' : 'Market prices'];
+        $offers = SupplierOffers::offers($id);
+        $standing = SupplierOffers::status($product, $offers);
         $offered = ProductSpecs::offered($product);
         $cbmFrom = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $settings['cbm_from_mm'];
+
+        // The configured base price (D-361) — what every selling price is worked out from.
+        $cfg = SupplierOffers::isConfigured($product);
+        $byKey['base'] = ['key' => 'base', 'ok' => $cfg, 'supplier' => false,
+            'label' => 'Configured base price set' . ($cfg ? ' (' . SupplierOffers::configuredShort($product, (int) ThicknessPrices::rules($product, $settings)['cbm_from']) . ')' : ''),
+            'detail' => $cfg ? '' : 'not configured yet — no selling price is worked out or offered until it is',
+            'link' => "/products/{$id}/configure", 'link_text' => $cfg ? 'Edit' : 'Configure'];
+
+        // At least one active supplier (a usable offer).
+        $names = [];
+        foreach ($offers as $o) {
+            if (!empty($o['usable']) && ($o['price_basis'] ?? 'unit') !== 'combo') {
+                $names[trim((string) $o['supplier_name'])] = true;
+            }
+        }
+        $names = array_keys(array_filter($names, static fn ($v, $k): bool => $k !== '', ARRAY_FILTER_USE_BOTH));
+        $nameText = count($names) > 3 ? implode(', ', array_slice($names, 0, 3)) . ' +' . (count($names) - 3) . ' more' : implode(', ', $names);
+        if ($standing['usable'] > 0) {
+            $byKey['suppliers'] = ['key' => 'suppliers', 'ok' => true, 'supplier' => true,
+                'label' => 'At least one active supplier' . ($nameText !== '' ? " ({$nameText})" : ''), 'detail' => '',
+                'link' => $market, 'link_text' => 'Market prices'];
+        } elseif ($standing['no_supplier_yet']) {
+            $byKey['suppliers'] = ['key' => 'suppliers', 'ok' => true, 'info' => true, 'supplier' => true,
+                'label' => 'No supplier linked yet — a product from before the Suppliers directory',
+                'detail' => 'information only — it keeps working until a supplier is linked',
+                'link' => "/products/{$id}/link-supplier", 'link_text' => 'Link a supplier'];
+        } else {
+            $byKey['suppliers'] = ['key' => 'suppliers', 'ok' => false, 'supplier' => true,
+                'label' => 'At least one active supplier',
+                'detail' => $standing['paused'] > 0 ? 'none active — ' . $standing['paused'] . ' paused' : 'no supplier price yet',
+                'link' => $market . '#add-price', 'link_text' => 'Add a supplier price'];
+        }
+
+        // A price for 50 mm and above (per CBM), when the product is sold that thick.
         $needsCbm = false;
+        $thickSpec = null;
         foreach ($offered as $sp) {
             if ($sp['kind'] !== 'thickness') {
                 continue;
@@ -573,16 +611,38 @@ final class PricingService
             foreach ($sp['options'] as $o) {
                 if ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $cbmFrom)) {
                     $needsCbm = true;
+                    $thickSpec ??= (int) $sp['id'];
                 }
             }
         }
         $cbm = self::cbmSupplier($id);
         if ($needsCbm) {
-            $items[] = ['key' => 'cbm', 'ok' => $cbm !== null, 'supplier' => true,
-                'label' => "Supplier price per CBM (needed: sold at {$cbmFrom} mm and above)",
-                'detail' => $cbm !== null ? '₹' . number_format((float) (self::fobParts($product, $cbm, 'cbm', null, $settings)['total'] ?? 0), 2) . ' per CBM' : 'none yet',
-                'link' => $market, 'link_text' => $cbm === null ? 'Add in Market prices' : 'Market prices'];
+            // "Add a 50 mm+ price": Edit price at 50 mm and above for a price for every thickness;
+            // otherwise Market prices › Add a price, "per CBM", for the same supplier.
+            $target = $unit;
+            if ($target === null) {
+                foreach ($offers as $o) {
+                    if (!empty($o['usable']) && in_array($o['price_basis'] ?? 'unit', ['unit', 'grid'], true)) {
+                        $target = $o;
+                        break;
+                    }
+                }
+            }
+            $addCbm = $target !== null && ($target['price_basis'] ?? '') === 'grid'
+                ? '/products/suppliers/' . (int) $target['id'] . '/edit-price?thickness_mm=' . ThicknessPrices::CBM
+                : $market . '?basis=cbm' . ($target !== null && ($target['supplier_id'] ?? null) !== null ? '&supplier_id=' . (int) $target['supplier_id'] : '') . '#add-price';
+            $byKey['cbm'] = ['key' => 'cbm', 'ok' => $cbm !== null, 'supplier' => true,
+                'label' => $cbm !== null ? "Supplier price per CBM (needed: sold at {$cbmFrom} mm and above)" : "No price for {$cbmFrom} mm and above (per CBM)",
+                'detail' => $cbm !== null ? '₹' . number_format((float) (self::fobParts($product, $cbm, 'cbm', null, $settings)['total'] ?? 0), 2) . ' per CBM'
+                    : "needed because this product is sold at {$cbmFrom} mm and above — orders at {$cbmFrom} mm+ cannot be priced",
+                'link' => $cbm !== null ? $market : $addCbm, 'link_text' => $cbm !== null ? 'Market prices' : "Add a {$cbmFrom} mm+ price"];
+            if ($cbm === null && $thickSpec !== null) {
+                // The existing per-product switch: untick the 50 mm+ thicknesses as "offered" for this product.
+                $byKey['cbm']['link2'] = "/products/{$id}/specifications?edit={$thickSpec}#spec-{$thickSpec}";
+                $byKey['cbm']['link2_text'] = "Not sold at {$cbmFrom} mm+";
+            }
         }
+
         $pdo = \App\Config\Database::connection();
         $count = static function (string $sql) use ($pdo, $id): int {
             $st = $pdo->prepare($sql);
@@ -600,10 +660,10 @@ final class PricingService
             $st->execute(['c' => $categoryId]);
             $categoryName = $st->fetchColumn() ?: null;
         }
-        $items[] = ['key' => 'specs', 'ok' => $offered !== [], 'supplier' => false,
+        $byKey['specs'] = ['key' => 'specs', 'ok' => $offered !== [], 'supplier' => false,
             'label' => $offered !== [] ? 'Specifications checked (follows ' . ($categoryName ?? 'its category') . ', ' . $changes . ' change' . ($changes === 1 ? '' : 's') . ')' : 'Specifications: none offered for this product',
             'detail' => count($offered) . ' specification' . (count($offered) === 1 ? '' : 's'),
-            'link' => "/products/{$id}/specifications", 'link_text' => 'View'];
+            'link' => "/products/{$id}/specifications", 'link_text' => $offered !== [] ? 'View' : 'Set the specifications'];
         $stale = [];
         foreach (['SQM/unit' => $unit, 'CBM' => $needsCbm ? $cbm : null] as $label => $s) {
             if ($s !== null && ($st = self::staleness($s, $settings['stale_days'])) !== null) {
@@ -611,17 +671,18 @@ final class PricingService
             }
         }
         $current = $unit !== null && $stale === [];
-        $items[] = ['key' => 'current', 'ok' => $current, 'supplier' => true,
+        $byKey['current'] = ['key' => 'current', 'ok' => $current, 'supplier' => true,
             'label' => 'Supplier price is current (under ' . $settings['stale_days'] . ' days old)',
             'detail' => $unit === null ? 'no price yet' : ($stale !== [] ? implode(', ', $stale) : (!empty($unit['valid_until']) ? 'valid until ' . date('d M', (int) strtotime((string) $unit['valid_until'])) : 'no valid-until date')),
-            'link' => $market, 'link_text' => 'Market prices'];
+            'link' => $current ? $market : ($unit !== null ? '/products/suppliers/' . (int) $unit['id'] . '/edit-price' : $market . '#add-price'),
+            'link_text' => $current ? 'Market prices' : ($unit !== null ? 'Edit price' : 'Add a supplier price')];
         $combos = array_values(array_filter(ProductSupplierRepository::forProduct($id), static fn (array $s): bool => ($s['price_basis'] ?? '') === 'combo' && (int) ($s['combo_in_use'] ?? 0) === 1));
         if ($combos !== []) {
             $ignored = count(array_filter($combos, fn (array $s): bool => self::staleness($s, $settings['stale_days']) !== null));
-            $items[] = ['key' => 'exact', 'ok' => $ignored === 0, 'supplier' => true,
+            $byKey['exact'] = ['key' => 'exact', 'ok' => $ignored === 0, 'supplier' => true,
                 'label' => 'Exact supplier prices for specific combinations are current',
                 'detail' => count($combos) . ' in use' . ($ignored > 0 ? ", {$ignored} stale or expired — ignored until renewed" : ''),
-                'link' => $market, 'link_text' => 'Market prices'];
+                'link' => $market, 'link_text' => $ignored > 0 ? 'Renew in Market prices' : 'Market prices'];
         }
         $forms = ProductSpecs::productForms($product);
         $open = [];
@@ -636,11 +697,36 @@ final class PricingService
                 }
             }
         }
-        $items[] = ['key' => 'associates', 'ok' => $open !== [], 'supplier' => false,
-            'label' => 'Product open to associates' . ($open !== [] ? ' (' . implode(', ', array_map('ucfirst', array_keys($open))) . ')' : ''),
-            'detail' => $open !== [] ? '' : 'no associate may price it yet',
-            'link' => '/associates', 'link_text' => 'Change'];
-        return ['items' => $items, 'to_fix' => count(array_filter($items, static fn (array $i): bool => !$i['ok']))];
+        $active = array_map('intval', $pdo->query("SELECT id FROM associates WHERE status = 'active' ORDER BY id LIMIT 2")->fetchAll(\PDO::FETCH_COLUMN));
+        if ($active === []) {
+            // No active associate in the system at all: information only, not "to fix".
+            $byKey['associates'] = ['key' => 'associates', 'ok' => true, 'info' => true, 'supplier' => false,
+                'label' => 'Not open to associates yet — no associate in the system',
+                'detail' => 'information only — does not stop quoting',
+                'link' => '/associates/access-levels', 'link_text' => 'Associates › Access levels'];
+        } else {
+            $byKey['associates'] = ['key' => 'associates', 'ok' => $open !== [], 'supplier' => false,
+                'label' => 'Product open to associates' . ($open !== [] ? ' (' . implode(', ', array_map('ucfirst', array_keys($open))) . ')' : ''),
+                'detail' => $open !== [] ? '' : 'no associate may price it yet',
+                'link' => $open === [] && count($active) === 1 ? '/associates/' . $active[0] . '/price-access' : '/associates',
+                'link_text' => $open !== [] ? 'Change' : 'Give price access'];
+        }
+        $items = [];
+        foreach (['base', 'suppliers', 'current', 'specs', 'cbm', 'exact', 'associates'] as $k) {
+            if (isset($byKey[$k])) {
+                $i = $byKey[$k];
+                $i['info'] = !empty($i['info']);
+                $i['state'] = $i['info'] ? 'info' : ($i['ok'] ? 'ok' : 'fix');
+                $items[] = $i;
+            }
+        }
+        return ['items' => $items, 'to_fix' => self::countToFix($items)];
+    }
+
+    /** D-365: the lines still to fix (information lines never count). @param list<array<string,mixed>> $items */
+    public static function countToFix(array $items): int
+    {
+        return count(array_filter($items, static fn (array $i): bool => !$i['ok'] && empty($i['info'])));
     }
 
     public static function levelLabel(array $level): string

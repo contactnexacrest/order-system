@@ -90,6 +90,11 @@ async function form(req, res) {
   req.session.edit_price_msg = msgs;
   const undo = (req.session.edit_price_undo || {})[id] || null;
   const old = flash.pullOld(req);
+  // D-365: "Add a 50 mm+ price" (Pricing ready?) opens this form at that thickness, price empty.
+  const pick = /^\d+$/.test(String(req.query.thickness_mm ?? '')) ? Number(req.query.thickness_mm) : null;
+  if (grid && pick !== null && pick !== fromMm && !isSet(old.thickness_mm) && supplierOffers.formThicknesses(rules, row).includes(pick)) {
+    Object.assign(old, { thickness_mm: String(pick), unit: pick === thicknessPrices.CBM ? 'CBM' : 'm2', price: '' });
+  }
   const from = fromOf(req);
   const today = todayYmd();
   const validUntil = isSet(old.valid_until) ? String(old.valid_until) : (ymdOf(row.valid_until) >= today ? ymdOf(row.valid_until) : '');
@@ -108,7 +113,7 @@ async function form(req, res) {
     unitLabel: (row.price_basis || '') === 'cbm' ? 'CBM' : (lineUnits.label(String(product.reference_unit || '')) || String(product.reference_unit || '') || 'unit'),
     fromUnit: fromMm === thicknessPrices.CBM ? 'CBM' : 'SQM',
     // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
-    gridUnit: fromMm === thicknessPrices.CBM ? 'CBM' : (['m2', 'SQFT'].includes(String(old.unit ?? '')) ? String(old.unit) : 'm2'),
+    gridUnit: fromMm === thicknessPrices.CBM || (isSet(old.thickness_mm) && String(old.thickness_mm) === String(thicknessPrices.CBM)) ? 'CBM' : (['m2', 'SQFT'].includes(String(old.unit ?? '')) ? String(old.unit) : 'm2'),
     sqmUnit: !grid && supplierOffers.sqmPriced(product, false, null, String(row.price_basis || 'unit')) ? String(product.reference_unit) : null,
     oldUnit: String(old.unit ?? ''),
     thicknesses: grid ? supplierOffers.formThicknesses(rules, row).map((mm) => ({

@@ -489,41 +489,97 @@ const shortDay = (d) => {
 
 /**
  * D-256: "Pricing ready?" — what a product still needs before it can be priced.
- * Each item: key, ok, label, detail, link, link_text, supplier (a supplier-price line Procurement may see).
+ * D-365 (owner go, 13 Nov 2026, mockups plist_r / plist2_t3): the "supplier price per unit … used for
+ * pricing" line is gone — the configured base price replaces it ('base'); "At least one active
+ * supplier" is added ('suppliers'; information only for a "No supplier yet" product); "Product open
+ * to associates" is information only while the system has no active associate at all. Every line
+ * that is not done has a button that opens the form to fix it. Each item: key, ok, state ('ok' |
+ * 'fix' | 'info'), label, detail, link, link_text, supplier (a line Procurement may see), and for
+ * 'cbm' the extra button (link2 / link2_text). PHP twin: PricingService::readiness().
  */
 async function readiness(product, s = null) {
   s = s || (await settings());
   const db = require('../config/db');
   const productSpecs = require('./productSpecs');
+  const supplierOffers = require('./supplierOffers');
+  const thicknessPrices = require('./thicknessPrices');
   const id = Number(product.id);
   const market = `/products/${id}/market-prices`;
-  const items = [];
+  const byKey = {};
   const unit = await pricingSupplier(id);
-  const unitInr = unit !== null ? ((await fobParts(product, unit, 'unit', null, s)) || {}).total ?? null : null; // D-300: grid prices too
-  items.push({
-    key: 'unit', ok: unit !== null && unitInr !== null && unitInr > 0, supplier: true,
-    label: `Supplier price per ${String(product.reference_unit || '') || 'unit'} entered and "used for pricing"`,
-    detail: unit !== null && unitInr !== null ? `₹${numberFormat(unitInr)}${priceDate(unit) !== null ? ` · ${shortDay(priceDate(unit))}` : ''}` : 'none yet',
-    link: market, link_text: unit === null ? 'Add in Market prices' : 'Market prices',
-  });
+  const offers = await supplierOffers.offers(id);
+  const standing = await supplierOffers.status(product, offers);
   const offeredSpecs = await productSpecs.offered(product);
   const cbmFrom = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : s.cbm_from_mm;
+
+  // The configured base price (D-361) — what every selling price is worked out from.
+  const cfg = supplierOffers.isConfigured(product);
+  byKey.base = {
+    key: 'base', ok: cfg, supplier: false,
+    label: `Configured base price set${cfg ? ` (${supplierOffers.configuredShort(product, Number((await thicknessPrices.rules(product, s)).cbm_from))})` : ''}`,
+    detail: cfg ? '' : 'not configured yet — no selling price is worked out or offered until it is',
+    link: `/products/${id}/configure`, link_text: cfg ? 'Edit' : 'Configure',
+  };
+
+  // At least one active supplier (a usable offer).
+  const names = [...new Set(offers.filter((o) => o.usable && (o.price_basis || 'unit') !== 'combo').map((o) => String(o.supplier_name || '').trim()))].filter((n) => n !== '');
+  const nameText = names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3} more` : names.join(', ');
+  if (standing.usable > 0) {
+    byKey.suppliers = {
+      key: 'suppliers', ok: true, supplier: true,
+      label: `At least one active supplier${nameText !== '' ? ` (${nameText})` : ''}`, detail: '',
+      link: market, link_text: 'Market prices',
+    };
+  } else if (standing.no_supplier_yet) {
+    byKey.suppliers = {
+      key: 'suppliers', ok: true, info: true, supplier: true,
+      label: 'No supplier linked yet — a product from before the Suppliers directory',
+      detail: 'information only — it keeps working until a supplier is linked',
+      link: `/products/${id}/link-supplier`, link_text: 'Link a supplier',
+    };
+  } else {
+    byKey.suppliers = {
+      key: 'suppliers', ok: false, supplier: true,
+      label: 'At least one active supplier',
+      detail: standing.paused > 0 ? `none active — ${standing.paused} paused` : 'no supplier price yet',
+      link: `${market}#add-price`, link_text: 'Add a supplier price',
+    };
+  }
+
+  // A price for 50 mm and above (per CBM), when the product is sold that thick.
   let needsCbm = false;
+  let thickSpec = null;
   for (const sp of offeredSpecs) {
     if (sp.kind !== 'thickness') continue;
     for (const o of sp.options) {
-      if (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= cbmFrom)) needsCbm = true;
+      if (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= cbmFrom)) {
+        needsCbm = true;
+        if (thickSpec === null) thickSpec = Number(sp.id);
+      }
     }
   }
   const cbm = await cbmSupplier(id);
   if (needsCbm) {
-    items.push({
+    // "Add a 50 mm+ price": Edit price at 50 mm and above for a price for every thickness;
+    // otherwise Market prices › Add a price, "per CBM", for the same supplier.
+    const target = unit || offers.find((o) => o.usable && ['unit', 'grid'].includes(o.price_basis || 'unit')) || null;
+    const addCbm = target && (target.price_basis || '') === 'grid'
+      ? `/products/suppliers/${Number(target.id)}/edit-price?thickness_mm=${thicknessPrices.CBM}`
+      : `${market}?basis=cbm${target && target.supplier_id !== null && target.supplier_id !== undefined ? `&supplier_id=${Number(target.supplier_id)}` : ''}#add-price`;
+    byKey.cbm = {
       key: 'cbm', ok: cbm !== null, supplier: true,
-      label: `Supplier price per CBM (needed: sold at ${cbmFrom} mm and above)`,
-      detail: cbm !== null ? `₹${numberFormat(((await fobParts(product, cbm, 'cbm', null, s)) || {}).total || 0)} per CBM` : 'none yet',
-      link: market, link_text: cbm === null ? 'Add in Market prices' : 'Market prices',
-    });
+      label: cbm !== null ? `Supplier price per CBM (needed: sold at ${cbmFrom} mm and above)` : `No price for ${cbmFrom} mm and above (per CBM)`,
+      detail: cbm !== null ? `₹${numberFormat(((await fobParts(product, cbm, 'cbm', null, s)) || {}).total || 0)} per CBM`
+        : `needed because this product is sold at ${cbmFrom} mm and above — orders at ${cbmFrom} mm+ cannot be priced`,
+      link: cbm !== null ? market : addCbm, link_text: cbm !== null ? 'Market prices' : `Add a ${cbmFrom} mm+ price`,
+    };
+    if (cbm === null && thickSpec !== null) {
+      // The existing per-product switch: untick the 50 mm+ thicknesses as "offered" for this product.
+      byKey.cbm.link2 = `/products/${id}/specifications?edit=${thickSpec}#spec-${thickSpec}`;
+      byKey.cbm.link2_text = `Not sold at ${cbmFrom} mm+`;
+    }
   }
+
   const count = async (sql) => Number((await db.queryOne(sql, { p: id })).n);
   const changes = await count('SELECT COUNT(*) AS n FROM product_spec_hidden WHERE product_id = :p')
     + await count('SELECT COUNT(*) AS n FROM product_option_overrides WHERE product_id = :p')
@@ -535,33 +591,35 @@ async function readiness(product, s = null) {
     const c = await db.queryOne('SELECT name FROM product_categories WHERE id = :c', { c: categoryId });
     categoryName = c ? c.name : null;
   }
-  items.push({
+  byKey.specs = {
     key: 'specs', ok: offeredSpecs.length > 0, supplier: false,
     label: offeredSpecs.length ? `Specifications checked (follows ${categoryName || 'its category'}, ${changes} change${changes === 1 ? '' : 's'})` : 'Specifications: none offered for this product',
     detail: `${offeredSpecs.length} specification${offeredSpecs.length === 1 ? '' : 's'}`,
-    link: `/products/${id}/specifications`, link_text: 'View',
-  });
+    link: `/products/${id}/specifications`, link_text: offeredSpecs.length ? 'View' : 'Set the specifications',
+  };
   const stale = [];
   for (const [label, sup] of [['SQM/unit', unit], ['CBM', needsCbm ? cbm : null]]) {
     if (sup === null) continue;
     const st = staleness(sup, s.stale_days);
     if (st !== null) stale.push(`${label} price ${st}`);
   }
-  items.push({
-    key: 'current', ok: unit !== null && !stale.length, supplier: true,
+  const current = unit !== null && !stale.length;
+  byKey.current = {
+    key: 'current', ok: current, supplier: true,
     label: `Supplier price is current (under ${s.stale_days} days old)`,
     detail: unit === null ? 'no price yet' : (stale.length ? stale.join(', ') : (unit.valid_until ? `valid until ${shortDay(unit.valid_until instanceof Date ? ymd(unit.valid_until) : unit.valid_until)}` : 'no valid-until date')),
-    link: market, link_text: 'Market prices',
-  });
+    link: current ? market : (unit !== null ? `/products/suppliers/${Number(unit.id)}/edit-price` : `${market}#add-price`),
+    link_text: current ? 'Market prices' : (unit !== null ? 'Edit price' : 'Add a supplier price'),
+  };
   const combos = (await productSupplierRepository.forProduct(id)).filter((r) => (r.price_basis || '') === 'combo' && Number(r.combo_in_use || 0) === 1);
   if (combos.length) {
     const ignored = combos.filter((r) => staleness(r, s.stale_days) !== null).length;
-    items.push({
+    byKey.exact = {
       key: 'exact', ok: ignored === 0, supplier: true,
       label: 'Exact supplier prices for specific combinations are current',
       detail: `${combos.length} in use${ignored > 0 ? `, ${ignored} stale or expired — ignored until renewed` : ''}`,
-      link: market, link_text: 'Market prices',
-    });
+      link: market, link_text: ignored > 0 ? 'Renew in Market prices' : 'Market prices',
+    };
   }
   const forms = productSpecs.productForms(product);
   const open = new Set();
@@ -573,14 +631,38 @@ async function readiness(product, s = null) {
       for (const h of hit) open.add(h);
     }
   }
-  const openList = [...open].map((f) => f.charAt(0).toUpperCase() + f.slice(1));
-  items.push({
-    key: 'associates', ok: open.size > 0, supplier: false,
-    label: `Product open to associates${open.size ? ` (${openList.join(', ')})` : ''}`,
-    detail: open.size ? '' : 'no associate may price it yet',
-    link: '/associates', link_text: 'Change',
-  });
-  return { items, to_fix: items.filter((i) => !i.ok).length };
+  const active = (await db.query("SELECT id FROM associates WHERE status = 'active' ORDER BY id LIMIT 2")).map((r) => Number(r.id));
+  if (!active.length) {
+    // No active associate in the system at all: information only, not "to fix".
+    byKey.associates = {
+      key: 'associates', ok: true, info: true, supplier: false,
+      label: 'Not open to associates yet — no associate in the system',
+      detail: 'information only — does not stop quoting',
+      link: '/associates/access-levels', link_text: 'Associates › Access levels',
+    };
+  } else {
+    const openList = [...open].map((f) => f.charAt(0).toUpperCase() + f.slice(1));
+    byKey.associates = {
+      key: 'associates', ok: open.size > 0, supplier: false,
+      label: `Product open to associates${open.size ? ` (${openList.join(', ')})` : ''}`,
+      detail: open.size ? '' : 'no associate may price it yet',
+      link: !open.size && active.length === 1 ? `/associates/${active[0]}/price-access` : '/associates',
+      link_text: open.size ? 'Change' : 'Give price access',
+    };
+  }
+  const items = [];
+  for (const k of ['base', 'suppliers', 'current', 'specs', 'cbm', 'exact', 'associates']) {
+    if (!byKey[k]) continue;
+    const i = { ...byKey[k], info: !!byKey[k].info };
+    i.state = i.info ? 'info' : (i.ok ? 'ok' : 'fix');
+    items.push(i);
+  }
+  return { items, to_fix: countToFix(items) };
+}
+
+/** D-365: the lines still to fix (information lines never count). */
+function countToFix(items) {
+  return items.filter((i) => !i.ok && !i.info).length;
 }
 
 /**
@@ -639,7 +721,7 @@ function readLadderForm(post, levelsById) {
 }
 
 module.exports = {
-  exactPrice, comboText, readiness,
+  exactPrice, comboText, readiness, countToFix,
   DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, cbmSupplier, staleness, priceDate,
   forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm, fobParts, effectiveFor, buildFromFob,
 };
