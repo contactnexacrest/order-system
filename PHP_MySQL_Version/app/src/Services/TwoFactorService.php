@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Config\Env;
 use App\Repositories\EmailTemplateRepository;
+use App\Repositories\RateLimitRepository;
 
 /**
  * The 6-digit login code e-mailed at every sign-in (owner decision D-265,
@@ -18,7 +19,8 @@ use App\Repositories\EmailTemplateRepository;
  * sign-in and a buyer sign-in in the same browser never mix.
  *
  * Rules (the same as the associate code): valid 10 minutes, 5 tries, a new
- * code at most once a minute. Always by e-mail (SMS stays off), sent as
+ * code at most once a minute, at most 5 codes per account in 15 minutes
+ * (HNT-L04). Always by e-mail (SMS stays off), sent as
  * security mail — it goes out even when Admin has switched business e-mail off.
  */
 final class TwoFactorService
@@ -30,11 +32,48 @@ final class TwoFactorService
     /** D-280: the buyer's own login-code wording (template client_login_code; this is its fallback). */
     public const CLIENT_CODE_BODY = "Hello,\n\nYour code to log in to your NexaCrest order portal is: {code}\n\nIt is valid for 10 minutes.\n\nIf you did not try to log in, you can ignore this e-mail — nobody can log in without this code. If it keeps happening, change your password with \"Forgot your password?\" on the login page.\n\nNexaCrest International Private Limited";
 
+    /**
+     * HNT-L04 (QA 13 Nov 2026): signing in again with the password sent a new code
+     * every time, without limit (staff, buyers and associates), so whoever knows a
+     * password could flood the inbox and get a fresh 5 tries as often as they liked.
+     * At most 5 codes per account in 15 minutes — signing in again and "send a new
+     * code" both count; a successful sign-in starts the count again. Each code sent
+     * is one rate_limit_hits row (recorded first, then counted, so parallel requests
+     * cannot slip past the limit), keyed by the account, not by the IP.
+     */
+    public const MAX_CODES_PER_WINDOW = 5;
+    public const CODES_WINDOW_MINUTES = 15;
+    public const TOO_MANY_CODES_MESSAGE = 'Too many login codes have been sent for this account (at most 5 in 15 minutes). Please use the latest code you received, or wait 15 minutes and sign in again.';
+    private const CODE_LEDGER_IP = 'login-code';
+
     private const SESSION_KEYS = ['staff' => '_2fa_pending', 'client' => '_client_2fa_pending'];
 
     private static function key(string $scope): string
     {
         return self::SESSION_KEYS[$scope] ?? self::SESSION_KEYS['staff'];
+    }
+
+    private static function codeBucket(string $audience, int $subjectId): string
+    {
+        return 'login_code_sent:' . $audience . ':' . $subjectId;
+    }
+
+    /**
+     * HNT-L04: claims one of the account's 5 codes per 15 minutes. False when the
+     * limit is already used up — then no code may be sent.
+     * $audience: 'staff', 'client' (buyer) or 'associate'.
+     */
+    public static function claimCodeSend(string $audience, int $subjectId): bool
+    {
+        $bucket = self::codeBucket($audience, $subjectId);
+        RateLimitRepository::recordHit($bucket, self::CODE_LEDGER_IP);
+        return RateLimitRepository::recentHitCount($bucket, self::CODE_LEDGER_IP, self::CODES_WINDOW_MINUTES) <= self::MAX_CODES_PER_WINDOW;
+    }
+
+    /** HNT-L04: after a successful sign-in the account's code count starts again. */
+    public static function resetCodeSends(string $audience, int $subjectId): void
+    {
+        RateLimitRepository::clearBucket(self::codeBucket($audience, $subjectId), self::CODE_LEDGER_IP);
     }
 
     /** Sends a new code by e-mail. Returns the code only in local dev (APP_ENV=local), else ''. */
@@ -79,8 +118,9 @@ final class TwoFactorService
     }
 
     /**
-     * A new code for the sign-in in progress, at most once a minute.
-     * @return array{status:string, wait?:int, dev_code?:string} status 'sent' | 'too_soon' | 'none'
+     * A new code for the sign-in in progress, at most once a minute (and within the
+     * account's 5 codes per 15 minutes, HNT-L04 — the code already sent stays valid).
+     * @return array{status:string, wait?:int, dev_code?:string} status 'sent' | 'too_soon' | 'too_many' | 'none'
      */
     public static function resend(string $scope = 'staff'): array
     {
@@ -91,6 +131,9 @@ final class TwoFactorService
         $wait = (int) $p['issued_at'] + self::RESEND_AFTER_SECONDS - time();
         if ($wait > 0) {
             return ['status' => 'too_soon', 'wait' => $wait];
+        }
+        if (!self::claimCodeSend($scope === 'client' ? 'client' : 'staff', (int) $p['user_id'])) {
+            return ['status' => 'too_many'];
         }
         $dev = self::issueCodeFor((int) $p['user_id'], 'email', (string) $p['destination'], $scope);
         return ['status' => 'sent', 'dev_code' => $dev];

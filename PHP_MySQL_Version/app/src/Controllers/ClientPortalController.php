@@ -66,6 +66,9 @@ final class ClientPortalController
                 $_SESSION['_client_2fa_dev_code'] = $result['dev_code'] ?? '';
                 header('Location: /client/login/code');
                 return;
+            case 'too_many_codes': // HNT-L04: at most 5 codes in 15 minutes
+                Flash::set('error', \App\Services\TwoFactorService::TOO_MANY_CODES_MESSAGE);
+                break;
             case 'locked_out':
                 Flash::set('error', 'Too many failed attempts. Try again after ' . htmlspecialchars((string) $result['locked_until']) . '.');
                 break;
@@ -115,6 +118,8 @@ final class ClientPortalController
         }
         if ($r['status'] === 'too_soon') {
             Flash::set('error', 'Please wait ' . $r['wait'] . ' second(s) before asking for a new code.');
+        } elseif ($r['status'] === 'too_many') {
+            Flash::set('error', \App\Services\TwoFactorService::TOO_MANY_CODES_MESSAGE); // HNT-L04
         } else {
             $_SESSION['_client_2fa_dev_code'] = $r['dev_code'] ?? '';
             Flash::set('success', 'A new code has been sent to your e-mail.');

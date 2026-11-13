@@ -144,6 +144,10 @@ final class AssociatePortalService
         if ((int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true)) {
             return ['status' => 'disabled'];
         }
+        if (!TwoFactorService::claimCodeSend('associate', (int) $a['id'])) {
+            AuditLogRepository::log(null, 'ASSOCIATE_LOGIN_CODE_LIMIT_REACHED', 'associates', (int) $a['id']); // HNT-L04
+            return ['status' => 'too_many_codes'];
+        }
         $code = self::issueToken((int) $a['id'], 'login_code', 10);
         EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.", true, 'login_code', 'associate'); // QA batch 3 MAIL-13: a one-time login code is security mail
         self::regenerate();
@@ -187,6 +191,7 @@ final class AssociatePortalService
         $_SESSION['_associate_last_activity_ts'] = time(); // D-283: the idle clock starts now
         $_SESSION[self::SESSION_PASSWORD_FP] = hash('sha256', (string) (AssociateRepository::find((int) $id)['password_hash'] ?? ''));
         AssociateRepository::setFields((int) $id, ['failed_login_count' => 0, 'locked_until' => null, 'last_login_at' => date('Y-m-d H:i:s')]);
+        TwoFactorService::resetCodeSends('associate', (int) $id); // HNT-L04
         AuditLogRepository::log(null, 'ASSOCIATE_LOGIN', 'associates', (int) $id);
         return true;
     }

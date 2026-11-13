@@ -74,7 +74,9 @@ A few things that catch people out the first time:
   the one you actually use.
 - **Every login asks for a 6-digit code** e-mailed to you after your
   password (owner decision D-265). It is valid for 10 minutes; after 5 wrong
-  tries, sign in again. "Send me a new code" works once a minute. It is not
+  tries, sign in again. "Send me a new code" works once a minute, and at
+  most 5 codes are sent to one account in 15 minutes (signing in again counts
+  too) — after that, use the latest code or wait 15 minutes. It is not
   optional and cannot be switched off — see your Admin if the e-mail does not
   arrive. On your own office computer (one nobody else uses) you may tick
   **"This is my own office computer"** to skip the code there for 30 days

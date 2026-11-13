@@ -237,6 +237,10 @@ final class ClientPortalService
         ClientLoginRepository::resetFailedLogins((int) $login['client_id']);
         // Owner decision D-265 (7 Nov 2026): a buyer, too, enters a 6-digit code e-mailed
         // to their login address at every sign-in. Staff "Log in as this client" is unaffected.
+        if (!TwoFactorService::claimCodeSend('client', (int) $login['client_id'])) {
+            AuditLogRepository::log(null, 'CLIENT_LOGIN_CODE_LIMIT_REACHED', 'clients', (int) $login['client_id']); // HNT-L04
+            return ['status' => 'too_many_codes'];
+        }
         $devCode = TwoFactorService::issueCodeFor((int) $login['client_id'], 'email', (string) $login['client_email'], 'client');
         return ['status' => 'requires_code', 'dev_code' => $devCode];
     }
@@ -256,6 +260,7 @@ final class ClientPortalService
         if ($login === null || !$login['is_active']) {
             return ['status' => 'no_pending'];
         }
+        TwoFactorService::resetCodeSends('client', $clientId); // HNT-L04
         session_regenerate_id(true);
         // 90-item backlog #6: session_regenerate_id() only rotates the
         // session ID — unlike Node's req.session.regenerate(), it leaves

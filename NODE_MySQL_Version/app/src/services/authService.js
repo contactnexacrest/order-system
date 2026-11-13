@@ -93,6 +93,10 @@ async function attemptLogin(req, email, password) {
     await auditLogRepository.log(user.id, 'LOGIN_SUCCESS_REMEMBERED_BROWSER', 'users', user.id, null, null, null, null, ip);
     return { status: 'ok', force_password_change: !!user.force_password_change };
   }
+  if (!(await twoFactorService.claimCodeSend('staff', user.id))) {
+    await auditLogRepository.log(user.id, 'LOGIN_CODE_LIMIT_REACHED', 'users', user.id); // HNT-L04
+    return { status: 'too_many_codes' };
+  }
   const devCode = await twoFactorService.issueCodeFor(req, user.id, 'email', user.email);
   return { status: 'requires_2fa', method: 'email', dev_code: devCode };
 }
@@ -125,6 +129,7 @@ async function completeWithBackupCode(req, backupCode, res = null) {
 
 async function finishCodeLogin(req, res, userId, auditAction, rememberBrowser) {
   const user = await userRepository.findById(userId);
+  await twoFactorService.resetCodeSends('staff', userId); // HNT-L04
   await establishSession(req, userId);
   await auditLogRepository.log(userId, auditAction, 'users', userId);
   const days = await rememberBrowserService.days();

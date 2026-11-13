@@ -19,6 +19,7 @@ const csv = require('../helpers/csv');
 const associateCodeService = require('../services/associateCodeService');
 const associateKyc = require('../services/associateKyc');
 const associatePortalService = require('../services/associatePortalService');
+const twoFactorService = require('../services/twoFactorService');
 const associateService = require('../services/associateService');
 const fileUploadService = require('../services/fileUploadService');
 const incentiveService = require('../services/incentiveService');
@@ -138,7 +139,7 @@ async function showLogin(req, res) {
 async function login(req, res) {
   const r = await associatePortalService.attemptLogin(req, String((req.body || {}).email || '').trim(), String((req.body || {}).password || ''));
   if (r.status !== 'code_sent') {
-    flash.set(req, 'error', { locked: 'Too many wrong attempts — try again in 15 minutes.', disabled: 'Your portal access is not active. Please contact your NexaCrest relationship manager.' }[r.status] || 'E-mail or password is not correct.');
+    flash.set(req, 'error', { locked: 'Too many wrong attempts — try again in 15 minutes.', too_many_codes: twoFactorService.TOO_MANY_CODES_MESSAGE /* HNT-L04 */, disabled: 'Your portal access is not active. Please contact your NexaCrest relationship manager.' }[r.status] || 'E-mail or password is not correct.');
     res.redirect('/associate/login');
     return;
   }

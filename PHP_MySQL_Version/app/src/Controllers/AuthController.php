@@ -50,6 +50,11 @@ final class AuthController
                 header('Location: /2fa');
                 return;
 
+            case 'too_many_codes': // HNT-L04: at most 5 codes in 15 minutes
+                Flash::set('error', \App\Services\TwoFactorService::TOO_MANY_CODES_MESSAGE);
+                header('Location: /login');
+                return;
+
             case 'locked_out':
                 Flash::set('error', 'Account locked until ' . $result['locked_until'] . ' after repeated failed attempts.');
                 header('Location: /login');
@@ -118,6 +123,8 @@ final class AuthController
         }
         if ($r['status'] === 'too_soon') {
             Flash::set('error', 'Please wait ' . $r['wait'] . ' second(s) before asking for a new code.');
+        } elseif ($r['status'] === 'too_many') {
+            Flash::set('error', \App\Services\TwoFactorService::TOO_MANY_CODES_MESSAGE); // HNT-L04
         } else {
             $_SESSION['_2fa_dev_code'] = $r['dev_code'] ?? '';
             Flash::set('success', 'A new code has been sent to your e-mail.');

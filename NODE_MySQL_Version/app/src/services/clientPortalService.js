@@ -196,6 +196,10 @@ async function attemptLogin(req, email, password) {
   await clientLoginRepository.resetFailedLogins(login.client_id);
   // Owner decision D-265 (7 Nov 2026): a buyer, too, enters a 6-digit code e-mailed
   // to their login address at every sign-in. Staff "Log in as this client" is unaffected.
+  if (!(await twoFactorService.claimCodeSend('client', Number(login.client_id)))) {
+    await auditLogRepository.log(null, 'CLIENT_LOGIN_CODE_LIMIT_REACHED', 'clients', Number(login.client_id)); // HNT-L04
+    return { status: 'too_many_codes' };
+  }
   const devCode = await twoFactorService.issueCodeFor(req, Number(login.client_id), 'email', String(login.client_email), 'client');
   return { status: 'requires_code', dev_code: devCode };
 }
@@ -210,6 +214,7 @@ async function completeLogin(req, code) {
   }
   const login = await clientLoginRepository.findByClientId(clientId);
   if (!login || !login.is_active) return { status: 'no_pending' };
+  await twoFactorService.resetCodeSends('client', clientId); // HNT-L04
   await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
     req.session[SESSION_CLIENT_ID] = Number(login.client_id);
     req.session._client_last_activity_ts = Date.now(); // D-283: the idle clock starts now

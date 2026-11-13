@@ -83,6 +83,9 @@ async function login(req, res) {
       req.session._client_2fa_dev_code = result.dev_code || '';
       res.redirect('/client/login/code');
       return;
+    case 'too_many_codes': // HNT-L04: at most 5 codes in 15 minutes
+      flash.set(req, 'error', twoFactorService.TOO_MANY_CODES_MESSAGE);
+      break;
     case 'locked_out':
       flash.set(req, 'error', `Too many failed attempts. Try again after ${result.locked_until}.`);
       break;
@@ -129,6 +132,8 @@ async function resendLoginCode(req, res) {
   }
   if (r.status === 'too_soon') {
     flash.set(req, 'error', `Please wait ${r.wait} second(s) before asking for a new code.`);
+  } else if (r.status === 'too_many') {
+    flash.set(req, 'error', twoFactorService.TOO_MANY_CODES_MESSAGE); // HNT-L04
   } else {
     req.session._client_2fa_dev_code = r.dev_code || '';
     flash.set(req, 'success', 'A new code has been sent to your e-mail.');

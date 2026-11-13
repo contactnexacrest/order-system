@@ -33,4 +33,11 @@ final class RateLimitRepository
         $stmt->execute();
         return (int) $stmt->fetch()['c'];
     }
+
+    /** HNT-L04: forgets a bucket's hits (a login-code count starts again after a successful sign-in). */
+    public static function clearBucket(string $bucketKey, string $ip): void
+    {
+        Database::connection()->prepare('DELETE FROM rate_limit_hits WHERE bucket_key = :bucket AND ip_address = :ip')
+            ->execute(['bucket' => $bucketKey, 'ip' => $ip]);
+    }
 }

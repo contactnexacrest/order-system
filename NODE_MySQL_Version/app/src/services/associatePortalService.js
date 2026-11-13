@@ -10,6 +10,7 @@ const associateRepository = require('../repositories/associateRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const loginAttemptRepository = require('../repositories/loginAttemptRepository');
 const emailService = require('./emailService');
+const twoFactorService = require('./twoFactorService');
 
 /**
  * Port of AssociatePortalService.php. Owner decision 1 Nov 2026 (AS-1,
@@ -129,6 +130,10 @@ async function attemptLogin(req, email, password) {
   if (Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status)) {
     return { status: 'disabled' };
   }
+  if (!(await twoFactorService.claimCodeSend('associate', Number(a.id)))) {
+    await auditLogRepository.log(null, 'ASSOCIATE_LOGIN_CODE_LIMIT_REACHED', 'associates', Number(a.id)); // HNT-L04
+    return { status: 'too_many_codes' };
+  }
   const code = await issueToken(Number(a.id), 'login_code', 10);
   try {
     await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`, { isSecurityEmail: true, kind: 'login_code', audience: 'associate' }); // QA batch 3 MAIL-13: a one-time login code is security mail
@@ -170,6 +175,7 @@ async function verifyCode(req, code) {
     req.session[SESSION_PASSWORD_FP] = sha256(String((loggedIn && loggedIn.password_hash) || ''));
   });
   await associateRepository.setFields(Number(id), { failed_login_count: 0, locked_until: null, last_login_at: formatForDb(new Date()) });
+  await twoFactorService.resetCodeSends('associate', Number(id)); // HNT-L04
   await auditLogRepository.log(null, 'ASSOCIATE_LOGIN', 'associates', Number(id));
   return true;
 }

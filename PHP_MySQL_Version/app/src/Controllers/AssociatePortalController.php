@@ -73,6 +73,7 @@ final class AssociatePortalController
         if ($r['status'] !== 'code_sent') {
             Flash::set('error', match ($r['status']) {
                 'locked' => 'Too many wrong attempts — try again in 15 minutes.',
+                'too_many_codes' => \App\Services\TwoFactorService::TOO_MANY_CODES_MESSAGE, // HNT-L04
                 'disabled' => 'Your portal access is not active. Please contact your NexaCrest relationship manager.',
                 default => 'E-mail or password is not correct.',
             });

@@ -86,6 +86,10 @@ final class AuthService
             AuditLogRepository::log((int) $user['id'], 'LOGIN_SUCCESS_REMEMBERED_BROWSER', 'users', (int) $user['id']);
             return ['status' => 'ok', 'force_password_change' => (bool) $user['force_password_change']];
         }
+        if (!TwoFactorService::claimCodeSend('staff', (int) $user['id'])) {
+            AuditLogRepository::log((int) $user['id'], 'LOGIN_CODE_LIMIT_REACHED', 'users', (int) $user['id']); // HNT-L04
+            return ['status' => 'too_many_codes'];
+        }
         $devCode = TwoFactorService::issueCodeFor((int) $user['id'], 'email', (string) $user['email']);
         return ['status' => 'requires_2fa', 'method' => 'email', 'dev_code' => $devCode];
     }
@@ -127,6 +131,7 @@ final class AuthService
     private static function finishCodeLogin(int $userId, string $auditAction, bool $rememberBrowser): array
     {
         $user = UserRepository::findById($userId);
+        TwoFactorService::resetCodeSends('staff', $userId); // HNT-L04
         self::establishSession($userId);
         AuditLogRepository::log($userId, $auditAction, 'users', $userId);
         if ($rememberBrowser && RememberBrowserService::days() > 0) {

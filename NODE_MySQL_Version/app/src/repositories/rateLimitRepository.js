@@ -26,4 +26,9 @@ async function recentHitCount(bucketKey, ip, withinMinutes) {
   return row ? parseInt(row.c, 10) : 0;
 }
 
-module.exports = { recordHit, recentHitCount };
+/** HNT-L04: forgets a bucket's hits (a login-code count starts again after a successful sign-in). */
+async function clearBucket(bucketKey, ip) {
+  await db.execute('DELETE FROM rate_limit_hits WHERE bucket_key = :bucket AND ip_address = :ip', { bucket: bucketKey, ip });
+}
+
+module.exports = { recordHit, recentHitCount, clearBucket };

@@ -26,7 +26,7 @@ associate's login never opens a buyer's orders.
 - **A 6-digit code at every sign-in** (owner decision D-265). After the
   e-mail and password, the buyer gets a code by e-mail at their login address
   and types it on the next screen (valid 10 minutes, 5 tries, "Send me a new
-  code" once a minute). A buyer cannot switch this off, and "Remember this
+  code" once a minute, at most 5 codes in 15 minutes). A buyer cannot switch this off, and "Remember this
   browser" is never offered to buyers. Staff "Log in as this client" does not
   ask the buyer for a code.
 - **Forgot password** — the sign-in screen has a "Forgot your password?"
