@@ -248,7 +248,8 @@ Two independent switches:
   D-280; replaced `mail_sending_enabled`) — testing mode holds every
   buyer and supplier e-mail (login codes and password links are never
   affected); the "Documents … — Buyer" switch holds document e-mails only.
-  Testing mode is **off** in a fresh installation. While buyer document
+  Testing mode is **on** in a fresh installation (owner decision D-347,
+  12 Nov 2026) — switch it off on go-live day. While buyer document
   e-mails are held there is **no Send to Buyer**
   at all: a buyer-facing document counts as **sent the moment it is
   approved** (its panel says "Counted as sent on approval (document e-mails to the buyer are held) — send the PDF to the buyer yourself"), the OC acknowledgement clock

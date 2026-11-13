@@ -508,17 +508,19 @@ challans →** opens `/associates/tds` (D-235).
    options (grade, thickness, finish, size, edge, quantity, packing, treatment,
    calibration). The answer comes at once: request number **PR-YY-DD-NNNN**,
    the **quote price** and the **lowest price they may agree** at their own
-   commission level, in the right unit (per CBM from 50 mm, with an ≈ per-m²
+   commission level, in the right unit (per CBM from 50 mm, with an ≈ per-SQM
    figure for comparison), what each option did to the price, separate
    charges (edge work per running metre, A-frame per container), and the date
    it is **valid until** (7 days, setting). At most **10 automatic requests a
    day** (setting; the MD can give one associate another limit). Ticking
    **The buyer needs something not listed here** (with a note of at least 10
    characters), an unlisted thickness of 50 mm or more, or a product without
-   a supplier price sends the request to our team: priced within **24 hours**,
+   a price set yet (not configured) sends the request to our team: priced within **24 hours**,
    not counted toward the daily limit; the associate is told in the portal and
    by e-mail when it is priced. Prices are shown on screen only (no download
-   or export) and every request is logged. Cost is never shown.
+   or export) and every request is logged. Cost is never shown. The answer
+   also lists their own quote and lowest price **per CBM, per SQM and per
+   SQFT** at the requested thickness — their level only (D-339).
 
    Staff side: **Associates › Price requests** (MD, ED — view the price
    build-up or manage pricing) lists every request, manual ones waiting first

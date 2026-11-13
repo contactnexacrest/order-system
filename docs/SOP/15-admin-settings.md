@@ -121,7 +121,8 @@ in the Audit Log.
 - **OPTIONAL** (off when installed): only the copy of buyer documents to the
   associate who introduced the buyer.
 - **Testing mode — hold all e-mails to buyers and suppliers** (top of the page;
-  replaces the old "mail sending" switch): while on, buyer and supplier
+  replaces the old "mail sending" switch; **on** in a fresh installation since
+  D-347 — switch it off on go-live day): while on, buyer and supplier
   e-mails are not sent and the screens say so and show the link to copy;
   staff and associate e-mails and every MUST e-mail still go out. While buyer
   document e-mails are held there is no Send to Buyer: an approved document
@@ -277,14 +278,17 @@ sees "Someone else must verify details you entered."
 
 Pricing (margin, buffer, pricing exchange rate, team-incentive reserve, stale days, and
 "Goods lines must be picked from Products" — on by default) is set under **Products › Global pricing settings**
-(MD only) — see [Pricing](./27-pricing.md). The D-240 reference-price
+(MD only); a category's margin, other costs and buffer under **Products › Category price rules**, and a
+product's own values under **Products › Configure** (D-361, D-362) — see [Pricing](./27-pricing.md). The D-240 reference-price
 note settings and the "Approve price discount" permission were removed by D-245 P2.
 
 ### Changing a setting does not change orders already agreed (owner decision D-262)
 
 A change under Admin (T&C clauses, company details, the shortfall tolerance, validity days,
 a product category, a payment preset's "Requires MD approval", the pricing exchange rate, a
-product's Zoho item) applies to new orders and to orders whose PI is not yet approved. An
+product's Zoho item) applies to new orders and to orders whose PI is not yet approved. The
+pricing exchange rate and the line prices are fixed even earlier, when the order's first
+Quotation is approved (D-342). An
 order whose PI is approved keeps its own copy — see [Stage 3](./03-stage3-pi-advance.md).
 Other masters behave the same way: renaming the "Pre-Shipment Inspection" compliance task
 never switches its gate off (the task has a fixed code); a vendor bill keeps the vendor's
@@ -400,10 +404,14 @@ and Zoho) and has a button to the page where it is set:
 2. **LUT and RCMC** numbers and expiry dates; **ECGC** if the company has a
    policy.
 3. **E-mail server** — SMTP in `app/.env` (server side); then send a test
-   e-mail from Settings › Company.
+   e-mail from Settings › Company. Testing mode (Settings › E-mail) is on in a fresh
+   installation (D-347): switch it off on go-live day, once the test e-mail
+   arrives.
 4. **Zoho** (optional), **Backups** (folder, encryption, off-site copy).
 5. **Pricing** (exchange rate and margins) and **Commission levels** — the MD
-   checks them and ticks (only someone who manages pricing may tick).
+   checks them and ticks (only someone who manages pricing may tick). The row's
+   link opens **Products**, where Global pricing settings and Category price rules
+   are on the link bar (D-362).
 6. **TDS and export-benefit deadlines** — tick once confirmed with the CA.
 7. **This year's holidays** — the national holidays (26 Jan, 15 Aug, 2 Oct)
    come pre-filled for this year and next; add the state and festival
@@ -880,7 +888,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Pricing › Specifications › Surface finish take their names from it;
   Pricing keeps only each finish's price change.
   - The list shows "Used in: …" and a read-only column **Price change (from
-    Pricing › Specifications)** — base price, +1.00 USD / m², or "no price
+    Pricing › Specifications)** — base price, +1.00 USD / SQM, or "no price
     change yet" with a link "set it in Pricing › Specifications".
   - **Add a finish** here: it appears in Pick from Products and in Pricing ›
     Specifications at once, with no price change. Then set its price there.
@@ -888,10 +896,13 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   - **Rename** a finish and press Save: the new name reaches Pick from
     Products, Pricing › Specifications and the lines of orders whose
     Quotation is not approved yet. The page then says, e.g. "Saved.
-    "Polished" is now "Natural Polish" everywhere: … 4 lines on 2 draft
+    "Honed" is now "Honed Matt" everywhere: … 4 lines on 2 draft
     orders (quotation not yet approved)" and "Not changed: 9 orders with an
     approved quotation or later, and every document already issued — they
-    keep "Polished"." Every rename and every changed line is in the audit log.
+    keep "Honed"." Every rename and every changed line is in the audit log.
+  - Since 12 Nov 2026 the base finish is **Natural Polish** (the old
+    "Polished" and "Mirror Finish" were merged into it; Natural and
+    Sandblasted into Sandblasted; Leather and Satin into Leather).
   - A finish name is at most 80 characters and can be in the list only once.
 - **Dropdown Option Lists** (`/admin/dropdown-options`) — the admin screen
   for `dropdown_options`, the generic small-option-list table several

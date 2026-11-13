@@ -13,6 +13,8 @@ profit never counts below ₹0.
   (15% to start) or a fixed amount per unit; a product may have its own.
 - On one order, the MD may set **a % of this order's profit** or **a fixed
   amount** instead, with a written reason.
+- The program is **on** in a fresh installation (owner decision D-347,
+  12 Nov 2026).
 - With the incentive program **off**, there is no global incentive; the MD
   may still set one by hand on a single order.
 - The app warns when the margin left after the incentive falls below the
@@ -53,7 +55,9 @@ start with:
 | Logistics | 15% | factory dispatch, CHA and freight |
 | Accounts | 10% | collection, FIRC and the books |
 
-A role can be added, renamed, deactivated, or deleted if it was never used.
+A role can be added, renamed, deactivated, or deleted if it was never used
+(**Delete** first asks "are you sure?" — Cancel leaves the role as it is,
+D-351).
 The Sales Manager is an employee and is paid only through this incentive.
 
 Each person has their usual role(s). On each order the MD can:

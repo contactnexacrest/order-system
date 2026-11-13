@@ -51,7 +51,10 @@ once it is. (An FOB order raises its CI before shipment, so no reminder.)
 
 **Generate Commercial Invoice** (11a) produces the CI — pre-filled with the
 actual shipped quantities and final figures rather than the estimates the
-PI was built on. Take it through [Document Review &
+PI was built on. Its line prices are the ones fixed by the approved
+Quotation (or by an activated Products & prices amendment); the CI is
+refused while a goods line is above its fixed price or not in the approved
+Quotation (D-342, [Amendments](./10-amendments.md)). Take it through [Document Review &
 Approval](./13-document-review-approval.md): 11d is refused until the CI is
 approved (buyer e-mails held) or sent (buyer e-mails sent). When the Zoho
 Books integration is on, the approved CI goes to Zoho Books as an export

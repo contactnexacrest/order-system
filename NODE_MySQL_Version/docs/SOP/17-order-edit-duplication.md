@@ -35,7 +35,10 @@ percentage, balance trigger, balance days — are never touched by any of
 the screens in this chapter. That's what
 [Amendments](./10-amendments.md) is for, specifically, with its own MD
 approval and signed-agreement paper trail. Keeping payment-terms changes
-in exactly one place, rather than two competing ones, is deliberate.
+in exactly one place, rather than two competing ones, is deliberate. The
+same holds, since owner decision D-342 (12 Nov 2026), for the order's
+**product lines and prices once its first Quotation is approved**: they
+change only through a **Products & prices** amendment (below).
 
 ## The pre/post-confirmation line
 
@@ -45,8 +48,18 @@ it is still being set up: editing its details or product lines needs
 nothing beyond the ordinary "Manage orders" permission, same as it always
 has.
 
+**Product lines are fixed earlier — at the first approved Quotation**
+(owner decision D-342, 12 Nov 2026). From the moment the order's first
+Quotation is approved, no one can add, edit, duplicate or delete a line, or
+change the order's currency — not with "Edit an order after confirmation",
+not with "Override locked data", not the Super Admin. The products table is
+read-only with the note "Prices and products are fixed by the approved
+Quotation of <date> — change them through an Amendment (Order page ›
+Amendments › Products & prices)." See [Amendments](./10-amendments.md).
+Packing-list actuals are still recorded as before.
+
 Once the order reaches Stage 4, its terms are meant to be settled. From
-that point on, changing a core detail or a product line
+that point on, changing a core detail
 needs the separate **"Edit an order after confirmation"** permission
 (granted by default to Admin, Managing Director, and Executive Director —
 adjustable any time from Roles & Permissions) — and every such change
@@ -129,9 +142,10 @@ original, marked "copy of line N": every option, the piece size, unit,
 quantity, price, HS code, line type, SAC, category, product, material and
 price-request link. The MD's price approval is **not** copied — the copy is
 checked at once and, if it is below your lowest price, goes to the MD.
-Change only what differs (usually the size and the price). From Stage 4 on, duplicating (like editing
-or removing a line, or adding a new one) needs the override permission
-and a reason, exactly like the Edit Order Details form above.
+Change only what differs (usually the size and the price). Lines can be
+added, edited, duplicated and deleted only until the order's first
+Quotation is approved (D-342, above); after that use a Products & prices
+amendment.
 
 The same **Duplicate** button is also on the **New Order** creation
 screen itself, on every product row, from the very first line — it
@@ -151,7 +165,10 @@ long since closed. It creates a brand-new order carrying over:
 
 - The same client, Incoterm, currency, ports, COO type, container type,
   special requirements, and every estimated weight/volume/freight field.
-- Every active product line, copied as-is.
+- Every active product line, copied as-is (with its No. of pieces and
+  Size note). The new order prints the detailed product table on its
+  documents (D-339), whatever the earlier order printed, and its prices
+  are fixed again only when its own first Quotation is approved.
 - **Annexure A** (since 12 Nov 2026, D-338): its product entries with the
   same pictures, its Additional Terms, whether it is included and its
   content (Product Specification / Additional Terms / Both). **Annexure B

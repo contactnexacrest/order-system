@@ -185,18 +185,17 @@ different entities:
   Commercial Invoice) — the Quotation, Order Confirmation, and Buyer PO
   never show a Notify Party section.
 
-90-item backlog "standalone order" follow-on: all of the above describes
-how the **client record itself** resolves these — and, by extension,
-what a *brand-new* order starts from the moment it's created. An
-*existing* order's own documents never re-read any of this live: the
-Buyer/Consignee/Notify Party details (and every toggle above) are
-snapshotted onto the order's own row once, at creation, and again
-whenever that specific order's own PI-details form is accepted (Chapter
-3) — never on a later, unrelated edit to the client record or to another
-order for the same client. A correction made on the admin Clients form
-(or on a different order's PI-intake) only ever changes what a *new*
-order will start from; it never reaches back into an order already
-created.
+All of the above describes how the **client record itself** resolves
+these — and, by extension, what a *brand-new* order starts from the moment
+it's created. Each order keeps its own copy of the Buyer / Consignee /
+Notify Party details (and every toggle above), taken at creation and again
+whenever that order's own PI-details form is accepted (Chapter 3). Since
+owner decision D-337 (12 Nov 2026) a correction made on the Clients form
+also reaches the client's running orders: **automatically** on every order
+with nothing issued yet (no document approved or sent), and **by an
+approved request** on an order that already has an issued document — see
+[Buyer details after the client is corrected](./17-order-edit-duplication.md#buyer-details-after-the-client-is-corrected-d-337).
+Documents already issued never change.
 
 **Certificate of Origin Type** is a dropdown (same admin-managed list the
 order-creation form itself uses, e.g. Non-Preferential), not a free-text
@@ -605,6 +604,29 @@ Notify Party as separate sections, and the Legal Terms & Definitions section —
 so the Quotation's Word copy reads "5. SHIPPING / COMMERCIAL TERMS", like the
 PDF.
 
+### How the generated documents look (owner decisions D-344, D-352 – D-356, 12 Nov 2026)
+
+These are printing rules only — nothing to enter. They apply to every
+document generated from 12 Nov 2026; documents already issued keep what they
+printed.
+
+- **Documents to be provided** (Quotation, PI, CI) lists plainly
+  "Commercial Invoice" and "Packing List" (on the CI: "Commercial Invoice
+  (this document)") — no "(digitally authorised)" or "(signed and stamped)"
+  (D-344). Item 3 is the Certificate of Origin line described above (D-349).
+- **No stars and no mandatory-fields note.** The line "Fields marked * are
+  mandatory …", the red stars on payment terms and money rows, and the "*"
+  after field labels (e.g. "QUOTATION NO.") are gone from every PDF and Word
+  copy (D-352, D-353). The input forms in the app keep their required "*".
+- **Headings stay with their content.** A section heading or a table's column
+  header is never left alone at the foot of a page; it moves to the next page
+  with its first rows (D-354).
+- **Payment Terms stand out** on the Quotation and the Proforma Invoice: the
+  lines under the PAYMENT TERMS heading sit in a light grey-blue box with a
+  navy left edge, and only the money figure (e.g. **USD 6,864.78**) is bold
+  (D-355). The Order Confirmation is unchanged.
+- **Word copies open cleanly** in Microsoft Word (no "repair" offer) (D-356).
+
 ## What the client does (or doesn't)
 
 - **If they came through Path A**, they filled the public form — that's
@@ -681,12 +703,20 @@ below the seller's lowest price a red note appears beside it and the saved line
 goes to the MD for approval; below the product's minimum price the line is
 refused. **Every document (QT, PI, OC, CI …) prints the line's own price.** The
 whole flow — who sees what, the MD's approval, the PI waiting, the figures fixed
-at the PI — is in [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
+at the first approved Quotation (D-342) — is in [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
+
+**Only products that can be quoted are offered** (owner decision D-361, 13 Nov
+2026). Pick from Products lists a product only when it is configured (its base
+price is set on Products › Configure) and has at least one active supplier. The
+others are shown greyed under **Not offered yet** with the reason ("not
+configured yet — ask the product manager" / "no active supplier — ask
+Procurement"); they cannot be picked.
 
 ### Quoting in any unit — piece size (owner decision D-270, 11 Nov 2026)
 
-You can quote a line in any unit of its category. Natural Stone: **CBM, SQM (m²),
-SQFT (sq ft), PCS, TON and RMT** (Set or Lot only if the MD adds them in Products ›
+You can quote a line in any unit of its category. Natural Stone: **CBM, SQM
+(square metre), SQFT (square foot), PCS, TON and RMT** — every screen uses these
+names, as the documents do (D-364) (Set or Lot only if the MD adds them in Products ›
 Categories). The product's prices are per its own unit (per CBM from 50 mm), so the
 app converts your price before checking it — you never have to switch to CBM.
 

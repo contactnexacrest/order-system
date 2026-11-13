@@ -9,21 +9,23 @@ or associates beyond their own two prices.**
 
 | Step | Rule | Example |
 |---|---|---|
-| Cost | supplier price "used for pricing" (₹) ÷ pricing exchange rate + other costs to FOB | ₹80,000 ÷ 82.00 = USD 975.61 + 2.5% = **USD 1,000.00** |
+| Cost | the product's **configured base price** (₹, set on **Configure** — D-361) + CHA and transport, ÷ pricing exchange rate, + other costs to FOB | ₹80,000 ÷ 82.00 = USD 975.61 + 2.5% = **USD 1,000.00** |
 | Minimum price | cost ÷ (1 − margin %) — *margin on the price, not markup* | ÷ 0.80 = **USD 1,250.00** — nobody goes below this |
 | Team incentive reserve | % of (minimum price − cost), or a USD amount; 0 when the incentive program is off | 15% of 250 = USD 37.50 |
 | Staff floor (shown to staff as **Staff lowest**, D-305) | minimum price + reserve | **USD 1,287.50** |
 | Associate floor (shown as **Associate lowest**) | staff floor ÷ (1 − commission %), or + a fixed USD amount | at 5%: **USD 1,355.26** |
 | Quote price | floor × (1 + buffer %) | staff **USD 1,326.13**; associate at 5% **USD 1,395.92** |
 
-Every % or amount has a **global value** (Products › **Global pricing settings**). A product can override
-any of them on its own page; an empty field means "use the global value".
+Every % or amount has a **global value** (Products › **Global pricing settings**). Margin, other costs and
+buffer can be changed for a whole category (**Category price rules**) and for one product (**Configure**); an
+empty field means "use the value of the level above" — product, else category, else global (D-359, D-361).
 
 ## Who sees and changes what
 
 | Permission | Default roles | What it allows |
 |---|---|---|
-| Record supplier / market prices | Procurement Executive, Manager, Director; MD | Product → **Market prices**: add a supplier price (dated, valid until, notes), correct one, choose the one **used for pricing**, copy a supplier quote from Procurement. No selling prices, margins or floors. |
+| Record supplier / market prices | Procurement Executive, Manager, Director; MD | Product → **Market prices** and **Edit price**: add a supplier price (dated, valid until, notes), correct one, copy a supplier quote from Procurement; on Procurement & suppliers › Suppliers switch an **offer** on or off and **+ Add product** (with *Manage suppliers*). No selling prices, margins or floors. |
+| Manage product catalogue | MD, ED (Admin) | **Configure** a product (its base price and its own margin, costs, buffer and physical values), switch it **Active**, **Duplicate** it, **Link a supplier**. |
 | See the full price build-up | MD, ED | The build-up on the product page, every associate level's floor and quote price, the extra columns on the product list, the pricing settings. |
 | Manage pricing | MD only | Change the pricing settings, a product's own settings, the commission levels and ladder, and each associate's commission level. |
 
@@ -31,14 +33,14 @@ Sales staff (anyone who may see selling prices) see only **Quote price** and **Y
 lowest price** on the product page and list. Supplier prices and cost components on the
 product page are shown only to people who may see purchase prices.
 
-## Products › Global pricing settings (MD)
+## Global pricing settings, commission levels and ladder (MD)
 
-1. **Global pricing settings:** minimum margin (% of price), other costs to FOB (%), pricing
+1. **Global pricing settings** (the link on the Products screen): minimum margin (% of price), other costs to FOB (%), pricing
    exchange rate (₹ per USD — keep it a little below the market rate), negotiating buffer
    (%), team incentive reserve (% of profit or USD per unit), and after how many days a
-   supplier price is "stale". Every change is logged (who, when, before → after). New
-   quotes use the new values; orders with an issued Proforma Invoice keep their prices.
-2. **Commission levels:** add, edit, deactivate or delete (2%, 5%, 7%, 10%, or a fixed USD
+   supplier price is "stale", and the default physical values (D-361). Every change is logged (who, when, before → after). New
+   quotes use the new values; orders whose first Quotation is approved keep their prices (D-342).
+2. **Commission levels** (Products › Pricing › Commission levels and ladder): add, edit, deactivate or delete (2%, 5%, 7%, 10%, or a fixed USD
    amount per unit). A level used by an associate or the ladder can only be deactivated.
    A fixed USD amount is always in US dollars: on an order in another currency it is
    converted at the pricing exchange rate (e.g. USD 1.00 × 2,000 units = ₹1,67,000 at
@@ -51,10 +53,15 @@ product page are shown only to people who may see purchase prices.
 ## Procurement → Market prices
 
 Open a product and click **Market prices** (or go to `/products/<id>/market-prices`).
-Record each new supplier quote as a **new row** so the history stays. Tick **Use this
-price for pricing**, or click **Use for pricing** on an existing row. A price older than
-the stale setting is marked **stale**; one past its "valid until" date is **expired** —
-update it before Sales quotes.
+Record a quote from a new supplier with **Add a price from another supplier**, and a new
+price from a supplier already listed with **Edit price** or **+ Add / update a price** on its
+card, so the history stays. **Use for pricing** on a row marks the supplier offer whose
+CHA + transport, packing and dates go with the product's price. Since D-361 (13 Nov 2026) none
+of this moves the selling price: that comes from the product's **configured base price**, and a
+changed supplier price only shows "Supplier prices changed: highest is now ₹X — **Use ₹X**" on
+Configure (see "Products, Configure and the base price" below). A price older than the stale
+setting is marked **stale**; one past its "valid until" date is **expired** — update it before
+Sales quotes.
 
 ## Prices on order lines (phase P2)
 
@@ -117,26 +124,30 @@ floor comes out of the line's team incentive first; on an associate's order the 
 earns **no commission on that line**). The MD writes a reason (at least 10 characters) and
 clicks **Approve** or **Refuse** (whoever asked is told). The approval holds while the line
 keeps that price and the same options and unit — **any later change of the price, the
-specification options or the unit voids it** and the line goes back to the MD. A change of
-options or unit after the Proforma Invoice also drops the figures fixed at the PI, so the
-line is checked against the floor of its new options.
+specification options or the unit voids it** and the line goes back to the MD. (Once the
+first Quotation is approved a line can be changed only through a Products & prices
+amendment, where a lowered price below the floor is approved by the MD with the amendment —
+D-342.)
 Audit: LINE_PRICE_APPROVAL_REQUESTED, LINE_PRICE_APPROVED, LINE_PRICE_APPROVAL_REFUSED,
 LINE_PRICE_APPROVAL_VOIDED. Users & roles › Self-approval rules ("price discount") decide whether the
 MD may approve a price they set themselves.
 
 **The Quotation and the Proforma Invoice wait** while any line is below its lowest price,
-below the minimum price, or picked from a product with **no price set** (no supplier price
-marked "used for pricing") — the last needs the MD's approval too ("No price set — needs MD
-approval"). Step 1 (Quotation) and Step 5c (PI) show the reason in red, e.g. "Line 1 is below
+below the minimum price, or picked from a product with **no price set** (e.g. "Not configured
+yet — set the base price in Configure.") — the last needs the MD's approval too ("No price set —
+needs MD approval"). Step 1 (Quotation) and Step 5c (PI) show the reason in red, e.g. "Line 1 is below
 the lowest price for this order — raise it, or ask the MD to approve it, before the
 Quotation (order page → Products)." Saving such a line is still allowed — it goes to the MD;
 only the documents are blocked.
 
-**Fixed when the PI is issued.** Generating the PI stores each checked line's figures (cost,
-minimum, floor, quote, level, settings used) on the line. After that, changes to the pricing
-settings or the supplier price do not move that order's check ("fixed at PI"); a price
-changed later (an amendment) is checked against the fixed figures. Picking a different
-product on the line clears them.
+**Fixed when the first Quotation is approved (D-342, 12 Nov 2026).** The moment the order's
+first Quotation is approved, the order keeps the exchange rate its prices were worked out at,
+and each line keeps the price the buyer accepted and its price-check figures (worked out at that
+rate). From then on floors and approvals use these fixed figures, never the live rate, and the
+lines cannot be changed on the order page — only through a **Products & prices** amendment (SOP
+10), where a price can only go down. Generating the PI also stores each checked line's figures
+(cost, minimum, floor, quote, level, settings used) on the line ("fixed at PI"); later changes to
+the pricing settings or a supplier price do not move that order's check.
 
 **Who sees what on the order page.** Sales staff see "Quote … · lowest …" and a badge per
 line (✓ OK / ✗ Below your lowest price / Approved by the MD); MD and ED also see the minimum
@@ -172,15 +183,15 @@ asked for — their level only.
 
 ## Settings to check on go-live day (owner decision, 5 Nov 2026)
 
-The installed values below are the owner's chosen starting values. Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need entering by hand on the day the site goes live (Products › Global pricing settings):
+The installed values below are the owner's chosen starting values (a fresh installation since D-347, 12 Nov 2026: other costs 5.5 %, margin 15 %, team incentive program on, and e-mail Testing mode on — switch Testing mode off on go-live day in Settings › E-mail). Since 11 Nov 2026 the exchange rate is fetched every day (D-301); only other costs to FOB may need adjusting by hand on the day the site goes live (Products › Global pricing settings):
 
 | Setting | Value | Where |
 |---|---|---|
 | Pricing exchange rate | **Automatic**: today's market ₹ per USD (Frankfurter / European Central Bank, fetched at 07:05 IST) minus the **2 %** cushion (0–5 %, one decimal); press **Fetch now** on go-live day; a daily change over 2 % waits for the MD | Products › Global pricing settings › Exchange Rate |
-| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Global pricing settings, and per product |
-| Minimum margin | 20% of the price (raise per product where the market allows) | Products › Global pricing settings |
+| Other costs to FOB | 5.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Products › Global pricing settings, and per product |
+| Minimum margin | 15% of the price (raise per category on Category price rules, or per product on Configure, where the market allows) | Products › Global pricing settings |
 | Negotiating buffer | 3% | Products › Global pricing settings |
-| Team incentive | 15% of profit (review after 6 months) | Products › Global pricing settings |
+| Team incentive | program on; 15% of profit (review after 6 months) | Products › Global pricing settings |
 | Supplier price stale after | 60 days | Products › Global pricing settings |
 | Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission › Commission settings and ladder |
 | Payout day | monthly, on the **last day of the month**; a Sunday or holiday moves to the working day before (D-292) | Associates › Commission › Commission settings and ladder |
@@ -199,7 +210,11 @@ and SOP 24.
 category, the specifications and their options. The Natural Stone category starts
 with: Grade / quality, Thickness, Surface finish, Size / format, Edge work,
 Quantity, Packing, Treatment, Calibration. The first (base) option of each changes
-nothing; every other option changes the **cost**:
+nothing; every other option changes the **cost**. (Since D-306 the same list is the
+**Options and their price effect** tab of Products › Categories › <category>.) Size /
+format includes **Monument (cut to size)** at 0 % for thick pieces cut to an exact size —
+headstones, bases, kerbs, sold per CBM — so a monument is not priced as a "Cutter slab"
+(−10 %) (D-347, 12 Nov 2026):
 
 - a **%** — multiplies the cost (e.g. Standard −8%, 30 mm +35%);
 - **USD per SQM** — added to the cost (e.g. Leather +USD 4.00/SQM);
@@ -224,8 +239,8 @@ finish option must be one of the Settings names.
 
 **Thick stone — per CBM.** From **50 mm** (setting "Price per CBM from (mm)"; a
 product can set its own) the price is per CBM and starts from the product's
-**per-CBM supplier price** (Products › Market prices › "Price per: CBM — thick
-stone", with its own "Used for pricing"). Thickness % options no longer apply;
+**price for 50 mm and above** (per CBM — the "50 mm and above" row of the supplier's
+price card on Market prices; older rows show "CBM — thick stone"). Thickness % options no longer apply;
 per-SQM amounts are converted ×1000 ÷ thickness. Example at 80 mm with ₹53,300 per CBM:
 quote **USD 904.56**, lowest **USD 878.21** per CBM (≈ USD 72.36 per SQM). No per-CBM
 supplier price goes to a manual price; "Other, 50 mm or more" on an order line uses
@@ -340,8 +355,8 @@ quote **USD 79.60**; associate Level 2 floor **USD 81.35**, quote **USD 83.79**.
 
 ## Help beside every setting (D-256)
 
-Every pricing setting, option type, the CBM threshold, every commission setting and every
-price-request setting has a short line beneath it with a worked example (e.g. "Example: cost
+Every pricing setting (Global pricing settings, Category price rules, Configure), option type, the CBM
+threshold, every commission setting and every price-request setting has a short line beneath it with a worked example (e.g. "Example: cost
 USD 1,000 at 20% → minimum price USD 1,250 (1,000 ÷ 0.80). Nobody can sell below it.").
 
 ## Product categories: units, HS code, packing, quality documents (D-257 Phase 0B, 5 Nov 2026)
@@ -440,7 +455,9 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
    and per SQM for each thickness (₹150 at 20 mm). Empty = the product's default.
 5. **Price for** — keep "Every thickness". Choose "A special combination" only for one exact price such as
    "30 mm · Leather".
-6. Tick **Use this price for pricing** and **Save price**.
+6. **Save price**. (Tick **Use this price for pricing** only to make this supplier's CHA + transport,
+   packing and dates go with the product's price; the selling price itself stays the configured base
+   price — D-361.)
 
 **The one rule (D-335, 12 Nov 2026).**
 1. **A price you typed always wins** — no rule ever changes it.
@@ -485,7 +502,9 @@ A product can have its own × K or container (Edit product, MD only) — it show
   on Market prices, and CHA + transport is only here (or on one supplier price).
 - **Price rules in effect for this product** — every rule with "category" or "own rule". The MD can switch on
   **Use own rules for this product** to change × K and the container for this product only; switched off, the
-  category's rules apply. The rules are only a calculator: they never change a typed price or the base.
+  category's rules apply. The rules are only a calculator: they never change a typed price or the base. Since
+  D-361 / D-363 a product's own values are changed more simply on **Configure** (the three levels and **Thickness
+  rules**); this section links there.
 
 ## Edit price — change one supplier's price in one form (D-359, 13 Nov 2026)
 
@@ -504,14 +523,17 @@ record supplier prices (Procurement, MD).
    **Valid until**. **More (optional)** holds CHA + transport per container (empty = the product's default), "Price
    includes packing and loading" and Notes.
 4. The MD and ED also see **Selling price after saving** (minimum and quote, and what they were) when this supplier's
-   price is the one the selling price comes from.
+   price is the one the selling price comes from. Since D-361 a configured product's selling price does not move when
+   you save — the product manager sees "Supplier prices changed … **Use ₹X**" on Configure and decides.
+   The unit can be **SQM**, **SQFT** or **CBM** (D-364, below).
 5. Click **Save**. You stay on the page with a green message ("Saved. … ₹old → ₹new …"), **Undo** and **See price
    history**. Undo puts the price back exactly as it was before your save; both the save and the undo are in the price
    history. Quotations and orders already issued never change.
 
 **Suppliers and offers that are switched off.** A price from a supplier marked inactive is never used for pricing.
-If the price "used for pricing" is switched off, the product shows "The supplier price used for pricing is switched off
-(inactive supplier or offer)." until another price is used or the supplier is active again.
+If the supplier price behind the product is switched off, the product shows "The supplier price behind this product is
+switched off (inactive supplier or offer) — choose another supplier price in Configure." until another price is used or
+the supplier is active again.
 
 **Where pricing values come from (D-359).** Margin, other costs and buffer: the product's own value, else its
 category's, else Global pricing settings. Weight per CBM, container size, container weight and the thickness factor: the
@@ -525,12 +547,14 @@ its offers (base price quoted, quoted on · valid until), an **Offer active** sw
 product**; the supplier's page has the same in **Prices given for products**. See
 [Procurement — Suppliers: the products they offer](./22-procurement.md) for the steps.
 
-- **Switching an offer off** stops its price being used: if it was the price the product is priced from, the product
-  shows "The supplier price used for pricing is switched off (inactive supplier or offer)." until it is switched on
-  again (then the same prices come back) or another price is used. Issued quotations and orders never change.
-- **+ Add product** records the supplier's price at one thickness; the other thicknesses are worked out by the
-  category's price rules, exactly as on Market prices. It becomes the price the product is priced from only when the
-  product has none yet; otherwise every price stays as it is.
+- **Switching an offer off** stops its price being used (for matching and for the lowest / highest supplier price).
+  When the last active supplier of a configured product is switched off the product shows **No active supplier** and
+  is not offered on new orders until one is switched on again; if the price behind the product is switched off it
+  says "The supplier price behind this product is switched off (inactive supplier or offer) — choose another supplier
+  price in Configure." Issued quotations and orders never change.
+- **+ Add product** records the supplier's price at one thickness (per SQM, SQFT or CBM — D-364); the other
+  thicknesses are worked out by the category's price rules, exactly as on Market prices. It never changes a configured
+  product's base price (D-361).
 - A **new product** created from a supplier starts Inactive and not configured — configure it on Products (D-361, below).
 
 ## Products, Configure and the base price (D-361, 13 Nov 2026)
@@ -541,9 +565,10 @@ product was fixed at exactly the price it used that day — no selling price cha
 later, the product's **Configure / Edit** screen says **"Supplier prices changed: highest is now ₹X"** with a **Use ₹X**
 button; nothing changes until you click it. Quotations and Proforma Invoices already issued never change.
 
-**Products list.** Products › **All products** shows for each product: **Suppliers** (how many are active, how many
-paused), **Lowest – highest supplier price** (click either figure to open that supplier's **Edit price**), the
-**Base price (configured)**, the USD prices as before, the **latest supplier quote** and where the product stands:
+**Products list.** Products › **All products** shows for each product its **Suppliers** (how many are active, how many
+paused), the **supplier prices** lowest – highest (click either figure to open that supplier's **Edit price**), the
+**Base price** (configured), the USD prices and where the product stands (the columns as they are today: see "Products
+list: the short view" under D-365 below):
 
 - **Configured** — it has a base price and at least one active supplier: it can be Active and quoted.
 - **Not configured** — created from a supplier, no base price yet: click **Configure**. It is not offered on orders.
@@ -607,13 +632,15 @@ opens the list of fetches below the fields.
 The MD can set Automatic / Manual and the cushion (0–5 %, one decimal), and **Fetch today's rate now**
 (in the box). If the fetch fails, yesterday's rate stays (a warning shows). If the rate moves more than 2 % in a
 day it waits: the MD reads the figures in the box, gives a reason and chooses **Use this rate** or **Keep the
-rate in use**. Quotations and Proforma Invoices already issued never change.
+rate in use**. Quotations and Proforma Invoices already issued never change, and an order whose first Quotation is
+approved keeps the rate of that day (D-342).
 
 On an order (MD and ED only), the Products card shows above Price check which rate the prices were worked out
-at: before the Proforma Invoice "Prices worked out at ₹86.63 per USD (Automatic, 12 Nov 2026) — live: follows
-today's rate."; after it "… — fixed on the Proforma Invoice of 12 Nov 2026 at ₹86.63 per USD." (and, if
-today's rate is different, "today's rate ₹86.40 does not change them"). Nobody else sees this line, and it is
-never on a document.
+at: before the first Quotation is approved "Prices worked out at ₹86.63 per USD (Automatic, 12 Nov 2026) — live:
+follows today's rate."; once it is approved (D-342) "Prices worked out at ₹86.63 per USD — fixed by the approved
+Quotation of 12 Nov 2026." (and, if today's rate is different, "; today's rate ₹86.40 does not change them."). An
+older order fixed only at its Proforma Invoice says "… — fixed on the Proforma Invoice of <date> at ₹… per USD".
+Nobody else sees this line, and it is never on a document.
 
 ## One master for HS codes and suppliers (D-302, D-303)
 
@@ -669,7 +696,8 @@ product** are small buttons side by side.
 
 - **Products list:** each row ends with small buttons on one line — **Edit** (or **Configure** when the product is not
   configured yet) filled, **View** and **Duplicate** outlined; **Link a supplier**, **Reactivate** and **Delete…** appear
-  in the same row where they apply. On a phone the buttons wrap neatly.
+  in the same row where they apply. On a phone the buttons wrap neatly. (Since the D-365 follow-up the buttons stack
+  in the Actions column so the list fits the page.)
 - **Add a category** (Products › Categories) and a category's **Name and attributes**: the name on the first row, then
   the six attribute boxes two per row (1 | 2, 3 | 4, 5 | 6), with examples Size, Grade, Colour, Finish, Thickness, Packing.
   Attribute 1 is required; at most 6.
@@ -712,7 +740,9 @@ product** are small buttons side by side.
   prices (₹)** — lowest – highest, each a link to that supplier's Edit price, with the unit and thickness, e.g.
   "₹160,000 – ₹190,000 / CBM (50 mm+)" or "₹2,000 / SQM (20 mm)", **Base price** ("₹180,000 / CBM"), **Cost (USD)** — our
   real cost, and **Min price (USD)** — never quote below it (both highlighted), **Staff lowest (USD)**, **Staff quote
-  (USD)** ("2,740.60 / CBM"), **Status** and **Actions**. Every figure stays on one line.
+  (USD)** ("2,740.60", with "/ CBM" on a small line under it), **Status** and **Actions**. No figure wraps. On a
+  normal office screen (1440 px wide) the whole table fits the page, so Staff lowest, Staff quote, Status and the row
+  buttons (stacked) are visible without scrolling.
 - Tick **Show all columns** (top right) to add **Associate lowest (USD)** and **Latest supplier quote** (shaded). The app
   remembers your choice in this browser; untick to go back. The **Name** column stays in place while you scroll the
   table sideways, also on a phone.
@@ -738,5 +768,7 @@ product catalogue click **Duplicate** — next to **View** on the product's row 
 4. Click **Create the copy**. The new product opens. It is **Inactive**, so it cannot be picked on an order yet. A
    blue note says "Copied from <product> on <date> by <role>. Check the details, update the supplier price, then
    switch it to Active."
-5. Check the details (**Edit**), update the supplier price (**Market prices**), then click **Reactivate** to make it
-   Active. The copy is in the audit log as PRODUCT_DUPLICATED with the product it came from.
+5. Check the details (**Edit**), update the supplier price (**Edit price** / **Market prices**) and the base price
+   (**Configure**), then click **Reactivate** (or tick **Active** on Configure) to make it Active — possible only when
+   it is configured and has an active supplier (D-361). The copy is in the audit log as PRODUCT_DUPLICATED with the
+   product it came from.

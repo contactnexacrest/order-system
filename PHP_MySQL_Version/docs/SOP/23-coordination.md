@@ -15,6 +15,7 @@ has to do next, earliest due first:
 | Procurement | Get supplier quotes and award | a purchase requirement is raised |
 | Procurement | Approve the award | an award is above the awarder's approval limit |
 | Procurement | Chase the supplier | an approved purchase reaches its needed-by date |
+| Procurement | Revise the Supplier PO (products amendment) | a Products & prices amendment that changed quantities is activated (D-342; the order page's re-issue checklist) |
 | Logistics | Book freight and CHA | goods are received (quality check not failed) and no freight terms exist |
 | Logistics | Send the documents to the buyer | the balance is cleared |
 | Accounts & Finance | Clear the buyer's payment | a remittance (advance, freight, balance) is recorded but not cleared |

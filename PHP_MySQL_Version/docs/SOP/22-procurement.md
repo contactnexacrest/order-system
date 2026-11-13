@@ -107,8 +107,9 @@ products and edit prices, the right to record supplier prices (Procurement, MD).
   If the supplier already has a price for that product you are taken to its **Edit price** instead — a supplier offers
   a product once.
 - On the supplier's page the **Prices given for products** table shows Base thickness, Price, dates, **Offer active**,
-  **Edit price** and **Open product**. (The old "Used for pricing" column is gone from this table; which supplier's
-  price the product is priced from is still set on the product's Market prices.)
+  **Edit price** and **Open product** (small buttons side by side, D-362). (The old "Used for pricing" column is gone
+  from this table; the product's selling price comes from its configured base price, set on Products › **Configure** —
+  D-361.)
 - **D-361 (13 Nov 2026).** Changing or adding a supplier's price never changes the product's selling price by itself:
   the product manager sees "Supplier prices changed: highest is now ₹X — Use ₹X" on the product and decides. A product
   created here is configured and switched Active by the product manager (Products › **Configure**). Products with no

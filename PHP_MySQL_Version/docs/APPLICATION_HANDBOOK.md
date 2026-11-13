@@ -852,7 +852,7 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 
 The two bank-details confirmations are listed since D-332 (12 Nov 2026); they were always sent (security path of the mail send, never held), and their senders (`AssociateBankConfirmation::sendCode`, `VendorBankChangeService::sendLink`, Node the same) pass the same kind and audience.
 
-**Testing mode** (`email_testing_mode`, replaced `mail_sending_enabled`; off in a fresh install) holds only buyer and supplier e-mails that are not MUST. Staff and associate e-mails and every MUST e-mail still go out. It is set on the E-mail settings page only (hidden from Company Settings). Each staff member's own "e-mail me my notifications" switch still applies to non-MUST e-mails.
+**Testing mode** (`email_testing_mode`, replaced `mail_sending_enabled`; **on** in a fresh install since D-347 — switched off on go-live day) holds only buyer and supplier e-mails that are not MUST. Staff and associate e-mails and every MUST e-mail still go out. It is set on the E-mail settings page only (hidden from Company Settings). Each staff member's own "e-mail me my notifications" switch still applies to non-MUST e-mails.
 
 **Never a false "e-mailed".** A screen or audit line says "e-mailed" only when the send returned true; otherwise it gives the reason ("testing mode holds e-mails to buyers and suppliers", "this e-mail is switched off in Admin › E-mail settings", "no client e-mail on file", "the e-mail could not be sent"). Links (set-password invites always; PI form, Buyer Action, Payment Action, Supplier Action, Vendor Details links) are shown under the message with a **Copy** button (`Flash::set($type, $message, $copyLink)`, partial `views/partials/copy_link.*`, app.js `[data-copy]`). Order Communication posts store the reason (`order_comments.email_status`: sent / testing_mode / switched_off / no_email / failed; `sending_off` on posts from before D-280).
 
@@ -1116,10 +1116,10 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `manage_payment_presets` | Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). | Admin, MD, ED, SysAdmin |
 | `manage_ports` | Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. | Admin, MD, ED, SysAdmin |
 | `manage_pricing` | Change the pricing settings, a product's pricing overrides, the associate commission levels and ladder, and an associate's commission level. | Admin, MD |
-| `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. | Admin, MD, ED |
+| `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. *Note: also Duplicate a product (D-358) and Configure it — base price, product-level values, switching it Active (D-361; Thickness rules also need `manage_product_specifications`, D-363).* | Admin, MD, ED |
 | `manage_product_specifications` | Change one product's specifications: hide a specification or option, change an option's value, add options or specifications for that product only, reset to the category. | Admin, MD |
 | `manage_suppliers` | Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
-| `record_market_prices` | Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. | Admin, MD, ProcEx, ProcMgr, ProcDir |
+| `record_market_prices` | Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. *Note: also Edit price, the Offer active switch and "+ Add product" (with `manage_suppliers`, D-359 / D-360); since D-361 the selling price comes from the configured base price, and "used for pricing" only picks whose CHA, packing and dates go with it.* | Admin, MD, ProcEx, ProcMgr, ProcDir |
 | `view_price_buildup` | See a product's cost, margin, minimum price, team-incentive reserve, every floor and quote price, and the pricing settings. | Admin, MD, ED |
 | `view_product_catalog` | Search and view individual products in the internal product catalog. | Admin, MD, ED, ExpEx, AccEx, LogEx, Viewer, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir |
 | `view_product_pricing` | See product pricing, supplier list, and misc charges. | Admin, MD, ED, ExpEx, AccEx, SalesMgr, SalesDir, FinMgr, FinDir |
@@ -1172,7 +1172,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `assign_order_owner` | Add or remove which staff are assigned to an order (order_assignees). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OpsMgr, ECMgr, ECDir |
 | `clear_payments` | Confirm a buyer payment actually landed in the bank, unlocking the next stage gate — split out of manage_payments so the person who records a payment is never also the one who confirms it. | Admin, MD, ED, AccEx, FinMgr, FinDir |
 | `close_orders` | Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order. | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir |
-| `edit_order_post_confirmation` | Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. | Admin, MD, ED |
+| `edit_order_post_confirmation` | Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. *Note: since D-342 product rows and the currency are fixed from the first approved Quotation for everyone, this permission included.* | Admin, MD, ED |
 | `manage_complaints` | View complaints, acknowledge/resolve them, and log one on a client's behalf. | Admin, MD, ED, SalesMgr, SalesDir |
 | `manage_compliance_checklist` | Work the order's compliance checklist (ECGC cover, inspection, fumigation, phytosanitary, due diligence …). | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, ECEx, ECMgr, ECDir |
 | `manage_disputes` | View/raise/update a dispute's status, attach evidence, and enable/disable the client-facing dispute button. | Admin, MD, ED, SalesMgr, SalesDir |
@@ -1885,6 +1885,15 @@ goods line picked from Products whose product offers either specification withou
 missing one named, "… depends on it."). Not affected: lines typed by hand, products without
 those specifications, a line from an associate's price request, and an edit that leaves the
 product and options of a saved line unchanged.
+
+**"Monument (cut to size)" and the installation defaults (D-347, 12 Nov 2026, owner "add this … in
+seed").** Natural Stone › Size / format has the option **Monument (cut to size)** at 0 % — thick
+pieces cut to an exact size (headstones, bases, kerbs), sold per CBM; "Cutter slab" stays −10 % and
+"Gangsaw slab" is for thin slabs. A fresh install (seed.sql, both stacks) also starts with e-mail
+Testing mode **on** (`email_testing_mode` 1 — switched off on go-live day), the team incentive
+program **on** (`incentive_settings.program_enabled` 1), other costs to FOB **5.5 %** and margin
+**15 %** (`pricing_settings`). Migration `2026-11-12i` adds the option and, in Part 2 (overwriting),
+sets the same four values on an existing database.
 The old "50 mm and above: set the unit to CBM" refusal is gone. A missing size is
 refused beside the field on save ("Enter the length (cm) — needed to compare a price
 per piece with the product's price per CBM."); a saved line without it gets the status
@@ -2004,8 +2013,10 @@ e.g. `SC/PI/26/0511001`.
 | Stored | `order_oc_acknowledgments`, `orders.oc_link_generated_at`. |
 | Document | **OC** `SC/OC/…` — order value, advance due, advance actually received, balance = value − actual advance (D-053). |
 
-From here edits to order details or lines need `edit_order_post_confirmation`
-and a reason (logged `ORDER_EDITED_POST_CONFIRMATION`).
+From here edits to order details need `edit_order_post_confirmation`
+and a reason (logged `ORDER_EDITED_POST_CONFIRMATION`). Product lines (and the
+currency) were already fixed when the first Quotation was approved (D-342, §8.10):
+they change only through a Products & prices amendment.
 
 #### Step 7 · Supplier PO (Stage 5) — Procurement
 
@@ -2244,7 +2255,9 @@ on 10 Dec, the balance is due 17 Dec.
 ### 5.9 Amendments, complaints, disputes, cancellation, Mark Lost
 
 **Amendments** (SOP 10, `AmendmentController`, `AmendmentService`,
-`amendments`). Change **payment terms** after the PI is issued.
+`amendments`). Change **payment terms** after the PI is issued — or, since D-342,
+the order's **products and prices** after its first Quotation is approved
+(`amendment_type` 'products', `ProductsAmendmentService`; §8.10).
 
 1. Raise a request (`manage_orders`): reason ≥ 10 characters, requested by
    importer or NexaCrest, only the terms that change, optional effective
@@ -2298,9 +2311,12 @@ reported as lost.
 
 ### 5.10 Editing, duplicating, archiving
 
-- **Before Stage 4**: `manage_orders` edits details and lines.
+- **Before Stage 4**: `manage_orders` edits details, and lines until the first
+  Quotation is approved.
 - **Stage 4+**: `edit_order_post_confirmation` + reason
-  (`ORDER_EDITED_POST_CONFIRMATION`).
+  (`ORDER_EDITED_POST_CONFIRMATION`) for the details.
+- **Lines and currency after the first approved Quotation** (D-342): refused for
+  everyone, overrides included — Products & prices amendment only (§8.10).
 - **Locked** (complete / lost / cancelled): `edit_locked_data` + reason
   (`ORDER_EDITED_WHILE_LOCKED`), checked first.
 - **Duplicate Order**: copies client, terms, ports and active lines into a
@@ -3261,7 +3277,7 @@ the same filters, counts, fields, actions and money rules on both templates
   - Security templates fall back to built-in wording if missing or off.
   - Settings › E-mail (D-280) switches each e-mail per audience; MUST
     e-mails (login and account access) always go; testing mode
-    (`email_testing_mode`, off in seed; replaced `mail_sending_enabled`)
+    (`email_testing_mode`, on in seed since D-347; replaced `mail_sending_enabled`)
     holds only buyer and supplier e-mails. `mail_approval_queue_enabled`
     (on) gives the two-level send.
   - E-mail only when someone must act or a client acts (D-135); recipients
@@ -3503,10 +3519,10 @@ This section explains every money calculation the app makes. Each rule is in **o
 
 | Step | Formula | Notes |
 |---|---|---|
-| 1. Supplier price in USD | supplier price (₹) ÷ pricing exchange rate | The supplier price is the row marked **"used for pricing"** in Products › Market prices. |
-| 2. Cost | supplier USD + other costs to FOB | Other costs = % of the supplier USD (default 2.5 %), or a fixed USD amount per unit (per-product override). |
+| 1. Supplier price in USD | supplier price (₹) ÷ pricing exchange rate | Since D-361 the supplier price is the product's **configured base price** (Products › Configure; `SupplierOffers::pricingRow()`), with the CHA, packing and dates of the usable offer marked "used for pricing". Before D-361 it was that row itself. |
+| 2. Cost | supplier USD + other costs to FOB | Other costs = % of the supplier USD (default 5.5 % since D-347), or a fixed USD amount per unit; product → category → global (D-359). |
 | 3. Minimum price | cost ÷ (1 − margin %) | **Margin on the price, not markup.** 20 % margin on cost 1,000 gives 1,250, not 1,200. Nobody may sell below it, not even the MD. |
-| 4. Team-incentive reserve | % of (minimum − cost), or a fixed USD amount per unit | **0 when the incentive program is off** (`incentive_settings.program_enabled`, seeded `0`). |
+| 4. Team-incentive reserve | % of (minimum − cost), or a fixed USD amount per unit | **0 when the incentive program is off** (`incentive_settings.program_enabled`, seeded `1` since D-347). |
 | 5. Staff floor | minimum + reserve | The lowest price any staff member may quote without MD approval. |
 | 6. Associate floor | staff floor ÷ (1 − commission %), or staff floor + fixed USD commission | One floor per commission level. |
 | 7. Quote price | floor × (1 + buffer %) | Default buffer 3 %. This is what fills in when a product is picked. |
@@ -3674,7 +3690,9 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
    price** and History. The form: Thickness *, Price * (₹ per SQM, per CBM for 50 mm+), Quoted on *, "Also work
    out from this <X> price" — one tick box per other thickness with the result and how ("= 4,600 − 20 %",
    "= 20 mm price ₹4,600 per SQM × 40", from a non-base price the base is worked back first: CBM ÷ K, or ÷ (1 +
-   %)) and a "change …" link to the product's price rules (`/products/{id}/edit#price-rules`); ticked by
+   %)) and a "change …" link to the product's price rules (`/products/{id}/edit#price-rules`; since D-363 one row
+   per thickness with a category / this product badge and one link "Change the % rules for this product" → Configure ›
+   Thickness rules); ticked by
    default only where no TYPED price exists ("you typed ₹… on … — kept unless you tick this"); Base for
    orders: keep / make this price the base. app.js `initThicknessCalc` previews; `ThicknessPrices::calcFrom`
    / `thicknessPrices.calcFrom` works it out again on save (`POST /products/suppliers/{id}/thickness-price`;
@@ -3744,7 +3762,10 @@ fall-back)"); after the PI the rate fixed with the line figures (`order_products
 else `orders.pricing_fx_rate_at_pi`) and the date of the first PI: "Prices worked out at ₹86.63 per USD — fixed
 on the Proforma Invoice of 12 Nov 2026 at ₹86.63 per USD.", adding "; today's rate ₹86.40 does not change
 them." when today's rate differs. Before the PI no per-line rate is stored, so there is nothing to compare
-with. Never shown to other roles, associates, buyers or on documents (D-304). No database change.
+with. Never shown to other roles, associates, buyers or on documents (D-304). No database change. **Since D-342** an
+order whose first Quotation is approved shows "Prices worked out at ₹86.63 per USD — fixed by the approved Quotation of
+12 Nov 2026." (`PriceLock::fixedRate()` / `fixedDate()`), with the same "; today's rate … does not change them." when it
+differs; the PI wording above remains only for an order fixed at its PI and not by a Quotation.
 
 **One master for HS code and supplier (D-302, D-303).** Product HS code must be an active `hs_codes` code
 (form datalist + `data-in-list`, server check); "+ Add a new HS code" posts to `/hs-codes` with `return_to`.
@@ -3775,7 +3796,8 @@ redirects to the Options tab; the specification actions redirect there too. A pr
   directory supplier is active (`suppliers.is_active`; a price typed before the directory link counts as active). An
   unusable offer is never used: not as the price "used for pricing", not as the per-CBM price, not as an exact price for a
   combination, not in lowest / highest. When the price marked "used for pricing" is switched off the product shows "The
-  supplier price used for pricing is switched off (inactive supplier or offer)." (`SupplierOffers::usable()` /
+  supplier price behind this product is switched off (inactive supplier or offer) — choose another supplier price in
+  Configure." (wording of the D-365 follow-up; `SupplierOffers::usable()` /
   `supplierOffers.usable()`; the repository's `forProduct()` / `find()` carry `supplier_is_active`.)
 - **Configured base price.** `catalog_products.configured_base_price_inr` with `configured_base_unit` ('m2' at a
   thickness, 'CBM' for 50 mm and above, or the product's unit), `configured_base_thickness_mm` (0 = 50 mm and above,
@@ -3869,8 +3891,8 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
 - **Offer active switch** (`POST /suppliers/offers/{offerId}/active`, `manage_suppliers` + `record_market_prices`, CSRF;
   `active` = 1 / 0, `from` = suppliers / supplier): `SupplierOffers::setOfferActive()` (history "Offer active", audit
   `SUPPLIER_OFFER_ON/OFF`). The engine reads it live: switched off, the offer is not used for pricing, matching or lowest /
-  highest (a product priced from it shows "The supplier price used for pricing is switched off (inactive supplier or
-  offer)."); switched on, the same figures come back.
+  highest (a product priced from it shows "The supplier price behind this product is switched off (inactive supplier or
+  offer) — choose another supplier price in Configure." — D-365 follow-up wording); switched on, the same figures come back.
 - **Code.** `SupplierController::index / editForm / addProductForm / addProduct / offerActive` (Node
   `supplierController.js`), `SupplierOffers::forSuppliers / listRow / countsBySupplier / existingOffer / priceShape /
   addProductChoices / createProduct / addOffer` (Node `supplierOffers.js`), views `suppliers/index`, `form`, `add_product`,
@@ -4090,6 +4112,13 @@ plist2_t3, plist_r).** No database change, no migration, no price changes (snaps
   `ProductController::index` / `show`, `EditPriceController::form` (`thickness_mm`), `PricingController::marketPrices`
   (`prefillBasis`), views `products/index`, `_pricing_ready`, `edit_price`, `market_prices`, `_price_add` (`pickMm`),
   Node twins; app.js `initShowAllColumns`; CSS D-365 block. The Products list has no board view (no Kanban twin).
+- **Follow-up the same day (owner): the list fits the page.** Compact type, the unit on its own small line, tighter
+  padding and stacked row buttons make the default view exactly the page width at 1440 px, so Staff lowest, Staff
+  quote, Status and Actions are visible without scrolling (CSS only, both stacks). The "not priced" reasons from
+  `PricingService::figures()` / `pricingService.figures()` no longer mention the removed "used for pricing" step:
+  "Not configured yet — set the base price in Configure."; "The supplier price behind this product is switched off
+  (inactive supplier or offer) — choose another supplier price in Configure."; "No price for 50 mm and above (per CBM)
+  yet — add a 50 mm+ supplier price, or set a manual price." No migration.
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
@@ -4598,6 +4627,20 @@ layout are otherwise unchanged, and page counts stay the same (a row or a sectio
 move to the previous page because a label no longer wraps). The input forms in the app keep
 their "*" for required fields.
 
+**"Documents to be provided" without "(digitally authorised)" (D-344, 12 Nov 2026, owner confirm 1 +
+confirm 2).** On the QT, PI and CI, PDF and Word, both stacks, the list reads "Commercial Invoice" and
+"Packing List" (CI: "Commercial Invoice (this document)"). Before, the PDF said "(digitally authorised)"
+and the Word copy "(signed and stamped)" — they disagreed, and "digitally authorised" could raise a
+discrepancy under an LC that asks for a signed invoice. The printed signature and seal, the other
+listed documents and the COO preparation checklist ("Commercial Invoice (signed copy)") are unchanged;
+stone fixtures updated for exactly these words.
+
+**Every Supplier PO in Indian grouping (D-345, 12 Nov 2026, owner).** The supplier is paid in rupees,
+so every rupee amount on the SUPPO (rate per unit, basic value, GST, total payable, advance, balance;
+PDF and Word, both stacks) uses `MoneyFormat::amount()` / `moneyFormat.amount()` with Indian grouping
+whatever the order's currency (D-343 had grouped it by the order currency). Amounts in words,
+quantities and every other document unchanged; issued Supplier POs keep what they printed.
+
 **Headings keep with what follows (D-354, 12 Nov 2026, owner confirm 1 + confirm 2).** In every
 generated document, PDF and Word, both stacks, a section heading or a table's column-header row
 is never left alone at the foot of a page: it moves to the next page together with its first
@@ -4820,12 +4863,12 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 
 `zoho_books_enabled` 0; `zoho_books_client_id`, `_client_secret`, `_refresh_token`, `_organization_id`, `_deposit_account_id` (empty, secrets masked "ends in 1a2b"); `zoho_books_sync_start_date` (go-live date; nothing earlier is sent); `zoho_books_restore_checked_at` (set by the app); `zoho_books_accounts_domain` accounts.zoho.in; `zoho_books_api_domain` www.zohoapis.in; `zoho_sync_clients` 0; `zoho_sync_products` 0; `zoho_api_daily_limit` 800; `zoho_api_minute_limit` 30. Books syncs only when `.env` `ZOHO_INTEGRATION_ENABLED=true` **and** `zoho_books_enabled = 1`. "Test Books Connection" only reads.
 
-#### Pricing (`pricing_settings`, Products › Pricing, MD only, audited)
+#### Pricing (`pricing_settings`, Products › Global pricing settings, MD only, audited)
 
 | Key | Default | Meaning |
 |---|---|---|
-| `margin_pct` | 20.00 | Minimum margin, % of price |
-| `other_cost_pct` | 2.50 | Other costs to FOB, % of supplier price |
+| `margin_pct` | 15.00 (D-347; was 20.00) | Minimum margin, % of price; a category (Category price rules) or product (Configure) may set its own |
+| `other_cost_pct` | 5.50 (D-347; was 2.50) | Other costs to FOB, % of supplier price; category / product as for margin |
 | `pricing_fx_rate` | 82.0000 | ₹ per USD — **set on go-live day** |
 | `buffer_pct` | 3.00 | Negotiating buffer |
 | `incentive_mode` / `incentive_value` | pct / 15.0000 | Team-incentive reserve and global incentive rule |
@@ -4840,7 +4883,7 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 
 #### Team incentive (`incentive_settings`, `incentive_roles`; Finance & accounts › Team incentive settings, MD)
 
-`program_enabled` **0** (on or off as the owner decides at go-live), `lock_reminder_days` 3. Roles and shares §7.4; caps per role (`cap_per_order_inr`, `cap_per_month_inr`, empty); eligibility per designation and per person (D-259).
+`program_enabled` **1** in a fresh install since D-347 (migration 2026-11-12i Part 2 sets it on an existing database too; the owner may still switch it off), `lock_reminder_days` 3. Roles and shares §7.4; caps per role (`cap_per_order_inr`, `cap_per_month_inr`, empty); eligibility per designation and per person (D-259).
 
 #### Associate commission and TDS (`incentive_settings`)
 
@@ -5247,7 +5290,7 @@ The business view is `docs/guides/GO_LIVE_CHECKLIST.md` (tick it top to bottom o
 
 Example (PHP on Bluehost): `0 * * * * php /home/<cpaneluser>/nexacrest_webapp/app/cron/zoho_sync.php >> /home/<cpaneluser>/logs/zoho_sync.log 2>&1`. Node: `cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1`. On Node, use **either** cron **or** `RUN_JOBS_IN_PROCESS=true` (node-cron inside the web process), never both, or every job fires twice.
 
-**7. Backups set-up** (§12.3), then **first login** (md@email.com / the seeded password `ChangeMe#2026`, forced change, then the e-mailed login code — on a first install with e-mail not yet set up, read it from the server log or set up mail first; then make the MD and Admin backup codes on My Account), company settings, company assets, pricing, commission and incentive settings, people, products, and a **dry run in Test Mode** (references get a `TEST-` prefix) with one order taken to closure. All in the go-live checklist, sections C–F.
+**7. Backups set-up** (§12.3), then **first login** (md@email.com / the seeded password `ChangeMe#2026`, forced change, then the e-mailed login code — on a first install with e-mail not yet set up, read it from the server log or set up mail first; then make the MD and Admin backup codes on My Account), company settings, company assets, pricing, commission and incentive settings, people, products, and a **dry run in Test Mode** (references get a `TEST-` prefix) with one order taken to closure. All in the go-live checklist, sections C–F. On go-live day switch e-mail **Testing mode** off (Settings › E-mail; it is on in a fresh install since D-347), once a test e-mail from Settings › Company arrives.
 
 ### 12.2 Daily and weekly checks
 
@@ -5416,6 +5459,10 @@ The full register is `docs/decisions/owner-decisions-register.md` (about 260 dec
 **Data and deployment (D-184–D-191, D-210, D-241, D-249, D-260).** MySQL-safe, run-twice-safe migrations (D-184); IST everywhere (D-188, R24); simultaneous saves handled (D-210); daily alert job reads once (D-249).
 
 **Testing and process (D-192–D-204, D-211, D-258).** Disposable test databases (D-192); no skips (D-193); every route has a behaviour test (D-211); the full QA programme found 107 untested bugs, fixed in batches QA1–QA4 (D-258); docs kept current with every change (D-198); work order on a QA round: highest priority first, batches pushed only after "push" (D-201).
+
+**Orders, documents and annexures, 12 Nov 2026 (D-336–D-346, D-349, D-352–D-356).** "As per annexure" order lines, Annexure B (as shipped) and the annexure chosen for the CI / PL (D-336, §8.8); reorder lines "As per annexure", a duplicate keeps Annexure A, a worked-out CBM price goes to the MD (D-338); one "Save all changes" on the annexure page, Edit / Regenerate Annexure A, Annexure B from the CI step (D-341); buyer details on orders follow the client — automatic while nothing is issued, by approved request after (D-337); the detailed product table, No. of pieces and prices in other units (D-339, §8.9); prices and products fixed by the first approved Quotation, changed only by a Products & prices amendment (D-342, §8.10); Indian grouping on INR documents, Total CBM from the lines, Word section numbers as the PDF (D-343, §8.11); "Documents to be provided" without "(digitally authorised)" (D-344); every Supplier PO in Indian grouping (D-345); the client billing address in parts only (D-346); the COO line without "TBC" and the MD name / title kept in sync (D-349); no mandatory note or stars, headings kept with their content, the Payment Terms box, a clean Word spacer (D-352–D-356, §8.5).
+
+**Products, suppliers and pricing, 12–13 Nov 2026 (D-340, D-347, D-348, D-357–D-365).** "Rate used for prices right now" box and the order-page rate line (D-340); "Monument (cut to size)" and the installation defaults — Testing mode on, incentive on, other costs 5.5 %, margin 15 % (D-347); Thickness and Size / format always chosen on an order line (D-348); one list of surface-finish names in Settings › Lists, base "Natural Polish" (D-357); Duplicate a product (D-358); supplier offers with an Offer active switch, Edit price and "+ Add product" (D-359, D-360); the configured base price that never changes by itself, Configure with Global / Category / Product values, Link a supplier, Link these prices, quotable-only Pick from Products and the Supplier PO supplier choice (D-361); Global pricing settings and Category price rules reached from the Products link bar (D-362); Products list buttons, the category form, "Also work out" rows and Configure › Thickness rules (D-363); supplier prices per SQFT and the unit names SQM · SQFT · CBM on every screen (D-364); the Products list short view and the "Pricing ready?" rework (D-365). Sitewide buttons: a pressed button's choice always reaches the server, and a question written on a button is asked (D-350, D-351).
 
 ### 13.3 Standing rules in one list
 

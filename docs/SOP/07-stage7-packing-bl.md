@@ -50,7 +50,13 @@ which runs alongside and never locks anything. Then:
    that product's record — it is shown read-only and can't be typed (the
    server sets it again on save, whatever the form sends). Once saved, **Generate Packing
    List** (10c) produces the PL document, which prints the quantity with its
-   unit.
+   unit. On an order with the detailed product table (every order created
+   since 12 Nov 2026, D-339) the PL prints that table without prices, its
+   last column **Crates / Packages** listing the crates whose product is the
+   line's. The PL prints the same annexure as the Commercial Invoice — the
+   one chosen in Step 11a, or until then the default (Annexure B when it is
+   included and filled in, otherwise Annexure A) (D-336, see
+   [Chapter 8](./08-stage8-ci-balance.md)).
 2. **Save Shipping Details** (10d) — shipping line, vessel name, voyage number,
    ETD/ETA, number of containers, container number(s), and seal number.
    Number of Containers is a simple count distinct from Container No. —

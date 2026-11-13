@@ -208,7 +208,10 @@ Opening an order (**Open order**) shows, top to bottom (with a
 [Chapter 17](./17-order-edit-duplication.md); the reorder form keeps each
 line's unit, matching it to the unit list whatever its capitals or spaces,
 and if the earlier unit is not on the list it shows it and asks the buyer
-to choose one, never switching silently to PCS):
+to choose one, never switching silently to PCS; each line also has an
+**As per annexure** tick box next to "Quantity not decided yet" — never
+both — and a line that was "As per annexure" on the earlier order starts
+ticked, D-338):
 
 1. **Please confirm your order** (button **Yes, this is correct — please go ahead**) — only appears
    when there's a pending OC acknowledgment; see

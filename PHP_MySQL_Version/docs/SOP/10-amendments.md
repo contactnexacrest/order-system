@@ -2,17 +2,23 @@
 
 ## What this module is for
 
-Changing an order's **payment terms** — advance percentage, balance terms,
-what triggers the balance (before shipment vs. against BL), balance days —
-after the Proforma Invoice is already issued, in a way that's legally
-binding on both parties rather than an informal email exchange. This exists
-because payment terms are a hard commitment once the PI is out; changing
-them needs its own paper trail, distinct from every other kind of order
-edit.
+Two kinds of amendment, each legally binding on both parties rather than an
+informal email exchange:
 
-Amendments can be raised on any order once a PI exists, regardless of what
-stage it's currently at — this module isn't part of the 9-stage pipeline
-and doesn't block or unlock any stage gate.
+- **Payment terms** — advance percentage, balance terms, what triggers the
+  balance (before shipment vs. against BL), balance days — after the
+  Proforma Invoice is already issued. Payment terms are a hard commitment
+  once the PI is out; changing them needs its own paper trail, distinct
+  from every other kind of order edit.
+- **Products & prices** (owner decision D-342, 12 Nov 2026) — the order's
+  lines and prices once its first Quotation is approved (below).
+
+A payment-terms amendment can be raised on any order once a PI exists; a
+Products & prices amendment once the first Quotation is approved ("This
+order's Quotation is not approved yet — change its lines on the order page
+(Products)." before that). Either way, regardless of what stage the order
+is at — this module isn't part of the 9-stage pipeline and doesn't block or
+unlock any stage gate.
 
 ## Products & prices amendment (owner decision D-342, 12 Nov 2026)
 

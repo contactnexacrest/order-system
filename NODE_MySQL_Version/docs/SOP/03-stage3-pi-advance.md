@@ -112,9 +112,11 @@ confused with each other — where staff either:
   "standalone order" follow-on: that same confirmed Buyer/Consignee/
   Notify Party data is also written onto *this order's own* snapshot
   columns at the same moment, so this order's documents reflect the
-  correction immediately and permanently — a later, unrelated edit to the
-  client record (or an acceptance on a different order for the same
-  client) never reaches back into it. Everything else on the submission
+  correction immediately. Accepting it also counts as saving the client:
+  the client's other running orders follow the corrected details — at once
+  where nothing is issued yet, through an approved request where a
+  document is already issued (D-337; see
+  [SOP 17](./17-order-edit-duplication.md#buyer-details-after-the-client-is-corrected-d-337)). Everything else on the submission
   (payment-terms confirmation, confirmed Incoterm/port,
   quotation-acceptance reference, any changes from the quotation) stays
   visible on the order for staff to read before generating the PI, but is
@@ -144,8 +146,12 @@ Proforma Invoice (order page → Products)." Step 5c shows the same in red.
 The **Price check** inside the Products card lists those lines with **Ask MD to
 approve line N**; only the MD (permission "Manage pricing") approves, down to the
 minimum price and never below, with a reason. An approval holds while the line
-keeps that price. When the PI is generated, each checked line's figures are fixed
-on the line. The Quotation (Step 1) is checked the same way. Details:
+keeps that price. The line prices and the exchange rate were already fixed when
+the order's first Quotation was approved (D-342) — the PI uses exactly those
+prices, and a line can be changed only through a Products & prices amendment
+([Amendments](./10-amendments.md)); when the PI is generated each checked line's
+figures are stored on the line as well. The Quotation (Step 1) is checked the
+same way. Details:
 [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 
 - The Price check is never on a document or in the client portal.
@@ -164,7 +170,9 @@ second **TOTAL PI VALUE** the PI (PDF and Word) prints an amber box:
 Payment Terms ends with: "The order is confirmed, and production starts,
 only once the advance is received in our account as cleared funds." Every
 buyer payment deadline on the PI, in PDF and Word alike, is in **Calendar
-Days**.
+Days**. Since 12 Nov 2026 (D-355) the lines under the PAYMENT TERMS heading
+sit in a light grey-blue box with a navy left edge, with only the money
+figures in bold — the same on the Quotation.
 
 **No advance** (owner decision 2026-10-28 — e.g. the *Irrevocable Letter of
 Credit at Sight* preset, 0% advance): the box reads **"NO ADVANCE PAYABLE —

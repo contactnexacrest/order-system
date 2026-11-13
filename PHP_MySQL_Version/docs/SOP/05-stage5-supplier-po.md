@@ -96,9 +96,16 @@ not "X% — To Be Confirmed" (which is what a blank GST Rate prints).
 **A 0% advance is allowed** (owner decision 2026-10-27). Type `0` in
 Advance %: the form fills Advance Amount as 0.00 and the whole Total
 Payable as the Balance, and 0 is saved as 0 — not as "not filled in". The
-Supplier PO then prints **"Advance (0.00%) \* 0.00"** and the full balance,
-instead of "Advance (X%) \* To Be Confirmed". Step 7e completes by itself
-(see below).
+Supplier PO then prints **Advance (0.00%)** with **0.00** and the full
+balance, instead of "Advance (X%)" with "To Be Confirmed". Step 7e completes
+by itself (see below).
+
+**Rupee amounts in Indian grouping** (owner decision D-345, 12 Nov 2026). The
+supplier is paid in rupees, so every rupee amount on the Supplier PO — rate per
+unit, basic value, GST, total payable, advance and balance — prints with Indian
+grouping (**1,75,000.00**, **15,40,175.00**), whatever the order's currency
+(PDF and Word). Amounts in words and quantities are unchanged; Supplier POs
+already issued keep what they printed.
 
 **Save Supplier PO Terms** (7a) creates the internal procurement record (and
 generates the Supplier PO reference) — it does **not** generate the document
