@@ -1417,6 +1417,15 @@
     if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
     }
+    // data-min-exclusive="x" (QA UI-011): the number must be greater than x — e.g. an order
+    // line's quantity, which the server refuses at 0. data-min-exclusive-unless="<checkbox
+    // name>": not while that checkbox of the form is ticked (Qty To Be Confirmed).
+    if (value !== '' && el.dataset.minExclusive !== undefined && /^-?\d*\.?\d+$/.test(value) && parseFloat(value) <= parseFloat(el.dataset.minExclusive)) {
+      var minExclusiveOff = el.dataset.minExclusiveUnless && el.form ? el.form.elements.namedItem(el.dataset.minExclusiveUnless) : null;
+      if (!(minExclusiveOff && minExclusiveOff.checked)) {
+        return el.dataset.minExclusiveMessage || 'Enter a number greater than ' + el.dataset.minExclusive + '.';
+      }
+    }
     // data-max-price="x" + data-max-price-message (D-342): a price fixed by the approved
     // Quotation can only go down in a "Products & prices" amendment — never above it.
     if (value !== '' && el.dataset.maxPrice !== undefined && parseFloat(value) > parseFloat(el.dataset.maxPrice) + 0.004) {

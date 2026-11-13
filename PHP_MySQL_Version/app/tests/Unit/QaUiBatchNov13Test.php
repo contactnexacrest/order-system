@@ -29,6 +29,25 @@ final class QaUiBatchNov13Test extends TestCase
         }
     }
 
+    /** UI-011: an order line's quantity of 0 is stopped in the browser (app.js data-min-exclusive; the Jest twin runs the rule). */
+    public function testUi011QuantityZeroIsCaughtInTheBrowser(): void
+    {
+        foreach ([__DIR__ . '/../../../public_html/assets/js/app.js', __DIR__ . '/../../../../NODE_MySQL_Version/app/public/js/app.js'] as $file) {
+            $js = (string) file_get_contents($file);
+            self::assertStringContainsString("el.dataset.minExclusive !== undefined", $js, $file);
+            self::assertStringContainsString("parseFloat(value) <= parseFloat(el.dataset.minExclusive)", $js, $file);
+            self::assertStringContainsString("el.dataset.minExclusiveUnless", $js, $file);
+        }
+        foreach ([
+            [self::VIEWS . '/orders/create.php', 'product_quantity[]', false], [self::NODE_VIEWS . '/orders/create.njk', 'product_quantity[]', false],
+            [self::VIEWS . '/orders/_products_table.php', 'quantity', true], [self::NODE_VIEWS . '/orders/_products_table.njk', 'quantity', true],
+        ] as [$file, $name, $hasTbc]) {
+            self::assertSame(1, preg_match('#<input type="text" name="' . preg_quote($name, '#') . '"[^>]*>#', (string) file_get_contents($file), $m), $file);
+            self::assertStringContainsString('data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0."', $m[0], $file);
+            self::assertSame($hasTbc, str_contains($m[0], 'data-min-exclusive-unless="quantity_is_tbc"'), $file);
+        }
+    }
+
     /**
      * UI-008: every fixed internal link in a view leads to a page route (the TDS
      * register linked to /associates/report, which does not exist). A route

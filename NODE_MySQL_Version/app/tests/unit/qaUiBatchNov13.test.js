@@ -69,6 +69,52 @@ describe('UI-004: "+ Add product line" still works after every line was removed'
   });
 });
 
+/** UI-011: an order line's quantity of 0 is stopped in the browser, beside the field (app.js fieldError). */
+describe('UI-011: quantity 0 is caught before the order form is sent', () => {
+  const APP_JS = [
+    path.join(__dirname, '..', '..', 'public', 'js', 'app.js'),
+    path.join(__dirname, '..', '..', '..', '..', 'PHP_MySQL_Version', 'public_html', 'assets', 'js', 'app.js'),
+  ];
+
+  /** The data-min-exclusive rule of fieldError(), run on its own. */
+  function minExclusiveRule(file) {
+    const text = fs.readFileSync(file, 'utf8');
+    const start = text.indexOf('    // data-min-exclusive="x"');
+    expect(start).toBeGreaterThan(0);
+    const end = text.indexOf('\n    }\n', text.indexOf('if (value !== \'\' && el.dataset.minExclusive', start)) + 7;
+    return new vm.Script(`(function (el, value) {\n${text.slice(start, end)}\n  return null;\n})`).runInNewContext({});
+  }
+
+  function field(dataset, tbcTicked = false) {
+    return { dataset, form: { elements: { namedItem: (n) => (n === 'quantity_is_tbc' ? { checked: tbcTicked } : null) } } };
+  }
+
+  for (const file of APP_JS) {
+    it(`${path.basename(path.dirname(path.dirname(file)))} app.js: 0 is refused, more than 0 passes, Qty To Be Confirmed lifts it`, () => {
+      const rule = minExclusiveRule(file);
+      const qty = { minExclusive: '0', minExclusiveMessage: 'The quantity must be more than 0.' };
+      expect(rule(field(qty), '0')).toBe('The quantity must be more than 0.');
+      expect(rule(field(qty), '0.000')).toBe('The quantity must be more than 0.');
+      expect(rule(field(qty), '0.001')).toBeNull();
+      expect(rule(field(qty), '40')).toBeNull();
+      expect(rule(field(qty), '')).toBeNull();
+      expect(rule(field({ ...qty, minExclusiveUnless: 'quantity_is_tbc' }, true), '0')).toBeNull();
+      expect(rule(field({ ...qty, minExclusiveUnless: 'quantity_is_tbc' }, false), '0')).toBe('The quantity must be more than 0.');
+      expect(rule(field({ minExclusive: '0' }), '0')).toBe('Enter a number greater than 0.');
+    });
+  }
+
+  it('the New order and order-line quantity fields carry the rule (both stacks)', () => {
+    for (const [file, name] of [
+      [path.join(VIEWS, 'orders', 'create.njk'), 'product_quantity[]'], [path.join(PHP_VIEWS, 'orders', 'create.php'), 'product_quantity[]'],
+      [path.join(VIEWS, 'orders', '_products_table.njk'), 'quantity'], [path.join(PHP_VIEWS, 'orders', '_products_table.php'), 'quantity'],
+    ]) {
+      const tag = fs.readFileSync(file, 'utf8').match(new RegExp(`<input type="text" name="${name.replace(/[[\]]/g, '\\$&')}"[^>]*>`))[0];
+      expect([file, tag.includes('data-min-exclusive="0"')]).toEqual([file, true]);
+    }
+  });
+});
+
 /**
  * UI-008: every fixed internal link in a view leads to a page route (the TDS
  * register linked to /associates/report, which does not exist). A route
