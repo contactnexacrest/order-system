@@ -1768,7 +1768,12 @@ app.use((err, req, res, next) => {
   // QA Round 5, R5-07: any other upload problem multer rejects (a file
   // under a field name this form doesn't have, too many files, ...) is a
   // bad request, not a server error — nothing has been stored.
-  if (err && err.name === 'MulterError') {
+  // HNT-007 (QA 13 Nov 2026): a multipart body the parser (busboy) itself cannot read —
+  // e.g. a file name holding a NUL byte ("Malformed part header") — is the same kind of
+  // bad upload: nothing was stored, so it gets the same answer instead of a 500.
+  const busboyError = err && !String(err.name || '').startsWith('Multer') && req.is && req.is('multipart/form-data')
+    && /^(Malformed part header|Unexpected end of form|Multipart: Boundary not found|Malformed content-disposition|Part terminated early)/i.test(String(err.message || ''));
+  if (err && (err.name === 'MulterError' || busboyError)) {
     // QA Round 6, R6-N03: back to the form with a message (and what was
     // typed so far), the same as PHP, instead of a bare error page.
     const message = 'We could not accept that file, so nothing was saved. Please add the file with the "Choose file" button on this form and try again.';

@@ -318,4 +318,26 @@ describe('QA Nov 2026 security batch', () => {
       expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM client_payment_reports WHERE order_id = :o', { o: orderId })).n)).toBe(0);
     });
   });
+
+  describe('HNT-007 unreadable multipart upload', () => {
+    it('HNT-007: a file name holding a NUL byte gets "We could not accept that file", not HTTP 500', async () => {
+      const { createTestClient, createTestOrder } = require('../support/fixtures');
+      const orderId = await createTestOrder(await createTestClient());
+      const md = await user('Managing Director');
+      const csrf = (await md.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const b = 'XqaSecBoundary';
+      const body = Buffer.concat([
+        Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="_csrf"\r\n\r\n${csrf}\r\n`),
+        Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="title"\r\n\r\nTEST-nul\r\n`),
+        Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="document"; filename="x.pdf`), Buffer.from([0]), Buffer.from(`.html"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4\r\n`),
+        Buffer.from(`--${b}--\r\n`),
+      ]);
+      const r = await md.agent.post(`/orders/${orderId}/additional-documents`).set('Content-Type', `multipart/form-data; boundary=${b}`).send(body);
+      expect(r.status).not.toBe(500);
+      expect([302, 400]).toContain(r.status);
+      if (r.status === 302) {
+        expect((await md.agent.get(r.headers.location)).text).toContain('We could not accept that file');
+      }
+    });
+  });
 });
