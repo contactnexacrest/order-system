@@ -1274,3 +1274,6 @@ table.product-list td .badge { font-size: 11px; padding: 2px 7px; }
 table.product-list .product-list-actions .btn-sm { font-size: 12px; padding: 3px 8px; white-space: normal; }
 table.product-list td:last-child { min-width: 92px; max-width: 110px; }
 table.product-list .unit-tail + br { display: none; }
+
+/* QA SUI-004 (13 Nov 2026): long unbroken values (e-mail addresses, references) in key/value tables wrap instead of widening the page on a phone. */
+table.kv td, table.kv th { overflow-wrap: anywhere; }
