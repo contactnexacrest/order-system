@@ -31,6 +31,9 @@ trait PricingFixtures
         foreach ($values as $k => $v) {
             $pdo->prepare('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k')->execute(['k' => $k, 'v' => $v]);
         }
+        // The worked examples price without the team-incentive allowance; the seed has the program on
+        // since D-347, so pin it off here too (otherwise the result depends on which test ran before).
+        $pdo->exec("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
     }
 
     /** Every pricing setting back at the code fallbacks (the installed values, D-347). */
@@ -40,6 +43,7 @@ trait PricingFixtures
         foreach (PricingService::DEFAULTS as $k => $v) {
             $pdo->prepare('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k')->execute(['k' => $k, 'v' => $v]);
         }
+        $pdo->exec("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // seed value (D-347)
     }
 
     /**

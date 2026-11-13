@@ -400,8 +400,14 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await ackForm
         .locator('textarea[name="acknowledged_note"]')
         .fill('Buyer confirmed by email reply, quoted verbatim in our records.');
-      await ackForm.getByRole('button', { name: /Record Buyer's (Email )?Acknowledgement/ }).click();
-      await expect(page.locator('.alert')).toContainText('unlocked');
+      // QA final run: under load the old .alert (Buyer Action link message) was read before the
+      // POST's redirect landed — wait for the form's response and the new page first.
+      await Promise.all([
+        page.waitForResponse((r) => r.url().endsWith(`/orders/${orderId}/oc-acknowledgment`) && r.request().method() === 'POST', { timeout: 60_000 }),
+        ackForm.getByRole('button', { name: /Record Buyer's (Email )?Acknowledgement/ }).click(),
+      ]);
+      await page.waitForLoadState('domcontentloaded');
+      await expect(page.locator('.alert')).toContainText('unlocked', { timeout: 30_000 });
     });
 
     await logout(page);

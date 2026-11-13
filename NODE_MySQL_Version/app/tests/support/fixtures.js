@@ -282,6 +282,9 @@ async function pinWorkedExamplePricing(overrides = {}) {
   for (const [k, v] of Object.entries(values)) {
     await db.execute('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k', { k, v });
   }
+  // The worked examples price without the team-incentive allowance; the seed has the program on
+  // since D-347, so pin it off here too (otherwise the result depends on which test ran before).
+  await db.execute("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
 }
 
 /** Every pricing setting back at the code fallbacks (the installed values, D-347). PHP twin: PricingFixtures::resetPricingSettings(). */
@@ -290,6 +293,7 @@ async function resetPricingSettings() {
   for (const [k, v] of Object.entries(DEFAULTS)) {
     await db.execute('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k', { k, v });
   }
+  await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // seed value (D-347)
 }
 
 /**
