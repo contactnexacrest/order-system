@@ -80,9 +80,9 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
       <?php endif; ?>
       <label>Description *<input type="text" name="description" required maxlength="500" placeholder="e.g. Black granite slabs, polished, 18 mm"></label>
       <label>HSN *<input type="text" name="hsn_code" required minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="e.g. 68029300"></label>
-      <label>Quantity *<input type="number" name="quantity" required min="0.001" step="0.001" placeholder="e.g. 120.5"></label>
+      <label>Quantity *<input type="number" name="quantity" required min="0.001" max="10000000" step="0.001" placeholder="e.g. 120.5"></label>
       <label>Unit *<input type="text" name="unit" required maxlength="20" placeholder="e.g. SQM"></label>
-      <label>Rate ₹ *<input type="number" name="rate_inr" required min="0.01" step="0.01" placeholder="e.g. 1450.00"></label>
+      <label>Rate ₹ *<input type="number" name="rate_inr" required min="0.01" max="99999999999.99" step="0.01" data-max-product="quantity" data-max-product-value="999999999999.99" data-max-product-message="The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99." placeholder="e.g. 1450.00"></label>
       <label>GST %<input type="number" name="gst_rate_pct" min="0" max="40" step="0.01" placeholder="blank = from the GST rates"></label>
       <p><button type="submit" class="btn-secondary">Add line</button></p>
     </form>

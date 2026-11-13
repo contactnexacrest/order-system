@@ -337,4 +337,55 @@ describe('D-257 Phase 2 — Domestic Trade', () => {
     expect(checks['Export-only modules switched off (export shipping, LUT, benefits)']).toBe(true);
     await db.execute("DELETE FROM departments WHERE code IN ('DOM_SALES','DOM_PURCHASE','DOM_DISPATCH')");
   });
+
+  /**
+   * HNT-L03 (QA 13 Nov 2026, briefed as HNT-L07): a Domestic Trade line took any quantity up to
+   * 10 digits and any rate up to 11 digits; PHP's GST maths then failed (HTTP 500) where Node
+   * worked it out. Now on both stacks: quantity at most 1,00,00,000, the line value (quantity ×
+   * rate) and the invoice total at most ₹9,99,99,99,99,999.99. PHP: DomesticTradeTest.php.
+   */
+  it('HNT-L03: extreme line amounts are refused alike on both stacks, in the browser too', async () => {
+    const orderId = await domOrder();
+    const line = (quantity, rate, gst = '18') => ({ description: 'Granite', hsn_code: '6802', quantity, unit: 'SQM', rate_inr: rate, gst_rate_pct: gst });
+    const add = (l) => step(() => D.addLine(orderId, l, domStaff.id));
+
+    expect(await add(line('99999999.999', '9999999.99'))).toBe('The quantity can be at most 1,00,00,000.');
+    expect(await add(line('10000000', '99999999999'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
+    expect(await add(line('10000000', '100000'))).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
+    expect(await repo.lines(orderId)).toEqual([]);
+    expect((await D.totals(orderId)).invoice_total).toBe('0.00');
+
+    expect(await add(line('10000000', '99999.99', '0'))).toBeNull();
+    expect((await D.totals(orderId)).invoice_total).toBe('999999900000.00');
+    expect(await add(line('1', '100000'))).toBe('With this line the invoice total would be more than ₹9,99,99,99,99,999.99.');
+    expect(await add(line('1', '99999.49', '0'))).toBeNull();
+    expect((await D.totals(orderId)).invoice_total).toBe('999999999999.00');
+    expect(await repo.lines(orderId)).toHaveLength(2);
+
+    // The browser checks the same limits before the form is sent (same tags on both stacks).
+    const page = (await (await loginAs(domStaff)).get(`/orders/${orderId}`)).text;
+    expect(page).toMatch(/name="quantity"[^>]*max="10000000"/);
+    expect(page).toMatch(/name="rate_inr"[^>]*max="99999999999.99"[^>]*data-max-product="quantity"[^>]*data-max-product-value="999999999999.99"/);
+    const tag = (text, name) => text.match(new RegExp(`<input type="number" name="${name}"[^>]*>`))[0];
+    const phpView = fs.readFileSync(`${__dirname}/../../../../PHP_MySQL_Version/app/views/domestic/show.php`, 'utf8');
+    const nodeView = fs.readFileSync(`${__dirname}/../../views/domestic/show.njk`, 'utf8');
+    for (const name of ['quantity', 'rate_inr']) expect(tag(phpView, name)).toBe(tag(nodeView, name));
+
+    // app.js (both stacks) runs the data-max-product rule beside the rate field.
+    for (const file of [`${__dirname}/../../public/js/app.js`, `${__dirname}/../../../../PHP_MySQL_Version/public_html/assets/js/app.js`]) {
+      const text = fs.readFileSync(file, 'utf8');
+      const start = text.indexOf('    // data-max-product="<field>"');
+      expect(start).toBeGreaterThan(0);
+      const end = text.indexOf('\n    }\n', text.indexOf('if (value !== \'\' && el.dataset.maxProduct', start)) + 7;
+      const rule = new (require('vm').Script)(`(function (el, value) {\n${text.slice(start, end)}\n  return null;\n})`).runInNewContext({});
+      const rate = (qty) => ({
+        dataset: { maxProduct: 'quantity', maxProductValue: '999999999999.99', maxProductMessage: 'The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.' },
+        form: { elements: { namedItem: (n) => (n === 'quantity' ? { value: qty } : null) } },
+      });
+      expect(rule(rate('10000000'), '100000')).toBe('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.');
+      expect(rule(rate('10000000'), '99999.99')).toBeNull();
+      expect(rule(rate(''), '100000')).toBeNull();
+      expect(rule(rate('2'), '')).toBeNull();
+    }
+  });
 });

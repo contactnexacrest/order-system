@@ -393,4 +393,41 @@ final class DomesticTradeTest extends DbTestCase
         self::assertTrue($checks['Export-only modules switched off (export shipping, LUT, benefits)']);
         $pdo->exec("DELETE FROM departments WHERE code IN ('DOM_SALES','DOM_PURCHASE','DOM_DISPATCH')");
     }
+
+    /**
+     * HNT-L03 (QA 13 Nov 2026, briefed as HNT-L07): a Domestic Trade line took any
+     * quantity up to 10 digits and any rate up to 11 digits, so quantity × rate could
+     * pass what PHP's whole numbers hold — the GST maths then failed (TypeError, an
+     * HTTP 500 on the order page) while Node worked it out. Now, as for export order
+     * lines: quantity at most 1,00,00,000, the line value (quantity × rate) and the
+     * invoice total at most ₹9,99,99,99,99,999.99 (999999999999.99). Node: the same
+     * test in domesticTrade.test.js.
+     */
+    public function testHntL03ExtremeLineAmountsAreRefusedNotA500(): void
+    {
+        $orderId = $this->domOrder();
+        $line = static fn (string $qty, string $rate, string $gst = '18'): array => ['description' => 'Granite', 'hsn_code' => '6802', 'quantity' => $qty, 'unit' => 'SQM', 'rate_inr' => $rate, 'gst_rate_pct' => $gst];
+
+        // The QA case: 99,99,99,999.999 × ₹99,99,999.99 — refused, nothing saved, the totals still work.
+        self::assertSame('The quantity can be at most 1,00,00,000.', DomesticOrderService::addLine($orderId, $line('99999999.999', '9999999.99'), $this->domStaff));
+        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('10000000', '99999999999'), $this->domStaff));
+        self::assertSame('The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('10000000', '100000'), $this->domStaff));
+        self::assertSame([], DomesticOrderRepository::lines($orderId));
+        self::assertSame('0.00', DomesticOrderService::totals($orderId)['invoice_total']);
+
+        // At the limits: accepted, and the GST maths works.
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('10000000', '99999.99', '0'), $this->domStaff));
+        self::assertSame('999999900000.00', DomesticOrderService::totals($orderId)['invoice_total']);
+        // The invoice total (with GST, rounded to the rupee) cannot pass the limit either.
+        self::assertSame('With this line the invoice total would be more than ₹9,99,99,99,99,999.99.', DomesticOrderService::addLine($orderId, $line('1', '100000'), $this->domStaff));
+        self::assertNull(DomesticOrderService::addLine($orderId, $line('1', '99999.49', '0'), $this->domStaff));
+        self::assertSame('999999999999.00', DomesticOrderService::totals($orderId)['invoice_total']);
+        self::assertCount(2, DomesticOrderRepository::lines($orderId));
+
+        // The browser checks the same limits before the form is sent.
+        $this->actAs($this->domStaff);
+        $page = $this->render(fn () => DomesticOrderController::show(OrderRepository::find($orderId)));
+        self::assertMatchesRegularExpression('/name="quantity"[^>]*max="10000000"/', $page);
+        self::assertMatchesRegularExpression('/name="rate_inr"[^>]*max="99999999999.99"[^>]*data-max-product="quantity"[^>]*data-max-product-value="999999999999.99"/', $page);
+    }
 }

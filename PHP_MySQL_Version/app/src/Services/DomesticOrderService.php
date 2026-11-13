@@ -78,6 +78,16 @@ final class DomesticOrderService
     /** Lines may change only before the tax invoice number is fixed. */
     private const LINES_OPEN = ['enquiry', 'quotation', 'order_confirmation', 'purchase'];
 
+    /**
+     * HNT-L03 (QA 13 Nov 2026): the limits of one line, as for export order lines
+     * (OrderLineValidator): quantity at most 1,00,00,000 (in thousandths here), and
+     * the line value and the invoice total at most 999999999999.99 (in paise). Without
+     * them quantity × rate could pass what PHP's whole numbers hold and the GST maths
+     * failed (HTTP 500) where Node worked it out.
+     */
+    public const MAX_LINE_QUANTITY_MILLI = 10000000000;
+    public const MAX_AMOUNT_PAISE = 99999999999999;
+
     public static function divisionId(string $code = self::CODE): ?int
     {
         foreach (DivisionService::all() as $d) {
@@ -322,8 +332,12 @@ final class DomesticOrderService
             $description === '' || mb_strlen($description) > 500 => 'Enter what is sold (up to 500 characters).',
             strlen($hsn) < 4 || strlen($hsn) > 8 => 'Enter the HSN code (4 to 8 digits).',
             preg_match('/^\d{1,10}(\.\d{1,3})?$/', $qty) !== 1 || GstCalculator::scaled($qty, 3) <= 0 => 'Enter a quantity above zero (up to 3 decimals).',
+            GstCalculator::scaled($qty, 3) > self::MAX_LINE_QUANTITY_MILLI => 'The quantity can be at most 1,00,00,000.', // HNT-L03
             $unit === '' || mb_strlen($unit) > 20 => 'Enter the unit (e.g. SQM, PCS).',
             preg_match('/^\d{1,11}(\.\d{1,2})?$/', $rate) !== 1 || GstCalculator::scaled($rate, 2) <= 0 => 'Enter the rate in ₹ above zero (up to 2 decimals).',
+            // HNT-L03: quantity × rate, rounded to the paisa, at most MAX_AMOUNT_PAISE — checked
+            // as rate ≤ limit ÷ quantity, so the check itself never multiplies past PHP_INT_MAX.
+            GstCalculator::scaled($rate, 2) > intdiv(self::MAX_AMOUNT_PAISE * 1000 + 499, GstCalculator::scaled($qty, 3)) => 'The line value (quantity × rate) can be at most ₹9,99,99,99,99,999.99.',
             $gst !== '' && !in_array(GstCalculator::money(GstCalculator::scaled($gst, 2)), ['0.00', '0.25', '3.00', '5.00', '12.00', '18.00', '28.00', '40.00'], true) => 'The GST rate must be one of 0, 0.25, 3, 5, 12, 18, 28 or 40 %.',
             // D-257 Phase 3: an Import & Distribution sale comes out of stock, which is kept per product.
             self::codeOfOrder($orderId) === 'IMP' && \App\Repositories\ImportRepository::product((int) ($in['product_id'] ?? 0)) === null => 'Choose the product: an Import & Distribution sale comes out of stock.',
@@ -332,6 +346,16 @@ final class DomesticOrderService
         if ($error !== null) {
             return $error;
         }
+        $gstPct = $gst !== '' ? GstCalculator::money(GstCalculator::scaled($gst, 2)) : self::gstRateFor($hsn);
+        // HNT-L03: the invoice total (with GST, rounded to the rupee) stays within the limit too.
+        $after = GstCalculator::compute(
+            array_merge(DomesticOrderRepository::lines($orderId), [['quantity' => $qty, 'rate_inr' => $rate, 'gst_rate_pct' => $gstPct, 'hsn_code' => $hsn]]),
+            (string) ($dom['seller_state_code'] ?? ''),
+            (string) ($dom['place_of_supply'] ?? '')
+        );
+        if (GstCalculator::scaled($after['invoice_total'], 2) > self::MAX_AMOUNT_PAISE) {
+            return 'With this line the invoice total would be more than ₹9,99,99,99,99,999.99.';
+        }
         DomesticOrderRepository::addLine($orderId, [
             'product_id' => ($in['product_id'] ?? '') !== '' ? (int) $in['product_id'] : null,
             'description' => $description,
@@ -339,7 +363,7 @@ final class DomesticOrderService
             'quantity' => $qty,
             'unit' => mb_strtoupper($unit),
             'rate_inr' => $rate,
-            'gst_rate_pct' => $gst !== '' ? GstCalculator::money(GstCalculator::scaled($gst, 2)) : self::gstRateFor($hsn),
+            'gst_rate_pct' => $gstPct,
         ], $userId);
         AuditLogRepository::log($userId, 'DOMESTIC_LINE_ADDED', 'orders', $orderId, 'line', null, $description);
         return null;

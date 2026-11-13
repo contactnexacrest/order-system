@@ -1417,6 +1417,16 @@
     if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
     }
+    // data-max-product="<field>" + data-max-product-value="x" (HNT-L03): this number
+    // times another number field of the same form can be at most x — e.g. a Domestic
+    // Trade line's rate × quantity (the line value). Message: data-max-product-message.
+    if (value !== '' && el.dataset.maxProduct && el.dataset.maxProductValue !== undefined && el.form) {
+      var factor = el.form.elements.namedItem(el.dataset.maxProduct);
+      var factorValue = factor ? parseFloat(String(factor.value || '').trim()) : NaN;
+      if (!isNaN(factorValue) && !isNaN(parseFloat(value)) && parseFloat(value) * factorValue > parseFloat(el.dataset.maxProductValue) + 0.004) {
+        return el.dataset.maxProductMessage || 'This times ' + el.dataset.maxProduct + ' can be at most ' + el.dataset.maxProductValue + '.';
+      }
+    }
     // data-min-exclusive="x" (QA UI-011): the number must be greater than x — e.g. an order
     // line's quantity, which the server refuses at 0. data-min-exclusive-unless="<checkbox
     // name>": not while that checkbox of the form is ticked (Qty To Be Confirmed).
