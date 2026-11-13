@@ -1192,6 +1192,9 @@ $router->get('/products/link-suppliers', [$catalogueMaster, 'linkSuppliers'], [S
 $router->post('/products/link-suppliers', [$catalogueMaster, 'saveLinks'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+// Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).
+$router->get('/products/{id}/duplicate', [$products, 'duplicateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/{id}/duplicate', [$products, 'duplicate'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/delete', [$products, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 // Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).

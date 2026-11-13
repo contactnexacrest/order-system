@@ -84,6 +84,7 @@
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
           <?php if ($status !== 'active'): ?><td<?= $p['is_active'] || ($p['usage']['total'] ?? 0) === 0 ? ' class="muted"' : '' ?>><?= $p['is_active'] ? '—' : View::e($p['usage_text']) ?></td><?php endif; ?>
           <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a>
+            <?php if ($canManage): // Owner decision D-358 (13 Nov 2026) ?><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>/duplicate" data-duplicate-link>Duplicate</a><?php endif; ?>
             <?php if ($canManage && !$p['is_active']): ?>
               <form method="post" action="/products/<?= (int) $p['id'] ?>/reactivate" class="inline-form" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
               <?php if ($p['delete_refusal'] === null): ?>

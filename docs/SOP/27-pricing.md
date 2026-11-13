@@ -542,3 +542,24 @@ the product catalogue can **Reactivate** it, or **Delete…** it — only when i
 supplier prices, images and price history go with it). A used product cannot be deleted, so its orders stay complete.
 On an active product's page the button is **Deactivate**, not Delete. Every deactivation, reactivation and delete is in
 the audit log.
+
+## Duplicate a product (D-358, 13 Nov 2026)
+
+To start a new product from one that is almost the same (another colour, another finish), people who manage the
+product catalogue click **Duplicate** — next to **View** on the product's row in Products › All products, or next to
+**Edit** on the product's page.
+
+1. The confirm screen shows **Name of the new product \*** filled in as "<name> (copy)". Change it now or later; two
+   products cannot have the same name (capitals do not count), so a name that is already used is refused beside the
+   field.
+2. **Copied exactly** lists what the copy gets, with the real numbers: category, HS code, origin, unit and the
+   specifications text; weight, container figures, thickness factor and costs to FOB; pricing overrides; the
+   product's own specifications and options with their price changes (and hidden or changed category options);
+   supplier links with their prices and dates; thickness prices; misc charges and images.
+3. **Not copied:** the Zoho item link (the copy gets its own Zoho item when it is synced) and orders, quotations,
+   price requests and the supplier price history — the copy has none yet.
+4. Click **Create the copy**. The new product opens. It is **Inactive**, so it cannot be picked on an order yet. A
+   blue note says "Copied from <product> on <date> by <role>. Check the details, update the supplier price, then
+   switch it to Active."
+5. Check the details (**Edit**), update the supplier price (**Market prices**), then click **Reactivate** to make it
+   Active. The copy is in the audit log as PRODUCT_DUPLICATED with the product it came from.

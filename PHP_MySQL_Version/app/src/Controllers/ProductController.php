@@ -330,6 +330,8 @@ final class ProductController
 
         $usage = ProductRepository::usage($id);
         View::render('products/show', [
+            // D-358: "Copied from …" while a product made by Duplicate is still inactive.
+            'copiedFrom'     => empty($details['product']['is_active']) ? \App\Services\ProductDuplicateService::copiedFrom($id) : null,
             'unitPrices'     => $unitPrices,
             'usage'          => $usage,
             'usageText'      => ProductRepository::usageText($usage),
@@ -396,6 +398,64 @@ final class ProductController
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_UPDATED', 'products', $id, null, null, $data['name']);
         Flash::set('success', 'Product updated.');
         header("Location: /products/{$id}");
+    }
+
+    /**
+     * Owner decision D-358 (13 Nov 2026): GET /products/{id}/duplicate — the confirm screen: the
+     * name of the copy (pre-filled "<name> (copy)"), what is copied (with real counts), what is not,
+     * and that the copy starts as Inactive.
+     */
+    public function duplicateForm(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $product = ProductRepository::find($id);
+        if (!$product) {
+            http_response_code(404);
+            echo 'Product not found.';
+            return;
+        }
+        $this->renderDuplicate($product, \App\Services\ProductDuplicateService::proposedName((string) $product['name']), null);
+    }
+
+    /** D-358: POST /products/{id}/duplicate — copies the product and every row that belongs to it, in one transaction. */
+    public function duplicate(array $params): void
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $product = ProductRepository::find($id);
+        if (!$product) {
+            http_response_code(404);
+            echo 'Product not found.';
+            return;
+        }
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $error = \App\Services\ProductDuplicateService::nameError($name);
+        if ($error !== null) {
+            http_response_code(422);
+            $this->renderDuplicate($product, $name, $error);
+            return;
+        }
+        $user = AuthService::currentUser();
+        try {
+            $newId = \App\Services\ProductDuplicateService::duplicate($id, $name, (int) $user['id']);
+        } catch (\Throwable $e) {
+            error_log('PRODUCT_DUPLICATE_FAILED: ' . $e->getMessage());
+            http_response_code(500);
+            $this->renderDuplicate($product, $name, 'The copy could not be made — nothing was saved. Please try again.');
+            return;
+        }
+        Flash::set('success', 'Copy "' . $name . '" created as Inactive.');
+        header("Location: /products/{$newId}");
+    }
+
+    private function renderDuplicate(array $product, string $name, ?string $error): void
+    {
+        View::render('products/duplicate', [
+            'product' => $product,
+            'name' => $name,
+            'nameError' => $error,
+            'counts' => \App\Services\ProductDuplicateService::counts((int) $product['id']),
+            'takenNames' => \App\Services\ProductDuplicateService::allNames(),
+        ], 'layout/base');
     }
 
     public function delete(array $params): void

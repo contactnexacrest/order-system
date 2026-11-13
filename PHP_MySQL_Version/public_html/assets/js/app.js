@@ -1299,6 +1299,19 @@
         if (!listed) return el.dataset.inListMessage || 'Choose one of the listed values.';
       }
     }
+    // data-not-in-list="<datalist id>" (D-358): the value must NOT be one of that list's
+    // options, case and surrounding spaces ignored — e.g. a duplicated product's name may not
+    // be the name of a product that already exists. Empty passes (required decides that).
+    if (el.dataset.notInList && value !== '') {
+      var takenList = document.getElementById(el.dataset.notInList);
+      if (takenList && takenList.options) {
+        for (var ti = 0; ti < takenList.options.length; ti++) {
+          if (takenList.options[ti].value.trim().toLowerCase() === value.toLowerCase()) {
+            return el.dataset.notInListMessage || 'This value is already used — choose another.';
+          }
+        }
+      }
+    }
     // data-at-least-one="<name prefix>" (D-300, owner point 12): at least one enabled
     // field of the form whose name starts with that prefix holds a number above 0 (e.g.
     // the thickness prices — "Enter at least one price"); the message goes on the first.

@@ -2568,6 +2568,35 @@ the same filters, counts, fields, actions and money rules on both templates
     allowed delete still marks the Zoho item inactive (D-238). An active product's
     page offers **Deactivate** (audit PRODUCT_DEACTIVATED), not Delete. Routes:
     POST `/products/{id}/deactivate`, `/products/{id}/reactivate`, `/products/{id}/delete`.
+  - **Duplicate a product (D-358, 13 Nov 2026, owner go; mockup approved).** `manage_product_catalog`
+    sees **Duplicate** next to View on each row of Products and next to Edit on the product page.
+    GET `/products/{id}/duplicate` is the confirm screen: **Name of the new product \*** (pre-filled
+    "<name> (copy)"; "(copy 2)" … when that is taken), **Copied exactly** and **Not copied** with real
+    counts, the note "The copy starts as Inactive …", **Create the copy** / **Cancel**. The name must be
+    unique among products, case and surrounding spaces ignored — checked in the browser (`data-not-in-list`
+    rule in `app.js`, against a datalist of every product name) and on the server (POST refused with 422
+    and the message beside the field). POST `/products/{id}/duplicate` (CSRF) copies in ONE transaction,
+    by INSERT … SELECT on the live column list (identical values; a column added later is copied too):
+    `catalog_products` (category, HS code, origin, unit, specifications text, costs to FOB, price rules,
+    pricing overrides …), the product's own `spec_definitions` and `spec_options` (option ↔ specification
+    links re-pointed to the copies, D-357 `dropdown_option_id` kept), `product_spec_hidden`,
+    `product_option_overrides`, `catalog_product_suppliers` with `catalog_supplier_thickness_prices` and
+    `catalog_product_supplier_options`, `catalog_product_misc_charges`, and `catalog_product_images` (the
+    image FILE is copied into the copy's own folder, so deleting one product's image never removes the
+    other's). **Reset on the copy:** name as typed, `is_active = 0`, `zoho_item_id` / `zoho_synced_hash` /
+    `zoho_synced_at` cleared, created/updated by the current user at now. Products have no SKU or unique
+    code, so nothing else is changed. **Not copied:** `catalog_supplier_price_history` (the trail of
+    changes on the source's supplier rows — the current price itself is on the copied supplier and
+    thickness rows), `price_requests`, order lines, quotations and anything on orders; associate price
+    access is per category (`associate_price_access`), so the copy is covered by its category as it is.
+    Audit `PRODUCT_DUPLICATED` on the new product (`field_name = copied_from_product_id`, `old_value` =
+    source id). No new column: the product page reads that audit row and, while the copy is inactive,
+    shows "Copied from <source> on <date> by <role>. Check the details, update the supplier price, then
+    switch it to Active." Zoho: the copy has no item, so the Zoho sync skips it while inactive and creates
+    a new item when it is active (existing `ZohoMasterDataSync::productsToPush()` rule). An inactive copy is
+    not offered in Pick from Products. Code: `ProductDuplicateService` (PHP
+    `app/src/Services/ProductDuplicateService.php`, Node `src/services/productDuplicateService.js`),
+    `ProductController::duplicateForm()/duplicate()`, view `products/duplicate`.
 - **Tables.** `catalog_products`, `catalog_product_images`,
   `catalog_product_suppliers`, `catalog_product_supplier_options`,
   `catalog_product_misc_charges`, `product_categories`,
@@ -2575,12 +2604,12 @@ the same filters, counts, fields, actions and money rules on both templates
   `product_option_overrides`, `product_spec_hidden`, `hs_codes`,
   `hs_code_product_examples`.
 - **Code.** `ProductController`, `ProductCategoryController`,
-  `SpecController`, `ProductService`, `ProductSpecs`,
+  `SpecController`, `ProductService`, `ProductDuplicateService` (D-358), `ProductSpecs`,
   `CategoryDocumentProfile`, `SpecRepository`, `ProductRepository`.
 - **Permissions.** `view_product_catalog`, `browse_product_catalog`,
   `manage_product_catalog`, `manage_product_specifications`,
   `view_product_pricing`, `manage_hs_codes`.
-- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334.
+- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358.
 
 ### 6.3 Pricing engine and price requests
 

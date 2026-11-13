@@ -79,6 +79,7 @@
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
           {% if status != 'active' %}<td{% if p.is_active or p.usage.total == 0 %} class="muted"{% endif %}>{{ '—' if p.is_active else p.usage_text }}</td>{% endif %}
           <td><a class="btn-sm" href="/products/{{ p.id }}">View</a>
+            {% if canManage %}<a class="btn-sm" href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
             {% if canManage and not p.is_active %}
               <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><button type="submit" class="btn-sm">Reactivate</button></form>
               {% if p.delete_refusal === null %}

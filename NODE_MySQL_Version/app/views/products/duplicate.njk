@@ -1,0 +1,47 @@
+{# Owner decision D-358 (13 Nov 2026): duplicate a product — confirm what is copied. #}
+{% macro plural(n, one, many) %}{{ n }} {{ one if n == 1 else many }}{% endmacro %}
+{% set c = counts %}
+<div class="card page-wide" data-duplicate-product>
+  <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
+  <h1>Duplicate — confirm what is copied</h1>
+  <p class="muted">A new product is made from <strong>{{ product.name }}</strong>. Nothing on the original changes.</p>
+
+  <form method="post" action="/products/{{ product.id }}/duplicate">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;align-items:start">
+      <div>
+        <label>Name of the new product *
+          <input type="text" name="name" value="{{ name }}" placeholder="e.g. Absolute Black Granite (copy)" required maxlength="255"
+            data-not-in-list="taken_product_names" data-not-in-list-message="A product with this name already exists — two products cannot have the same name. Choose another name."{% if nameError %} class="field-invalid"{% endif %}>
+          {% if nameError %}<small class="reason-error form-field-error">{{ nameError }}</small>{% endif %}
+        </label>
+        <datalist id="taken_product_names">{% for t in takenNames %}<option value="{{ t }}"></option>{% endfor %}</datalist>
+        <p class="muted small">Change it now or later — two products cannot have the same name.</p>
+
+        <h2>Copied exactly</h2>
+        <ul data-copied-list>
+          <li>Category, HS code, origin, unit and the specifications text</li>
+          <li>Weight, container CBM / maximum tonnes, thickness factor and costs to FOB</li>
+          <li>Pricing overrides (margin, buffer, other costs, incentive)</li>
+          <li>{{ plural(c.specs, 'own specification', 'own specifications') }} with {{ plural(c.options, 'option', 'options') }} and their price changes{% if c.hidden_specs > 0 or c.option_overrides > 0 %}; {{ plural(c.hidden_specs, 'hidden category specification', 'hidden category specifications') }} and {{ plural(c.option_overrides, 'changed category option', 'changed category options') }}{% endif %}</li>
+          <li>Supplier links with their prices and dates ({{ plural(c.suppliers, 'supplier', 'suppliers') }})</li>
+          <li>Thickness prices ({{ plural(c.thickness_rows, 'row', 'rows') }})</li>
+          {% if c.misc_charges > 0 %}<li>{{ plural(c.misc_charges, 'misc charge', 'misc charges') }}</li>{% endif %}
+          {% if c.images > 0 %}<li>{{ plural(c.images, 'image', 'images') }} (the image files are copied)</li>{% endif %}
+        </ul>
+      </div>
+      <div>
+        <h2>Not copied</h2>
+        <ul data-not-copied-list>
+          <li><strong>Zoho item link</strong> — the copy gets its own Zoho item when it is synced</li>
+          <li>Orders, quotations, price requests and the supplier price history{% if c.price_history > 0 %} ({{ plural(c.price_history, 'change', 'changes') }}){% endif %} — the copy has none yet</li>
+        </ul>
+        <div class="alert alert-warning" data-inactive-note><strong>The copy starts as Inactive.</strong> It cannot be picked on an order until you check it, update the price and switch it to Active.</div>
+        <p>
+          <button type="submit" class="btn-sm btn-accent">Create the copy</button>
+          <a class="btn-sm" href="/products/{{ product.id }}">Cancel</a>
+        </p>
+      </div>
+    </div>
+  </form>
+</div>

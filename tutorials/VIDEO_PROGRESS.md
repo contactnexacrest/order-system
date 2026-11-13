@@ -162,6 +162,12 @@ re-recorded; the owner decides when the videos restart**:
 
 Not affected: A01, C01 – C03, C05, C06 (no finish shown or said).
 
+D-358 (13 Nov 2026: **Duplicate** next to View on each row of Products › All products and next to Edit on the
+product page; the confirm screen and the "Copied from …" note on the copy) — checked against every script: no
+recorded video opens the staff Products list or a product page (B01 / A02-1 only use "Pick from Products" on an
+order, C04 / C06 show the associate's catalogue, which has no Duplicate). An inactive copy is never offered in Pick
+from Products. No video is affected; nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

@@ -1425,6 +1425,9 @@ app.get('/products/link-suppliers', requireAuth, requirePermissionAny(['record_m
 app.post('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(catalogueMasterController.saveLinks));
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
+// Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).
+app.get('/products/:id/duplicate', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.duplicateForm));
+app.post('/products/:id/duplicate', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.duplicate));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));
 app.post('/products/:id/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.remove));
 // Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).

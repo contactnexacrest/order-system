@@ -3,11 +3,17 @@
   <h1>{{ product.name }} <span class="badge {{ 'badge-active' if product.is_active else 'badge-inactive' }}">{{ 'Active' if product.is_active else 'Inactive' }}</span></h1>
   <p class="muted">HS Code: <strong>{{ product.hs_code }}</strong> &nbsp;·&nbsp; Origin: {{ product.origin or '—' }}</p>
 
+  {# Owner decision D-358 (13 Nov 2026): a copy made by Duplicate says where it came from while it is still inactive. #}
+  {% if copiedFrom %}
+    <div class="alert" data-copied-from style="background:var(--navy-soft);color:var(--ink);border-left:4px solid var(--navy)">Copied from {% if copiedFrom.source_exists %}<a href="/products/{{ copiedFrom.source_id }}">{{ copiedFrom.source_name }}</a>{% else %}product #{{ copiedFrom.source_id }} (since deleted){% endif %} on {{ copiedFrom.copied_at }} by {{ copiedFrom.by }}. Check the details, update the supplier price, then switch it to <strong>Active</strong>.</div>
+  {% endif %}
   {# Owner (12 Nov 2026): where the product is used; a used or active product is never deleted. #}
   <p class="muted">Used on: <strong>{{ usageText }}</strong></p>
   {% if canManage %}
     <p>
       <a class="btn-sm" href="/products/{{ product.id }}/edit">Edit</a>
+      {# Owner decision D-358 (13 Nov 2026): a copy of this product, Inactive until checked. #}
+      <a class="btn-sm" href="/products/{{ product.id }}/duplicate" data-duplicate-link>Duplicate</a>
       {% if product.is_active %}
         <form method="post" action="/products/{{ product.id }}/deactivate" style="display:inline" data-confirm="Deactivate &quot;{{ product.name }}&quot;? It is hidden from the active list and cannot be picked on new order lines. Orders that already use it are not changed. You can reactivate it at any time.">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">

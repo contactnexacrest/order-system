@@ -12,6 +12,7 @@ const productImageRepository = require('../repositories/productImageRepository')
 const productSupplierRepository = require('../repositories/productSupplierRepository');
 const productMiscChargeRepository = require('../repositories/productMiscChargeRepository');
 const productService = require('../services/productService');
+const productDuplicateService = require('../services/productDuplicateService');
 const pricingService = require('../services/pricingService');
 const pricingRepository = require('../repositories/pricingRepository');
 
@@ -381,6 +382,8 @@ async function show(req, res) {
 
   const usage = await productRepository.usage(id);
   res.renderView('products/show', {
+    // D-358: "Copied from …" while a product made by Duplicate is still inactive.
+    copiedFrom: details.product.is_active ? null : await productDuplicateService.copiedFrom(id),
     unitPrices,
     usage,
     usageText: productRepository.usageText(usage),
@@ -452,6 +455,59 @@ async function update(req, res) {
   await auditLogRepository.log(user.id, 'PRODUCT_UPDATED', 'products', id, null, null, data.name);
   flash.set(req, 'success', 'Product updated.');
   res.redirect(`/products/${id}`);
+}
+
+/**
+ * Owner decision D-358 (13 Nov 2026): GET /products/:id/duplicate — the confirm screen: the
+ * name of the copy (pre-filled "<name> (copy)"), what is copied (with real counts), what is not,
+ * and that the copy starts as Inactive.
+ */
+async function duplicateForm(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const product = await productRepository.find(id);
+  if (!product) {
+    res.status(404).send('Product not found.');
+    return;
+  }
+  await renderDuplicate(res, product, await productDuplicateService.proposedName(product.name), null);
+}
+
+/** D-358: POST /products/:id/duplicate — copies the product and every row that belongs to it, in one transaction. */
+async function duplicate(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const product = await productRepository.find(id);
+  if (!product) {
+    res.status(404).send('Product not found.');
+    return;
+  }
+  const name = String((req.body || {}).name || '').trim();
+  const error = await productDuplicateService.nameError(name);
+  if (error !== null) {
+    res.status(422);
+    await renderDuplicate(res, product, name, error);
+    return;
+  }
+  let newId;
+  try {
+    newId = await productDuplicateService.duplicate(id, name, req.user.id);
+  } catch (e) {
+    require('../helpers/logger').error('PRODUCT_DUPLICATE_FAILED', e);
+    res.status(500);
+    await renderDuplicate(res, product, name, 'The copy could not be made — nothing was saved. Please try again.');
+    return;
+  }
+  flash.set(req, 'success', `Copy "${name}" created as Inactive.`);
+  res.redirect(`/products/${newId}`);
+}
+
+async function renderDuplicate(res, product, name, error) {
+  res.renderView('products/duplicate', {
+    product,
+    name,
+    nameError: error,
+    counts: await productDuplicateService.counts(Number(product.id)),
+    takenNames: await productDuplicateService.allNames(),
+  });
 }
 
 async function remove(req, res) {
@@ -838,6 +894,8 @@ module.exports = {
   edit,
   update,
   remove,
+  duplicateForm, // D-358
+  duplicate, // D-358
   reactivate,
   deactivate,
   uploadImage,

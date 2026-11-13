@@ -4,11 +4,17 @@
   <h1><?= View::e($product['name']) ?> <span class="badge <?= $product['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $product['is_active'] ? 'Active' : 'Inactive' ?></span></h1>
   <p class="muted">HS Code: <strong><?= View::e($product['hs_code']) ?></strong> &nbsp;·&nbsp; Origin: <?= View::e($product['origin'] ?? '—') ?></p>
 
+  <?php // Owner decision D-358 (13 Nov 2026): a copy made by Duplicate says where it came from while it is still inactive. ?>
+  <?php if (!empty($copiedFrom)): ?>
+    <div class="alert" data-copied-from style="background:var(--navy-soft);color:var(--ink);border-left:4px solid var(--navy)">Copied from <?php if ($copiedFrom['source_exists']): ?><a href="/products/<?= (int) $copiedFrom['source_id'] ?>"><?= View::e((string) $copiedFrom['source_name']) ?></a><?php else: ?>product #<?= (int) $copiedFrom['source_id'] ?> (since deleted)<?php endif; ?> on <?= View::e($copiedFrom['copied_at']) ?> by <?= View::e($copiedFrom['by']) ?>. Check the details, update the supplier price, then switch it to <strong>Active</strong>.</div>
+  <?php endif; ?>
   <?php // Owner (12 Nov 2026): where the product is used; a used or active product is never deleted. ?>
   <p class="muted">Used on: <strong><?= View::e($usageText) ?></strong></p>
   <?php if ($canManage): ?>
     <p>
       <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/edit">Edit</a>
+      <?php // Owner decision D-358 (13 Nov 2026): a copy of this product, Inactive until checked. ?>
+      <a class="btn-sm" href="/products/<?= (int) $product['id'] ?>/duplicate" data-duplicate-link>Duplicate</a>
       <?php if ($product['is_active']): ?>
         <form method="post" action="/products/<?= (int) $product['id'] ?>/deactivate" style="display:inline" data-confirm="Deactivate &quot;<?= View::e($product['name']) ?>&quot;? It is hidden from the active list and cannot be picked on new order lines. Orders that already use it are not changed. You can reactivate it at any time.">
           <?= Csrf::field() ?>
