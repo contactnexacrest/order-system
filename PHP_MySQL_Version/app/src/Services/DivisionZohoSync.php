@@ -104,7 +104,8 @@ final class DivisionZohoSync
         $result = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
         if (!ZohoBooksService::isEnabled()) {
             if ($only === null) {
-                ZohoSyncLogRepository::log('division_sync', null, null, null, 'skipped', null, 'Zoho Books is not enabled — no Domestic Trade, Import & Distribution or Merchant Trade records sent.', $triggeredBy, $userId);
+                // QA ZOH-008: the same reason as every other row of the run (server switch off / Books not enabled).
+                ZohoSyncLogRepository::log('division_sync', null, null, null, 'skipped', null, CaSyncService::offReason() . ' — no Domestic Trade, Import & Distribution or Merchant Trade records sent.', $triggeredBy, $userId);
             }
             $result['skipped'] = 1;
             return $result;
@@ -125,7 +126,7 @@ final class DivisionZohoSync
                 $log($type, $entity, $id, 'success', $ref, $message($ref));
                 $result['sent']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e);
+                ZohoSyncStop::rethrow($e, $result);
                 $log($type, $entity, $id, 'error', null, $e->getMessage());
                 $result['failed']++;
             }

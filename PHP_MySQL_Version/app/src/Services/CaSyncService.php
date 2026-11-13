@@ -59,11 +59,16 @@ final class CaSyncService
         $since = ZohoSyncFailureNotifier::mark();
         self::$onlyOrderId = $orderId;
         $result = self::emptyResult();
+        $section = 'revenue';
         try {
             $result['revenue'] = self::syncPendingRevenue('manual', $triggeredByUserId);
+            $section = 'purchases';
             $result['purchases'] = self::syncPurchases('manual', $triggeredByUserId);
+            $section = 'benefits';
             $result['benefits'] = self::syncBenefits('manual', $triggeredByUserId);
         } catch (ZohoSyncStop $stop) {
+            // QA ZOH-007: what the section had already sent before the stop still counts.
+            $result[$section] = $stop->partialFor($result[$section]);
             $result['stopped'] = self::logStop($stop, 'manual', $triggeredByUserId, $orderId);
         } finally {
             self::$onlyOrderId = null;
@@ -123,26 +128,36 @@ final class CaSyncService
     {
         $since = ZohoSyncFailureNotifier::mark();
         $result = self::emptyResult();
+        $section = 'master_data';
         try {
             // The day's full check of the records already in Books (ZohoRestoreService::due()).
             $dailyCheck = $triggeredBy !== 'manual' && ZohoBooksService::isEnabled() && ZohoRestoreService::due($triggeredBy);
             // Owner decision 2 Nov 2026 (D-238): clients and products first, so invoices find their customer.
             $result['master_data'] = ZohoMasterDataSync::run($triggeredBy, $triggeredByUserId);
+            $section = 'revenue';
             $result['revenue'] = self::syncPendingRevenue($triggeredBy, $triggeredByUserId);
             // Stage 3 runs before the expense import, so the order expenses it
             // sends are already marked and the import skips them.
+            $section = 'purchases';
             $result['purchases'] = self::syncPurchases($triggeredBy, $triggeredByUserId);
+            $section = 'expenses';
             $result['expenses'] = self::importPendingExpenses($triggeredBy, $triggeredByUserId);
+            $section = 'benefits';
             $result['benefits'] = self::syncBenefits($triggeredBy, $triggeredByUserId);
+            $section = 'gst_refunds';
             $result['gst_refunds'] = self::syncGstRefunds($triggeredBy, $triggeredByUserId);
             // D-264: the associate payout costs (a company cost, never on an order) — full sync only, like the GST refunds.
+            $section = 'payout_costs';
             $result['payout_costs'] = self::syncPayoutCosts($triggeredBy, $triggeredByUserId);
             // D-257 Zoho: Domestic Trade, Import & Distribution and Merchant Trade money.
+            $section = 'divisions';
             $result['divisions'] = DivisionZohoSync::run($triggeredBy, $triggeredByUserId);
             if ($dailyCheck) {
                 ZohoRestoreService::markScheduledCheckDone();
             }
         } catch (ZohoSyncStop $stop) {
+            // QA ZOH-007: what the section had already sent before the stop still counts.
+            $result[$section] = $stop->partialFor($result[$section]);
             $result['stopped'] = self::logStop($stop, $triggeredBy, $triggeredByUserId, null);
         }
         // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
@@ -201,7 +216,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('export_benefit', 'order', $benefit['order_id'] !== null ? (int) $benefit['order_id'] : null, 'journal', 'success', $newId, ZohoRestoreService::note("ben:{$id}") . ($journalId !== null ? 'Updated' : 'Sent') . " export benefit {$what} (claim #{$id}) received on {$benefit['received_at']} as Zoho Books journal.", $triggeredBy, $triggeredByUserId);
                 $result['journals']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('export_benefit', 'order', $benefit['order_id'] !== null ? (int) $benefit['order_id'] : null, 'journal', 'error', $journalId, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $result['failed']++;
             }
@@ -241,7 +256,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('gst_refund', 'gst_refund_credit', (int) $credit['id'], 'journal', 'success', $journalId, 'Sent as Zoho Books journal: ' . PaymentDescription::gstRefund($credit) . '.', $triggeredBy, $triggeredByUserId);
                 $result['journals']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('gst_refund', 'gst_refund_credit', (int) $credit['id'], 'journal', 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $result['failed']++;
             }
@@ -307,7 +322,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('associate_payout_cost', 'order', (int) $p['order_id'], 'journal', 'success', $newId, ($journalId !== null ? 'Updated' : 'Sent') . ' as Zoho Books journal: ' . AssociatePayoutService::payoutCostDescription($p) . '.', $triggeredBy, $triggeredByUserId);
                 $result['journals']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('associate_payout_cost', 'order', (int) $p['order_id'], 'journal', 'error', $journalId, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $result['failed']++;
             }
@@ -393,7 +408,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('invoice', 'order', $item['order_id'], $item['kind'], 'success', $pushed['zoho_invoice_id'], ZohoRestoreService::note("invoice:{$item['order_id']}:{$item['kind']}") . "{$what} {$label} {$invoice['invoice_number']} as Zoho Books invoice ({$invoice['currency_code']} " . number_format($invoice['total'], 2, '.', '') . ' @ ' . $invoice['exchange_rate'] . ').', $triggeredBy, $triggeredByUserId);
                 $invoices++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('invoice', 'order', $item['order_id'], $item['kind'], 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -433,7 +448,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('revenue_payment', 'order_payment_status', (int) $leg['order_id'], $leg['leg'], 'success', $zohoReference, ZohoRestoreService::note("leg:{$leg['order_id']}:{$leg['leg']}") . "Pushed as Zoho Books customer payment {$zohoReference}" . self::appliedNote($leg['leg'], $target, $result['applied']), $triggeredBy, $triggeredByUserId);
                 $synced++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('revenue_payment', 'order_payment_status', (int) $leg['order_id'], $leg['leg'], 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -465,7 +480,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('payment_apply', 'order_payment_status', (int) $leg['order_id'], $leg['leg'], 'success', (string) $leg['zoho_reference'], "Applied " . number_format($amount, 2, '.', '') . " of payment {$leg['zoho_reference']} to " . ZohoInvoiceData::KIND_LABELS[self::LEG_INVOICE[$leg['leg']]] . " {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
                 $applied++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('payment_apply', 'order_payment_status', (int) $leg['order_id'], $leg['leg'], 'error', (string) $leg['zoho_reference'], $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -500,7 +515,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('revenue_payment', 'order_payment_milestones', (int) $m['id'], 'milestone', 'success', $result['payment_id'], "Pushed payment milestone {$m['seq']} as Zoho Books customer payment {$result['payment_id']}" . self::appliedNote('balance', $target, $result['applied']), $triggeredBy, $triggeredByUserId);
                 $synced++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('revenue_payment', 'order_payment_milestones', (int) $m['id'], 'milestone', 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -524,7 +539,7 @@ final class CaSyncService
                 ZohoSyncLogRepository::log('payment_apply', 'order_payment_milestones', (int) $m['id'], 'milestone', 'success', (string) $m['zoho_reference'], 'Applied ' . number_format($amount, 2, '.', '') . " of milestone payment {$m['zoho_reference']} to Commercial Invoice {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
                 $applied++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('payment_apply', 'order_payment_milestones', (int) $m['id'], 'milestone', 'error', (string) $m['zoho_reference'], $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -558,7 +573,7 @@ final class CaSyncService
                     $applied++;
                 }
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, ['synced' => $synced ?? 0, 'failed' => $failed, 'invoices' => $invoices, 'applied' => $applied ?? 0]); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log($lc['lc_zoho_synced_at'] === null ? 'revenue_payment' : 'payment_apply', 'order_lc_details', $orderId, 'lc', 'error', $lc['lc_zoho_payment_id'], $e->getMessage(), $triggeredBy, $triggeredByUserId);
                 $failed++;
             }
@@ -638,7 +653,7 @@ final class CaSyncService
                 $log('vendor_bill', (int) $bill['order_id'], 'bill', 'success', $zohoBillId, ZohoRestoreService::note("bill:{$bill['id']}") . "Sent bill {$bill['bill_no']} from {$bill['vendor_name']} (INR " . number_format((float) $bill['total_inr'], 2, '.', '') . (!empty($bill['gst_reverse_charge']) ? ', reverse charge' : '') . ') as Zoho Books bill.');
                 $result['bills']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 $log('vendor_bill', (int) $bill['order_id'], 'bill', 'error', null, $e->getMessage());
                 $result['failed']++;
             }
@@ -659,7 +674,7 @@ final class CaSyncService
                 $result['payments']++;
                 $result['applied'] += $pushed['applied'] > 0 ? 1 : 0;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 $log('vendor_payment', (int) $bill['order_id'], 'payment', 'error', null, $e->getMessage());
                 $result['failed']++;
             }
@@ -679,7 +694,7 @@ final class CaSyncService
                 $log('vendor_payment_apply', (int) $bill['order_id'], 'payment', 'success', (string) $payment['zoho_payment_id'], 'Applied ' . number_format($amount, 2, '.', '') . " of payment {$payment['payment_ref']} to bill {$target['bill_no']}.");
                 $result['applied']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 $log('vendor_payment_apply', (int) $bill['order_id'], 'payment', 'error', (string) $payment['zoho_payment_id'], $e->getMessage());
                 $result['failed']++;
             }
@@ -695,7 +710,7 @@ final class CaSyncService
                 $log('order_expense', (int) $expense['order_id'], 'expense', 'success', $zohoExpenseId, ZohoRestoreService::note("exp:{$expense['id']}") . "Sent expense \"{$expense['details']}\" (INR " . number_format((float) $expense['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
                 $result['expenses']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 $log('order_expense', (int) $expense['order_id'], 'expense', 'error', null, $e->getMessage());
                 $result['failed']++;
             }
@@ -730,12 +745,12 @@ final class CaSyncService
                                 : ' TDS INR ' . number_format($c['tds_inr'], 2, '.', '') . ' left on the bill for the CA to book (no Zoho TDS tax set in Settings → Associate TDS).';
                         }
                     } catch (\Throwable $e) {
-                        ZohoSyncStop::rethrow($e);
+                        ZohoSyncStop::rethrow($e, $result);
                     }
                     $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoBillId, 'Sent the associate commission (INR ' . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as the associate\'s Zoho Books bill with its vendor payment.' . $tdsNote);
                     $result['bills']++;
                 } catch (\Throwable $e) {
-                    ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                    ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                     $log('order_cost', (int) $cost['order_id'], 'cost', 'error', null, $e->getMessage());
                     $result['failed']++;
                 }
@@ -747,7 +762,7 @@ final class CaSyncService
                 $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoExpenseId, ZohoRestoreService::note("cost:{$cost['id']}") . ($cost['zoho_expense_id'] !== null ? 'Updated' : 'Sent') . " order cost \"{$label}\" (INR " . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
                 $result['expenses']++;
             } catch (\Throwable $e) {
-                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncStop::rethrow($e, $result); // D-239: a spent allowance / rate limit stops the whole run
                 $log('order_cost', (int) $cost['order_id'], 'cost', 'error', null, $e->getMessage());
                 $result['failed']++;
             }
@@ -893,7 +908,8 @@ final class CaSyncService
         };
     }
 
-    private static function offReason(): string
+    /** Why nothing was sent — the same words on every Sync Log row of the run (QA ZOH-008: public for DivisionZohoSync). */
+    public static function offReason(): string
     {
         return ZohoGuard::integrationEnabled()
             ? 'Zoho Books is not enabled/configured'

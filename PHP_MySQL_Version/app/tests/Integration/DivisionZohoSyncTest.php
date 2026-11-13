@@ -391,4 +391,17 @@ final class DivisionZohoSyncTest extends DbTestCase
         unset($this->vendorPayments[(string) $pdo->query("SELECT duty_zoho_payment_id FROM import_shipments WHERE id = {$importId}")->fetchColumn()]);
         self::assertSame(1, DivisionZohoSync::check('import', $importId)['counts']['missing']);
     }
+
+    /** QA ZOH-008: with the server switch off, the division row gives the same reason as every other row. */
+    public function testZoh008WithTheServerSwitchOffTheDivisionRowSaysSo(): void
+    {
+        $_ENV['ZOHO_INTEGRATION_ENABLED'] = 'false';
+        $pdo = Database::connection();
+        $before = (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM zoho_sync_log')->fetchColumn();
+        DivisionZohoSync::run('manual', null);
+        $stmt = $pdo->prepare("SELECT message FROM zoho_sync_log WHERE id > :id AND sync_type = 'division_sync'");
+        $stmt->execute(['id' => $before]);
+        self::assertSame('Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env) — no Domestic Trade, Import & Distribution or Merchant Trade records sent.', $stmt->fetchColumn());
+        self::assertSame(CaSyncService::offReason(), 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)');
+    }
 }

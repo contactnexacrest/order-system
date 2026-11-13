@@ -38,6 +38,9 @@ final class ZohoBooksStage2Test extends DbTestCase
     /** Make the invoice list miss an invoice just created, once (the list lags behind a create, seen in the test organisation). */
     private bool $invoiceListLags = false;
 
+    /** QA ZOH-007: answer "too many requests" once this many invoices were created (null = never). */
+    private ?int $rateLimitAfterInvoices = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -75,6 +78,9 @@ final class ZohoBooksStage2Test extends DbTestCase
         $path = (string) parse_url($url, PHP_URL_PATH);
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
         $json = static fn (array $body, int $status = 200): array => ['status' => $status, 'body' => (string) json_encode($body)];
+        if ($this->rateLimitAfterInvoices !== null && $path === '/books/v3/invoices' && $method === 'POST' && count($this->invoices) >= $this->rateLimitAfterInvoices) {
+            return $json(['code' => 44, 'message' => 'too many requests'], 429);
+        }
 
         if ($path === '/oauth/v2/token') {
             return $json(['access_token' => 'fake-access']);
@@ -477,5 +483,23 @@ final class ZohoBooksStage2Test extends DbTestCase
             // Test data left behind keeps Test Mode from being switched off in later tests.
             Database::connection()->exec("UPDATE orders SET is_test_data = 0 WHERE id = {$real}");
         }
+    }
+
+    /** QA ZOH-007: a run stopped by the rate limit still counts what it sent before the stop in that section. */
+    public function testZoh007ARunStoppedInTheMiddleOfASectionCountsWhatItHadSent(): void
+    {
+        foreach (['TEST-ZOH007 Buyer A', 'TEST-ZOH007 Buyer B'] as $i => $buyer) {
+            $orderId = $this->createCifOrder($buyer);
+            $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/70070' . $i);
+        }
+        $this->rateLimitAfterInvoices = 1;
+
+        $result = CaSyncService::runFullSync('manual', null);
+
+        self::assertNotNull($result['stopped']);
+        self::assertStringContainsString('rate limit', (string) $result['stopped']);
+        self::assertCount(1, $this->invoices);
+        self::assertSame(1, $result['revenue']['invoices'], 'the invoice sent before the stop is counted');
+        self::assertSame(0, $result['purchases']['bills'], 'a section never reached stays at zero');
     }
 }

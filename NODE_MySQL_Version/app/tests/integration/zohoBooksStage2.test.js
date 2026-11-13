@@ -25,6 +25,8 @@ describe('Zoho Books Stage 2', () => {
   let invoiceWrites500;
   // Make the invoice list miss an invoice just created, once (the list lags behind a create, seen in the test organisation).
   let invoiceListLags;
+  // QA ZOH-007: answer "too many requests" once this many invoices were created (null = never).
+  let rateLimitAfterInvoices;
 
   function storedInvoice(id, payload, status) {
     const total = payload.line_items.reduce((sum, line) => sum + Math.round(line.quantity * line.rate * 100) / 100, 0);
@@ -45,6 +47,9 @@ describe('Zoho Books Stage 2', () => {
     const p = u.pathname;
     const json = (body, status = 200) => ({ status, body: JSON.stringify(body) });
     let m;
+    if (rateLimitAfterInvoices !== null && p === '/books/v3/invoices' && method === 'POST' && Object.keys(invoices).length >= rateLimitAfterInvoices) {
+      return json({ code: 44, message: 'too many requests' }, 429);
+    }
 
     if (p === '/oauth/v2/token') return json({ access_token: 'fake-access' });
     if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: gstRegistered } });
@@ -139,6 +144,7 @@ describe('Zoho Books Stage 2', () => {
     gstRegistered = false;
     invoiceWrites500 = false;
     invoiceListLags = false;
+    rateLimitAfterInvoices = null;
     process.env.ZOHO_INTEGRATION_ENABLED = 'true';
     process.env.ZOHO_ENVIRONMENT = 'test';
     process.env.ZOHO_EINVOICE_ENABLED = 'false';
@@ -422,5 +428,20 @@ describe('Zoho Books Stage 2', () => {
       // Test data left behind keeps Test Mode from being switched off in later tests.
       await db.execute('UPDATE orders SET is_test_data = 0 WHERE id = :id', { id: real });
     }
+  });
+
+  test('QA ZOH-007: a run stopped in the middle of a section counts what it had sent', async () => {
+    for (const [i, buyer] of ['TEST-ZOH007 Buyer A', 'TEST-ZOH007 Buyer B'].entries()) {
+      const orderId = await createCifOrder(buyer);
+      await approveDocument(orderId, 'CI', `TEST-SC/CI/2026/70070${i}`);
+    }
+    rateLimitAfterInvoices = 1;
+
+    const result = await caSyncService.runFullSync('manual', null);
+
+    expect(String(result.stopped)).toContain('rate limit');
+    expect(Object.keys(invoices)).toHaveLength(1);
+    expect(result.revenue.invoices).toBe(1); // the invoice sent before the stop is counted
+    expect(result.purchases.bills).toBe(0); // a section never reached stays at zero
   });
 });

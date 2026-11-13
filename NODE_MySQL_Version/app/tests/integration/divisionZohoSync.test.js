@@ -304,4 +304,13 @@ describe('D-257 Zoho: the new divisions sync like Export', () => {
     delete vendorPayments[s.duty_zoho_payment_id];
     expect((await divisionZohoSync.check('import', importId)).counts.missing).toBe(1);
   });
+
+  test('QA ZOH-008: with the server switch off, the division row gives the same reason as every other row', async () => {
+    process.env.ZOHO_INTEGRATION_ENABLED = 'false';
+    const before = Number((await db.queryOne('SELECT COALESCE(MAX(id), 0) AS m FROM zoho_sync_log')).m);
+    await divisionZohoSync.run('manual', null);
+    const row = await db.queryOne("SELECT message FROM zoho_sync_log WHERE id > :id AND sync_type = 'division_sync'", { id: before });
+    expect(row.message).toBe('Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env) — no Domestic Trade, Import & Distribution or Merchant Trade records sent.');
+    expect(caSyncService.offReason()).toBe('Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)');
+  });
 });

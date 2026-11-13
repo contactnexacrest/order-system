@@ -84,7 +84,8 @@ async function pendingCounts(start) {
 async function run(triggeredBy, userId, only = null) {
   const result = { sent: 0, failed: 0, skipped: 0 };
   if (!(await zohoBooksService.isEnabled())) {
-    if (only === null) await zohoSyncLogRepository.log('division_sync', null, null, null, 'skipped', null, 'Zoho Books is not enabled — no Domestic Trade, Import & Distribution or Merchant Trade records sent.', triggeredBy, userId);
+    // QA ZOH-008: the same reason as every other row of the run (server switch off / Books not enabled).
+    if (only === null) await zohoSyncLogRepository.log('division_sync', null, null, null, 'skipped', null, `${require('./caSyncService').offReason()} — no Domestic Trade, Import & Distribution or Merchant Trade records sent.`, triggeredBy, userId);
     result.skipped = 1;
     return result;
   }
@@ -101,7 +102,7 @@ async function run(triggeredBy, userId, only = null) {
       await log(type, entity, id, 'success', ref, message(ref));
       result.sent += 1;
     } catch (e) {
-      zohoApiBudget.rethrow(e);
+      zohoApiBudget.rethrow(e, result);
       await log(type, entity, id, 'error', null, e.message);
       result.failed += 1;
     }

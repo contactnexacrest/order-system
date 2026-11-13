@@ -47,9 +47,25 @@ function signInFailedMessage(error) {
     + 'remaining records will be sent at the next sync.';
 }
 
-/** In a per-record catch: let a stop reason end the whole run. */
-function rethrow(e) {
-  if (e instanceof ZohoSyncStop) throw e;
+/**
+ * In a per-record catch: let a stop reason end the whole run. QA ZOH-007:
+ * soFar is what the section had already done, so the run's result still
+ * counts it (the last catch the stop passes, the section's own, wins).
+ */
+function rethrow(e, soFar = null) {
+  if (e instanceof ZohoSyncStop) {
+    if (soFar) e.partial = { ...soFar };
+    throw e;
+  }
+}
+
+/** QA ZOH-007: a section's counts after a stop — its zeros overlaid with what it had done before the stop. */
+function partialFor(e, zero) {
+  const out = { ...zero };
+  if (e && e.partial) {
+    for (const k of Object.keys(zero)) if (k in e.partial) out[k] = e.partial[k];
+  }
+  return out;
 }
 
 const context = new AsyncLocalStorage();
@@ -204,7 +220,7 @@ async function usage() {
 
 module.exports = {
   DEFAULT_DAILY, DEFAULT_MINUTE, SPEED_LIMIT_MESSAGE, RATE_LIMIT_MESSAGE,
-  ZohoSyncStop, ZohoBudgetExhausted, ZohoRateLimited, ZohoSignInFailed, signInFailedMessage, rethrow,
+  ZohoSyncStop, ZohoBudgetExhausted, ZohoRateLimited, ZohoSignInFailed, signInFailedMessage, rethrow, partialFor,
   inBackground, setTestLimits, useSettingLimits, setClock, setSleeper,
   dailyLimit, minuteLimit, dayKey, minuteKey, exhaustedMessage, exhaustedToday,
   acquire, assertNotRateLimited, usage,

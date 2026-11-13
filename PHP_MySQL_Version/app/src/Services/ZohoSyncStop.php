@@ -14,11 +14,35 @@ namespace App\Services;
  */
 class ZohoSyncStop extends \RuntimeException
 {
-    /** In a per-record catch: let a stop reason end the whole run. */
-    public static function rethrow(\Throwable $e): void
+    /** @var array<string,int>|null QA ZOH-007: the counts of the section the run stopped in, up to the stop */
+    public ?array $partial = null;
+
+    /**
+     * In a per-record catch: let a stop reason end the whole run. QA ZOH-007:
+     * $soFar is what the section had already done, so the run's result still
+     * counts it (the last catch the stop passes, the section's own, wins).
+     *
+     * @param array<string,int>|null $soFar
+     */
+    public static function rethrow(\Throwable $e, ?array $soFar = null): void
     {
         if ($e instanceof self) {
+            if ($soFar !== null) {
+                $e->partial = $soFar;
+            }
             throw $e;
         }
+    }
+
+    /**
+     * QA ZOH-007: the section's counts after a stop — the zeros it started with,
+     * overlaid with what it had done before the stop.
+     *
+     * @param array<string,int> $zero
+     * @return array<string,int>
+     */
+    public function partialFor(array $zero): array
+    {
+        return $this->partial === null ? $zero : array_replace($zero, array_intersect_key($this->partial, $zero));
     }
 }
