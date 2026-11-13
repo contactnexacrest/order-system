@@ -253,6 +253,14 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
  *   immediate attempt actually succeeded); false means it's queued for
  *   Level 2 as usual and sent is always null.
  */
+/** QA MTX-003: why the last dispatch() was held (testing mode / switched off), or null when it was not held. */
+const dispatchState = { lastHoldReason: null };
+
+/** QA MTX-003: what the screen says when a send was held, not failed (D-280: staff send it outside the app). */
+function heldMessage(reason) {
+  return `Not e-mailed: ${reason}. The send is recorded as held, not sent — send it outside the app, or submit it again once that changes.`;
+}
+
 async function requestSend(orderId, documentId, templateKey, scheduledAt, requestedByUserId) {
   const preview = await buildPreview(orderId, documentId, templateKey, requestedByUserId);
 
@@ -287,7 +295,7 @@ async function requestSend(orderId, documentId, templateKey, scheduledAt, reques
     await auditLogRepository.log(requestedByUserId, 'EMAIL_SEND_AUTO_APPROVED', 'email_log', id, null, null, null, 'mail_approval_queue_enabled is off — no Level-2 approval required.');
     const row = await emailLogRepository.find(id);
     const sent = row ? await dispatch(row) : false;
-    return { id, dispatched: true, sent };
+    return { id, dispatched: true, sent, held: sent ? null : dispatchState.lastHoldReason };
   }
 
   // Notify whoever can actually approve this (approve_email_send — the
@@ -399,6 +407,7 @@ async function sendNowOverride(emailLogId, userId) {
  * Returns true on send success.
  */
 async function dispatch(emailLogRow) {
+  dispatchState.lastHoldReason = null;
   // QA-5 EML-06: atomically claim this row before doing anything else, so
   // an overlapping dispatch run (or a duplicate manual trigger) can never
   // send the same approved email twice. A lost race is not a failure — it
@@ -462,6 +471,8 @@ async function dispatch(emailLogRow) {
     if (!isResend && document.document_type_code === 'QT' && document.order_id !== null && document.order_id !== undefined) {
       await stageGateService.passAndUnlockNext(document.order_id, 1, null);
     }
+  } else if (mailSenderService.state.lastOutcome === 'held') {
+    await held(emailLogRow, 'buyer_documents', 'buyer');
   } else {
     await failed(emailLogRow);
   }
@@ -478,6 +489,23 @@ async function dispatch(emailLogRow) {
  * QA batch 3 MAIL-9 (port of PHP failed()): a failed send is recorded AND the
  * person who asked for it (and the approver) are told.
  */
+/**
+ * QA MTX-003 (port of PHP held()): the send was held by testing mode or its switch in Admin › E-mail settings
+ * (D-280). Nothing failed: the log says held with the reason, the requester and approver are told why, and staff
+ * send it outside the app or submit it again once the hold is lifted. Never sent later by itself.
+ */
+async function held(emailLogRow, kind, audience) {
+  const reason = await emailPolicy.notSentReason(kind, audience);
+  dispatchState.lastHoldReason = reason;
+  await emailLogRepository.markHeld(emailLogRow.id, `Held, not sent: ${reason}. Send it outside the app, or submit it again once that changes.`);
+  await auditLogRepository.log(null, 'EMAIL_HELD', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email, reason);
+  const orderId = emailLogRow.order_id ? Number(emailLogRow.order_id) : null;
+  const message = `The e-mail "${emailLogRow.subject || ''}" to ${emailLogRow.recipient_email || ''} was not sent: ${reason}. Send it outside the app, or submit it again once that changes.`;
+  for (const userId of [...new Set([Number(emailLogRow.requested_by || 0), Number(emailLogRow.approved_by || 0)].filter(Boolean))]) {
+    await notificationRepository.createInAppOnly(userId, 'email_send_failed', orderId, message);
+  }
+}
+
 async function failed(emailLogRow) {
   await emailLogRepository.markFailed(emailLogRow.id);
   const orderId = emailLogRow.order_id ? Number(emailLogRow.order_id) : null;
@@ -592,12 +620,15 @@ async function dispatchGeneric(emailLogRow) {
     attachments.push({ path: file.server_path, name: file.original_filename });
   }
 
+  const kind = emailPolicy.TEMPLATE_KINDS[String(emailLogRow.template_key)] || 'buyer_followups';
   const sent = await mailSenderService.send(emailLogRow.recipient_email, emailLogRow.subject, emailLogRow.body_snapshot, attachments,
-    { kind: emailPolicy.TEMPLATE_KINDS[String(emailLogRow.template_key)] || 'buyer_followups', audience: 'buyer' });
+    { kind, audience: 'buyer' });
 
   if (sent) {
     await emailLogRepository.markSent(emailLogRow.id);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
+  } else if (mailSenderService.state.lastOutcome === 'held') {
+    await held(emailLogRow, kind, 'buyer');
   } else {
     await failed(emailLogRow);
   }
@@ -629,4 +660,4 @@ async function linkMailOutcome(what, email, sent, link, kind = 'buyer_links', au
   return `${what} e-mailed to ${email}. If they did not get it, copy the link and send it yourself.`;
 }
 
-module.exports = { PAYMENT_LINK_PARAGRAPH, associateCopyBody, senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };
+module.exports = { PAYMENT_LINK_PARAGRAPH, associateCopyBody, senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock, dispatchState, heldMessage };

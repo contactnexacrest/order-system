@@ -200,6 +200,18 @@ final class EmailLogRepository
         )->execute(['id' => $id]);
     }
 
+    /**
+     * QA MTX-003 (D-280): the e-mail was held by testing mode or its switch in Admin › E-mail settings — nothing
+     * failed and nothing was sent. Recorded as cancelled by the system (no cancelled_by) with the hold as the reason,
+     * so it is not counted as a failure and the same send can be submitted again once the hold is lifted.
+     */
+    public static function markHeld(int $id, string $reason): void
+    {
+        Database::connection()->prepare(
+            "UPDATE email_log SET status = 'cancelled', cancelled_by = NULL, cancelled_at = NOW(), cancellation_reason = :reason WHERE id = :id"
+        )->execute(['reason' => mb_substr($reason, 0, 500), 'id' => $id]);
+    }
+
     public static function markFailed(int $id): void
     {
         Database::connection()->prepare(

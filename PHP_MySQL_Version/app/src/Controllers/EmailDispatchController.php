@@ -112,7 +112,9 @@ final class EmailDispatchController
 
         try {
             $result = EmailDispatchService::requestSend($orderId, $documentId, $templateKey, $scheduledAt, (int) AuthService::currentUser()['id']);
-            if ($result['dispatched']) {
+            if ($result['dispatched'] && !$result['sent'] && !empty($result['held'])) {
+                Flash::set('warning', EmailDispatchService::heldMessage($result['held'])); // QA MTX-003
+            } elseif ($result['dispatched']) {
                 Flash::set($result['sent'] ? 'success' : 'error', $result['sent']
                     ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
                     : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
@@ -143,7 +145,9 @@ final class EmailDispatchController
 
         try {
             $result = EmailDispatchService::requestSend($orderId, null, $templateKey, $scheduledAt, (int) AuthService::currentUser()['id']);
-            if ($result['dispatched']) {
+            if ($result['dispatched'] && !$result['sent'] && !empty($result['held'])) {
+                Flash::set('warning', EmailDispatchService::heldMessage($result['held'])); // QA MTX-003
+            } elseif ($result['dispatched']) {
                 Flash::set($result['sent'] ? 'success' : 'error', $result['sent']
                     ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
                     : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
@@ -190,7 +194,11 @@ final class EmailDispatchController
         $id = (int) $params['emailLogId'];
         try {
             $sent = EmailDispatchService::sendNowOverride($id, (int) AuthService::currentUser()['id']);
-            Flash::set($sent ? 'success' : 'error', $sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+            if (!$sent && EmailDispatchService::$lastHoldReason !== null) {
+                Flash::set('warning', EmailDispatchService::heldMessage(EmailDispatchService::$lastHoldReason)); // QA MTX-003
+            } else {
+                Flash::set($sent ? 'success' : 'error', $sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+            }
         } catch (\Throwable $e) {
             Flash::setErrorFromException($e);
         }

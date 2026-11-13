@@ -104,7 +104,9 @@ async function requestSend(req, res) {
 
   try {
     const result = await emailDispatchService.requestSend(orderId, documentId, templateKey, scheduledAt, req.user.id);
-    if (result.dispatched) {
+    if (result.dispatched && !result.sent && result.held) {
+      flash.set(req, 'warning', emailDispatchService.heldMessage(result.held)); // QA MTX-003
+    } else if (result.dispatched) {
       flash.set(req, result.sent ? 'success' : 'error', result.sent
         ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
         : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
@@ -134,7 +136,9 @@ async function requestSendGeneric(req, res) {
 
   try {
     const result = await emailDispatchService.requestSend(orderId, null, templateKey, scheduledAt, req.user.id);
-    if (result.dispatched) {
+    if (result.dispatched && !result.sent && result.held) {
+      flash.set(req, 'warning', emailDispatchService.heldMessage(result.held)); // QA MTX-003
+    } else if (result.dispatched) {
       flash.set(req, result.sent ? 'success' : 'error', result.sent
         ? 'Sent immediately — the 2-level approval queue is currently switched off (Settings).'
         : 'Send attempted immediately (approval queue is off) but it failed — check Settings for the SMTP/mail configuration.');
@@ -169,7 +173,11 @@ async function sendNow(req, res) {
   const id = parseInt(req.params.emailLogId, 10);
   try {
     const sent = await emailDispatchService.sendNowOverride(id, req.user.id);
-    flash.set(req, sent ? 'success' : 'error', sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+    if (!sent && emailDispatchService.dispatchState.lastHoldReason !== null) {
+      flash.set(req, 'warning', emailDispatchService.heldMessage(emailDispatchService.dispatchState.lastHoldReason)); // QA MTX-003
+    } else {
+      flash.set(req, sent ? 'success' : 'error', sent ? 'Sent.' : 'Send attempted now but it failed — check the mail configuration in Settings.');
+    }
   } catch (e) {
     flash.setErrorFromException(req, e);
   }

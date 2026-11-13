@@ -152,6 +152,15 @@ final class EmailDispatchService
      *   attempt actually succeeded); false means it's queued for Level 2 as
      *   usual and sent is always null.
      */
+    /** QA MTX-003: why the last dispatch() was held (testing mode / switched off), or null when it was not held. */
+    public static ?string $lastHoldReason = null;
+
+    /** QA MTX-003: what the screen says when a send was held, not failed (D-280: staff send it outside the app). */
+    public static function heldMessage(string $reason): string
+    {
+        return "Not e-mailed: {$reason}. The send is recorded as held, not sent — send it outside the app, or submit it again once that changes.";
+    }
+
     public static function requestSend(
         int $orderId,
         ?int $documentId,
@@ -194,7 +203,7 @@ final class EmailDispatchService
             AuditLogRepository::log($requestedByUserId, 'EMAIL_SEND_AUTO_APPROVED', 'email_log', $id, null, null, null, 'mail_approval_queue_enabled is off — no Level-2 approval required.');
             $row = EmailLogRepository::find($id);
             $sent = $row ? self::dispatch($row) : false;
-            return ['id' => $id, 'dispatched' => true, 'sent' => $sent];
+            return ['id' => $id, 'dispatched' => true, 'sent' => $sent, 'held' => $sent ? null : self::$lastHoldReason];
         }
 
         // Notify whoever can actually approve this (approve_email_send —
@@ -310,6 +319,7 @@ final class EmailDispatchService
      */
     public static function dispatch(array $emailLogRow): bool
     {
+        self::$lastHoldReason = null;
         // QA-5 EML-06: atomically claim this row before doing anything
         // else, so an overlapping dispatch run (or a duplicate manual
         // trigger) can never send the same approved email twice. A lost
@@ -385,6 +395,8 @@ final class EmailDispatchService
             if (!$isResend && $document['document_type_code'] === 'QT' && $document['order_id'] !== null) {
                 StageGateService::passAndUnlockNext((int) $document['order_id'], 1, null);
             }
+        } elseif (MailSenderService::$lastOutcome === 'held') {
+            self::held($emailLogRow, 'buyer_documents', 'buyer');
         } else {
             self::failed($emailLogRow);
         }
@@ -400,6 +412,27 @@ final class EmailDispatchService
      *
      * @param array<string,mixed> $emailLogRow
      */
+    /**
+     * QA MTX-003: the send was held by testing mode or its switch in Admin › E-mail settings (D-280). Nothing
+     * failed: the log says held with the reason (not "failed — check the mail configuration"), the requester and
+     * approver are told why, and — as D-280 says — staff send it outside the app (the full message is in the
+     * error log); it can be submitted again once the hold is lifted. Never sent later by itself.
+     *
+     * @param array<string,mixed> $emailLogRow
+     */
+    private static function held(array $emailLogRow, string $kind, string $audience): void
+    {
+        $reason = EmailPolicy::notSentReason($kind, $audience);
+        self::$lastHoldReason = $reason;
+        EmailLogRepository::markHeld((int) $emailLogRow['id'], "Held, not sent: {$reason}. Send it outside the app, or submit it again once that changes.");
+        AuditLogRepository::log(null, 'EMAIL_HELD', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email'], $reason);
+        $orderId = !empty($emailLogRow['order_id']) ? (int) $emailLogRow['order_id'] : null;
+        $message = 'The e-mail "' . ($emailLogRow['subject'] ?? '') . '" to ' . ($emailLogRow['recipient_email'] ?? '') . " was not sent: {$reason}. Send it outside the app, or submit it again once that changes.";
+        foreach (array_unique(array_filter([(int) ($emailLogRow['requested_by'] ?? 0), (int) ($emailLogRow['approved_by'] ?? 0)])) as $userId) {
+            NotificationRepository::createInAppOnly($userId, 'email_send_failed', $orderId, $message);
+        }
+    }
+
     private static function failed(array $emailLogRow): void
     {
         EmailLogRepository::markFailed((int) $emailLogRow['id']);
@@ -569,19 +602,22 @@ final class EmailDispatchService
             $attachments[] = ['path' => $file['server_path'], 'name' => $file['original_filename']];
         }
 
+        $kind = EmailPolicy::TEMPLATE_KINDS[(string) $emailLogRow['template_key']] ?? 'buyer_followups';
         $sent = MailSenderService::send(
             $emailLogRow['recipient_email'],
             $emailLogRow['subject'],
             $emailLogRow['body_snapshot'],
             $attachments,
             false,
-            EmailPolicy::TEMPLATE_KINDS[(string) $emailLogRow['template_key']] ?? 'buyer_followups',
+            $kind,
             'buyer'
         );
 
         if ($sent) {
             EmailLogRepository::markSent((int) $emailLogRow['id']);
             AuditLogRepository::log(null, 'EMAIL_SENT', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email']);
+        } elseif (MailSenderService::$lastOutcome === 'held') {
+            self::held($emailLogRow, $kind, 'buyer');
         } else {
             self::failed($emailLogRow);
         }
