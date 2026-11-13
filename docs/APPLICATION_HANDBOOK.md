@@ -4623,6 +4623,8 @@ Every page carries the reference and the watermark (D-065). A blank watermark se
 | Supplier PO section 3 | "Material / Stone Type", ±2 mm / ±0.5 mm | "Material / Product Type", "As per the approved drawing / specification", Quality Documents Required |
 | T&C | Natural stone clause set | The category's clause set |
 
+A goods line with **no category attributes** (e.g. every Natural Stone line) prints "Dimensions: … · Finish: … · HS Code: … · Country of Origin: India" under the line on the PDF and Word copies of the QT, PI and CI and in the detailed line table (QA item 12, owner decision 13 Nov 2026, confirm 1 + confirm 2: the Node PDF templates tested the attribute list itself, which is true in Nunjucks even when empty, so the Node QT/PI/CI PDFs printed only "HS Code · Country of Origin"; they now test `| length`, as PHP always behaved). Tests: `DocumentSpecLineItem12Test` / `documentSpecLineItem12.test.js`; the Node Natural Stone PDF fixtures of the QT, PI and CI (FOB and CIF) were captured again once (PHP fixtures unchanged).
+
 **Certificate of Origin line (D-349, 12 Nov 2026, owner confirm 1 + confirm 2).** Item 3 of
 "Documents to be provided" (QT), "Export documentation" (PI) and "Documents provided with this
 shipment" (CI), PDF and Word, prints `order.coo_line` from `DocumentDataAssembler::cooLine()` /

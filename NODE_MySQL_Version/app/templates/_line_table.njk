@@ -137,7 +137,8 @@
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span>Invoiced separately on our Export Service Invoice
     </td>
   </tr>
-  {% elseif p.attributes %}
+  {% elseif p.attributes | length %}
+  {# QA item 12 (13 Nov 2026): "| length" because an empty list is true in Nunjucks (false in Twig); a line without category attributes prints Dimensions and Finish below. #}
   <tr class="spec">
     <td></td>
     <td colspan="5">

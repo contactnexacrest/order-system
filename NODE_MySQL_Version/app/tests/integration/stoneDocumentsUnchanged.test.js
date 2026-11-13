@@ -13,6 +13,8 @@
 // Legal Terms & Definitions); the PDF fixtures did not change.
 // Owner decision QA item 11 (13 Nov 2026, confirm 1 + confirm 2): the Word fixtures CIF_QT_docx, CIF_PI_docx and
 // CIF_OC_docx were captured again once — "Freight Debit Note" became "Debit Note" (the PDF wording); nothing else changed.
+// Owner decision QA item 12 (13 Nov 2026, confirm 1 + confirm 2): the PDF fixtures of the QT, PI and CI (FOB and CIF) were
+// captured again once — the spec line now prints "Dimensions: … · Finish: … ·" before the HS Code, as the PHP PDF; nothing else changed.
 // Owner decision D-352 (12 Nov 2026): the mandatory-fields note and the red "*" (QT/PI payment terms, PI/OC estimated shipment,
 // CI money rows and amount in words) were removed from every PDF and Word fixture by hand; nothing else changed.
 // Owner decision D-353 (12 Nov 2026): the remaining plain "*" after field labels was removed from every PDF and Word
