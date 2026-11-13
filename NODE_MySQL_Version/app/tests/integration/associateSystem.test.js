@@ -593,6 +593,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const a = await associate();
     const req = { session: {}, method: 'GET' };
     await associatePortalService.startViewAs(req, admin, Number(a.id));
+    req.session._auth_user_id = admin; // HNT-L10: view-as lasts only while that staff member is signed in
     let passed = false;
     const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, send(b) { this.body = b; }, redirect(l) { this.location = l; } };
     await associateAuth.required()(req, res, () => { passed = true; });
