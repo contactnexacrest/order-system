@@ -178,7 +178,8 @@ final class OrderZohoMatchService
                 continue;
             }
             $label = OrderCostEntryRepository::CATEGORIES[$c['category']];
-            self::expense($add, $compare, "Cost: {$label}" . (!empty($c['description']) ? " — {$c['description']}" : ''), (float) $c['amount_inr'], $c['zoho_expense_id'], $notSent((string) ($c['incurred_at'] ?? $c['created_at'])), $errorFor('order_cost', 'cost'));
+            // QA ZOH-002: an associate's commission is their Books bill (AS-12), not an expense — its id is a bill id.
+            self::expense($add, $compare, "Cost: {$label}" . (!empty($c['description']) ? " — {$c['description']}" : ''), (float) $c['amount_inr'], $c['zoho_expense_id'], $notSent((string) ($c['incurred_at'] ?? $c['created_at'])), $errorFor('order_cost', 'cost'), ($c['incentive_kind'] ?? null) === 'associate' ? 'bill' : 'expense');
         }
 
         // --- Export benefits received.
@@ -215,16 +216,19 @@ final class OrderZohoMatchService
             : $add('Sales', $item, $amount, (float) $row['amount'], $compare($amount, (float) $row['amount']), '', $currency);
     }
 
-    private static function expense(callable $add, callable $compare, string $item, float $amount, ?string $zohoId, string $notSentStatus, string $error): void
+    private static function expense(callable $add, callable $compare, string $item, float $amount, ?string $zohoId, string $notSentStatus, string $error, string $kind = 'expense'): void
     {
         if ($zohoId === null) {
             $add('Expenses', $item, $amount, null, $notSentStatus, $error);
             return;
         }
-        $row = ZohoBooksService::readRecord('expense', $zohoId);
+        $row = ZohoBooksService::readRecord($kind, $zohoId);
+        // QA ZOH-002: an associate commission bill is compared on its amount before tax (sub_total) — the gross
+        // commission; GST paid on the associate's tax invoice (D-256) is on the bill as a tax on top.
+        $books = $row === null ? 0.0 : (float) ($kind === 'bill' ? ($row['sub_total'] ?? $row['total'] ?? 0) : ($row['total'] ?? $row['amount'] ?? 0));
         $row === null
             ? $add('Expenses', $item, $amount, null, 'missing', 'Sent by the app, but Books no longer has it.')
-            : $add('Expenses', $item, $amount, (float) ($row['total'] ?? $row['amount'] ?? 0), $compare($amount, (float) ($row['total'] ?? $row['amount'] ?? 0)));
+            : $add('Expenses', $item, $amount, $books, $compare($amount, $books));
     }
 
     /** @return array<string,string> "sync_type:leg" => the latest error message for this order, when it is newer than the latest success */

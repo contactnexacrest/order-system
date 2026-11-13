@@ -162,17 +162,19 @@ async function check(orderId) {
   }
 
   // --- Expenses: the order's expenses and its real paid cost entries.
-  const expense = async (item, amount, zohoId, notSentStatus, error) => {
+  const expense = async (item, amount, zohoId, notSentStatus, error, kind = 'expense') => {
     if (zohoId === null || zohoId === undefined) {
       add('Expenses', item, amount, null, notSentStatus, error);
       return;
     }
-    const row = await zohoBooksService.readRecord('expense', String(zohoId));
+    const row = await zohoBooksService.readRecord(kind, String(zohoId));
     if (row === null) {
       add('Expenses', item, amount, null, 'missing', MISSING_NOTE);
       return;
     }
-    const total = Number(row.total ?? row.amount ?? 0);
+    // QA ZOH-002: an associate commission bill is compared on its amount before tax (sub_total) — the gross
+    // commission; GST paid on the associate's tax invoice (D-256) is on the bill as a tax on top.
+    const total = Number(kind === 'bill' ? (row.sub_total ?? row.total ?? 0) : (row.total ?? row.amount ?? 0));
     add('Expenses', item, amount, total, compare(amount, total));
   };
   for (const e of await orderExpenseRepository.forOrder(orderId)) {
@@ -183,7 +185,8 @@ async function check(orderId) {
     // An incentive line goes to Books once it is paid, not when it is fixed.
     if (!orderCostEntryRepository.ZOHO_CATEGORIES.includes(c.category) || (c.incentive_kind !== null && c.paid_from === null)) continue;
     const label = orderCostEntryRepository.CATEGORIES[c.category];
-    await expense(`Cost: ${label}${c.description ? ` — ${c.description}` : ''}`, Number(c.amount_inr), c.zoho_expense_id, notSent(c.incurred_at || c.created_at), errorFor('order_cost', 'cost'));
+    // QA ZOH-002: an associate's commission is their Books bill (AS-12), not an expense — its id is a bill id.
+    await expense(`Cost: ${label}${c.description ? ` — ${c.description}` : ''}`, Number(c.amount_inr), c.zoho_expense_id, notSent(c.incurred_at || c.created_at), errorFor('order_cost', 'cost'), c.incentive_kind === 'associate' ? 'bill' : 'expense');
   }
 
   // --- Export benefits received.

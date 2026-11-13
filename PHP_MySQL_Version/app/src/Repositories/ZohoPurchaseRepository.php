@@ -254,8 +254,10 @@ final class ZohoPurchaseRepository
         foreach ($pdo->query('SELECT zoho_expense_id, details, amount_inr FROM order_expenses WHERE zoho_expense_id IS NOT NULL')->fetchAll() as $r) {
             $out[] = ['kind' => 'expense', 'id' => (string) $r['zoho_expense_id'], 'label' => "expense {$r['details']} INR {$r['amount_inr']} (created by this database)"];
         }
-        foreach ($pdo->query('SELECT zoho_expense_id, category, amount_inr FROM order_cost_entries WHERE zoho_expense_id IS NOT NULL')->fetchAll() as $r) {
-            $out[] = ['kind' => 'expense', 'id' => (string) $r['zoho_expense_id'], 'label' => "order cost {$r['category']} INR {$r['amount_inr']} (created by this database)"];
+        foreach ($pdo->query('SELECT zoho_expense_id, category, amount_inr, incentive_kind FROM order_cost_entries WHERE zoho_expense_id IS NOT NULL')->fetchAll() as $r) {
+            // QA ZOH-002: an associate's commission is their Books bill (AS-12), not an expense.
+            $kind = ($r['incentive_kind'] ?? null) === 'associate' ? 'bill' : 'expense';
+            $out[] = ['kind' => $kind, 'id' => (string) $r['zoho_expense_id'], 'label' => ($kind === 'bill' ? 'associate commission bill' : "order cost {$r['category']}") . " INR {$r['amount_inr']} (created by this database)"];
         }
         foreach ($pdo->query('SELECT zoho_bill_id, bill_no, total_inr FROM order_vendor_bills WHERE zoho_bill_id IS NOT NULL')->fetchAll() as $r) {
             $out[] = ['kind' => 'bill', 'id' => (string) $r['zoho_bill_id'], 'label' => "bill {$r['bill_no']} INR {$r['total_inr']} (created by this database)"];

@@ -317,6 +317,19 @@ final class ZohoRestoreService
             $zohoId = (string) $cost['zoho_expense_id'];
             $what = 'Order cost "' . (\App\Repositories\OrderCostEntryRepository::CATEGORIES[$cost['category']] ?? $cost['category']) . '"';
             try {
+                // QA ZOH-002: an associate's commission is their Books bill (AS-12), not an expense. It is sent once,
+                // so only a deleted bill is put back (the sync finds it again by its bill number, never a duplicate).
+                if (($cost['incentive_kind'] ?? null) === 'associate') {
+                    if (ZohoBooksService::readRecord('bill', $zohoId) !== null) {
+                        continue;
+                    }
+                    if (self::locked((string) $cost['cost_date'], 'order_cost', (int) $cost['order_id'], 'cost', $zohoId, $what . ' (the associate\'s bill) was deleted in Zoho Books', $triggeredBy, $userId)) {
+                        continue;
+                    }
+                    ZohoPurchaseRepository::forgetZohoRecord('expense', $zohoId);
+                    self::$notes["cost:{$cost['id']}"] = self::RECREATED;
+                    continue;
+                }
                 $total = $totals[$zohoId] ?? (($r = ZohoBooksService::readRecord('expense', $zohoId)) !== null ? (float) ($r['total'] ?? $r['amount'] ?? 0) : null);
                 $deleted = $total === null;
                 if (!$deleted && abs($total - (float) $cost['amount_inr']) <= 0.01) {

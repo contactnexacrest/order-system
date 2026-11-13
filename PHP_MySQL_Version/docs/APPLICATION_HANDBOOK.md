@@ -886,7 +886,7 @@ The two bank-details confirmations are listed since D-332 (12 Nov 2026); they we
 | Running | `CaSyncService::fullSync` (hourly cron), *Sync now*, *Sync this order* (`POST /orders/{id}/zoho-sync`); `ZohoSyncLock` one run at a time; `DivisionZohoSync` for DOM/IMP/MTT | |
 | What is waiting | `ZohoPendingService` (order page, menu, Sync page, D-233) | |
 | Failures | `ZohoSyncFailureNotifier` e-mails holders of `ca_module_manage` once per failing run; every call in `zoho_sync_log` | |
-| Checking | `OrderZohoMatchService`, `GET /orders/{id}/zoho-check` — read-only: match / not sent / before go-live / different / missing in Books / only in Books | |
+| Checking | `OrderZohoMatchService`, `GET /orders/{id}/zoho-check` — read-only: match / not sent / before go-live / different / missing in Books / only in Books | An associate's commission is its Books bill (AS-12): the check compares the bill's amount before tax, and the daily restore puts back only a deleted bill (QA ZOH-002). |
 | Master data | `ZohoMasterDataSync`: app → Zoho customers and items, linked by exact name, made inactive (never deleted) | D-238 |
 | Descriptions | `PaymentDescription` builds the same description for app and Books (D-212) | |
 | Records in Zoho | Contacts, invoices (CI, Debit Note, ESI), customer payments, bills and vendor payments, expenses, journals (GST refunds, export benefits, IGST credit, associate payout costs) | Ids stored on the app rows (`zoho_*` columns). |

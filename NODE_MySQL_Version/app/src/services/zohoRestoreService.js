@@ -306,6 +306,15 @@ async function purchases(startDate, triggeredBy, userId) {
     const what = `Order cost "${orderCostEntryRepository.CATEGORIES[cost.category] || cost.category}"`;
     const orderId = Number(cost.order_id);
     try {
+      // QA ZOH-002: an associate's commission is their Books bill (AS-12), not an expense. It is sent once,
+      // so only a deleted bill is put back (the sync finds it again by its bill number, never a duplicate).
+      if (cost.incentive_kind === 'associate') {
+        if ((await zohoBooksService.readRecord('bill', zohoId)) !== null) continue;
+        if (await locked(String(cost.cost_date), 'order_cost', orderId, 'cost', zohoId, `${what} (the associate's bill) was deleted in Zoho Books`, triggeredBy, userId)) continue;
+        await zohoPurchaseRepository.forgetZohoRecord('expense', zohoId);
+        notes.set(`cost:${cost.id}`, RECREATED);
+        continue;
+      }
       const total = await totalOf(zohoId);
       const deleted = total === null;
       if (!deleted && Math.abs(total - Number(cost.amount_inr)) <= 0.01) continue;
