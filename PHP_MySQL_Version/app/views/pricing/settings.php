@@ -27,9 +27,9 @@ $__ro = $canManage ? '' : ' disabled';
     <?= Csrf::field() ?>
     <fieldset><legend>Margin and Costs</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['margin_pct']) ?> *<small class="muted">Margin on the selling price, not markup: 20% on a cost of USD 1,000 gives USD 1,250. Nobody can quote below the minimum price.</small><span class="help-line">Example: cost USD 1,000 at 20% → minimum price USD 1,250 (1,000 ÷ 0.80). Nobody can sell below it.</span></span>
-        <input type="number" name="margin_pct" min="0" max="90" step="0.01" required value="<?= View::e($settings['margin_pct']) ?>" placeholder="e.g. 20.00"<?= $__ro ?>></label>
+        <input type="number" name="margin_pct" min="0" max="90" step="0.01" required value="<?= View::e($settings['margin_pct']) ?>" placeholder="e.g. 15.00"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['other_cost_pct']) ?> *<small class="muted">Packing, inland transport to port, CHA, inspection, documents and bank charges not already in the supplier price. A product can set its own % or USD amount.</small><span class="help-line">Example: supplier price USD 975.61 + 2.5% = cost USD 1,000.00.</span></span>
-        <input type="number" name="other_cost_pct" min="0" max="100" step="0.01" required value="<?= View::e($settings['other_cost_pct']) ?>" placeholder="e.g. 2.50"<?= $__ro ?>></label>
+        <input type="number" name="other_cost_pct" min="0" max="100" step="0.01" required value="<?= View::e($settings['other_cost_pct']) ?>" placeholder="e.g. 5.50"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['buffer_pct']) ?> *<small class="muted">Room to negotiate: the quote price is the floor plus this %.</small><span class="help-line">Example: lowest price USD 1,287.50 + 3% → quote price USD 1,326.13; the team may agree anywhere between the two.</span></span>
         <input type="number" name="buffer_pct" min="0" max="100" step="0.01" required value="<?= View::e($settings['buffer_pct']) ?>" placeholder="e.g. 3.00"<?= $__ro ?>></label>
     </fieldset>
