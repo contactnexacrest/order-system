@@ -324,14 +324,14 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   }
   if (supplier === null) {
     if (spec !== null && spec.adj.basis === 'cbm') {
-      out.missing = 'No per-CBM supplier price is marked "used for pricing" for thick stone yet — needs a manual price.';
+      out.missing = 'No price for 50 mm and above (per CBM) yet — add a 50 mm+ supplier price, or set a manual price.';
       out.manual = true;
       return out;
     }
     const marked = await supplierOffers.markedForPricing(product.id);
     out.missing = marked !== null && !supplierOffers.usable(marked)
-      ? 'The supplier price used for pricing is switched off (inactive supplier or offer).'
-      : 'No supplier price is marked "used for pricing" yet.';
+      ? 'The supplier price behind this product is switched off (inactive supplier or offer) — choose another supplier price in Configure.'
+      : 'Not configured yet — set the base price in Configure.';
     return out;
   }
   // D-300: FOB cost (₹) = supplier price + CHA and transport per unit (+ packing and loading

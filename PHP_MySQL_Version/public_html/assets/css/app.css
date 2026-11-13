@@ -1257,3 +1257,20 @@ table.product-list:not(.show-all) .col-extra { display: none; }
   table.product-list .name-col { min-width: 9.5rem; max-width: 12rem; }
   .show-all-form { justify-content: flex-start; }
 }
+
+/* D-365 follow-up (13 Nov 2026): the Products list fits the page width — staff prices, Status and Actions
+   visible without sideways scrolling: smaller type, unit on its own small line, buttons stacked. */
+table.product-list { font-size: 13px; }
+table.product-list th { font-size: 12px; white-space: normal; line-height: 1.25; }
+table.product-list td.name-col, table.product-list th.name-col { max-width: 210px; min-width: 150px; }
+table.product-list .unit-tail { display: block; font-size: 11.5px; white-space: nowrap; }
+table.product-list .usd-approx { font-size: 12px; white-space: nowrap; }
+table.product-list td .badge { margin: 1px 0; }
+table.product-list .product-list-actions { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; }
+table.product-list .product-list-actions .btn-sm { text-align: center; }
+table.product-list td.name-col, table.product-list th.name-col { max-width: 175px; min-width: 130px; }
+table.product-list th, table.product-list td { padding-left: 7px; padding-right: 7px; }
+table.product-list td .badge { font-size: 11px; padding: 2px 7px; }
+table.product-list .product-list-actions .btn-sm { font-size: 12px; padding: 3px 8px; white-space: normal; }
+table.product-list td:last-child { min-width: 92px; max-width: 110px; }
+table.product-list .unit-tail + br { display: none; }
