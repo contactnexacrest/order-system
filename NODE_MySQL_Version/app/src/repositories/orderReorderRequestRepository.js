@@ -25,7 +25,7 @@ async function addProductLine(requestId, lineNo, description, dimensions, finish
     {
       reorder_request_id: requestId, line_no: lineNo, description, dimensions, finish,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
-      unit_price: unitPrice || null, hs_code: hsCode || null,
+      unit_price: require('../helpers/orderLineValidator').priceInput(unitPrice), hs_code: hsCode || null, // HNT-011: 0 stays 0.00
       // D-338 (1a): the line's size is given in the annexure (no Dimensions).
       as_per_annexure: asPerAnnexure ? 1 : 0,
     }

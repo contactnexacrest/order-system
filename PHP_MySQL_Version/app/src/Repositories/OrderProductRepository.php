@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Helpers\OrderLineValidator;
 
 final class OrderProductRepository
 {
@@ -57,6 +58,7 @@ final class OrderProductRepository
         ?string $unitPrice,
         string $hsCode
     ): void {
+        $unitPrice = OrderLineValidator::priceInput($unitPrice); // HNT-011 (owner, 13 Nov): a typed 0 is 0.00, only blank is "no price yet"
         $fobValue = ($quantity !== null && $unitPrice !== null && !$quantityIsTbc)
             ? number_format(round(((float) $quantity) * ((float) $unitPrice), 2), 2, '.', '') // QA batch 4, MON-3: rounded once, half away from zero, the same on both stacks
             : null;
@@ -74,7 +76,7 @@ final class OrderProductRepository
             'quantity'        => $quantity ?: null,
             'quantity_is_tbc' => $quantityIsTbc ? 1 : 0,
             'unit'            => $unit,
-            'unit_price'      => $unitPrice ?: null,
+            'unit_price'      => $unitPrice,
             'fob_value'       => $fobValue,
             'hs_code'         => $hsCode ?: '680293',
             'id'              => $id,
@@ -202,6 +204,7 @@ final class OrderProductRepository
         ?string $unitPrice,
         string $hsCode = '680293'
     ): int {
+        $unitPrice = OrderLineValidator::priceInput($unitPrice); // HNT-011 (owner, 13 Nov): a typed 0 is 0.00, only blank is "no price yet"
         $fobValue = ($quantity !== null && $unitPrice !== null && !$quantityIsTbc)
             ? number_format(round(((float) $quantity) * ((float) $unitPrice), 2), 2, '.', '') // QA batch 4, MON-3: rounded once, half away from zero, the same on both stacks
             : null;
@@ -222,7 +225,7 @@ final class OrderProductRepository
             'quantity'        => $quantity ?: null,
             'quantity_is_tbc' => $quantityIsTbc ? 1 : 0,
             'unit'            => $unit,
-            'unit_price'      => $unitPrice ?: null,
+            'unit_price'      => $unitPrice,
             'fob_value'       => $fobValue,
             'hs_code'         => $hsCode ?: '680293',
         ]);

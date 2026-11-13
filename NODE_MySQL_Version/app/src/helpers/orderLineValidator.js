@@ -89,4 +89,14 @@ function checkLine(rawQuantity, isTbc, rawPrice) {
   return null;
 }
 
-module.exports = { checkQuantity, checkUnitPrice, checkLine, MAX_PRICE, MAX_QUANTITY };
+/**
+ * HNT-011 (owner decision 13 Nov 2026, item 8 option A): a unit price typed as 0 is a price
+ * of 0.00 (free of charge); only a blank price means "no price yet / To Be Confirmed".
+ * Same rule as PHP OrderLineValidator::priceInput() (a numeric 0 stays 0 too).
+ */
+function priceInput(raw) {
+  const value = String(raw ?? '').trim();
+  return value === '' ? null : value;
+}
+
+module.exports = { checkQuantity, checkUnitPrice, checkLine, priceInput, MAX_PRICE, MAX_QUANTITY };

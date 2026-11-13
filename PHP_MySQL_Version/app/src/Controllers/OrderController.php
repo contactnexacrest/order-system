@@ -561,7 +561,7 @@ final class OrderController
                 ['client_id' => $clientId, 'currency_code' => $__currencyCode],
                 self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
                 'goods',
-                trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
+                OrderLineValidator::priceInput($_POST['product_unit_price'][$i] ?? null),
                 self::seesPriceBuildup(),
                 // D-255: the row's chosen specification options and unit.
                 $__rowSel,
@@ -691,7 +691,7 @@ final class OrderController
                     trim((string) ($_POST['product_quantity'][$i] ?? '')) ?: null,
                     $quantityIsTbc,
                     trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null,
-                    trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
+                    OrderLineValidator::priceInput($_POST['product_unit_price'][$i] ?? null),
                     trim((string) ($_POST['product_hs_code'][$i] ?? ''))
                 );
                 // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
@@ -1274,7 +1274,7 @@ final class OrderController
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $_POST['catalog_product_id'] ?? null)
             // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
             ?? ($__priceRequest !== null ? null : \App\Services\OrderLinePricing::requiredSpecsRefusal(OrderProductRepository::nextLineNo($orderId), self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $__specSel))
-            ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
+            ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, OrderLineValidator::priceInput($_POST['unit_price'] ?? null), self::seesPriceBuildup(),
                 $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size,
                 // D-338 (1c): a line "As per annexure" has no size — its own wording.
                 $__perAnnexure ? OrderProductRepository::nextLineNo($orderId) : null);
@@ -1302,7 +1302,7 @@ final class OrderController
             trim((string) ($_POST['quantity'] ?? '')) ?: null,
             !empty($_POST['quantity_is_tbc']),
             trim((string) ($_POST['unit'] ?? '')) ?: null,
-            trim((string) ($_POST['unit_price'] ?? '')) ?: null,
+            OrderLineValidator::priceInput($_POST['unit_price'] ?? null),
             $hsCode
         );
         OrderProductRepository::setLineType($newLineId, $lineType, $sacCode);
@@ -1388,7 +1388,7 @@ final class OrderController
 
         // Owner decision D-245 P2: never below the product's minimum price.
         $__catalogId = array_key_exists('catalog_product_id', $_POST) ? self::catalogProductInput($_POST['catalog_product_id']) : (isset($product['catalog_product_id']) ? (int) $product['catalog_product_id'] : null);
-        $__newPriceIn = trim((string) ($_POST['unit_price'] ?? '')) ?: null;
+        $__newPriceIn = OrderLineValidator::priceInput($_POST['unit_price'] ?? null);
         $__priceUnchanged = $__newPriceIn !== null && $product['unit_price'] !== null && abs((float) $product['unit_price'] - (float) $__newPriceIn) < 0.005
             && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0);
         // D-255: the chosen options (a form without the field keeps the line's options).
@@ -1437,7 +1437,7 @@ final class OrderController
             trim((string) ($_POST['quantity'] ?? '')) ?: null,
             !empty($_POST['quantity_is_tbc']),
             trim((string) ($_POST['unit'] ?? '')) ?: null,
-            trim((string) ($_POST['unit_price'] ?? '')) ?: null,
+            OrderLineValidator::priceInput($_POST['unit_price'] ?? null),
             $hsCode
         );
         OrderProductRepository::setLineType($productId, $lineType, $sacCode);

@@ -2338,6 +2338,7 @@ reported as lost.
 - **Quantity limit (QA HNT-011, 13 Nov 2026)**: one line's quantity can be at
   most 10,000,000 (`OrderLineValidator::MAX_QUANTITY`, also the quantity
   fields' `data-max-value`) on New Order, + Add product and Edit line.
+- **Unit price 0 (owner decision HNT-011, item 8 option A, 13 Nov 2026)**: a price typed as 0 is stored as 0.00 (line value 0.00, free of charge) on both stacks — documents print 0.00 and the line goes to Zoho at rate 0; only a blank price means "no price yet" (NULL, "To Be Confirmed", the invoice is held back). `OrderLineValidator::priceInput()` / `priceInput()` on every line save (New Order, + Add product, Edit line, reorder lines, repository); a Products goods line at 0 is below its minimum and refused (D-245), service / charge lines are not price-checked.
 - **Duplicate a line (D-272, owner point 24)**: an exact copy placed right
   below the original (later lines move down one `line_no`), marked "copy of
   line N" (`order_products.copied_from_id`): description, every option

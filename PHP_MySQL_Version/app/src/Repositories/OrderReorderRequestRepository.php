@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Helpers\OrderLineValidator;
 
 /**
  * Client-initiated "repeat order" requests (schema.sql Section AJ). A
@@ -57,7 +58,7 @@ final class OrderReorderRequestRepository
             'quantity'           => $quantity ?: null,
             'quantity_is_tbc'    => $quantityIsTbc ? 1 : 0,
             'unit'               => $unit,
-            'unit_price'         => $unitPrice ?: null,
+            'unit_price'         => OrderLineValidator::priceInput($unitPrice), // HNT-011: 0 stays 0.00
             'hs_code'            => $hsCode ?: null,
             // D-338 (1a): the line's size is given in the annexure (no Dimensions).
             'as_per_annexure'    => $asPerAnnexure ? 1 : 0,

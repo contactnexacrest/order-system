@@ -60,6 +60,17 @@ final class OrderLineValidator
         return null;
     }
 
+    /**
+     * HNT-011 (owner decision 13 Nov 2026, item 8 option A): a unit price typed as 0 is a price
+     * of 0.00 (free of charge); only a blank price means "no price yet / To Be Confirmed".
+     * PHP's `?: null` turned the string "0" into NULL — Node always kept 0.00.
+     */
+    public static function priceInput(mixed $raw): ?string
+    {
+        $value = trim((string) ($raw ?? ''));
+        return $value === '' ? null : $value;
+    }
+
     /** QA Round 6, R6-N14: DECIMAL(14,2) for price and line value, DECIMAL(14,3) for quantity. */
     public const MAX_PRICE = 999999999999.99;
     /**

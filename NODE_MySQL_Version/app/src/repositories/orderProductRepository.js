@@ -11,6 +11,7 @@ async function forOrder(orderId) {
 // (order creation — see ordersController.store()), defaulting to the plain
 // pool for every other existing call site.
 async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '680293', executor = db) {
+  unitPrice = require('../helpers/orderLineValidator').priceInput(unitPrice); // HNT-011 (owner, 13 Nov): a typed 0 is 0.00, only blank is "no price yet"
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
     ? require('../helpers/money').round2(parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) // QA batch 4, MON-3: PHP round(), not the binary float
     : null;
@@ -23,7 +24,7 @@ async function add(orderId, lineNo, description, dimensions, finish, quantity, q
     {
       order_id: orderId, line_no: lineNo, description, finish, dimensions,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
-      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '680293',
+      unit_price: unitPrice, fob_value: fobValue, hs_code: hsCode || '680293',
     }
   );
   return result.insertId;
@@ -44,6 +45,7 @@ async function nextLineNo(orderId) {
  * update/delete/duplicate path existed for a line already saved.
  */
 async function update(id, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode) {
+  unitPrice = require('../helpers/orderLineValidator').priceInput(unitPrice); // HNT-011 (owner, 13 Nov): a typed 0 is 0.00, only blank is "no price yet"
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
     ? require('../helpers/money').round2(parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) // QA batch 4, MON-3: PHP round(), not the binary float
     : null;
@@ -57,7 +59,7 @@ async function update(id, description, dimensions, finish, quantity, quantityIsT
     {
       description, finish, dimensions,
       quantity: quantity || null, quantity_is_tbc: quantityIsTbc ? 1 : 0, unit,
-      unit_price: unitPrice || null, fob_value: fobValue, hs_code: hsCode || '680293',
+      unit_price: unitPrice, fob_value: fobValue, hs_code: hsCode || '680293',
       id,
     }
   );

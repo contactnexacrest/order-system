@@ -123,7 +123,7 @@ final class ReorderRequestController
                 'quantity'        => trim((string) ($_POST['quantity'][$i] ?? '')) ?: null,
                 'quantity_is_tbc' => !empty($_POST['quantity_is_tbc'][$i]),
                 'unit'            => trim((string) ($_POST['unit'][$i] ?? '')) ?: null,
-                'unit_price'      => trim((string) ($_POST['unit_price'][$i] ?? '')) ?: null,
+                'unit_price'      => \App\Helpers\OrderLineValidator::priceInput($_POST['unit_price'][$i] ?? null),
                 'hs_code'         => $hsCode,
             ];
         }
