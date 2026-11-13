@@ -4490,6 +4490,8 @@ The app **builds** it from the facts, so it is never blank or wrong. Staff notes
 |---|---|
 | Buyer advance (`PaymentDescription::buyerPayment`) | `Advance received from <Buyer> for order <ref> · USD 1,600.00 at ₹84.10 · against Proforma Invoice <PI no.> · bank ref <UTR>` |
 | Buyer balance with charges | `Balance received from <Buyer> for order <ref> · USD 14,000.00 at ₹83.95 · ₹700.00 bank charges deducted by the banks · against Commercial Invoice <CI no.> · bank ref <UTR>` |
+| Buyer freight | `Freight received from <Buyer> for order <ref> · USD 1,070.00 at ₹90.00 · against Debit Note <DN no.> · bank ref <UTR>` |
+| What a receipt settles (QA MTX-004) | The Zoho invoice it is applied to; before that, the app's own issued (approved / sent) document: freight the Debit Note, the balance and LC money the Commercial Invoice, an advance — or a balance before the CI — the Proforma Invoice. |
 | LC money | `LC money received from <Buyer> for order <ref> · LC <no.> (<bank>) · USD 20,000.00, ₹1,679,300.00 credited after ₹700.00 bank charges · against Commercial Invoice <CI no.> · bank ref <ref>` |
 | Milestone | `Milestone 2 (30% on loading) received from <Buyer> for order <ref> · USD 6,000.00 at ₹83.90 · against Commercial Invoice <CI no.> · bank ref <UTR>` |
 | Bank charges cost (D-244) | `Bank charges deducted in rupees from <Buyer>'s <leg> remittance for order <ref>: USD x at the bank's rate ₹r = ₹y, credited ₹z, charges ₹g · bank ref <UTR>` |

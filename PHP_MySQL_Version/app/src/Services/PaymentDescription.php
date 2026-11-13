@@ -160,17 +160,47 @@ final class PaymentDescription
         return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 
-    /** What the payment settles: its invoice in Zoho, or, for an advance not yet applied, the Proforma Invoice it was asked for. */
+    /**
+     * What the payment settles: its invoice in Zoho, or else the app's own document — QA MTX-004 (rule D-212):
+     * freight the issued Debit Note, the balance (and LC money) the issued Commercial Invoice, and an advance or
+     * a balance before the CI the Proforma Invoice it was asked for.
+     */
     private static function against(int $orderId, string $leg, ?string $invoiceNumber): ?string
     {
         if ($invoiceNumber !== null && $invoiceNumber !== '') {
             return ($leg === 'freight' ? 'Debit Note ' : 'Commercial Invoice ') . $invoiceNumber;
         }
-        if ($leg === 'advance') {
+        if ($leg === 'freight') {
+            $dn = self::issued($orderId, 'FDN');
+            return $dn !== null ? "Debit Note {$dn}" : null;
+        }
+        if ($leg === 'balance' || $leg === 'lc') {
+            $ci = self::issued($orderId, 'CI');
+            if ($ci !== null) {
+                return "Commercial Invoice {$ci}";
+            }
+            if ($leg === 'lc') {
+                return null;
+            }
+        }
+        if ($leg === 'advance' || $leg === 'balance') {
             $pi = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
             return $pi !== null && !empty($pi['document_reference']) ? 'Proforma Invoice ' . $pi['document_reference'] : null;
         }
         return null;
+    }
+
+    /** QA MTX-004: the reference of the order's latest approved (or sent) document of this type, or null. */
+    private static function issued(int $orderId, string $typeCode): ?string
+    {
+        $stmt = \App\Config\Database::connection()->prepare(
+            "SELECT d.document_reference FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.order_id = :o AND dt.code = :c AND d.status IN ('approved', 'sent') AND d.document_reference IS NOT NULL AND d.document_reference <> ''
+             ORDER BY d.revision_number DESC, d.id DESC LIMIT 1"
+        );
+        $stmt->execute(['o' => $orderId, 'c' => $typeCode]);
+        $ref = $stmt->fetchColumn();
+        return $ref === false ? null : (string) $ref;
     }
 
     /** 84.1 → "84.10", 83.3333 → "83.3333": two decimals at least, the rate as recorded otherwise. */

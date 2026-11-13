@@ -180,4 +180,39 @@ final class PaymentDescriptionRuleTest extends DbTestCase
         self::assertSame('Travel expenses (factory visits) — 175 km to the factory, 5% of the order value USD 8,000.00 at ₹84.10', \App\Services\PaymentDescription::travelExpenses(175.0, 5.0, 'USD', 8000.0, 84.1));
         self::assertSame('Travel expenses (factory visits) — 7.5% of the order value INR 500,000.00', \App\Services\PaymentDescription::travelExpenses(null, 7.5, 'INR', 500000.0, 1.0));
     }
+
+    /**
+     * QA MTX-004 (rule D-212): freight and balance receipts say what they settle from the app's own
+     * documents even before their Zoho invoice exists — freight the issued Debit Note, the balance the
+     * issued Commercial Invoice, or before the CI the Proforma Invoice.
+     */
+    public function testMtx004FreightAndBalanceSayWhatTheySettleWithoutAZohoInvoice(): void
+    {
+        $pdo = Database::connection();
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $pdo->exec("INSERT IGNORE INTO order_payment_status (order_id) VALUES ({$orderId})");
+        $pdo->exec("UPDATE order_payment_status SET freight_amount = 1070, freight_exchange_rate = 90, freight_bank_reference = 'UTR-MX-FRT-1',
+                    balance_amount = 2700, balance_exchange_rate = 91, balance_bank_reference = 'UTR-MX-BAL-1' WHERE order_id = {$orderId}");
+        $doc = function (string $code, string $ref, string $status) use ($pdo, $orderId): void {
+            $id = $this->createTestDocument($orderId, $code, $status);
+            $pdo->prepare('UPDATE documents SET document_reference = :r WHERE id = :id')->execute(['r' => $ref, 'id' => $id]);
+        };
+        $doc('PI', 'TEST-SC/PI/26/0001', 'approved');
+        $doc('FDN', 'TEST-SC/DN/26/0001', 'approved');
+        $head = static fn (string $leg): string => "{$leg} received from PHPUnit Test Buyer Ltd for order " . $pdo->query("SELECT buyer_inquiry_ref FROM orders WHERE id = {$orderId}")->fetchColumn();
+        $currency = (string) $pdo->query("SELECT currency_code FROM orders WHERE id = {$orderId}")->fetchColumn();
+
+        self::assertSame($head('Freight') . " · {$currency} 1,070.00 at ₹90.00 · against Debit Note TEST-SC/DN/26/0001 · bank ref UTR-MX-FRT-1",
+            \App\Services\PaymentDescription::buyerPayment($orderId, 'freight'));
+        self::assertSame($head('Balance') . " · {$currency} 2,700.00 at ₹91.00 · against Proforma Invoice TEST-SC/PI/26/0001 · bank ref UTR-MX-BAL-1",
+            \App\Services\PaymentDescription::buyerPayment($orderId, 'balance'), 'before the CI: the PI it was asked for');
+
+        $doc('CI', 'TEST-SC/CI/26/0001', 'draft');
+        self::assertStringContainsString('against Proforma Invoice', \App\Services\PaymentDescription::buyerPayment($orderId, 'balance'), 'a draft CI is not issued yet');
+        $doc('CI', 'TEST-SC/CI/26/0002', 'approved');
+        self::assertSame($head('Balance') . " · {$currency} 2,700.00 at ₹91.00 · against Commercial Invoice TEST-SC/CI/26/0002 · bank ref UTR-MX-BAL-1",
+            \App\Services\PaymentDescription::buyerPayment($orderId, 'balance'));
+        // The Zoho invoice number, when the payment is applied to one, still wins.
+        self::assertStringContainsString('against Debit Note DN-ZOHO-9 ·', \App\Services\PaymentDescription::buyerPayment($orderId, 'freight', 'DN-ZOHO-9'));
+    }
 }

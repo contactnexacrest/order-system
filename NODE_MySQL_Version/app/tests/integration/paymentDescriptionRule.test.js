@@ -8,7 +8,7 @@ const caExportBenefitRepository = require('../../src/repositories/caExportBenefi
 const incentiveRepository = require('../../src/repositories/incentiveRepository');
 const paymentDescription = require('../../src/services/paymentDescription');
 const { todayIst } = require('../../src/helpers/dbDateTime');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
 
 /**
  * Port of PaymentDescriptionRuleTest.php. Owner rule D-212 (2026-10-31):
@@ -175,5 +175,36 @@ describe('Rule D-212 — money records need the reference their description is b
     expect(paymentDescription.lcLoanInterest(null, null, null)).toBe('Bank loan interest (LC order)');
     expect(paymentDescription.travelExpenses(175, 5, 'USD', 8000, 84.1)).toBe('Travel expenses (factory visits) — 175 km to the factory, 5% of the order value USD 8,000.00 at ₹84.10');
     expect(paymentDescription.travelExpenses(null, 7.5, 'INR', 500000, 1)).toBe('Travel expenses (factory visits) — 7.5% of the order value INR 500,000.00');
+  });
+
+  // QA MTX-004 (rule D-212): freight and balance receipts say what they settle from the app's own
+  // documents even before their Zoho invoice exists — freight the issued Debit Note, the balance the
+  // issued Commercial Invoice, or before the CI the Proforma Invoice.
+  test('QA MTX-004: freight and balance say what they settle without a Zoho invoice', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:id)', { id: orderId });
+    await db.execute(`UPDATE order_payment_status SET freight_amount = 1070, freight_exchange_rate = 90, freight_bank_reference = 'UTR-MX-FRT-1',
+                      balance_amount = 2700, balance_exchange_rate = 91, balance_bank_reference = 'UTR-MX-BAL-1' WHERE order_id = :id`, { id: orderId });
+    const doc = async (code, ref, status) => {
+      const id = await createTestDocument(orderId, code, status);
+      await db.execute('UPDATE documents SET document_reference = :r WHERE id = :id', { r: ref, id });
+    };
+    await doc('PI', 'TEST-SC/PI/26/0001', 'approved');
+    await doc('FDN', 'TEST-SC/DN/26/0001', 'approved');
+    const order = await db.queryOne('SELECT buyer_inquiry_ref, currency_code FROM orders WHERE id = :id', { id: orderId });
+    const head = (leg) => `${leg} received from Jest Test Buyer Ltd for order ${order.buyer_inquiry_ref}`;
+    const cur = order.currency_code;
+
+    expect(await paymentDescription.buyerPayment(orderId, 'freight'))
+      .toBe(`${head('Freight')} · ${cur} 1,070.00 at ₹90.00 · against Debit Note TEST-SC/DN/26/0001 · bank ref UTR-MX-FRT-1`);
+    expect(await paymentDescription.buyerPayment(orderId, 'balance'))
+      .toBe(`${head('Balance')} · ${cur} 2,700.00 at ₹91.00 · against Proforma Invoice TEST-SC/PI/26/0001 · bank ref UTR-MX-BAL-1`);
+
+    await doc('CI', 'TEST-SC/CI/26/0001', 'draft');
+    expect(await paymentDescription.buyerPayment(orderId, 'balance')).toContain('against Proforma Invoice'); // a draft CI is not issued yet
+    await doc('CI', 'TEST-SC/CI/26/0002', 'approved');
+    expect(await paymentDescription.buyerPayment(orderId, 'balance'))
+      .toBe(`${head('Balance')} · ${cur} 2,700.00 at ₹91.00 · against Commercial Invoice TEST-SC/CI/26/0002 · bank ref UTR-MX-BAL-1`);
+    expect(await paymentDescription.buyerPayment(orderId, 'freight', 'DN-ZOHO-9')).toContain('against Debit Note DN-ZOHO-9 ·');
   });
 });

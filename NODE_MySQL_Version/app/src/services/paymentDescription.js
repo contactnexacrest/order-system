@@ -6,6 +6,7 @@
  * bank reference — built here from the facts, never typed, so it is never
  * blank or wrong. Port of App\Services\PaymentDescription (same wording).
  */
+const db = require('../config/db');
 const documentRepository = require('../repositories/documentRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
@@ -79,11 +80,33 @@ async function against(orderId, leg, invoiceNumber) {
   if (invoiceNumber !== null && invoiceNumber !== undefined && invoiceNumber !== '') {
     return `${leg === 'freight' ? 'Debit Note ' : 'Commercial Invoice '}${invoiceNumber}`;
   }
-  if (leg === 'advance') {
+  // QA MTX-004 (rule D-212): else the app's own document — freight the issued Debit Note, the balance (and LC
+  // money) the issued Commercial Invoice, and an advance or a balance before the CI the Proforma Invoice.
+  if (leg === 'freight') {
+    const dn = await issued(orderId, 'FDN');
+    return dn !== null ? `Debit Note ${dn}` : null;
+  }
+  if (leg === 'balance' || leg === 'lc') {
+    const ci = await issued(orderId, 'CI');
+    if (ci !== null) return `Commercial Invoice ${ci}`;
+    if (leg === 'lc') return null;
+  }
+  if (leg === 'advance' || leg === 'balance') {
     const pi = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
     return pi && pi.document_reference ? `Proforma Invoice ${pi.document_reference}` : null;
   }
   return null;
+}
+
+/** QA MTX-004: the reference of the order's latest approved (or sent) document of this type, or null. */
+async function issued(orderId, typeCode) {
+  const row = await db.queryOne(
+    `SELECT d.document_reference FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+     WHERE d.order_id = :o AND dt.code = :c AND d.status IN ('approved', 'sent') AND d.document_reference IS NOT NULL AND d.document_reference <> ''
+     ORDER BY d.revision_number DESC, d.id DESC LIMIT 1`,
+    { o: orderId, c: typeCode }
+  );
+  return row ? String(row.document_reference) : null;
 }
 
 /**
