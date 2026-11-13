@@ -16,26 +16,28 @@
 --   * Existing rows keep bank_reference empty: no data is changed here.
 --
 -- Safe to run twice: every column is guarded through information_schema + PREPARE
--- (MySQL-compatible, no IF [NOT] EXISTS on columns). The last line shows "3 of 3".
+-- (MySQL-compatible, no IF [NOT] EXISTS on columns). Every ALTER names the database
+-- (`<db>`.table), so it also works in phpMyAdmin, which may switch to information_schema
+-- after the check query (fix of 13 Nov 2026: "#1044 Access denied … information_schema"). The last line shows "3 of 3".
 -- Run after a backup, in filename order:
 --   mysql -u <user> -p <database> < docs/migrations/2026-11-13d-expense-cost-bank-reference.sql
 SET NAMES utf8mb4;
 SET @db := DATABASE();
 
 SET @s := (SELECT IF(COUNT(*) = 0,
-  'ALTER TABLE order_expenses ADD COLUMN bank_reference VARCHAR(150) NULL',
+  CONCAT('ALTER TABLE `', @db, '`.order_expenses ADD COLUMN bank_reference VARCHAR(150) NULL'),
   'SELECT 1') FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'order_expenses' AND COLUMN_NAME = 'bank_reference');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 
 SET @s := (SELECT IF(COUNT(*) = 0,
-  'ALTER TABLE order_expenses ADD COLUMN zoho_pushed_hash CHAR(64) NULL',
+  CONCAT('ALTER TABLE `', @db, '`.order_expenses ADD COLUMN zoho_pushed_hash CHAR(64) NULL'),
   'SELECT 1') FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'order_expenses' AND COLUMN_NAME = 'zoho_pushed_hash');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 
 SET @s := (SELECT IF(COUNT(*) = 0,
-  'ALTER TABLE order_cost_entries ADD COLUMN bank_reference VARCHAR(150) NULL',
+  CONCAT('ALTER TABLE `', @db, '`.order_cost_entries ADD COLUMN bank_reference VARCHAR(150) NULL'),
   'SELECT 1') FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'order_cost_entries' AND COLUMN_NAME = 'bank_reference');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
