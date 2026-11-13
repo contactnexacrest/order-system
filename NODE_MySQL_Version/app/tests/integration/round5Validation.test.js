@@ -245,7 +245,7 @@ describe('Round 5 validation (Batch 6)', () => {
     has('dropdown_options/index.njk', '<input type="number" min="0" step="1" required name="sort_order[');
     has('reference_docs/edit.njk', 'name="content" required');
     has('clients/edit.njk', 'name="agreement_file" required');
-    has('orders/show.njk', 'data-required-unless="attachments" data-required-unless-message="Write a message or attach a file before posting."');
+    has('orders/show.njk', 'data-required-unless="attachments[]" data-required-unless-message="Write a message or attach a file before posting."');
     has('orders/show.njk', '<input type="number" min="0" step="any" name="factory_distance_km"');
     has('reports/aggregate.njk', 'name="name" required');
     has('signatories/index.njk', "'' if u.is_signatory_eligible else ' required'");

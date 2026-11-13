@@ -573,6 +573,17 @@ const uploadLarge = withLimitLabel(multer({ storage: multer.memoryStorage(), lim
 // limit (fileUploadService enforces that from the DB; this instance's cap
 // just has to be generous enough not to reject a valid upload first).
 const uploadMedia = withLimitLabel(multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }), 50 * 1024 * 1024);
+// QA UI-016: the order-message form names its file field "attachments[]" on both stacks
+// (PHP needs the brackets for several files); "attachments" is still accepted. Either
+// way req.files is the one list fileUploadService.handleMultipleUploads() reads.
+function orderMessageFiles() {
+  const flatten = (req, res, next) => {
+    const byField = req.files || {};
+    req.files = [...(byField.attachments || []), ...(byField['attachments[]'] || [])];
+    next();
+  };
+  return [...uploadMedia.fields([{ name: 'attachments' }, { name: 'attachments[]' }]), flatten];
+}
 
 // QA Round 6, R6-N05/N07: a record id in a URL (:id, :orderId, ...) is a
 // positive whole number (1-15 digits) — "-1", "0", "1.5", "abc" or a
@@ -1306,7 +1317,7 @@ app.post('/orders/:id/production-status', requireAuth, requirePermission('manage
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
 // docs/schema.sql Section AI — order progress chat.
-app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), uploadMedia.array('attachments'), verifyCsrf, asyncHandler(orderCommentController.post));
+app.post('/orders/:id/comments', requireAuth, requirePermission('manage_orders'), orderMessageFiles(), verifyCsrf, asyncHandler(orderCommentController.post));
 app.get('/orders/:id/comment-attachments/:fileId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(orderCommentController.downloadAttachment));
 
 // Step 16 — staff recording feedback the client gave over the phone/in person rather than via the portal. No checkOrderLock: feedback is only reachable once the order is shipped_docs_sent/complete, which is already past the point of being "locked" in the ordinary editing sense.
@@ -1700,7 +1711,7 @@ app.post('/client/account/password', requireClientAuth, verifyCsrf, asyncHandler
 app.get('/client/orders/:id', requireClientAuth, asyncHandler(clientPortalController.showOrder));
 app.get('/client/orders/:id/reorder', requireClientAuth, asyncHandler(clientPortalController.showReorderForm));
 app.post('/client/orders/:id/reorder', requireClientAuth, verifyCsrf, asyncHandler(clientPortalController.submitReorder));
-app.post('/client/orders/:id/comments', requireClientAuth, uploadMedia.array('attachments'), verifyCsrf, asyncHandler(clientPortalController.postComment));
+app.post('/client/orders/:id/comments', requireClientAuth, orderMessageFiles(), verifyCsrf, asyncHandler(clientPortalController.postComment));
 app.get('/client/orders/:id/comment-attachments/:fileId/download', requireClientAuth, asyncHandler(clientPortalController.downloadCommentAttachment));
 app.get('/client/orders/:id/payment-reports/:reportId/screenshot', requireClientAuth, asyncHandler(clientPortalController.downloadPaymentScreenshot));
 app.post('/client/orders/:id/report-payment', requireClientAuth, uploadLarge.single('screenshot'), verifyCsrf, asyncHandler(clientPortalController.reportPayment));

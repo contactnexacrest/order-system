@@ -114,7 +114,12 @@ final class FileUploadService
             return [];
         }
         $field = $_FILES[$formFieldName];
-        $count = is_array($field['name']) ? count($field['name']) : 0;
+        // QA UI-016: a field posted without "[]" (one file, as Node's form named it) is taken
+        // as a list of one, instead of being silently dropped.
+        if (!is_array($field['name'])) {
+            $field = array_map(static fn ($v): array => [$v], $field);
+        }
+        $count = count($field['name']);
 
         $ids = [];
         for ($i = 0; $i < $count; $i++) {

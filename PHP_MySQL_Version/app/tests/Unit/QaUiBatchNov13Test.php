@@ -69,6 +69,33 @@ final class QaUiBatchNov13Test extends TestCase
     }
 
     /**
+     * UI-016: the order-message file field is attachments[] on both stacks, and a
+     * field posted without "[]" (one file) is no longer silently dropped.
+     */
+    public function testUi016MessageFilesUnderEitherFieldName(): void
+    {
+        foreach ([self::VIEWS . '/orders/show.php', self::VIEWS . '/client_portal/order_show.php',
+            self::NODE_VIEWS . '/orders/show.njk', self::NODE_VIEWS . '/client_portal/order_show.njk'] as $file) {
+            self::assertStringContainsString('<input type="file" name="attachments[]" multiple', (string) file_get_contents($file), $file);
+        }
+        $saved = $_FILES;
+        try {
+            $_FILES = ['attachments' => ['name' => 'photo.jpg', 'type' => 'image/jpeg', 'tmp_name' => '/tmp/none', 'error' => UPLOAD_ERR_NO_FILE, 'size' => 0]];
+            self::assertSame([], \App\Services\FileUploadService::handleMultipleUploads('attachments', 'order_comment_media', 'x', null, 1, 1));
+            // A single file under "attachments" is now read (here a broken upload, so it is refused rather than ignored).
+            $_FILES['attachments']['error'] = UPLOAD_ERR_PARTIAL;
+            try {
+                \App\Services\FileUploadService::handleMultipleUploads('attachments', 'order_comment_media', 'x', null, 1, 1);
+                self::fail('a single file under "attachments" was ignored');
+            } catch (\RuntimeException $e) {
+                self::assertSame('Upload failed for "photo.jpg".', $e->getMessage());
+            }
+        } finally {
+            $_FILES = $saved;
+        }
+    }
+
+    /**
      * UI-008: every fixed internal link in a view leads to a page route (the TDS
      * register linked to /associates/report, which does not exist). A route
      * parameter named …id only takes digits, as the controllers expect.

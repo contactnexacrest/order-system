@@ -168,6 +168,30 @@ describe('QA Round 6 — smaller fixes', () => {
     expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM order_comments WHERE order_id = :o', { o: orderId })).n)).toBe(0);
   });
 
+  it('UI-016: the message file field is attachments[] as on PHP, and attachments is still accepted', async () => {
+    const email = `jest-ui016-${Math.random().toString(16).slice(2, 10)}@example.test`;
+    const clientId = await createTestClient(email);
+    await createTestClientLogin(clientId, 'JestClient6!');
+    const orderId = await createTestOrder(clientId);
+    const client = request.agent(app);
+    const loginCsrf = csrfOf((await client.get('/client/login')).text);
+    await client.post('/client/login').type('form').send({ _csrf: loginCsrf, email, password: 'JestClient6!' });
+    const page = `/client/orders/${orderId}`;
+    const html = (await client.get(page)).text;
+    expect(html).toContain('<input type="file" name="attachments[]" multiple');
+    const attached = async () => Number((await db.queryOne(
+      'SELECT COUNT(*) AS n FROM order_comment_attachments a JOIN order_comments c ON c.id = a.comment_id WHERE c.order_id = :o', { o: orderId })).n);
+    for (const [field, files] of [['attachments[]', 2], ['attachments', 1]]) {
+      const before = await attached();
+      const csrf = csrfOf((await client.get(page)).text);
+      let req = client.post(`${page}/comments`).set('Host', 'portal.example.test').set('Referer', `http://portal.example.test${page}`)
+        .field('_csrf', csrf).field('body', `Photos (${field})`);
+      for (let i = 0; i < files; i++) req = req.attach(field, Buffer.from('%PDF-1.4 x'), `p${i}.pdf`);
+      expect((await req).status).toBe(302);
+      expect([field, (await attached()) - before]).toEqual([field, files]);
+    }
+  });
+
   it('invalid dropdown options are refused (R6-N25)', async () => {
     const admin = await staff('Admin');
     const row = await db.queryOne("SELECT id, option_value FROM dropdown_options WHERE list_key = 'unit' ORDER BY id LIMIT 1");
