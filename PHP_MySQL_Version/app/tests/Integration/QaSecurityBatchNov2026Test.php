@@ -354,4 +354,16 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
             self::assertStringContainsString(date('Y-m-t'), $html, $d);
         }
     }
+
+    /** HNT-011: a quantity above 10,000,000 is refused (99,999,999,999 x 10 was saved); 10,000,000 still passes. */
+    public function testHnt011QuantitySanityLimit(): void
+    {
+        self::assertStringContainsString('quantity can be at most 10,000,000', (string) \App\Helpers\OrderLineValidator::checkLine('99999999999', false, '10'));
+        self::assertNotNull(\App\Helpers\OrderLineValidator::checkLine('10000000.001', false, '1'));
+        self::assertNull(\App\Helpers\OrderLineValidator::checkLine('10000000', false, '1'));
+        self::assertNull(\App\Helpers\OrderLineValidator::checkLine('', true, '10'));
+        foreach (['orders/_products_table.php', 'orders/create.php'] as $view) {
+            self::assertStringContainsString('data-max-value="10000000"', (string) file_get_contents(__DIR__ . '/../../views/' . $view));
+        }
+    }
 }

@@ -172,7 +172,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
             <?php if ($__detailed): // Owner decision D-339: No. of pieces — with the size given, the Qty is worked out from it (app.js and the server). ?>
             <label>No. of pieces<input type="text" inputmode="numeric" name="pieces_count" data-pieces-count maxlength="7" value="<?= htmlspecialchars((string) ($__p['pieces_count'] ?? '')) ?>" placeholder="e.g. 25"></label>
             <?php endif; ?>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." data-min-exclusive-unless="quantity_is_tbc" value="<?= htmlspecialchars((string) ($__p['quantity'] ?? '')) ?>" placeholder="e.g. 40"><?php if ($__detailed): ?><small class="muted qty-worked-out" aria-live="polite"></small><?php endif; ?></label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="10000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." data-min-exclusive-unless="quantity_is_tbc" value="<?= htmlspecialchars((string) ($__p['quantity'] ?? '')) ?>" placeholder="e.g. 40"><?php if ($__detailed): ?><small class="muted qty-worked-out" aria-live="polite"></small><?php endif; ?></label>
             <label class="checkbox-row"><input type="checkbox" name="quantity_is_tbc" value="1" <?= !empty($__p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
             <?php // Owner decision D-336: the size is given in the annexure; never with "Qty To Be Confirmed" (app.js and the server). ?>
             <input type="hidden" name="as_per_annexure_field" value="1">

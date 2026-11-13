@@ -55,7 +55,10 @@ function checkUnitPrice(rawValue) {
 
 /** QA Round 6, R6-N14: DECIMAL(14,2) for price and line value, DECIMAL(14,3) for quantity. */
 const MAX_PRICE = 999999999999.99;
-const MAX_QUANTITY = 99999999999.999;
+// HNT-011 (QA 13 Nov 2026): a sanity limit on one line's quantity, well inside the column
+// (DECIMAL(14,3) holds 99,999,999,999.999) — 99,999,999,999 pieces is a typing slip, not an
+// order. The same number is the quantity fields' data-max-value in the browser and on PHP.
+const MAX_QUANTITY = 10000000;
 
 function fmt(n, places) {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: places, maximumFractionDigits: places });

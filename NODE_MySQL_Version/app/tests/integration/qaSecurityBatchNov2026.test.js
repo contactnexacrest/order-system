@@ -449,4 +449,17 @@ describe('QA Nov 2026 security batch', () => {
       expect(r.text).not.toContain('2026-13-45');
     });
   });
+
+  describe('HNT-011 order line quantity sanity limit', () => {
+    it('HNT-011: a quantity above 10,000,000 is refused (99,999,999,999 x 10 was saved); 10,000,000 still passes', () => {
+      const v = require('../../src/helpers/orderLineValidator');
+      expect(v.checkLine('99999999999', false, '10')).toMatch(/quantity can be at most 10,000,000/);
+      expect(v.checkLine('10000000.001', false, '1')).toMatch(/quantity can be at most/);
+      expect(v.checkLine('10000000', false, '1')).toBeNull();
+      expect(v.checkLine('', true, '10')).toBeNull();
+      for (const view of ['orders/_products_table.njk', 'orders/create.njk']) {
+        expect(fs.readFileSync(path.join(__dirname, '../../views', view), 'utf8')).toContain('data-max-value="10000000"');
+      }
+    });
+  });
 });

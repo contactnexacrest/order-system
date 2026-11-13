@@ -173,7 +173,7 @@
           </label>
           <?php // Owner decision D-339: No. of pieces — with the size given in CBM / SQM / SQFT the Qty is worked out from it (PCS: the Qty is the pieces). ?>
           <label>No. of pieces<input type="text" inputmode="numeric" name="product_pieces_count[]" data-pieces-count maxlength="7" value="<?= htmlspecialchars((string) ($old['product_pieces_count'][$__i] ?? '')) ?>" placeholder="e.g. 25"></label>
-          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="99999999999.999" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
+          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="10000000" data-min-exclusive="0" data-min-exclusive-message="The quantity must be more than 0." value="<?= htmlspecialchars((string) ($old['product_quantity'][$__i] ?? '')) ?>" placeholder="e.g. 100"><small class="muted qty-worked-out" aria-live="polite"></small></label>
           <label>Size note <small class="muted">(only when no size is given)</small><input type="text" name="product_size_note[]" maxlength="200" value="<?= htmlspecialchars((string) ($old['product_size_note'][$__i] ?? '')) ?>" placeholder="e.g. Random sizes, as available"></label>
           <label>Unit
             <select name="product_unit[]">

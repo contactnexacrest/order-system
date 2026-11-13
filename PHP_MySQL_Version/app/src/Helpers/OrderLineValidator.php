@@ -62,7 +62,12 @@ final class OrderLineValidator
 
     /** QA Round 6, R6-N14: DECIMAL(14,2) for price and line value, DECIMAL(14,3) for quantity. */
     public const MAX_PRICE = 999999999999.99;
-    public const MAX_QUANTITY = 99999999999.999;
+    /**
+     * HNT-011 (QA 13 Nov 2026): a sanity limit on one line's quantity, well inside the column
+     * (DECIMAL(14,3) holds 99,999,999,999.999) — 99,999,999,999 pieces is a typing slip, not an
+     * order. The same number is the quantity fields' data-max-value in the browser and on Node.
+     */
+    public const MAX_QUANTITY = 10000000.0;
 
     /**
      * QA Round 6, R6-N14/N15: one line's quantity, unit price and line
