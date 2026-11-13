@@ -114,7 +114,7 @@ async function completeWithBackupCode(req, backupCode, res = null) {
   const userId = twoFactorService.pendingUserId(req);
   if (!userId) return { status: 'no_pending_2fa' };
   if (!(await backupCodeService.eligible(userId))) return { status: 'not_allowed' };
-  if (!twoFactorService.countBackupTry(req) || !(await backupCodeService.consume(userId, backupCode))) {
+  if (!(await twoFactorService.countBackupTry(req)) || !(await backupCodeService.consume(userId, backupCode))) {
     await auditLogRepository.log(userId, 'LOGIN_BACKUP_CODE_FAILED', 'users', userId);
     return { status: 'invalid_code' };
   }

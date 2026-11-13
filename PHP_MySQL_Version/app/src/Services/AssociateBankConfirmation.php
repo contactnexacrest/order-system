@@ -111,8 +111,11 @@ final class AssociateBankConfirmation
         if ((int) $b['confirm_code_attempts'] >= BankDetailsCheck::CODE_ATTEMPTS) {
             return 'Too many wrong codes — ask for a new code.';
         }
+        // HNT-001: the try is claimed atomically before the code is checked (parallel tries cannot all pass the limit).
+        if (!AssociateBankRepository::claimCodeAttempt($bankId, BankDetailsCheck::CODE_ATTEMPTS)) {
+            return 'Too many wrong codes — ask for a new code.';
+        }
         if (!hash_equals((string) $b['confirm_code_hash'], hash('sha256', preg_replace('/\D/', '', $code) ?? ''))) {
-            AssociateBankRepository::addCodeAttempt($bankId);
             return 'The code is not right — check the e-mail we sent you, or ask for a new code.';
         }
         if (!AssociateBankRepository::markConfirmed($bankId)) {

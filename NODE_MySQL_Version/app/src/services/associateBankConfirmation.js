@@ -91,9 +91,10 @@ async function confirm(associate, bankId, last4, code, ticked) {
     return `Ask for a code first (or a new one — a code is valid for ${bankDetailsCheck.CODE_MINUTES} minutes).`;
   }
   if (Number(b.confirm_code_attempts) >= bankDetailsCheck.CODE_ATTEMPTS) return 'Too many wrong codes — ask for a new code.';
+  // HNT-001: the try is claimed atomically before the code is checked (parallel tries cannot all pass the limit).
+  if (!(await associateBankRepository.claimCodeAttempt(Number(b.id), bankDetailsCheck.CODE_ATTEMPTS))) return 'Too many wrong codes — ask for a new code.';
   const given = sha256(String(code ?? '').replace(/\D/g, ''));
   if (!crypto.timingSafeEqual(Buffer.from(String(b.confirm_code_hash)), Buffer.from(given))) {
-    await associateBankRepository.addCodeAttempt(Number(b.id));
     return 'The code is not right — check the e-mail we sent you, or ask for a new code.';
   }
   if (!(await associateBankRepository.markConfirmed(Number(b.id)))) return 'These bank details are no longer waiting for your confirmation.';

@@ -129,6 +129,12 @@ async function addCodeAttempt(id) {
   await db.execute('UPDATE associate_bank_accounts SET confirm_code_attempts = confirm_code_attempts + 1 WHERE id = :id', { id });
 }
 
+/** HNT-001: counts one code try in a single atomic UPDATE; false once `max` tries are used. */
+async function claimCodeAttempt(id, max) {
+  const r = await db.execute('UPDATE associate_bank_accounts SET confirm_code_attempts = confirm_code_attempts + 1 WHERE id = :id AND confirm_code_attempts < :max', { id, max: Number(max) });
+  return r.affectedRows === 1;
+}
+
 /** Is the code still valid (not expired)? */
 async function codeLive(id) {
   return !!(await db.queryOne('SELECT 1 AS x FROM associate_bank_accounts WHERE id = :id AND confirm_code_hash IS NOT NULL AND confirm_code_expires > NOW()', { id }));
@@ -179,5 +185,5 @@ function masked(b) {
 
 module.exports = {
   request, forAssociate, find, fullNumber, usable, pendingCount, firstCheck, verify, reject, masked,
-  hasVerified, awaiting, markAwaiting, setCode, addCodeAttempt, codeLive, markConfirmed, cancel, markReminded, overdue, saveChecks, verifyOne,
+  hasVerified, awaiting, markAwaiting, setCode, addCodeAttempt, claimCodeAttempt, codeLive, markConfirmed, cancel, markReminded, overdue, saveChecks, verifyOne,
 };

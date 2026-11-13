@@ -120,6 +120,14 @@ final class AssociateBankRepository
         Database::connection()->prepare('UPDATE associate_bank_accounts SET confirm_code_attempts = confirm_code_attempts + 1 WHERE id = :id')->execute(['id' => $id]);
     }
 
+    /** HNT-001: counts one code try in a single atomic UPDATE; false once $max tries are used. */
+    public static function claimCodeAttempt(int $id, int $max): bool
+    {
+        $stmt = Database::connection()->prepare('UPDATE associate_bank_accounts SET confirm_code_attempts = confirm_code_attempts + 1 WHERE id = :id AND confirm_code_attempts < :max');
+        $stmt->execute(['id' => $id, 'max' => $max]);
+        return $stmt->rowCount() === 1;
+    }
+
     /** The associate confirmed: now waiting for staff ('pending'). False if no longer waiting. */
     public static function markConfirmed(int $id): bool
     {

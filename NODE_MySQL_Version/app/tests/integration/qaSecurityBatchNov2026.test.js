@@ -66,4 +66,79 @@ describe('QA Nov 2026 security batch', () => {
       expect(offenders).toEqual([]);
     });
   });
+
+  describe('HNT-001 login-code tries are limited even when sent in parallel', () => {
+    const authService = require('../../src/services/authService');
+    const twoFactorService = require('../../src/services/twoFactorService');
+    const associatePortalService = require('../../src/services/associatePortalService');
+
+    /** A request whose session is a copy of `session` — as each parallel request reads the same stored session row. */
+    function reqWith(session) {
+      const req = { ip: '127.0.0.1', headers: {} };
+      const s = JSON.parse(JSON.stringify(session || {}));
+      Object.defineProperty(s, 'regenerate', { enumerable: false, value: (cb) => { req.session = {}; Object.defineProperty(req.session, 'regenerate', { enumerable: false, value: s.regenerate }); cb(); } });
+      req.session = s;
+      return req;
+    }
+
+    it('HNT-001: 20 wrong staff codes sent at once use up the 5 tries; the right code afterwards is refused', async () => {
+      const { email } = await user('Export Executive');
+      const start = reqWith({});
+      const r = await authService.attemptLogin(start, email, PASSWORD);
+      expect(r.status).toBe('requires_2fa');
+      const wrong = r.dev_code === '000000' ? '111111' : '000000';
+      const stored = JSON.parse(JSON.stringify(start.session));
+      await Promise.all(Array.from({ length: 20 }, () => twoFactorService.verify(reqWith(stored), wrong)));
+      // The right code, sent with the session as it was stored before the burst (last write wins at best for the attacker).
+      const after = reqWith(stored);
+      expect((await authService.completeTwoFactor(after, r.dev_code)).status).not.toBe('ok');
+      expect(authService.currentUserId(after)).toBeNull();
+    });
+
+    it('HNT-001: buyer portal code — same rule', async () => {
+      const { createTestClient, createTestClientLogin } = require('../support/fixtures');
+      const clientPortalService = require('../../src/services/clientPortalService');
+      const bEmail = `qasec-buyer-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;
+      await createTestClientLogin(await createTestClient(bEmail), PASSWORD);
+      const start = reqWith({});
+      const r = await clientPortalService.attemptLogin(start, bEmail, PASSWORD);
+      const wrong = r.dev_code === '000000' ? '111111' : '000000';
+      const stored = JSON.parse(JSON.stringify(start.session));
+      await Promise.all(Array.from({ length: 20 }, () => twoFactorService.verify(reqWith(stored), wrong, 'client')));
+      expect(await twoFactorService.verify(reqWith(stored), r.dev_code, 'client')).toBe(false);
+    });
+
+    it('HNT-001: sequential tries still allow the right code within 5', async () => {
+      const { email } = await user('Export Executive');
+      const req = reqWith({});
+      const r = await authService.attemptLogin(req, email, PASSWORD);
+      const wrong = r.dev_code === '000000' ? '111111' : '000000';
+      for (let i = 0; i < 4; i++) expect(await twoFactorService.verify(req, wrong)).toBe(false);
+      expect((await authService.completeTwoFactor(req, r.dev_code)).status).toBe('ok');
+    });
+
+    it('HNT-001: associate portal code — parallel wrong codes cannot exceed 5 tries', async () => {
+      const associateId = (await db.execute("INSERT INTO associates (name, status) VALUES ('TEST-QA Sec Associate', 'active')")).insertId;
+      const code = '246813';
+      await db.execute("INSERT INTO associate_tokens (associate_id, purpose, token_hash, expires_at) VALUES (:a, 'login_code', :h, DATE_ADD(NOW(), INTERVAL 10 MINUTE))",
+        { a: associateId, h: crypto.createHash('sha256').update(code).digest('hex') });
+      const stored = { _associate_portal_pending_id: Number(associateId) };
+      await Promise.all(Array.from({ length: 20 }, () => associatePortalService.verifyCode(reqWith(stored), '135790')));
+      const row = await db.queryOne("SELECT attempts FROM associate_tokens WHERE associate_id = :a AND purpose = 'login_code'", { a: associateId });
+      expect(Number(row.attempts)).toBe(5);
+      expect(await associatePortalService.verifyCode(reqWith(stored), code)).toBe(false);
+    });
+
+    it('HNT-001: associate bank-change confirmation code — tries claimed atomically, never past the limit', async () => {
+      const associateBankRepository = require('../../src/repositories/associateBankRepository');
+      const associateId = (await db.execute("INSERT INTO associates (name, status) VALUES ('TEST-QA Sec Bank Associate', 'active')")).insertId;
+      const bankId = (await db.execute(
+        "INSERT INTO associate_bank_accounts (associate_id, holder_name, account_number_enc, account_last4, bank_name) VALUES (:a, 'TEST-QA Holder', 'x', '1234', 'TEST Bank')",
+        { a: associateId }
+      )).insertId;
+      const results = await Promise.all(Array.from({ length: 12 }, () => associateBankRepository.claimCodeAttempt(bankId, 5)));
+      expect(results.filter(Boolean).length).toBe(5);
+      expect(Number((await db.queryOne('SELECT confirm_code_attempts AS n FROM associate_bank_accounts WHERE id = :id', { id: bankId })).n)).toBe(5);
+    });
+  });
 });

@@ -166,11 +166,21 @@ final class AssociatePortalService
         if (!$t || (int) $t['attempts'] >= 5) {
             return false;
         }
-        if (!hash_equals((string) $t['token_hash'], hash('sha256', trim($code)))) {
-            $pdo->prepare('UPDATE associate_tokens SET attempts = attempts + 1 WHERE id = :id')->execute(['id' => $t['id']]);
+        // HNT-001: claim the try in one atomic UPDATE before checking the code, so tries
+        // sent in parallel can never all read attempts < 5 and all be checked.
+        $claim = $pdo->prepare('UPDATE associate_tokens SET attempts = attempts + 1 WHERE id = :id AND attempts < 5 AND used_at IS NULL');
+        $claim->execute(['id' => $t['id']]);
+        if ($claim->rowCount() !== 1) {
             return false;
         }
-        $pdo->prepare('UPDATE associate_tokens SET used_at = NOW() WHERE id = :id')->execute(['id' => $t['id']]);
+        if (!hash_equals((string) $t['token_hash'], hash('sha256', trim($code)))) {
+            return false;
+        }
+        $used = $pdo->prepare('UPDATE associate_tokens SET used_at = NOW() WHERE id = :id AND used_at IS NULL');
+        $used->execute(['id' => $t['id']]);
+        if ($used->rowCount() !== 1) {
+            return false;
+        }
         self::regenerate();
         unset($_SESSION[self::SESSION_PENDING]);
         $_SESSION[self::SESSION_ID] = (int) $id;

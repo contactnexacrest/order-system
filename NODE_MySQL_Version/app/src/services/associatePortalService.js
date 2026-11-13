@@ -152,12 +152,16 @@ async function verifyCode(req, code) {
     { a: id }
   );
   if (!t || Number(t.attempts) >= 5) return false;
+  // HNT-001: claim the try in one atomic UPDATE before checking the code, so tries
+  // sent in parallel can never all read attempts < 5 and all be checked.
+  const claimed = await db.execute('UPDATE associate_tokens SET attempts = attempts + 1 WHERE id = :id AND attempts < 5 AND used_at IS NULL', { id: t.id });
+  if (claimed.affectedRows !== 1) return false;
   const given = sha256(String(code || '').trim());
   if (given.length !== String(t.token_hash).length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(String(t.token_hash)))) {
-    await db.execute('UPDATE associate_tokens SET attempts = attempts + 1 WHERE id = :id', { id: t.id });
     return false;
   }
-  await db.execute('UPDATE associate_tokens SET used_at = NOW() WHERE id = :id', { id: t.id });
+  const used = await db.execute('UPDATE associate_tokens SET used_at = NOW() WHERE id = :id AND used_at IS NULL', { id: t.id });
+  if (used.affectedRows !== 1) return false;
   const loggedIn = await associateRepository.find(Number(id));
   await regenerate(req, () => {
     delete req.session[SESSION_PENDING];

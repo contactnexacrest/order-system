@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const env = require('../config/env');
 const emailService = require('./emailService');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
+const rateLimitRepository = require('../repositories/rateLimitRepository');
 
 // Port of App\Services\TwoFactorService — the 6-digit login code e-mailed at
 // every sign-in (owner decision D-265, 7 Nov 2026): every staff member, every
@@ -22,6 +23,8 @@ const CLIENT_CODE_BODY = 'Hello,\n\nYour code to log in to your NexaCrest order 
 const MAX_VERIFY_ATTEMPTS = 5;
 const RESEND_AFTER_SECONDS = 60;
 const SESSION_KEYS = { staff: '_2fa_pending', client: '_client_2fa_pending' };
+/** HNT-001: rate_limit_hits.ip_address is NOT NULL; login-code tries are keyed by the pending sign-in, not by IP. */
+const TRY_LEDGER_IP = 'login-code';
 
 function key(scope) {
   return SESSION_KEYS[scope] || SESSION_KEYS.staff;
@@ -39,6 +42,8 @@ async function issueCodeFor(req, subjectId, method, destination, scope = 'staff'
     issued_at: now,
     expires_at: now + CODE_TTL_SECONDS * 1000,
     attempts: 0,
+    // HNT-001: tries are counted in the database under this key (see useTry).
+    try_key: crypto.randomBytes(16).toString('hex'),
   };
   // 90-item backlog #37: admin-editable (Admin > Settings > Email Templates), with this
   // wording as the fallback, since a login code must never silently fail to go out.
@@ -77,21 +82,39 @@ async function resend(req, scope = 'staff') {
   return { status: 'sent', dev_code: devCode };
 }
 
-/** Counts a try against the pending sign-in; false (and the sign-in ends) once 5 tries are used or it expired. */
-function useTry(req, scope) {
+/**
+ * Counts a try against the pending sign-in; false (and the sign-in ends) once 5 tries are used or it expired.
+ *
+ * HNT-001 (QA 13 Nov 2026): the count used to live only in the session row, so
+ * requests sent in parallel each read attempts=0 and wrote back 1 (last write
+ * wins) — unlimited guesses. Every try is now first recorded as its own row in
+ * rate_limit_hits (one INSERT each, so concurrent tries can never overwrite one
+ * another) and then counted: the n-th try recorded always sees at least n, so at
+ * most 5 tries per code are ever checked, however they are timed. PHP needs no
+ * such step: its file session is locked for the whole request.
+ */
+async function useTry(req, scope) {
   const k = key(scope);
   const p = req.session[k];
   if (!p) return false;
-  if (p.attempts >= MAX_VERIFY_ATTEMPTS || Date.now() > p.expires_at) {
+  if (Number(p.attempts) >= MAX_VERIFY_ATTEMPTS || Date.now() > p.expires_at) {
     delete req.session[k];
     return false;
   }
-  p.attempts += 1;
+  if (!p.try_key) p.try_key = crypto.randomBytes(16).toString('hex');
+  const bucket = `login_code_try:${p.try_key}`;
+  await rateLimitRepository.recordHit(bucket, TRY_LEDGER_IP);
+  const used = await rateLimitRepository.recentHitCount(bucket, TRY_LEDGER_IP, Math.ceil(CODE_TTL_SECONDS / 60) + 5);
+  if (used > MAX_VERIFY_ATTEMPTS) {
+    delete req.session[k];
+    return false;
+  }
+  p.attempts = Math.max(Number(p.attempts) + 1, used);
   return true;
 }
 
 async function verify(req, submittedCode, scope = 'staff') {
-  if (!useTry(req, scope)) return false;
+  if (!(await useTry(req, scope))) return false;
   const k = key(scope);
   if (await bcrypt.compare(String(submittedCode).trim(), req.session[k].code_hash)) {
     delete req.session[k];
@@ -102,7 +125,7 @@ async function verify(req, submittedCode, scope = 'staff') {
 }
 
 /** A backup-code try counts against the same 5 tries; the caller checks the backup code itself. */
-function countBackupTry(req, scope = 'staff') {
+async function countBackupTry(req, scope = 'staff') {
   return useTry(req, scope);
 }
 
