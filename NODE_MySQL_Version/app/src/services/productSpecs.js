@@ -28,7 +28,7 @@ const FORMS = { block: 'Blocks', slab: 'Slabs', tile: 'Tiles', kerb: 'Kerbs', st
 const CHANGE_TYPES = {
   none: 'No change',
   pct: '% of the price',
-  usd_m2: 'USD per m²',
+  usd_m2: 'USD per SQM',
   usd_rm: 'USD per running metre',
   usd_container: 'USD per container',
   // D-257 Phase 0B: price options for products sold per piece, per kg or per set.
@@ -38,7 +38,7 @@ const CHANGE_TYPES = {
   cbm: 'Priced per CBM',
 };
 
-const KINDS = { normal: 'Normal', thickness: 'Thickness (m² or CBM)', quantity: 'Quantity (applied last)' };
+const KINDS = { normal: 'Normal', thickness: 'Thickness (SQM or CBM)', quantity: 'Quantity (applied last)' };
 
 /** Units that count as "per running metre" for per-rm amounts. */
 const RM_UNITS = ['RM', 'RMT', 'LM', 'RUNNING METRE', 'RUNNING METER'];
@@ -247,7 +247,7 @@ function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = [], lin
     } else if (type === 'usd_m2') {
       if (out.basis === 'cbm') {
         if (out.thickness_mm === null || out.thickness_mm <= 0) {
-          out.manual = out.manual ?? 'A per-m² option on a thickness that is not listed needs a manual price.';
+          out.manual = out.manual ?? 'A per-SQM option on a thickness that is not listed needs a manual price.';
           continue;
         }
         const conv = v * 1000 / out.thickness_mm;
@@ -292,7 +292,7 @@ function changeLabel(type, value) {
   if (v === 0) return 'Included in base price'; // D-256
   const sign = v < 0 ? '−' : '+';
   if (type === 'pct') return `${sign}${trim2(v)}%`;
-  const per = { usd_m2: '/m²', usd_rm: '/rm', usd_container: '/container', usd_piece: '/piece', usd_kg: '/kg', usd_set: '/set' }[type] || '';
+  const per = { usd_m2: '/SQM', usd_rm: '/rm', usd_container: '/container', usd_piece: '/piece', usd_kg: '/kg', usd_set: '/set' }[type] || '';
   return `${sign}$${trim2(v)}${per}`;
 }
 

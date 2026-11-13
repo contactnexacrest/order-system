@@ -12,7 +12,7 @@ if (!empty($unitPrices) && $unitPrices['sets'] !== []):
 ?>
 <div class="section unit-prices-card">
   <h2>Prices in other units — <?= View::e((string) $product['name']) ?></h2>
-  <p class="muted small">Worked out from this product's prices for each thickness (1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT). Read-only, nothing is saved. Per piece needs a size, so it is shown on the order line, not here. Ton and RMT follow the same rules as the price check (D-270).</p>
+  <p class="muted small">Worked out from this product's prices for each thickness (1 CBM = 1,000 ÷ thickness in mm SQM; 1 SQM = 10.7639 SQFT). Read-only, nothing is saved. Per piece needs a size, so it is shown on the order line, not here. Ton and RMT follow the same rules as the price check (D-270).</p>
   <?php foreach ($unitPrices['sets'] as $__i => $__set): ?>
     <details<?= $__i === 0 ? ' open' : '' ?>>
       <summary><b><?= View::e($__set['label']) ?></b> <span class="muted small">(<?= View::e($__set['currency']) ?>)</span></summary>

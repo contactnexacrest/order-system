@@ -158,8 +158,8 @@ describe('D-300 to D-306 products and pricing', () => {
     expect([done.values[40].price, done.values[40].how]).toEqual([2890, 'calculated']);
     expect(done.values[0].price).toBe(68000);
     const history = (await thicknessPrices.historyFor(Number(row.id))).map((h) => `${h.what}: ${h.old_value} → ${h.new_value}`);
-    expect(history).toContain('20 mm per m²: 1600.00 typed → 1700.00 typed');
-    expect(history).toContain('40 mm per m²: 2720.00 calculated → 2890.00 calculated');
+    expect(history).toContain('20 mm per SQM: 1600.00 typed → 1700.00 typed');
+    expect(history).toContain('40 mm per SQM: 2720.00 calculated → 2890.00 calculated');
     expect(await post(agent, edit, edit, { ...base, 'price[20]': '', 'how[20]': 'typed', 'price[30]': '0', 'how[30]': 'typed' })).toBe('Enter at least one price.');
     const page = (await agent.get(edit)).text;
     expect(page).toContain('Price history');

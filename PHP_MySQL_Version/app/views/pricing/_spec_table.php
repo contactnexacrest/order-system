@@ -98,7 +98,7 @@ $__ro = $canManage ? '' : ' disabled';
   <?php if ($canManage): ?>
     <div class="note small" id="option-types-help"><strong>How each kind of option changes the price</strong> (the change is made to the cost, so your margin is always kept):
   <span class="help-line">% — e.g. Standard grade −8%: cost USD 40.00 → USD 36.80. 0 = "Included in base price".</span>
-  <span class="help-line">USD per m² — e.g. Leather +4.00: cost USD 40.00 → USD 44.00. At 50 mm and above it is converted per CBM (× 1,000 ÷ thickness).</span>
+  <span class="help-line">USD per SQM — e.g. Leather +4.00: cost USD 40.00 → USD 44.00. At 50 mm and above it is converted per CBM (× 1,000 ÷ thickness).</span>
   <span class="help-line">USD per running metre — e.g. Bullnose edge +4.00: added to the price of products sold per running metre; otherwise shown as a separate charge.</span>
   <span class="help-line">USD per container — e.g. A-frame +150: shown as a separate charge per container.</span>
   <span class="help-line">Priced per CBM — e.g. 80 mm: the price comes from the product's per-CBM supplier price instead.</span>

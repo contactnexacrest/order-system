@@ -36,9 +36,9 @@ $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['incl
   <?php endif; ?>
   <?php if ($rules['grid']): ?>
     <table class="list">
-      <tr><th>Thickness</th><th>m² per container</th><th class="num">CHA + transport per m² (₹)</th><th class="num">per sq ft (₹)</th></tr>
+      <tr><th>Thickness</th><th>SQM per container</th><th class="num">CHA + transport per SQM (₹)</th><th class="num">per SQFT (₹)</th></tr>
       <?php foreach ($rules['rows'] as $__r): $__m2 = $__fit['fits_cbm'] / ($__r['mm'] / 1000); ?>
-        <tr data-cha-row data-mm="<?= (int) $__r['mm'] ?>"><td><?= (int) $__r['mm'] ?> mm</td><td><?= number_format($__m2, 1) ?> m² (<?= number_format($__m2 * \App\Services\LineUnits::SQFT_PER_M2, 0) ?> sq ft)</td>
+        <tr data-cha-row data-mm="<?= (int) $__r['mm'] ?>"><td><?= (int) $__r['mm'] ?> mm</td><td><?= number_format($__m2, 1) ?> SQM (<?= number_format($__m2 * \App\Services\LineUnits::SQFT_PER_M2, 0) ?> SQFT)</td>
           <td class="num" data-cha-m2><?= $__fit['per_cbm'] !== null ? number_format($__fit['per_cbm'] * $__r['mm'] / 1000, 2) : '—' ?></td>
           <td class="num" data-cha-sqft><?= $__fit['per_cbm'] !== null ? number_format($__fit['per_cbm'] * $__r['mm'] / 1000 / \App\Services\LineUnits::SQFT_PER_M2, 2) : '—' ?></td></tr>
       <?php endforeach; ?>

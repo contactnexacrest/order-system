@@ -9,6 +9,8 @@ use App\Helpers\View;
  * code; it starts Inactive and not configured), then the supplier's price: base thickness *,
  * price ₹ *, per (unit) *, quoted on *, valid until. The thicknesses and units follow the
  * product's (or the category's) price rules — app.js fills them from data-choices.
+ * D-364: a price per SQM may be typed per SQFT — shown converted live under the fields
+ * ("₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)") and saved as the SQM price.
  * Used on the Edit supplier page (a panel) and on its own page from the Suppliers list.
  * Expects $addProduct = [supplier, from, old, today, choices]. Node twin: _add_product.njk.
  */
@@ -77,11 +79,12 @@ $__back = $__ap['from'] === 'supplier' ? '/suppliers/' . (int) $__s['id'] . '/ed
       <input type="text" name="price" inputmode="decimal" required pattern="[0-9,]{1,15}(\.[0-9]{1,2})?" value="<?= View::e((string) ($__o['price'] ?? '')) ?>" placeholder="e.g. 180000">
     </label>
     <label>per *
-      <select name="unit" required data-add-offer-unit data-required-message="Choose what the price is per.">
+      <select name="unit" required data-add-offer-unit data-sqft-unit data-required-message="Choose what the price is per.">
         <option value="">Choose…</option>
       </select>
     </label>
   </div>
+  <p class="sqft-note" data-sqft-note hidden></p>
   <div class="add-offer-row">
     <label>Quoted on *
       <input type="date" name="quoted_on" required max="<?= View::e($__ap['today']) ?>" value="<?= View::e((string) ($__o['quoted_on'] ?? $__ap['today'])) ?>">

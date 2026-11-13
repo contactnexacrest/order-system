@@ -4,7 +4,8 @@
  * for a product from before migration 13b that has no supplier yet — the supplier (or "+ new
  * supplier"), their price, per (unit) or for (thickness), quoted on, valid until. The product's
  * configured base price stays as it is (owner decision 1). Saved with SupplierOffers::addOffer,
- * the same as the supplier page's "+ Add product". Node twin: views/products/link_supplier.njk.
+ * the same as the supplier page's "+ Add product". D-364: per SQM, SQFT (saved as the SQM price,
+ * shown converted live) or CBM. Node twin: views/products/link_supplier.njk.
  */
 use App\Helpers\Csrf;
 use App\Helpers\View;
@@ -27,17 +28,23 @@ $__picked = (int) ($old['supplier_id'] ?? $pickedId);
       <input type="text" name="price" inputmode="decimal" required pattern="[0-9,]{1,15}(\.[0-9]{1,2})?" data-pattern-message="The price in ₹, e.g. 158000 or 158000.50." value="<?= View::e((string) ($old['price'] ?? '')) ?>" placeholder="e.g. 158000"></label>
     <?php if ($shape['grid']): ?>
       <label>For *
-        <select name="mm" required data-required-message="Choose the thickness the price is for.">
+        <select name="mm" required data-sqft-thickness data-required-message="Choose the thickness the price is for.">
           <option value="">Choose…</option>
-          <?php foreach ($shape['thicknesses'] as $__t): ?><option value="<?= (int) $__t['mm'] ?>"<?= (string) ($old['mm'] ?? (string) $shape['base_mm']) === (string) $__t['mm'] ? ' selected' : '' ?>><?= View::e($__t['label']) ?> (per <?= $__t['unit'] === 'CBM' ? 'CBM' : 'm²' ?>)</option><?php endforeach; ?>
+          <?php foreach ($shape['thicknesses'] as $__t): ?><option value="<?= (int) $__t['mm'] ?>" data-unit="<?= $__t['unit'] === 'CBM' ? 'CBM' : 'SQM' ?>"<?= (int) $__t['mm'] === (int) $shape['base_mm'] ? ' data-base="1"' : '' ?><?= (string) ($old['mm'] ?? (string) $shape['base_mm']) === (string) $__t['mm'] ? ' selected' : '' ?>><?= View::e($__t['label']) ?> (per <?= $__t['unit'] === 'CBM' ? 'CBM' : 'SQM' ?>)</option><?php endforeach; ?>
+        </select></label>
+      <?php $__selMm = (string) ($old['mm'] ?? (string) $shape['base_mm']); $__selUnit = (string) ($old['unit'] ?? ($__selMm === (string) \App\Services\ThicknessPrices::CBM ? 'CBM' : 'm2')); ?>
+      <label>Per *
+        <select name="unit" required data-sqft-unit data-required-message="Choose what the price is per.">
+          <?php foreach ($shape['units'] as $__u): ?><option value="<?= View::e($__u['value']) ?>"<?= !empty($__u['sqft']) ? ' data-sqft="1"' : '' ?><?= $__selUnit === $__u['value'] ? ' selected' : '' ?>><?= View::e($__u['label']) ?></option><?php endforeach; ?>
         </select></label>
     <?php else: ?>
       <label>Per *
-        <select name="unit" required data-required-message="Choose what the price is per.">
+        <select name="unit" required data-sqft-unit data-required-message="Choose what the price is per.">
           <option value="">Choose…</option>
-          <?php foreach ($shape['units'] as $__u): ?><option value="<?= View::e($__u['value']) ?>"<?= (string) ($old['unit'] ?? $shape['units'][0]['value']) === $__u['value'] ? ' selected' : '' ?>><?= View::e($__u['label']) ?></option><?php endforeach; ?>
+          <?php foreach ($shape['units'] as $__u): ?><option value="<?= View::e($__u['value']) ?>"<?= !empty($__u['sqft']) ? ' data-sqft="1"' : '' ?><?= (string) ($old['unit'] ?? $shape['units'][0]['value']) === $__u['value'] ? ' selected' : '' ?>><?= View::e($__u['label']) ?></option><?php endforeach; ?>
         </select></label>
     <?php endif; ?>
+    <p class="sqft-note full" data-sqft-note hidden></p>
     <label>Quoted on *<input type="date" name="quoted_on" required max="<?= View::e($today) ?>" value="<?= View::e((string) ($old['quoted_on'] ?? $today)) ?>"></label>
     <label>Valid until<input type="date" name="valid_until" value="<?= View::e((string) ($old['valid_until'] ?? '')) ?>" data-not-before="[name=quoted_on]" data-not-before-message="Valid until cannot be before the quoted date."></label>
     <p class="muted small full"><?= $configured ? 'The product\'s configured base price stays ' . View::e((string) $baseText) . '. If this supplier quotes a different price, the product shows "Supplier prices changed — Use ₹…" and you decide.' : 'The product has no base price yet — Configure it after linking to set its selling price.' ?></p>

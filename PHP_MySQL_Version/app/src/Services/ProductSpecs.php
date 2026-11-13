@@ -34,7 +34,7 @@ final class ProductSpecs
     public const CHANGE_TYPES = [
         'none' => 'No change',
         'pct' => '% of the price',
-        'usd_m2' => 'USD per m²',
+        'usd_m2' => 'USD per SQM',
         'usd_rm' => 'USD per running metre',
         'usd_container' => 'USD per container',
         // D-257 Phase 0B: price options for products sold per piece, per kg or per set.
@@ -47,7 +47,7 @@ final class ProductSpecs
     /** Selection value meaning "no thickness chosen — price the supplier's BASE" (Try a price). */
     public const SUPPLIER_BASE = 'base';
 
-    public const KINDS = ['normal' => 'Normal', 'thickness' => 'Thickness (m² or CBM)', 'quantity' => 'Quantity (applied last)'];
+    public const KINDS = ['normal' => 'Normal', 'thickness' => 'Thickness (SQM or CBM)', 'quantity' => 'Quantity (applied last)'];
 
     /** Units that count as "per running metre" for per-rm amounts. */
     private const RM_UNITS = ['RM', 'RMT', 'LM', 'RUNNING METRE', 'RUNNING METER'];
@@ -307,7 +307,7 @@ final class ProductSpecs
             } elseif ($type === 'usd_m2') {
                 if ($out['basis'] === 'cbm') {
                     if ($out['thickness_mm'] === null || $out['thickness_mm'] <= 0) {
-                        $out['manual'] ??= 'A per-m² option on a thickness that is not listed needs a manual price.';
+                        $out['manual'] ??= 'A per-SQM option on a thickness that is not listed needs a manual price.';
                         continue;
                     }
                     $conv = $v * 1000 / $out['thickness_mm'];
@@ -361,7 +361,7 @@ final class ProductSpecs
         if ($type === 'pct') {
             return $sign . rtrim(rtrim(number_format(abs($v), 2, '.', ''), '0'), '.') . '%';
         }
-        $per = ['usd_m2' => '/m²', 'usd_rm' => '/rm', 'usd_container' => '/container', 'usd_piece' => '/piece', 'usd_kg' => '/kg', 'usd_set' => '/set'][$type] ?? '';
+        $per = ['usd_m2' => '/SQM', 'usd_rm' => '/rm', 'usd_container' => '/container', 'usd_piece' => '/piece', 'usd_kg' => '/kg', 'usd_set' => '/set'][$type] ?? '';
         return $sign . '$' . rtrim(rtrim(number_format(abs($v), 2, '.', ''), '0'), '.') . $per;
     }
 

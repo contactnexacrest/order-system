@@ -41,16 +41,29 @@
             <label>New price (₹) *<input type="text" inputmode="decimal" name="price" required class="edit-price-big" data-max-decimals="2" data-max-value="999999999999.99"
                    placeholder="e.g. 185000" value="{{ priceValue }}" data-edit-price-input></label>
             {% if grid %}
-              <span class="edit-price-per">per <strong data-edit-price-unit>{{ fromUnit }}</strong> for</span>
-              <label>Thickness *<select name="thickness_mm" required data-edit-price-thickness>
+              <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                <option value="m2"{% if gridUnit == 'm2' %} selected{% endif %}>SQM</option>
+                <option value="SQFT" data-sqft="1"{% if gridUnit == 'SQFT' %} selected{% endif %}>SQFT</option>
+                <option value="CBM"{% if gridUnit == 'CBM' %} selected{% endif %}>CBM</option>
+              </select></label>
+              <span class="edit-price-per">for</span>
+              <label>Thickness *<select name="thickness_mm" required data-edit-price-thickness data-sqft-thickness>
                 {% for t in thicknesses %}
-                  <option value="{{ t.mm }}" data-unit="{{ t.unit }}"{% if t.selected %} selected{% endif %}>{{ t.label }}{% if t.isBase %} (base){% endif %}</option>
+                  <option value="{{ t.mm }}" data-unit="{{ t.unit }}"{% if t.isRuleBase %} data-base="1"{% endif %}{% if t.selected %} selected{% endif %}>{{ t.label }}{% if t.isBase %} (base){% endif %}</option>
                 {% endfor %}
               </select></label>
             {% else %}
-              <span class="edit-price-per">per <strong>{{ unitLabel }}</strong></span>
+              {% if sqmUnit %}
+                <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                  <option value="{{ sqmUnit }}"{% if oldUnit != 'SQFT' %} selected{% endif %}>SQM</option>
+                  <option value="SQFT" data-sqft="1"{% if oldUnit == 'SQFT' %} selected{% endif %}>SQFT</option>
+                </select></label>
+              {% else %}
+                <span class="edit-price-per">per <strong>{{ unitLabel }}</strong></span>
+              {% endif %}
             {% endif %}
           </div>
+          <p class="sqft-note" data-sqft-note hidden></p>
           <p class="small muted" data-edit-price-change>{{ wasLine }}</p>
           <div class="field-grid">
             <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ quotedOn }}"></label>

@@ -25,7 +25,7 @@
   <h2>Thickness</h2>
   {% if not r.spec %}<p class="muted">This category has no Thickness specification — add one on the "Options and their price effect" tab first.</p>{% endif %}
   <table class="list">
-    <tr><th>Thickness</th><th>Price compared with {{ r.base_mm }} mm</th><th class="num">Example ({{ r.base_mm }} mm = ₹{{ v.example | money0 }} / m²)</th></tr>
+    <tr><th>Thickness</th><th>Price compared with {{ r.base_mm }} mm</th><th class="num">Example ({{ r.base_mm }} mm = ₹{{ v.example | money0 }} / SQM)</th></tr>
     {% for t in v.thickness %}
       <tr data-rule-row data-mm="{{ t.mm }}">
         <td>{{ t.name }}</td>
@@ -35,7 +35,7 @@
     {% endfor %}
     <tr data-rule-cbm>
       <td>{{ r.cbm_from }} mm and above (per CBM)</td>
-      <td class="rule-cell">{{ r.base_mm }} mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="{{ v.k }}" placeholder="e.g. {{ v.g.k }}" aria-label="{{ r.cbm_from }} mm and above: {{ r.base_mm }} mm price per m² times" class="rule-input"{{ ro }}>{{ rg('thick_k_factor', canManagePricing) }}</td>
+      <td class="rule-cell">{{ r.base_mm }} mm price per SQM × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="{{ v.k }}" placeholder="e.g. {{ v.g.k }}" aria-label="{{ r.cbm_from }} mm and above: {{ r.base_mm }} mm price per SQM times" class="rule-input"{{ ro }}>{{ rg('thick_k_factor', canManagePricing) }}</td>
       <td class="num" data-rule-example>{{ v.kExample }}</td>
     </tr>
   </table>

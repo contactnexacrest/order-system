@@ -41,7 +41,7 @@ final class LineUnits
         'KG' => ['KG', 'KGS'],
     ];
 
-    private const LABELS = ['CBM' => 'CBM', 'M2' => 'm²', 'SQFT' => 'sq ft', 'PCS' => 'piece', 'RMT' => 'running metre', 'TON' => 'Ton', 'KG' => 'kg'];
+    private const LABELS = ['CBM' => 'CBM', 'M2' => 'SQM', 'SQFT' => 'SQFT', 'PCS' => 'piece', 'RMT' => 'running metre', 'TON' => 'Ton', 'KG' => 'kg'];
 
     /** The size fields of a line, in the order they are asked for. */
     public const SIZE_FIELDS = ['piece_length_cm' => 'length', 'piece_width_cm' => 'width', 'piece_thickness_cm' => 'thickness'];

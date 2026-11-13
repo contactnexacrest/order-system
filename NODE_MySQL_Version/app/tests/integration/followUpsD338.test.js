@@ -151,7 +151,7 @@ test('1b: a duplicate copies Annexure A but not Annexure B', async () => {
 
 test('1c: the message follows the line unit', () => {
   expect(orderLinePricing.annexureSizeMessage(3, 'CBM')).toBe('Line 3 says "As per annexure", so its size is not known — type the price per CBM for this line.');
-  expect(orderLinePricing.annexureSizeMessage(4, 'SQM')).toBe('Line 4 says "As per annexure", so its size is not known — type the price per m² for this line.');
+  expect(orderLinePricing.annexureSizeMessage(4, 'SQM')).toBe('Line 4 says "As per annexure", so its size is not known — type the price per SQM for this line.');
   expect(orderLinePricing.annexureSizeMessage(1, 'PCS')).toBe('Line 1 says "As per annexure", so its size is not known — type the price per piece for this line.');
   expect(orderLinePricing.annexureSizeMessage(2, '')).toBe('Line 2 says "As per annexure", so its size is not known — type the price per CBM for this line.');
 });

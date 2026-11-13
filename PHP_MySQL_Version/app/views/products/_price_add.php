@@ -50,7 +50,7 @@ $__afBaseMm = (int) $rules['base_mm'];
           <option value="<?= $__mm ?>"<?= $__mm === ThicknessPrices::CBM ? ' data-cbm="1"' : ' data-pct="' . View::e(ThicknessPrices::fmt($__afPct[$__mm] ?? 0.0)) . '"' ?>><?= View::e(ThicknessPrices::label($__mm, $__afCbmFrom)) ?></option>
         <?php endforeach; ?>
       </select></label>
-    <label>Price (₹ per m², or per CBM for <?= $__afCbmFrom ?> mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price
+    <label>Price (₹ per SQM, or per CBM for <?= $__afCbmFrom ?> mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price
       data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 4600.00"></label>
     <?php if ($__afDate !== ''): ?>
       <label>Quoted on *<input type="date" name="<?= View::e($__afDate) ?>" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
@@ -63,11 +63,11 @@ $__afBaseMm = (int) $rules['base_mm'];
       <div class="also-row<?= $__typed ? ' also-typed' : '' ?>" data-also-mm="<?= $__mm ?>"<?= $__isCbm ? ' data-cbm="1"' : ' data-pct="' . View::e(ThicknessPrices::fmt($__p)) . '"' ?>>
         <label class="also-check"><input type="checkbox" name="also[]" value="<?= $__mm ?>"<?= $__typed ? '' : ' checked' ?>>
           <b><?= View::e(ThicknessPrices::label($__mm, $__afCbmFrom)) ?></b></label>
-        <span class="also-amount"><span data-also-amount>₹<span data-also-price>…</span> <?= $__isCbm ? '/ CBM' : '/ m²' ?></span>
+        <span class="also-amount"><span data-also-amount>₹<span data-also-price>…</span> <?= $__isCbm ? '/ CBM' : '/ SQM' ?></span>
           <small class="muted" data-also-how>type the price to see it</small></span>
         <span class="also-rule">
           <?php if ($__typed): ?><span class="also-typed-note">you typed ₹<?= number_format((float) $__v['price'], 2) ?><?= !empty($__v['quoted_on']) ? ' on ' . View::e(\App\Helpers\Dates::short((string) $__v['quoted_on'])) : '' ?> — kept unless you tick</span><br><?php endif; ?>
-          <?php if ($__isCbm): ?>× <?= View::e(ThicknessPrices::fmt((float) $rules['k'])) ?> of <?= $__afBaseMm ?> mm per m²
+          <?php if ($__isCbm): ?>× <?= View::e(ThicknessPrices::fmt((float) $rules['k'])) ?> of <?= $__afBaseMm ?> mm per SQM
           <?php elseif ($__mm === $__afBaseMm): ?>base
           <?php else: ?><?= $__p < 0 ? '−' : '+' ?><?= View::e(ThicknessPrices::fmt(abs($__p))) ?> % of <?= $__afBaseMm ?> mm<?php endif; ?>
           <?php if ($__mm !== $__afBaseMm || $__isCbm): ?><span class="badge level-from level-from-<?= $__own ? 'product' : 'category' ?>"><?= $__own ? 'this product' : 'category' ?></span><?php endif; ?>

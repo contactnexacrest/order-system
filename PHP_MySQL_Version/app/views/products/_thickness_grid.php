@@ -31,10 +31,10 @@ $__money = static fn (float $v): string => number_format($v, 2);
           data-at-least-one-message="Enter at least one price."
           value="<?= $__v !== null ? View::e(number_format((float) $__v['price'], 2, '.', '')) : '' ?>"
           placeholder="<?= $__v !== null ? View::e(number_format((float) $__v['calc'], 2, '.', '')) : ($__isCbm ? 'e.g. 64000.00' : 'e.g. 1600.00') ?>"
-          aria-label="Supplier price for <?= View::e($__label) ?> (₹ <?= $__isCbm ? 'per CBM' : 'per m²' ?>)">
+          aria-label="Supplier price for <?= View::e($__label) ?> (₹ <?= $__isCbm ? 'per CBM' : 'per SQM' ?>)">
         <input type="hidden" name="how[<?= $__mm ?>]" value="<?= $__typed ? 'typed' : 'calculated' ?>">
       </td>
-      <td><?= $__isCbm ? 'per CBM' : 'per m²' ?></td>
+      <td><?= $__isCbm ? 'per CBM' : 'per SQM' ?></td>
       <td class="grid-how">
         <span class="badge <?= $__typed ? 'badge-typed' : 'badge-calculated' ?>" data-grid-badge><?= $__typed ? 'TYPED' : 'CALCULATED' ?></span>
         <small class="muted" data-grid-rule><?= View::e($__rule) ?></small>

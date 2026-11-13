@@ -75,7 +75,7 @@ async function defaultShape(product, lh, s) {
 async function shapeLabel(mm, unit, product, s) {
   if (mm !== null) {
     const rules = await thicknessPrices.rules(product, s);
-    return `₹ / ${mm === thicknessPrices.CBM ? 'CBM' : 'm²'}, ${thicknessPrices.label(mm, Number(rules.cbm_from))}`;
+    return `₹ / ${mm === thicknessPrices.CBM ? 'CBM' : 'SQM'}, ${thicknessPrices.label(mm, Number(rules.cbm_from))}`;
   }
   return `₹ / ${lineUnits.label(unit) || unit}`;
 }
@@ -336,7 +336,12 @@ async function linkSupplier(req, res) {
   if (error === null && shape.grid) {
     mm = /^\d+$/.test(mmRaw) ? Number(mmRaw) : -1;
     if (!shape.thicknesses.map((t) => Number(t.mm)).includes(mm)) error = 'For: choose the thickness the price is for.';
-    unit = mm === thicknessPrices.CBM ? 'CBM' : 'm2';
+    // D-364: per SQM or SQFT (saved as the SQM price) below "50 mm and above", per CBM from it.
+    const want = mm === thicknessPrices.CBM ? ['CBM'] : ['m2', supplierOffers.SQFT_INPUT];
+    if (error === null && !want.includes(unit)) {
+      unit = unit === '' ? want[0] : unit;
+      if (!want.includes(unit)) error = `Per: a price for ${thicknessPrices.label(mm)} is per ${mm === thicknessPrices.CBM ? 'CBM' : 'SQM or SQFT'}.`;
+    }
   } else if (error === null && !shape.units.map((u) => u.value).includes(unit)) {
     error = 'Per: choose the unit the price is for.';
   }
@@ -356,7 +361,8 @@ async function linkSupplier(req, res) {
   }
   const fresh = (await productRepository.find(id)) || product;
   const st = await supplierOffers.status(fresh);
-  flash.set(req, 'success', `Linked. ${product.name} now has ${st.usable} active supplier${st.usable === 1 ? '' : 's'} (${supplier.supplier_legal_name}, ₹${thicknessPrices.amount(price)}).`
+  flash.set(req, 'success', `Linked. ${product.name} now has ${st.usable} active supplier${st.usable === 1 ? '' : 's'} (${supplier.supplier_legal_name}, `
+    + `${unit === supplierOffers.SQFT_INPUT && supplierOffers.sqmPriced(product, !!shape.grid, mm) ? supplierOffers.typedText(price) : `₹${thicknessPrices.amount(price)}`}).`
     + ' The red "No supplier yet" badge is gone; from now on the normal rule applies — if every supplier is switched off, the product is not offered on new orders.'
     + (supplierOffers.isConfigured(fresh) ? ' The configured base price stays as it is.' : ' Configure the product to set its selling price.'));
   res.redirect('/products?status=all');

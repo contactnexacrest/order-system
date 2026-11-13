@@ -230,7 +230,7 @@ final class SurfaceFinishList
         if ($type === 'pct') {
             return [$sign . number_format(abs($v), 2) . ' %', false];
         }
-        $per = ['usd_m2' => 'USD / m²', 'usd_rm' => 'USD / running m', 'usd_container' => 'USD / container', 'usd_piece' => 'USD / piece', 'usd_kg' => 'USD / kg', 'usd_set' => 'USD / set'][$type] ?? 'USD';
+        $per = ['usd_m2' => 'USD / SQM', 'usd_rm' => 'USD / running m', 'usd_container' => 'USD / container', 'usd_piece' => 'USD / piece', 'usd_kg' => 'USD / kg', 'usd_set' => 'USD / set'][$type] ?? 'USD';
         return [$sign . number_format(abs($v), 2) . ' ' . $per, false];
     }
 

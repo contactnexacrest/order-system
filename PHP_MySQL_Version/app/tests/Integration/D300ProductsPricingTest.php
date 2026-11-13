@@ -181,8 +181,8 @@ final class D300ProductsPricingTest extends DbTestCase
         self::assertSame([2890.0, 'calculated'], [$done['values'][40]['price'], $done['values'][40]['how']]);
         self::assertSame(68000.0, $done['values'][0]['price']);
         $history = array_map(static fn ($h) => $h['what'] . ': ' . $h['old_value'] . ' → ' . $h['new_value'], ThicknessPrices::historyFor((int) $row['id']));
-        self::assertContains('20 mm per m²: 1600.00 typed → 1700.00 typed', $history);
-        self::assertContains('40 mm per m²: 2720.00 calculated → 2890.00 calculated', $history);
+        self::assertContains('20 mm per SQM: 1600.00 typed → 1700.00 typed', $history);
+        self::assertContains('40 mm per SQM: 2720.00 calculated → 2890.00 calculated', $history);
         // Every box empty or 0 is refused.
         $_POST = $base + ['price' => [20 => '', 30 => '0'], 'how' => [20 => 'typed', 30 => 'typed']];
         $this->render(fn () => (new PricingController())->savePrice(['supplierId' => (string) $row['id']]));

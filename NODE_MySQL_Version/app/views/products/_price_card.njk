@@ -34,7 +34,7 @@
     {% if card.parts %}₹{{ card.parts.total | money }} per {{ card.unit_label }} · {{ card.base_label }}
       {% if card.build and canSeeBuild %}→ USD {{ card.build.cost | money }} at ₹{{ card.fx }} · minimum ({{ card.margin }} % margin) USD {{ card.build.minimum | money }} · quote (+{{ card.buffer }} %) USD {{ card.build.staff_quote | money }}{% endif %}
     {% else %}the base ({{ card.base_label }}) has no price yet — an order line without a thickness goes to the MD.{% endif %}</p>
-  {% if card.cha_per_cbm !== null %}<p class="small muted">CHA + transport ₹{{ card.cha_per_container | money }} per container ÷ {{ card.fits_cbm }} CBM = ₹{{ card.cha_per_cbm | money }} per CBM (per m² = per CBM × the thickness).</p>{% endif %}
+  {% if card.cha_per_cbm !== null %}<p class="small muted">CHA + transport ₹{{ card.cha_per_container | money }} per container ÷ {{ card.fits_cbm }} CBM = ₹{{ card.cha_per_cbm | money }} per CBM (per SQM = per CBM × the thickness).</p>{% endif %}
   <p class="small muted">The base is what a new order line without a thickness (or {{ rules.cbm_from }} mm and above) uses. You choose it — the app never swaps it for a calculated price.{% if card.auto %} This price was saved before 12 Nov 2026: a thickness without its own price is still worked out each time, until you add a price below.{% endif %}</p>
   <div class="price-card-actions">
     {% if canRecord %}

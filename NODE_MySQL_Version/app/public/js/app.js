@@ -777,7 +777,7 @@
     CBM: ['CBM', 'M3', 'M³', 'CUM', 'CU M'], M2: ['M2', 'M²', 'SQM', 'SQ M', 'SQMT'], SQFT: ['SQFT', 'SQ FT', 'SFT', 'FT2'],
     PCS: ['PCS', 'PC', 'PIECE', 'PIECES', 'NOS', 'NO'], RMT: ['RMT', 'RM', 'LM'], TON: ['TON', 'TONS', 'TONNE', 'MT', 'T'], KG: ['KG', 'KGS']
   };
-  var UNIT_LABELS = { CBM: 'CBM', M2: 'm²', SQFT: 'sq ft', PCS: 'piece', RMT: 'running metre', TON: 'Ton', KG: 'kg' };
+  var UNIT_LABELS = { CBM: 'CBM', M2: 'SQM', SQFT: 'SQFT', PCS: 'piece', RMT: 'running metre', TON: 'Ton', KG: 'kg' };
   var SIZE_NEEDS = { M2: ['thickness'], SQFT: ['thickness'], PCS: ['length', 'width', 'thickness'], RMT: ['width', 'thickness'] };
   function unitKind(u) {
     u = String(u || '').trim().toUpperCase();
@@ -1091,7 +1091,7 @@
           var how;
           if (cbm) {
             v = round2(base * k);
-            how = '= ' + baseMm + ' mm price ₹' + amount(base) + ' per m² × ' + fmt(k) + (from !== baseMm ? ' (' + baseMm + ' mm = ' + back + ')' : '');
+            how = '= ' + baseMm + ' mm price ₹' + amount(base) + ' per SQM × ' + fmt(k) + (from !== baseMm ? ' (' + baseMm + ' mm = ' + back + ')' : '');
           } else {
             v = round2(base * (1 + pct / 100));
             how = '= ' + root + (mm === baseMm ? '' : ' ' + (pct < 0 ? '− ' : '+ ') + fmt(Math.abs(pct)) + ' %');
@@ -1212,7 +1212,7 @@
           var cell = row.querySelector('[data-rule-example]');
           var pct = input ? parseFloat(input.value) : 0;
           if (isNaN(pct)) pct = 0;
-          if (cell) cell.textContent = fmt(ex * (1 + pct / 100)) + ' / m²';
+          if (cell) cell.textContent = fmt(ex * (1 + pct / 100)) + ' / SQM';
         });
         var kRow = form.querySelector('[data-rule-cbm]');
         if (kRow) {
@@ -2248,6 +2248,7 @@
       var price = form.querySelector('[data-edit-price-input]');
       var sel = form.querySelector('[data-edit-price-thickness]');
       var unit = form.querySelector('[data-edit-price-unit]');
+      var unitSel = form.querySelector('[data-edit-price-unit-select]'); // D-364: SQM / SQFT / CBM
       var change = form.querySelector('[data-edit-price-change]');
       var selling = form.querySelector('[data-edit-price-selling]');
       var err = form.querySelector('[data-edit-price-error]');
@@ -2262,6 +2263,7 @@
         var p = new URLSearchParams();
         p.set('price', (price.value || '').replace(/,/g, '').trim());
         if (sel) p.set('thickness_mm', sel.value);
+        if (unitSel) p.set('unit', unitSel.value);
         form.querySelectorAll('[data-edit-price-own]').forEach(function (inp) {
           var row = inp.closest('[data-edit-price-row]');
           if (inp.value.trim() !== '' && row && !row.classList.contains('edit-price-from')) p.set(inp.name, inp.value.replace(/,/g, '').trim());
@@ -2323,6 +2325,7 @@
         timer = setTimeout(refresh, 250);
       }
       price.addEventListener('input', later);
+      if (unitSel) unitSel.addEventListener('change', refresh);
       if (sel) {
         sel.addEventListener('change', function () {
           var opt = sel.options[sel.selectedIndex];
@@ -2504,7 +2507,9 @@
         if (!s || !s.grid) return;
         var opt = thick.options[thick.selectedIndex];
         var want = opt ? opt.getAttribute('data-unit') : '';
-        if (want) unit.value = want;
+        // D-364: SQFT is a way to type a price per SQM, so it stays when the thickness is per SQM.
+        if (want && !(want === 'm2' && unit.value === 'SQFT')) unit.value = want;
+        unit.dispatchEvent(new Event('input'));
       }
       function fill() {
         var s = shape();
@@ -2526,7 +2531,10 @@
         } else {
           option(thick, 'none', 'No thickness: one price', true);
         }
-        s.units.forEach(function (u, i) { option(unit, u.value, u.label, keepUnit !== '' ? u.value === keepUnit : i === 0); });
+        s.units.forEach(function (u, i) {
+          var o = option(unit, u.value, u.label, keepUnit !== '' ? u.value === keepUnit : i === 0);
+          if (u.sqft) o.setAttribute('data-sqft', '1'); // D-364: typed per SQFT, saved as the SQM price
+        });
         if (unit.selectedIndex < 0 && unit.options.length) unit.options[0].selected = true;
         syncUnit();
         oldThick = '';
@@ -2565,14 +2573,88 @@
         if (!s || !s.grid) return;
         // A price per CBM is for 50 mm and above; per m² for a thinner slab.
         var opt = thick.options[thick.selectedIndex];
-        if (opt && opt.getAttribute('data-unit') !== unit.value) {
+        var per = unit.value === 'SQFT' ? 'm2' : unit.value; // D-364: SQFT is a price per SQM
+        if (opt && opt.getAttribute('data-unit') !== per) {
           for (var i = 0; i < thick.options.length; i++) {
-            if (thick.options[i].getAttribute('data-unit') === unit.value) { thick.selectedIndex = i; break; }
+            if (thick.options[i].getAttribute('data-unit') === per) { thick.selectedIndex = i; break; }
           }
         }
       });
       fill();
       showProduct();
+    });
+  }
+
+  // D-364 (13 Nov 2026, mockup sqm_sqft_mockup): a supplier price per SQM may be typed per SQFT.
+  // select[data-sqft-unit]: when its chosen option has data-sqft, the form's [data-sqft-note] shows
+  // the conversion live under the fields — "₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639) — saved as
+  // the SQM price" (the server converts the same way: SupplierOffers::sqftToSqm / supplierOffers.sqftToSqm).
+  // select[data-sqft-thickness] (options with data-unit "CBM" or "SQM"): a "50 mm and above"
+  // thickness is per CBM, a thinner one per SQM or SQFT — the unit follows the thickness and back.
+  var SQFT_PER_SQM = 10.7639;
+  function initSqftNote() {
+    document.querySelectorAll('select[data-sqft-unit]').forEach(function (unit) {
+      var form = unit.form;
+      if (!form) return;
+      var price = form.querySelector('input[name="price"]');
+      var note = form.querySelector('[data-sqft-note]');
+      var thick = form.querySelector('select[data-sqft-thickness]');
+      function rupees(v) {
+        var n = Math.round(v * 100) / 100;
+        return '₹' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+      }
+      function show() {
+        if (!note || !price) return;
+        var opt = unit.options[unit.selectedIndex];
+        var v = Number(String(price.value || '').replace(/,/g, '').trim());
+        note.textContent = '';
+        if (!opt || !opt.hasAttribute('data-sqft') || !(v > 0)) { note.hidden = true; return; }
+        var b = document.createElement('strong');
+        b.textContent = rupees(Math.round(v * SQFT_PER_SQM * 100) / 100) + ' / SQM';
+        note.appendChild(document.createTextNode(rupees(v) + ' / SQFT = '));
+        note.appendChild(b);
+        note.appendChild(document.createTextNode(' (× ' + SQFT_PER_SQM + ') — saved as the SQM price'));
+        note.hidden = false;
+      }
+      function isCbm(sel) {
+        var o = sel && sel.options[sel.selectedIndex];
+        return !!o && o.getAttribute('data-unit') === 'CBM';
+      }
+      function pick(value) {
+        for (var i = 0; i < unit.options.length; i++) {
+          if (unit.options[i].value === value || (value === 'SQM' && !unit.options[i].hasAttribute('data-sqft') && unit.options[i].value !== 'CBM' && unit.options[i].value !== '')) { unit.selectedIndex = i; return; }
+        }
+      }
+      if (thick) {
+        // The thickness sets the unit (CBM for "50 mm and above", else SQM unless SQFT is chosen)…
+        var follow = function () {
+          var cbm = isCbm(thick);
+          var before = unit.value;
+          if (cbm && unit.value !== 'CBM') pick('CBM');
+          if (!cbm && (unit.value === 'CBM' || unit.value === '')) pick('SQM');
+          if (unit.value !== before) unit.dispatchEvent(new Event('change'));
+        };
+        // …and a unit chosen by hand moves the thickness: CBM → "50 mm and above"; SQM / SQFT → the
+        // base slab thickness (option data-base, or marked "(base)"), else the first slab thickness.
+        unit.addEventListener('change', function () {
+          var wantCbm = unit.value === 'CBM';
+          if (unit.value === '' || isCbm(thick) === wantCbm) return;
+          var first = -1;
+          for (var i = 0; i < thick.options.length; i++) {
+            var o = thick.options[i];
+            if (o.value === '' || (o.getAttribute('data-unit') === 'CBM') !== wantCbm) continue;
+            if (first < 0) first = i;
+            if (o.hasAttribute('data-base') || /\(base\)/.test(o.textContent)) { first = i; break; }
+          }
+          if (first >= 0) { thick.selectedIndex = first; thick.dispatchEvent(new Event('change')); }
+        });
+        thick.addEventListener('change', follow);
+        follow();
+      }
+      unit.addEventListener('change', show);
+      unit.addEventListener('input', show);
+      if (price) price.addEventListener('input', show);
+      show();
     });
   }
 
@@ -2641,6 +2723,7 @@
     initAnnexureLine(); // D-336
     initLinePieces(); // D-339
     initThicknessCalc(); // D-335
+    initSqftNote(); // D-364
     initSupplierPick();
     initRulesExample();
     initSectionMenus(); // D-320

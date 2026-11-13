@@ -61,7 +61,7 @@ final class PricingService
         'weight_t_per_cbm' => 'Weight, tonnes per CBM',
         'container_max_t' => 'Container max tonnes',
         'container_cbm' => 'Container CBM',
-        'thick_k_factor' => 'Thickness factor (50 mm and above per CBM = base per m² × this)',
+        'thick_k_factor' => 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
     ];
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -605,7 +605,7 @@ final class PricingService
             'detail' => count($offered) . ' specification' . (count($offered) === 1 ? '' : 's'),
             'link' => "/products/{$id}/specifications", 'link_text' => 'View'];
         $stale = [];
-        foreach (['m²/unit' => $unit, 'CBM' => $needsCbm ? $cbm : null] as $label => $s) {
+        foreach (['SQM/unit' => $unit, 'CBM' => $needsCbm ? $cbm : null] as $label => $s) {
             if ($s !== null && ($st = self::staleness($s, $settings['stale_days'])) !== null) {
                 $stale[] = "{$label} price {$st}";
             }

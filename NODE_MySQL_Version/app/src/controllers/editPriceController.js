@@ -106,10 +106,14 @@ async function form(req, res) {
     todayLine: `${base ? `${amt(base.inr)} ${base.label}` : 'no price yet'}${row.quoted_on ? `, quoted ${longDate(ymdOf(row.quoted_on))}` : ''}`,
     inactive: !supplierOffers.usable(row),
     unitLabel: (row.price_basis || '') === 'cbm' ? 'CBM' : (lineUnits.label(String(product.reference_unit || '')) || String(product.reference_unit || '') || 'unit'),
-    fromUnit: fromMm === thicknessPrices.CBM ? 'CBM' : 'm²',
+    fromUnit: fromMm === thicknessPrices.CBM ? 'CBM' : 'SQM',
+    // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+    gridUnit: fromMm === thicknessPrices.CBM ? 'CBM' : (['m2', 'SQFT'].includes(String(old.unit ?? '')) ? String(old.unit) : 'm2'),
+    sqmUnit: !grid && supplierOffers.sqmPriced(product, false, null, String(row.price_basis || 'unit')) ? String(product.reference_unit) : null,
+    oldUnit: String(old.unit ?? ''),
     thicknesses: grid ? supplierOffers.formThicknesses(rules, row).map((mm) => ({
-      mm, label: thicknessPrices.label(mm, Number(rules.cbm_from)), unit: mm === thicknessPrices.CBM ? 'CBM' : 'm²',
-      selected: Number(isSet(old.thickness_mm) ? old.thickness_mm : fromMm) === mm, isBase: mm === fromMm,
+      mm, label: thicknessPrices.label(mm, Number(rules.cbm_from)), unit: mm === thicknessPrices.CBM ? 'CBM' : 'SQM',
+      selected: Number(isSet(old.thickness_mm) ? old.thickness_mm : fromMm) === mm, isBase: mm === fromMm, isRuleBase: mm === Number(rules.base_mm),
     })) : [],
     lines: preview.lines.map((l) => ({
       ...l, newText: isSet(l.price) ? `${amt(l.price)} / ${l.unit}` : '—', wasText: isSet(l.was) ? amt(l.was) : '—',
@@ -149,7 +153,12 @@ async function preview(req, res) {
       if (p !== null && p > 0 && /^\d+$/.test(k)) own[Number(k)] = p;
     }
   }
-  const out = await supplierOffers.preview(product, row, mm, price, own);
+  // D-364: a price typed per SQFT is previewed as the SQM price it is saved as.
+  const grid = (row.price_basis || '') === 'grid';
+  const inp = supplierOffers.fromSqft({ price, unit: String(q.unit ?? ''), mm: mm ?? (grid ? thicknessPrices.baseOf(row, await thicknessPrices.rules(product)) : null) },
+    product, grid, String(row.price_basis || 'unit'));
+  const out = await supplierOffers.preview(product, row, mm, Number(inp.price), own);
+  out.typed = isSet(inp.typed_sqft) ? supplierOffers.typedText(inp.typed_sqft) : null;
   if (!can(req, 'view_price_buildup')) out.selling = null; // Procurement sees supplier prices only, never selling prices.
   res.json(out);
 }
@@ -173,6 +182,11 @@ function read(body, rules, row, grid) {
       own[Number(k)] = p;
     }
   }
+  // D-364: "per" — SQM or SQFT for a price per SQM (SQFT is saved as the SQM price), else the price's own unit.
+  const unit = String(body.unit ?? '').trim();
+  if (unit === supplierOffers.SQFT_INPUT && !supplierOffers.sqmPriced({ reference_unit: row._reference_unit ?? null }, grid, fromMm, String(row.price_basis || 'unit'))) {
+    return [{}, 'Per: SQFT is only for a price per SQM — choose the unit the price is per.'];
+  }
   const okDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && ymdOf(new Date(`${v}T00:00:00`)) === v;
   const q = String(body.quoted_on ?? '').trim();
   if (!okDate(q)) return [{}, 'Quoted on: enter the date the supplier quoted this price.'];
@@ -191,7 +205,7 @@ function read(body, rules, row, grid) {
   // The hidden "0" and the ticked "1" arrive as a list when ticked (PHP keeps the last one).
   const incl = String([].concat(body.includes_packing_loading ?? '0').pop()) === '1';
   return [{
-    price, from_mm: fromMm, own, quoted_on: q, valid_until: v, cha: chaRaw !== '' ? Number(chaRaw) : null, includes_packing_loading: incl, notes,
+    price, unit, from_mm: fromMm, own, quoted_on: q, valid_until: v, cha: chaRaw !== '' ? Number(chaRaw) : null, includes_packing_loading: incl, notes,
   }, null];
 }
 
@@ -208,7 +222,7 @@ async function save(req, res) {
   const rules = await thicknessPrices.rules(product);
   const grid = (row.price_basis || '') === 'grid';
   const body = req.body || {};
-  const [inp, error] = read(body, rules, row, grid);
+  const [inp, error] = read(body, rules, { ...row, _reference_unit: product.reference_unit ?? null }, grid);
   if (error) {
     flash.set(req, 'error', error);
     flash.setOld(req, body);

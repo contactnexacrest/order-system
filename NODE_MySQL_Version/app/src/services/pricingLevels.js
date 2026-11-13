@@ -25,7 +25,7 @@ const PHYSICAL = {
   weight_t_per_cbm: 'Weight (t per CBM)',
   container_cbm: 'Container (CBM)',
   container_max_t: 'Container max (t)',
-  thick_k_factor: 'Thickness factor (50 mm and above = base per m² × K)',
+  thick_k_factor: 'Thickness factor (50 mm and above = base per SQM × K)',
 };
 
 /** The product's own pricing values that "Reset all" clears. */

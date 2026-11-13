@@ -71,7 +71,8 @@ check found unless it passed.
 
 ## 6. Supplier performance
 
-**Procurement & suppliers › Supplier performance** shows, for each supplier: quotes
+**Procurement & suppliers › Supplier performance** (also the **Supplier performance** button next to the Status filter on
+the Procurement page) shows, for each supplier: quotes
 given, awards won, receipts, how many came by the needed-by date, and how
 many failed the quality check. The link shows only to people with **Manage
 purchasing**, the permission the page needs.
@@ -79,7 +80,7 @@ purchasing**, the permission the page needs.
 ## 6a. Suppliers: the products they offer and their prices (D-360, 13 Nov 2026)
 
 **Procurement & suppliers › Suppliers** lists every supplier with, under it, the products it offers: the base price
-it quoted (₹ per m² or per CBM at the base thickness, or per unit), **Quoted on · valid until**, an **Offer active**
+it quoted (₹ per SQM or per CBM at the base thickness, or per unit), **Quoted on · valid until**, an **Offer active**
 switch and **Edit price**. You need *Manage suppliers*; to see prices, *View purchase prices*; to switch offers, add
 products and edit prices, the right to record supplier prices (Procurement, MD).
 
@@ -95,8 +96,11 @@ products and edit prices, the right to record supplier prices (Procurement, MD).
   1. **Product** — pick it from the list (products that have no supplier yet come first and are marked "no supplier
      yet"), or click **create a new product** and enter its **Name** (must be new), **Category** and, if you know it,
      **HS code** (empty = the category's code).
-  2. **Base thickness**, **Price ₹** and **per** (m² for a slab thickness, CBM for 50 mm and above; for a product
+  2. **Base thickness**, **Price ₹** and **per** (SQM or SQFT for a slab thickness — a price per SQFT is saved as the SQM price — CBM for 50 mm and above; for a product
      without thicknesses, per its unit or per CBM). The other thicknesses are worked out by the category's price rules.
+     If the supplier quoted per square foot, choose **SQFT** and type that price: the line under the fields shows it
+     per SQM ("₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639) — saved as the SQM price"); it is saved per SQM and the notes
+     keep "typed ₹185 / SQFT" (D-364).
   3. **Quoted on** (not in the future) and **Valid until** if the supplier gave one. **Save**.
   You return to where you started with a green message; the offer is switched on. A product created here starts
   **Inactive** and not configured — it is not offered on quotations until it is configured on Products.

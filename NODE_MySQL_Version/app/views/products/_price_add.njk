@@ -22,7 +22,7 @@
           <option value="{{ o.mm }}"{% if o.cbm %} data-cbm="1"{% else %} data-pct="{{ o.pct }}"{% endif %}>{{ o.label }}</option>
         {% endfor %}
       </select></label>
-    <label>Price (₹ per m², or per CBM for {{ av.cbmFrom }} mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price
+    <label>Price (₹ per SQM, or per CBM for {{ av.cbmFrom }} mm and above) *<input type="text" inputmode="decimal" name="thickness_price" required data-calc-price
       data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 4600.00"></label>
     {% if afDate %}
       <label>Quoted on *<input type="date" name="{{ afDate }}" required max="{{ today }}" value="{{ today }}"></label>

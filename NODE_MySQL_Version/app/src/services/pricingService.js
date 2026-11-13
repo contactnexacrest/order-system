@@ -56,7 +56,7 @@ const LABELS = {
   weight_t_per_cbm: 'Weight, tonnes per CBM',
   container_max_t: 'Container max tonnes',
   container_cbm: 'Container CBM',
-  thick_k_factor: 'Thickness factor (50 mm and above per CBM = base per m² × this)',
+  thick_k_factor: 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -542,7 +542,7 @@ async function readiness(product, s = null) {
     link: `/products/${id}/specifications`, link_text: 'View',
   });
   const stale = [];
-  for (const [label, sup] of [['m²/unit', unit], ['CBM', needsCbm ? cbm : null]]) {
+  for (const [label, sup] of [['SQM/unit', unit], ['CBM', needsCbm ? cbm : null]]) {
     if (sup === null) continue;
     const st = staleness(sup, s.stale_days);
     if (st !== null) stale.push(`${label} price ${st}`);

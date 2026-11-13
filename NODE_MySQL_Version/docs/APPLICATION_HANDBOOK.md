@@ -687,7 +687,7 @@ One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/asset
 | Function | What it does |
 |---|---|
 | `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
-| `fieldError(el)` | D-348: a `required` drop-down still on its empty "Choose…" option with `data-required-message` shows that message (an order line's Thickness and Size / format). D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; m² / sq ft thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
+| `fieldError(el)` | D-348: a `required` drop-down still on its empty "Choose…" option with `data-required-message` shows that message (an order line's Thickness and Size / format). D-270: `data-piece-size="length|width|thickness"` on an order line's size fields — needed when the line's unit must be converted to the product's reference unit (PCS all three; RMT width and thickness; SQM / SQFT thickness unless the Thickness option gives it): "Enter the length — needed to compare a price per piece."; `data-allowed-goods-only` on a category option applies its unit list to goods lines only. The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
 | `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
 | `initReasonFieldValidation()` | Reason fields need meaningful text (10 characters, or the field's own `minlength`). By default a grey "Must be at least 10 characters." hint shows under the field from the start; a field with `data-reason-hint="on-error"` (compact inline boxes, e.g. Reject / Cancel Send on Email Send Approvals, D-269) shows no hint and only the red error ("Reason must be at least 10 characters (n so far).") on blur or submit. |
 | `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
@@ -1368,7 +1368,7 @@ refused at approval if the rule was withdrawn in between.
 | Procurement Director, MD, ED | no limit |
 | Any manager-level designation with no limit set | ₹0 (waits — nobody self-approves on an unknown limit) |
 
-Example: a Procurement Manager awards a quote of 2,000 m² × ₹300 + 18% GST =
+Example: a Procurement Manager awards a quote of 2,000 SQM × ₹300 + 18% GST =
 ₹7,08,000. That is above ₹5,00,000, so it waits for a holder of
 `approve_purchases` whose own limit covers it (Director or MD/ED).
 
@@ -1851,7 +1851,7 @@ converted into the product's reference unit (`LineUnits` / `lineUnits.js`):
 | Line unit | Needs | Converted to the reference (per CBM) |
 |---|---|---|
 | CBM | — | same unit |
-| m² (SQM) / sq ft (SQFT) | thickness | 1 m² × thickness; 1 m² = 10.7639 sq ft (no thickness needed between the two) |
+| SQM / SQFT | thickness | 1 SQM × thickness; 1 SQM = 10.7639 SQFT (no thickness needed between the two) |
 | PCS (also NOS) | length, width, thickness | one piece = L × W × T |
 | RMT | width, thickness | 1 m × W × T |
 | Ton (TON, MT) / kg | — | weight per CBM: `product_categories.weight_t_per_cbm` (Natural Stone 2.7), product override `catalog_products.weight_t_per_cbm` |
@@ -2549,7 +2549,7 @@ the same filters, counts, fields, actions and money rules on both templates
   - Category **Natural Stone** is fixed; others may have up to 6 attributes
     (e.g. Size, Grade, Colour); empty attributes print "To Be Confirmed" (D-215).
   - An inactive category stays on existing lines.
-  - Specifications per category with options worth a %, USD per m², USD per
+  - Specifications per category with options worth a %, USD per SQM, USD per
     running metre, USD per container, or a quantity % applied last
     (D-255). Base option changes nothing; a 0 option reads "Included in base
     price" (D-256).
@@ -3551,7 +3551,7 @@ A product category has specifications (Grade, Thickness, Finish, Size, Edge, Qua
 
 1. **% options** multiply the cost, one after another (e.g. Standard −8 %, 30 mm +35 %).
 2. **Fixed USD amounts** are added:
-   - USD per m²: added. On a CBM price it is converted: USD per m² × 1000 ÷ thickness (mm).
+   - USD per SQM: added. On a CBM price it is converted: USD per SQM × 1000 ÷ thickness (mm).
    - USD per running metre: added only if the product is sold per running metre (unit RM, RMT, LM …); otherwise listed as "charged separately".
    - USD per piece / per kg / per set (D-257 Phase 0B): added only if the product's selling unit matches (PCS/NOS, KG, SET); otherwise "charged separately".
    - USD per container: never in the unit price; always "charged separately".
@@ -3574,21 +3574,21 @@ Owner decision D-357 (12 Nov 2026, owner confirm 1 + confirm 2; mockup approved)
 - **Switched off in Settings** → the linked options are switched off, so the finish leaves Pick from Products (saved lines keep it, shown as "no longer offered").
 - **Renamed in Settings** (on save) → the linked options are renamed, and `order_products.finish` changes on lines of orders whose first Quotation is not approved yet (`orders.prices_fixed_at IS NULL`, the D-342 rule) whose finish is exactly the old name. Orders with an approved Quotation or later, and every `documents` row and issued file, keep the old name. Audit: `DROPDOWN_OPTION_UPDATED`, `SURFACE_FINISH_RENAMED` (with the counts) and one `ORDER_LINE_FINISH_RENAMED` per line. The page shows: "Saved. "Polished" is now "Natural Polish" everywhere: Pick from Products, Pricing › Specifications, and N lines on M draft orders (quotation not yet approved)." and "Not changed: K orders with an approved quotation or later, and every document already issued — they keep "Polished"."
 - A finish name is at most 80 characters and appears once in the list (any letter case); otherwise nothing is saved.
-- The Settings list shows "Used in: Pick from Products …, order lines, the Supplier PO, the buyer's quotation form and every document" and a read-only column "Price change (from Pricing › Specifications)" (base price / +1.00 USD / m² / no price change yet), one entry per category when more than one category has the specification.
+- The Settings list shows "Used in: Pick from Products …, order lines, the Supplier PO, the buyer's quotation form and every document" and a read-only column "Price change (from Pricing › Specifications)" (base price / +1.00 USD / SQM / no price change yet), one entry per category when more than one category has the specification.
 - **Order lines.** A line picked from Products takes its finish from its Surface finish option every time it is saved (`OrderLinePricing::saveSelection()` and the line update call `SurfaceFinishList::applyToLine()`); the "More › finish" box is hidden for such a line (New Order form and order page line panel; the picker data carries `finish: true` on the linked specification). A line typed by hand keeps the box, fed from the same Settings list.
 - **A product's own option** on the Surface finish specification must be a Settings name (it is linked to that row); the product page points to Settings instead of offering a free-text option there.
-- **Merge on a live site:** `docs/migrations/2026-11-12j-surface-finish-one-list.sql` (see `docs/migrations/README.md`; it also handles a base finish renamed "Mirror Finish"). Seed: Natural Polish (base, default) 1, Honed +1.00 2, Flamed +2.00 3, Sandblasted +3.00 4, Leather +4.00 5, Brushed +4.50 6, Rock-Pitched 7 and Bush-Hammered 8 (no price change), all USD per m².
+- **Merge on a live site:** `docs/migrations/2026-11-12j-surface-finish-one-list.sql` (see `docs/migrations/README.md`; it also handles a base finish renamed "Mirror Finish"). Seed: Natural Polish (base, default) 1, Honed +1.00 2, Flamed +2.00 3, Sandblasted +3.00 4, Leather +4.00 5, Brushed +4.50 6, Rock-Pitched 7 and Bush-Hammered 8 (no price change), all USD per SQM.
 
 #### CBM at 50 mm and above
 
 From **50 mm** (setting `cbm_from_mm`, default 50; a product may set its own `cbm_from_mm`) the price is **per CBM** and starts from the product's separate **per-CBM supplier price** (`price_basis = 'cbm'`, `is_cbm_primary = 1`). On a CBM price:
 
 - thickness % options no longer apply;
-- per-m² amounts are converted ×1000 ÷ thickness;
+- per-SQM amounts are converted ×1000 ÷ thickness;
 - no per-CBM supplier price, or an unlisted thickness of 50 mm or more → **manual price** (staff price it by hand);
 - an order line of 50 mm or more must have unit **CBM**, or the save is refused.
 
-**Worked example 2 (CBM).** ₹53,300 per CBM, 80 mm, Standard −8 %, Leather +USD 4.00 per m², 2–4 containers −2 %, other settings as in example 1.
+**Worked example 2 (CBM).** ₹53,300 per CBM, 80 mm, Standard −8 %, Leather +USD 4.00 per SQM, 2–4 containers −2 %, other settings as in example 1.
 
 | Step | Working | USD |
 |---|---|---|
@@ -3601,11 +3601,11 @@ From **50 mm** (setting `cbm_from_mm`, default 50; a product may set its own `cb
 | Staff quote | × 1.03 | **861.57** per CBM |
 | Associate Level 2 | floor ÷ 0.95; quote × 1.03 | 880.50 / 906.92 |
 
-**SOP 27's per-CBM figures (quote USD 904.56, lowest USD 878.21) are also correct**, for different inputs that SOP 27 does not spell out. They are the **associate's** quote and lowest price at Level 2 (5 %), for a product with **other costs 0 %**, options Standard · 80 mm · Leather and **no quantity option** (test `D255PriceRequestsTest` / `d255PriceRequests.test.js`, mockup mock9/t1). Recomputed with `PricingEngine::build()`: 53,300 ÷ 82 = 650.00 → × 0.92 = 598.00 → + 50.00 = cost **648.00** → minimum 810.00 → reserve 24.30 → staff floor 834.30 (staff quote 859.33) → associate floor 834.30 ÷ 0.95 = **878.21** → associate quote × 1.03 = **904.56** per CBM (≈ USD 72.36 per m² at 80 mm). The USD 861.57 above is the **staff** quote with other costs 2.5 % and the 2–4 containers option. SOP 27 should name its inputs (doc fix, §14.5).
+**SOP 27's per-CBM figures (quote USD 904.56, lowest USD 878.21) are also correct**, for different inputs that SOP 27 does not spell out. They are the **associate's** quote and lowest price at Level 2 (5 %), for a product with **other costs 0 %**, options Standard · 80 mm · Leather and **no quantity option** (test `D255PriceRequestsTest` / `d255PriceRequests.test.js`, mockup mock9/t1). Recomputed with `PricingEngine::build()`: 53,300 ÷ 82 = 650.00 → × 0.92 = 598.00 → + 50.00 = cost **648.00** → minimum 810.00 → reserve 24.30 → staff floor 834.30 (staff quote 859.33) → associate floor 834.30 ÷ 0.95 = **878.21** → associate quote × 1.03 = **904.56** per CBM (≈ USD 72.36 per SQM at 80 mm). The USD 861.57 above is the **staff** quote with other costs 2.5 % and the 2–4 containers option. SOP 27 should name its inputs (doc fix, §14.5).
 
 #### Exact supplier prices (D-256)
 
-A supplier may quote one figure for a combination ("30 mm leather, ₹4,900 per m²"). Procurement records it as `price_basis = 'combo'` and names an option for some specifications ("any" for the rest). `PricingService::exactPrice()`:
+A supplier may quote one figure for a combination ("30 mm leather, ₹4,900 per SQM"). Procurement records it as `price_basis = 'combo'` and names an option for some specifications ("any" for the rest). `PricingService::exactPrice()`:
 
 - uses it **as it is** for the options it names; the other options still apply;
 - the row naming **the most options** wins; on a tie, the **most recently quoted**;
@@ -3629,10 +3629,10 @@ A supplier price is **expired** after its `valid_until` date, and **stale** when
 #### Products and pricing, 11 Nov 2026 (D-300 to D-306)
 
 **Thickness prices (D-300).** A supplier-price row with `price_basis = 'grid'` holds every thickness: the
-category's Thickness options below `cbm_from_mm` (20 mm base, 15/18/30/40 mm with their %) per m², and
+category's Thickness options below `cbm_from_mm` (20 mm base, 15/18/30/40 mm with their %) per SQM, and
 "50 mm and above" per CBM. Before D-335 (below) only TYPED prices were stored, in `catalog_supplier_thickness_prices`
 (`thickness_mm` 0 = 50 mm+ per CBM); CALCULATED prices are worked out each time by `ThicknessPrices` /
-`thicknessPrices.js`: other thickness = base × (1 + % / 100); 50 mm+ per CBM = base per m² × K
+`thicknessPrices.js`: other thickness = base × (1 + % / 100); 50 mm+ per CBM = base per SQM × K
 (`product_categories.thick_k_factor`, product override `catalog_products.thick_k_factor`). The base is the
 typed 20 mm price, else worked back from the first typed thickness, else from the per-CBM price ÷ K.
 Saving a box at 0 / empty calculates it again; nothing typed → "Enter at least one price". A box posted as
@@ -3641,7 +3641,7 @@ Every change of a price, CHA or the packing tick is a row in `catalog_supplier_p
 old → new), shown on Products › a product › Market prices › Edit (`/products/suppliers/{id}/price`).
 
 **FOB cost.** `PricingService::fobParts()` = supplier price for the chosen thickness, converted to the
-product's unit (per CBM = per m² ÷ thickness; then `LineUnits::cbmPerUnit`), + CHA + transport per unit,
+product's unit (per CBM = per SQM ÷ thickness; then `LineUnits::cbmPerUnit`), + CHA + transport per unit,
 + the product's packing + loading costs when "Price includes packing and loading" is unticked. CHA +
 transport per container (`catalog_product_suppliers.cha_transport_per_container`, default
 `catalog_products.cha_transport_per_container`) ÷ what one container carries: `container_cbm` (8) unless
@@ -3671,9 +3671,9 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
    FOB cost (₹) incl. CHA in the thickness's own unit · Base for orders ◉ BASE, "○ make base"), then
    "Product price (from the base): ₹… per <unit> · <base> → USD … at ₹… · minimum (… % margin) USD … · quote
    (+… %) USD …" (the USD part only for `view_price_buildup`), the CHA per CBM line, **+ Add / update a
-   price** and History. The form: Thickness *, Price * (₹ per m², per CBM for 50 mm+), Quoted on *, "Also work
+   price** and History. The form: Thickness *, Price * (₹ per SQM, per CBM for 50 mm+), Quoted on *, "Also work
    out from this <X> price" — one tick box per other thickness with the result and how ("= 4,600 − 20 %",
-   "= 20 mm price ₹4,600 per m² × 40", from a non-base price the base is worked back first: CBM ÷ K, or ÷ (1 +
+   "= 20 mm price ₹4,600 per SQM × 40", from a non-base price the base is worked back first: CBM ÷ K, or ÷ (1 +
    %)) and a "change …" link to the product's price rules (`/products/{id}/edit#price-rules`); ticked by
    default only where no TYPED price exists ("you typed ₹… on … — kept unless you tick this"); Base for
    orders: keep / make this price the base. app.js `initThicknessCalc` previews; `ThicknessPrices::calcFrom`
@@ -3681,7 +3681,7 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
    `POST /products/suppliers/{id}/base` for "make base"; both `record_market_prices`). Save: upsert the typed
    thickness (`how` 'typed', `quoted_on`), upsert the ticked ones (`how` 'calculated', `calc_from_mm`), leave
    the unticked ones untouched, set the base if chosen, `auto_fill` = 0, and write history lines ("20 mm per
-   m²: — → 4,600.00 typed", "15 mm per m²: … → 3,680.00 calculated from 20 mm", "Base: … → 50 mm and above").
+   SQM: — → 4,600.00 typed", "15 mm per SQM: … → 3,680.00 calculated from 20 mm", "Base: … → 50 mm and above").
    A new supplier price (Add a price from another supplier) uses the same fields; its typed thickness is the base.
 - **Older rows** (`auto_fill` 1, saved before 12 Nov 2026) keep the old on-the-fly completion, so no price
   changed. The first "Add / update a price" stores what each untouched thickness showed as CALCULATED, then
@@ -3690,7 +3690,7 @@ prices are worked out each time" part of D-300 for every price added from 12 Nov
 - **Owner example** (product sold per CBM, base 50 mm+ typed ₹1,80,000 / CBM, CHA ₹80,000 per container of
   8.2 CBM, rate 95, margin 8 %, other 0 %, buffer 3 %): FOB ₹1,89,756.10 / CBM, supplier USD 1,894.74, cost
   USD 1,997.43, minimum USD 2,171.12, quote USD 2,236.26 (the engine rounds at the end; ≈ 2,236.25). A 20 mm
-  price of ₹4,600 typed later: 4,600 + CHA 195.12 = ₹4,795.12 per m²; the base stays ₹1,89,756.10 / CBM.
+  price of ₹4,600 typed later: 4,600 + CHA 195.12 = ₹4,795.12 per SQM; the base stays ₹1,89,756.10 / CBM.
 - **Product page (Edit product):** "Costs to FOB" — CHA + transport per container (₹, with "÷ X CBM per
   container = ₹Y per CBM") and Packing + loading per unit (₹; stored in `default_packing_cost`,
   `default_loading_cost` set empty; both still added up where read; added only when a supplier price does
@@ -3799,7 +3799,7 @@ redirects to the Options tab; the specification actions redirect there too. A pr
 - **Edit price** (`/products/suppliers/{id}/edit-price`, `record_market_prices`; mockup `edit_price_new.png`). Reached from
   an **Edit price** button on each supplier row of Products › a product › Market prices and an **Edit price** link on each
   row of the supplier page's "Prices given for products" (Cancel / close go back there, `?from=supplier`). Left: New price
-  (₹) * (big), per m² / CBM / the unit, Thickness * (a price for every thickness; default the base thickness, marked
+  (₹) * (big), per SQM / CBM / the unit, Thickness * (a price for every thickness; default the base thickness, marked
   "(base)"), "Was ₹… → now ₹… (−₹…, −… %)", Quoted on * (not in the future), Valid until (not before Quoted on), "More
   (optional)": CHA + transport per container (₹; placeholder shows the product's default), Price includes packing and
   loading, Notes; Save / Cancel. Right: "Other thicknesses — worked out for you" (thickness · price · was), **Type it
@@ -3828,7 +3828,7 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
   no offer linked to them); a **No product prices yet** badge next to such a supplier; three columns **Base price quoted (₹)**,
   **Quoted on · valid until**, **Offer active**; under each supplier one row per offer linked to it (`catalog_product_suppliers`
   with that `supplier_id`): product name (link to the product; "Product inactive" badge), the base price as quoted
-  (`SupplierOffers::offerBase()`: "₹190,000 / CBM (50 mm and above)", "₹1,650 / m² (20 mm)", "₹80,000 / unit"; "Exact price for
+  (`SupplierOffers::offerBase()`: "₹190,000 / CBM (50 mm and above)", "₹1,650 / SQM (20 mm)", "₹80,000 / unit"; "Exact price for
   a combination" for a combo row), "12 Nov 2026 · 12 Jan 2027" (or "no end date"), the **Offer active** switch and **Edit price**
   (`/products/suppliers/{id}/edit-price?from=suppliers`; Back / Cancel return to `/suppliers#supplier-{id}`). **+ Add product**
   per active supplier. An inactive supplier's offers are greyed with "Inactive: none of their prices are used anywhere."
@@ -3847,7 +3847,7 @@ mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns)
   use Edit price)" — or **create a new product**: **Name *** (unique, as Duplicate checks it), **Category *** (active
   categories), **HS code** (optional; must be on the HS Code Master List; empty = the category's default HS code). Then
   **Base thickness *** (the product's / category's thicknesses with the base marked "(base)", or "No thickness: one price" for
-  a product without thickness rules), **Price ₹ *** (above 0, at most 2 decimals), **per *** (m² / CBM following the
+  a product without thickness rules), **Price ₹ *** (above 0, at most 2 decimals), **per *** (SQM / SQFT / CBM following the
   thickness; for one price the product's unit or CBM — a new product's unit list for a new product), **Quoted on *** (not in
   the future), **Valid until** (not before Quoted on). app.js `initAddOffer` fills the thickness and unit lists from
   `data-choices` (`SupplierOffers::addProductChoices()` / `priceShape()`); the fields of the hidden half are disabled so the
@@ -3908,7 +3908,7 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   **Go to Suppliers**; "+ Add Product" and "Link suppliers" are gone from the page and the Products menu (their routes still
   work). Empty state "No products yet — 1. Add a supplier · 2. Add the products they offer · 3. Configure" with Go to Suppliers.
 - **Configure / Edit (`/products/{id}/configure`, `manage_product_catalog`).** Left: **Base price (₹ / CBM, 50 mm and above |
-  ₹ / m², 20 mm | ₹ / unit) *** — default the highest usable supplier price (its unit / thickness; configured products keep
+  ₹ / SQM, 20 mm | ₹ / unit) *** — default the highest usable supplier price (its unit / thickness; configured products keep
   theirs), "Default = highest active supplier price (…). Lowest: …", a warning below the lowest ("Below the lowest supplier
   price — no supplier sells at this price."), **See all supplier prices (N)** (supplier, base price as quoted, dates, active /
   paused, Edit price `?from=configure`), and — when the highest usable price differs from the base and a supplier price changed
@@ -3986,7 +3986,7 @@ recommendation"; mockups ui3_u1–u4).**
   same layout and placeholders).
 - **"Also work out from this … price"** (`products/_price_add`, inside "+ Add / update a price"; Edit price does not use
   it): one row per thickness — tick box · thickness · the worked-out price (live while the price is typed; until then
-  "type the price to see it") · its % rule ("−20 % of 20 mm", "base", "× 40 of 20 mm per m²") with a badge **category** or
+  "type the price to see it") · its % rule ("−20 % of 20 mm", "base", "× 40 of 20 mm per SQM") with a badge **category** or
   **this product** (the product's own value: its option override, or its own thickness factor). A thickness with a typed
   price is highlighted: "you typed ₹X on <date> — kept unless you tick". The per-row "change −20 %" links are replaced by
   one link under the list, **Change the % rules for this product** → `/products/{id}/configure#thickness-rules`. Field
@@ -4009,6 +4009,48 @@ recommendation"; mockups ui3_u1–u4).**
   `category`, `_price_add`, `configure`, `_form`; CSS D-363 block. No migration. The Products list has no board view (no
   Kanban twin).
 
+**Supplier prices typed per SQFT, one set of unit names, and the "Supplier performance" button (D-364, 13 Nov 2026, owner
+"go with recommendation"; mockups units_a, units_b, sqm_sqft_mockup).** No database change, no migration.
+- **Supplier price unit list: SQM · SQFT · CBM.** "+ Add product" (suppliers `_add_product`), Edit price (D-359) and Link a
+  supplier (D-361) have a **per \*** drop-down: **SQM** and **SQFT** for a thickness below "50 mm and above" (or a product
+  without thicknesses sold per SQM), **CBM** for "50 mm and above" (or a per-CBM price). The unit follows the thickness and
+  back (app.js `initSqftNote`, `select[data-sqft-thickness]` options carry `data-unit` "SQM" / "CBM"). PCS, Ton and RMT are
+  not offered here (they need the piece size or the weight; they stay on the order line). "+ Add / update a price"
+  (`_price_add`) has no unit choice and is unchanged apart from its labels. A product whose own unit is SQFT (no
+  thicknesses) keeps its price per SQFT.
+- **SQFT is an input unit only.** On save the price per SQFT becomes the SQM price, ₹ per SQFT × 10.7639
+  (`LineUnits::SQFT_PER_M2` / `lineUnits.SQFT_PER_M2`), 2 decimals, and is stored exactly as an SQM price is stored
+  (`unit` "m2", the thickness price rows, `fob_value`) — nothing downstream changes. `SupplierOffers::fromSqft()` (Node
+  `supplierOffers.fromSqft`) does it once for `addOffer()` (+ Add product, Link a supplier) and `save()` (Edit price);
+  `sqmPriced()` says when SQFT is allowed; `sqftToSqm()`, `typedText()`, `notesWithTyped()`. The Edit price preview
+  (`/products/suppliers/{id}/edit-price/preview?unit=SQFT`) converts the same way.
+- **Live conversion under the field** (`p[data-sqft-note]`, `.sqft-note`): "₹185 / SQFT = **₹1,991.32 / SQM** (× 10.7639)
+  — saved as the SQM price", shown while SQFT is chosen and a price is typed.
+- **What was typed is kept:** the offer's notes get the line "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)" (staff
+  notes are kept; a later save typed per SQM drops the old line, a new SQFT save replaces it), the price history gets a row
+  "Price typed per SQFT" with the same text, and the green message and the audit log say it too.
+- **The same unit names on every screen: SQM, SQFT, CBM.** `LineUnits` LABELS (and app.js `UNIT_LABELS`) now read 'M2' =>
+  'SQM', 'SQFT' => 'SQFT' (was "m²" / "sq ft"); every screen label "m²" / "per m²" / "sq ft" reads SQM / SQFT: supplier
+  prices, the thickness rows ("Also work out"), the Products list, Configure, Market prices, the product page, Edit price,
+  the suppliers pages, CHA + transport, price rules, Global pricing settings, specification price changes ("USD per
+  SQM"), the order line's price check messages and the price history texts written from now on ("20 mm per SQM").
+  **Documents, e-mails and Zoho are unchanged**: no document builder, template, `DocumentDataAssembler`, e-mail or Zoho
+  payload reads these labels (documents print their own unit codes, `LineTable`); a QT, PI, OC, CI, PL and Supplier PO
+  generated before and after (rolled back) have identical text on both stacks.
+- **Order-line conversion verified** (product priced per SQM at 20 mm, quote 55.51 · lowest 53.89 · minimum 52.71): SQFT
+  ÷ 10.7639 → 5.16 · 5.01 · 4.90; CBM × 50 (÷ 0.02 m) → 2,775.50 · 2,694.50 · 2,635.50; PCS 60 × 40 cm × 0.24 → 13.32 ·
+  12.93 · 12.65; Ton × 18.5185 (CBM ÷ 2.70) → 1,027.96 · 997.96 · 976.11. The order form's live quote now uses only the
+  newest answer (`refreshPrice` keeps a per-line sequence), so a late "Enter the width" no longer overwrites the hint.
+- **"Supplier performance" button** (Procurement, next to the Status filter) is a normal small button aligned with the
+  drop-down. Fixed at the root in the CSS D-364 block: `a.btn-secondary:not(.btn)` is an inline-block button (no
+  underline, rounded); `form.btn-row` aligns its items to the bottom so links and small buttons line up with the
+  drop-downs (also Associates › TDS and Edit price's Cancel).
+- **Code.** `SupplierOffers` D-364 section, `SupplierController::readOffer` / `addProduct`, `EditPriceController`
+  (`unit`, `sqmUnit`, preview), `ProductConfigureController::linkSupplier`, views `suppliers/_add_product`,
+  `products/edit_price`, `products/link_supplier`, `orders/_product_picker_js`; app.js `initSqftNote`, `initAddOffer`,
+  `initEditPrice`; tests `SqftSupplierPriceTest` / `sqftSupplierPrice.test.js`. Kanban: none of these screens has a board
+  view (no Kanban twin).
+
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
 `OrderLinePricing` checks each line against the floor of **whoever sells the order**:
@@ -4029,7 +4071,7 @@ recommendation"; mockups ui3_u1–u4).**
 | CBM price worked out (`cbm_calculated`, D-338) | price ≥ floor, but the line is priced per CBM (50 mm and above) from a supplier row whose 50 mm+ price is only CALCULATED from a thinner base (no typed per-CBM price) | Sent to the MD exactly like a line below the floor ("Ask MD to approve line N", notification, Approvals › Prices "Price — CBM worked out", approval page "Reason: CBM price worked out from the supplier's 20 mm price — no 50 mm+ price quoted" — the base and 50 mm figures follow the row and the rules). QT and PI wait for it. A typed CBM price needs no approval. Worked out from the build-up (`ThicknessPrices::cost()` returns `how`, `calc_from_mm`, `cbm_from`; `liveFigures()` adds `cbm_calculated`); no new column. |
 | Approved | MD approved this exact price and options | Passes. |
 
-**A line "As per annexure" that needs its size (D-338, 1c).** When a line ticked "As per annexure" is priced in a unit that needs the piece size to be compared (e.g. a per-m² product on a CBM line), the refusal is exactly *Line N says "As per annexure", so its size is not known — type the price per CBM for this line.* (the unit word follows the line's unit: "per m²", "per piece" …; `OrderLinePricing::annexureSizeMessage()` / `annexureSizeMessage()`). The same text when the line is saved (`saveRefusal(…, $annexureLineNo)`; shown without the "Product line:" prefix), on the Quotation / PI gate (`documentBlockReason()`), in the price check and on the MD's approval page.
+**A line "As per annexure" that needs its size (D-338, 1c).** When a line ticked "As per annexure" is priced in a unit that needs the piece size to be compared (e.g. a per-SQM product on a CBM line), the refusal is exactly *Line N says "As per annexure", so its size is not known — type the price per CBM for this line.* (the unit word follows the line's unit: "per SQM", "per piece" …; `OrderLinePricing::annexureSizeMessage()` / `annexureSizeMessage()`). The same text when the line is saved (`saveRefusal(…, $annexureLineNo)`; shown without the "Product line:" prefix), on the Quotation / PI gate (`documentBlockReason()`), in the price check and on the MD's approval page.
 
 Comparisons allow 0.0001 for floating noise.
 

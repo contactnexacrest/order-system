@@ -470,7 +470,7 @@ final class ThicknessPrices
         }
         if ($k !== null && $k > 0 && $fromMm !== self::CBM) {
             $values[self::CBM] = ['price' => PricingEngine::round2($base * $k), 'calc_from_mm' => $fromMm,
-                'how' => '= ' . $baseMm . ' mm price ₹' . self::amount($base) . ' per m² × ' . self::fmt($k) . ($fromMm !== $baseMm ? ' (' . $baseMm . ' mm = ' . $back . ')' : ''),
+                'how' => '= ' . $baseMm . ' mm price ₹' . self::amount($base) . ' per SQM × ' . self::fmt($k) . ($fromMm !== $baseMm ? ' (' . $baseMm . ' mm = ' . $back . ')' : ''),
                 'change' => '× ' . self::fmt($k)];
         }
         return ['ok' => true, 'error' => null, 'base' => $base, 'values' => $values];
@@ -484,7 +484,7 @@ final class ThicknessPrices
 
     private static function what(int $mm, int $cbmFrom): string
     {
-        return self::label($mm, $cbmFrom) . ($mm === self::CBM ? ' per CBM' : ' per m²');
+        return self::label($mm, $cbmFrom) . ($mm === self::CBM ? ' per CBM' : ' per SQM');
     }
 
     /**
@@ -652,7 +652,7 @@ final class ThicknessPrices
             $oldText = $old === null ? null : number_format($old['price'], 2, '.', '') . ' ' . $old['how'];
             $newText = number_format($v['price'], 2, '.', '') . ' ' . $v['how'];
             if ($oldText !== $newText) {
-                self::history($productSupplierId, self::label((int) $mm, (int) $rules['cbm_from']) . ((int) $mm === self::CBM ? ' per CBM' : ' per m²'), $oldText, $newText, $userId);
+                self::history($productSupplierId, self::label((int) $mm, (int) $rules['cbm_from']) . ((int) $mm === self::CBM ? ' per CBM' : ' per SQM'), $oldText, $newText, $userId);
             }
         }
     }

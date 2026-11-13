@@ -103,10 +103,12 @@ final class EditPriceController
         $old = Flash::pullOld();
         View::render('products/edit_price', [
             'product' => $product, 'row' => $row, 'rules' => $rules, 'grid' => $grid, 'base' => $base,
-            'thicknesses' => $grid ? array_map(static fn (int $mm): array => ['mm' => $mm, 'label' => ThicknessPrices::label($mm, (int) $rules['cbm_from']), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'm²'],
+            'thicknesses' => $grid ? array_map(static fn (int $mm): array => ['mm' => $mm, 'label' => ThicknessPrices::label($mm, (int) $rules['cbm_from']), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'SQM'],
                 SupplierOffers::formThicknesses($rules, $row)) : [],
             'fromMm' => $fromMm, 'preview' => $preview, 'saved' => $saved,
             'undoToken' => $_SESSION['edit_price_undo'][$id]['token'] ?? null,
+            // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+            'sqmUnit' => !$grid && SupplierOffers::sqmPriced($product, false, null, (string) ($row['price_basis'] ?? 'unit')) ? (string) $product['reference_unit'] : null,
             'unitLabel' => ($row['price_basis'] ?? '') === 'cbm' ? 'CBM' : (LineUnits::label((string) ($product['reference_unit'] ?? '')) ?: ((string) ($product['reference_unit'] ?? '') ?: 'unit')),
             'from' => self::from(), 'backUrl' => self::backUrl($row, self::from()),
             'canSeeSelling' => self::can('view_price_buildup'), 'old' => $old,
@@ -133,7 +135,12 @@ final class EditPriceController
                 $own[(int) $k] = $p;
             }
         }
-        $out = SupplierOffers::preview($product, $row, $mm, $price, $own);
+        // D-364: a price typed per SQFT is previewed as the SQM price it is saved as.
+        $grid = ($row['price_basis'] ?? '') === 'grid';
+        $in = SupplierOffers::fromSqft(['price' => $price, 'unit' => (string) ($_GET['unit'] ?? ''), 'mm' => $mm ?? ($grid ? ThicknessPrices::baseOf($row, ThicknessPrices::rules($product)) : null)],
+            $product, $grid, (string) ($row['price_basis'] ?? 'unit'));
+        $out = SupplierOffers::preview($product, $row, $mm, (float) $in['price'], $own);
+        $out['typed'] = $in['typed_sqft'] !== null ? SupplierOffers::typedText((float) $in['typed_sqft']) : null;
         if (!self::can('view_price_buildup')) {
             $out['selling'] = null; // Procurement sees supplier prices only, never selling prices.
         }
@@ -153,7 +160,7 @@ final class EditPriceController
         $self = self::selfUrl($id, $from);
         $rules = ThicknessPrices::rules($product);
         $grid = ($row['price_basis'] ?? '') === 'grid';
-        [$in, $error] = self::read($rules, $row, $grid);
+        [$in, $error] = self::read($rules, $row + ['_reference_unit' => $product['reference_unit'] ?? null], $grid);
         if ($error !== null) {
             Flash::set('error', $error);
             Flash::setOld($_POST);
@@ -222,6 +229,11 @@ final class EditPriceController
                 $own[(int) $k] = $p;
             }
         }
+        // D-364: "per" — SQM or SQFT for a price per SQM (SQFT is saved as the SQM price), else the price's own unit.
+        $unit = trim((string) ($_POST['unit'] ?? ''));
+        if ($unit === SupplierOffers::SQFT_INPUT && !SupplierOffers::sqmPriced(['reference_unit' => $row['_reference_unit'] ?? null], $grid, $fromMm, (string) ($row['price_basis'] ?? 'unit'))) {
+            return [[], 'Per: SQFT is only for a price per SQM — choose the unit the price is per.'];
+        }
         $q = trim((string) ($_POST['quoted_on'] ?? ''));
         $d = \DateTime::createFromFormat('!Y-m-d', $q);
         if ($d === false || $d->format('Y-m-d') !== $q) {
@@ -249,7 +261,7 @@ final class EditPriceController
             return [[], 'Notes: at most 1000 characters.'];
         }
         return [[
-            'price' => $price, 'from_mm' => $fromMm, 'own' => $own, 'quoted_on' => $q, 'valid_until' => $v,
+            'price' => $price, 'unit' => $unit, 'from_mm' => $fromMm, 'own' => $own, 'quoted_on' => $q, 'valid_until' => $v,
             'cha' => $chaRaw !== '' ? (float) $chaRaw : null,
             'includes_packing_loading' => (string) ($_POST['includes_packing_loading'] ?? '0') === '1',
             'notes' => $notes,

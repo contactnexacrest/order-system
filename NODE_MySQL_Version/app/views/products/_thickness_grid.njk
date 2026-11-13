@@ -16,10 +16,10 @@
           data-at-least-one-message="Enter at least one price."
           value="{{ g.value }}"
           placeholder="{{ g.placeholder }}"
-          aria-label="Supplier price for {{ g.label }} (₹ {{ 'per CBM' if g.cbm else 'per m²' }})">
+          aria-label="Supplier price for {{ g.label }} (₹ {{ 'per CBM' if g.cbm else 'per SQM' }})">
         <input type="hidden" name="how[{{ g.mm }}]" value="{{ 'typed' if g.typed else 'calculated' }}">
       </td>
-      <td>{{ 'per CBM' if g.cbm else 'per m²' }}</td>
+      <td>{{ 'per CBM' if g.cbm else 'per SQM' }}</td>
       <td class="grid-how">
         <span class="badge {{ 'badge-typed' if g.typed else 'badge-calculated' }}" data-grid-badge>{{ 'TYPED' if g.typed else 'CALCULATED' }}</span>
         <small class="muted" data-grid-rule>{{ g.rule }}</small>

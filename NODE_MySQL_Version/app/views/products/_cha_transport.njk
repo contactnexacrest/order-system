@@ -19,9 +19,9 @@
   {% if cha.weightLine %}<p class="small muted">{{ cha.weightLine }}</p>{% endif %}
   {% if rules.grid %}
     <table class="list">
-      <tr><th>Thickness</th><th>m² per container</th><th class="num">CHA + transport per m² (₹)</th><th class="num">per sq ft (₹)</th></tr>
+      <tr><th>Thickness</th><th>SQM per container</th><th class="num">CHA + transport per SQM (₹)</th><th class="num">per SQFT (₹)</th></tr>
       {% for r in cha.rows %}
-        <tr data-cha-row data-mm="{{ r.mm }}"><td>{{ r.mm }} mm</td><td>{{ r.m2 }} m² ({{ r.sqft }} sq ft)</td>
+        <tr data-cha-row data-mm="{{ r.mm }}"><td>{{ r.mm }} mm</td><td>{{ r.m2 }} SQM ({{ r.sqft }} SQFT)</td>
           <td class="num" data-cha-m2>{{ r.perM2 }}</td><td class="num" data-cha-sqft>{{ r.perSqft }}</td></tr>
       {% endfor %}
       <tr><td>{{ rules.cbm_from }} mm+</td><td colspan="3"><span data-cha-cbm-line>{{ cha.cbmLine }}</span></td></tr>

@@ -107,7 +107,7 @@ final class SupplierOffers
                 return null;
             }
             return ['inr' => (float) $v['price'], 'mm' => $mm, 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'm2',
-                'label' => ($mm === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . ')'];
+                'label' => ($mm === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . ')'];
         }
         $v = (new ProductService())->effectiveFobForSupplier($row, $product);
         if ($v === null || $v <= 0) {
@@ -301,7 +301,7 @@ final class SupplierOffers
                 $isFrom = $mm === $fromMm;
                 $p = $isFrom ? $price : ($own[$mm] ?? ($calc['values'][$mm]['price'] ?? null));
                 $how = $isFrom ? 'entered' : (isset($own[$mm]) ? 'typed' : ($p !== null ? 'calculated' : null));
-                $out['lines'][] = ['mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'm²',
+                $out['lines'][] = ['mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'SQM',
                     'price' => $p, 'was' => isset($was['values'][$mm]) ? (float) $was['values'][$mm]['price'] : null, 'how' => $how, 'from' => $isFrom,
                     'rule' => $calc['values'][$mm]['change'] ?? ''];
                 if ($p !== null && $p > 0) {
@@ -369,6 +369,9 @@ final class SupplierOffers
         $grid = ($row['price_basis'] ?? '') === 'grid';
         $cbmFrom = (int) $rules['cbm_from'];
         $before = self::offerBase($product, $row, $rules);
+        // D-364: a price typed per SQFT is saved as the SQM price; the notes keep what was typed.
+        $in = self::fromSqft($in + ['unit' => '', 'mm' => $in['from_mm'] ?? null], $product, $grid, (string) ($row['price_basis'] ?? 'unit'));
+        $in['notes'] = self::notesWithTyped((string) ($in['notes'] ?? ''), $in['typed_sqft']) ?? '';
         // ThicknessPrices::addPrice() runs its own transaction for the thickness prices.
         if ($grid) {
             $from = (int) $in['from_mm'];
@@ -413,17 +416,22 @@ final class SupplierOffers
             $fresh['notes'] = $in['notes'] !== '' ? $in['notes'] : null;
             ProductSupplierRepository::update($id, $fresh, $userId);
         }
+        if ($in['typed_sqft'] !== null) {
+            ThicknessPrices::history($id, 'Price typed per SQFT', null, self::typedText((float) $in['typed_sqft']), $userId);
+        }
         $after = self::offerBase($product, ProductSupplierRepository::find($id) ?? $row, $rules);
         self::refreshFollowedBase(ProductRepository::find((int) $product['id']) ?? $product, $userId);
-        $what = $grid ? ((int) $in['from_mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label((int) $in['from_mm'], $cbmFrom) . ')'
+        $what = $grid ? ((int) $in['from_mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label((int) $in['from_mm'], $cbmFrom) . ')'
             : 'per ' . (($row['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($product['reference_unit'] ?? '') ?: 'unit'));
         $summary = $row['supplier_name'] . ' · ' . $product['name'] . ': '
             . ($before !== null ? '₹' . ThicknessPrices::amount($before['inr']) . ' → ' : '') . '₹' . ThicknessPrices::amount((float) $in['price']) . ' ' . $what
+            . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '')
             . ', quoted ' . date('j M Y', (int) strtotime((string) $in['quoted_on'])) . '.'
             . ($grid && $after !== null && $before !== null && ((int) $in['from_mm'] !== ($after['mm'] ?? -1)) ? ' Base price now ₹' . ThicknessPrices::amount($after['inr']) . ' ' . $after['label'] . '.' : '')
             . ($grid ? ' Other thicknesses updated.' : '');
         AuditLogRepository::log($userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', $id, null,
-            $before !== null ? '₹' . number_format($before['inr'], 2) . ' ' . $before['label'] : null, '₹' . number_format((float) $in['price'], 2) . ' ' . $what . ' quoted ' . $in['quoted_on'] . ' (Edit price)');
+            $before !== null ? '₹' . number_format($before['inr'], 2) . ' ' . $before['label'] : null, '₹' . number_format((float) $in['price'], 2) . ' ' . $what
+            . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '') . ' quoted ' . $in['quoted_on'] . ' (Edit price)');
         return [$summary, null];
     }
 
@@ -511,7 +519,7 @@ final class SupplierOffers
         $base = self::offerBase($product, $r, $rules, $settings);
         $cbmFrom = (int) $rules['cbm_from'];
         if ($base !== null) {
-            $short = $base['unit'] === 'CBM' ? 'CBM' : ($base['unit'] === 'm2' ? 'm²' : (LineUnits::label($base['unit']) ?: $base['unit']));
+            $short = $base['unit'] === 'CBM' ? 'CBM' : ($base['unit'] === 'm2' ? 'SQM' : (LineUnits::label($base['unit']) ?: $base['unit']));
             $price = '₹' . ThicknessPrices::amount($base['inr']) . ' / ' . $short . ($base['mm'] !== null ? ' (' . ThicknessPrices::label($base['mm'], $cbmFrom) . ')' : '');
         } else {
             $price = $basis === 'combo' ? 'Exact price for a combination' : '—';
@@ -565,7 +573,8 @@ final class SupplierOffers
             $cbmFrom = (int) $rules['cbm_from'];
             return ['grid' => true, 'base_mm' => (int) $rules['base_mm'],
                 'thicknesses' => array_map(static fn (int $mm): array => ['mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'm2'], ThicknessPrices::thicknesses($rules)),
-                'units' => [['value' => 'm2', 'label' => 'm²'], ['value' => 'CBM', 'label' => 'CBM']]];
+                // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+                'units' => [['value' => 'm2', 'label' => 'SQM'], ['value' => self::SQFT_INPUT, 'label' => 'SQFT', 'sqft' => true], ['value' => 'CBM', 'label' => 'CBM']]];
         }
         $units = [];
         if ($newProduct) {
@@ -575,11 +584,72 @@ final class SupplierOffers
         } else {
             $u = (string) ($product['reference_unit'] ?? '');
             $units[] = ['value' => $u !== '' ? $u : 'unit', 'label' => $u !== '' ? (LineUnits::label($u) ?: $u) : 'unit'];
+            if (LineUnits::canonical($u) === 'M2') {
+                $units[] = ['value' => self::SQFT_INPUT, 'label' => 'SQFT', 'sqft' => true]; // D-364
+            }
         }
         if (!in_array('CBM', array_map(static fn (array $x): string => strtoupper($x['value']), $units), true)) {
             $units[] = ['value' => 'CBM', 'label' => 'CBM'];
         }
         return ['grid' => false, 'base_mm' => null, 'thicknesses' => [], 'units' => $units];
+    }
+
+    // ------------------------------------------------------------------ D-364: a price typed per SQFT
+
+    /** D-364: the unit a per-area supplier price may be typed in; it is saved as the SQM price. */
+    public const SQFT_INPUT = 'SQFT';
+
+    /** D-364: ₹ per SQFT → ₹ per SQM (× 10.7639, LineUnits::SQFT_PER_M2), 2 decimals. */
+    public static function sqftToSqm(float $perSqft): float
+    {
+        return round($perSqft * LineUnits::SQFT_PER_M2, 2);
+    }
+
+    /** D-364: whether a price is per SQM — a thickness below "50 mm and above" (grid), else a product sold per SQM. */
+    public static function sqmPriced(array $product, bool $grid, ?int $mm, string $basis = 'unit'): bool
+    {
+        if ($grid) {
+            return $mm !== null && $mm !== ThicknessPrices::CBM;
+        }
+        return $basis !== 'cbm' && LineUnits::canonical((string) ($product['reference_unit'] ?? '')) === 'M2';
+    }
+
+    /**
+     * D-364: a price typed per SQFT becomes the SQM price, stored exactly as an SQM price is;
+     * 'typed_sqft' keeps what was typed (for the notes and the price history). Any other unit
+     * (or a product whose own unit is SQFT) is left as it is.
+     *
+     * @param array<string,mixed> $in price, unit, mm
+     * @return array<string,mixed>
+     */
+    public static function fromSqft(array $in, array $product, bool $grid, string $basis = 'unit'): array
+    {
+        $in['typed_sqft'] = null;
+        if (strtoupper(trim((string) ($in['unit'] ?? ''))) !== self::SQFT_INPUT
+            || !self::sqmPriced($product, $grid, isset($in['mm']) && $in['mm'] !== null ? (int) $in['mm'] : null, $basis)) {
+            return $in;
+        }
+        $in['typed_sqft'] = (float) $in['price'];
+        $in['price'] = self::sqftToSqm((float) $in['price']);
+        $in['unit'] = $grid ? 'm2' : (string) $product['reference_unit'];
+        return $in;
+    }
+
+    /** D-364: "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)". */
+    public static function typedText(float $perSqft): string
+    {
+        return 'typed ₹' . ThicknessPrices::amount($perSqft) . ' / SQFT = ₹' . ThicknessPrices::amount(self::sqftToSqm($perSqft)) . ' / SQM (× ' . LineUnits::SQFT_PER_M2 . ')';
+    }
+
+    /** D-364: the offer's notes with its "typed … / SQFT" line set (or dropped for a price typed per SQM); staff notes are kept. */
+    public static function notesWithTyped(?string $notes, ?float $typedSqft): ?string
+    {
+        $keep = array_filter(preg_split('/\R/u', (string) $notes) ?: [], static fn (string $l): bool => preg_match('#^typed ₹[0-9,.]+ / SQFT\b#u', trim($l)) !== 1);
+        $text = trim(implode("\n", $keep));
+        if ($typedSqft !== null) {
+            $text = trim($text . "\n" . self::typedText($typedSqft));
+        }
+        return $text !== '' ? $text : null;
     }
 
     /**
@@ -647,6 +717,7 @@ final class SupplierOffers
         $productId = (int) $product['id'];
         $rules = ThicknessPrices::rules($product);
         $grid = $in['mm'] !== null && $rules['grid'];
+        $in = self::fromSqft($in, $product, $grid); // D-364: a price per SQFT is saved as the SQM price
         $unitIsCbm = strtoupper((string) $in['unit']) === 'CBM';
         $basis = $grid ? 'grid' : ($unitIsCbm && LineUnits::canonical((string) ($product['reference_unit'] ?? '')) !== 'CBM' ? 'cbm' : 'unit');
         $primary = $basis !== 'cbm' && self::markedForPricing($productId) === null;
@@ -656,7 +727,7 @@ final class SupplierOffers
             'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
             'fob_source' => 'direct', 'fob_value' => $grid ? null : (float) $in['price'],
             'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null,
-            'is_primary' => 0, 'notes' => null,
+            'is_primary' => 0, 'notes' => self::notesWithTyped(null, $in['typed_sqft']),
         ], $userId);
         PricingRepository::setSupplierDates($id, (string) $in['quoted_on'], $in['valid_until'] !== '' ? (string) $in['valid_until'] : null);
         ProductSupplierRepository::setPriceDetails($id, (int) $supplier['id'], true, null);
@@ -679,9 +750,13 @@ final class SupplierOffers
         $fresh = ProductRepository::find($productId) ?? $product;
         $after = self::offerBase($fresh, ProductSupplierRepository::find($id) ?? ['id' => $id], $rules);
         ThicknessPrices::history($id, 'Offer added (+ Add product)', null, $after !== null ? '₹' . number_format($after['inr'], 2) . ' ' . $after['label'] : 'added', $userId);
+        if ($in['typed_sqft'] !== null) {
+            ThicknessPrices::history($id, 'Price typed per SQFT', null, self::typedText((float) $in['typed_sqft']), $userId);
+        }
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
             $supplier['supplier_legal_name'] . ': ' . $product['name'] . ' ₹' . number_format((float) $in['price'], 2) . ' '
-            . ($grid ? ((int) $in['mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label((int) $in['mm'], (int) $rules['cbm_from']) . ')' : 'per ' . $in['unit'])
+            . ($grid ? ((int) $in['mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label((int) $in['mm'], (int) $rules['cbm_from']) . ')' : 'per ' . $in['unit'])
+            . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '')
             . ' quoted ' . $in['quoted_on'] . ' (+ Add product)' . ($primary ? ' (used for pricing)' : ''));
         return $id;
     }
@@ -822,7 +897,7 @@ final class SupplierOffers
         $mm = ($product['configured_base_thickness_mm'] ?? null) !== null ? (int) $product['configured_base_thickness_mm'] : null;
         if ($mm !== null) {
             $rules = ThicknessPrices::rules($product, $settings);
-            return ($mm === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . ')';
+            return ($mm === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label($mm, (int) $rules['cbm_from']) . ')';
         }
         $u = (string) ($product['configured_base_unit'] ?? '');
         return 'per ' . ($u === '' ? 'unit' : (LineUnits::label($u) ?: $u));
@@ -928,7 +1003,7 @@ final class SupplierOffers
                     if ($key !== null && isset($vals['values'][$key]) && (float) $vals['values'][$key]['price'] > 0) {
                         $price = (float) $vals['values'][$key]['price'];
                         $unit = $key === ThicknessPrices::CBM ? 'CBM' : 'm2';
-                        $label = ($key === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label($key, $cbmFrom) . ')';
+                        $label = ($key === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label($key, $cbmFrom) . ')';
                     }
                 }
                 if ($price === null) {

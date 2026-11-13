@@ -357,7 +357,7 @@ async function priceCard(req, product, row, rules, s, grid) {
     }
     const since = !v ? null : (v.how === 'typed' ? (v.quoted_on || v.since || null) : (v.since || null));
     lines.push({
-      mm, label: thicknessPrices.label(mm, cbmFrom), unit: isCbm ? 'per CBM' : 'per m²',
+      mm, label: thicknessPrices.label(mm, cbmFrom), unit: isCbm ? 'per CBM' : 'per SQM',
       price: v ? Number(v.price) : null, how: v ? v.how : null, note, since,
       cha: chaU, fob: v ? Number(v.price) + chaU : null, is_base: mm === baseMm,
     });
@@ -368,7 +368,7 @@ async function priceCard(req, product, row, rules, s, grid) {
   const perContainer = thicknessPrices.chaPerContainer(row, product);
   return {
     lines, base_mm: baseMm, base_label: thicknessPrices.label(baseMm, cbmFrom), base_price: basePrice,
-    base_unit: baseMm === thicknessPrices.CBM ? 'CBM' : 'm²', base_chosen: thicknessPrices.rowBase(row) !== null,
+    base_unit: baseMm === thicknessPrices.CBM ? 'CBM' : 'SQM', base_chosen: thicknessPrices.rowBase(row) !== null,
     cha_per_cbm: cha.per_cbm, fits_cbm: thicknessPrices.fmt(Math.round(cha.fits_cbm * 100) / 100), cha_per_container: perContainer,
     parts, build, auto: thicknessPrices.autoFill(row),
     unit_label: parts ? (require('../services/lineUnits').label(String(parts.unit)) || String(parts.unit)) : '',
@@ -391,10 +391,10 @@ function addView(rules, grid) {
     const v = vals[mm] || null;
     const typed = !!v && v.how === 'typed' && !v.auto;
     return {
-      mm, cbm: isCbm, pct: thicknessPrices.fmt(p), label: thicknessPrices.label(mm, cbmFrom), per: isCbm ? '/ CBM' : '/ m²', typed,
+      mm, cbm: isCbm, pct: thicknessPrices.fmt(p), label: thicknessPrices.label(mm, cbmFrom), per: isCbm ? '/ CBM' : '/ SQM', typed,
       typedPrice: typed ? fmt2(v.price) : '', typedOn: typed && v.quoted_on ? v.quoted_on : '',
       change: isCbm ? `× ${thicknessPrices.fmt(rules.k)}` : (mm === baseMm ? 'the rules' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} %`),
-      rule: isCbm ? `× ${thicknessPrices.fmt(rules.k)} of ${baseMm} mm per m²` : (mm === baseMm ? 'base' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} % of ${baseMm} mm`),
+      rule: isCbm ? `× ${thicknessPrices.fmt(rules.k)} of ${baseMm} mm per SQM` : (mm === baseMm ? 'base' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} % of ${baseMm} mm`),
       isBase: !isCbm && mm === baseMm, own: isCbm ? ownK : !!ownOpt.get(mm),
     };
   });
@@ -426,7 +426,7 @@ function readThicknessPrice(body, rules, dateField) {
 /** D-335: "20 mm ₹4,600.00 per m² typed; worked out: 15 mm, 18 mm" for the audit log. */
 function addText(rules, mm, price, ticked) {
   const cbmFrom = Number(rules.cbm_from);
-  return `${thicknessPrices.label(mm, cbmFrom)} ₹${fmt2(price)}${mm === thicknessPrices.CBM ? ' per CBM' : ' per m²'} typed`
+  return `${thicknessPrices.label(mm, cbmFrom)} ₹${fmt2(price)}${mm === thicknessPrices.CBM ? ' per CBM' : ' per SQM'} typed`
     + (ticked.length ? `; worked out: ${ticked.map((m) => thicknessPrices.label(m, cbmFrom)).join(', ')}` : '');
 }
 
@@ -606,7 +606,7 @@ async function readCombo(product, body) {
 
 /** "20 mm ₹1,600.00 per m² · … (typed; others calculated)" for the audit log. */
 function gridText(typed, rules) {
-  return `${Object.entries(typed).map(([mm, v]) => `${thicknessPrices.label(Number(mm), rules.cbm_from)} ₹${fmt2(v)}${Number(mm) === thicknessPrices.CBM ? ' per CBM' : ' per m²'}`).join(' · ')} (typed; others calculated)`;
+  return `${Object.entries(typed).map(([mm, v]) => `${thicknessPrices.label(Number(mm), rules.cbm_from)} ₹${fmt2(v)}${Number(mm) === thicknessPrices.CBM ? ' per CBM' : ' per SQM'}`).join(' · ')} (typed; others calculated)`;
 }
 
 async function addMarketPrice(req, res) {

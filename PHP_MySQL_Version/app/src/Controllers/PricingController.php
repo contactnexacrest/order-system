@@ -385,7 +385,7 @@ final class PricingController
             }
             $since = $v === null ? null : ($v['how'] === 'typed' ? ($v['quoted_on'] ?? $v['since'] ?? null) : ($v['since'] ?? null));
             $lines[] = [
-                'mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $isCbm ? 'per CBM' : 'per m²',
+                'mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $isCbm ? 'per CBM' : 'per SQM',
                 'price' => $v !== null ? (float) $v['price'] : null, 'how' => $v['how'] ?? null, 'note' => $note, 'since' => $since,
                 'cha' => $chaU, 'fob' => $v !== null ? (float) $v['price'] + $chaU : null, 'is_base' => $mm === $baseMm,
             ];
@@ -397,7 +397,7 @@ final class PricingController
         $build = $parts !== null && self::can('view_price_buildup') ? PricingService::buildFromFob($product, (float) $parts['total'], $settings) : null;
         return [
             'lines' => $lines, 'base_mm' => $baseMm, 'base_label' => ThicknessPrices::label($baseMm, $cbmFrom), 'base_price' => $basePrice,
-            'base_unit' => $baseMm === ThicknessPrices::CBM ? 'CBM' : 'm²', 'base_chosen' => ThicknessPrices::rowBase($row) !== null,
+            'base_unit' => $baseMm === ThicknessPrices::CBM ? 'CBM' : 'SQM', 'base_chosen' => ThicknessPrices::rowBase($row) !== null,
             'cha_per_cbm' => $cha['per_cbm'], 'fits_cbm' => $cha['fits_cbm'], 'cha_per_container' => ThicknessPrices::chaPerContainer($row, $product),
             'parts' => $parts, 'build' => $build, 'auto' => ThicknessPrices::autoFill($row),
             'unit_label' => $parts !== null ? (\App\Services\LineUnits::label((string) $parts['unit']) ?: (string) $parts['unit']) : '',
@@ -444,7 +444,7 @@ final class PricingController
     private static function addText(array $rules, int $mm, float $price, array $ticked): string
     {
         $cbmFrom = (int) $rules['cbm_from'];
-        return ThicknessPrices::label($mm, $cbmFrom) . ' ₹' . number_format($price, 2) . ($mm === ThicknessPrices::CBM ? ' per CBM' : ' per m²') . ' typed'
+        return ThicknessPrices::label($mm, $cbmFrom) . ' ₹' . number_format($price, 2) . ($mm === ThicknessPrices::CBM ? ' per CBM' : ' per SQM') . ' typed'
             . ($ticked !== [] ? '; worked out: ' . implode(', ', array_map(static fn (int $m): string => ThicknessPrices::label($m, $cbmFrom), $ticked)) : '');
     }
 
@@ -729,7 +729,7 @@ final class PricingController
     {
         $parts = [];
         foreach ($typed as $mm => $v) {
-            $parts[] = ThicknessPrices::label((int) $mm, (int) $rules['cbm_from']) . ' ₹' . number_format((float) $v, 2) . ((int) $mm === ThicknessPrices::CBM ? ' per CBM' : ' per m²');
+            $parts[] = ThicknessPrices::label((int) $mm, (int) $rules['cbm_from']) . ' ₹' . number_format((float) $v, 2) . ((int) $mm === ThicknessPrices::CBM ? ' per CBM' : ' per SQM');
         }
         return implode(' · ', $parts) . ' (typed; others calculated)';
     }

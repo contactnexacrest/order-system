@@ -92,7 +92,7 @@ final class ProductConfigureController
     {
         if ($mm !== null) {
             $rules = ThicknessPrices::rules($product, $settings);
-            return '₹ / ' . ($mm === ThicknessPrices::CBM ? 'CBM' : 'm²') . ', ' . ThicknessPrices::label($mm, (int) $rules['cbm_from']);
+            return '₹ / ' . ($mm === ThicknessPrices::CBM ? 'CBM' : 'SQM') . ', ' . ThicknessPrices::label($mm, (int) $rules['cbm_from']);
         }
         return '₹ / ' . (\App\Services\LineUnits::label($unit) ?: $unit);
     }
@@ -402,7 +402,14 @@ final class ProductConfigureController
             if (!in_array($mm, array_column($shape['thicknesses'], 'mm'), true)) {
                 $error = 'For: choose the thickness the price is for.';
             }
-            $unit = $mm === ThicknessPrices::CBM ? 'CBM' : 'm2';
+            // D-364: per SQM or SQFT (saved as the SQM price) below "50 mm and above", per CBM from it.
+            $want = $mm === ThicknessPrices::CBM ? ['CBM'] : ['m2', SupplierOffers::SQFT_INPUT];
+            if ($error === null && !in_array($unit, $want, true)) {
+                $unit = $unit === '' ? $want[0] : $unit;
+                if (!in_array($unit, $want, true)) {
+                    $error = 'Per: a price for ' . ThicknessPrices::label($mm) . ' is per ' . ($mm === ThicknessPrices::CBM ? 'CBM' : 'SQM or SQFT') . '.';
+                }
+            }
         } elseif ($error === null && !in_array($unit, array_column($shape['units'], 'value'), true)) {
             $error = 'Per: choose the unit the price is for.';
         }
@@ -423,7 +430,8 @@ final class ProductConfigureController
         }
         $fresh = ProductRepository::find($id) ?? $product;
         $st = SupplierOffers::status($fresh);
-        Flash::set('success', 'Linked. ' . $product['name'] . ' now has ' . $st['usable'] . ' active supplier' . ($st['usable'] === 1 ? '' : 's') . ' (' . $supplier['supplier_legal_name'] . ', ₹' . ThicknessPrices::amount($price) . ').'
+        Flash::set('success', 'Linked. ' . $product['name'] . ' now has ' . $st['usable'] . ' active supplier' . ($st['usable'] === 1 ? '' : 's') . ' (' . $supplier['supplier_legal_name'] . ', '
+            . ($unit === SupplierOffers::SQFT_INPUT && SupplierOffers::sqmPriced($product, (bool) $shape['grid'], $mm) ? SupplierOffers::typedText($price) : '₹' . ThicknessPrices::amount($price)) . ').'
             . ' The red "No supplier yet" badge is gone; from now on the normal rule applies — if every supplier is switched off, the product is not offered on new orders.'
             . (SupplierOffers::isConfigured($fresh) ? ' The configured base price stays as it is.' : ' Configure the product to set its selling price.'));
         header('Location: /products?status=all');

@@ -117,7 +117,7 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         self::assertTrue($c['ok']);
         self::assertSame([3680.0, '= 4,600 − 20 %', '−20 %'], [$c['values'][15]['price'], $c['values'][15]['how'], $c['values'][15]['change']]);
         self::assertSame([4370.0, 6210.0, 7820.0], [$c['values'][18]['price'], $c['values'][30]['price'], $c['values'][40]['price']]);
-        self::assertSame([184000.0, '= 20 mm price ₹4,600 per m² × 40', '× 40'], [$c['values'][0]['price'], $c['values'][0]['how'], $c['values'][0]['change']]);
+        self::assertSame([184000.0, '= 20 mm price ₹4,600 per SQM × 40', '× 40'], [$c['values'][0]['price'], $c['values'][0]['how'], $c['values'][0]['change']]);
         self::assertArrayNotHasKey(20, $c['values'], 'the typed thickness itself is not worked out');
         // From the 50 mm+ price per CBM: 20 mm = CBM ÷ 40, then the %.
         $c = ThicknessPrices::calcFrom(self::rules(), 0, 180000.0);
@@ -182,8 +182,8 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         self::assertEqualsWithDelta(189756.10, $p['supplier_inr'], 0.005);
 
         $history = array_map(static fn ($h) => $h['what'] . ': ' . $h['old_value'] . ' → ' . $h['new_value'], ThicknessPrices::historyFor((int) $row['id']));
-        self::assertContains('20 mm per m²: — → 4,600.00 typed', $history);
-        self::assertContains('15 mm per m²: — → 3,680.00 calculated from 20 mm', $history);
+        self::assertContains('20 mm per SQM: — → 4,600.00 typed', $history);
+        self::assertContains('15 mm per SQM: — → 3,680.00 calculated from 20 mm', $history);
         self::assertContains('Base: 20 mm (category) → 50 mm and above', $history);
 
         // The price card: 20 mm costs 4,600 + CHA 195.12 = 4,795.12 per m²; the summary is from the base.

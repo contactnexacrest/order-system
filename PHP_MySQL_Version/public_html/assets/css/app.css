@@ -1208,3 +1208,13 @@ dialog.confirm-box ul { margin: .4rem 0 .8rem 1.2rem; }
 .thickness-rules-table td{vertical-align:middle;}
 .thickness-rules .thickness-rules-table td{white-space:nowrap;}
 .thickness-rules .thickness-rules-table input[type="text"]{width:6rem;max-width:6rem;display:inline-block;}
+
+/* D-364 (13 Nov 2026, mockup units_a): a link styled as a small outlined button (a.btn-sm.btn-secondary,
+   e.g. Procurement's "Supplier performance") is a normal small button — not a tall, underlined outlined
+   box (the same for a plain a.btn-secondary, e.g. Edit price's Cancel) — and in a filter row (form.btn-row) the buttons line up with the bottom of the drop-downs. */
+a.btn-secondary:not(.btn){display:inline-block;text-decoration:none;border-radius:8px;font-weight:600;line-height:1.25;}
+a.btn-secondary:not(.btn):not(.btn-sm){padding:0.55rem 1.1rem;}
+form.btn-row{align-items:flex-end;}
+form.btn-row > a.btn-sm, form.btn-row > button.btn-sm{margin-bottom:1rem;}
+/* D-364 (mockup sqm_sqft_mockup): the live "₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)" line under a supplier price. */
+.sqft-note{margin:0.25rem 0 0.75rem;padding:0.5rem 0.75rem;background:var(--navy-soft);border-left:4px solid var(--navy);border-radius:4px;font-size:0.9rem;color:var(--ink);}

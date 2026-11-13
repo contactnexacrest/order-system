@@ -161,7 +161,7 @@ async function show(req, res) {
     data.rules = r;
     data.rulesView = {
       example: ex,
-      thickness: r.thickness.map((t) => ({ ...t, value: String(oldPct[t.id] ?? fmt(t.pct)), example: `₹${Math.round(ex * (1 + t.pct / 100)).toLocaleString('en-US')} / m²` })),
+      thickness: r.thickness.map((t) => ({ ...t, value: String(oldPct[t.id] ?? fmt(t.pct)), example: `₹${Math.round(ex * (1 + t.pct / 100)).toLocaleString('en-US')} / SQM` })),
       k: String(old.thick_k_factor ?? (r.k !== null ? fmt(r.k) : '')), kExample: r.k !== null ? `₹${Math.round(ex * r.k).toLocaleString('en-US')} / CBM` : '—',
       containerCbm: String(old.container_cbm ?? (r.container_cbm !== null ? fmt(r.container_cbm) : '')),
       containerMaxT: String(old.container_max_t ?? (r.container_max_t !== null ? fmt(r.container_max_t) : '')),

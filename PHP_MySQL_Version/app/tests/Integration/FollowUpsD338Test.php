@@ -156,7 +156,7 @@ final class FollowUpsD338Test extends DbTestCase
     public function testAnnexureSizeMessageFollowsTheLineUnit(): void
     {
         self::assertSame('Line 3 says "As per annexure", so its size is not known — type the price per CBM for this line.', OrderLinePricing::annexureSizeMessage(3, 'CBM'));
-        self::assertSame('Line 4 says "As per annexure", so its size is not known — type the price per m² for this line.', OrderLinePricing::annexureSizeMessage(4, 'SQM'));
+        self::assertSame('Line 4 says "As per annexure", so its size is not known — type the price per SQM for this line.', OrderLinePricing::annexureSizeMessage(4, 'SQM'));
         self::assertSame('Line 1 says "As per annexure", so its size is not known — type the price per piece for this line.', OrderLinePricing::annexureSizeMessage(1, 'PCS'));
         self::assertSame('Line 2 says "As per annexure", so its size is not known — type the price per CBM for this line.', OrderLinePricing::annexureSizeMessage(2, ''));
     }

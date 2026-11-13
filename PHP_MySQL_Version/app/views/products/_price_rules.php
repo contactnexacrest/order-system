@@ -39,17 +39,17 @@ $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="but
   <h2>Thickness</h2>
   <?php if ($__r['spec'] === null): ?><p class="muted">This category has no Thickness specification — add one on the "Options and their price effect" tab first.</p><?php endif; ?>
   <table class="list">
-    <tr><th>Thickness</th><th>Price compared with <?= (int) $__r['base_mm'] ?> mm</th><th class="num">Example (<?= (int) $__r['base_mm'] ?> mm = ₹<?= number_format($__ex, 0) ?> / m²)</th></tr>
+    <tr><th>Thickness</th><th>Price compared with <?= (int) $__r['base_mm'] ?> mm</th><th class="num">Example (<?= (int) $__r['base_mm'] ?> mm = ₹<?= number_format($__ex, 0) ?> / SQM)</th></tr>
     <?php foreach ($__r['thickness'] as $__t): ?>
       <tr data-rule-row data-mm="<?= (int) $__t['mm'] ?>">
         <td><?= View::e($__t['name']) ?></td>
         <td class="rule-cell"><?php if ($__t['base']): ?>base<?php else: ?>+ <input type="text" inputmode="decimal" name="pct[<?= (int) $__t['id'] ?>]" data-rule-pct data-max-decimals="2" data-max-value="500" value="<?= View::e((string) ($__old['pct'][$__t['id']] ?? $__fmt($__t['pct']))) ?>" placeholder="e.g. 35" aria-label="<?= View::e($__t['name']) ?>: % compared with <?= (int) $__r['base_mm'] ?> mm" class="rule-input"<?= $__ro ?>> %<?php endif; ?></td>
-        <td class="num" data-rule-example>₹<?= number_format($__ex * (1 + $__t['pct'] / 100), 0) ?> / m²</td>
+        <td class="num" data-rule-example>₹<?= number_format($__ex * (1 + $__t['pct'] / 100), 0) ?> / SQM</td>
       </tr>
     <?php endforeach; ?>
     <tr data-rule-cbm>
       <td><?= (int) $__r['cbm_from'] ?> mm and above (per CBM)</td>
-      <td class="rule-cell"><?= (int) $__r['base_mm'] ?> mm price per m² × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. <?= View::e(ThicknessPrices::fmt((float) $__r['global']['thick_k_factor'])) ?>" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per m² times" class="rule-input"<?= $__ro ?>><?= $__rg('thick_k_factor') ?></td>
+      <td class="rule-cell"><?= (int) $__r['base_mm'] ?> mm price per SQM × <input type="text" inputmode="decimal" name="thick_k_factor" data-rule-k data-max-decimals="3" data-max-value="1000" value="<?= View::e((string) ($__old['thick_k_factor'] ?? $__fmt($__k))) ?>" placeholder="e.g. <?= View::e(ThicknessPrices::fmt((float) $__r['global']['thick_k_factor'])) ?>" aria-label="<?= (int) $__r['cbm_from'] ?> mm and above: <?= (int) $__r['base_mm'] ?> mm price per SQM times" class="rule-input"<?= $__ro ?>><?= $__rg('thick_k_factor') ?></td>
       <td class="num" data-rule-example><?= $__k !== null ? '₹' . number_format($__ex * $__k, 0) . ' / CBM' : '—' ?></td>
     </tr>
   </table>

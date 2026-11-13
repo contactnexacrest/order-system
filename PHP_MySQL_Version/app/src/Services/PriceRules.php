@@ -115,7 +115,7 @@ final class PriceRules
             }
             return [(float) $v, null];
         };
-        [$k, $e1] = $num('thick_k_factor', 1, 1000, 3, '50 mm and above: 20 mm price per m² ×');
+        [$k, $e1] = $num('thick_k_factor', 1, 1000, 3, '50 mm and above: 20 mm price per SQM ×');
         [$cbm, $e2] = $num('container_cbm', 0.5, 100, 2, 'One container holds (CBM)');
         [$maxT, $e3] = $num('container_max_t', 1, 100, 2, 'Container maximum (tonnes)');
         [$weight, $e4] = $num('weight_t_per_cbm', 0.1, 20, 3, 'Stone weight (tonnes per CBM)');

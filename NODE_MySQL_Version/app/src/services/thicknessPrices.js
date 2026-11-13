@@ -369,7 +369,7 @@ function calcFrom(r, fromMm, price) {
   if (k !== null && k > 0 && fromMm !== CBM) {
     out[CBM] = {
       price: pricingEngine.round2(base * k), calc_from_mm: fromMm,
-      how: `= ${baseMm} mm price ₹${amount(base)} per m² × ${fmt(k)}${fromMm !== baseMm ? ` (${baseMm} mm = ${back})` : ''}`,
+      how: `= ${baseMm} mm price ₹${amount(base)} per SQM × ${fmt(k)}${fromMm !== baseMm ? ` (${baseMm} mm = ${back})` : ''}`,
       change: `× ${fmt(k)}`,
     };
   }
@@ -377,7 +377,7 @@ function calcFrom(r, fromMm, price) {
 }
 
 const priceText = (p) => Number(p).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const what = (mm, cbmFrom) => `${label(mm, cbmFrom)}${Number(mm) === CBM ? ' per CBM' : ' per m²'}`;
+const what = (mm, cbmFrom) => `${label(mm, cbmFrom)}${Number(mm) === CBM ? ' per CBM' : ' per SQM'}`;
 
 /**
  * D-335: "Add / update a price" — saves the TYPED thickness, the TICKED ones as CALCULATED (from
@@ -490,7 +490,7 @@ async function saveTyped(productSupplierId, typed, r, userId) {
     const old = before.values[x.mm];
     const oldText = old ? `${old.price.toFixed(2)} ${old.how}` : null;
     const newText = `${x.price.toFixed(2)} ${x.how}`;
-    if (oldText !== newText) await history(productSupplierId, `${label(x.mm, r.cbm_from)}${x.mm === CBM ? ' per CBM' : ' per m²'}`, oldText, newText, userId);
+    if (oldText !== newText) await history(productSupplierId, `${label(x.mm, r.cbm_from)}${x.mm === CBM ? ' per CBM' : ' per SQM'}`, oldText, newText, userId);
   }
 }
 

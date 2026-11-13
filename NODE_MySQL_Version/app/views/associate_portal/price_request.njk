@@ -20,9 +20,9 @@
         <tr><td>Quote price (USD)</td>{% for u in ['CBM', 'SQM', 'SQFT'] %}<td class="r">{{ (otherUnits.quote[u] | money) if otherUnits.quote[u] != null else '—' }}</td>{% endfor %}</tr>
         <tr><td>Lowest you may agree (USD)</td>{% for u in ['CBM', 'SQM', 'SQFT'] %}<td class="r">{{ (otherUnits.lowest[u] | money) if otherUnits.lowest[u] != null else '—' }}</td>{% endfor %}</tr>
       </table>
-      <p class="muted small">1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
+      <p class="muted small">1 CBM = 1,000 ÷ thickness in mm SQM; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
     {% endif %}
-    {% if breakdown.per_m2 %}<p class="muted small">About USD {{ breakdown.per_m2 | money }} per square metre (one cubic metre gives {{ breakdown.m2_per_cbm }} m²). This is only to compare; the order is priced per cubic metre.</p>{% endif %}
+    {% if breakdown.per_m2 %}<p class="muted small">About USD {{ breakdown.per_m2 | money }} per square metre (one cubic metre gives {{ breakdown.m2_per_cbm }} SQM). This is only to compare; the order is priced per cubic metre.</p>{% endif %}
     <table class="list">
       {% for l in breakdown.lines or [] %}<tr><td>{{ l.label }}</td><td class="r">{{ l.change }}</td></tr>{% endfor %}
     </table>

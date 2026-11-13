@@ -112,7 +112,7 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     expect(c.ok).toBe(true);
     expect([c.values[15].price, c.values[15].how, c.values[15].change]).toEqual([3680, '= 4,600 − 20 %', '−20 %']);
     expect([c.values[18].price, c.values[30].price, c.values[40].price]).toEqual([4370, 6210, 7820]);
-    expect([c.values[0].price, c.values[0].how, c.values[0].change]).toEqual([184000, '= 20 mm price ₹4,600 per m² × 40', '× 40']);
+    expect([c.values[0].price, c.values[0].how, c.values[0].change]).toEqual([184000, '= 20 mm price ₹4,600 per SQM × 40', '× 40']);
     expect(c.values[20]).toBeUndefined();
     c = thicknessPrices.calcFrom(rules(), 0, 180000);
     expect([c.values[20].price, c.values[15].price]).toEqual([4500, 3600]);
@@ -170,8 +170,8 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     expect(p.supplier_inr).toBeCloseTo(189756.10, 2);
 
     const history = (await thicknessPrices.historyFor(Number(row.id))).map((h) => `${h.what}: ${h.old_value} → ${h.new_value}`);
-    expect(history).toContain('20 mm per m²: — → 4,600.00 typed');
-    expect(history).toContain('15 mm per m²: — → 3,680.00 calculated from 20 mm');
+    expect(history).toContain('20 mm per SQM: — → 4,600.00 typed');
+    expect(history).toContain('15 mm per SQM: — → 3,680.00 calculated from 20 mm');
     expect(history).toContain('Base: 20 mm (category) → 50 mm and above');
 
     const page = (await agent.get(url)).text.replace(/&#39;/g, "'");

@@ -296,10 +296,13 @@
     ['piece_length_cm', 'piece_width_cm', 'piece_thickness_cm'].forEach(function (n) { var f = field(scope, n); if (f && f.value.trim() !== '') { q += '&' + n + '=' + encodeURIComponent(f.value.trim()); } });
     if (select.dataset.orderId) { q += '&order_id=' + encodeURIComponent(select.dataset.orderId); }
     else { var client = document.querySelector('select[name="client_id"]'); if (client && client.value) { q += '&client_id=' + encodeURIComponent(client.value); } }
+    // D-364: only the newest answer counts — an older one arriving late (e.g. "Enter the width"
+    // after the width was given) never overwrites the price and the hint.
+    var mine = scope.lineQuoteSeq = (scope.lineQuoteSeq || 0) + 1;
     fetch('/pricing/line-quote?' + q, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if (!d) { return; }
+        if (!d || mine !== scope.lineQuoteSeq) { return; }
         var per = d.unit ? ' per ' + d.unit : '';
         if (d.ok) {
           // D-270 / D-339: the quote converted into the line's unit, only while the price was not typed.

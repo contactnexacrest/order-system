@@ -56,16 +56,30 @@ $__sell = $preview['selling'] ?? null;
             <label>New price (₹) *<input type="text" inputmode="decimal" name="price" required class="edit-price-big" data-max-decimals="2" data-max-value="999999999999.99"
                    placeholder="e.g. 185000" value="<?= View::e((string) ($old['price'] ?? ($base !== null ? rtrim(rtrim(number_format($base['inr'], 2, '.', ''), '0'), '.') : ''))) ?>" data-edit-price-input></label>
             <?php if ($grid): ?>
-              <span class="edit-price-per">per <strong data-edit-price-unit><?= $fromMm === ThicknessPrices::CBM ? 'CBM' : 'm²' ?></strong> for</span>
-              <label>Thickness *<select name="thickness_mm" required data-edit-price-thickness>
+              <?php $__unit = (string) ($old['unit'] ?? ''); $__unit = $fromMm === ThicknessPrices::CBM ? 'CBM' : (in_array($__unit, ['m2', 'SQFT'], true) ? $__unit : 'm2'); ?>
+              <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                <option value="m2"<?= $__unit === 'm2' ? ' selected' : '' ?>>SQM</option>
+                <option value="SQFT" data-sqft="1"<?= $__unit === 'SQFT' ? ' selected' : '' ?>>SQFT</option>
+                <option value="CBM"<?= $__unit === 'CBM' ? ' selected' : '' ?>>CBM</option>
+              </select></label>
+              <span class="edit-price-per">for</span>
+              <label>Thickness *<select name="thickness_mm" required data-edit-price-thickness data-sqft-thickness>
                 <?php foreach ($thicknesses as $t): ?>
-                  <option value="<?= (int) $t['mm'] ?>" data-unit="<?= View::e($t['unit']) ?>"<?= (int) ($old['thickness_mm'] ?? $fromMm) === (int) $t['mm'] ? ' selected' : '' ?>><?= View::e($t['label']) ?><?= (int) $t['mm'] === (int) $fromMm ? ' (base)' : '' ?></option>
+                  <option value="<?= (int) $t['mm'] ?>" data-unit="<?= View::e($t['unit']) ?>"<?= (int) $t['mm'] === (int) $rules['base_mm'] ? ' data-base="1"' : '' ?><?= (int) ($old['thickness_mm'] ?? $fromMm) === (int) $t['mm'] ? ' selected' : '' ?>><?= View::e($t['label']) ?><?= (int) $t['mm'] === (int) $fromMm ? ' (base)' : '' ?></option>
                 <?php endforeach; ?>
               </select></label>
             <?php else: ?>
-              <span class="edit-price-per">per <strong><?= View::e($unitLabel) ?></strong></span>
+              <?php if ($sqmUnit !== null): $__unit = (string) ($old['unit'] ?? '') === 'SQFT' ? 'SQFT' : $sqmUnit; ?>
+                <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                  <option value="<?= View::e($sqmUnit) ?>"<?= $__unit !== 'SQFT' ? ' selected' : '' ?>>SQM</option>
+                  <option value="SQFT" data-sqft="1"<?= $__unit === 'SQFT' ? ' selected' : '' ?>>SQFT</option>
+                </select></label>
+              <?php else: ?>
+                <span class="edit-price-per">per <strong><?= View::e($unitLabel) ?></strong></span>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
+          <p class="sqft-note" data-sqft-note hidden></p>
           <p class="small muted" data-edit-price-change><?= $base !== null ? 'Was ' . View::e($__amt($base['inr'])) : '' ?></p>
           <div class="field-grid">
             <label>Quoted on *<input type="date" name="quoted_on" required max="<?= View::e($today) ?>" value="<?= View::e((string) ($old['quoted_on'] ?? $today)) ?>"></label>

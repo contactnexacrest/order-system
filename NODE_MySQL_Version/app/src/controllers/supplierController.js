@@ -189,7 +189,7 @@ async function productPricesFor(req, id) {
     let price;
     if ((pp.price_basis || '') === 'grid') {
       const g = await thicknessPrices.typedFor(Number(pp.id));
-      price = `${Object.entries(g).map(([mm, v]) => `${Number(mm) === 0 ? '50 mm+' : `${mm} mm`} ₹${fmt2(v)}${Number(mm) === 0 ? ' / CBM' : ' / m²'}`).join(' · ')} (typed; others calculated)`;
+      price = `${Object.entries(g).map(([mm, v]) => `${Number(mm) === 0 ? '50 mm+' : `${mm} mm`} ₹${fmt2(v)}${Number(mm) === 0 ? ' / CBM' : ' / SQM'}`).join(' · ')} (typed; others calculated)`;
     } else {
       price = `₹${pp.fob_value !== null ? fmt2(pp.fob_value) : '—'} / ${(pp.price_basis || '') === 'cbm' ? 'CBM' : (String(pp.reference_unit || '') || 'unit')}`;
     }
@@ -422,7 +422,8 @@ function readOffer(body, shape) {
     mm = /^\d+$/.test(raw) ? Number(raw) : -1;
     if (!allowed.includes(mm)) return { error: 'Base thickness: choose the thickness the supplier quoted.' };
     const want = mm === thicknessPricesCbm() ? 'CBM' : 'm2';
-    if (unit !== want) return { error: `Unit: a price for ${require('../services/thicknessPrices').label(mm)} is per ${want === 'CBM' ? 'CBM' : 'm²'}.` };
+    // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+    if (unit !== want && !(want === 'm2' && unit === supplierOffers.SQFT_INPUT)) return { error: `Unit: a price for ${require('../services/thicknessPrices').label(mm)} is per ${want === 'CBM' ? 'CBM' : 'SQM or SQFT'}.` };
   } else if (!shape.units.map((u) => String(u.value)).includes(unit)) {
     return { error: 'Unit: choose what the price is per.' };
   }
@@ -532,11 +533,12 @@ async function addProduct(req, res) {
     return;
   }
   const row = await require('../repositories/productSupplierRepository').find(offerId);
+  const typedSqft = supplierOffers.fromSqft(inp, product, inp.mm !== null && (await require('../services/thicknessPrices').rules(product)).grid).typed_sqft; // D-364
   const listed = row ? await supplierOffers.listRow(product, row, await require('../services/thicknessPrices').rules(product)) : null;
   const d = new Date(`${inp.quoted_on}T00:00:00`);
   const quoted = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })} ${d.getFullYear()}`;
   flash.set(req, 'success', `${mode === 'new' ? `New product "${product.name}" created (Inactive, not configured yet) and added` : `"${product.name}" added`}`
-    + ` to ${supplier.supplier_legal_name}${listed ? `: ${listed.price}` : ''}, quoted ${quoted}. The offer is active.`);
+    + ` to ${supplier.supplier_legal_name}${listed ? `: ${listed.price}` : ''}${typedSqft !== null ? ` (${supplierOffers.typedText(typedSqft)})` : ''}, quoted ${quoted}. The offer is active.`);
   res.redirect(backTo(sid, from));
 }
 

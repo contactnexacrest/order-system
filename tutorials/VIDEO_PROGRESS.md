@@ -216,6 +216,18 @@ list, Categories, "+ Add / update a price" or Configure. No recorded video is af
 these: **B05** (Procurement: "+ Add / update a price") and **B09** (MD / ED: Products list, Categories, Configure ›
 Thickness rules). Listed only — nothing re-recorded.
 
+D-364 (13 Nov 2026: Procurement's "Supplier performance" link drawn as a small button beside the Status filter; supplier
+prices may be typed per SQFT on "+ Add product", Edit price and Link a supplier — saved as the SQM price, the conversion
+shown under the field; every screen label "m²" / "sq ft" now reads SQM / SQFT; documents, e-mails and Zoho unchanged) —
+checked against every script: no recorded video opens the Procurement page, a supplier's page, Edit price, Link a
+supplier, Market prices, Configure or the product page, and no narration says "square metre", "m²" or "sq ft".
+Possibly affected, listed only: **B01 Part 1** (Export Executive) — the order line panel's small grey help line under the
+size fields now reads "… SQM and SQFT the thickness …" (was "m² and sq ft"); not narrated, the line on camera is priced
+per SQM so its price hint is unchanged. Owner to decide whether to re-record (together with the B01 items noted above).
+Not yet recorded but will show these: **B05** (Procurement: Supplier performance button, + Add product per SQFT, Edit
+price) and **B09** (MD / ED: Products list, Configure, Market prices with SQM / SQFT labels). Listed only — nothing
+re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

@@ -128,7 +128,7 @@ $selectedTypes = $supplier['types'] ?? [];
         <tr class="offer-row<?= $__off !== null && !$__off['offer_active'] ? ' offer-row-off' : '' ?>"><td><?= htmlspecialchars((string) $__pp['product_name']) ?></td>
           <td><?= htmlspecialchars($__off['thickness'] ?? '—') ?></td>
           <td><?php if (($__pp['price_basis'] ?? '') === 'grid'): $__g = \App\Services\ThicknessPrices::typedFor((int) $__pp['id']); ?>
-              <?= htmlspecialchars(implode(' · ', array_map(static fn ($mm, $v) => ($mm === 0 ? '50 mm+' : $mm . ' mm') . ' ₹' . number_format((float) $v, 2) . ($mm === 0 ? ' / CBM' : ' / m²'), array_keys($__g), $__g))) ?> <small class="muted">(typed; others calculated)</small>
+              <?= htmlspecialchars(implode(' · ', array_map(static fn ($mm, $v) => ($mm === 0 ? '50 mm+' : $mm . ' mm') . ' ₹' . number_format((float) $v, 2) . ($mm === 0 ? ' / CBM' : ' / SQM'), array_keys($__g), $__g))) ?> <small class="muted">(typed; others calculated)</small>
             <?php else: ?>₹<?= $__pp['fob_value'] !== null ? number_format((float) $__pp['fob_value'], 2) : '—' ?> <small class="muted">/ <?= htmlspecialchars(($__pp['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($__pp['reference_unit'] ?? '') ?: 'unit')) ?></small><?php endif; ?></td>
           <td><?= htmlspecialchars((string) ($__pp['quoted_on'] ?? '—')) ?></td><td><?= htmlspecialchars((string) ($__pp['valid_until'] ?? '—')) ?></td>
           <td><?php if ($__off !== null): $__from = 'supplier'; $__canSwitch = !empty($canEditPrice); require __DIR__ . '/_offer_switch.php'; endif; ?></td>

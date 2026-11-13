@@ -214,7 +214,7 @@ async function fobFormView(product, categoryId) {
     if (Number(r.mm) === Number(pr.base_mm)) continue;
     rows.push({ rule: `${r.mm} mm`, value: `${pr.base_mm} mm ${r.pct < 0 ? '−' : '+'} ${tp.fmt(Math.abs(r.pct))} %`, own: pr.own.includes(r.option) });
   }
-  if (pr.k !== null && pr.k !== undefined) rows.push({ rule: `${pr.cbm_from} mm and above, per CBM`, value: `${pr.base_mm} mm price per m² × ${tp.fmt(pr.k)}`, own: has('thick_k_factor') });
+  if (pr.k !== null && pr.k !== undefined) rows.push({ rule: `${pr.cbm_from} mm and above, per CBM`, value: `${pr.base_mm} mm price per SQM × ${tp.fmt(pr.k)}`, own: has('thick_k_factor') });
   rows.push({ rule: 'Container', value: `${tp.fmt(pr.container_cbm)} CBM · max ${tp.fmt(pr.container_max_t)} t`, own: has('container_cbm') || has('container_max_t') });
   return {
     chaHint: `÷ ${tp.fmt(Math.round(fit.fits_cbm * 100) / 100)} CBM per container${fit.per_cbm !== null ? ` = ₹${fmt2(fit.per_cbm)} per CBM` : ''}${fit.by_weight ? ' (the weight limit is reached first)' : ''}`,
@@ -234,7 +234,7 @@ function readPriceRuleFields(req) {
     Object.assign(out, { thick_k_factor: null, container_cbm: null, container_max_t: null });
     spec = { cha_transport_per_container: spec.cha_transport_per_container };
   } else if ((req.permissions || {}).manage_pricing) {
-    Object.assign(spec, { thick_k_factor: ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], container_cbm: ['Container holds (CBM)', 0.5, 100, 2],
+    Object.assign(spec, { thick_k_factor: ['50 mm and above: 20 mm price per SQM ×', 1, 1000, 3], container_cbm: ['Container holds (CBM)', 0.5, 100, 2],
       container_max_t: ['Container maximum (tonnes)', 1, 100, 2] });
   }
   const packing = String(body.packing_loading_cost ?? '').trim();

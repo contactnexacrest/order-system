@@ -87,7 +87,7 @@ async function offerBase(product, row, rules = null, s = null) {
     if (!v || !(Number(v.price) > 0)) return null;
     return {
       inr: Number(v.price), mm, unit: mm === thicknessPrices.CBM ? 'CBM' : 'm2',
-      label: `${mm === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(mm, Number(rules.cbm_from))})`,
+      label: `${mm === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(mm, Number(rules.cbm_from))})`,
     };
   }
   const v = productService.effectiveFobForSupplier(row, product);
@@ -239,7 +239,7 @@ async function preview(product, row, fromMm, price, own = {}, s = null) {
       const p = isFrom ? price : (isSet(own[mm]) ? own[mm] : (calc.values[mm] ? calc.values[mm].price : null));
       const how = isFrom ? 'entered' : (isSet(own[mm]) ? 'typed' : (p !== null ? 'calculated' : null));
       out.lines.push({
-        mm, label: thicknessPrices.label(mm, cbmFrom), unit: mm === thicknessPrices.CBM ? 'CBM' : 'm²',
+        mm, label: thicknessPrices.label(mm, cbmFrom), unit: mm === thicknessPrices.CBM ? 'CBM' : 'SQM',
         price: p, was: was.values[mm] ? Number(was.values[mm].price) : null, how, from: isFrom, rule: calc.values[mm] ? calc.values[mm].change : '',
       });
       if (p !== null && p > 0) {
@@ -310,6 +310,9 @@ async function save(product, row, inp, userId) {
   const grid = (row.price_basis || '') === 'grid';
   const cbmFrom = Number(rules.cbm_from);
   const before = await offerBase(product, row, rules);
+  // D-364: a price typed per SQFT is saved as the SQM price; the notes keep what was typed.
+  inp = fromSqft({ unit: '', mm: inp.from_mm ?? null, ...inp }, product, grid, String(row.price_basis || 'unit'));
+  inp.notes = notesWithTyped(String(inp.notes ?? ''), inp.typed_sqft) ?? '';
   // thicknessPrices.addPrice() runs its own transaction for the thickness prices.
   if (grid) {
     const from = Number(inp.from_mm);
@@ -345,19 +348,21 @@ async function save(product, row, inp, userId) {
     fresh = { ...((await productSupplierRepository.find(id)) || fresh), notes: inp.notes !== '' ? inp.notes : null };
     await productSupplierRepository.update(id, fresh, userId);
   }
+  if (isSet(inp.typed_sqft)) await thicknessPrices.history(id, 'Price typed per SQFT', null, typedText(inp.typed_sqft), userId);
   const after = await offerBase(product, (await productSupplierRepository.find(id)) || row, rules);
   await refreshFollowedBase((await productRepository.find(Number(product.id))) || product, userId);
   const what = grid
-    ? `${Number(inp.from_mm) === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(Number(inp.from_mm), cbmFrom)})`
+    ? `${Number(inp.from_mm) === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(Number(inp.from_mm), cbmFrom)})`
     : `per ${(row.price_basis || '') === 'cbm' ? 'CBM' : (String(product.reference_unit || '') || 'unit')}`;
   const d = new Date(`${inp.quoted_on}T00:00:00`);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const summary = `${row.supplier_name} · ${product.name}: ${before ? `₹${thicknessPrices.amount(before.inr)} → ` : ''}₹${thicknessPrices.amount(Number(inp.price))} ${what}`
+    + (isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : '')
     + `, quoted ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}.`
     + (grid && after && before && Number(inp.from_mm) !== (after.mm ?? -1) ? ` Base price now ₹${thicknessPrices.amount(after.inr)} ${after.label}.` : '')
     + (grid ? ' Other thicknesses updated.' : '');
   await auditLogRepository.log(userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', id, null,
-    before ? `₹${ps().numberFormat(before.inr, 2)} ${before.label}` : null, `₹${ps().numberFormat(Number(inp.price), 2)} ${what} quoted ${inp.quoted_on} (Edit price)`);
+    before ? `₹${ps().numberFormat(before.inr, 2)} ${before.label}` : null, `₹${ps().numberFormat(Number(inp.price), 2)} ${what}${isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : ''} quoted ${inp.quoted_on} (Edit price)`);
   return [summary, null];
 }
 
@@ -401,7 +406,7 @@ async function listRow(product, r, rules, s = null) {
   const cbmFrom = Number(rules.cbm_from);
   let price;
   if (base) {
-    const short = base.unit === 'CBM' ? 'CBM' : (base.unit === 'm2' ? 'm²' : (lineUnits.label(base.unit) || base.unit));
+    const short = base.unit === 'CBM' ? 'CBM' : (base.unit === 'm2' ? 'SQM' : (lineUnits.label(base.unit) || base.unit));
     price = `₹${thicknessPrices.amount(base.inr)} / ${short}${base.mm !== null ? ` (${thicknessPrices.label(base.mm, cbmFrom)})` : ''}`;
   } else {
     price = basis === 'combo' ? 'Exact price for a combination' : '—';
@@ -480,7 +485,8 @@ async function priceShape(product, s = null, newProduct = false) {
     return {
       grid: true, base_mm: Number(rules.base_mm),
       thicknesses: thicknessPrices.thicknesses(rules).map((mm) => ({ mm, label: thicknessPrices.label(mm, cbmFrom), unit: mm === thicknessPrices.CBM ? 'CBM' : 'm2' })),
-      units: [{ value: 'm2', label: 'm²' }, { value: 'CBM', label: 'CBM' }],
+      // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+      units: [{ value: 'm2', label: 'SQM' }, { value: SQFT_INPUT, label: 'SQFT', sqft: true }, { value: 'CBM', label: 'CBM' }],
     };
   }
   const units = [];
@@ -491,9 +497,54 @@ async function priceShape(product, s = null, newProduct = false) {
   } else {
     const u = String(product.reference_unit || '');
     units.push({ value: u !== '' ? u : 'unit', label: u !== '' ? (lineUnits.label(u) || u) : 'unit' });
+    if (lineUnits.canonical(u) === 'M2') units.push({ value: SQFT_INPUT, label: 'SQFT', sqft: true }); // D-364
   }
   if (!units.some((x) => x.value.toUpperCase() === 'CBM')) units.push({ value: 'CBM', label: 'CBM' });
   return { grid: false, base_mm: null, thicknesses: [], units };
+}
+
+// ------------------------------------------------------------------ D-364: a price typed per SQFT
+
+/** D-364: the unit a per-area supplier price may be typed in; it is saved as the SQM price. */
+const SQFT_INPUT = 'SQFT';
+
+/** D-364: ₹ per SQFT → ₹ per SQM (× 10.7639, lineUnits.SQFT_PER_M2), 2 decimals. */
+function sqftToSqm(perSqft) {
+  return require('./pricingEngine').round2(Number(perSqft) * lineUnits.SQFT_PER_M2);
+}
+
+/** D-364: whether a price is per SQM — a thickness below "50 mm and above" (grid), else a product sold per SQM. */
+function sqmPriced(product, grid, mm, basis = 'unit') {
+  if (grid) return mm !== null && mm !== undefined && Number(mm) !== thicknessPrices.CBM;
+  return basis !== 'cbm' && lineUnits.canonical(String((product && product.reference_unit) || '')) === 'M2';
+}
+
+/**
+ * D-364: a price typed per SQFT becomes the SQM price, stored exactly as an SQM price is;
+ * typed_sqft keeps what was typed (for the notes and the price history). Any other unit (or a
+ * product whose own unit is SQFT) is left as it is.
+ */
+function fromSqft(inp, product, grid, basis = 'unit') {
+  const out = { ...inp, typed_sqft: null };
+  if (String(inp.unit ?? '').trim().toUpperCase() !== SQFT_INPUT
+    || !sqmPriced(product, grid, isSet(inp.mm) ? Number(inp.mm) : null, basis)) return out;
+  out.typed_sqft = Number(inp.price);
+  out.price = sqftToSqm(Number(inp.price));
+  out.unit = grid ? 'm2' : String(product.reference_unit);
+  return out;
+}
+
+/** D-364: "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)". */
+function typedText(perSqft) {
+  return `typed ₹${thicknessPrices.amount(perSqft)} / SQFT = ₹${thicknessPrices.amount(sqftToSqm(perSqft))} / SQM (× ${lineUnits.SQFT_PER_M2})`;
+}
+
+/** D-364: the offer's notes with its "typed … / SQFT" line set (or dropped for a price typed per SQM); staff notes are kept. */
+function notesWithTyped(notes, typedSqft) {
+  const keep = String(notes ?? '').split(/\r\n|\r|\n/).filter((l) => !/^typed ₹[0-9,.]+ \/ SQFT\b/u.test(l.trim()));
+  let text = keep.join('\n').trim();
+  if (isSet(typedSqft)) text = `${text}\n${typedText(typedSqft)}`.trim();
+  return text !== '' ? text : null;
 }
 
 /**
@@ -550,6 +601,7 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   const productId = Number(product.id);
   const rules = await thicknessPrices.rules(product);
   const grid = inp.mm !== null && rules.grid;
+  inp = fromSqft(inp, product, grid); // D-364: a price per SQFT is saved as the SQM price
   const unitIsCbm = String(inp.unit).toUpperCase() === 'CBM';
   const basis = grid ? 'grid' : (unitIsCbm && lineUnits.canonical(String(product.reference_unit || '')) !== 'CBM' ? 'cbm' : 'unit');
   const primary = basis !== 'cbm' && (await markedForPricing(productId)) === null;
@@ -559,7 +611,7 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
     contact_person: null, contact_phone: null, contact_email: null,
     fob_source: 'direct', fob_value: grid ? null : Number(inp.price),
     factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null,
-    is_primary: 0, notes: null,
+    is_primary: 0, notes: notesWithTyped(null, inp.typed_sqft),
   }, userId));
   await pricingRepository.setSupplierDates(id, String(inp.quoted_on), inp.valid_until !== '' ? String(inp.valid_until) : null);
   await productSupplierRepository.setPriceDetails(id, Number(supplier.id), true, null);
@@ -581,9 +633,11 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   const after = await offerBase(fresh, (await productSupplierRepository.find(id)) || { id }, rules);
   const f2c = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   await thicknessPrices.history(id, 'Offer added (+ Add product)', null, after ? `₹${f2c(after.inr)} ${after.label}` : 'added', userId);
+  if (isSet(inp.typed_sqft)) await thicknessPrices.history(id, 'Price typed per SQFT', null, typedText(inp.typed_sqft), userId);
   await auditLogRepository.log(userId, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
     `${supplier.supplier_legal_name}: ${product.name} ₹${f2c(inp.price)} `
-    + (grid ? `${Number(inp.mm) === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(Number(inp.mm), Number(rules.cbm_from))})` : `per ${inp.unit}`)
+    + (grid ? `${Number(inp.mm) === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(Number(inp.mm), Number(rules.cbm_from))})` : `per ${inp.unit}`)
+    + (isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : '')
     + ` quoted ${inp.quoted_on} (+ Add product)${primary ? ' (used for pricing)' : ''}`);
   return id;
 }
@@ -678,7 +732,7 @@ async function baseLabel(product, s = null) {
   const mm = isSet(product.configured_base_thickness_mm) ? Number(product.configured_base_thickness_mm) : null;
   if (mm !== null) {
     const rules = await thicknessPrices.rules(product, s);
-    return `${mm === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(mm, Number(rules.cbm_from))})`;
+    return `${mm === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(mm, Number(rules.cbm_from))})`;
   }
   const u = String(product.configured_base_unit || '');
   return `per ${u === '' ? 'unit' : (lineUnits.label(u) || u)}`;
@@ -775,7 +829,7 @@ async function forOrderPo(orderId, s = null) {
         if (key !== null && vals.values[key] && Number(vals.values[key].price) > 0) {
           price = Number(vals.values[key].price);
           unit = key === thicknessPrices.CBM ? 'CBM' : 'm2';
-          label = `${key === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(key, cbmFrom)})`;
+          label = `${key === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(key, cbmFrom)})`;
         }
       }
       if (price === null) {
@@ -808,6 +862,8 @@ module.exports = {
   formThicknesses, preview, snapshot, save, undo,
   // D-360
   listRow, forSuppliers, countsBySupplier, existingOffer, priceShape, addProductChoices, createProduct, addOffer,
+  // D-364
+  SQFT_INPUT, sqftToSqm, sqmPriced, fromSqft, typedText, notesWithTyped,
   // D-361
   USABLE_SQL, CONFIGURED_SQL, NO_SUPPLIER_YET_SQL, quotableSql, isConfigured, status, supplierLinked, priceChange,
   baseLabel, productRow, unlinkedPrices, unlinkedCount, linkPrice, forOrderPo,

@@ -3,7 +3,8 @@
   a product from before migration 13b that has no supplier yet — the supplier (or "+ new supplier"),
   their price, per (unit) or for (thickness), quoted on, valid until. The product's configured base
   price stays as it is (owner decision 1). Saved with supplierOffers.addOffer, the same as the
-  supplier page's "+ Add product". PHP twin: app/views/products/link_supplier.php.
+  supplier page's "+ Add product". D-364: per SQM, SQFT (saved as the SQM price, shown converted
+  live) or CBM. PHP twin: app/views/products/link_supplier.php.
 #}
 {% set pickedId = (old.supplier_id | int) if old.supplier_id else picked %}
 <div class="card">
@@ -21,19 +22,25 @@
       <input type="text" name="price" inputmode="decimal" required pattern="[0-9,]{1,15}(\.[0-9]{1,2})?" data-pattern-message="The price in ₹, e.g. 158000 or 158000.50." value="{{ old.price or '' }}" placeholder="e.g. 158000"></label>
     {% if shape.grid %}
       <label>For *
-        <select name="mm" required data-required-message="Choose the thickness the price is for.">
+        <select name="mm" required data-sqft-thickness data-required-message="Choose the thickness the price is for.">
           <option value="">Choose…</option>
           {% set selMm = (old.mm if old.mm !== undefined else (shape.base_mm | string)) %}
-          {% for t in shape.thicknesses %}<option value="{{ t.mm }}"{% if (selMm | string) == (t.mm | string) %} selected{% endif %}>{{ t.label }} (per {{ 'CBM' if t.unit == 'CBM' else 'm²' }})</option>{% endfor %}
+          {% for t in shape.thicknesses %}<option value="{{ t.mm }}" data-unit="{{ 'CBM' if t.unit == 'CBM' else 'SQM' }}"{% if t.mm == shape.base_mm %} data-base="1"{% endif %}{% if (selMm | string) == (t.mm | string) %} selected{% endif %}>{{ t.label }} (per {{ 'CBM' if t.unit == 'CBM' else 'SQM' }})</option>{% endfor %}
+        </select></label>
+      {% set selGridUnit = old.unit if old.unit !== undefined else ('CBM' if (selMm | string) == '0' else 'm2') %}
+      <label>Per *
+        <select name="unit" required data-sqft-unit data-required-message="Choose what the price is per.">
+          {% for u in shape.units %}<option value="{{ u.value }}"{% if u.sqft %} data-sqft="1"{% endif %}{% if selGridUnit == u.value %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
         </select></label>
     {% else %}
       <label>Per *
-        <select name="unit" required data-required-message="Choose what the price is per.">
+        <select name="unit" required data-sqft-unit data-required-message="Choose what the price is per.">
           <option value="">Choose…</option>
           {% set selU = old.unit if old.unit !== undefined else shape.units[0].value %}
-          {% for u in shape.units %}<option value="{{ u.value }}"{% if selU == u.value %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
+          {% for u in shape.units %}<option value="{{ u.value }}"{% if u.sqft %} data-sqft="1"{% endif %}{% if selU == u.value %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
         </select></label>
     {% endif %}
+    <p class="sqft-note full" data-sqft-note hidden></p>
     <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ old.quoted_on or today }}"></label>
     <label>Valid until<input type="date" name="valid_until" value="{{ old.valid_until or '' }}" data-not-before="[name=quoted_on]" data-not-before-message="Valid until cannot be before the quoted date."></label>
     <p class="muted small full">{% if configured %}The product's configured base price stays {{ baseText }}. If this supplier quotes a different price, the product shows "Supplier prices changed — Use ₹…" and you decide.{% else %}The product has no base price yet — Configure it after linking to set its selling price.{% endif %}</p>

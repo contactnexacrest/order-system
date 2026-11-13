@@ -25,7 +25,7 @@ foreach ($categories as $__c) {
 <div class="card page-wide">
   <p class="muted small"><a href="/products/<?= (int) $product['id'] ?>">&larr; Back to <?= View::e($product['name']) ?></a></p>
   <h1>Specifications — <?= View::e($product['name']) ?></h1>
-  <p class="help-line">Example: the category says Leather +USD 4.00/m²; type 6.00 here and this product uses USD 6.00 while every other product keeps 4.00. Type 0 to make it "Included in base price"; untick to stop offering it for this product.</p>
+  <p class="help-line">Example: the category says Leather +USD 4.00/SQM; type 6.00 here and this product uses USD 6.00 while every other product keeps 4.00. Type 0 to make it "Included in base price"; untick to stop offering it for this product.</p>
   <p class="muted">Starts from its category. Change only what is different for this product — everything else follows the category automatically, including later changes there.</p>
   <p><?= $__badge('category') ?> <?= $__badge('changed') ?> <?= $__badge('product') ?> <?= $__badge('hidden') ?></p>
 

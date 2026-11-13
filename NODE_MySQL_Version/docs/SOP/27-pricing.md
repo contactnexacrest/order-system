@@ -95,7 +95,7 @@ Invoice wait for the approval. Once a 50 mm+ price is typed for that supplier (M
 + Add / update a price), new lines need no approval.
 
 **A line "As per annexure" (D-338).** Such a line has no piece size. If its unit needs the
-size to compare the price (e.g. a product priced per m² on a CBM line), the line is refused
+size to compare the price (e.g. a product priced per SQM on a CBM line), the line is refused
 with "Line 3 says "As per annexure", so its size is not known — type the price per CBM for
 this line." — the same message on the Quotation and Proforma Invoice and on the MD's page.
 
@@ -155,7 +155,7 @@ rate 0.
 
 The product page has a read-only card **Prices in other units**: for each
 thickness the product offers, the price per CBM, per SQM and per SQFT, worked
-out from the product's prices (1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT).
+out from the product's prices (1 CBM = 1,000 ÷ thickness in mm SQM; 1 SQM = 10.7639 SQFT).
 Nothing is saved. You see the sets your permissions allow: the **supplier
 price** (people who may see purchase prices), the **staff quote and floor**
 (people who see selling prices) and **every associate level** (MD and ED). A
@@ -202,16 +202,16 @@ Quantity, Packing, Treatment, Calibration. The first (base) option of each chang
 nothing; every other option changes the **cost**:
 
 - a **%** — multiplies the cost (e.g. Standard −8%, 30 mm +35%);
-- **USD per m²** — added to the cost (e.g. Leather +USD 4.00/m²);
+- **USD per SQM** — added to the cost (e.g. Leather +USD 4.00/SQM);
 - **USD per running metre** — in the unit price only for products sold per running
   metre; otherwise shown to the associate as a separate charge;
 - **USD per container** — always a separate charge (e.g. A-frame);
 - **Quantity** % — applied last (e.g. 2–4 containers −2%).
 
 Margin, team incentive, associate commission and buffer are then added as usual, so
-every option keeps the margin. Worked example (₹3,280 per m², ₹82 = USD 1, other
+every option keeps the margin. Worked example (₹3,280 per SQM, ₹82 = USD 1, other
 costs 0%, margin 20%, incentive 15% on, buffer 3%, Level 2 = 5%): Standard · 30 mm ·
-Leather · 2–4 containers → quote **USD 73.43**, lowest **USD 71.30** per m².
+Leather · 2–4 containers → quote **USD 73.43**, lowest **USD 71.30** per SQM.
 
 **Surface finish — names come from Settings (D-357, 12 Nov 2026).** The finish
 names, their order and on/off are set in **Settings › Lists › surface_finish**, the
@@ -226,13 +226,13 @@ finish option must be one of the Settings names.
 product can set its own) the price is per CBM and starts from the product's
 **per-CBM supplier price** (Products › Market prices › "Price per: CBM — thick
 stone", with its own "Used for pricing"). Thickness % options no longer apply;
-per-m² amounts are converted ×1000 ÷ thickness. Example at 80 mm with ₹53,300 per CBM:
-quote **USD 904.56**, lowest **USD 878.21** per CBM (≈ USD 72.36 per m²). No per-CBM
+per-SQM amounts are converted ×1000 ÷ thickness. Example at 80 mm with ₹53,300 per CBM:
+quote **USD 904.56**, lowest **USD 878.21** per CBM (≈ USD 72.36 per SQM). No per-CBM
 supplier price goes to a manual price; "Other, 50 mm or more" on an order line uses
 the line's own thickness (e.g. 13 cm), so it needs no manual price. Since owner
 decision D-270 (11 Nov 2026) an order line may be in **any unit** of its category —
-PCS, m², sq ft, RMT, Ton or CBM: the line price is converted to the product's
-reference unit with the piece size (one piece = L × W × T; 1 m² = 10.7639 sq ft;
+PCS, SQM, SQFT, RMT, Ton or CBM: the line price is converted to the product's
+reference unit with the piece size (one piece = L × W × T; 1 SQM = 10.7639 SQFT;
 Ton by the weight per CBM, stone 2.7 t) for every check — the save, the badge, Price
 check, the MD's approval and the Quotation / PI hold. See
 [Stage 1 — Quoting in any unit](./01-stage1-enquiry-quotation.md#quoting-in-any-unit--piece-size-owner-decision-d-270-11-nov-2026).
@@ -300,14 +300,14 @@ base price is for (e.g. 50 mm and above, per CBM) — so the first figure equals
 the build-up (D-335). Pick a thickness to price that thickness instead; the option shown is always
 the one priced.
 
-Example (₹3,200 per m², ₹82 = USD 1, other costs 2.5%, margin 20%, incentive 15% on,
+Example (₹3,200 per SQM, ₹82 = USD 1, other costs 2.5%, margin 20%, incentive 15% on,
 buffer 3%): ₹3,200 ÷ 82 + 2.5% = **USD 40.00**; Standard · 30 mm · Leather · 2–4 containers →
 staff quote **USD 69.76**; associate Level 2 (5%) floor **USD 71.30**, quote **USD 73.43**.
 
 ## Exact supplier prices for a specific combination (D-256)
 
 Sometimes a supplier quotes one figure for a particular combination (e.g. "30 mm leather,
-₹4,900 per m²") rather than a base price plus changes. Record it in **Market prices** ›
+₹4,900 per SQM") rather than a base price plus changes. Record it in **Market prices** ›
 Add a price › **Price for: A specific combination (exact price)**, then under "For a
 specific combination" choose the option for each specification the price fixes and leave the
 rest as **any**. A supplier quote from Procurement can be copied in with **Copy for a
@@ -420,14 +420,14 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
    Use **+ Add a new supplier (quick)**: name, location, phone, type. It is added as *Details pending*;
    GSTIN, bank and contacts follow later. The **Location** list shows the supplier's factory / quarry addresses.
 2. **Thickness, Price and the tick boxes** (D-335) — choose the thickness the supplier quoted and type its
-   price, e.g. 20 mm = ₹1,600 per m² (per CBM for 50 mm and above). Under "Also work out from this 20 mm
+   price, e.g. 20 mm = ₹1,600 per SQM (per CBM for 50 mm and above). Under "Also work out from this 20 mm
    price" each other thickness shows what it would be and how: 30 mm → ₹2,160.00 (= 1,600 + 35 %),
-   50 mm and above → ₹64,000.00 per CBM (= 20 mm price ₹1,600 per m² × 40). Leave ticked the ones you want
+   50 mm and above → ₹64,000.00 per CBM (= 20 mm price ₹1,600 per SQM × 40). Leave ticked the ones you want
    worked out; untick the others (they stay "no price"). The price you type becomes the **base** of this
    supplier's price.
 3. **Price includes packing and loading** — leave ticked unless the supplier's price is without them.
 4. **CHA + transport per container (₹)** — e.g. ₹60,000. The screen shows it per CBM (₹7,500 with 8 CBM)
-   and per m² for each thickness (₹150 at 20 mm). Empty = the product's default.
+   and per SQM for each thickness (₹150 at 20 mm). Empty = the product's default.
 5. **Price for** — keep "Every thickness". Choose "A special combination" only for one exact price such as
    "30 mm · Leather".
 6. Tick **Use this price for pricing** and **Save price**.
@@ -442,17 +442,17 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
 
 **The price card.** Market prices shows one card per supplier: every thickness with its price, unit, how it
 was set (**TYPED**, **CALCULATED** from 20 mm …, or *no price*), since when, the FOB cost including CHA and
-transport (per m², or per CBM for 50 mm and above) and which one is the **BASE**. Below it: "Product price
+transport (per SQM, or per CBM for 50 mm and above) and which one is the **BASE**. Below it: "Product price
 (from the base)". *Example (product sold per CBM):* 50 mm and above typed ₹1,80,000 per CBM and made the base,
 CHA + transport ₹80,000 per container of 8.2 CBM (₹9,756.10 per CBM): FOB cost ₹1,89,756.10 per CBM. At a rate of
 ₹95, 8 % margin and 3 % buffer: USD 1,997.43, minimum USD 2,171.12, quote about USD 2,236.
 
-**Later prices: + Add / update a price** on the card. Example: the supplier now quotes 20 mm at ₹4,600 per m².
+**Later prices: + Add / update a price** on the card. Example: the supplier now quotes 20 mm at ₹4,600 per SQM.
 Choose 20 mm, type 4,600 and the date. The tick boxes show 15 mm → ₹3,680.00 (= 4,600 − 20 %), 18 mm →
 ₹4,370.00, 30 mm → ₹6,210.00, 40 mm → ₹7,820.00 — ticked, because they have no typed price — and 50 mm
 and above → ₹1,84,000.00 per CBM **not ticked**, with "you typed ₹1,80,000.00 on 11 Nov — kept unless you
 tick this". Base for orders: keep 50 mm and above, or make this 20 mm price the base. **Save price**. After
-saving: 20 mm is TYPED (₹4,600 + CHA 195.12 = ₹4,795.12 per m²), 15/18/30/40 mm are CALCULATED from 20 mm,
+saving: 20 mm is TYPED (₹4,600 + CHA 195.12 = ₹4,795.12 per SQM), 15/18/30/40 mm are CALCULATED from 20 mm,
 the CBM price is unchanged and still the base. A thickness you leave unticked keeps its price (or stays "no
 price" — an order line for it goes to the MD, as today). "○ make base" on a row changes the base without a
 new price. Every change is in the **History** (who, when, old → new).
@@ -486,7 +486,7 @@ record supplier prices (Procurement, MD).
 
 **Steps.**
 1. Type the **New price (₹)**. For a price for every thickness choose the **Thickness** it is for — it starts on the
-   supplier's base thickness (marked "(base)"); the unit (per m², or per CBM for 50 mm and above) follows.
+   supplier's base thickness (marked "(base)"); the unit (per SQM, or per CBM for 50 mm and above) follows.
 2. Under the price you see "Was ₹… → now ₹… (−₹…, −… %)". On the right, **Other thicknesses — worked out for you**
    shows each thickness's new price next to what it was. To keep a different price for one thickness, click **Type it
    yourself** on its row and type it — that row is then saved as you typed it.
@@ -525,7 +525,7 @@ product**; the supplier's page has the same in **Prices given for products**. Se
 
 ## Products, Configure and the base price (D-361, 13 Nov 2026)
 
-**The base price never changes by itself.** Each product has a **configured base price** (₹ per m² at the base
+**The base price never changes by itself.** Each product has a **configured base price** (₹ per SQM at the base
 thickness, per CBM for 50 mm and above, or per unit). Every selling price is worked out from it. On 13 Nov 2026 every
 product was fixed at exactly the price it used that day — no selling price changed. When a supplier's price changes
 later, the product's **Configure / Edit** screen says **"Supplier prices changed: highest is now ₹X"** with a **Use ₹X**
@@ -674,6 +674,26 @@ product** are small buttons side by side.
   **reset** on a row puts back the category's % (then Save); **Reset all to category** shows what goes back and asks
   before it saves. The 50 mm and above factor is the **Thickness factor** row of the table above. The category's own %
   are changed on **Category price rules** — *applies to every product in the category unless the product changes it.*
+
+## Supplier prices per SQFT, and the unit names SQM · SQFT · CBM (D-364, 13 Nov 2026)
+
+- **Typing a supplier price per SQFT.** On **+ Add product** (a supplier's page), **Edit price** and **Link a supplier**,
+  the **per \*** list offers **SQM**, **SQFT** and **CBM**. Choose **SQFT** when the supplier quoted per square foot,
+  e.g. ₹185. Under the fields the app shows straight away: "₹185 / SQFT = **₹1,991.32 / SQM** (× 10.7639) — saved as
+  the SQM price". Click **Save**: the price is stored as ₹1,991.32 per SQM, exactly as if you had typed it per SQM, so
+  the other thicknesses, the selling price and every order unit work as before.
+- **What you typed is kept:** the price's notes read "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)" and the price
+  history (**See price history**) has a row **Price typed per SQFT**. Your own notes stay; the next save typed per SQM
+  removes the old "typed … / SQFT" line.
+- **CBM** is for "50 mm and above" (or a product priced per CBM): choose that thickness and the unit turns to CBM by
+  itself; choose SQM or SQFT and the thickness goes back to a slab thickness. Pieces, Ton and running metre are not in
+  this list — they need the piece size or the weight and are chosen on the order line.
+- **Unit names:** every screen now says **SQM**, **SQFT** and **CBM** (as the documents already do) — e.g. "₹1,991.32 /
+  SQM", "15 mm → ₹3,700 / SQM", "USD 50.00 / SQM", "per CBM · per SQM · per SQFT". The documents, e-mails and Zoho are
+  not changed.
+- **Order lines** keep SQM / SQFT / CBM / PCS / TON. A price in another unit is compared with the product's price per
+  SQM: per SQFT ÷ 10.7639, per CBM ÷ the thickness (20 mm: × 50), per piece × the piece area (60 × 40 cm = 0.24 SQM),
+  per Ton = per CBM ÷ 2.70.
 
 ## Duplicate a product (D-358, 13 Nov 2026)
 

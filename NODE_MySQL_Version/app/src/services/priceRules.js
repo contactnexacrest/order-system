@@ -76,7 +76,7 @@ async function save(categoryId, post, userId) {
     }
     return [Number(v), null];
   };
-  const [k, e1] = numIn('thick_k_factor', 1, 1000, 3, '50 mm and above: 20 mm price per m² ×');
+  const [k, e1] = numIn('thick_k_factor', 1, 1000, 3, '50 mm and above: 20 mm price per SQM ×');
   const [cbm, e2] = numIn('container_cbm', 0.5, 100, 2, 'One container holds (CBM)');
   const [maxT, e3] = numIn('container_max_t', 1, 100, 2, 'Container maximum (tonnes)');
   const [weight, e4] = numIn('weight_t_per_cbm', 0.1, 20, 3, 'Stone weight (tonnes per CBM)');

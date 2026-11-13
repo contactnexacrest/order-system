@@ -28,9 +28,9 @@ $__unit = (string) ($r['unit'] ?? '');
         <tr><td>Quote price (USD)</td><td class="r"><?= $__u($otherUnits['quote']['CBM']) ?></td><td class="r"><?= $__u($otherUnits['quote']['SQM']) ?></td><td class="r"><?= $__u($otherUnits['quote']['SQFT']) ?></td></tr>
         <tr><td>Lowest you may agree (USD)</td><td class="r"><?= $__u($otherUnits['lowest']['CBM']) ?></td><td class="r"><?= $__u($otherUnits['lowest']['SQM']) ?></td><td class="r"><?= $__u($otherUnits['lowest']['SQFT']) ?></td></tr>
       </table>
-      <p class="muted small">1 SQM = thickness × 1 m²; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
+      <p class="muted small">1 CBM = 1,000 ÷ thickness in mm SQM; 1 SQM = 10.7639 SQFT. "—" needs a thickness. Only to compare — the order is priced in the unit above.</p>
     <?php endif; ?>
-    <?php if (!empty($breakdown['per_m2'])): ?><p class="muted small">About USD <?= number_format((float) $breakdown['per_m2'], 2) ?> per square metre (one cubic metre gives <?= View::e((string) $breakdown['m2_per_cbm']) ?> m²). This is only to compare; the order is priced per cubic metre.</p><?php endif; ?>
+    <?php if (!empty($breakdown['per_m2'])): ?><p class="muted small">About USD <?= number_format((float) $breakdown['per_m2'], 2) ?> per square metre (one cubic metre gives <?= View::e((string) $breakdown['m2_per_cbm']) ?> SQM). This is only to compare; the order is priced per cubic metre.</p><?php endif; ?>
     <table class="list">
       <?php foreach ($breakdown['lines'] ?? [] as $l): ?><tr><td><?= View::e($l['label']) ?></td><td class="r"><?= View::e($l['change']) ?></td></tr><?php endforeach; ?>
     </table>

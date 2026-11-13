@@ -148,7 +148,7 @@ function priceText(o) {
   const sign = v < 0 ? '−' : '+';
   const n = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (type === 'pct') return [`${sign}${n} %`, false];
-  const per = { usd_m2: 'USD / m²', usd_rm: 'USD / running m', usd_container: 'USD / container', usd_piece: 'USD / piece', usd_kg: 'USD / kg', usd_set: 'USD / set' }[type] || 'USD';
+  const per = { usd_m2: 'USD / SQM', usd_rm: 'USD / running m', usd_container: 'USD / container', usd_piece: 'USD / piece', usd_kg: 'USD / kg', usd_set: 'USD / set' }[type] || 'USD';
   return [`${sign}${n} ${per}`, false];
 }
 

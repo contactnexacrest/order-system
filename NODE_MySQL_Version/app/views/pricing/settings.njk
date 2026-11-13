@@ -117,7 +117,7 @@
         <input type="number" name="container_max_t" min="1" max="100" step="0.01" required value="{{ settings.container_max_t }}" placeholder="e.g. 27.00"{{ ro }}></label>
       <label class="setting-row"><span class="setting-label">{{ labels.container_cbm }} *<small class="muted">What one container holds, used to spread CHA + transport per container.</small><span class="help-line">Example: 8 → ₹40,000 per container = ₹5,000 per CBM.</span></span>
         <input type="number" name="container_cbm" min="0.5" max="100" step="0.01" required value="{{ settings.container_cbm }}" placeholder="e.g. 8.00"{{ ro }}></label>
-      <label class="setting-row"><span class="setting-label">{{ labels.thick_k_factor }} *<small class="muted">50 mm and above is priced per CBM = the base thickness price per m² × this factor.</small><span class="help-line">Example: 40 → ₹1,600 per m² × 40 = ₹64,000 per CBM.</span></span>
+      <label class="setting-row"><span class="setting-label">{{ labels.thick_k_factor }} *<small class="muted">50 mm and above is priced per CBM = the base thickness price per SQM × this factor.</small><span class="help-line">Example: 40 → ₹1,600 per SQM × 40 = ₹64,000 per CBM.</span></span>
         <input type="number" name="thick_k_factor" min="1" max="1000" step="0.001" required value="{{ settings.thick_k_factor }}" placeholder="e.g. 40"{{ ro }}></label>
     </fieldset>
 
@@ -130,7 +130,7 @@
     </fieldset>
 
     <fieldset><legend>Specifications and Associate Prices (D-255)</legend>
-      <label class="setting-row"><span class="setting-label">{{ labels.cbm_from_mm }} *<small class="muted">From this thickness the price is per CBM, from the product's per-CBM supplier price (Market prices). A product can set its own.</small><span class="help-line">Example: 50 → 20, 30 and 40 mm are priced per m²; 50, 60, 80 mm per CBM (12.5 m² in one CBM at 80 mm).</span></span>
+      <label class="setting-row"><span class="setting-label">{{ labels.cbm_from_mm }} *<small class="muted">From this thickness the price is per CBM, from the product's per-CBM supplier price (Market prices). A product can set its own.</small><span class="help-line">Example: 50 → 20, 30 and 40 mm are priced per SQM; 50, 60, 80 mm per CBM (12.5 SQM in one CBM at 80 mm).</span></span>
         <input type="number" name="cbm_from_mm" min="1" max="2000" step="1" required value="{{ settings.cbm_from_mm }}" placeholder="e.g. 50"{{ ro }}></label>
       <label class="setting-row"><span class="setting-label">{{ labels.price_request_daily_limit }} *<small class="muted">Automatic price requests an associate may make in one day; non-standard requests to our team do not count. An associate can have their own limit.</small><span class="help-line">Example: 10 → the 11th automatic "Get price" that day is refused; a non-standard request still goes to staff.</span></span>
         <input type="number" name="price_request_daily_limit" min="0" max="1000" step="1" required value="{{ settings.price_request_daily_limit }}" placeholder="e.g. 10"{{ ro }}></label>

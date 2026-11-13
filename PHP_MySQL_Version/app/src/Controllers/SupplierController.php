@@ -498,9 +498,10 @@ final class SupplierController
             return;
         }
         $row = \App\Repositories\ProductSupplierRepository::find($offerId);
+        $__typed = SupplierOffers::fromSqft($in, $product, $in['mm'] !== null && \App\Services\ThicknessPrices::rules($product)['grid'])['typed_sqft']; // D-364
         $listed = $row !== null ? SupplierOffers::listRow($product, $row, \App\Services\ThicknessPrices::rules($product)) : null;
         Flash::set('success', ($mode === 'new' ? 'New product "' . $product['name'] . '" created (Inactive, not configured yet) and added' : '"' . $product['name'] . '" added')
-            . ' to ' . $supplier['supplier_legal_name'] . ($listed !== null ? ': ' . $listed['price'] : '') . ', quoted ' . date('j M Y', (int) strtotime($in['quoted_on'])) . '. The offer is active.');
+            . ' to ' . $supplier['supplier_legal_name'] . ($listed !== null ? ': ' . $listed['price'] : '') . ($__typed !== null ? ' (' . SupplierOffers::typedText((float) $__typed) . ')' : '') . ', quoted ' . date('j M Y', (int) strtotime($in['quoted_on'])) . '. The offer is active.');
         header('Location: ' . self::backTo($sid, $from));
     }
 
@@ -522,8 +523,9 @@ final class SupplierController
                 return [[], 'Base thickness: choose the thickness the supplier quoted.'];
             }
             $want = $mm === \App\Services\ThicknessPrices::CBM ? 'CBM' : 'm2';
-            if ($unit !== $want) {
-                return [[], 'Unit: a price for ' . \App\Services\ThicknessPrices::label($mm) . ' is per ' . ($want === 'CBM' ? 'CBM' : 'm²') . '.'];
+            // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
+            if ($unit !== $want && !($want === 'm2' && $unit === SupplierOffers::SQFT_INPUT)) {
+                return [[], 'Unit: a price for ' . \App\Services\ThicknessPrices::label($mm) . ' is per ' . ($want === 'CBM' ? 'CBM' : 'SQM or SQFT') . '.'];
             }
         } elseif (!in_array($unit, array_map(static fn (array $u): string => (string) $u['value'], $shape['units']), true)) {
             return [[], 'Unit: choose what the price is per.'];

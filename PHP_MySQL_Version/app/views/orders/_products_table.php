@@ -179,7 +179,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
             <label class="checkbox-row"><input type="checkbox" name="as_per_annexure" value="1" data-annexure-line <?= !empty($__p['as_per_annexure']) ? 'checked' : '' ?>> As per annexure</label>
           </div>
           <p class="muted small annexure-line-hint">"Qty To Be Confirmed" or "As per annexure" — only one of the two. As per annexure: the sizes go in Annexure A (order page › Annexure A); the Qty is still needed.</p>
-          <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; m² and sq ft the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
+          <p class="muted small">PCS needs length, width and thickness; RMT width and thickness; SQM and SQFT the thickness (or the Thickness option). The thickness and the Thickness option follow each other.</p>
           <?php if ($__detailed): ?>
           <p class="muted small">With Length and Width (and Thickness for CBM) in CBM, SQM or SQFT, type the No. of pieces — the Qty is worked out from it. PCS: the Qty is the pieces. Without a size, type the Qty as before.</p>
           <p class="line-pieces-summary notice notice-info small" aria-live="polite" data-currency="<?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?>"<?= $__pieceSummary === null ? ' hidden' : '' ?>><?= htmlspecialchars((string) $__pieceSummary) ?></p>

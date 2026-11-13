@@ -210,7 +210,7 @@ final class ProductController
             $out = ['thick_k_factor' => null, 'container_cbm' => null, 'container_max_t' => null];
             $spec = ['cha_transport_per_container' => $spec['cha_transport_per_container']];
         } elseif ($this->can('manage_pricing')) {
-            $spec += ['thick_k_factor' => ['50 mm and above: 20 mm price per m² ×', 1, 1000, 3], 'container_cbm' => ['Container holds (CBM)', 0.5, 100, 2],
+            $spec += ['thick_k_factor' => ['50 mm and above: 20 mm price per SQM ×', 1, 1000, 3], 'container_cbm' => ['Container holds (CBM)', 0.5, 100, 2],
                 'container_max_t' => ['Container maximum (tonnes)', 1, 100, 2]];
         }
         $packing = trim((string) ($_POST['packing_loading_cost'] ?? ''));
