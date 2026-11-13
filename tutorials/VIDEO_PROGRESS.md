@@ -241,6 +241,16 @@ product page or "Pricing ready?", and no narration names these columns or checks
 recorded but will show these: **B05** (Procurement: the supplier-price lines of "Pricing ready?") and **B09** (MD / ED:
 Products list short view and "Show all columns", "Pricing ready?"). Listed only — nothing re-recorded.
 
+## Needs re-recording after the 13 Nov 2026 QA fixes (owner decision D-368, item 10b; recording still ON HOLD)
+
+| Video | What now differs |
+|---|---|
+| A01 | Getting started: roles other than MD / ED / Admin no longer see the dashboard screenshot; SOP chapters a role may not open are plain text (QA fix UI-005). |
+| B01 Part 1 | New order: Currency starts at "Choose…" (UI-013); a quantity of 0 is caught beside the field (UI-011); a very large quantity asks "I confirm this quantity" (item 10a). |
+| C02 | New associate: Based in, Currency and Commission start at "Choose…" (UI-013). |
+
+B02 was checked and stays as it is. Do not record until the owner lifts the hold.
+
 ## Script update of 13 Nov 2026 — docs audit C (owner request; recording still ON HOLD)
 
 The owner asked (13 Nov 2026) for every training and tutorial document, including the video scripts, to match
