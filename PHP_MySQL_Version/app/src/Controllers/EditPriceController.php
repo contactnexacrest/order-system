@@ -45,17 +45,28 @@ final class EditPriceController
         return [$row, $product];
     }
 
-    /** Where Cancel / close goes: the supplier's page when the form was opened from there. */
+    /** Where Cancel / close goes: the supplier's page or the Suppliers list (D-360) when the form was opened from there. */
     private static function backUrl(array $row, string $from): string
     {
-        return $from === 'supplier' && !empty($row['supplier_id'])
-            ? '/suppliers/' . (int) $row['supplier_id'] . '/edit#product-prices'
-            : '/products/' . (int) $row['product_id'] . '/market-prices';
+        if ($from === 'supplier' && !empty($row['supplier_id'])) {
+            return '/suppliers/' . (int) $row['supplier_id'] . '/edit#product-prices';
+        }
+        if ($from === 'suppliers' && !empty($row['supplier_id'])) {
+            return '/suppliers#supplier-' . (int) $row['supplier_id'];
+        }
+        return '/products/' . (int) $row['product_id'] . '/market-prices';
     }
 
     private static function from(): string
     {
-        return (string) ($_GET['from'] ?? $_POST['from'] ?? '') === 'supplier' ? 'supplier' : 'product';
+        $f = (string) ($_GET['from'] ?? $_POST['from'] ?? '');
+        return in_array($f, ['supplier', 'suppliers'], true) ? $f : 'product';
+    }
+
+    /** The form's own address, keeping where it was opened from. */
+    private static function selfUrl(int $id, string $from): string
+    {
+        return "/products/suppliers/{$id}/edit-price" . ($from !== 'product' ? '?from=' . $from : '');
     }
 
     /** "185000" / "185,000.50" → 185000.5; null when not a ₹ amount with at most 2 decimals. */
@@ -132,7 +143,7 @@ final class EditPriceController
         }
         $id = (int) $row['id'];
         $from = self::from();
-        $self = "/products/suppliers/{$id}/edit-price" . ($from === 'supplier' ? '?from=supplier' : '');
+        $self = self::selfUrl($id, $from);
         $rules = ThicknessPrices::rules($product);
         $grid = ($row['price_basis'] ?? '') === 'grid';
         [$in, $error] = self::read($rules, $row, $grid);
@@ -160,7 +171,7 @@ final class EditPriceController
         [$row] = self::load($params);
         $id = (int) ($params['supplierId'] ?? 0);
         $from = self::from();
-        $self = "/products/suppliers/{$id}/edit-price" . ($from === 'supplier' ? '?from=supplier' : '');
+        $self = self::selfUrl($id, $from);
         $u = $_SESSION['edit_price_undo'][$id] ?? null;
         if ($row === null || $u === null || !hash_equals((string) $u['token'], (string) ($_POST['undo_token'] ?? ''))) {
             Flash::set('error', 'There is nothing to undo here any more.');

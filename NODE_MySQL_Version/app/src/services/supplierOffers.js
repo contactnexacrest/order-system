@@ -389,8 +389,207 @@ async function undo(snap, userId) {
   return null;
 }
 
+// ------------------------------------------------------------------ D-360: the Suppliers pages
+
+/** D-360: one offer as the Suppliers pages show it. */
+async function listRow(product, r, rules, s = null) {
+  const basis = String(r.price_basis || 'unit');
+  const base = await offerBase(product, r, rules, s);
+  const cbmFrom = Number(rules.cbm_from);
+  let price;
+  if (base) {
+    const short = base.unit === 'CBM' ? 'CBM' : (base.unit === 'm2' ? 'm²' : (lineUnits.label(base.unit) || base.unit));
+    price = `₹${thicknessPrices.amount(base.inr)} / ${short}${base.mm !== null ? ` (${thicknessPrices.label(base.mm, cbmFrom)})` : ''}`;
+  } else {
+    price = basis === 'combo' ? 'Exact price for a combination' : '—';
+  }
+  const day = (v) => (v ? (v instanceof Date ? ymd(v) : String(v).slice(0, 10)) : null);
+  return {
+    id: Number(r.id), product_id: Number(product.id), product_name: String(product.name),
+    product_active: Number(product.is_active ?? 1) === 1,
+    price, thickness: basis === 'grid' ? thicknessPrices.label(thicknessPrices.baseOf(r, rules), cbmFrom) : '—', basis,
+    quoted_on: day(r.quoted_on), valid_until: day(r.valid_until),
+    // "12 Nov 2026 · 31 Dec 2026" (quoted on · valid until)
+    dates: `${day(r.quoted_on) ? longDay(day(r.quoted_on)) : '—'} · ${day(r.valid_until) ? longDay(day(r.valid_until)) : 'no end date'}`,
+    offer_active: Number(r.offer_active ?? 1) === 1,
+    supplier_active: Number(r.supplier_is_active ?? 1) === 1,
+    // "Edit price" is the simple form for one typed price (not an exact price for a combination).
+    editable: (r.fob_source || 'direct') === 'direct' && basis !== 'combo',
+  };
+}
+
+/** "2026-11-12" → "12 Nov 2026" (PHP date('j M Y')). */
+function longDay(v) {
+  const [y, m, d] = v.split('-').map(Number);
+  return `${d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${y}`;
+}
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** D-360: every offer linked to these directory suppliers, by supplier id, for the Suppliers list and the supplier page. */
+async function forSuppliers(supplierIds, s = null) {
+  const ids = [...new Set(supplierIds.map(Number))];
+  if (!ids.length) return {};
+  s = s || (await ps().settings());
+  const params = {};
+  ids.forEach((id, i) => { params[`s${i}`] = id; });
+  const rows = await db.query(`SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps JOIN suppliers sd ON sd.id = cps.supplier_id
+    JOIN catalog_products p ON p.id = cps.product_id WHERE cps.supplier_id IN (${ids.map((_, i) => `:s${i}`).join(', ')}) ORDER BY p.name, cps.id`, params);
+  const products = {};
+  const rules = {};
+  const out = {};
+  for (const r of rows) {
+    const pid = Number(r.product_id);
+    if (!(pid in products)) products[pid] = await productRepository.find(pid);
+    const product = products[pid];
+    if (!product) continue;
+    if (!(pid in rules)) rules[pid] = await thicknessPrices.rules(product, s);
+    (out[Number(r.supplier_id)] = out[Number(r.supplier_id)] || []).push(await listRow(product, r, rules[pid], s));
+  }
+  return out;
+}
+
+/** D-360: how many offers each directory supplier has (linked rows). */
+async function countsBySupplier() {
+  const out = {};
+  for (const r of await db.query('SELECT supplier_id, COUNT(*) AS n FROM catalog_product_suppliers WHERE supplier_id IS NOT NULL GROUP BY supplier_id')) {
+    out[Number(r.supplier_id)] = Number(r.n);
+  }
+  return out;
+}
+
+/** D-360: this supplier's offer of this product, if it already has one. */
+async function existingOffer(supplierId, productId) {
+  const r = await db.queryOne('SELECT id FROM catalog_product_suppliers WHERE supplier_id = :s AND product_id = :p ORDER BY id LIMIT 1', { s: supplierId, p: productId });
+  return r ? productSupplierRepository.find(Number(r.id)) : null;
+}
+
+/**
+ * D-360: what "+ Add product" can price for a product (or a new product of a category): a price
+ * for every thickness (the thicknesses, the base, m² / CBM) or one price per unit.
+ */
+async function priceShape(product, s = null, newProduct = false) {
+  const rules = await thicknessPrices.rules(product, s);
+  if (rules.grid) {
+    const cbmFrom = Number(rules.cbm_from);
+    return {
+      grid: true, base_mm: Number(rules.base_mm),
+      thicknesses: thicknessPrices.thicknesses(rules).map((mm) => ({ mm, label: thicknessPrices.label(mm, cbmFrom), unit: mm === thicknessPrices.CBM ? 'CBM' : 'm2' })),
+      units: [{ value: 'm2', label: 'm²' }, { value: 'CBM', label: 'CBM' }],
+    };
+  }
+  const units = [];
+  if (newProduct) {
+    for (const o of await require('../repositories/lookupRepository').dropdownOptions('unit')) {
+      units.push({ value: String(o.option_value), label: lineUnits.label(String(o.option_value)) || String(o.option_value) });
+    }
+  } else {
+    const u = String(product.reference_unit || '');
+    units.push({ value: u !== '' ? u : 'unit', label: u !== '' ? (lineUnits.label(u) || u) : 'unit' });
+  }
+  if (!units.some((x) => x.value.toUpperCase() === 'CBM')) units.push({ value: 'CBM', label: 'CBM' });
+  return { grid: false, base_mm: null, thicknesses: [], units };
+}
+
+/**
+ * D-360: the "+ Add product" choices — every product (those with no directory supplier yet first,
+ * marked), with what this supplier already offers, and every active category.
+ */
+async function addProductChoices(supplierId, s = null) {
+  s = s || (await ps().settings());
+  const linked = new Set((await db.query('SELECT DISTINCT product_id FROM catalog_product_suppliers WHERE supplier_id IS NOT NULL')).map((r) => Number(r.product_id)));
+  const mine = {};
+  for (const r of await db.query('SELECT product_id, MIN(id) AS id FROM catalog_product_suppliers WHERE supplier_id = :s GROUP BY product_id', { s: supplierId })) {
+    mine[Number(r.product_id)] = Number(r.id);
+  }
+  const products = [];
+  for (const p of await db.query('SELECT * FROM catalog_products ORDER BY name, id')) {
+    products.push({
+      id: Number(p.id), name: String(p.name), active: Number(p.is_active) === 1,
+      no_supplier: !linked.has(Number(p.id)), offer_id: mine[Number(p.id)] ?? null,
+      shape: await priceShape(p, s),
+    });
+  }
+  products.sort((a, b) => (a.no_supplier === b.no_supplier ? 0 : (a.no_supplier ? -1 : 1))
+    || (a.name.toLowerCase() < b.name.toLowerCase() ? -1 : (a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0)));
+  const categories = [];
+  for (const c of await require('../repositories/productCategoryRepository').all(true)) {
+    categories.push({ id: Number(c.id), name: String(c.name), shape: await priceShape({ id: 0, category_id: Number(c.id) }, s, true) });
+  }
+  return { products, categories };
+}
+
+/**
+ * D-360: a new product from a supplier's "+ Add product" — name (unique), category, HS code
+ * (optional: the category's default HS code, else empty until Configure). It starts Inactive
+ * and not configured (D-361 adds Configure). Returns the new product's id.
+ */
+async function createProduct(name, categoryId, hsCode, unit, userId) {
+  const category = await require('../repositories/productCategoryRepository').find(categoryId);
+  const hs = hsCode !== '' ? hsCode : String((category && category.default_hs_code) || '');
+  const id = Number(await productRepository.create({ name, specifications: '', hs_code: hs, reference_unit: unit, is_active: 0 }, userId));
+  // Not configured: configured_at stays empty until Configure (D-361).
+  await require('../repositories/specRepository').setProductFields(id, categoryId, null, null, null);
+  await auditLogRepository.log(userId, 'PRODUCT_CREATED', 'products', id, null, null, `${name} (from a supplier, Inactive, not configured)`);
+  return id;
+}
+
+/**
+ * D-360: "+ Add product" — this directory supplier's offer of a product: one price at one
+ * thickness (the other thicknesses worked out by the price rules, as Market prices does) or one
+ * price per unit / per CBM, quoted on, valid until; the offer is switched on. It is "used for
+ * pricing" only when the product has no supplier price used for pricing yet.
+ * inp: price, mm (grid; null otherwise), unit, quoted_on, valid_until. Returns the offer id.
+ */
+async function addOffer(supplier, product, inp, userId, newProduct = false) {
+  const productId = Number(product.id);
+  const rules = await thicknessPrices.rules(product);
+  const grid = inp.mm !== null && rules.grid;
+  const unitIsCbm = String(inp.unit).toUpperCase() === 'CBM';
+  const basis = grid ? 'grid' : (unitIsCbm && lineUnits.canonical(String(product.reference_unit || '')) !== 'CBM' ? 'cbm' : 'unit');
+  const primary = basis !== 'cbm' && (await markedForPricing(productId)) === null;
+  const id = Number(await productSupplierRepository.create({
+    product_id: productId, supplier_name: String(supplier.supplier_legal_name),
+    location: [String(supplier.city || ''), String(supplier.state || '')].filter((x) => x !== '').join(', ') || null,
+    contact_person: null, contact_phone: null, contact_email: null,
+    fob_source: 'direct', fob_value: grid ? null : Number(inp.price),
+    factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null,
+    is_primary: 0, notes: null,
+  }, userId));
+  await pricingRepository.setSupplierDates(id, String(inp.quoted_on), inp.valid_until !== '' ? String(inp.valid_until) : null);
+  await productSupplierRepository.setPriceDetails(id, Number(supplier.id), true, null);
+  await pricingRepository.setSupplierBasis(id, basis);
+  if (grid) {
+    const row = (await productSupplierRepository.find(id)) || { id };
+    const others = thicknessPrices.thicknesses(rules).filter((mm) => mm !== Number(inp.mm));
+    const error = await thicknessPrices.addPrice(row, rules, Number(inp.mm), Number(inp.price), String(inp.quoted_on), others, true, userId);
+    if (error !== null && error !== undefined) {
+      await productSupplierRepository.remove(id);
+      throw new Error(error);
+    }
+  }
+  if (primary) await productService.setPrimarySupplier(productId, id);
+  const fresh = (await productRepository.find(productId)) || product;
+  if (primary && !newProduct) {
+    // The product had no supplier price used for pricing: its base price now follows this one.
+    await refreshFollowedBase(fresh, userId);
+  }
+  const after = await offerBase(fresh, (await productSupplierRepository.find(id)) || { id }, rules);
+  const f2c = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  await thicknessPrices.history(id, 'Offer added (+ Add product)', null, after ? `₹${f2c(after.inr)} ${after.label}` : 'added', userId);
+  await auditLogRepository.log(userId, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
+    `${supplier.supplier_legal_name}: ${product.name} ₹${f2c(inp.price)} `
+    + (grid ? `${Number(inp.mm) === thicknessPrices.CBM ? 'per CBM' : 'per m²'} (${thicknessPrices.label(Number(inp.mm), Number(rules.cbm_from))})` : `per ${inp.unit}`)
+    + ` quoted ${inp.quoted_on} (+ Add product)${primary ? ' (used for pricing)' : ''}`);
+  return id;
+}
+
 module.exports = {
   usable, offers, markedForPricing, setOfferActive, offerBase, lowestHighest,
   configuredBase, setConfiguredBase, followSupplier, refreshFollowedBase, pricingRow,
   formThicknesses, preview, snapshot, save, undo,
+  // D-360
+  listRow, forSuppliers, countsBySupplier, existingOffer, priceShape, addProductChoices, createProduct, addOffer,
 };

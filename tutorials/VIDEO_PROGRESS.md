@@ -175,6 +175,13 @@ every script: no recorded video opens Market prices, a supplier's page or a supp
 shown on camera (Pick from Products, Price check, Get price) is unchanged (every product's figures were compared
 before and after on both stacks). No video is affected; listed only, nothing re-recorded.
 
+D-360 (13 Nov 2026: Procurement & suppliers › Suppliers lists each supplier's product offers with the base price
+quoted, quoted on · valid until, an Offer active switch, Edit price and + Add product, a "No product prices yet"
+filter and badge; the supplier page's "Prices given for products" gains the switch, Edit price, Open product and a
++ Add product panel and loses its "Used for pricing" column) — checked against every script: no recorded video opens
+the Suppliers list (`/suppliers`) or a supplier's page, and every price shown on camera is unchanged (every product's
+figures compared before and after on both stacks). No video is affected; listed only, nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

@@ -2335,6 +2335,126 @@
     });
   }
 
+  // D-360 (13 Nov 2026, mockups p2 / decision_d1 part B): "+ Add product" on the Suppliers pages.
+  // An existing product or a new one ("create a new product" swaps the fields; the hidden ones are
+  // disabled field by field, so the sitewide validation skips them). The base thickness and the unit follow the
+  // product's (or the new product's category's) price rules, sent by the server in data-choices
+  // (SupplierOffers::addProductChoices / supplierOffers.addProductChoices). A link with
+  // data-open-details="<id>" opens that <details> panel.
+  function initAddOffer() {
+    document.querySelectorAll('a[data-open-details]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        var d = document.getElementById(a.getAttribute('data-open-details'));
+        if (d && d.tagName === 'DETAILS') d.open = true;
+      });
+    });
+    document.querySelectorAll('form[data-add-offer]').forEach(function (form) {
+      var choices = {};
+      try { choices = JSON.parse(form.getAttribute('data-choices') || '{}'); } catch (e) { choices = {}; }
+      var modeField = form.querySelector('[data-add-offer-mode-field]');
+      var existing = form.querySelector('[data-add-offer-existing]');
+      var fresh = form.querySelector('[data-add-offer-new]');
+      var product = form.querySelector('[data-add-offer-product]');
+      var category = form.querySelector('[data-add-offer-category]');
+      var thick = form.querySelector('[data-add-offer-thickness]');
+      var unit = form.querySelector('[data-add-offer-unit]');
+      var badge = form.querySelector('[data-add-offer-badge]');
+      var dup = form.querySelector('[data-add-offer-dup]');
+      var oldThick = form.getAttribute('data-old-thickness') || '';
+      var oldUnit = form.getAttribute('data-old-unit') || '';
+      function option(sel, value, text, selected) {
+        var o = document.createElement('option');
+        o.value = value;
+        o.textContent = text;
+        if (selected) o.selected = true;
+        sel.appendChild(o);
+        return o;
+      }
+      function shape() {
+        if (modeField.value === 'new') {
+          var c = (choices.categories || {})[category.value];
+          return c ? c.shape : null;
+        }
+        var p = (choices.products || {})[product.value];
+        return p ? p.shape : null;
+      }
+      function syncUnit() {
+        var s = shape();
+        if (!s || !s.grid) return;
+        var opt = thick.options[thick.selectedIndex];
+        var want = opt ? opt.getAttribute('data-unit') : '';
+        if (want) unit.value = want;
+      }
+      function fill() {
+        var s = shape();
+        var keepThick = thick.value || oldThick;
+        var keepUnit = unit.value || oldUnit;
+        thick.innerHTML = '';
+        unit.innerHTML = '';
+        if (!s) {
+          option(thick, '', modeField.value === 'new' ? 'Choose the category first' : 'Choose the product first', true);
+          option(unit, '', 'Choose…', true);
+          return;
+        }
+        if (s.grid) {
+          s.thicknesses.forEach(function (t) {
+            var o = option(thick, String(t.mm), t.label + (t.mm === s.base_mm ? ' (base)' : ''), keepThick !== '' ? String(t.mm) === keepThick : t.mm === s.base_mm);
+            o.setAttribute('data-unit', t.unit);
+          });
+          if (thick.selectedIndex < 0 && thick.options.length) thick.options[0].selected = true;
+        } else {
+          option(thick, 'none', 'No thickness: one price', true);
+        }
+        s.units.forEach(function (u, i) { option(unit, u.value, u.label, keepUnit !== '' ? u.value === keepUnit : i === 0); });
+        if (unit.selectedIndex < 0 && unit.options.length) unit.options[0].selected = true;
+        syncUnit();
+        oldThick = '';
+        oldUnit = '';
+      }
+      function showProduct() {
+        var p = (choices.products || {})[product.value];
+        if (badge) badge.hidden = !(modeField.value !== 'new' && p && p.no_supplier);
+        if (dup) dup.hidden = !(modeField.value !== 'new' && p && p.offer_id);
+      }
+      function setMode(m) {
+        modeField.value = m;
+        var isNew = m === 'new';
+        if (existing) existing.hidden = isNew;
+        if (product) product.disabled = isNew;
+        if (fresh) {
+          fresh.hidden = !isNew;
+          // Each field, not the fieldset: the sitewide check reads el.disabled.
+          fresh.querySelectorAll('input, select, textarea').forEach(function (f) { f.disabled = !isNew; });
+        }
+        thick.value = '';
+        unit.value = '';
+        fill();
+        showProduct();
+        var first = isNew ? form.querySelector('input[name="new_name"]') : product;
+        if (first) first.focus();
+      }
+      form.querySelectorAll('[data-add-offer-mode]').forEach(function (b) {
+        b.addEventListener('click', function () { setMode(b.getAttribute('data-add-offer-mode')); });
+      });
+      if (product) product.addEventListener('change', function () { thick.value = ''; unit.value = ''; fill(); showProduct(); });
+      if (category) category.addEventListener('change', function () { thick.value = ''; unit.value = ''; fill(); });
+      thick.addEventListener('change', syncUnit);
+      unit.addEventListener('change', function () {
+        var s = shape();
+        if (!s || !s.grid) return;
+        // A price per CBM is for 50 mm and above; per m² for a thinner slab.
+        var opt = thick.options[thick.selectedIndex];
+        if (opt && opt.getAttribute('data-unit') !== unit.value) {
+          for (var i = 0; i < thick.options.length; i++) {
+            if (thick.options[i].getAttribute('data-unit') === unit.value) { thick.selectedIndex = i; break; }
+          }
+        }
+      });
+      fill();
+      showProduct();
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -2404,6 +2524,7 @@
     initRulesExample();
     initSectionMenus(); // D-320
     initEditPrice(); // D-359
+    initAddOffer(); // D-360
   }
 
   if (document.readyState === 'loading') {

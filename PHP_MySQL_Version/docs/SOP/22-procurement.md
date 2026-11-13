@@ -76,6 +76,36 @@ given, awards won, receipts, how many came by the needed-by date, and how
 many failed the quality check. The link shows only to people with **Manage
 purchasing**, the permission the page needs.
 
+## 6a. Suppliers: the products they offer and their prices (D-360, 13 Nov 2026)
+
+**Procurement & suppliers › Suppliers** lists every supplier with, under it, the products it offers: the base price
+it quoted (₹ per m² or per CBM at the base thickness, or per unit), **Quoted on · valid until**, an **Offer active**
+switch and **Edit price**. You need *Manage suppliers*; to see prices, *View purchase prices*; to switch offers, add
+products and edit prices, the right to record supplier prices (Procurement, MD).
+
+- **Show:** All · Active · Inactive · **No product prices yet (N)** — the last lists suppliers with no product price
+  yet (they carry a yellow "No product prices yet" badge), so you can work through them.
+- **Offer active.** Click the switch to stop using a supplier's price for a product ("not offering now") and click
+  again to use it again. A switched-off price is not used for the product's selling price, for matching or for the
+  lowest / highest supplier price. A supplier marked **Inactive** has its products greyed: "Inactive: none of their
+  prices are used anywhere."
+- **Edit price** opens the simple Edit price form (see [Pricing](./27-pricing.md)); Cancel brings you back here.
+- **+ Add product** (on the supplier's row, or **+ Add product** under **Prices given for products** on the supplier's
+  page):
+  1. **Product** — pick it from the list (products that have no supplier yet come first and are marked "no supplier
+     yet"), or click **create a new product** and enter its **Name** (must be new), **Category** and, if you know it,
+     **HS code** (empty = the category's code).
+  2. **Base thickness**, **Price ₹** and **per** (m² for a slab thickness, CBM for 50 mm and above; for a product
+     without thicknesses, per its unit or per CBM). The other thicknesses are worked out by the category's price rules.
+  3. **Quoted on** (not in the future) and **Valid until** if the supplier gave one. **Save**.
+  You return to where you started with a green message; the offer is switched on. A product created here starts
+  **Inactive** and not configured — it is not offered on quotations until it is configured on Products.
+  If the supplier already has a price for that product you are taken to its **Edit price** instead — a supplier offers
+  a product once.
+- On the supplier's page the **Prices given for products** table shows Base thickness, Price, dates, **Offer active**,
+  **Edit price** and **Open product**. (The old "Used for pricing" column is gone from this table; which supplier's
+  price the product is priced from is still set on the product's Market prices.)
+
 ## 7. Cancelling
 
 A requirement not yet received can be cancelled with a reason; it stays

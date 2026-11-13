@@ -46,13 +46,20 @@ async function load(req) {
 
 /** Where Cancel / close goes: the supplier's page when the form was opened from there. */
 function backUrl(row, from) {
-  return from === 'supplier' && row.supplier_id
-    ? `/suppliers/${Number(row.supplier_id)}/edit#product-prices`
-    : `/products/${Number(row.product_id)}/market-prices`;
+  if (from === 'supplier' && row.supplier_id) return `/suppliers/${Number(row.supplier_id)}/edit#product-prices`;
+  // D-360: opened from the Suppliers list.
+  if (from === 'suppliers' && row.supplier_id) return `/suppliers#supplier-${Number(row.supplier_id)}`;
+  return `/products/${Number(row.product_id)}/market-prices`;
 }
 
 function fromOf(req) {
-  return String((req.query && req.query.from) || (req.body && req.body.from) || '') === 'supplier' ? 'supplier' : 'product';
+  const f = String((req.query && req.query.from) || (req.body && req.body.from) || '');
+  return ['supplier', 'suppliers'].includes(f) ? f : 'product';
+}
+
+/** The form's own address, keeping where it was opened from. */
+function selfUrl(id, from) {
+  return `/products/suppliers/${id}/edit-price${from !== 'product' ? `?from=${from}` : ''}`;
 }
 
 /** "185000" / "185,000.50" → 185000.5; null when not a ₹ amount with at most 2 decimals. */
@@ -194,7 +201,7 @@ async function save(req, res) {
   }
   const id = Number(row.id);
   const from = fromOf(req);
-  const self = `/products/suppliers/${id}/edit-price${from === 'supplier' ? '?from=supplier' : ''}`;
+  const self = selfUrl(id, from);
   const rules = await thicknessPrices.rules(product);
   const grid = (row.price_basis || '') === 'grid';
   const body = req.body || {};
@@ -222,7 +229,7 @@ async function undo(req, res) {
   const [row] = await load(req);
   const id = parseInt(req.params.supplierId, 10) || 0;
   const from = fromOf(req);
-  const self = `/products/suppliers/${id}/edit-price${from === 'supplier' ? '?from=supplier' : ''}`;
+  const self = selfUrl(id, from);
   const all = req.session.edit_price_undo || {};
   const u = all[id] || null;
   const token = String((req.body && req.body.undo_token) || '');

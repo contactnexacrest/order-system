@@ -464,4 +464,223 @@ final class SupplierOffers
         AuditLogRepository::log($userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', $id, null, 'Edit price', 'undone');
         return null;
     }
+
+    // ------------------------------------------------------------------ D-360: the Suppliers pages
+
+    /**
+     * D-360: every offer linked to these directory suppliers, by supplier id, for the Suppliers
+     * list and the supplier page: product, base price as quoted (offerBase), dates, the switch.
+     *
+     * @param list<int> $supplierIds
+     * @return array<int, list<array<string,mixed>>>
+     */
+    public static function forSuppliers(array $supplierIds, ?array $settings = null): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $supplierIds)));
+        if ($ids === []) {
+            return [];
+        }
+        $settings ??= PricingService::settings();
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = Database::connection()->prepare("SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps JOIN suppliers sd ON sd.id = cps.supplier_id
+            JOIN catalog_products p ON p.id = cps.product_id WHERE cps.supplier_id IN ({$in}) ORDER BY p.name, cps.id");
+        $st->execute($ids);
+        $products = [];
+        $rules = [];
+        $out = [];
+        foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $pid = (int) $r['product_id'];
+            $products[$pid] ??= ProductRepository::find($pid);
+            $product = $products[$pid];
+            if ($product === null) {
+                continue;
+            }
+            $rules[$pid] ??= ThicknessPrices::rules($product, $settings);
+            $out[(int) $r['supplier_id']][] = self::listRow($product, $r, $rules[$pid], $settings);
+        }
+        return $out;
+    }
+
+    /** One offer as the Suppliers pages show it. @return array<string,mixed> */
+    public static function listRow(array $product, array $r, array $rules, ?array $settings = null): array
+    {
+        $basis = (string) ($r['price_basis'] ?? 'unit');
+        $base = self::offerBase($product, $r, $rules, $settings);
+        $cbmFrom = (int) $rules['cbm_from'];
+        if ($base !== null) {
+            $short = $base['unit'] === 'CBM' ? 'CBM' : ($base['unit'] === 'm2' ? 'm²' : (LineUnits::label($base['unit']) ?: $base['unit']));
+            $price = '₹' . ThicknessPrices::amount($base['inr']) . ' / ' . $short . ($base['mm'] !== null ? ' (' . ThicknessPrices::label($base['mm'], $cbmFrom) . ')' : '');
+        } else {
+            $price = $basis === 'combo' ? 'Exact price for a combination' : '—';
+        }
+        $thickness = $basis === 'grid' ? ThicknessPrices::label(ThicknessPrices::baseOf($r, $rules), $cbmFrom) : '—';
+        return [
+            'id' => (int) $r['id'], 'product_id' => (int) $product['id'], 'product_name' => (string) $product['name'],
+            'product_active' => (int) ($product['is_active'] ?? 1) === 1,
+            'price' => $price, 'thickness' => $thickness, 'basis' => $basis,
+            'quoted_on' => !empty($r['quoted_on']) ? substr((string) $r['quoted_on'], 0, 10) : null,
+            'valid_until' => !empty($r['valid_until']) ? substr((string) $r['valid_until'], 0, 10) : null,
+            // "12 Nov 2026 · 31 Dec 2026" (quoted on · valid until)
+            'dates' => (!empty($r['quoted_on']) ? date('j M Y', (int) strtotime(substr((string) $r['quoted_on'], 0, 10))) : '—') . ' · '
+                . (!empty($r['valid_until']) ? date('j M Y', (int) strtotime(substr((string) $r['valid_until'], 0, 10))) : 'no end date'),
+            'offer_active' => (int) ($r['offer_active'] ?? 1) === 1,
+            'supplier_active' => (int) ($r['supplier_is_active'] ?? 1) === 1,
+            // "Edit price" is the simple form for one typed price (not an exact price for a combination).
+            'editable' => ($r['fob_source'] ?? 'direct') === 'direct' && $basis !== 'combo',
+        ];
+    }
+
+    /** D-360: how many offers each directory supplier has (linked rows). @return array<int,int> */
+    public static function countsBySupplier(): array
+    {
+        $out = [];
+        foreach (Database::connection()->query('SELECT supplier_id, COUNT(*) AS n FROM catalog_product_suppliers WHERE supplier_id IS NOT NULL GROUP BY supplier_id')->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $out[(int) $r['supplier_id']] = (int) $r['n'];
+        }
+        return $out;
+    }
+
+    /** D-360: this supplier's offer of this product, if it already has one. */
+    public static function existingOffer(int $supplierId, int $productId): ?array
+    {
+        $st = Database::connection()->prepare('SELECT id FROM catalog_product_suppliers WHERE supplier_id = :s AND product_id = :p ORDER BY id LIMIT 1');
+        $st->execute(['s' => $supplierId, 'p' => $productId]);
+        $id = $st->fetchColumn();
+        return $id !== false ? ProductSupplierRepository::find((int) $id) : null;
+    }
+
+    /**
+     * D-360: what "+ Add product" can price for a product (or a new product of a category):
+     * a price for every thickness (the thicknesses, the base, m² / CBM) or one price per unit.
+     *
+     * @return array{grid: bool, base_mm: ?int, thicknesses: list<array{mm:int,label:string,unit:string}>, units: list<array{value:string,label:string}>}
+     */
+    public static function priceShape(array $product, ?array $settings = null, bool $newProduct = false): array
+    {
+        $rules = ThicknessPrices::rules($product, $settings);
+        if ($rules['grid']) {
+            $cbmFrom = (int) $rules['cbm_from'];
+            return ['grid' => true, 'base_mm' => (int) $rules['base_mm'],
+                'thicknesses' => array_map(static fn (int $mm): array => ['mm' => $mm, 'label' => ThicknessPrices::label($mm, $cbmFrom), 'unit' => $mm === ThicknessPrices::CBM ? 'CBM' : 'm2'], ThicknessPrices::thicknesses($rules)),
+                'units' => [['value' => 'm2', 'label' => 'm²'], ['value' => 'CBM', 'label' => 'CBM']]];
+        }
+        $units = [];
+        if ($newProduct) {
+            foreach (\App\Repositories\LookupRepository::dropdownOptions('unit') as $o) {
+                $units[] = ['value' => (string) $o['option_value'], 'label' => LineUnits::label((string) $o['option_value']) ?: (string) $o['option_value']];
+            }
+        } else {
+            $u = (string) ($product['reference_unit'] ?? '');
+            $units[] = ['value' => $u !== '' ? $u : 'unit', 'label' => $u !== '' ? (LineUnits::label($u) ?: $u) : 'unit'];
+        }
+        if (!in_array('CBM', array_map(static fn (array $x): string => strtoupper($x['value']), $units), true)) {
+            $units[] = ['value' => 'CBM', 'label' => 'CBM'];
+        }
+        return ['grid' => false, 'base_mm' => null, 'thicknesses' => [], 'units' => $units];
+    }
+
+    /**
+     * D-360: the "+ Add product" choices — every product (those with no directory supplier yet
+     * first, marked), with what this supplier already offers, and every active category.
+     *
+     * @return array{products: list<array<string,mixed>>, categories: list<array<string,mixed>>}
+     */
+    public static function addProductChoices(int $supplierId, ?array $settings = null): array
+    {
+        $settings ??= PricingService::settings();
+        $pdo = Database::connection();
+        $linked = [];
+        foreach ($pdo->query('SELECT DISTINCT product_id FROM catalog_product_suppliers WHERE supplier_id IS NOT NULL')->fetchAll(\PDO::FETCH_COLUMN) as $pid) {
+            $linked[(int) $pid] = true;
+        }
+        $st = $pdo->prepare('SELECT product_id, MIN(id) AS id FROM catalog_product_suppliers WHERE supplier_id = :s GROUP BY product_id');
+        $st->execute(['s' => $supplierId]);
+        $mine = [];
+        foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $mine[(int) $r['product_id']] = (int) $r['id'];
+        }
+        $products = [];
+        foreach ($pdo->query('SELECT * FROM catalog_products ORDER BY name, id')->fetchAll(\PDO::FETCH_ASSOC) as $p) {
+            $products[] = ['id' => (int) $p['id'], 'name' => (string) $p['name'], 'active' => (int) $p['is_active'] === 1,
+                'no_supplier' => !isset($linked[(int) $p['id']]), 'offer_id' => $mine[(int) $p['id']] ?? null,
+                'shape' => self::priceShape($p, $settings)];
+        }
+        usort($products, static fn (array $a, array $b): int => [$a['no_supplier'] ? 0 : 1, mb_strtolower($a['name'])] <=> [$b['no_supplier'] ? 0 : 1, mb_strtolower($b['name'])]);
+        $categories = [];
+        foreach (\App\Repositories\ProductCategoryRepository::all(true) as $c) {
+            $categories[] = ['id' => (int) $c['id'], 'name' => (string) $c['name'],
+                'shape' => self::priceShape(['id' => 0, 'category_id' => (int) $c['id']], $settings, true)];
+        }
+        return ['products' => $products, 'categories' => $categories];
+    }
+
+    /**
+     * D-360: a new product from a supplier's "+ Add product" — name (unique), category, HS code
+     * (optional: the category's default HS code, else empty until Configure). It starts
+     * Inactive and not configured (D-361 adds Configure). Returns the new product's id.
+     */
+    public static function createProduct(string $name, int $categoryId, string $hsCode, ?string $unit, int $userId): int
+    {
+        $category = \App\Repositories\ProductCategoryRepository::find($categoryId);
+        $hs = $hsCode !== '' ? $hsCode : (string) ($category['default_hs_code'] ?? '');
+        $id = ProductRepository::create(['name' => $name, 'specifications' => '', 'hs_code' => $hs, 'reference_unit' => $unit, 'is_active' => 0], $userId);
+        // Not configured: configured_at stays empty until Configure (D-361).
+        \App\Repositories\SpecRepository::setProductFields($id, $categoryId, null, null, null);
+        AuditLogRepository::log($userId, 'PRODUCT_CREATED', 'products', $id, null, null, $name . ' (from a supplier, Inactive, not configured)');
+        return $id;
+    }
+
+    /**
+     * D-360: "+ Add product" — this directory supplier's offer of a product: one price at one
+     * thickness (the other thicknesses worked out by the price rules, as Market prices does)
+     * or one price per unit / per CBM, quoted on, valid until; the offer is switched on. It is
+     * "used for pricing" only when the product has no supplier price used for pricing yet.
+     * $in: price, mm (grid; null otherwise), unit, quoted_on, valid_until. Returns the offer id.
+     *
+     * @param array<string,mixed> $in
+     */
+    public static function addOffer(array $supplier, array $product, array $in, int $userId, bool $newProduct = false): int
+    {
+        $productId = (int) $product['id'];
+        $rules = ThicknessPrices::rules($product);
+        $grid = $in['mm'] !== null && $rules['grid'];
+        $unitIsCbm = strtoupper((string) $in['unit']) === 'CBM';
+        $basis = $grid ? 'grid' : ($unitIsCbm && LineUnits::canonical((string) ($product['reference_unit'] ?? '')) !== 'CBM' ? 'cbm' : 'unit');
+        $primary = $basis !== 'cbm' && self::markedForPricing($productId) === null;
+        $id = ProductSupplierRepository::create([
+            'product_id' => $productId, 'supplier_name' => (string) $supplier['supplier_legal_name'],
+            'location' => trim(implode(', ', array_filter([(string) ($supplier['city'] ?? ''), (string) ($supplier['state'] ?? '')]))) ?: null,
+            'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
+            'fob_source' => 'direct', 'fob_value' => $grid ? null : (float) $in['price'],
+            'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null,
+            'is_primary' => 0, 'notes' => null,
+        ], $userId);
+        PricingRepository::setSupplierDates($id, (string) $in['quoted_on'], $in['valid_until'] !== '' ? (string) $in['valid_until'] : null);
+        ProductSupplierRepository::setPriceDetails($id, (int) $supplier['id'], true, null);
+        PricingRepository::setSupplierBasis($id, $basis);
+        if ($grid) {
+            $row = ProductSupplierRepository::find($id) ?? ['id' => $id];
+            $others = array_values(array_filter(ThicknessPrices::thicknesses($rules), static fn (int $mm): bool => $mm !== (int) $in['mm']));
+            $error = ThicknessPrices::addPrice($row, $rules, (int) $in['mm'], (float) $in['price'], (string) $in['quoted_on'], $others, true, $userId);
+            if ($error !== null) {
+                ProductSupplierRepository::delete($id);
+                throw new \RuntimeException($error);
+            }
+        }
+        if ($primary) {
+            (new ProductService())->setPrimarySupplier($productId, $id, $userId);
+        }
+        $fresh = ProductRepository::find($productId) ?? $product;
+        if ($primary && !$newProduct) {
+            // The product had no supplier price used for pricing: its base price now follows this one.
+            self::refreshFollowedBase($fresh, $userId);
+        }
+        $after = self::offerBase($fresh, ProductSupplierRepository::find($id) ?? ['id' => $id], $rules);
+        ThicknessPrices::history($id, 'Offer added (+ Add product)', null, $after !== null ? '₹' . number_format($after['inr'], 2) . ' ' . $after['label'] : 'added', $userId);
+        AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
+            $supplier['supplier_legal_name'] . ': ' . $product['name'] . ' ₹' . number_format((float) $in['price'], 2) . ' '
+            . ($grid ? ((int) $in['mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per m²') . ' (' . ThicknessPrices::label((int) $in['mm'], (int) $rules['cbm_from']) . ')' : 'per ' . $in['unit'])
+            . ' quoted ' . $in['quoted_on'] . ' (+ Add product)' . ($primary ? ' (used for pricing)' : ''));
+        return $id;
+    }
 }

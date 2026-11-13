@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <h1>Suppliers</h1>
-  <p class="muted">The directory of suppliers a Supplier PO is raised against. A supplier can hold more than one type (e.g. Quarry Owner and Factory Owner). Editing or deleting a supplier here never changes an order that has already saved its Supplier PO terms — the order keeps its own copy of the supplier's details.</p>
+  <p class="muted">Every supplier with the products they offer and their quoted price. The directory of suppliers a Supplier PO is raised against. A supplier can hold more than one type (e.g. Quarry Owner and Factory Owner). Editing or deleting a supplier here never changes an order that has already saved its Supplier PO terms — the order keeps its own copy of the supplier's details.</p>
 
   <div class="section">
     <form method="get" action="/suppliers" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
@@ -16,20 +16,32 @@
         <input type="text" name="q" value="{{ search }}" placeholder="Supplier name">
       </label>
       <button type="submit" class="btn-sm btn-secondary">Search</button>
-      {% if filterType or search %}<a href="/suppliers" class="btn-sm btn-secondary">Clear</a>{% endif %}
+      {% if filterType or search or show != 'all' %}<a href="/suppliers" class="btn-sm btn-secondary">Clear</a>{% endif %}
+      {% if show != 'all' %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
       <a href="/suppliers/create" class="btn-sm btn-accent" style="margin-left:auto;">Add Supplier</a>
     </form>
+    {# D-360: All / Active / Inactive / suppliers with no product price yet (kept with the type and search). #}
+    <nav class="filter-pills" aria-label="Show suppliers">
+      <span class="muted small">Show:</span>
+      {% for pill in showPills %}
+        <a href="{{ pill.href }}" class="filter-pill{{ ' is-current' if show == pill.key else '' }}"{% if show == pill.key %} aria-current="page"{% endif %}>{{ pill.label }}</a>
+      {% endfor %}
+    </nav>
 
     <div class="table-scroll">
     <table class="list suppliers-table">
-      <tr><th>Supplier</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th><th>Status</th><th>Actions</th></tr>
+      {% set withOffers = offers !== null %}
+      {% set cols = 12 if withOffers else 9 %}
+      <tr><th>Supplier / product</th><th>Type(s)</th><th>Location</th><th>Phone / WhatsApp</th><th>Contact Person</th><th>GSTIN</th><th>Bank</th>{% if withOffers %}<th>Base price quoted (₹)</th><th>Quoted on · valid until</th><th>Offer active</th>{% endif %}<th>Status</th><th>Actions</th></tr>
       {% if not suppliers.length %}
-      <tr><td colspan="9" class="muted">{{ 'No suppliers match this filter.' if (filterType or search) else 'No suppliers yet — add the first one above.' }}</td></tr>
+      <tr><td colspan="{{ cols }}" class="muted">{{ 'No suppliers match this filter.' if (filterType or search or show != 'all') else 'No suppliers yet — add the first one above.' }}</td></tr>
       {% endif %}
       {% for s in suppliers %}
       {% set location = [s.city, s.state] | select | join(', ') %}
-      <tr>
-        <td>{{ s.supplier_legal_name }}{% if s.details_pending == 1 %} <span class="badge badge-warning">Details pending</span>{% endif %}{% if s.email %}<br><small class="muted">{{ s.email }}</small>{% endif %}</td>
+      {% set mine = (offers[s.id] or []) if withOffers else [] %}
+      {% set noPrices = not (offerCounts[s.id] > 0) %}
+      <tr class="supplier-row" id="supplier-{{ s.id }}">
+        <td><strong>{{ s.supplier_legal_name }}</strong>{% if s.details_pending == 1 %} <span class="badge badge-warning">Details pending</span>{% endif %}{% if noPrices %} <span class="badge badge-warning">No product prices yet</span>{% endif %}{% if s.email %}<br><small class="muted">{{ s.email }}</small>{% endif %}</td>
         <td>{{ s.types | join(', ') if s.types.length else '—' }}</td>
         <td>{{ location or '—' }}</td>
         <td>
@@ -42,9 +54,11 @@
         </td>
         <td>{{ s.gstin or '—' }}</td>
         <td>{% if not s.bank_account_number %}<span class="muted">—</span>{% elif s.bank_verified_at %}<span class="badge good">&#10003; Verified</span>{% else %}<span class="badge warn">&#9888; Not verified</span>{% endif %}</td>
+        {% if withOffers %}<td></td><td></td><td></td>{% endif %}
         <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
         <td><div class="row-actions">
           <a href="/suppliers/{{ s.id }}/edit" class="btn-sm btn-secondary">Edit</a>
+          {% if canEditPrice and s.is_active %}<a href="/suppliers/{{ s.id }}/add-product" class="btn-sm">+ Add product</a>{% endif %}
           <form method="post" action="/suppliers/{{ s.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if s.is_active else 'Reactivate' }} ' + {{ s.supplier_legal_name | dump }} + '?{{ ' It will no longer appear in the Supplier PO supplier list.' if s.is_active else '' }}');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if s.is_active else 'btn-success' }}">{{ 'Deactivate' if s.is_active else 'Reactivate' }}</button>
@@ -59,6 +73,20 @@
           {% endif %}
         </div></td>
       </tr>
+      {% if mine.length and not s.is_active %}
+      <tr class="offer-row offer-row-off"><td colspan="{{ cols }}" class="muted small offer-indent">Inactive: none of their prices are used anywhere.</td></tr>
+      {% endif %}
+      {% for off in mine %}
+      <tr class="offer-row{{ ' offer-row-off' if (not s.is_active or not off.offer_active) else '' }}">
+        <td class="offer-indent"><a href="/products/{{ off.product_id }}">{{ off.product_name }}</a>{% if not off.product_active %} <span class="badge badge-inactive">Product inactive</span>{% endif %}</td>
+        <td colspan="6"></td>
+        <td>{{ off.price }}</td>
+        <td>{{ off.dates }}</td>
+        <td>{% set offFrom = 'suppliers' %}{% set canSwitch = canEditPrice %}{% include "suppliers/_offer_switch.njk" %}</td>
+        <td></td>
+        <td>{% if canEditPrice and off.editable %}<a href="/products/suppliers/{{ off.id }}/edit-price?from=suppliers" class="btn-sm btn-secondary">Edit price</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
       {% endfor %}
     </table>
     </div>

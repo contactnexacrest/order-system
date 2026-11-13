@@ -113,22 +113,36 @@ $selectedTypes = $supplier['types'] ?? [];
   </div>
   <?php endif; ?>
 
-  <?php // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only). ?>
+  <?php // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
+        // D-360 (mockup p2): editable here — "+ Add product", "Edit price", the offer switch and "Open product";
+        // the "Used for pricing" column is gone from this table (the product keeps its own pricing supplier). ?>
   <?php if ($isEdit && isset($productPrices) && $productPrices !== null): ?>
-    <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
-    <table class="list">
-      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th><?php if (!empty($canEditPrice)): ?><th></th><?php endif; ?></tr>
-      <?php foreach ($productPrices as $__pp): ?>
-        <tr><td><?= htmlspecialchars((string) $__pp['product_name']) ?></td>
+    <div class="section-head-row">
+      <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
+      <?php if (!empty($addProduct) && $supplier['is_active']): ?><a href="#add-product" class="btn-sm" data-open-details="add-product">+ Add product</a><?php endif; ?>
+    </div>
+    <?php if (!$supplier['is_active'] && $productPrices !== []): ?><p class="muted small">Inactive: none of their prices are used anywhere.</p><?php endif; ?>
+    <table class="list<?= !$supplier['is_active'] ? ' offer-table-off' : '' ?>">
+      <tr><th>Product</th><th>Base thickness</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Offer active</th><th>Actions</th></tr>
+      <?php foreach ($productPrices as $__pp): $__off = $offerRows[(int) $__pp['id']] ?? null; ?>
+        <tr class="offer-row<?= $__off !== null && !$__off['offer_active'] ? ' offer-row-off' : '' ?>"><td><?= htmlspecialchars((string) $__pp['product_name']) ?></td>
+          <td><?= htmlspecialchars($__off['thickness'] ?? '—') ?></td>
           <td><?php if (($__pp['price_basis'] ?? '') === 'grid'): $__g = \App\Services\ThicknessPrices::typedFor((int) $__pp['id']); ?>
               <?= htmlspecialchars(implode(' · ', array_map(static fn ($mm, $v) => ($mm === 0 ? '50 mm+' : $mm . ' mm') . ' ₹' . number_format((float) $v, 2) . ($mm === 0 ? ' / CBM' : ' / m²'), array_keys($__g), $__g))) ?> <small class="muted">(typed; others calculated)</small>
             <?php else: ?>₹<?= $__pp['fob_value'] !== null ? number_format((float) $__pp['fob_value'], 2) : '—' ?> <small class="muted">/ <?= htmlspecialchars(($__pp['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($__pp['reference_unit'] ?? '') ?: 'unit')) ?></small><?php endif; ?></td>
           <td><?= htmlspecialchars((string) ($__pp['quoted_on'] ?? '—')) ?></td><td><?= htmlspecialchars((string) ($__pp['valid_until'] ?? '—')) ?></td>
-          <td><?= !empty($__pp['is_primary']) || !empty($__pp['is_cbm_primary']) || !empty($__pp['combo_in_use']) ? 'Yes' : '—' ?></td>
-          <?php if (!empty($canEditPrice)): ?><td><?php if (($__pp['fob_source'] ?? 'direct') === 'direct'): ?><a class="btn-sm" href="/products/suppliers/<?= (int) $__pp['id'] ?>/edit-price?from=supplier">Edit price</a><?php endif; ?></td><?php endif; ?></tr>
+          <td><?php if ($__off !== null): $__from = 'supplier'; $__canSwitch = !empty($canEditPrice); require __DIR__ . '/_offer_switch.php'; endif; ?></td>
+          <td><div class="row-actions"><?php if (!empty($canEditPrice) && ($__off['editable'] ?? false)): ?><a class="btn-sm" href="/products/suppliers/<?= (int) $__pp['id'] ?>/edit-price?from=supplier">Edit price</a><?php endif; ?>
+            <a class="btn-sm btn-secondary" href="/products/<?= (int) $__pp['product_id'] ?>">Open product</a></div></td></tr>
       <?php endforeach; ?>
-      <?php if ($productPrices === []): ?><tr><td colspan="<?= !empty($canEditPrice) ? 6 : 5 ?>" class="muted">No product prices from this supplier yet.</td></tr><?php endif; ?>
+      <?php if ($productPrices === []): ?><tr><td colspan="7" class="muted">No product prices from this supplier yet<?= !empty($addProduct) && $supplier['is_active'] ? ' — add one with "+ Add product".' : '.' ?></td></tr><?php endif; ?>
     </table>
+    <?php if (!empty($addProduct) && $supplier['is_active']): ?>
+    <details class="add-offer-panel" id="add-product"<?= isset($_GET['add']) || $addProduct['old'] !== [] ? ' open' : '' ?>>
+      <summary>+ Add product — <?= htmlspecialchars((string) $supplier['supplier_legal_name']) ?></summary>
+      <?php require __DIR__ . '/_add_product.php'; ?>
+    </details>
+    <?php endif; ?>
   <?php endif; ?>
 </div>
 

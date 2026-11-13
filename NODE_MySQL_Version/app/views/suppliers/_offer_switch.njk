@@ -1,0 +1,17 @@
+{#
+  D-360: the "Offer active" switch for one offer (off = supplierOffers.listRow, offFrom = "suppliers" |
+  "supplier", canSwitch). Off = the price is not used for pricing, matching or the lowest / highest
+  supplier price. PHP twin: _offer_switch.php.
+#}
+{% if canSwitch %}
+<form method="post" action="/suppliers/offers/{{ off.id }}/active" class="offer-switch-form">
+  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+  <input type="hidden" name="from" value="{{ offFrom }}">
+  <input type="hidden" name="active" value="{{ '0' if off.offer_active else '1' }}">
+  <button type="submit" class="offer-switch{{ ' is-on' if off.offer_active else '' }}" role="switch" aria-checked="{{ 'true' if off.offer_active else 'false' }}"
+          aria-label="Offer active: {{ off.product_name }}" title="{{ 'Switch this offer off' if off.offer_active else 'Switch this offer on' }}"><span class="offer-switch-knob"></span></button>
+  {% if not off.offer_active %}<small class="muted">not offering now</small>{% endif %}
+</form>
+{% else %}
+<span class="badge {{ 'badge-active' if off.offer_active else 'badge-inactive' }}">{{ 'On' if off.offer_active else 'Off' }}</span>
+{% endif %}

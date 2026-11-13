@@ -365,6 +365,10 @@ foreach (['verify' => 'supplierVerify', 'check' => 'supplierCheck', 'reject' => 
 }
 // D-303 (point 15): "+ Add a new supplier (quick)" from a product price (before /suppliers/{id}/…).
 $router->post('/suppliers/quick-add', [$suppliersDirectory, 'quickAdd'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'manage_suppliers']), CsrfCheck::verify()]);
+// D-360: products on the Suppliers pages — "+ Add product" (existing or new product) and the per-offer switch.
+$router->post('/suppliers/offers/{offerId}/active', [$suppliersDirectory, 'offerActive'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->get('/suppliers/{id}/add-product', [$suppliersDirectory, 'addProductForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices')]);
+$router->post('/suppliers/{id}/add-product', [$suppliersDirectory, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses', [$suppliersDirectory, 'addFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 $router->post('/suppliers/{id}/factory-addresses/{addressId}/delete', [$suppliersDirectory, 'deleteFactoryAddress'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
 

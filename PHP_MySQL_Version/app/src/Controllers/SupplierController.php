@@ -12,6 +12,7 @@ use App\Repositories\SupplierFactoryAddressRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\VendorDetailsRepository;
 use App\Services\AuthService;
+use App\Services\SupplierOffers;
 use App\Services\TestModeService;
 use App\Services\VendorDetailsService;
 
@@ -28,12 +29,30 @@ final class SupplierController
     {
         $type = trim((string) ($_GET['type'] ?? ''));
         $search = trim((string) ($_GET['q'] ?? ''));
+        // D-360: All / Active / Inactive / "No product prices yet" (suppliers with no offer).
+        $show = in_array((string) ($_GET['show'] ?? ''), ['active', 'inactive', 'no-prices'], true) ? (string) $_GET['show'] : 'all';
+        $suppliers = SupplierRepository::all(true, $type !== '' ? $type : null, $search !== '' ? $search : null);
+        $counts = SupplierOffers::countsBySupplier();
+        $noPrices = count(array_filter($suppliers, static fn (array $s): bool => ($counts[(int) $s['id']] ?? 0) === 0));
+        $suppliers = array_values(array_filter($suppliers, static fn (array $s): bool => match ($show) {
+            'active' => (int) $s['is_active'] === 1,
+            'inactive' => (int) $s['is_active'] !== 1,
+            'no-prices' => ($counts[(int) $s['id']] ?? 0) === 0,
+            default => true,
+        }));
+        $canSeePrices = \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE);
         View::render('suppliers/index', [
-            'suppliers' => SupplierRepository::all(true, $type !== '' ? $type : null, $search !== '' ? $search : null),
+            'suppliers' => $suppliers,
             'usedIds' => SupplierRepository::idsUsedOnOrders(),
             'supplierTypes' => self::typeOptions(),
             'filterType' => $type,
             'search' => $search,
+            'show' => $show,
+            'noPricesCount' => $noPrices,
+            'offerCounts' => $counts,
+            // D-360: each supplier's product offers (purchase-price viewers only).
+            'offers' => $canSeePrices ? SupplierOffers::forSuppliers(array_map(static fn (array $s): int => (int) $s['id'], $suppliers)) : null,
+            'canEditPrice' => self::canRecordPrices(),
         ], 'layout/base');
     }
 
@@ -88,9 +107,10 @@ final class SupplierController
             'detailsLink' => self::detailsLinkUrl($supplier),
             // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
             'productPrices' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE) ? \App\Repositories\ProductSupplierRepository::forDirectorySupplier($id) : null,
-            // D-359: an "Edit price" link per row for those who record supplier prices.
-            'canEditPrice' => ($__u = \App\Services\AuthService::currentUser()) !== null
-                && \App\Services\PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'record_market_prices'),
+            // D-359 / D-360: "+ Add product", "Edit price" and the offer switch for those who record supplier prices.
+            'canEditPrice' => self::canRecordPrices(),
+            'offerRows' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE) ? array_column(SupplierOffers::forSuppliers([$id])[$id] ?? [], null, 'id') : [],
+            'addProduct' => self::canRecordPrices() ? self::addProductView($supplier, 'supplier') : null,
         ], 'layout/base');
     }
 
@@ -335,5 +355,210 @@ final class SupplierController
             'whatsapp_number'         => $field('whatsapp_number'),
             'notes'                   => $field('notes'),
         ];
+    }
+
+    // ------------------------------------------------------------------ D-360: products on the Suppliers pages
+
+    private static function canRecordPrices(): bool
+    {
+        $u = AuthService::currentUser();
+        return $u !== null && \App\Services\PermissionService::can((int) $u['id'], $u['role_id'] !== null ? (int) $u['role_id'] : null, 'record_market_prices');
+    }
+
+    /** "suppliers" = the Suppliers list; "supplier" = the Edit supplier page. */
+    private static function fromPage(): string
+    {
+        return (string) ($_GET['from'] ?? $_POST['from'] ?? '') === 'supplier' ? 'supplier' : 'suppliers';
+    }
+
+    private static function backTo(int $supplierId, string $from): string
+    {
+        return $from === 'supplier' ? "/suppliers/{$supplierId}/edit#product-prices" : "/suppliers#supplier-{$supplierId}";
+    }
+
+    /** What the "+ Add product" form needs (shared by the list's page and the supplier page's panel). @return array<string,mixed> */
+    private static function addProductView(array $supplier, string $from): array
+    {
+        $old = $_SESSION['add_product_old'][(int) $supplier['id']] ?? [];
+        unset($_SESSION['add_product_old'][(int) $supplier['id']]);
+        return [
+            'supplier' => $supplier, 'from' => $from, 'old' => $old, 'today' => date('Y-m-d'),
+            'choices' => SupplierOffers::addProductChoices((int) $supplier['id']),
+        ];
+    }
+
+    /** D-360: "+ Add product" from the Suppliers list (the same form as on the supplier page). */
+    public function addProductForm(array $params): void
+    {
+        $supplier = SupplierRepository::find((int) ($params['id'] ?? 0));
+        if (!$supplier) {
+            http_response_code(404);
+            echo 'Supplier not found.';
+            return;
+        }
+        if (self::fromPage() === 'supplier') {
+            header('Location: /suppliers/' . (int) $supplier['id'] . '/edit?add=1#add-product');
+            return;
+        }
+        View::render('suppliers/add_product', ['addProduct' => self::addProductView($supplier, 'suppliers')], 'layout/base');
+    }
+
+    /**
+     * D-360: saves "+ Add product" — an existing product, or a new one (name unique, category,
+     * HS code; Inactive, not configured), with this supplier's price. A second offer of the same
+     * product from the same supplier is refused: the user is sent to "Edit price" instead.
+     */
+    public function addProduct(array $params): void
+    {
+        $supplier = SupplierRepository::find((int) ($params['id'] ?? 0));
+        if (!$supplier) {
+            Flash::set('error', 'Supplier not found.');
+            header('Location: /suppliers');
+            return;
+        }
+        $sid = (int) $supplier['id'];
+        $from = self::fromPage();
+        $formUrl = $from === 'supplier' ? "/suppliers/{$sid}/edit?add=1#add-product" : "/suppliers/{$sid}/add-product";
+        $fail = static function (string $message) use ($sid, $formUrl): void {
+            $_SESSION['add_product_old'][$sid] = $_POST;
+            unset($_SESSION['add_product_old'][$sid]['_csrf'], $_SESSION['add_product_old'][$sid]['csrf_token']);
+            Flash::set('error', $message);
+            header("Location: {$formUrl}");
+        };
+        if ((int) $supplier['is_active'] !== 1) {
+            $fail('"' . $supplier['supplier_legal_name'] . '" is inactive — reactivate the supplier before adding its prices.');
+            return;
+        }
+        $mode = (string) ($_POST['product_mode'] ?? 'existing') === 'new' ? 'new' : 'existing';
+        $product = null;
+        $newName = '';
+        $categoryId = 0;
+        $hs = '';
+        if ($mode === 'existing') {
+            $product = \App\Repositories\ProductRepository::find((int) ($_POST['product_id'] ?? 0));
+            if ($product === null) {
+                $fail('Product: pick a product from the list, or create a new product.');
+                return;
+            }
+            $dup = SupplierOffers::existingOffer($sid, (int) $product['id']);
+            if ($dup !== null) {
+                Flash::set('error', '"' . $supplier['supplier_legal_name'] . '" already has a price for "' . $product['name'] . '" — a supplier offers a product once. Change that price here with Edit price.');
+                header('Location: /products/suppliers/' . (int) $dup['id'] . '/edit-price?from=' . $from);
+                return;
+            }
+            $shape = SupplierOffers::priceShape($product);
+        } else {
+            $newName = trim((string) ($_POST['new_name'] ?? ''));
+            $nameError = \App\Services\ProductDuplicateService::nameError($newName);
+            if ($nameError !== null) {
+                $fail('New product name: ' . $nameError);
+                return;
+            }
+            $categoryId = (int) ($_POST['new_category_id'] ?? 0);
+            $category = $categoryId > 0 ? \App\Repositories\ProductCategoryRepository::find($categoryId) : null;
+            if ($category === null || (int) ($category['is_active'] ?? 1) !== 1) {
+                $fail('Category: choose the new product\'s category.');
+                return;
+            }
+            $hs = trim((string) ($_POST['new_hs_code'] ?? ''));
+            if ($hs !== '' && !\App\Repositories\HsCodeRepository::isActiveCode($hs)) {
+                $fail("HS code \"{$hs}\" is not on the HS Code Master List — pick one from the list, or leave it empty.");
+                return;
+            }
+            $shape = SupplierOffers::priceShape(['id' => 0, 'category_id' => $categoryId], null, true);
+        }
+        [$in, $error] = self::readOffer($shape);
+        if ($error !== null) {
+            $fail($error);
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        $pdo = \App\Config\Database::connection();
+        try {
+            if ($mode === 'new') {
+                $unit = !$shape['grid'] && strtoupper($in['unit']) !== 'CBM' ? $in['unit'] : ($shape['grid'] ? null : 'CBM');
+                $pid = SupplierOffers::createProduct($newName, $categoryId, $hs, $unit, $userId);
+                $product = \App\Repositories\ProductRepository::find($pid);
+            }
+            $offerId = SupplierOffers::addOffer($supplier, $product, $in, $userId, $mode === 'new');
+        } catch (\RuntimeException $e) {
+            if ($mode === 'new' && isset($pid)) {
+                \App\Repositories\ProductRepository::delete($pid);
+            }
+            $fail($e->getMessage());
+            return;
+        }
+        $row = \App\Repositories\ProductSupplierRepository::find($offerId);
+        $listed = $row !== null ? SupplierOffers::listRow($product, $row, \App\Services\ThicknessPrices::rules($product)) : null;
+        Flash::set('success', ($mode === 'new' ? 'New product "' . $product['name'] . '" created (Inactive, not configured yet) and added' : '"' . $product['name'] . '" added')
+            . ' to ' . $supplier['supplier_legal_name'] . ($listed !== null ? ': ' . $listed['price'] : '') . ', quoted ' . date('j M Y', (int) strtotime($in['quoted_on'])) . '. The offer is active.');
+        header('Location: ' . self::backTo($sid, $from));
+    }
+
+    /**
+     * Reads the price part of "+ Add product" (the same checks the browser does first).
+     *
+     * @param array{grid: bool, base_mm: ?int, thicknesses: list<array<string,mixed>>, units: list<array<string,string>>} $shape
+     * @return array{0: array<string,mixed>, 1: ?string}
+     */
+    private static function readOffer(array $shape): array
+    {
+        $mm = null;
+        $unit = trim((string) ($_POST['unit'] ?? ''));
+        if ($shape['grid']) {
+            $raw = trim((string) ($_POST['thickness_mm'] ?? ''));
+            $allowed = array_map(static fn (array $t): int => (int) $t['mm'], $shape['thicknesses']);
+            $mm = $raw !== '' && ctype_digit($raw) ? (int) $raw : -1;
+            if (!in_array($mm, $allowed, true)) {
+                return [[], 'Base thickness: choose the thickness the supplier quoted.'];
+            }
+            $want = $mm === \App\Services\ThicknessPrices::CBM ? 'CBM' : 'm2';
+            if ($unit !== $want) {
+                return [[], 'Unit: a price for ' . \App\Services\ThicknessPrices::label($mm) . ' is per ' . ($want === 'CBM' ? 'CBM' : 'm²') . '.'];
+            }
+        } elseif (!in_array($unit, array_map(static fn (array $u): string => (string) $u['value'], $shape['units']), true)) {
+            return [[], 'Unit: choose what the price is per.'];
+        }
+        $p = trim(str_replace(',', '', (string) ($_POST['price'] ?? '')));
+        if (preg_match('/^\d{1,12}(\.\d{1,2})?$/', $p) !== 1 || (float) $p <= 0) {
+            return [[], 'Price: enter the supplier\'s price in ₹ (above 0, at most 2 decimals).'];
+        }
+        $q = trim((string) ($_POST['quoted_on'] ?? ''));
+        $d = \DateTime::createFromFormat('!Y-m-d', $q);
+        if ($d === false || $d->format('Y-m-d') !== $q) {
+            return [[], 'Quoted on: enter the date the supplier quoted this price.'];
+        }
+        if ($q > date('Y-m-d')) {
+            return [[], 'Quoted on: the date cannot be in the future.'];
+        }
+        $v = trim((string) ($_POST['valid_until'] ?? ''));
+        if ($v !== '') {
+            $dv = \DateTime::createFromFormat('!Y-m-d', $v);
+            if ($dv === false || $dv->format('Y-m-d') !== $v) {
+                return [[], 'Valid until: enter a valid date, or leave it empty.'];
+            }
+            if ($v < $q) {
+                return [[], '"Valid until" cannot be before the quoted date.'];
+            }
+        }
+        return [['price' => (float) $p, 'mm' => $mm, 'unit' => $unit, 'quoted_on' => $q, 'valid_until' => $v], null];
+    }
+
+    /** D-360: the "Offer active" switch (Suppliers list and supplier page). */
+    public function offerActive(array $params): void
+    {
+        $row = \App\Repositories\ProductSupplierRepository::find((int) ($params['offerId'] ?? 0));
+        $from = self::fromPage();
+        if ($row === null || empty($row['supplier_id'])) {
+            Flash::set('error', 'That supplier price no longer exists.');
+            header('Location: /suppliers');
+            return;
+        }
+        $on = (string) ($_POST['active'] ?? '') === '1';
+        $product = \App\Repositories\ProductRepository::find((int) $row['product_id']);
+        // The engine reads the switch live (SupplierOffers::usable); nothing else to recalculate.
+        SupplierOffers::setOfferActive((int) $row['id'], $on, (int) AuthService::currentUserId());
+        Flash::set('success', '"' . ($product['name'] ?? 'Product') . '" from ' . $row['supplier_name'] . ': offer ' . ($on ? 'switched on — its price is used again.' : 'switched off — its price is no longer used for pricing, matching or the lowest / highest supplier price.'));
+        header('Location: ' . self::backTo((int) $row['supplier_id'], $from));
     }
 }

@@ -2880,7 +2880,8 @@ the same filters, counts, fields, actions and money rules on both templates
   Procurement/Finance/management.
 - **Screens.** Order page "Purchase Requirements — for Procurement" card
   (next to Step 7); Procurement & suppliers › Procurement (`/procurement`, queue);
-  › Supplier performance; › Suppliers (`/suppliers`);
+  › Supplier performance; › Suppliers (`/suppliers`; each supplier's product offers, the offer switch and
+  "+ Add product" — D-360, see 7.1);
   order Step 7 (Supplier PO); public Supplier Link page.
 - **Key rules.**
   - Sales raises a requirement (product, quantity, needed-by) — never a
@@ -3811,6 +3812,66 @@ redirects to the Options tab; the specification actions redirect there too. A pr
   audit `SUPPLIER_OFFER_ON/OFF`), `offerBase()`, `lowestHighest()` (usable offers quoted like the product's base),
   `configuredBase()`, `setConfiguredBase()` (follows = 0, audit `PRODUCT_BASE_PRICE_SET`), `followSupplier()`,
   `refreshFollowedBase()`, `pricingRow()`; Node twins in `supplierOffers.js` and `pricingLevels.js`.
+
+**Suppliers pages — products, offers and "+ Add product" (D-360, 13 Nov 2026, owner "go with recommendation"; Push 2 of 3;
+mockups p1, p2, decision_d1 part B).** No database change (uses D-359's columns).
+- **Procurement & suppliers › Suppliers (`/suppliers`, `manage_suppliers`).** Every existing column and filter stays (Type,
+  Search, Status, Actions; Edit / Deactivate / Delete). New: **Show:** All · Active · Inactive · **No product prices yet (N)**
+  (`?show=all|active|inactive|no-prices`, kept with Type and Search; N counts the suppliers in the current Type / Search with
+  no offer linked to them); a **No product prices yet** badge next to such a supplier; three columns **Base price quoted (₹)**,
+  **Quoted on · valid until**, **Offer active**; under each supplier one row per offer linked to it (`catalog_product_suppliers`
+  with that `supplier_id`): product name (link to the product; "Product inactive" badge), the base price as quoted
+  (`SupplierOffers::offerBase()`: "₹190,000 / CBM (50 mm and above)", "₹1,650 / m² (20 mm)", "₹80,000 / unit"; "Exact price for
+  a combination" for a combo row), "12 Nov 2026 · 12 Jan 2027" (or "no end date"), the **Offer active** switch and **Edit price**
+  (`/products/suppliers/{id}/edit-price?from=suppliers`; Back / Cancel return to `/suppliers#supplier-{id}`). **+ Add product**
+  per active supplier. An inactive supplier's offers are greyed with "Inactive: none of their prices are used anywhere."
+  Offers, prices and the switch are shown only to purchase-price viewers (`view_purchase_prices`, as on the supplier page);
+  the switch, + Add product and Edit price need `record_market_prices` as well (without it the switch shows On / Off).
+  Prices typed against a supplier name not linked to the directory (before D-303) are not listed under a supplier until
+  linked (Products › Link suppliers). The Suppliers list has no board view, so there is no Kanban twin to keep parallel.
+- **Edit supplier › Prices given for products (mockup p2).** Columns Product · Base thickness · Price · Quoted on · Valid until ·
+  **Offer active** · **Actions** (**Edit price** `?from=supplier`, **Open product** `/products/{id}`). The "Used for pricing"
+  column is removed from this table only — the product keeps its own pricing supplier (Market prices) until D-361. A
+  **+ Add product** button beside the heading opens the **+ Add product** panel below the table (a `<details id="add-product">`,
+  open after `?add=1` or a refused save).
+- **"+ Add product"** (the same form, `suppliers/_add_product.php` / `_add_product.njk`, on the supplier page's panel and on
+  `GET /suppliers/{id}/add-product` from the list): **Product *** — every product, those with no offer linked to any
+  directory supplier first ("— no supplier yet", red badge "no supplier yet" when picked), "(Inactive)", "(already offered:
+  use Edit price)" — or **create a new product**: **Name *** (unique, as Duplicate checks it), **Category *** (active
+  categories), **HS code** (optional; must be on the HS Code Master List; empty = the category's default HS code). Then
+  **Base thickness *** (the product's / category's thicknesses with the base marked "(base)", or "No thickness: one price" for
+  a product without thickness rules), **Price ₹ *** (above 0, at most 2 decimals), **per *** (m² / CBM following the
+  thickness; for one price the product's unit or CBM — a new product's unit list for a new product), **Quoted on *** (not in
+  the future), **Valid until** (not before Quoted on). app.js `initAddOffer` fills the thickness and unit lists from
+  `data-choices` (`SupplierOffers::addProductChoices()` / `priceShape()`); the fields of the hidden half are disabled so the
+  sitewide check skips them. `POST /suppliers/{id}/add-product` (`manage_suppliers` + `record_market_prices`, CSRF):
+  refuses an inactive supplier; refuses a second offer of the same product from the same supplier and sends the user to that
+  offer's **Edit price** with "… already has a price for … — a supplier offers a product once. Change that price here with
+  Edit price."; a new product is created by `SupplierOffers::createProduct()` — **Inactive**, not configured
+  (`configured_at` empty), category set, specifications empty, audit `PRODUCT_CREATED` "(from a supplier, Inactive, not
+  configured)". The offer (`SupplierOffers::addOffer()`): a `catalog_product_suppliers` row with the supplier's directory
+  name and city / state, `supplier_id`, `offer_active` = 1, packing and loading included, CHA = the product's default, the
+  dates; a price for every thickness → `ThicknessPrices::addPrice()` at the typed thickness with every other thickness
+  ticked and the typed one made the base (others worked out by the category's price rules, exactly as Market prices); one
+  price → `fob_value` (`price_basis` 'cbm' when per CBM for a product whose unit is not CBM). It is marked "used for pricing"
+  only when the product has none yet (then an existing product's followed base price is refreshed); otherwise every
+  existing price is untouched. History "Offer added (+ Add product)", audit `MARKET_PRICE_ADDED` "… (+ Add product)". Back to
+  where it was opened (`/suppliers#supplier-{id}` or the supplier page `#product-prices`) with a green "<product> added to
+  <supplier>: ₹… / … (…), quoted …. The offer is active." (for a new product: "New product "…" created (Inactive, not
+  configured yet) and added …").
+- **Offer active switch** (`POST /suppliers/offers/{offerId}/active`, `manage_suppliers` + `record_market_prices`, CSRF;
+  `active` = 1 / 0, `from` = suppliers / supplier): `SupplierOffers::setOfferActive()` (history "Offer active", audit
+  `SUPPLIER_OFFER_ON/OFF`). The engine reads it live: switched off, the offer is not used for pricing, matching or lowest /
+  highest (a product priced from it shows "The supplier price used for pricing is switched off (inactive supplier or
+  offer)."); switched on, the same figures come back.
+- **Code.** `SupplierController::index / editForm / addProductForm / addProduct / offerActive` (Node
+  `supplierController.js`), `SupplierOffers::forSuppliers / listRow / countsBySupplier / existingOffer / priceShape /
+  addProductChoices / createProduct / addOffer` (Node `supplierOffers.js`), views `suppliers/index`, `form`, `add_product`,
+  `_add_product`, `_offer_switch`; `EditPriceController` accepts `from=suppliers`. CSS `.filter-pill`, `.offer-switch`,
+  `.add-offer-*`.
+- **Left for D-361.** Products list (statuses, Configure / Edit, "Link a supplier", removed buttons); Configure screen (fixes
+  the configured base price; activates a product created here); Pricing settings physical block; Price rules per category;
+  the quotable rule in Pick from Products; Supplier PO supplier-choice table.
 
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 

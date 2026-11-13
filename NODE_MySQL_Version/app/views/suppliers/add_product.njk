@@ -1,0 +1,12 @@
+{#
+  Owner decision D-360 (13 Nov 2026): "+ Add product" opened from the Suppliers list — the same form
+  as the Edit supplier page's panel (suppliers/_add_product.njk). Saving goes back to the list with a
+  green message. PHP twin: add_product.php.
+#}
+<div class="card page-wide">
+  <p class="muted small"><a href="/suppliers#supplier-{{ addProduct.supplier.id }}">&larr; Back to Suppliers</a></p>
+  <div class="add-offer-panel">
+    <h1 class="add-offer-title">+ Add product — {{ addProduct.supplier.supplier_legal_name }}</h1>
+    {% include "suppliers/_add_product.njk" %}
+  </div>
+</div>

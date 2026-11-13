@@ -831,6 +831,10 @@ for (const [a, m] of [['verify', 'supplierVerify'], ['check', 'supplierCheck'], 
 }
 // D-303 (point 15): "+ Add a new supplier (quick)" from a product price.
 app.post('/suppliers/quick-add', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(supplierController.quickAdd));
+// D-360: products on the Suppliers pages — "+ Add product" (existing or new product) and the per-offer switch.
+app.post('/suppliers/offers/:offerId/active', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), verifyCsrf, asyncHandler(supplierController.offerActive));
+app.get('/suppliers/:id/add-product', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), asyncHandler(supplierController.addProductForm));
+app.post('/suppliers/:id/add-product', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), verifyCsrf, asyncHandler(supplierController.addProduct));
 app.post('/suppliers/:id/factory-addresses', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.addFactoryAddress));
 app.post('/suppliers/:id/factory-addresses/:addressId/delete', requireAuth, requirePermission('manage_suppliers'), verifyCsrf, asyncHandler(supplierController.deleteFactoryAddress));
 

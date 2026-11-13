@@ -1110,3 +1110,31 @@ input.qty-auto[readonly]{background:#f1f3f7;color:#374151}
 .edit-price-selling{margin-top:0.75rem;}
 .edit-price-saved .inline-form{display:inline;margin:0;}
 @media (max-width:760px){.edit-price-cols{grid-template-columns:1fr;}}
+
+/* D-360 (13 Nov 2026, mockups p1 / p2): products on the Suppliers pages — offers under each
+   supplier, the "Offer active" switch, filter pills and the "+ Add product" form. */
+.filter-pills{display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;margin:0 0 0.75rem;}
+.filter-pill{display:inline-block;padding:0.25rem 0.75rem;border:1px solid var(--navy,#1f3a68);border-radius:8px;font-size:0.85rem;text-decoration:none;color:var(--navy,#1f3a68);background:#fff;}
+.filter-pill.is-current{background:var(--navy,#1f3a68);color:#fff;}
+.suppliers-table tr.supplier-row td{background:#f4f7fc;}
+.suppliers-table tr.offer-row td{background:#fffdf3;}
+.offer-indent{padding-left:1.6rem !important;}
+tr.offer-row-off td,.offer-table-off td{color:var(--muted,#777);}
+tr.offer-row-off td a:not(.btn-sm){color:var(--muted,#777);}
+.offer-switch-form{display:inline-flex;align-items:center;gap:0.4rem;margin:0;}
+.offer-switch{position:relative;width:2.6rem;height:1.4rem;border-radius:999px;border:0;padding:0;background:#c8ccd4;cursor:pointer;transition:background .15s;}
+.offer-switch.is-on{background:var(--success,#2e7d32);}
+.offer-switch-knob{position:absolute;top:0.15rem;left:0.15rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s;}
+.offer-switch.is-on .offer-switch-knob{left:1.35rem;}
+.offer-switch:focus-visible{outline:2px solid var(--navy,#1f3a68);outline-offset:2px;}
+.section-head-row{display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;}
+.add-offer-panel{border:2px solid var(--navy,#1f3a68);border-left-width:6px;border-radius:10px;padding:0.9rem 1.1rem;background:#eef2fa;margin:0.75rem 0;}
+.add-offer-panel > summary{cursor:pointer;font-weight:700;color:var(--navy,#1f3a68);}
+.add-offer-panel[open] > summary{margin-bottom:0.6rem;}
+.add-offer-title{font-size:1.15rem;}
+.add-offer-row{display:flex;flex-wrap:wrap;gap:0.5rem 0.9rem;align-items:flex-end;margin-bottom:0.6rem;}
+.add-offer-row label{margin-bottom:0;width:auto;}
+.add-offer-row[hidden],.add-offer-new[hidden]{display:none;}
+.add-offer-new{border:1px dashed var(--navy,#1f3a68);border-radius:8px;padding:0.5rem 0.8rem;margin:0 0 0.6rem;}
+.add-offer-actions{display:flex;gap:0.5rem;align-items:center;}
+.add-offer-note{flex-basis:100%;margin:0;}

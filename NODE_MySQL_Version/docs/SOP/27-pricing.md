@@ -479,7 +479,8 @@ A product can have its own × K or container (Edit product, MD only) — it show
 
 ## Edit price — change one supplier's price in one form (D-359, 13 Nov 2026)
 
-**Where.** Products › a product › **Market prices** › **Edit price** on the supplier's row, or Procurement & suppliers ›
+**Where.** Products › a product › **Market prices** › **Edit price** on the supplier's row, Procurement & suppliers ›
+Suppliers › **Edit price** on the product's row under the supplier (D-360), or Procurement & suppliers ›
 Suppliers › the supplier › **Prices given for products** › **Edit price** on the product's row. You need the right to
 record supplier prices (Procurement, MD).
 
@@ -506,6 +507,21 @@ If the price "used for pricing" is switched off, the product shows "The supplier
 category's, else Pricing settings. Weight per CBM, container size, container weight and the thickness factor: the
 product's, else the category's, else the global defaults (2.70 t per CBM, 27 t, 8 CBM, × 40). Nothing changed in the
 prices on the day this came in.
+
+## Supplier offers on the Suppliers pages (D-360, 13 Nov 2026)
+
+Each supplier's price for a product is an **offer**. On Procurement & suppliers › **Suppliers** every supplier shows
+its offers (base price quoted, quoted on · valid until), an **Offer active** switch, **Edit price** and **+ Add
+product**; the supplier's page has the same in **Prices given for products**. See
+[Procurement — Suppliers: the products they offer](./22-procurement.md) for the steps.
+
+- **Switching an offer off** stops its price being used: if it was the price the product is priced from, the product
+  shows "The supplier price used for pricing is switched off (inactive supplier or offer)." until it is switched on
+  again (then the same prices come back) or another price is used. Issued quotations and orders never change.
+- **+ Add product** records the supplier's price at one thickness; the other thicknesses are worked out by the
+  category's price rules, exactly as on Market prices. It becomes the price the product is priced from only when the
+  product has none yet; otherwise every price stays as it is.
+- A **new product** created from a supplier starts Inactive and not configured.
 
 ## Exchange rate (D-301, 11 Nov 2026)
 

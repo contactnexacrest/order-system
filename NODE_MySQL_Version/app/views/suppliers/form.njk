@@ -108,17 +108,32 @@
   </div>
   {% endif %}
 
-  {# D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only). #}
+  {# D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
+     D-360 (mockup p2): editable here — "+ Add product", "Edit price", the offer switch and "Open product";
+     the "Used for pricing" column is gone from this table (the product keeps its own pricing supplier). #}
   {% if isEdit and productPrices %}
-    <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
-    <table class="list">
-      <tr><th>Product</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Used for pricing</th>{% if canEditPrice %}<th></th>{% endif %}</tr>
+    <div class="section-head-row">
+      <h2 style="font-size:1rem;" id="product-prices">Prices given for products</h2>
+      {% if addProduct and supplier.is_active %}<a href="#add-product" class="btn-sm" data-open-details="add-product">+ Add product</a>{% endif %}
+    </div>
+    {% if not supplier.is_active and productPrices.length %}<p class="muted small">Inactive: none of their prices are used anywhere.</p>{% endif %}
+    <table class="list{{ ' offer-table-off' if not supplier.is_active else '' }}">
+      <tr><th>Product</th><th>Base thickness</th><th>Price</th><th>Quoted on</th><th>Valid until</th><th>Offer active</th><th>Actions</th></tr>
       {% for pp in productPrices %}
-        <tr><td>{{ pp.product_name }}</td><td>{{ pp.price }}</td><td>{{ pp.quoted_on }}</td><td>{{ pp.valid_until }}</td><td>{{ 'Yes' if pp.used else '—' }}</td>
-          {% if canEditPrice %}<td>{% if pp.direct %}<a class="btn-sm" href="/products/suppliers/{{ pp.id }}/edit-price?from=supplier">Edit price</a>{% endif %}</td>{% endif %}</tr>
+        {% set off = offerRows[pp.id] %}
+        <tr class="offer-row{{ ' offer-row-off' if (off and not off.offer_active) else '' }}"><td>{{ pp.product_name }}</td><td>{{ off.thickness if off else '—' }}</td><td>{{ pp.price }}</td><td>{{ pp.quoted_on }}</td><td>{{ pp.valid_until }}</td>
+          <td>{% if off %}{% set offFrom = 'supplier' %}{% set canSwitch = canEditPrice %}{% include "suppliers/_offer_switch.njk" %}{% endif %}</td>
+          <td><div class="row-actions">{% if canEditPrice and off and off.editable %}<a class="btn-sm" href="/products/suppliers/{{ pp.id }}/edit-price?from=supplier">Edit price</a>{% endif %}
+            <a class="btn-sm btn-secondary" href="/products/{{ pp.product_id }}">Open product</a></div></td></tr>
       {% endfor %}
-      {% if not productPrices.length %}<tr><td colspan="{{ 6 if canEditPrice else 5 }}" class="muted">No product prices from this supplier yet.</td></tr>{% endif %}
+      {% if not productPrices.length %}<tr><td colspan="7" class="muted">No product prices from this supplier yet{{ ' — add one with "+ Add product".' if (addProduct and supplier.is_active) else '.' }}</td></tr>{% endif %}
     </table>
+    {% if addProduct and supplier.is_active %}
+    <details class="add-offer-panel" id="add-product"{% if addOpen or addProduct.hasOld %} open{% endif %}>
+      <summary>+ Add product — {{ supplier.supplier_legal_name }}</summary>
+      {% include "suppliers/_add_product.njk" %}
+    </details>
+    {% endif %}
   {% endif %}
 </div>
 

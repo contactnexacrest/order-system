@@ -14,7 +14,7 @@ use App\Services\ThicknessPrices;
  * existing ThicknessPrices / PricingService maths). Node twin: edit_price.njk.
  */
 $__id = (int) $row['id'];
-$__q = $from === 'supplier' ? '?from=supplier' : '';
+$__q = $from !== 'product' ? '?from=' . $from : '';
 $__amt = static fn (?float $v): string => $v === null ? '—' : '₹' . ThicknessPrices::amount($v);
 $__validUntil = (string) ($old['valid_until'] ?? ((string) ($row['valid_until'] ?? '') >= $today ? (string) ($row['valid_until'] ?? '') : ''));
 $__cha = (string) ($old['cha_transport_per_container'] ?? ($row['cha_transport_per_container'] !== null ? rtrim(rtrim(number_format((float) $row['cha_transport_per_container'], 2, '.', ''), '0'), '.') : ''));

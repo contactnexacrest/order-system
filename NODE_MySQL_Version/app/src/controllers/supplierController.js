@@ -10,6 +10,7 @@ const testModeService = require('../services/testModeService');
 const vendorDetailsService = require('../services/vendorDetailsService');
 const vendorDetailsRepository = require('../repositories/vendorDetailsRepository');
 const bankDetailsInput = require('../helpers/bankDetailsInput');
+const supplierOffers = require('../services/supplierOffers');
 
 /**
  * Port of App\Controllers\SupplierController — the Suppliers directory
@@ -82,12 +83,38 @@ async function collectFormData(req, existingTypes = []) {
 async function index(req, res) {
   const type = String(req.query.type || '').trim();
   const search = String(req.query.q || '').trim();
+  // D-360: All / Active / Inactive / "No product prices yet" (suppliers with no offer).
+  const show = ['active', 'inactive', 'no-prices'].includes(String(req.query.show || '')) ? String(req.query.show) : 'all';
+  let suppliers = await supplierRepository.all(true, type || null, search || null);
+  const counts = await supplierOffers.countsBySupplier();
+  const noPricesCount = suppliers.filter((x) => !(counts[Number(x.id)] > 0)).length;
+  suppliers = suppliers.filter((x) => {
+    if (show === 'active') return Number(x.is_active) === 1;
+    if (show === 'inactive') return Number(x.is_active) !== 1;
+    if (show === 'no-prices') return !(counts[Number(x.id)] > 0);
+    return true;
+  });
+  const canSeePrices = require('../services/moneyVisibility').can(req.permissions, 'purchase');
+  const qs = (v) => {
+    const p = new URLSearchParams();
+    if (type) p.set('type', type);
+    if (search) p.set('q', search);
+    if (v !== 'all') p.set('show', v);
+    return `/suppliers?${p.toString()}`;
+  };
   res.renderView('suppliers/index', {
-    suppliers: await supplierRepository.all(true, type || null, search || null),
+    suppliers,
     usedIds: [...(await supplierRepository.idsUsedOnOrders())],
     supplierTypes: await typeOptions(),
     filterType: type,
     search,
+    show,
+    noPricesCount,
+    offerCounts: counts,
+    showPills: [['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive'], ['no-prices', `No product prices yet (${noPricesCount})`]].map(([k, l]) => ({ key: k, label: l, href: qs(k) })),
+    // D-360: each supplier's product offers (purchase-price viewers only).
+    offers: canSeePrices ? await supplierOffers.forSuppliers(suppliers.map((x) => Number(x.id))) : null,
+    canEditPrice: canRecordPrices(req),
   }, 'layout/base');
 }
 
@@ -143,8 +170,12 @@ async function editForm(req, res) {
     vendor: supplier,
     // D-303 (point 15): the prices this supplier has given for products (purchase-price viewers only).
     productPrices: await productPricesFor(req, id),
-    // D-359: an "Edit price" link per row for those who record supplier prices.
-    canEditPrice: !!(req.permissions && req.permissions.record_market_prices),
+    // D-359 / D-360: "+ Add product", "Edit price" and the offer switch for those who record supplier prices.
+    canEditPrice: canRecordPrices(req),
+    offerRows: require('../services/moneyVisibility').can(req.permissions, 'purchase')
+      ? Object.fromEntries(((await supplierOffers.forSuppliers([id]))[id] || []).map((o) => [o.id, o])) : {},
+    addProduct: canRecordPrices(req) ? await addProductView(req, supplier, 'supplier') : null,
+    addOpen: req.query.add !== undefined,
   }, 'layout/base');
 }
 
@@ -162,7 +193,7 @@ async function productPricesFor(req, id) {
     } else {
       price = `₹${pp.fob_value !== null ? fmt2(pp.fob_value) : '—'} / ${(pp.price_basis || '') === 'cbm' ? 'CBM' : (String(pp.reference_unit || '') || 'unit')}`;
     }
-    out.push({ id: Number(pp.id), direct: (pp.fob_source || 'direct') === 'direct', product_name: pp.product_name, price, quoted_on: pp.quoted_on ? String(pp.quoted_on).slice(0, 10) : '—',
+    out.push({ id: Number(pp.id), product_id: Number(pp.product_id), direct: (pp.fob_source || 'direct') === 'direct', product_name: pp.product_name, price, quoted_on: pp.quoted_on ? String(pp.quoted_on).slice(0, 10) : '—',
       valid_until: pp.valid_until ? String(pp.valid_until).slice(0, 10) : '—', used: Number(pp.is_primary) === 1 || Number(pp.is_cbm_primary || 0) === 1 || Number(pp.combo_in_use || 0) === 1 });
   }
   return out;
@@ -321,7 +352,207 @@ async function sendDetailsLink(req, res) {
   res.redirect(`/suppliers/${id}/edit#vendor-details-link`);
 }
 
+// ------------------------------------------------------------------ D-360: products on the Suppliers pages
+
+function canRecordPrices(req) {
+  return !!(req.permissions && req.permissions.record_market_prices);
+}
+
+/** "suppliers" = the Suppliers list; "supplier" = the Edit supplier page. */
+function fromPage(req) {
+  return String((req.body && req.body.from) || (req.query && req.query.from) || '') === 'supplier' ? 'supplier' : 'suppliers';
+}
+
+function backTo(supplierId, from) {
+  return from === 'supplier' ? `/suppliers/${supplierId}/edit#product-prices` : `/suppliers#supplier-${supplierId}`;
+}
+
+function todayYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** What the "+ Add product" form needs (shared by the list's page and the supplier page's panel). */
+async function addProductView(req, supplier, from) {
+  const all = (req.session && req.session.add_product_old) || {};
+  const old = all[Number(supplier.id)] || {};
+  if (req.session && req.session.add_product_old) delete req.session.add_product_old[Number(supplier.id)];
+  const choices = await supplierOffers.addProductChoices(Number(supplier.id));
+  const map = { products: {}, categories: {} };
+  for (const p of choices.products) map.products[String(p.id)] = { shape: p.shape, no_supplier: p.no_supplier, offer_id: p.offer_id };
+  for (const c of choices.categories) map.categories[String(c.id)] = { shape: c.shape };
+  return {
+    supplier, from, old, hasOld: Object.keys(old).length > 0, today: todayYmd(), choices, choicesJson: JSON.stringify(map),
+    mode: String(old.product_mode || 'existing') === 'new' ? 'new' : 'existing',
+    back: from === 'supplier' ? `/suppliers/${Number(supplier.id)}/edit#product-prices` : `/suppliers#supplier-${Number(supplier.id)}`,
+  };
+}
+
+/** D-360: "+ Add product" from the Suppliers list (the same form as on the supplier page). */
+async function addProductForm(req, res) {
+  const supplier = await supplierRepository.find(parseInt(req.params.id, 10));
+  if (!supplier) {
+    res.status(404).send('Supplier not found.');
+    return;
+  }
+  if (fromPage(req) === 'supplier') {
+    res.redirect(`/suppliers/${Number(supplier.id)}/edit?add=1#add-product`);
+    return;
+  }
+  res.renderView('suppliers/add_product', { addProduct: await addProductView(req, supplier, 'suppliers') }, 'layout/base');
+}
+
+/**
+ * Reads the price part of "+ Add product" (the same checks the browser does first). Same
+ * messages as PHP.
+ */
+function readOffer(body, shape) {
+  let mm = null;
+  const unit = String(body.unit || '').trim();
+  if (shape.grid) {
+    const raw = String(body.thickness_mm || '').trim();
+    const allowed = shape.thicknesses.map((t) => Number(t.mm));
+    mm = /^\d+$/.test(raw) ? Number(raw) : -1;
+    if (!allowed.includes(mm)) return { error: 'Base thickness: choose the thickness the supplier quoted.' };
+    const want = mm === thicknessPricesCbm() ? 'CBM' : 'm2';
+    if (unit !== want) return { error: `Unit: a price for ${require('../services/thicknessPrices').label(mm)} is per ${want === 'CBM' ? 'CBM' : 'm²'}.` };
+  } else if (!shape.units.map((u) => String(u.value)).includes(unit)) {
+    return { error: 'Unit: choose what the price is per.' };
+  }
+  const p = String(body.price || '').replace(/,/g, '').trim();
+  if (!/^\d{1,12}(\.\d{1,2})?$/.test(p) || !(Number(p) > 0)) return { error: 'Price: enter the supplier\'s price in ₹ (above 0, at most 2 decimals).' };
+  const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+  const q = String(body.quoted_on || '').trim();
+  if (!isDate(q)) return { error: 'Quoted on: enter the date the supplier quoted this price.' };
+  if (q > todayYmd()) return { error: 'Quoted on: the date cannot be in the future.' };
+  const v = String(body.valid_until || '').trim();
+  if (v !== '') {
+    if (!isDate(v)) return { error: 'Valid until: enter a valid date, or leave it empty.' };
+    if (v < q) return { error: '"Valid until" cannot be before the quoted date.' };
+  }
+  return { inp: { price: Number(p), mm, unit, quoted_on: q, valid_until: v } };
+}
+
+function thicknessPricesCbm() {
+  return require('../services/thicknessPrices').CBM;
+}
+
+/**
+ * D-360: saves "+ Add product" — an existing product, or a new one (name unique, category, HS
+ * code; Inactive, not configured), with this supplier's price. A second offer of the same product
+ * from the same supplier is refused: the user is sent to "Edit price" instead.
+ */
+async function addProduct(req, res) {
+  const supplier = await supplierRepository.find(parseInt(req.params.id, 10));
+  if (!supplier) {
+    flash.set(req, 'error', 'Supplier not found.');
+    res.redirect('/suppliers');
+    return;
+  }
+  const sid = Number(supplier.id);
+  const from = fromPage(req);
+  const formUrl = from === 'supplier' ? `/suppliers/${sid}/edit?add=1#add-product` : `/suppliers/${sid}/add-product`;
+  const fail = (message) => {
+    const old = { ...req.body };
+    delete old._csrf;
+    req.session.add_product_old = { ...(req.session.add_product_old || {}), [sid]: old };
+    flash.set(req, 'error', message);
+    res.redirect(formUrl);
+  };
+  if (Number(supplier.is_active) !== 1) {
+    fail(`"${supplier.supplier_legal_name}" is inactive — reactivate the supplier before adding its prices.`);
+    return;
+  }
+  const productRepository = require('../repositories/productRepository');
+  const mode = String(req.body.product_mode || 'existing') === 'new' ? 'new' : 'existing';
+  let product = null;
+  let newName = '';
+  let categoryId = 0;
+  let hs = '';
+  let shape;
+  if (mode === 'existing') {
+    product = await productRepository.find(parseInt(req.body.product_id, 10) || 0);
+    if (!product) {
+      fail('Product: pick a product from the list, or create a new product.');
+      return;
+    }
+    const dup = await supplierOffers.existingOffer(sid, Number(product.id));
+    if (dup) {
+      flash.set(req, 'error', `"${supplier.supplier_legal_name}" already has a price for "${product.name}" — a supplier offers a product once. Change that price here with Edit price.`);
+      res.redirect(`/products/suppliers/${Number(dup.id)}/edit-price?from=${from}`);
+      return;
+    }
+    shape = await supplierOffers.priceShape(product);
+  } else {
+    newName = String(req.body.new_name || '').trim();
+    const nameError = await require('../services/productDuplicateService').nameError(newName);
+    if (nameError) {
+      fail(`New product name: ${nameError}`);
+      return;
+    }
+    categoryId = parseInt(req.body.new_category_id, 10) || 0;
+    const category = categoryId > 0 ? await require('../repositories/productCategoryRepository').find(categoryId) : null;
+    if (!category || Number(category.is_active ?? 1) !== 1) {
+      fail('Category: choose the new product\'s category.');
+      return;
+    }
+    hs = String(req.body.new_hs_code || '').trim();
+    if (hs !== '' && !(await require('../repositories/hsCodeRepository').isActiveCode(hs))) {
+      fail(`HS code "${hs}" is not on the HS Code Master List — pick one from the list, or leave it empty.`);
+      return;
+    }
+    shape = await supplierOffers.priceShape({ id: 0, category_id: categoryId }, null, true);
+  }
+  const read = readOffer(req.body, shape);
+  if (read.error) {
+    fail(read.error);
+    return;
+  }
+  const inp = read.inp;
+  const userId = Number(req.user.id);
+  let pid = null;
+  let offerId;
+  try {
+    if (mode === 'new') {
+      const unit = !shape.grid && inp.unit.toUpperCase() !== 'CBM' ? inp.unit : (shape.grid ? null : 'CBM');
+      pid = await supplierOffers.createProduct(newName, categoryId, hs, unit, userId);
+      product = await productRepository.find(pid);
+    }
+    offerId = await supplierOffers.addOffer(supplier, product, inp, userId, mode === 'new');
+  } catch (e) {
+    if (mode === 'new' && pid) await productRepository.remove(pid);
+    fail(e.message);
+    return;
+  }
+  const row = await require('../repositories/productSupplierRepository').find(offerId);
+  const listed = row ? await supplierOffers.listRow(product, row, await require('../services/thicknessPrices').rules(product)) : null;
+  const d = new Date(`${inp.quoted_on}T00:00:00`);
+  const quoted = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })} ${d.getFullYear()}`;
+  flash.set(req, 'success', `${mode === 'new' ? `New product "${product.name}" created (Inactive, not configured yet) and added` : `"${product.name}" added`}`
+    + ` to ${supplier.supplier_legal_name}${listed ? `: ${listed.price}` : ''}, quoted ${quoted}. The offer is active.`);
+  res.redirect(backTo(sid, from));
+}
+
+/** D-360: the "Offer active" switch (Suppliers list and supplier page). */
+async function offerActive(req, res) {
+  const row = await require('../repositories/productSupplierRepository').find(parseInt(req.params.offerId, 10) || 0);
+  const from = fromPage(req);
+  if (!row || !row.supplier_id) {
+    flash.set(req, 'error', 'That supplier price no longer exists.');
+    res.redirect('/suppliers');
+    return;
+  }
+  const on = String(req.body.active || '') === '1';
+  const product = await require('../repositories/productRepository').find(Number(row.product_id));
+  // The engine reads the switch live (supplierOffers.usable); nothing else to recalculate.
+  await supplierOffers.setOfferActive(Number(row.id), on, Number(req.user.id));
+  flash.set(req, 'success', `"${product ? product.name : 'Product'}" from ${row.supplier_name}: offer ${on ? 'switched on — its price is used again.' : 'switched off — its price is no longer used for pricing, matching or the lowest / highest supplier price.'}`);
+  res.redirect(backTo(Number(row.supplier_id), from));
+}
+
 module.exports = {
   sendDetailsLink,
   index, createForm, create, editForm, update, toggleActive, remove, addFactoryAddress, deleteFactoryAddress, quickAdd,
+  // D-360
+  addProductForm, addProduct, offerActive,
 };
