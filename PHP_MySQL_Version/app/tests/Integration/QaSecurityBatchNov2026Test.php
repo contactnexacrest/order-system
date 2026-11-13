@@ -343,4 +343,15 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
             [$_SERVER['HTTP_REFERER'], $_SERVER['HTTP_HOST']] = $saved;
         }
     }
+
+    /** UI-003: Incentives owed with an impossible date (2026-13-45) uses the default month-end date, the same on both stacks. */
+    public function testUi003OwedReportImpossibleDate(): void
+    {
+        $md = $this->createTestUser('Managing Director');
+        foreach (['2026-13-45', '0000-00-00', '2026-02-30'] as $d) {
+            $html = $this->render($md, new \App\Controllers\IncentiveReportController(), 'owed', ['date' => $d]);
+            self::assertStringNotContainsString($d, $html, $d);
+            self::assertStringContainsString(date('Y-m-t'), $html, $d);
+        }
+    }
 }

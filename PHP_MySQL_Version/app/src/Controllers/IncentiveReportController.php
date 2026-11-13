@@ -67,7 +67,8 @@ final class IncentiveReportController
     public function owed(array $params): void
     {
         $date = (string) ($_GET['date'] ?? '');
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+        // UI-003: an impossible day (2026-13-45, 0000-00-00) falls back to the default like any other bad value.
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) !== 1 || !checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
             $date = date('Y-m-t');
         }
         $rows = IncentiveReportService::owedAt($date);

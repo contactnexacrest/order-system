@@ -63,7 +63,10 @@ async function toPay(req, res) {
 
 async function owed(req, res) {
   let date = String(req.query.date || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  // UI-003: an impossible day (2026-13-45, 0000-00-00) falls back to the default like any other bad value.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const real = m && Number(m[1]) >= 1 && (() => { const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))); return d.getUTCMonth() + 1 === Number(m[2]) && d.getUTCDate() === Number(m[3]); })();
+  if (!real) {
     const t = today();
     const [y, m] = t.split('-').map(Number);
     date = `${t.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;

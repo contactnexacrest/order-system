@@ -424,4 +424,29 @@ describe('QA Nov 2026 security batch', () => {
       }
     });
   });
+
+  describe('UI-003 impossible dates on report pages', () => {
+    it('UI-003: no report page answers 500 for 2026-13-45, 2026-02-30 or "abc" in its date parameters', async () => {
+      const md = await user('Managing Director');
+      const pages = ['/reports/missing-ebrc', '/reports/associates', '/reports', '/reports/aggregate', '/reports/queues', '/reports/payments', '/reports/todays-payments',
+        '/reports/disputes', '/reports/amendments', '/reports/trends', '/reports/staff', '/reports/ageing', '/reports/freight-cost', '/reports/products', '/reports/suppliers',
+        '/reports/conversion', '/reports/performance', '/reports/order-profitability', '/reports/incentives', '/reports/incentives/to-pay', '/reports/incentives/owed',
+        '/reports/incentives/statement'];
+      const bad = [];
+      for (const page of pages) {
+        for (const d of ['2026-13-45', '2026-02-30', 'abc', '0000-00-00']) {
+          const r = await md.agent.get(`${page}?date=${d}&date_from=${d}&date_to=${d}&from=${d}&to=${d}`);
+          if (r.status >= 500) bad.push(`${page} ${d} ${r.status}`);
+        }
+      }
+      expect(bad).toEqual([]);
+    });
+
+    it('UI-003: Incentives owed with an impossible date shows the default (month end), as PHP', async () => {
+      const md = await user('Managing Director');
+      const r = await md.agent.get('/reports/incentives/owed?date=2026-13-45');
+      expect(r.status).toBe(200);
+      expect(r.text).not.toContain('2026-13-45');
+    });
+  });
 });
