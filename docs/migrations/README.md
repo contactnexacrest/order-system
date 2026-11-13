@@ -71,6 +71,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-13d-expense-cost-bank-reference.sql` | QA ZOH-005 (owner decision 13 Nov 2026, Option A; rule D-212) | New empty columns `order_expenses.bank_reference`, `order_expenses.zoho_pushed_hash` and `order_cost_entries.bank_reference` (UTR / transaction ID, required on the forms when paid from the company account). No data change; on the next Zoho sync every order expense and order cost already in Books is updated once with the new description ("… · order expense paid from the company account · UTR …"), amounts, dates and accounts unchanged. Guarded through information_schema + PREPARE, re-runnable, MySQL-safe; the last line shows "3 of 3". Checked 13 Nov 2026: applied twice to scratch databases of both stacks built from the previous schema; the columns then equal a fresh install's. |
 | `2026-11-13e-quantity-warning-levels.sql` | Owner decision item 10a (13 Nov 2026) | The six large-quantity levels per unit in `company_settings` (category `orders`, Settings › Orders): `quantity_warning_level_sqm` 30000, `_sqft` 300000, `_cbm` 500, `_ton` 600, `_pcs` 600000, `_rmt` 60000 (1 to 1,000,000). Above its unit's level one order line (create, add, edit) or Domestic Trade line saves only with "I confirm this quantity" ticked (audit `LARGE_QUANTITY_CONFIRMED`); above 1,000,000 in any unit it is refused (in the app, no table change). INSERT … WHERE NOT EXISTS: a level already changed is kept. Re-runnable, MySQL-safe; the last line shows "6 of 6". Checked 13 Nov 2026: run twice on scratch copies of both stacks' previous seed; the rows then equal a fresh install's. |
 | `2026-11-13f-remember-office-computer-7-days.sql` | Owner decision D-369 (13 Nov 2026) | `login_remember_browser_days` 30 → 7 where still 30 (a changed value is kept) and its help text "default 7". Plain UPDATEs; safe to run twice. |
+| `2026-11-13g-freeze-prices-at-pi.sql` | Owner decision D-370 (13 Nov 2026, "go"; QA HNT-L05, a gap in D-342) | No schema change. Orders that have an approved Proforma Invoice (status approved / sent / superseded) — or, failing a PI, an approved Order Confirmation, Buyer PO or Commercial Invoice — but `prices_fixed_at IS NULL` are fixed as the app now fixes them at the first approved PI: `prices_fixed_at` = that document's last reviewer approval (else its generation time), `prices_fixed_by_document_id` = that document, `pricing_fx_rate_at_qt` = `pricing_fx_rate_at_pi` when stored, else the pricing rate in use on that day (rate history minus the cushion; Manual: the typed rate), else the rate in use now; each active line's `qt_fixed_unit_price` = its unit price now. Run the read-only list below first. Only unfixed orders are touched (safe to run twice); no information_schema query, every statement names the database through `@db` (works in phpMyAdmin); ONLY_FULL_GROUP_BY-safe; the last line must say "0 still to fix". Checked 13 Nov 2026: on a scratch database (schema + seed + sample data, one sample order's PI set to sent with its Quotation a draft) the list showed 2 orders, the file fixed both (one by its PI, one by its sent Order Confirmation), run twice plain and twice after `USE information_schema`, the list was then empty; the scratch database was dropped. |
 
 ### Before `2026-11-13a`: two read-only checks
 
@@ -134,7 +135,36 @@ The files from `2026-11-12f` on were checked as their rows above say. Decisions 
 that need no database change (D-340, D-341, D-343–D-346, D-348–D-356, D-358, D-360, D-362–D-365)
 have no file here.
 
-The live-site order of work (backup, files `2026-11-11a` … `2026-11-13f`, the two checks above,
+### Before `2026-11-13g`: one read-only list
+
+Run this on the live database before `2026-11-13g` and show the output to the owner (it changes
+nothing). Each row is an order that has an approved / sent Proforma Invoice (or a later document)
+but whose prices are not fixed yet — `2026-11-13g` fixes them at that PI (D-370): its rate, each
+line's price as it is now. An empty result means `2026-11-13g` changes nothing.
+
+```sql
+SELECT o.order_reference AS `Order no`, c.company_legal_name AS `Client`,
+       COALESCE(sm.stage_name, '—') AS `Stage`,
+       (SELECT CONCAT(dt.code, ' ', COALESCE(d.document_reference, CONCAT('#', d.id)), ' (', d.status, ')')
+          FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+         WHERE d.order_id = o.id AND dt.code IN ('PI', 'OC', 'BUYERPO', 'CI')
+           AND d.status IN ('approved', 'sent', 'superseded')
+         ORDER BY (dt.code = 'PI') DESC, d.id LIMIT 1) AS `PI number`,
+       (SELECT COUNT(*) FROM order_products op WHERE op.order_id = o.id AND op.is_active = 1) AS `Lines`
+  FROM orders o
+  JOIN clients c ON c.id = o.client_id
+  LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+ WHERE o.prices_fixed_at IS NULL
+   AND EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+                WHERE d.order_id = o.id AND dt.code IN ('PI', 'OC', 'BUYERPO', 'CI')
+                  AND d.status IN ('approved', 'sent', 'superseded'))
+ ORDER BY o.id;
+```
+
+"PI number" shows the document that will fix the order (a PI when there is one, e.g.
+`PI SC/PI/26/1311002 (sent)`; else the first approved later document, e.g. an Order Confirmation).
+
+The live-site order of work (backup, files `2026-11-11a` … `2026-11-13g`, the two checks above and the list before `2026-11-13g`,
 the exchange-rate cron job at 07:05 IST, settings to check) is in
 `docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026" (it covers the builds of
 11, 12 and 13 Nov 2026).

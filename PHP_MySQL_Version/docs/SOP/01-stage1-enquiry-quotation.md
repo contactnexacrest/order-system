@@ -595,6 +595,15 @@ not with an override, not the Super Admin. If the buyer wants more slabs,
 another size, a line less or a lower price, raise a **Products & prices
 amendment** (SOP 10). A price can never go up after the Quotation.
 
+**If the Proforma Invoice is approved before any Quotation (owner decision
+D-370, 13 Nov 2026).** Sometimes the PI is approved while the Quotation is
+still a draft. Then the **first approved PI** fixes the prices instead, in
+exactly the same way — whichever of the two is approved first. The note then
+reads "Prices and products are fixed by the approved Proforma Invoice of
+<date> — …", and everything above applies unchanged: the products table is
+read-only, changes go through a Products & prices amendment, and a price can
+only go down. Approving the Quotation later changes nothing.
+
 ### Rupee amounts, Total CBM and the Word copy (owner decision D-343, 12 Nov 2026)
 
 **Orders in INR.** On the documents of an order in Indian Rupees every amount

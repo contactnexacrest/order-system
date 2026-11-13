@@ -730,6 +730,9 @@ async function finalizeApproval(documentId) {
   if (document.document_type_code === 'PI') await orderSnapshotService.freeze(orderId);
   // D-342 (owner, confirmed twice): the first approved Quotation fixes the rate, the prices and the products.
   if (document.document_type_code === 'QT') await require('./priceLock').fixAtQtApproval(orderId, documentId);
+  // D-370 (owner "go", 13 Nov 2026; QA HNT-L05): no Quotation approved first — the first approved PI fixes them
+  // (after the D-262 freeze above, so the PI's rate is the one fixed). Does nothing once a Quotation fixed them.
+  if (document.document_type_code === 'PI') await require('./priceLock').fixAtPiApproval(orderId, documentId);
 }
 
 async function finalizeApprovalUnfrozen(documentId) {

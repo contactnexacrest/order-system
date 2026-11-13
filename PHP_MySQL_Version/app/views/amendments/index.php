@@ -10,7 +10,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
   <h1>Amendments — <?= htmlspecialchars($order['order_reference']) ?></h1>
   <p class="muted"><?= htmlspecialchars($order['company_legal_name']) ?></p>
 
-  <?php // Owner decision D-342: once the Quotation is approved, products and prices change only through an amendment. ?>
+  <?php // Owner decision D-342: once the Quotation is approved (D-370: or, failing that, the PI), products and prices change only through an amendment. ?>
   <div class="section" id="products-amendment">
     <h2>Products &amp; prices</h2>
     <?php if (\App\Services\PriceLock::isFixed($order)): ?>
@@ -22,7 +22,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
         <p class="notice notice-info"><?= htmlspecialchars($__why) ?></p>
       <?php endif; ?>
     <?php else: ?>
-      <p class="muted">The Quotation is not approved yet — products and prices are changed on the order page (Products).</p>
+      <p class="muted">Neither a Quotation nor a Proforma Invoice is approved yet — products and prices are changed on the order page (Products).</p>
     <?php endif; ?>
   </div>
 

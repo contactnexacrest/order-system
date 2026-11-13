@@ -215,7 +215,7 @@ $isLockedOrder = (bool) $order['is_locked'];
 $canOverrideLockEdit = OrderEditGuard::canOverrideLock((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
 $__productCategories = \App\Repositories\ProductCategoryRepository::all();
 $canEditProducts = $canManageOrders && $sees['selling'] && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
-// Owner decision D-342: once the approved Quotation fixed prices and products, the lines change only through an amendment (no override).
+// Owner decision D-342: once the approved Quotation (D-370: or, failing that, the approved PI) fixed prices and products, the lines change only through an amendment (no override).
 $pricesFixed = \App\Services\PriceLock::isFixed($order);
 if ($pricesFixed) {
     $canEditProducts = false;

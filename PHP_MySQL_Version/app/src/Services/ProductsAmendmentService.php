@@ -55,18 +55,21 @@ final class ProductsAmendmentService
         return $v === null ? '—' : number_format($v, 2);
     }
 
-    /** "Line 1: USD 1,950.00 is the price the buyer accepted in the Quotation — a price can only go down, with the MD's approval." */
-    public static function priceUpMessage(int $lineNo, string $currency, float $fixed): string
+    /**
+     * "Line 1: USD 1,950.00 is the price the buyer accepted in the Quotation — a price can only go down, with the MD's approval."
+     * D-370: "… in the Proforma Invoice …" when the approved PI fixed the prices ($fixedBy = PriceLock::fixedByLabel()).
+     */
+    public static function priceUpMessage(int $lineNo, string $currency, float $fixed, string $fixedBy = 'Quotation'): string
     {
         return "Line {$lineNo}: {$currency} " . number_format($fixed, 2)
-            . ' is the price the buyer accepted in the Quotation — a price can only go down, with the MD\'s approval.';
+            . ' is the price the buyer accepted in the ' . $fixedBy . ' — a price can only go down, with the MD\'s approval.';
     }
 
     /** Why a products amendment cannot be raised on this order now, or null. */
     public static function cannotStart(array $order): ?string
     {
         if (!PriceLock::isFixed($order)) {
-            return 'This order\'s Quotation is not approved yet — change its lines on the order page (Products).';
+            return 'Neither a Quotation nor a Proforma Invoice of this order is approved yet — change its lines on the order page (Products).';
         }
         $open = AmendmentRepository::openProductsAmendment((int) $order['id']);
         if ($open !== null) {
@@ -230,7 +233,7 @@ final class ProductsAmendmentService
             }
             $fixed = $c['fixed_price'];
             if ($fixed !== null && $fig['new_unit_price'] > $fixed + 0.004) {
-                $errors[] = self::priceUpMessage($no, $currency, (float) $fixed);
+                $errors[] = self::priceUpMessage($no, $currency, (float) $fixed, PriceLock::fixedByLabel($order));
             } elseif (!self::sameNum($fig['new_unit_price'], $old['old_unit_price'], 0.004)) {
                 $changes[] = 'price';
                 $row['price_lowered'] = true;
@@ -734,7 +737,7 @@ final class ProductsAmendmentService
             'intro' => 'Products & prices as per Amendment ' . $ref . ', signed by the buyer ' . $signed . '. Order stays at ' . $stage . '.',
             'items' => $items,
             'money' => $money,
-            'rate' => PriceLock::fixedRate($order) !== null ? 'Exchange rate unchanged: ₹' . number_format((float) PriceLock::fixedRate($order), 2) . ' (fixed at QT approval).' : null,
+            'rate' => PriceLock::fixedRate($order) !== null ? 'Exchange rate unchanged: ₹' . number_format((float) PriceLock::fixedRate($order), 2) . ' (fixed at the ' . PriceLock::fixedByLabel($order) . '\'s approval).' : null,
         ];
     }
 

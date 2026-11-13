@@ -11,19 +11,24 @@ informal email exchange:
   once the PI is out; changing them needs its own paper trail, distinct
   from every other kind of order edit.
 - **Products & prices** (owner decision D-342, 12 Nov 2026) — the order's
-  lines and prices once its first Quotation is approved (below).
+  lines and prices once its first Quotation is approved, or — if no
+  Quotation was approved first — its first Proforma Invoice (D-370, below).
 
 A payment-terms amendment can be raised on any order once a PI exists; a
-Products & prices amendment once the first Quotation is approved ("This
-order's Quotation is not approved yet — change its lines on the order page
-(Products)." before that). Either way, regardless of what stage the order
+Products & prices amendment once the first Quotation — or, failing that, the
+first Proforma Invoice (D-370) — is approved ("Neither a Quotation nor a
+Proforma Invoice of this order is approved yet — change its lines on the
+order page (Products)." before that). Either way, regardless of what stage the order
 is at — this module isn't part of the 9-stage pipeline and doesn't block or
 unlock any stage gate.
 
 ## Products & prices amendment (owner decision D-342, 12 Nov 2026)
 
 Once the order's Quotation is approved, its products and prices are fixed
-(SOP 01). Any change the buyer agrees to — more or fewer pieces, another size,
+(SOP 01). If the Proforma Invoice was approved before any Quotation, the PI
+fixed them instead (owner decision D-370, 13 Nov 2026); the amendment works
+the same way and its messages name the PI ("… the price the buyer accepted in
+the Proforma Invoice …"). Any change the buyer agrees to — more or fewer pieces, another size,
 an extra line, a line dropped, a lower price — goes through a **Products &
 prices** amendment. The order does not go back to the Quotation stage: it
 carries on from where it is.

@@ -148,7 +148,7 @@ approve line N**; only the MD (permission "Manage pricing") approves, down to th
 minimum price and never below, with a reason. An approval holds while the line
 keeps that price. The line prices and the exchange rate were already fixed when
 the order's first Quotation was approved (D-342) — the PI uses exactly those
-prices, and a line can be changed only through a Products & prices amendment
+prices (if no Quotation was approved, approving this PI fixes them, D-370), and a line can be changed only through a Products & prices amendment
 ([Amendments](./10-amendments.md)); when the PI is generated each checked line's
 figures are stored on the line as well. The Quotation (Step 1) is checked the
 same way. Details:

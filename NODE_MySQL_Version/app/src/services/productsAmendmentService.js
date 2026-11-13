@@ -56,15 +56,18 @@ function money(v) {
   return v === null || v === undefined ? '—' : nf(v, 2);
 }
 
-/** "Line 1: USD 1,950.00 is the price the buyer accepted in the Quotation — a price can only go down, with the MD's approval." */
-function priceUpMessage(lineNo, currency, fixed) {
-  return `Line ${lineNo}: ${currency} ${nf(fixed, 2)} is the price the buyer accepted in the Quotation — a price can only go down, with the MD's approval.`;
+/**
+ * "Line 1: USD 1,950.00 is the price the buyer accepted in the Quotation — a price can only go down, with the MD's approval."
+ * D-370: "… in the Proforma Invoice …" when the approved PI fixed the prices (fixedBy = priceLock.fixedByLabel()).
+ */
+function priceUpMessage(lineNo, currency, fixed, fixedBy = 'Quotation') {
+  return `Line ${lineNo}: ${currency} ${nf(fixed, 2)} is the price the buyer accepted in the ${fixedBy} — a price can only go down, with the MD's approval.`;
 }
 
 /** Why a products amendment cannot be raised on this order now, or null. */
 async function cannotStart(order) {
   if (!priceLock.isFixed(order)) {
-    return 'This order\'s Quotation is not approved yet — change its lines on the order page (Products).';
+    return 'Neither a Quotation nor a Proforma Invoice of this order is approved yet — change its lines on the order page (Products).';
   }
   const open = await amendmentRepository.openProductsAmendment(Number(order.id));
   if (open) {
@@ -212,7 +215,7 @@ async function draft(order, post) {
     }
     const fixed = c.fixed_price;
     if (fixed !== null && fig.new_unit_price > fixed + 0.004) {
-      errors.push(priceUpMessage(no, currency, fixed));
+      errors.push(priceUpMessage(no, currency, fixed, priceLock.fixedByLabel(order)));
     } else if (!sameNum(fig.new_unit_price, old.old_unit_price, 0.004)) {
       changes.push('price');
       row.price_lowered = true;
@@ -616,7 +619,7 @@ async function checklist(order) {
     intro: `Products & prices as per Amendment ${ref}, signed by the buyer ${priceLock.dayText(a.activated_at)}. Order stays at ${stage}.`,
     items,
     money: moneyText,
-    rate: rate !== null ? `Exchange rate unchanged: ₹${nf(rate, 2)} (fixed at QT approval).` : null,
+    rate: rate !== null ? `Exchange rate unchanged: ₹${nf(rate, 2)} (fixed at the ${priceLock.fixedByLabel(order)}'s approval).` : null,
   };
 }
 

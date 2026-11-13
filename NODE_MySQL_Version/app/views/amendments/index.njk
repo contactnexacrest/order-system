@@ -3,7 +3,7 @@
   <h1>Amendments — {{ order.order_reference }}</h1>
   <p class="muted">{{ order.company_legal_name }}</p>
 
-  {# Owner decision D-342: once the Quotation is approved, products and prices change only through an amendment. #}
+  {# Owner decision D-342: once the Quotation is approved (D-370: or, failing that, the PI), products and prices change only through an amendment. #}
   <div class="section" id="products-amendment">
     <h2>Products &amp; prices</h2>
     {% if productsAmendment.fixed %}
@@ -14,7 +14,7 @@
         <p class="notice notice-info">{{ productsAmendment.why }}</p>
       {% endif %}
     {% else %}
-      <p class="muted">The Quotation is not approved yet — products and prices are changed on the order page (Products).</p>
+      <p class="muted">Neither a Quotation nor a Proforma Invoice is approved yet — products and prices are changed on the order page (Products).</p>
     {% endif %}
   </div>
 

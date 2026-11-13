@@ -29,7 +29,7 @@ $__was = static fn (string $old, string $new): string => $old !== $new ? '<span 
 <div class="card page-wide amendment-products">
   <p class="muted small"><a href="/orders/<?= (int) $order['id'] ?>/amendments">&larr; Back to Amendments</a></p>
   <h1>New amendment — Products &amp; prices · Order <?= htmlspecialchars((string) $order['order_reference']) ?></h1>
-  <p class="muted">Prices fixed by the approved Quotation of <?= htmlspecialchars(PriceLock::fixedDate($order)) ?><?= $seesRate && PriceLock::fixedRate($order) !== null ? ' at ₹' . number_format((float) PriceLock::fixedRate($order), 2) . ' per USD' : '' ?>. Change only what the buyer agreed; the order itself changes only when this amendment is signed and activated.</p>
+  <p class="muted">Prices fixed by the approved <?= htmlspecialchars(PriceLock::fixedByLabel($order)) ?> of <?= htmlspecialchars(PriceLock::fixedDate($order)) ?><?= $seesRate && PriceLock::fixedRate($order) !== null ? ' at ₹' . number_format((float) PriceLock::fixedRate($order), 2) . ' per USD' : '' ?>. Change only what the buyer agreed; the order itself changes only when this amendment is signed and activated.</p>
 
   <?php if ($errors !== []): ?>
     <div class="notice notice-error" role="alert"><?php foreach ($errors as $__e): ?><p><?= htmlspecialchars($__e) ?></p><?php endforeach; ?></div>
@@ -71,7 +71,7 @@ $__was = static fn (string $old, string $new): string => $old !== $new ? '<span 
           <td class="num">
             <?php if ($d !== null && !empty($d['price_lowered'])): ?><span class="amd-old"><?= PA::money((float) $d['old_unit_price']) ?></span><?php endif; ?>
             <input type="text" inputmode="decimal" name="line[<?= $id ?>][unit_price]" value="<?= $__in($id, 'unit_price', $l['unit_price'] !== null ? number_format((float) $l['unit_price'], 2, '.', '') : '') ?>" placeholder="e.g. 1950.00" data-max-decimals="2" required
-              <?php if ($fixed !== null): ?>data-max-price="<?= number_format((float) $fixed, 2, '.', '') ?>" data-max-price-message="<?= htmlspecialchars(PA::priceUpMessage($no, $ccy, (float) $fixed)) ?>"<?php endif; ?>
+              <?php if ($fixed !== null): ?>data-max-price="<?= number_format((float) $fixed, 2, '.', '') ?>" data-max-price-message="<?= htmlspecialchars(PA::priceUpMessage($no, $ccy, (float) $fixed, PriceLock::fixedByLabel($order))) ?>"<?php endif; ?>
               aria-label="Line <?= $no ?> unit price (<?= htmlspecialchars($ccy) ?> per <?= htmlspecialchars($unit) ?>)">
           </td>
           <td class="num"><?= $d !== null && $kind !== 'remove' ? $__was(PA::money($d['old_line_total']), PA::money($d['new_line_total'])) : PA::money($l['fob_value'] !== null ? (float) $l['fob_value'] : null) ?></td>
@@ -128,6 +128,6 @@ $__was = static fn (string $old, string $new): string => $old !== $new ? '<span 
       <button type="submit" class="btn-primary" data-step="send" data-loading-text="Sending…">Send to MD for approval</button>
       <a class="btn-sm btn-secondary" href="/orders/<?= (int) $order['id'] ?>/amendments">Cancel</a>
     </p>
-    <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the Quotation at <?= htmlspecialchars($ccy) ?> …"). New lines get their own price.</p>
+    <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the <?= htmlspecialchars(PriceLock::fixedByLabel($order)) ?> at <?= htmlspecialchars($ccy) ?> …"). New lines get their own price.</p>
   </form>
 </div>

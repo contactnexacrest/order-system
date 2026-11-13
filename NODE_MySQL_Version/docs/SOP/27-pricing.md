@@ -145,7 +145,10 @@ first Quotation is approved, the order keeps the exchange rate its prices were w
 and each line keeps the price the buyer accepted and its price-check figures (worked out at that
 rate). From then on floors and approvals use these fixed figures, never the live rate, and the
 lines cannot be changed on the order page — only through a **Products & prices** amendment (SOP
-10), where a price can only go down. Generating the PI also stores each checked line's figures
+10), where a price can only go down. If the Proforma Invoice is approved before any Quotation,
+the first approved PI fixes them in exactly the same way, at the rate the PI keeps (owner decision
+D-370, 13 Nov 2026); the order page then says "fixed by the approved Proforma Invoice of <date>".
+Generating the PI also stores each checked line's figures
 (cost, minimum, floor, quote, level, settings used) on the line ("fixed at PI"); later changes to
 the pricing settings or a supplier price do not move that order's check.
 

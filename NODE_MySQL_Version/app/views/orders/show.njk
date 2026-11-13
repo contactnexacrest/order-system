@@ -901,7 +901,7 @@
 
   <details class="step-card" id="step-products"{{ ' open' if ((sees.selling and linePricing.blocking.length) or qualityOpen) else '' }}>
     <summary><h2>Products</h2></summary>
-    {# Owner decision D-342: once the approved Quotation fixed prices and products, the lines change only through an amendment (no override). #}
+    {# Owner decision D-342: once the approved Quotation (D-370: or, failing that, the approved PI) fixed prices and products, the lines change only through an amendment (no override). #}
     {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) and not pricesFixed %}
     {# Owner decision D-273 (point 17): one compact products table, summary bar, totals and side-panel editing. #}
     {% include "orders/_products_table.njk" %}

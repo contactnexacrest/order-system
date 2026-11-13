@@ -308,6 +308,7 @@ function productsAmendmentView(order, draft) {
   const t = draft && draft.errors.length === 0 ? draft.totals : null;
   return {
     fixedDate: priceLock.fixedDate(order),
+    fixedBy: priceLock.fixedByLabel(order),
     fixedRate: priceLock.fixedRate(order),
     totals: t,
     signedDifference: t ? productsAmendmentService.signedDifference(t) : '',

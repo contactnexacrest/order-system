@@ -55,7 +55,10 @@ change the order's currency — not with "Edit an order after confirmation",
 not with "Override locked data", not the Super Admin. The products table is
 read-only with the note "Prices and products are fixed by the approved
 Quotation of <date> — change them through an Amendment (Order page ›
-Amendments › Products & prices)." See [Amendments](./10-amendments.md).
+Amendments › Products & prices)." If the Proforma Invoice was approved before
+any Quotation, the first approved PI fixes them in the same way and the note
+names it ("… fixed by the approved Proforma Invoice of <date> …", owner
+decision D-370, 13 Nov 2026). See [Amendments](./10-amendments.md).
 Packing-list actuals are still recorded as before.
 
 Once the order reaches Stage 4, its terms are meant to be settled. From

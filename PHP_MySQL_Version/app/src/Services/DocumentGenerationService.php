@@ -686,6 +686,11 @@ final class DocumentGenerationService
         if (($document['document_type_code'] ?? null) === 'QT') {
             PriceLock::fixAtQtApproval($orderId, $documentId);
         }
+        // D-370 (owner "go", 13 Nov 2026; QA HNT-L05): no Quotation approved first — the first approved PI fixes them
+        // (after the D-262 freeze above, so the PI's rate is the one fixed). Does nothing once a Quotation fixed them.
+        if (($document['document_type_code'] ?? null) === 'PI') {
+            PriceLock::fixAtPiApproval($orderId, $documentId);
+        }
     }
 
     private static function finalizeApprovalUnfrozen(int $documentId): void

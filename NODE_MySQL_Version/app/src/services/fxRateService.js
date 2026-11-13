@@ -310,12 +310,12 @@ async function orderLine(order, checks) {
     }
   }
   const now = await status();
-  // D-342: the approved Quotation fixed the rate (the PI keeps the same one).
+  // D-342: the approved Quotation fixed the rate (the PI keeps the same one); D-370: or the approved PI when no Quotation was approved first.
   const priceLock = require('./priceLock');
   const qtRate = priceLock.fixedRate(order);
   if (qtRate !== null) {
     const r = `₹${nf(qtRate, 2)}`;
-    return `Prices worked out at ${r} per USD — fixed by the approved Quotation of ${priceLock.fixedDate(order)}`
+    return `Prices worked out at ${r} per USD — fixed by the approved ${priceLock.fixedByLabel(order)} of ${priceLock.fixedDate(order)}`
       + (Math.abs(qtRate - Number(now.rate)) >= 0.005 ? `; today's rate ₹${nf(now.rate, 2)} does not change them.` : '.');
   }
   if (issued) {

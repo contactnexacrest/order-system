@@ -346,10 +346,10 @@ final class FxRateService
             }
         }
         $now = self::status();
-        // D-342: the approved Quotation fixed the rate (the PI keeps the same one).
+        // D-342: the approved Quotation fixed the rate (the PI keeps the same one); D-370: or the approved PI when no Quotation was approved first.
         if (($qtRate = PriceLock::fixedRate($order)) !== null) {
             $r = '₹' . number_format($qtRate, 2);
-            return 'Prices worked out at ' . $r . ' per USD — fixed by the approved Quotation of ' . PriceLock::fixedDate($order)
+            return 'Prices worked out at ' . $r . ' per USD — fixed by the approved ' . PriceLock::fixedByLabel($order) . ' of ' . PriceLock::fixedDate($order)
                 . (abs($qtRate - (float) $now['rate']) >= 0.005 ? '; today\'s rate ₹' . number_format((float) $now['rate'], 2) . ' does not change them.' : '.');
         }
         if ($issued) {

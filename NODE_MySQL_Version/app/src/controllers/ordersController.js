@@ -2038,7 +2038,7 @@ async function show(req, res) {
       supplierFactoryAddressesBySupplier,
       supplierFactoryAddressTextsBySupplier,
       amendmentCount: (await amendmentRepository.forOrder(orderId)).length,
-      // Owner decision D-342: prices and products fixed by the approved Quotation; the re-issue checklist.
+      // Owner decision D-342: prices and products fixed by the approved Quotation (D-370: or, failing that, the approved PI); the re-issue checklist.
       pricesFixed: require('../services/priceLock').isFixed(order),
       priceLockMessage: require('../services/priceLock').isFixed(order) ? require('../services/priceLock').message(order) : null,
       reissue: req.permissions && req.permissions.manage_orders ? await require('../services/productsAmendmentService').checklist(order) : null,

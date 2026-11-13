@@ -143,7 +143,8 @@ async function findUncached(id) {
             (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR ', ')
              FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
              WHERE oa2.order_id = o.id) AS assignee_names,
-            (o.active_amendment_id IS NOT NULL) AS has_active_amendment
+            (o.active_amendment_id IS NOT NULL) AS has_active_amendment,
+            ${require('../services/priceLock').FIXED_BY_TYPE_SQL} AS prices_fixed_by_type
      FROM orders o
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id

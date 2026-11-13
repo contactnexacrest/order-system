@@ -9,7 +9,7 @@
 <div class="card page-wide amendment-products">
   <p class="muted small"><a href="/orders/{{ order.id }}/amendments">&larr; Back to Amendments</a></p>
   <h1>New amendment — Products &amp; prices · Order {{ order.order_reference }}</h1>
-  <p class="muted">Prices fixed by the approved Quotation of {{ view.fixedDate }}{% if seesRate and view.fixedRate !== none %} at ₹{{ view.money(view.fixedRate) }} per USD{% endif %}. Change only what the buyer agreed; the order itself changes only when this amendment is signed and activated.</p>
+  <p class="muted">Prices fixed by the approved {{ view.fixedBy }} of {{ view.fixedDate }}{% if seesRate and view.fixedRate !== none %} at ₹{{ view.money(view.fixedRate) }} per USD{% endif %}. Change only what the buyer agreed; the order itself changes only when this amendment is signed and activated.</p>
 
   {% if errors.length %}
     <div class="notice notice-error" role="alert">{% for e in errors %}<p>{{ e }}</p>{% endfor %}</div>
@@ -49,7 +49,7 @@
           <td class="num">
             {% if d and d.price_lowered %}<span class="amd-old">{{ view.money(d.old_unit_price) }}</span>{% endif %}
             <input type="text" inputmode="decimal" name="line[{{ id }}][unit_price]" value="{{ pin.unit_price if pin.unit_price !== undefined else (l.unit_price if l.unit_price !== none else '') }}" placeholder="e.g. 1950.00" data-max-decimals="2" required
-              {% if l.fixed_price !== none %}data-max-price="{{ l.fixed_price.toFixed(2) }}" data-max-price-message="{{ view.priceUpMessage(no, ccy, l.fixed_price) }}"{% endif %}
+              {% if l.fixed_price !== none %}data-max-price="{{ l.fixed_price.toFixed(2) }}" data-max-price-message="{{ view.priceUpMessage(no, ccy, l.fixed_price, view.fixedBy) }}"{% endif %}
               aria-label="Line {{ no }} unit price ({{ ccy }} per {{ unit }})">
           </td>
           <td class="num">{% if d and kind != 'remove' %}{{ was(view.money(d.old_line_total), view.money(d.new_line_total)) }}{% else %}{{ view.money(l.fob_value) }}{% endif %}</td>
@@ -104,6 +104,6 @@
       <button type="submit" class="btn-primary" data-step="send" data-loading-text="Sending…">Send to MD for approval</button>
       <a class="btn-sm btn-secondary" href="/orders/{{ order.id }}/amendments">Cancel</a>
     </p>
-    <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the Quotation at {{ ccy }} …"). New lines get their own price.</p>
+    <p class="muted small">A price can only go DOWN, and only with MD approval; a higher price is refused ("the buyer accepted the {{ view.fixedBy }} at {{ ccy }} …"). New lines get their own price.</p>
   </form>
 </div>
