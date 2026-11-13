@@ -25,13 +25,23 @@ async function run() {
   return result;
 }
 
+/** What the job prints for the cron e-mail / log — the same lines as PHP cron/daily_digest.php (QA MTX-007). */
+function consoleLines(r) {
+  return [
+    // QA Round 8, R8-N02: say plainly when nothing could leave.
+    dailyDigestService.summary(r),
+    `Associate reminders: ${r.associateReminders} sent.`,
+    `Bank changes: ${r.bankExpired} associate and ${r.vendorBank.expired} supplier change(s) cancelled (not confirmed); ${r.vendorBank.applied} supplier change(s) put in use.`,
+    // QA MTX-007: the associate commission and incentive lock reminder results, as the PHP job prints them.
+    `Associate commission: ${JSON.stringify(r.associatePayouts)}`,
+    `Incentive lock reminders: ${r.incentiveLockReminders} sent.`,
+  ];
+}
+
 if (require.main === module) {
   run()
     .then((r) => {
-      // QA Round 8, R8-N02: say plainly when nothing could leave.
-      console.log(dailyDigestService.summary(r));
-      console.log(`Associate reminders: ${r.associateReminders} sent.`);
-      console.log(`Bank changes: ${r.bankExpired} associate and ${r.vendorBank.expired} supplier change(s) cancelled (not confirmed); ${r.vendorBank.applied} supplier change(s) put in use.`);
+      for (const line of consoleLines(r)) console.log(line);
       return db.pool.end();
     })
     .catch((e) => {
@@ -40,4 +50,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { run };
+module.exports = { run, consoleLines };
