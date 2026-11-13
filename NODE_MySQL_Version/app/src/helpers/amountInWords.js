@@ -8,6 +8,8 @@
  * App\Helpers\AmountInWords — both must give identical text.
  */
 
+const { phpRound } = require('./money');
+
 const CURRENCIES = {
   USD: ['US Dollars', 'Cents'],
   EUR: ['Euros', 'Cents'],
@@ -32,7 +34,8 @@ function words(n) {
 }
 
 function format(amount, currencyCode) {
-  const cents = Math.round(Math.abs(Number(amount) || 0) * 100);
+  // HNT-009 (owner-confirmed twice, 13 Nov 2026): PHP's round(abs($amount) * 100), so 1.005 reads "One and One Cents" as on PHP.
+  const cents = phpRound(Math.abs(Number(amount) || 0) * 100, 0);
   const whole = Math.floor(cents / 100);
   const minor = cents % 100;
   const code = String(currencyCode || '').trim().toUpperCase();
@@ -56,7 +59,7 @@ function wordsIndian(n) {
 }
 
 function formatIndian(amount) {
-  const paise = Math.round(Math.abs(Number(amount) || 0) * 100);
+  const paise = phpRound(Math.abs(Number(amount) || 0) * 100, 0); // HNT-009: PHP round()
   const whole = Math.floor(paise / 100);
   const minor = paise % 100;
   let text = `Indian Rupees ${wordsIndian(whole)}`;

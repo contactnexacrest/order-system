@@ -57,7 +57,7 @@ function legsFor(order) {
 async function amountDue(order, leg) {
   const fob = parseFloat(await orderProductRepository.totalFobValue(order.id)) || 0;
   if (leg === 'advance') {
-    return Math.round(fob * (parseFloat(order.advance_pct) || 0)) / 100;
+    return require('../helpers/money').phpRound(fob * (parseFloat(order.advance_pct) || 0) / 100, 2); // HNT-009: PHP round(), as the PI
   }
   if (leg === 'freight') {
     const freight = await orderFreightRepository.find(order.id);

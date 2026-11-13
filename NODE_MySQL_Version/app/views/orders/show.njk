@@ -1951,7 +1951,7 @@
         {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/advance">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round(2) %}
+          {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round_money %}{# HNT-009: as PHP round() and the PI #}
           <p class="advance-due-note">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
           <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}" placeholder="e.g. 1800.00"></label>
           {% set rd = { label: 'Advance', due: advanceDue, so_far: (partPayments.advance.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}

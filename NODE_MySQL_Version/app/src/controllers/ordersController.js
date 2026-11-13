@@ -2712,7 +2712,7 @@ async function recordAdvancePayment(req, res) {
   const orderForAdvance = await orderRepository.find(orderId);
   const fobTotal = parseFloat(await orderProductRepository.totalFobValue(orderId)) || 0;
   const advancePctNum = parseFloat((orderForAdvance && orderForAdvance.advance_pct) || 0);
-  const advanceDue = Math.round(fobTotal * advancePctNum) / 100;
+  const advanceDue = require('../helpers/money').phpRound(fobTotal * advancePctNum / 100, 2); // HNT-009: PHP round(), as the PI
   const currency = (orderForAdvance && orderForAdvance.currency_code) || '';
   const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const advanceSoFar = await partPaymentService.receivedTotal(orderId, 'advance');

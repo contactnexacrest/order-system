@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const { phpRound } = require('../helpers/money');
 
 // QA-5 ORD-05: optional executor lets this join the caller's transaction
 // (order creation — see ordersController.store()), defaulting to the plain
@@ -21,8 +22,8 @@ function balanceDue(fobTotal, advancePct, payment, milestones = 0) {
   const fob = parseFloat(fobTotal) || 0;
   const advance = payment && payment.advance_amount !== null && payment.advance_amount !== undefined
     ? parseFloat(payment.advance_amount)
-    : Math.round(fob * (parseFloat(advancePct) || 0)) / 100;
-  return Math.max(0, Math.round((fob - advance - (parseFloat(milestones) || 0)) * 100) / 100);
+    : phpRound(fob * (parseFloat(advancePct) || 0) / 100, 2); // HNT-009: PHP round(), as the PI
+  return Math.max(0, phpRound(fob - advance - (parseFloat(milestones) || 0), 2));
 }
 
 async function find(orderId) {

@@ -161,6 +161,8 @@ njkEnv.addFilter('fromJson', (v) => { try { return v ? JSON.parse(v) : {}; } cat
 njkEnv.addFilter('unitLabel', (u) => require('./services/lineUnits').label(u));
 njkEnv.addFilter('sizeNum', (v) => (v === null || v === undefined || v === '' ? '' : require('./services/lineUnits').num(v)));
 njkEnv.addFilter('factor4', (v) => String(Math.round(Number(v) * 10000) / 10000));
+// HNT-009 (owner-confirmed twice, 13 Nov 2026): money rounded exactly as PHP round($x, 2) — Nunjucks' own round(2) rounds some halves down.
+njkEnv.addFilter('round_money', (v) => require('./helpers/money').phpRound(Number(v) || 0, 2));
 njkEnv.addFilter('shortDate', dates.short);
 // D-245 P4: the time (HH:MM) of a 'YYYY-MM-DD HH:MM:SS' value, for the incentive history.
 njkEnv.addFilter('timeHm', (v) => String(v || '').slice(11, 16));

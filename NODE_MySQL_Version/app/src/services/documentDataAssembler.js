@@ -1,6 +1,7 @@
 'use strict';
 
 const amountInWords = require('../helpers/amountInWords');
+const { phpRound } = require('../helpers/money');
 const moneyFormat = require('../helpers/moneyFormat');
 const fs = require('fs');
 
@@ -349,8 +350,8 @@ async function assemble(orderId, documentTypeCode = null) {
       // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
       // "Total Invoice Value in Words" line prints the same figure as Total
       // Commercial Invoice Value, in words — never a blank line.
-      total_invoice_value_in_words: amountInWords.format(Math.round(Number(totalCommercialInvoiceValue) * 100) / 100, order.currency_code || null),
-      fob_value_in_words: amountInWords.format(Math.round(Number(fobValue) * 100) / 100, order.currency_code || null),
+      total_invoice_value_in_words: amountInWords.format(round2(Number(totalCommercialInvoiceValue)), order.currency_code || null),
+      fob_value_in_words: amountInWords.format(round2(Number(fobValue)), order.currency_code || null),
       freight_insurance_amount: freightForTotal !== null ? money(freightForTotal) : null,
       preset_name: order.preset_name,
     },
@@ -1200,8 +1201,10 @@ function formatDate(value) {
   return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// HNT-009 (owner-confirmed twice, 13 Nov 2026): PHP round($x, 2) exactly — the old
+// Math.round(n + EPSILON) form printed USD 4,159.23 × 50 % as 2,079.61 where PHP prints 2,079.62.
 function round2(n) {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+  return phpRound(n, 2);
 }
 
 /** 'YYYY-MM-DD' plus whole calendar days, as 'YYYY-MM-DD'. */

@@ -4511,6 +4511,7 @@ Floating point differs slightly between languages, so the code avoids relying on
 |---|---|---|
 | Decimal-string half-up | `PricingEngine::round2`, `pricingEngine.round2`, `money.js round2` | Format to 9 decimals, then round on the string: 1,326.125 → 1,326.13; 75.225 → 75.23; −12.345 → −12.35. Matches PHP `round($x, 2)` (half away from zero). |
 | Integer paise | `GstCalculator`, `ImportService`, `MerchantTradeService` | Amounts parsed from strings into integers (`scaled()`), divided with `roundDiv()` (half away from zero), printed with `money()`. |
+| PHP `round()` step for step | `money.js phpRound(x, places)` (Node only) | HNT-009 (owner-confirmed twice, 13 Nov 2026): the PI/QT/OC advance and balance, the amount in words, the order page's "Advance due" and Record Advance prefill, and the client payment page's advance due use it, so USD 4,159.23 × 50 % is 2,079.62 / 2,079.61 on both stacks (Node printed 2,079.61 / 2,079.62). It rounds to 15 significant digits first, as PHP does, so it also matches at amounts of a million and more. |
 | Rupee rounding | TDS | `round(x, 0)` (section 288B). |
 | Display | `format2()` (Node) = PHP `number_format(round($x,2),2)`; `GstCalculator::inr()` for Indian grouping (12,34,567.00); generated documents: `MoneyFormat::amount()` / `moneyFormat.amount()` (Indian grouping for an INR order, D-343) | |
 
