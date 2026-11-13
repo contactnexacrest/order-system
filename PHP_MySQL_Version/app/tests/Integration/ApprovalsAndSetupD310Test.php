@@ -159,6 +159,9 @@ final class ApprovalsAndSetupD310Test extends DbTestCase
         self::assertStringContainsString('Kanban Board', $board);
         self::assertStringContainsString('Switch to list view', $board);
         self::assertStringContainsString('Switch to board view', $list);
+        // UI-002: the list view's tab chips keep the list view (one &amp; in the HTML, never &amp;amp;).
+        self::assertStringContainsString('href="/approvals?tab=prices&amp;view=list"', $list);
+        self::assertStringNotContainsString('&amp;amp;', $list);
         foreach ([$board, $list] as $html) {
             self::assertStringContainsString('href="/orders/' . $orderId . '/products/' . $lineId . '/price-approval"', $html);
             self::assertStringContainsString('href="/orders/' . $orderId . '"', $html);

@@ -147,6 +147,9 @@ describe('D-310 / D-312 / D-313: Approvals page and Setup checklist', () => {
     expect(board).toContain('Kanban Board');
     expect(board).toContain('Switch to list view');
     expect(list).toContain('Switch to board view');
+    // UI-002: the list view's tab chips keep the list view (one &amp; in the HTML, never &amp;amp;).
+    expect(list).toContain('href="/approvals?tab=prices&amp;view=list"');
+    expect(list).not.toContain('&amp;amp;');
     for (const html of [board, list]) {
       expect(html).toContain(`href="/orders/${orderId}/products/${lineId}/price-approval"`);
       expect(html).toContain(`href="/orders/${orderId}"`);

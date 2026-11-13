@@ -1,9 +1,9 @@
 {# D-310: the parts of one approval, shared by the list row and the board card. Port of approvals/_cell.php / _tabs.php. #}
 {% macro tabsRow(tabs, counts, tab, listView) %}
 <div class="filter-chip-row" role="tablist" aria-label="Approval types">
-  <a class="filter-chip{{ ' active' if tab == 'all' else '' }}" href="/approvals?tab=all{{ '&amp;view=list' if listView else '' }}">All {{ counts.all }}</a>
+  <a class="filter-chip{{ ' active' if tab == 'all' else '' }}" href="/approvals?tab=all{{ '&view=list' if listView else '' }}">All {{ counts.all }}</a>
   {% for key, label in tabs %}
-  <a class="filter-chip{{ ' active' if tab == key else '' }}" href="/approvals?tab={{ key }}{{ '&amp;view=list' if listView else '' }}">{{ label }} {{ counts[key] }}</a>
+  <a class="filter-chip{{ ' active' if tab == key else '' }}" href="/approvals?tab={{ key }}{{ '&view=list' if listView else '' }}">{{ label }} {{ counts[key] }}</a>
   {% endfor %}
 </div>
 {% endmacro %}
