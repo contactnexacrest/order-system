@@ -25,6 +25,12 @@ const pool = mysql.createPool({
   maxIdle: env.getInt('DB_POOL_SIZE', 10),
   idleTimeout: 60000,
   dateStrings: true, // keep DATETIME/TIMESTAMP as 'YYYY-MM-DD HH:MM:SS' strings, matching PDO's default fetch behavior the PHP code relies on
+  // UI-015 / MTX-009 (QA 13 Nov 2026): pool.execute() keeps every distinct SQL text as a
+  // server-side prepared statement per connection — mysql2's default cache is 16,000 per
+  // connection, so one long-running process could hold thousands and push MySQL past its
+  // server-wide max_prepared_stmt_count (default 16,382), after which every query on the
+  // server fails (PHP too). The least recently used statements are now closed beyond this many.
+  maxPreparedStatements: env.getInt('DB_MAX_PREPARED_STATEMENTS', 200),
 });
 
 /**

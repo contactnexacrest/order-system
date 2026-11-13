@@ -411,4 +411,17 @@ describe('QA Nov 2026 security batch', () => {
       expect(r.headers.location).toBe(`/orders/${orderId}?tab=docs`);
     });
   });
+
+  describe('UI-015 / MTX-009 bounded prepared-statement cache', () => {
+    it('UI-015: each pooled connection keeps at most 200 prepared statements open', async () => {
+      const conn = await db.pool.getConnection();
+      try {
+        expect(conn.connection.config.maxPreparedStatements).toBe(200);
+        for (let i = 0; i < 260; i++) await conn.execute(`SELECT ${i} AS n /* ui015-${i} */`);
+        expect(conn.connection._statements.size).toBeLessThanOrEqual(200);
+      } finally {
+        conn.release();
+      }
+    });
+  });
 });
