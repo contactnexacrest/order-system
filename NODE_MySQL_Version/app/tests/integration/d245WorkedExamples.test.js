@@ -29,6 +29,9 @@ const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc,
  * register, "To pay", "Owed" and profitability report totals equal the sum of
  * these orders.
  */
+// QA final run 3: these examples walk whole orders on a large test database; allow 2 minutes under load.
+jest.setTimeout(120000);
+
 describe('D-245 worked examples (P6)', () => {
   let admin;
   const p = {};

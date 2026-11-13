@@ -218,8 +218,9 @@ describe('Prices fixed at the first approved Quotation or, failing that, the fir
     const sql = fs.readFileSync(path.join(__dirname, '../../../../docs/migrations/2026-11-13g-freeze-prices-at-pi.sql'), 'utf8');
     // phpMyAdmin (shared hosting) switches database after an information_schema query and then refuses
     // PREPAREd statements (#1044, 13 Nov 2026): the file must be plain statements only.
-    expect(sql).not.toContain('PREPARE');
-    expect(sql.replace(/^--.*$/gm, '').toLowerCase()).not.toContain('information_schema');
+    const code = sql.replace(/^--.*$/gm, ''); // comments may mention the words
+    expect(code).not.toContain('PREPARE');
+    expect(code.toLowerCase()).not.toContain('information_schema');
     const args = ['-h', env.get('DB_HOST', '127.0.0.1'), '-P', String(env.get('DB_PORT', '3306')), '-u', env.get('DB_USERNAME'), `-p${env.get('DB_PASSWORD', '')}`, env.get('DB_DATABASE')];
     for (const text of [sql, sql]) {
       const out = execFileSync('mysql', args, { input: text }).toString();

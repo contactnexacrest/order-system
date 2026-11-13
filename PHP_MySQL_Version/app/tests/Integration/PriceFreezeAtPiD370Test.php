@@ -204,8 +204,9 @@ final class PriceFreezeAtPiD370Test extends DbTestCase
         $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-13g-freeze-prices-at-pi.sql');
         // phpMyAdmin (shared hosting) switches database after an information_schema query and then refuses
         // PREPAREd statements (#1044, 13 Nov 2026): the file must be plain statements only.
-        self::assertStringNotContainsString('PREPARE', $sql);
-        self::assertStringNotContainsStringIgnoringCase('information_schema', preg_replace('/^--.*$/m', '', $sql));
+        $code = (string) preg_replace('/^--.*$/m', '', $sql); // comments may mention the words
+        self::assertStringNotContainsString('PREPARE', $code);
+        self::assertStringNotContainsStringIgnoringCase('information_schema', $code);
         $cmd = ['mysql', '-h', Env::get('DB_HOST', '127.0.0.1'), '-P', Env::get('DB_PORT', '3306'), '-u', Env::get('DB_USERNAME'),
             '-p' . Env::get('DB_PASSWORD', ''), Env::get('DB_DATABASE')];
         foreach ([$sql, $sql] as $run => $text) {
