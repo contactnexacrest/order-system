@@ -37,6 +37,15 @@ class ZohoSyncStop extends Error {}
 class ZohoBudgetExhausted extends ZohoSyncStop {}
 /** Zoho answered "too many requests", or this app's per-minute speed limit was reached. */
 class ZohoRateLimited extends ZohoSyncStop {}
+/** QA ZOH-004: Zoho refused the Books refresh token (invalid_code, revoked, mistyped) — stop at the first refusal. */
+class ZohoSignInFailed extends ZohoSyncStop {}
+
+/** QA ZOH-004: the stop reason when Zoho refuses the refresh token (PHP ZohoSignInFailed::message()). */
+function signInFailedMessage(error) {
+  return `Stopped: Zoho sign-in failed — Zoho refused the Zoho Books refresh token (${error}). `
+    + 'Reconnect: put a new refresh token from the Zoho API Console in Settings (Zoho Books refresh token) and run Test Zoho Books Connection; '
+    + 'remaining records will be sent at the next sync.';
+}
 
 /** In a per-record catch: let a stop reason end the whole run. */
 function rethrow(e) {
@@ -195,7 +204,7 @@ async function usage() {
 
 module.exports = {
   DEFAULT_DAILY, DEFAULT_MINUTE, SPEED_LIMIT_MESSAGE, RATE_LIMIT_MESSAGE,
-  ZohoSyncStop, ZohoBudgetExhausted, ZohoRateLimited, rethrow,
+  ZohoSyncStop, ZohoBudgetExhausted, ZohoRateLimited, ZohoSignInFailed, signInFailedMessage, rethrow,
   inBackground, setTestLimits, useSettingLimits, setClock, setSleeper,
   dailyLimit, minuteLimit, dayKey, minuteKey, exhaustedMessage, exhaustedToday,
   acquire, assertNotRateLimited, usage,

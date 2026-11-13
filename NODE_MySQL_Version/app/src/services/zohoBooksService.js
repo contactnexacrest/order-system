@@ -56,6 +56,11 @@ const taxes = new Map();
 
 // Owner decision 2 Nov 2026 (D-239): token → how to refresh it (re-fetch on 401).
 const tokenOwners = new Map();
+// QA ZOH-003: a token Zoho refused (401) → the token fetched in its place, so every later request of the run uses it.
+const tokenReplacements = new Map();
+// QA ZOH-004: refresh token → { message, at } when Zoho refused it (sign-in failed); not tried again for 10 minutes.
+const signInFailures = new Map();
+const SIGN_IN_FAILURE_MEMORY_MS = 600 * 1000;
 // Tests: a fresh fake Zoho starts with no shared token and no calls counted.
 let resetDone = Promise.resolve();
 
@@ -63,6 +68,8 @@ let resetDone = Promise.resolve();
 function forgetTokensInMemoryForTests() {
   tokens.clear();
   tokenOwners.clear();
+  tokenReplacements.clear();
+  signInFailures.clear();
 }
 
 /** Tests only: answer every Zoho request with fn(method, url, payload, headers, formEncoded) instead of the network (null restores real HTTP). */
@@ -70,6 +77,8 @@ function setTransport(fn) {
   transport = fn;
   tokens.clear();
   tokenOwners.clear();
+  tokenReplacements.clear();
+  signInFailures.clear();
   if (fn) {
     resetDone = Promise.all([db.execute('DELETE FROM zoho_token_cache'), db.execute('DELETE FROM zoho_api_usage')]).catch(() => {});
   }
@@ -1537,6 +1546,9 @@ async function getAccessToken(accountsDomain, clientId, clientSecret, refreshTok
   const key = crypto.createHash('sha256').update(`${zohoGuard.environment()}|${refreshToken}`).digest('hex');
   let fromDb = await cachedToken(key);
   if (fromDb) return rememberToken(refreshToken, fromDb.token, fromDb.expires, owner);
+  // QA ZOH-004: Zoho already refused this refresh token a moment ago — do not ask again for every record.
+  const failed = signInFailures.get(refreshToken);
+  if (failed && failed.at > Date.now() - SIGN_IN_FAILURE_MEMORY_MS) throw new zohoApiBudget.ZohoSignInFailed(failed.message);
   const lockName = `nx_zoho_token_${key.slice(0, 40)}`;
   const conn = await db.pool.getConnection();
   try {
@@ -1553,6 +1565,14 @@ async function getAccessToken(accountsDomain, clientId, clientSecret, refreshTok
       grant_type: 'refresh_token',
     }, { 'Content-Type': 'application/x-www-form-urlencoded' }, true);
     const decoded = safeJson(res.body);
+    // QA ZOH-004: Zoho refused the refresh token itself (HTTP 200 {"error":"invalid_code"}, invalid_client, ...).
+    // request() has already turned "too many requests" into a rate-limit stop, so this is a sign-in failure:
+    // stop the run with a sign-in message and remember it, so no further token request is made.
+    if (decoded && typeof decoded === 'object' && !decoded.access_token && typeof decoded.error === 'string' && decoded.error !== '') {
+      const message = zohoApiBudget.signInFailedMessage(decoded.error);
+      signInFailures.set(refreshToken, { message, at: Date.now() });
+      throw new zohoApiBudget.ZohoSignInFailed(message);
+    }
     if (!res.ok || !decoded || !decoded.access_token) {
       throw new Error(`Zoho Books OAuth token refresh failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
     }
@@ -1598,6 +1618,12 @@ async function request(method, url, payload, headers, formEncoded = false) {
   await resetDone;
   // Owner decision 2 Nov 2026 (D-239): every call counts against this app's daily / per-minute allowance.
   await zohoApiBudget.acquire();
+  // QA ZOH-003: a token Zoho refused earlier in this operation was replaced — every later request uses the new one.
+  if (headers && typeof headers.Authorization === 'string' && headers.Authorization.startsWith('Zoho-oauthtoken ')) {
+    let token = headers.Authorization.slice('Zoho-oauthtoken '.length);
+    for (let hops = 0; tokenReplacements.has(token) && hops < 10; hops += 1) token = tokenReplacements.get(token);
+    headers = { ...headers, Authorization: `Zoho-oauthtoken ${token}` };
+  }
   let res = await send(method, url, payload, headers, formEncoded);
   if (res.status === 401 && headers && typeof headers.Authorization === 'string' && headers.Authorization.startsWith('Zoho-oauthtoken ')) {
     // A token Zoho no longer accepts: forget it, fetch a new one, try once more.
@@ -1606,6 +1632,7 @@ async function request(method, url, payload, headers, formEncoded = false) {
     if (owner) {
       await forgetToken(old);
       const fresh = await getAccessToken(...owner);
+      tokenReplacements.set(old, fresh);
       headers = { ...headers, Authorization: `Zoho-oauthtoken ${fresh}` };
       await zohoApiBudget.acquire();
       res = await send(method, url, payload, headers, formEncoded);

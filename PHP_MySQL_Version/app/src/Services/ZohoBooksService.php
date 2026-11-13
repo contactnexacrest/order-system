@@ -42,6 +42,12 @@ final class ZohoBooksService
     private static array $tokens = [];
     /** @var array<string, array{0:string,1:string,2:string,3:string}> token => how to refresh it (D-239: re-fetch on 401) */
     private static array $tokenOwners = [];
+    /** @var array<string, string> QA ZOH-003: a token Zoho refused (401) => the token fetched in its place */
+    private static array $tokenReplacements = [];
+    /** QA ZOH-004: seconds a refused refresh token is not tried again (a new one saved in Settings is tried at once) */
+    private const SIGN_IN_FAILURE_MEMORY = 600;
+    /** @var array<string, array{message:string, at:int}> QA ZOH-004: refresh token => Zoho refused it (sign-in failed) */
+    private static array $signInFailures = [];
     /** @var array<string, bool> whether each Books organisation is GST-registered */
     private static array $gstRegistered = [];
     /** @var array<string, string> each GST-registered Books organisation's own GSTIN */
@@ -55,6 +61,8 @@ final class ZohoBooksService
         self::$transport = $transport;
         self::$tokens = [];
         self::$tokenOwners = [];
+        self::$tokenReplacements = [];
+        self::$signInFailures = [];
         // Tests: a fresh fake Zoho starts with no shared token and no calls counted (D-239).
         \App\Config\Database::connection()->exec('DELETE FROM zoho_token_cache');
         \App\Config\Database::connection()->exec('DELETE FROM zoho_api_usage');
@@ -1370,7 +1378,9 @@ final class ZohoBooksService
             'zip' => (string) ($client['billing_postcode'] ?? ''),
             'country' => (string) ($client['billing_country'] ?? ''),
         ], static fn (string $v): bool => trim($v) !== '');
-        $payload = ['contact_name' => $name, 'company_name' => $name, 'billing_address' => $address];
+        // QA ZOH-001: Books needs billing_address as a JSON object — an empty PHP array would be sent as [] (a list)
+        // and Zoho answers 400 "JSON is not well formed"; Node sends {} for a client with no structured address.
+        $payload = ['contact_name' => $name, 'company_name' => $name, 'billing_address' => $address === [] ? new \stdClass() : $address];
         $person = array_filter([
             'first_name' => mb_substr(trim((string) ($client['contact_person'] ?? '')), 0, 100),
             'email' => trim((string) ($client['email'] ?? '')),
@@ -2818,6 +2828,11 @@ final class ZohoBooksService
         if ($fromDb !== null) {
             return self::rememberToken($refreshToken, $fromDb['token'], $fromDb['expires'], [$accountsDomain, $clientId, $clientSecret, $refreshToken]);
         }
+        // QA ZOH-004: Zoho already refused this refresh token a moment ago — do not ask again for every record.
+        $failed = self::$signInFailures[$refreshToken] ?? null;
+        if ($failed !== null && $failed['at'] > time() - self::SIGN_IN_FAILURE_MEMORY) {
+            throw new ZohoSignInFailed($failed['message']);
+        }
         $pdo = \App\Config\Database::connection();
         $lockName = 'nx_zoho_token_' . substr($key, 0, 40);
         $lock = $pdo->prepare('SELECT GET_LOCK(:n, 15)');
@@ -2846,6 +2861,14 @@ final class ZohoBooksService
             );
 
             $decoded = json_decode($response['body'], true);
+            // QA ZOH-004: Zoho refused the refresh token itself (HTTP 200 {"error":"invalid_code"}, invalid_client, ...).
+            // request() has already turned "too many requests" into a rate-limit stop, so this is a sign-in failure:
+            // stop the run with a sign-in message and remember it, so no further token request is made.
+            if (is_array($decoded) && empty($decoded['access_token']) && !empty($decoded['error']) && is_string($decoded['error'])) {
+                $message = ZohoSignInFailed::message($decoded['error']);
+                self::$signInFailures[$refreshToken] = ['message' => $message, 'at' => time()];
+                throw new ZohoSignInFailed($message);
+            }
             if ($response['status'] !== 200 || !is_array($decoded) || empty($decoded['access_token'])) {
                 throw new \RuntimeException('Zoho Books OAuth token refresh failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
@@ -2903,6 +2926,17 @@ final class ZohoBooksService
         ZohoGuard::assertRequestAllowed($url);
         // Owner decision 2 Nov 2026 (D-239): every call counts against this app's daily / per-minute allowance.
         ZohoApiBudget::acquire();
+        // QA ZOH-003: a token Zoho refused earlier in this operation was replaced — every later request uses the new one.
+        foreach ($headers as $i => $h) {
+            if (str_starts_with($h, 'Authorization: Zoho-oauthtoken ')) {
+                $token = substr($h, strlen('Authorization: Zoho-oauthtoken '));
+                for ($hops = 0; isset(self::$tokenReplacements[$token]) && $hops < 10; $hops++) {
+                    $token = self::$tokenReplacements[$token];
+                }
+                $headers[$i] = 'Authorization: Zoho-oauthtoken ' . $token;
+                break;
+            }
+        }
         $response = self::send($method, $url, $payload, $headers, $formEncoded);
         if ($response['status'] === 401) {
             // A token Zoho no longer accepts: forget it, fetch a new one, try once more.
@@ -2912,7 +2946,9 @@ final class ZohoBooksService
                     $owner = self::$tokenOwners[$old] ?? null;
                     if ($owner !== null) {
                         self::forgetToken($old);
-                        $headers[$i] = 'Authorization: Zoho-oauthtoken ' . self::getAccessToken(...$owner);
+                        $fresh = self::getAccessToken(...$owner);
+                        self::$tokenReplacements[$old] = $fresh;
+                        $headers[$i] = 'Authorization: Zoho-oauthtoken ' . $fresh;
                         ZohoApiBudget::acquire();
                         $response = self::send($method, $url, $payload, $headers, $formEncoded);
                     }
