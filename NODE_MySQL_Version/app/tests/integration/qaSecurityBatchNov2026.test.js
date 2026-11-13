@@ -397,4 +397,18 @@ describe('QA Nov 2026 security batch', () => {
       expect(isTransientDbError(new Error('boom'))).toBe(false);
     });
   });
+
+  describe('UI-009 back to the form when the site runs on a port (parity with PHP)', () => {
+    it('UI-009: a refused upload goes back to the referring page on the same host:port', async () => {
+      const { createTestClient, createTestOrder } = require('../support/fixtures');
+      const orderId = await createTestOrder(await createTestClient());
+      const md = await user('Managing Director');
+      const csrf = (await md.agent.get(`/orders/${orderId}`)).text.match(/name="_csrf" value="([^"]+)"/)[1];
+      const r = await md.agent.post(`/orders/${orderId}/additional-documents`)
+        .set('Host', '127.0.0.1:8080').set('Referer', `http://127.0.0.1:8080/orders/${orderId}?tab=docs`)
+        .field('_csrf', csrf).attach('not_the_right_field', Buffer.from('%PDF-1.4'), 'x.pdf');
+      expect(r.status).toBe(302);
+      expect(r.headers.location).toBe(`/orders/${orderId}?tab=docs`);
+    });
+  });
 });

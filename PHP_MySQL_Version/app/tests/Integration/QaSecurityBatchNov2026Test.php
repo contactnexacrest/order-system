@@ -323,4 +323,24 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         // An ordinary error stays a 500.
         self::assertSame(500, \App\Helpers\DbResilience::errorResponse(new \RuntimeException('boom', 0, new \LogicException('x')), false)['status']);
     }
+
+    /** UI-009: a refused form goes back to itself when the site runs on a port (dev/UAT), not to the Dashboard. */
+    public function testUi009SafeRedirectBackKeepsThePort(): void
+    {
+        $saved = [$_SERVER['HTTP_REFERER'] ?? null, $_SERVER['HTTP_HOST'] ?? null];
+        try {
+            $_SERVER['HTTP_HOST'] = '127.0.0.1:8080';
+            $_SERVER['HTTP_REFERER'] = 'http://127.0.0.1:8080/clients/create?x=1';
+            self::assertSame('/clients/create?x=1', \App\Helpers\Router::safeRedirectBack());
+            $_SERVER['HTTP_REFERER'] = 'http://127.0.0.1:9999/clients/create';
+            self::assertSame('/', \App\Helpers\Router::safeRedirectBack(), 'another port is another site');
+            $_SERVER['HTTP_REFERER'] = '//evil.example.com/phish';
+            self::assertSame('/', \App\Helpers\Router::safeRedirectBack());
+            $_SERVER['HTTP_HOST'] = 'example.com';
+            $_SERVER['HTTP_REFERER'] = 'https://example.com/clients/create';
+            self::assertSame('/clients/create', \App\Helpers\Router::safeRedirectBack());
+        } finally {
+            [$_SERVER['HTTP_REFERER'], $_SERVER['HTTP_HOST']] = $saved;
+        }
+    }
 }

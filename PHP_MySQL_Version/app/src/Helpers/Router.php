@@ -251,7 +251,12 @@ final class Router
             // A scheme-relative Referer ("//evil.example.com/phish") still
             // parses PHP_URL_PATH as "/phish" alone — only trust the path
             // when the Referer's own host actually matches this request's.
-            if (parse_url($referer, PHP_URL_HOST) === $host) {
+            // UI-009: compare host AND port — HTTP_HOST carries the port ("127.0.0.1:8080")
+            // when the site runs on one, so a host-only compare sent every refused form to '/'.
+            $refHost = parse_url($referer, PHP_URL_HOST);
+            $refPort = parse_url($referer, PHP_URL_PORT);
+            $refAuthority = is_string($refHost) ? $refHost . (is_int($refPort) ? ':' . $refPort : '') : null;
+            if ($refAuthority !== null && strcasecmp($refAuthority, (string) $host) === 0) {
                 $path = parse_url($referer, PHP_URL_PATH);
                 if (is_string($path) && str_starts_with($path, '/')) {
                     $query = parse_url($referer, PHP_URL_QUERY);
