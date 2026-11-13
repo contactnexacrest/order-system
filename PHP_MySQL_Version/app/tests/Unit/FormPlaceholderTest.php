@@ -58,7 +58,14 @@ final class FormPlaceholderTest extends TestCase
                 if (str_starts_with($tag, '<input') && in_array($type, self::NOT_TYPED, true)) {
                     continue;
                 }
-                if (preg_match('/\btype\s*=\s*["\'][^"\']*<\?/', $tag) || preg_match('/\breadonly\b/', $tag) || str_contains($tag, 'placeholder')) {
+                // QA UI-012: a placeholder or readonly written only inside a PHP block (Settings echoed a placeholder
+                // only for number settings) does not count, and a type chosen in PHP counts as typed when it can be
+                // one of the typed kinds.
+                $fixed = (string) preg_replace('/<\?.*?\?>/s', '', $tag);
+                if (preg_match('/\btype\s*=\s*["\'][^"\']*<\?(.*?)\?>/s', $tag, $dyn) && !preg_match('/\'(?:text|number|email|tel|search|url|password)\'/', $dyn[1])) {
+                    continue;
+                }
+                if (preg_match('/\breadonly\b/', $fixed) || preg_match('/\splaceholder\s*=/', $fixed)) {
                     continue;
                 }
                 $missing[] = substr($file->getPathname(), strlen(self::VIEWS) + 1) . ':' . (substr_count($text, "\n", 0, $offset) + 1);

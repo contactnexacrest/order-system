@@ -158,6 +158,74 @@ const LABELS = {
   zoho_sync_products: ['Send products to Zoho Books as items', null],
 };
 
+/**
+ * QA UI-012 (owner rule 2026-11-01, placeholders on every input): an example or
+ * the expected format for each typed setting. Role addresses and placeholder
+ * numbers only (no PII). A key not listed gets one from its value type
+ * (placeholder()). Same list in SettingLabels.php.
+ */
+const PLACEHOLDERS = {
+  bank_account_no: 'e.g. 001234567890',
+  bank_address: 'e.g. Branch building, street, city, PIN',
+  bank_branch: 'e.g. Main branch',
+  bank_name: 'e.g. State Bank of India',
+  bank_pincode: 'e.g. 400001',
+  ifsc: 'e.g. SBIN0001234',
+  swift_bic: 'e.g. SBININBB123',
+  rcmc_number: 'e.g. RCMC/CAPEXIL/00000/2026-2027',
+  corporate_office: 'e.g. Office no., building, street, city, PIN',
+  registered_office: 'e.g. Office no., building, street, city, PIN',
+  director_name: "The director's full name, as it should print",
+  director_title: 'e.g. Director',
+  md_name: "The Managing Director's full name, as it should print",
+  md_title: 'e.g. Managing Director',
+  email: 'e.g. info@email.com',
+  phone: 'e.g. +91-0000000000',
+  gstin: 'e.g. 27ABCDE1234F1Z5',
+  iec_pan: 'e.g. ABCDE1234F',
+  legal_name: 'e.g. Company Name Private Limited',
+  ecgc_policy_no: 'e.g. ECGC/SCR/2026/00',
+  default_currency: 'e.g. USD',
+  weekly_off_days: 'e.g. sunday (or saturday,sunday)',
+  annexure_product_note: 'Type the note printed under the products in the annexure',
+  generated_document_disclaimer_text: 'Type the disclaimer printed on generated documents',
+  master_tracking_ref_format: 'e.g. NC/SC/{YY}/{DDMM}{NNN}',
+  order_ref_format: 'e.g. NC/SC/ORD/{YY}/{DDMM}{NNN}',
+  lut_number: 'e.g. AD000000000000X',
+  lut_valid_fy: 'e.g. FY 2026-27',
+  reply_to_email: 'e.g. info@email.com',
+  mail_cc_emails: 'e.g. md@email.com, ed@email.com',
+  mail_default_cc_email: 'e.g. admin@email.com',
+  mail_redirect_address: 'e.g. admin@email.com',
+  password_complexity_json: 'e.g. {"require_upper":true,"require_number":true,"require_symbol":false}',
+  bl_consignee_instruction: 'e.g. TO ORDER OF {company}',
+  bl_type_instruction: 'e.g. ORIGINAL NEGOTIABLE BILL OF LADING',
+  zoho_account_id: 'e.g. 1000000000000000',
+  zoho_accounts_domain: 'e.g. accounts.zoho.in',
+  zoho_api_domain: 'e.g. mail.zoho.in',
+  zoho_from_address: 'e.g. info@email.com',
+  zoho_books_accounts_domain: 'e.g. accounts.zoho.in',
+  zoho_books_api_domain: 'e.g. www.zohoapis.in',
+  zoho_books_deposit_account_id: 'e.g. 1000000000000000000',
+  zoho_books_organization_id: 'e.g. 60000000000',
+  zoho_books_restore_checked_at: 'Set by the app, e.g. 2026-11-13 10:00:00',
+};
+
+/** The placeholder of a typed setting field (UI-012). */
+function placeholder(key, valueType) {
+  if (Object.prototype.hasOwnProperty.call(PLACEHOLDERS, key)) return PLACEHOLDERS[key];
+  switch (String(valueType || '')) {
+    case 'number': return 'e.g., 30';
+    case 'email': return 'e.g. info@email.com';
+    case 'email_list': return 'e.g. md@email.com, ed@email.com';
+    case 'json': return 'e.g. {"key": "value"}';
+    default: {
+      const l = label(key);
+      return `Type the ${/^[A-Z][a-z]/.test(l) ? l.charAt(0).toLowerCase() + l.slice(1) : l}`;
+    }
+  }
+}
+
 function humanise(key) {
   const t = String(key).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -189,4 +257,4 @@ function sortSections(grouped) {
   return out;
 }
 
-module.exports = { SECTIONS, LABELS, humanise, sectionTitle, label, help, sortSections };
+module.exports = { SECTIONS, LABELS, PLACEHOLDERS, humanise, sectionTitle, label, help, placeholder, sortSections };

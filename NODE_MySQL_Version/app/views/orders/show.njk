@@ -2890,7 +2890,7 @@
           <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}" placeholder="e.g. 24000"></label>
           <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}" placeholder="e.g. 28.5"></label>
           <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
-          <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
+          <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" placeholder="e.g. 2.5" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
           <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
         </div>
 

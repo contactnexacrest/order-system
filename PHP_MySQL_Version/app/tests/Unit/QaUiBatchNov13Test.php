@@ -48,6 +48,26 @@ final class QaUiBatchNov13Test extends TestCase
         }
     }
 
+    /** UI-012: every typed setting on Settings › Company shows a placeholder (the Jest twin compares both lists). */
+    public function testUi012SettingsPlaceholders(): void
+    {
+        self::assertSame('e.g. Company Name Private Limited', \App\Helpers\SettingLabels::placeholder('legal_name', 'string'));
+        self::assertSame('e.g. +91-0000000000', \App\Helpers\SettingLabels::placeholder('phone', 'string'));
+        self::assertSame('e.g., 30', \App\Helpers\SettingLabels::placeholder('some_days', 'number'));
+        self::assertSame('e.g. info@email.com', \App\Helpers\SettingLabels::placeholder('new_mail', 'email'));
+        self::assertSame('e.g. md@email.com, ed@email.com', \App\Helpers\SettingLabels::placeholder('new_list', 'email_list'));
+        self::assertSame('Type the lut expiry note', \App\Helpers\SettingLabels::placeholder('lut_expiry_note', 'string'));
+        foreach (\App\Helpers\SettingLabels::PLACEHOLDERS as $key => $text) {
+            preg_match_all('/[\w.+-]+@[\w.-]+/', $text, $emails);
+            foreach ($emails[0] as $email) {
+                self::assertMatchesRegularExpression('/^(?:info|md|ed|admin)@email\.com$/', $email, $key);
+            }
+        }
+        // The view never makes the placeholder depend on the value type (FormPlaceholderTest checks every view).
+        $view = (string) file_get_contents(self::VIEWS . '/settings/index.php');
+        self::assertSame(2, substr_count($view, 'placeholder="<?= htmlspecialchars(\App\Helpers\SettingLabels::placeholder('));
+    }
+
     /**
      * UI-008: every fixed internal link in a view leads to a page route (the TDS
      * register linked to /associates/report, which does not exist). A route

@@ -115,6 +115,35 @@ describe('UI-011: quantity 0 is caught before the order form is sent', () => {
   });
 });
 
+/** UI-012: every typed setting on Settings › Company shows a placeholder (same list on both stacks, no PII). */
+describe('UI-012: Settings placeholders', () => {
+  const settingLabels = require('../../src/helpers/settingLabels');
+
+  it('the PHP and Node lists are the same', () => {
+    const php = read(__dirname, '..', '..', '..', '..', 'PHP_MySQL_Version', 'app', 'src', 'Helpers', 'SettingLabels.php');
+    const block = php.slice(php.indexOf('public const PLACEHOLDERS = ['), php.indexOf('];', php.indexOf('public const PLACEHOLDERS = [')));
+    const phpMap = {};
+    for (const m of block.matchAll(/'([a-z0-9_]+)' => (?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/g)) phpMap[m[1]] = (m[2] !== undefined ? m[2] : m[3]).replace(/\\(.)/g, '$1');
+    expect(Object.keys(phpMap).length).toBeGreaterThan(30);
+    expect(phpMap).toEqual(settingLabels.PLACEHOLDERS);
+  });
+
+  it('uses role addresses and placeholder numbers only', () => {
+    for (const [key, text] of Object.entries(settingLabels.PLACEHOLDERS)) {
+      for (const email of text.match(/[\w.+-]+@[\w.-]+/g) || []) expect([key, email]).toEqual([key, expect.stringMatching(/^(?:info|md|ed|admin)@email\.com$/)]);
+      for (const phone of text.match(/\+\d[\d-]{7,}/g) || []) expect([key, phone]).toEqual([key, '+91-0000000000']);
+    }
+  });
+
+  it('a setting not listed gets one from its value type', () => {
+    expect(settingLabels.placeholder('legal_name', 'string')).toBe('e.g. Company Name Private Limited');
+    expect(settingLabels.placeholder('some_days', 'number')).toBe('e.g., 30');
+    expect(settingLabels.placeholder('new_mail', 'email')).toBe('e.g. info@email.com');
+    expect(settingLabels.placeholder('new_list', 'email_list')).toBe('e.g. md@email.com, ed@email.com');
+    expect(settingLabels.placeholder('lut_expiry_note', 'string')).toBe('Type the lut expiry note');
+  });
+});
+
 /**
  * UI-008: every fixed internal link in a view leads to a page route (the TDS
  * register linked to /associates/report, which does not exist). A route

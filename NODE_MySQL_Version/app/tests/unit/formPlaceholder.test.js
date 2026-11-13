@@ -46,7 +46,13 @@ describe('form placeholders (owner rule 2026-11-01)', () => {
         const t = tag.match(/\btype\s*=\s*["']([a-zA-Z-]+)["']/);
         const type = t ? t[1].toLowerCase() : 'text';
         if (tag.startsWith('<input') && NOT_TYPED.has(type)) continue;
-        if (/\btype\s*=\s*["'][^"']*\{\{/.test(tag) || /\breadonly\b/.test(tag) || tag.includes('placeholder')) continue;
+        // QA UI-012: a placeholder or readonly only inside a {{ … if … }} / {% if %} does not count
+        // (Settings showed one only for number settings), and a type chosen in the template
+        // counts as typed when it can be one of the typed kinds.
+        const fixed = tag.replace(/\{%-?\s*if\b[\s\S]*?\{%-?\s*endif\s*-?%\}/g, '').replace(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}|\{#[\s\S]*?#\}/g, '');
+        const dynamicType = tag.match(/\btype\s*=\s*["'][^"']*\{\{([\s\S]*?)\}\}/);
+        if (dynamicType && !/'(?:text|number|email|tel|search|url|password)'/.test(dynamicType[1])) continue;
+        if (/\breadonly\b/.test(fixed) || /\splaceholder\s*=/.test(fixed)) continue;
         missing.push(`${path.relative(VIEWS, file)}:${text.slice(0, offset).split('\n').length}`);
       }
     }

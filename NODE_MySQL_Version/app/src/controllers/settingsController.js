@@ -32,6 +32,7 @@ async function index(req, res) {
     // D-332: the plain name and help sentence (the technical key stays as small grey text).
     row.plainLabel = settingLabels.label(row.setting_key);
     row.plainHelp = settingLabels.help(row.setting_key, row.description);
+    row.placeholder = settingLabels.placeholder(row.setting_key, row.value_type); // QA UI-012
     (grouped[row.category] ||= []).push(row);
   }
   if (!zohoMailService.IN_USE) {

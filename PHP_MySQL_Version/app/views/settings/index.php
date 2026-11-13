@@ -128,6 +128,7 @@
                 name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
                 data-key="<?= htmlspecialchars($row['setting_key']) ?>"
                 rows="3"
+                placeholder="<?= htmlspecialchars(\App\Helpers\SettingLabels::placeholder((string) $row['setting_key'], $row['value_type'] ?? null)) ?>"
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
                 <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'readonly' : '' ?>
@@ -139,7 +140,7 @@
                 name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
                 data-key="<?= htmlspecialchars($row['setting_key']) ?>"
                 value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"
-                <?= $row['value_type'] === 'number' ? 'placeholder="e.g., 30"' : '' ?>
+                placeholder="<?= htmlspecialchars(\App\Helpers\SettingLabels::placeholder((string) $row['setting_key'], $row['value_type'] ?? null)) ?>"
                 data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>"
                 data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
                 <?php /* 90-item backlog #33: storage_base_path is forced readonly here
