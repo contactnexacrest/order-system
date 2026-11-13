@@ -3974,6 +3974,41 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   Global pricing settings"). Other in-app links stay, with the new names. Routes and permissions unchanged; the left menu
   still marks Products on both pages.
 
+**Products list buttons, category form, "Also work out" rows and Thickness rules (D-363, 13 Nov 2026, owner "go with
+recommendation"; mockups ui3_u1–u4).**
+- **Products list row actions.** The last column is a `.row-actions` cell of small buttons on one line (`.product-list-actions`):
+  the main action filled — **Edit**, or **Configure** when the product is not configured — then **View** and **Duplicate**
+  outlined (`btn-sm btn-secondary`); **Link a supplier** (filled), **Reactivate** and **Delete…** sit in the same row. No
+  wrapping on desktop; whole buttons wrap below 760 px. A "cannot delete" reason shows under the buttons.
+- **Add a category / category Name and attributes.** `.cat-attr-grid`: **Name \*** alone on the first row (half width), then
+  the attributes two per row (1 | 2, 3 | 4, 5 | 6); one column below 760 px. Still exactly `MAX_ATTRIBUTES` = 6 boxes, no
+  "+ add attribute". Placeholders: e.g. Size, Grade, Colour, Finish, Thickness, Packing (the category edit form uses the
+  same layout and placeholders).
+- **"Also work out from this … price"** (`products/_price_add`, inside "+ Add / update a price"; Edit price does not use
+  it): one row per thickness — tick box · thickness · the worked-out price (live while the price is typed; until then
+  "type the price to see it") · its % rule ("−20 % of 20 mm", "base", "× 40 of 20 mm per m²") with a badge **category** or
+  **this product** (the product's own value: its option override, or its own thickness factor). A thickness with a typed
+  price is highlighted: "you typed ₹X on <date> — kept unless you tick". The per-row "change −20 %" links are replaced by
+  one link under the list, **Change the % rules for this product** → `/products/{id}/configure#thickness-rules`. Field
+  names (`thickness_mm`, `thickness_price`, `price_quoted_on`, `also[]`, `base`), the ticking rule (ticked = no typed
+  price) and the maths are unchanged — a save posts and stores exactly the same rows as before (checked against HEAD).
+  app.js `initThicknessCalc` hides `[data-also-amount]` until the amount can be worked out.
+- **Configure › Thickness rules** (`#thickness-rules`, below the Configure form): table Thickness | Category | This product
+  (input) | Comes from (badge) | reset, the base row as "base", and "50 mm and above × K" read-only (that factor is the
+  "Thickness factor" row of the levels table). Save posts to the existing product Price options save
+  (`POST /products/{id}/specifications/{specId}`, `manage_product_specifications`) with `from=configure`: a value equal to
+  the category's follows the category (no own value), only this product's `product_option_overrides` rows are written —
+  never `spec_options` (the category) or another product — and the page returns to Configure with "Saved for <product>
+  only — other products keep the category's values." Options not shown (not offered, 50 mm and above) are posted back
+  unchanged. **Reset all to category** opens a confirm box listing the changed rows and posts the same save with every
+  shown value empty. "reset" on one row puts back the category value (then Save). Users without
+  `manage_product_specifications` see the table read-only. The product form's "Price rules in effect for this product"
+  links to it. Category price rules already carry "Applies to every product in the category unless the product changes it"
+  (D-362). Code: `ProductConfigureController::thicknessRules` (Node `thicknessRules`), `SpecController::saveProductSpec`
+  (`from=configure`), `pricingController.addView` (Node: `rule`, `isBase`, `own`), views `products/index`, `categories`,
+  `category`, `_price_add`, `configure`, `_form`; CSS D-363 block. No migration. The Products list has no board view (no
+  Kanban twin).
+
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
 `OrderLinePricing` checks each line against the floor of **whoever sells the order**:

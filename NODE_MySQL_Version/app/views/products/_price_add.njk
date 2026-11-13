@@ -5,6 +5,11 @@
   product's price rules). Ticked by default: only thicknesses with no TYPED price. app.js
   (initThicknessCalc) shows the amounts while typing; the server works them out again on save
   (thicknessPrices.calcFrom). For an existing supplier price: "Base for orders".
+  D-363 (13 Nov 2026, mockup ui3_u3): one row per thickness — tick box · thickness · the worked-out
+  price (live as the base price is typed; until then "type the price to see it") · its % rule with a
+  badge saying where it comes from ("category" or "this product"). A thickness with a typed price is
+  highlighted ("you typed ₹X on <date> — kept unless you tick"). One link under the list, "Change the
+  % rules for this product", opens Configure › Thickness rules. Same fields and maths.
   In: av (pricingController.addView), product, afCard (price card or null), afDate (date field name or '').
   Port of views/products/_price_add.php.
 #}
@@ -26,13 +31,19 @@
   <fieldset class="thickness-also">
     <legend class="legend-sentence">Also work out from this <span data-calc-from>…</span> price <small class="muted">(the price rules in effect for this product)</small></legend>
     {% for a in av.rows %}
-      <div class="also-row" data-also-mm="{{ a.mm }}"{% if a.cbm %} data-cbm="1"{% else %} data-pct="{{ a.pct }}"{% endif %}>
-        <label class="inline"><input type="checkbox" name="also[]" value="{{ a.mm }}"{% if not a.typed %} checked{% endif %}>
-          <b>{{ a.label }} → ₹<span data-also-price>…</span></b> {{ a.per }}</label>
-        {% if a.typed %}<span class="badge badge-typed">you typed ₹{{ a.typedPrice }}{% if a.typedOn %} on {{ a.typedOn | shortDate }}{% endif %} — kept unless you tick this</span>{% endif %}
-        <br><small class="muted"><span data-also-how></span> · <a href="/products/{{ product.id }}/edit#price-rules">change <span data-also-change>{{ a.change }}</span></a></small>
+      <div class="also-row{% if a.typed %} also-typed{% endif %}" data-also-mm="{{ a.mm }}"{% if a.cbm %} data-cbm="1"{% else %} data-pct="{{ a.pct }}"{% endif %}>
+        <label class="also-check"><input type="checkbox" name="also[]" value="{{ a.mm }}"{% if not a.typed %} checked{% endif %}>
+          <b>{{ a.label }}</b></label>
+        <span class="also-amount"><span data-also-amount>₹<span data-also-price>…</span> {{ a.per }}</span>
+          <small class="muted" data-also-how>type the price to see it</small></span>
+        <span class="also-rule">
+          {% if a.typed %}<span class="also-typed-note">you typed ₹{{ a.typedPrice }}{% if a.typedOn %} on {{ a.typedOn | shortDate }}{% endif %} — kept unless you tick</span><br>{% endif %}
+          {{ a.rule }}
+          {% if not a.isBase %}<span class="badge level-from level-from-{{ 'product' if a.own else 'category' }}">{{ 'this product' if a.own else 'category' }}</span>{% endif %}
+        </span>
       </div>
     {% endfor %}
+    <p class="also-change"><a href="/products/{{ product.id }}/configure#thickness-rules">Change the % rules for this product</a></p>
     <p class="small muted">Ticked by default: only thicknesses that have no typed price. A typed price is never ticked — tick it only if you really want to replace it. A thickness you leave unticked keeps the price it has (or stays "no price").</p>
   </fieldset>
   {% if afCard %}

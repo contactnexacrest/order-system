@@ -379,6 +379,11 @@ async function saveProductSpec(req, res) {
   const body = req.body || {};
   const offered = asMap(body.offered);
   const values = asMap(body.value);
+  // D-363 (13 Nov 2026): the same save from Configure › Thickness rules. There the boxes show
+  // the category's % too, so a value equal to the category's follows the category (no own
+  // value), and the page returns to Configure. Only this product's overrides are written —
+  // never the category's options or another product.
+  const fromConfigure = String(body.from ?? '') === 'configure';
   const errors = [];
   const changes = [];
   let anyOffered = false;
@@ -395,13 +400,14 @@ async function saveProductSpec(req, res) {
         continue;
       }
       value = Number(v).toFixed(4);
+      if (fromConfigure && o.value !== null && Math.abs(Number(value) - Number(o.value)) < 1e-9) value = null;
     }
     changes.push([oid, hidden, value, o.name]);
   }
   if (!anyOffered) errors.push('Keep at least one option offered, or hide the whole specification for this product.');
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
-    await go(res, `/products/${pid}/specifications?edit=${spec.id}`);
+    await go(res, fromConfigure ? `/products/${pid}/configure#thickness-rules` : `/products/${pid}/specifications?edit=${spec.id}`);
     return;
   }
   const summary = [];
@@ -410,6 +416,11 @@ async function saveProductSpec(req, res) {
     if (hidden || value !== null) summary.push(name + (hidden ? ' hidden' : ` ${value}`));
   }
   await auditLogRepository.log(uid(req), 'PRODUCT_SPEC_CHANGED', 'catalog_products', pid, String(spec.name), null, summary.length ? summary.join('; ') : 'follows the category');
+  if (fromConfigure) {
+    flash.set(req, 'success', `Saved for ${p.name} only — other products keep the category's values.`);
+    await go(res, `/products/${pid}/configure#thickness-rules`);
+    return;
+  }
   flash.set(req, 'success', `"${spec.name}" saved for ${p.name}. New quotes use it.`);
   await go(res, `/products/${pid}/specifications`);
 }

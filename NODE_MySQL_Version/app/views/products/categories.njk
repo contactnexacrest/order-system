@@ -26,11 +26,14 @@
   <h2>Add a category</h2>
   <form method="post" action="/products/categories">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
-    {% set hints = ['e.g. Size', 'e.g. Grade', 'e.g. Colour', '', '', ''] %}
+    {# D-363 (13 Nov 2026): the name alone on row 1 (half width), then the attributes two per row (1 | 2, 3 | 4, 5 | 6); one column on a phone. Still exactly MAX_ATTRIBUTES (6) boxes. #}
+    <div class="cat-attr-grid">
+    <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
+    {% set hints = ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'] %}
     {% for i in range(0, maxAttributes) %}
-    <label>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} placeholder="{{ hints[i] }}"></label>
+    <label{% if i == 0 %} class="cat-attr-first"{% endif %}>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} placeholder="{{ hints[i] or 'e.g. Finish' }}"></label>
     {% endfor %}
+    </div>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Add Category</button></div>
   </form>
 </div>

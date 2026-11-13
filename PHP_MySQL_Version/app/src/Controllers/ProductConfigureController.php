@@ -97,6 +97,54 @@ final class ProductConfigureController
         return '₹ / ' . (\App\Services\LineUnits::label($unit) ?: $unit);
     }
 
+    /**
+     * D-363 (13 Nov 2026, mockup ui3_u4): Configure › Thickness rules — per thickness the category's
+     * % next to this product's own (Thickness | Category | This product | Comes from | reset). Saved
+     * with the product's own Price options save (SpecController::saveProductSpec, from=configure),
+     * which writes only this product's overrides — never the category or another product.
+     *
+     * @return array{specs: list<array<string,mixed>>, k: ?string, k_own: bool, cbm_label: string, can_edit: bool}
+     */
+    private static function thicknessRules(array $product, array $settings): array
+    {
+        $rules = ThicknessPrices::rules($product, $settings);
+        $cbmFrom = (int) $rules['cbm_from'];
+        $pct = static fn (?float $v): string => $v === null ? '—' : (abs($v) < 1e-9 ? '0 %' : ($v < 0 ? '−' : '+') . ThicknessPrices::fmt(abs($v)) . ' %');
+        $specs = [];
+        foreach (ProductSpecs::tree($product, true) as $s) {
+            if ($s['kind'] !== 'thickness' || $s['hidden']) {
+                continue;
+            }
+            $rows = [];
+            $keep = [];
+            foreach ($s['options'] as $o) {
+                $isRow = !$o['hidden'] && $o['thickness_mm'] !== null && $o['thickness_mm'] < $cbmFrom && in_array($o['change_type'], ['none', 'pct'], true);
+                if (!$isRow) {
+                    // Not shown: posted back unchanged (offered or not, and its own value).
+                    $keep[] = ['id' => $o['id'], 'offered' => !$o['hidden'], 'value' => $o['source'] === 'changed' && $o['value'] !== null ? ThicknessPrices::fmt((float) $o['value']) : ''];
+                    continue;
+                }
+                $base = $o['is_base'] || $o['change_type'] === 'none';
+                $rows[] = [
+                    'id' => $o['id'], 'mm' => (int) $o['thickness_mm'], 'label' => ThicknessPrices::label((int) $o['thickness_mm'], $cbmFrom), 'base' => $base,
+                    'category' => $o['source'] === 'product' ? '—' : ($base ? 'base' : $pct($o['category_value'])),
+                    'category_value' => $o['category_value'] !== null ? ThicknessPrices::fmt((float) $o['category_value']) : '',
+                    'value' => $o['value'] !== null ? ThicknessPrices::fmt((float) $o['value']) : '',
+                    'value_label' => $base ? 'base' : $pct($o['value']),
+                    'from' => $o['source'] === 'category' ? 'category' : 'product', 'editable' => $o['source'] !== 'product' && !$base,
+                ];
+            }
+            usort($rows, static fn (array $a, array $b): int => $a['mm'] <=> $b['mm']);
+            $changed = array_values(array_filter($rows, static fn (array $r): bool => $r['editable'] && $r['from'] === 'product'));
+            $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'editable' => $s['source'] === 'category', 'rows' => $rows, 'keep' => $keep, 'changed' => $changed];
+        }
+        return [
+            'specs' => $specs, 'k' => $rules['k'] !== null ? ThicknessPrices::fmt((float) $rules['k']) : null,
+            'k_own' => ($product['thick_k_factor'] ?? null) !== null, 'cbm_label' => ThicknessPrices::label(ThicknessPrices::CBM, $cbmFrom),
+            'can_edit' => self::can('manage_product_specifications'),
+        ];
+    }
+
     public function form(array $params): void
     {
         $product = self::product($params);
@@ -146,6 +194,7 @@ final class ProductConfigureController
             'previewCategory' => self::figureChanges(PricingLevels::resetPreview($product, 'category', $settings)),
             'previewGlobal' => self::figureChanges(PricingLevels::resetPreview($product, 'global', $settings)),
             'canEditPrice' => self::can('record_market_prices'),
+            'thickness' => self::thicknessRules($product, $settings),
             'old' => $old,
         ], 'layout/base');
     }

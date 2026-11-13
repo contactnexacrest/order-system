@@ -80,6 +80,49 @@ async function shapeLabel(mm, unit, product, s) {
   return `₹ / ${lineUnits.label(unit) || unit}`;
 }
 
+/**
+ * D-363 (13 Nov 2026, mockup ui3_u4): Configure › Thickness rules — per thickness the category's
+ * % next to this product's own (Thickness | Category | This product | Comes from | reset). Saved
+ * with the product's own Price options save (specController.saveProductSpec, from=configure),
+ * which writes only this product's overrides — never the category or another product.
+ * Same as ProductConfigureController::thicknessRules (PHP).
+ */
+async function thicknessRules(product, s, perms) {
+  const rules = await thicknessPrices.rules(product, s);
+  const cbmFrom = Number(rules.cbm_from);
+  const pct = (v) => (v === null || v === undefined ? '—' : (Math.abs(v) < 1e-9 ? '0 %' : `${v < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(v))} %`));
+  const specs = [];
+  for (const sp of await productSpecs.tree(product, true)) {
+    if (sp.kind !== 'thickness' || sp.hidden) continue;
+    const rows = [];
+    const keep = [];
+    for (const o of sp.options) {
+      const isRow = !o.hidden && o.thickness_mm !== null && o.thickness_mm < cbmFrom && ['none', 'pct'].includes(o.change_type);
+      if (!isRow) {
+        // Not shown: posted back unchanged (offered or not, and its own value).
+        keep.push({ id: o.id, offered: !o.hidden, value: o.source === 'changed' && o.value !== null ? thicknessPrices.fmt(o.value) : '' });
+        continue;
+      }
+      const base = o.is_base || o.change_type === 'none';
+      rows.push({
+        id: o.id, mm: Number(o.thickness_mm), label: thicknessPrices.label(Number(o.thickness_mm), cbmFrom), base,
+        category: o.source === 'product' ? '—' : (base ? 'base' : pct(o.category_value)),
+        category_value: o.category_value !== null ? thicknessPrices.fmt(o.category_value) : '',
+        value: o.value !== null ? thicknessPrices.fmt(o.value) : '',
+        value_label: base ? 'base' : pct(o.value),
+        from: o.source === 'category' ? 'category' : 'product', editable: o.source !== 'product' && !base,
+      });
+    }
+    rows.sort((a, b) => a.mm - b.mm);
+    specs.push({ id: sp.id, name: sp.name, editable: sp.source === 'category', rows, keep, changed: rows.filter((r) => r.editable && r.from === 'product') });
+  }
+  return {
+    specs, k: rules.k !== null && rules.k !== undefined ? thicknessPrices.fmt(rules.k) : null,
+    k_own: isSet(product.thick_k_factor), cbm_label: thicknessPrices.label(thicknessPrices.CBM, cbmFrom),
+    can_edit: !!(perms || {}).manage_product_specifications,
+  };
+}
+
 async function form(req, res) {
   const product = await loadProduct(req, res);
   if (!product) return;
@@ -128,6 +171,7 @@ async function form(req, res) {
     previewCategory: figureChanges(await pricingLevels.resetPreview(product, 'category', s)),
     previewGlobal: figureChanges(await pricingLevels.resetPreview(product, 'global', s)),
     canEditPrice: !!(req.permissions || {}).record_market_prices,
+    thickness: await thicknessRules(product, s, req.permissions),
     oldLevel: old.level && typeof old.level === 'object' ? old.level : null,
   }, 'layout/base');
 }

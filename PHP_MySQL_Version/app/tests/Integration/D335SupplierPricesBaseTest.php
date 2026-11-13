@@ -190,7 +190,7 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         $page = $this->render(fn () => (new PricingController())->marketPrices(['id' => (string) $productId]));
         foreach (['4,795.12', '4,600.00 + CHA 195.12', '189,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
             'Product price (from the base):', '₹189,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
-            'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick this'] as $s) {
+            'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick'] as $s) {
             self::assertStringContainsString($s, $page);
         }
 

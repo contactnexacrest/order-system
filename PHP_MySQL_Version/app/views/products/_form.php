@@ -61,7 +61,7 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
     <?php else: ?>
       <p class="small muted"><?= $__hasOwn ? 'This product uses its own rules (marked "own rule").' : 'This product uses the category\'s rules.' ?> Only the MD can switch on own rules for a product.</p>
     <?php endif; ?>
-    <p class="small muted">Switch on to edit the rules for this product only; the thickness % are changed on the Category price rules (or this product's Price options). The Category price rules keep the standard for every product in the category.</p>
+    <p class="small muted">Switch on to edit the rules for this product only; the thickness % are changed on the Category price rules (or this product's Price options). The Category price rules keep the standard for every product in the category.<?php if ($isEdit): // D-363 ?> This product's own thickness %: <a href="/products/<?= (int) $product['id'] ?>/configure#thickness-rules">Configure › Thickness rules</a>.<?php endif; ?></p>
   </fieldset>
 
   <?php // Owner decision D-245 P2: the product's selling unit (filled into an order line). Prices come from Products → pricing. ?>

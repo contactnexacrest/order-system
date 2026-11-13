@@ -5,6 +5,9 @@
   Comes from) with a reset per row and "Reset all to category / global values" (each with a confirm
   box listing the changes), and the Active switch. Details, specifications, thickness prices and
   images stay on the product's own pages. PHP twin: app/views/products/configure.php.
+  D-363 (13 Nov 2026, mockup ui3_u4): "Thickness rules" — this product's thickness % next to the
+  category's (Thickness | Category | This product | Comes from | reset), "Reset all to category"
+  with a confirm box. Saved only for this product (other products and the category keep theirs).
 #}
 {% set catName = category.name if category else null %}
 <div class="card page-wide">
@@ -82,6 +85,69 @@
     <button type="submit">Save</button>
     <a class="btn-sm btn-secondary" href="/products?status=all">Cancel</a>
   </form>
+
+  {# D-363 (13 Nov 2026, mockup ui3_u4): this product's thickness % rules — the category's next to this product's own. #}
+  <section class="configure-box thickness-rules" id="thickness-rules" data-testid="thickness-rules">
+    <h2>Thickness rules <small class="muted">(this product only)</small></h2>
+    <p class="muted small">Each thickness's price compared with the base thickness. Anything this product does not change comes from the category{% if catName %} ({{ catName }}, Category price rules){% endif %}. Changing a rule here changes it for <b>{{ product.name }}</b> only — never the category or other products. Used when a thickness price is worked out from another one.</p>
+    {% if not thickness.specs.length %}<p class="muted">This product has no thickness options — its category has no Thickness specification.</p>{% endif %}
+    {% for ts in thickness.specs %}
+      {% set tsEdit = thickness.can_edit and ts.editable %}
+      <form method="post" action="/products/{{ product.id }}/specifications/{{ ts.id }}" id="thickness-form-{{ ts.id }}">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="from" value="configure">
+        {# Options not shown in the table (not offered, or 50 mm and above) are posted back unchanged. #}
+        {% for k in ts.keep %}{% if k.offered %}<input type="hidden" name="offered[{{ k.id }}]" value="1">{% endif %}{% if k.value !== '' %}<input type="hidden" name="value[{{ k.id }}]" value="{{ k.value }}">{% endif %}{% endfor %}
+        <table class="list levels-table thickness-rules-table">
+          <tr><th>Thickness</th><th>Category</th><th>This product</th><th>Comes from</th><th></th></tr>
+          {% for tr in ts.rows %}
+            <tr{% if tr.editable %} data-level-row="thickness-{{ tr.id }}"{% endif %}>
+              <td>{{ tr.label }}</td>
+              <td>{{ tr.category }}</td>
+              <td><input type="hidden" name="offered[{{ tr.id }}]" value="1">
+                {% if tr.editable and tsEdit %}
+                  <input type="text" inputmode="decimal" name="value[{{ tr.id }}]" value="{{ tr.value }}" data-level-input data-inherit="{{ tr.category_value }}" data-inherit-from="category"
+                    pattern="-?[0-9]+([.][0-9]{1,4})?" data-max-decimals="4" placeholder="e.g. {{ tr.category_value if tr.category_value !== '' else '0' }}" aria-label="{{ tr.label }} — % for this product"> %
+                {% else %}{{ tr.value_label }}{% if tr.editable and tr.from == 'product' %}<input type="hidden" name="value[{{ tr.id }}]" value="{{ tr.value }}">{% endif %}{% endif %}</td>
+              <td>{% if not tr.base %}<span class="badge level-from level-from-{{ tr.from }}" data-level-from>{{ 'this product' if tr.from == 'product' else 'category' }}</span>{% endif %}</td>
+              <td>{% if tr.editable and tsEdit %}<a href="#" data-level-reset{% if tr.from != 'product' %} hidden{% endif %}>reset</a>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          {% if thickness.k !== null %}
+            <tr><td>{{ thickness.cbm_label }}</td><td colspan="2">× {{ thickness.k }} <small class="muted">(per CBM — "Thickness factor" in the table above)</small></td>
+              <td><span class="badge level-from level-from-{{ 'product' if thickness.k_own else 'category' }}">{{ 'this product' if thickness.k_own else 'category' }}</span></td><td></td></tr>
+          {% endif %}
+        </table>
+        {% if tsEdit %}
+          <p>
+            <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-thickness-{{ ts.id }}">Reset all to category</button>
+            <button type="submit" class="btn-sm">Save</button>
+          </p>
+          <p class="muted small">"reset" on one row puts back the category's % — then Save. Saved for {{ product.name }} only — other products keep the category's values.</p>
+        {% elif not thickness.can_edit %}
+          <p class="muted small">Only users who may change product specifications can change these.</p>
+        {% endif %}
+      </form>
+      {% if tsEdit %}
+        {% set tsChanged = ts.changed %}
+        <dialog class="confirm-box" id="reset-thickness-{{ ts.id }}" data-testid="confirm-thickness">
+          <h3>Reset all thickness rules to the category?</h3>
+          {% if not tsChanged.length %}<p class="muted">No changes — every thickness already follows the category.</p>
+          {% else %}<p>These go back to the <b>{{ catName or 'category' }}</b> values, for {{ product.name }} only:</p>
+            <ul>{% for c in tsChanged %}<li>{{ c.label }} {{ c.value_label }} → {{ c.category }}</li>{% endfor %}</ul>{% endif %}
+          <p>Other products and the category are not changed.</p>
+          <form method="post" action="/products/{{ product.id }}/specifications/{{ ts.id }}">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="from" value="configure">
+            {% for tr in ts.rows %}<input type="hidden" name="offered[{{ tr.id }}]" value="1">{% endfor %}
+            {% for k in ts.keep %}{% if k.offered %}<input type="hidden" name="offered[{{ k.id }}]" value="1">{% endif %}{% if k.value !== '' %}<input type="hidden" name="value[{{ k.id }}]" value="{{ k.value }}">{% endif %}{% endfor %}
+            <button type="button" class="btn-sm btn-secondary" data-close-dialog>Cancel</button>
+            <button type="submit" class="btn-sm btn-primary">Reset</button>
+          </form>
+        </dialog>
+      {% endif %}
+    {% endfor %}
+  </section>
 
   {% if change %}
     <form method="post" action="/products/{{ product.id }}/configure/use-price" id="use-price-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"></form>

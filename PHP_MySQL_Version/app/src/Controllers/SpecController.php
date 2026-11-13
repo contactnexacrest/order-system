@@ -434,6 +434,11 @@ final class SpecController
         }
         $offered = (array) ($_POST['offered'] ?? []);
         $values = (array) ($_POST['value'] ?? []);
+        // D-363 (13 Nov 2026): the same save from Configure › Thickness rules. There the boxes show
+        // the category's % too, so a value equal to the category's follows the category (no own
+        // value), and the page returns to Configure. Only this product's overrides are written —
+        // never the category's options or another product.
+        $fromConfigure = ($_POST['from'] ?? '') === 'configure';
         $errors = [];
         $changes = [];
         $anyOffered = false;
@@ -452,6 +457,9 @@ final class SpecController
                     continue;
                 }
                 $value = number_format((float) $v, 4, '.', '');
+                if ($fromConfigure && $o['value'] !== null && abs((float) $value - (float) $o['value']) < 1e-9) {
+                    $value = null;
+                }
             }
             $changes[] = [$oid, $hidden, $value, $o['name']];
         }
@@ -460,7 +468,7 @@ final class SpecController
         }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
-            self::back("/products/{$id}/specifications?edit={$spec['id']}");
+            self::back($fromConfigure ? "/products/{$id}/configure#thickness-rules" : "/products/{$id}/specifications?edit={$spec['id']}");
             return;
         }
         $summary = [];
@@ -471,6 +479,11 @@ final class SpecController
             }
         }
         AuditLogRepository::log((int) self::user()['id'], 'PRODUCT_SPEC_CHANGED', 'catalog_products', $id, (string) $spec['name'], null, $summary === [] ? 'follows the category' : implode('; ', $summary));
+        if ($fromConfigure) {
+            Flash::set('success', "Saved for {$product['name']} only — other products keep the category's values.");
+            self::back("/products/{$id}/configure#thickness-rules");
+            return;
+        }
         Flash::set('success', "\"{$spec['name']}\" saved for {$product['name']}. New quotes use it.");
         self::back("/products/{$id}/specifications");
     }

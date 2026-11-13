@@ -118,13 +118,16 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
             <br><span class="badge <?= View::e($__st['badge']) ?>" data-standing="<?= View::e($__st['key']) ?>"><?= View::e($__st['label']) ?></span></td>
           <?php if ($status !== 'active'): ?><td<?= $p['is_active'] || ($p['usage']['total'] ?? 0) === 0 ? ' class="muted"' : '' ?>><?= $p['is_active'] ? '—' : View::e($p['usage_text']) ?></td><?php endif; ?>
           <td>
+            <?php /* D-363 (13 Nov 2026): small buttons on one line (.row-actions, as D-362) — the main action filled
+                     (Edit, or Configure when not configured), View / Duplicate outlined; wraps neatly on a narrow screen. */ ?>
+            <div class="row-actions product-list-actions">
             <?php if ($canManage): // D-361: Configure (not configured) or Edit — manage_product_catalog only (owner decision 2) ?>
               <?php if ($__st['configured']): ?><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>/configure">Edit</a>
-              <?php else: ?><a class="btn-sm btn-primary" href="/products/<?= (int) $p['id'] ?>/configure">Configure</a><?php endif; ?>
+              <?php else: ?><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>/configure">Configure</a><?php endif; ?>
             <?php endif; ?>
-            <?php if ($__st['no_supplier_yet'] && !empty($canLinkSupplier)): // decision 1 part A ?><a class="btn-sm btn-primary" href="/products/<?= (int) $p['id'] ?>/link-supplier">Link a supplier</a><?php endif; ?>
-            <br><a href="/products/<?= (int) $p['id'] ?>">View</a>
-            <?php if ($canManage): // Owner decision D-358 (13 Nov 2026) ?> · <a href="/products/<?= (int) $p['id'] ?>/duplicate" data-duplicate-link>Duplicate</a><?php endif; ?>
+            <?php if ($__st['no_supplier_yet'] && !empty($canLinkSupplier)): // decision 1 part A ?><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>/link-supplier">Link a supplier</a><?php endif; ?>
+            <a class="btn-sm btn-secondary" href="/products/<?= (int) $p['id'] ?>">View</a>
+            <?php if ($canManage): // Owner decision D-358 (13 Nov 2026) ?><a class="btn-sm btn-secondary" href="/products/<?= (int) $p['id'] ?>/duplicate" data-duplicate-link>Duplicate</a><?php endif; ?>
             <?php if ($canManage && !$p['is_active']): ?>
               <?php if ($__st['can_activate']): ?>
                 <form method="post" action="/products/<?= (int) $p['id'] ?>/reactivate" class="inline-form" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="return_to" value="list"><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php if ($searched): ?><input type="hidden" name="q" value="<?= View::e($query) ?>"><?php endif; ?><button type="submit" class="btn-sm">Reactivate</button></form>
@@ -135,9 +138,10 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
                 <form method="post" action="/products/<?= (int) $p['id'] ?>/delete" class="inline-form" style="display:inline" data-confirm="Delete &quot;<?= View::e($p['name']) ?>&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone."><?= Csrf::field() ?><button type="submit" class="btn-sm btn-danger">Delete…</button></form>
               <?php else: ?>
                 <button type="button" class="btn-sm btn-secondary" disabled title="<?= View::e($p['delete_refusal']) ?>">Delete</button>
-                <div class="muted small"><?= View::e($p['delete_refusal']) ?></div>
               <?php endif; ?>
-            <?php endif; ?></td>
+            <?php endif; ?>
+            </div>
+            <?php if ($canManage && !$p['is_active'] && $p['delete_refusal'] !== null): ?><div class="muted small"><?= View::e($p['delete_refusal']) ?></div><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
     </table>

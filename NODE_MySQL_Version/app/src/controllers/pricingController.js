@@ -381,6 +381,10 @@ function addView(rules, grid) {
   const cbmFrom = Number(rules.cbm_from);
   const pct = new Map(rules.rows.map((x) => [Number(x.mm), Number(x.pct)]));
   const vals = grid ? grid.values : {};
+  // D-363: where each rule comes from — the product's own value ("this product") or the category.
+  const ownOpt = new Map(rules.rows.map((x) => [Number(x.mm), rules.own.includes(String(x.option))]));
+  const ownK = rules.own.some((o) => String(o).startsWith('×'));
+  const baseMm = Number(rules.base_mm);
   const rows = thicknessPrices.thicknesses(rules).map((mm) => {
     const isCbm = mm === thicknessPrices.CBM;
     const p = pct.get(mm) || 0;
@@ -389,7 +393,9 @@ function addView(rules, grid) {
     return {
       mm, cbm: isCbm, pct: thicknessPrices.fmt(p), label: thicknessPrices.label(mm, cbmFrom), per: isCbm ? '/ CBM' : '/ m²', typed,
       typedPrice: typed ? fmt2(v.price) : '', typedOn: typed && v.quoted_on ? v.quoted_on : '',
-      change: isCbm ? `× ${thicknessPrices.fmt(rules.k)}` : (mm === Number(rules.base_mm) ? 'the rules' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} %`),
+      change: isCbm ? `× ${thicknessPrices.fmt(rules.k)}` : (mm === baseMm ? 'the rules' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} %`),
+      rule: isCbm ? `× ${thicknessPrices.fmt(rules.k)} of ${baseMm} mm per m²` : (mm === baseMm ? 'base' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} % of ${baseMm} mm`),
+      isBase: !isCbm && mm === baseMm, own: isCbm ? ownK : !!ownOpt.get(mm),
     };
   });
   return { rows, k: thicknessPrices.fmt(rules.k), baseMm: Number(rules.base_mm), cbmFrom };

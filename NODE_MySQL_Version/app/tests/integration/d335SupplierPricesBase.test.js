@@ -177,7 +177,7 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     const page = (await agent.get(url)).text.replace(/&#39;/g, "'");
     for (const s of ['4,795.12', '4,600.00 + CHA 195.12', '189,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
       'Product price (from the base):', '₹189,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
-      'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick this']) expect(page).toContain(s);
+      'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick']) expect(page).toContain(s);
 
     await post(agent, url, `/products/suppliers/${row.id}/thickness-price`, {
       thickness_mm: '20', thickness_price: '5000', price_quoted_on: '2026-11-11', 'also[]': ['0'], base: 'keep',

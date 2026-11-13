@@ -1079,6 +1079,9 @@
           row.hidden = from !== null && mm === from;
           var priceEl = row.querySelector('[data-also-price]');
           var howEl = row.querySelector('[data-also-how]');
+          // D-363: the amount shows only once it can be worked out; until then "type the price to see it".
+          var amountEl = row.querySelector('[data-also-amount]');
+          if (amountEl) amountEl.hidden = base === null;
           if (base === null) {
             if (priceEl) priceEl.textContent = '…';
             if (howEl) howEl.textContent = 'type the price to see it';

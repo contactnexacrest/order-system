@@ -208,6 +208,14 @@ or the Pricing drop-down; no recorded narration says "Pricing settings" or "Pric
 Not yet recorded but will show these: **B05** (Procurement: supplier page and Suppliers list buttons) and **B09** (MD /
 ED: Products list tabs, Global pricing settings, Category price rules). Listed only — nothing re-recorded.
 
+D-363 (13 Nov 2026: Products list row actions as small buttons — Edit / Configure, View, Duplicate; "Add a category"
+with the name alone and the attributes two per row, new placeholders for attributes 4–6; "Also work out from this …
+price" as one row per thickness with live price and a category / this product badge, and one "Change the % rules for
+this product" link; Configure › Thickness rules) — checked against every script: no recorded video opens the Products
+list, Categories, "+ Add / update a price" or Configure. No recorded video is affected. Not yet recorded but will show
+these: **B05** (Procurement: "+ Add / update a price") and **B09** (MD / ED: Products list, Categories, Configure ›
+Thickness rules). Listed only — nothing re-recorded.
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

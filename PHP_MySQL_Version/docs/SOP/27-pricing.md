@@ -655,6 +655,26 @@ settings · Fix HS codes · Go to Suppliers**. They are no longer in the left me
 pricing settings › Exchange rate. On a supplier's page, the Suppliers list and Configure, **Edit price** and **Open
 product** are small buttons side by side.
 
+## Products list buttons, categories, "Also work out" and Thickness rules (D-363, 13 Nov 2026)
+
+- **Products list:** each row ends with small buttons on one line — **Edit** (or **Configure** when the product is not
+  configured yet) filled, **View** and **Duplicate** outlined; **Link a supplier**, **Reactivate** and **Delete…** appear
+  in the same row where they apply. On a phone the buttons wrap neatly.
+- **Add a category** (Products › Categories) and a category's **Name and attributes**: the name on the first row, then
+  the six attribute boxes two per row (1 | 2, 3 | 4, 5 | 6), with examples Size, Grade, Colour, Finish, Thickness, Packing.
+  Attribute 1 is required; at most 6.
+- **+ Add / update a price › Also work out from this … price:** each thickness on one line — tick box, thickness, the
+  price worked out as soon as you type the price ("type the price to see it" until then), and its % rule with a badge:
+  **category** (from Category price rules) or **this product** (changed for this product only). A thickness you typed a
+  price for is highlighted — "you typed ₹X on <date> — kept unless you tick". To change a %, click **Change the % rules
+  for this product** under the list.
+- **Configure › Thickness rules** (people who may change product specifications): for each thickness the category's % and
+  this product's %, and where it comes from. Type a new % (e.g. 30 for 30 mm) and click **Save** — the green message says
+  "Saved for <product> only — other products keep the category's values." The category and other products do not change.
+  **reset** on a row puts back the category's % (then Save); **Reset all to category** shows what goes back and asks
+  before it saves. The 50 mm and above factor is the **Thickness factor** row of the table above. The category's own %
+  are changed on **Category price rules** — *applies to every product in the category unless the product changes it.*
+
 ## Duplicate a product (D-358, 13 Nov 2026)
 
 To start a new product from one that is almost the same (another colour, another finish), people who manage the

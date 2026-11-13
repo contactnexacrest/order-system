@@ -34,10 +34,13 @@ $__return = "/products/categories/{$__id}?tab=general";
       <form method="post" action="/products/categories/<?= $__id ?>">
         <?= Csrf::field() ?>
         <input type="hidden" name="return_to" value="<?= View::e($__return) ?>">
-        <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="<?= View::e((string) $__c['name']) ?>" placeholder="e.g. Granite slabs"<?= $__ro ?>></label>
+        <?php // D-363 (13 Nov 2026): same layout as "Add a category" — name alone, then the attributes two per row. ?>
+        <div class="cat-attr-grid">
+        <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" value="<?= View::e((string) $__c['name']) ?>" placeholder="e.g. Granite slabs"<?= $__ro ?>></label>
         <?php for ($i = 0; $i < $maxAttributes; $i++): ?>
-        <label>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> value="<?= View::e((string) ($__c['attributes'][$i] ?? '')) ?>" placeholder="e.g. Finish"<?= $__ro ?>></label>
+        <label<?= $i === 0 ? ' class="cat-attr-first"' : '' ?>>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> value="<?= View::e((string) ($__c['attributes'][$i] ?? '')) ?>" placeholder="<?= ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'][$i] ?? 'e.g. Finish' ?>"<?= $__ro ?>></label>
         <?php endfor; ?>
+        </div>
         <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" <?= (int) $__c['is_active'] === 1 ? 'checked' : '' ?><?= $__ro ?>> Active (offered on new order lines)</label>
         <?php if ($canManageCatalog): ?><div class="btn-row"><button type="submit" class="btn-sm btn-success">Save <?= View::e((string) $__c['name']) ?></button></div><?php endif; ?>
       </form>

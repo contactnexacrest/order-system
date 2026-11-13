@@ -27,10 +27,13 @@
   <h2>Add a category</h2>
   <form method="post" action="/products/categories">
     <?= Csrf::field() ?>
-    <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
+    <?php // D-363 (13 Nov 2026): the name alone on row 1 (half width), then the attributes two per row (1 | 2, 3 | 4, 5 | 6); one column on a phone. Still exactly MAX_ATTRIBUTES (6) boxes. ?>
+    <div class="cat-attr-grid">
+    <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
     <?php for ($i = 0; $i < $maxAttributes; $i++): ?>
-    <label>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> placeholder="<?= ['e.g. Size', 'e.g. Grade', 'e.g. Colour', '', '', ''][$i] ?>"></label>
+    <label<?= $i === 0 ? ' class="cat-attr-first"' : '' ?>>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> placeholder="<?= ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'][$i] ?? 'e.g. Finish' ?>"></label>
     <?php endfor; ?>
+    </div>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Add Category</button></div>
   </form>
 </div>

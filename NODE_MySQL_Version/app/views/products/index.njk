@@ -109,13 +109,16 @@
             <br><span class="badge {{ st.badge }}" data-standing="{{ st.key }}">{{ st.label }}</span></td>
           {% if status != 'active' %}<td{% if p.is_active or p.usage.total == 0 %} class="muted"{% endif %}>{{ '—' if p.is_active else p.usage_text }}</td>{% endif %}
           <td>
+            {# D-363 (13 Nov 2026): small buttons on one line (.row-actions, as D-362) — the main action filled
+               (Edit, or Configure when not configured), View / Duplicate outlined; wraps neatly on a narrow screen. #}
+            <div class="row-actions product-list-actions">
             {% if canManage %}{# D-361: Configure (not configured) or Edit — manage_product_catalog only (owner decision 2) #}
               {% if st.configured %}<a class="btn-sm" href="/products/{{ p.id }}/configure">Edit</a>
-              {% else %}<a class="btn-sm btn-primary" href="/products/{{ p.id }}/configure">Configure</a>{% endif %}
+              {% else %}<a class="btn-sm" href="/products/{{ p.id }}/configure">Configure</a>{% endif %}
             {% endif %}
-            {% if st.no_supplier_yet and canLinkSupplier %}<a class="btn-sm btn-primary" href="/products/{{ p.id }}/link-supplier">Link a supplier</a>{% endif %}
-            <br><a href="/products/{{ p.id }}">View</a>
-            {% if canManage %} · <a href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
+            {% if st.no_supplier_yet and canLinkSupplier %}<a class="btn-sm" href="/products/{{ p.id }}/link-supplier">Link a supplier</a>{% endif %}
+            <a class="btn-sm btn-secondary" href="/products/{{ p.id }}">View</a>
+            {% if canManage %}<a class="btn-sm btn-secondary" href="/products/{{ p.id }}/duplicate" data-duplicate-link>Duplicate</a>{% endif %}{# Owner decision D-358 (13 Nov 2026) #}
             {% if canManage and not p.is_active %}
               {% if st.can_activate %}
                 <form method="post" action="/products/{{ p.id }}/reactivate" class="inline-form" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="return_to" value="list"><input type="hidden" name="status" value="{{ status }}">{% if searched %}<input type="hidden" name="q" value="{{ query }}">{% endif %}<button type="submit" class="btn-sm">Reactivate</button></form>
@@ -126,9 +129,10 @@
                 <form method="post" action="/products/{{ p.id }}/delete" class="inline-form" style="display:inline" data-confirm="Delete &quot;{{ p.name }}&quot;? It is not used anywhere. Its supplier prices, images and price history are deleted too. This cannot be undone."><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-danger">Delete…</button></form>
               {% else %}
                 <button type="button" class="btn-sm btn-secondary" disabled title="{{ p.delete_refusal }}">Delete</button>
-                <div class="muted small">{{ p.delete_refusal }}</div>
               {% endif %}
-            {% endif %}</td>
+            {% endif %}
+            </div>
+            {% if canManage and not p.is_active and p.delete_refusal !== null %}<div class="muted small">{{ p.delete_refusal }}</div>{% endif %}</td>
         </tr>
       {% endfor %}
     </table>

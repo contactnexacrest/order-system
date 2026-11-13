@@ -7,6 +7,10 @@
  * (each with a confirm box listing the changes), and the Active switch. Details, specifications,
  * thickness prices and images stay on the product's own pages.
  *
+ * D-363 (13 Nov 2026, mockup ui3_u4): "Thickness rules" — this product's thickness % next to the
+ * category's (Thickness | Category | This product | Comes from | reset), "Reset all to category"
+ * with a confirm box. Saved only for this product (other products and the category keep theirs).
+ *
  * In: see ProductConfigureController::form(). Node twin: views/products/configure.njk.
  */
 use App\Helpers\Csrf;
@@ -93,6 +97,67 @@ $__old = $old['level'] ?? null;
     <button type="submit">Save</button>
     <a class="btn-sm btn-secondary" href="/products?status=all">Cancel</a>
   </form>
+
+  <?php // D-363 (13 Nov 2026, mockup ui3_u4): this product's thickness % rules — the category's next to this product's own. ?>
+  <section class="configure-box thickness-rules" id="thickness-rules" data-testid="thickness-rules">
+    <h2>Thickness rules <small class="muted">(this product only)</small></h2>
+    <p class="muted small">Each thickness's price compared with the base thickness. Anything this product does not change comes from the category<?= $__cat !== null ? ' (' . View::e($__cat) . ', Category price rules)' : '' ?>. Changing a rule here changes it for <b><?= View::e((string) $product['name']) ?></b> only — never the category or other products. Used when a thickness price is worked out from another one.</p>
+    <?php if ($thickness['specs'] === []): ?><p class="muted">This product has no thickness options — its category has no Thickness specification.</p><?php endif; ?>
+    <?php foreach ($thickness['specs'] as $__ts): $__tsEdit = $thickness['can_edit'] && $__ts['editable']; $__tsChanged = $__ts['changed']; ?>
+      <form method="post" action="/products/<?= $__id ?>/specifications/<?= (int) $__ts['id'] ?>" id="thickness-form-<?= (int) $__ts['id'] ?>">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="from" value="configure">
+        <?php // Options not shown in the table (not offered, or 50 mm and above) are posted back unchanged. ?>
+        <?php foreach ($__ts['keep'] as $__k): ?><?php if ($__k['offered']): ?><input type="hidden" name="offered[<?= (int) $__k['id'] ?>]" value="1"><?php endif; ?><?php if ($__k['value'] !== ''): ?><input type="hidden" name="value[<?= (int) $__k['id'] ?>]" value="<?= View::e($__k['value']) ?>"><?php endif; ?><?php endforeach; ?>
+        <table class="list levels-table thickness-rules-table">
+          <tr><th>Thickness</th><th>Category</th><th>This product</th><th>Comes from</th><th></th></tr>
+          <?php foreach ($__ts['rows'] as $__tr): ?>
+            <tr<?= $__tr['editable'] ? ' data-level-row="thickness-' . (int) $__tr['id'] . '"' : '' ?>>
+              <td><?= View::e($__tr['label']) ?></td>
+              <td><?= View::e($__tr['category']) ?></td>
+              <td><input type="hidden" name="offered[<?= (int) $__tr['id'] ?>]" value="1">
+                <?php if ($__tr['editable'] && $__tsEdit): ?>
+                  <input type="text" inputmode="decimal" name="value[<?= (int) $__tr['id'] ?>]" value="<?= View::e($__tr['value']) ?>" data-level-input data-inherit="<?= View::e($__tr['category_value']) ?>" data-inherit-from="category"
+                    pattern="-?[0-9]+([.][0-9]{1,4})?" data-max-decimals="4" placeholder="e.g. <?= View::e($__tr['category_value'] !== '' ? $__tr['category_value'] : '0') ?>" aria-label="<?= View::e($__tr['label']) ?> — % for this product"> %
+                <?php else: ?><?= View::e($__tr['value_label']) ?><?php if ($__tr['editable'] && $__tr['from'] === 'product'): ?><input type="hidden" name="value[<?= (int) $__tr['id'] ?>]" value="<?= View::e($__tr['value']) ?>"><?php endif; ?><?php endif; ?></td>
+              <td><?php if (!$__tr['base']): ?><span class="badge level-from level-from-<?= $__tr['from'] ?>" data-level-from><?= $__tr['from'] === 'product' ? 'this product' : 'category' ?></span><?php endif; ?></td>
+              <td><?php if ($__tr['editable'] && $__tsEdit): ?><a href="#" data-level-reset<?= $__tr['from'] === 'product' ? '' : ' hidden' ?>>reset</a><?php endif; ?></td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if ($thickness['k'] !== null): ?>
+            <tr><td><?= View::e($thickness['cbm_label']) ?></td><td colspan="2">× <?= View::e($thickness['k']) ?> <small class="muted">(per CBM — "Thickness factor" in the table above)</small></td>
+              <td><span class="badge level-from level-from-<?= $thickness['k_own'] ? 'product' : 'category' ?>"><?= $thickness['k_own'] ? 'this product' : 'category' ?></span></td><td></td></tr>
+          <?php endif; ?>
+        </table>
+        <?php if ($__tsEdit): ?>
+          <p>
+            <button type="button" class="btn-sm btn-secondary" data-open-dialog="reset-thickness-<?= (int) $__ts['id'] ?>">Reset all to category</button>
+            <button type="submit" class="btn-sm">Save</button>
+          </p>
+          <p class="muted small">"reset" on one row puts back the category's % — then Save. Saved for <?= View::e((string) $product['name']) ?> only — other products keep the category's values.</p>
+        <?php elseif (!$thickness['can_edit']): ?>
+          <p class="muted small">Only users who may change product specifications can change these.</p>
+        <?php endif; ?>
+      </form>
+      <?php if ($__tsEdit): ?>
+        <dialog class="confirm-box" id="reset-thickness-<?= (int) $__ts['id'] ?>" data-testid="confirm-thickness">
+          <h3>Reset all thickness rules to the category?</h3>
+          <?php if ($__tsChanged === []): ?><p class="muted">No changes — every thickness already follows the category.</p>
+          <?php else: ?><p>These go back to the <b><?= View::e($__cat ?? 'category') ?></b> values, for <?= View::e((string) $product['name']) ?> only:</p>
+            <ul><?php foreach ($__tsChanged as $__c): ?><li><?= View::e($__c['label']) ?> <?= View::e($__c['value_label']) ?> → <?= View::e($__c['category']) ?></li><?php endforeach; ?></ul><?php endif; ?>
+          <p>Other products and the category are not changed.</p>
+          <form method="post" action="/products/<?= $__id ?>/specifications/<?= (int) $__ts['id'] ?>">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="from" value="configure">
+            <?php foreach ($__ts['rows'] as $__tr): ?><input type="hidden" name="offered[<?= (int) $__tr['id'] ?>]" value="1"><?php endforeach; ?>
+            <?php foreach ($__ts['keep'] as $__k): ?><?php if ($__k['offered']): ?><input type="hidden" name="offered[<?= (int) $__k['id'] ?>]" value="1"><?php endif; ?><?php if ($__k['value'] !== ''): ?><input type="hidden" name="value[<?= (int) $__k['id'] ?>]" value="<?= View::e($__k['value']) ?>"><?php endif; ?><?php endforeach; ?>
+            <button type="button" class="btn-sm btn-secondary" data-close-dialog>Cancel</button>
+            <button type="submit" class="btn-sm btn-primary">Reset</button>
+          </form>
+        </dialog>
+      <?php endif; ?>
+    <?php endforeach; ?>
+  </section>
 
   <?php if ($change !== null): ?>
     <form method="post" action="/products/<?= $__id ?>/configure/use-price" id="use-price-form"><?= Csrf::field() ?></form>
