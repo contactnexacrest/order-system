@@ -16,7 +16,7 @@ const incentiveService = require('../../src/services/incentiveService');
 const orderLinePricing = require('../../src/services/orderLinePricing');
 const orderProfitabilityService = require('../../src/services/orderProfitabilityService');
 const pricingService = require('../../src/services/pricingService');
-const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc, pinWorkedExamplePricing } = require('../support/fixtures');
 
 /**
  * Port of D245WorkedExamplesTest.php. Owner decision D-245, phase P6: five worked
@@ -52,6 +52,9 @@ describe('D-245 worked examples (P6)', () => {
   }
 
   beforeEach(async () => {
+    // QA 13 Nov 2026 (D-347 stale test): the worked examples use margin 20 % and other costs
+    // 2.5 % (installed values are 15 % / 5.5 % since D-347) — every pricing setting is pinned.
+    await pinWorkedExamplePricing();
     admin = await createTestUser('Admin');
     for (const [k, role] of Object.entries({ sales: 'Export Executive', manager: 'Export Executive', export: 'Export Executive', logistics: 'Logistics Executive',
       marketing: 'Export Executive', accounts: 'Accounts Executive' })) {

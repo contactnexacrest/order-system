@@ -47,9 +47,10 @@ final class EmailOffAutoSentTest extends DbTestCase
         ReviewWorkflowService::approve((int) $review['id'], (int) $review['reviewer_id'], null);
     }
 
-    public function testSeedDefaultIsMailSendingOff(): void
+    /** QA 13 Nov 2026 (D-347 stale test): a fresh install starts with Testing mode ON (buyer and supplier e-mails held). */
+    public function testSeedDefaultIsTestingModeOn(): void
     {
-        self::assertSame('0', $this->originalMailSendingEnabled);
+        self::assertSame('1', $this->originalMailSendingEnabled);
     }
 
     public function testApprovedQuotationCountsAsSentWhenMailIsOff(): void

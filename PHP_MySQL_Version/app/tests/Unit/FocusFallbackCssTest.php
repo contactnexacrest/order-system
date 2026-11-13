@@ -44,10 +44,30 @@ final class FocusFallbackCssTest extends TestCase
         self::assertStringContainsString('function initStepStatusClasses()', $js);
         self::assertStringContainsString('initStepStatusClasses();', $js);
 
+        // Stale-test fix (QA 13 Nov 2026, D-360): only the selector part of a rule
+        // (the text before '{') is checked — a comma inside a declaration such as
+        // var(--navy,#1f3a68) is not a selector list.
         foreach (preg_split('/\R/', $css) as $line) {
-            if (str_contains($line, ':focus-visible') && str_contains($line, ',') && str_contains($line, '{') && !str_starts_with($line, 'a:focus-visible, button:focus-visible')) {
+            if (self::hasMixedFocusVisibleList($line)) {
                 self::fail("A :focus-visible selector shares a rule with others (older Safari drops the whole rule): {$line}");
             }
         }
+        // The check itself still catches a mixed list.
+        self::assertTrue(self::hasMixedFocusVisibleList('.x:focus-visible, .y:hover{outline:0}'));
+        self::assertFalse(self::hasMixedFocusVisibleList('.offer-switch:focus-visible{outline:2px solid var(--navy,#1f3a68)}'));
+    }
+
+    private static function hasMixedFocusVisibleList(string $line): bool
+    {
+        foreach (explode('}', $line) as $segment) {
+            if (!str_contains($segment, '{')) {
+                continue;
+            }
+            $selector = trim(substr($segment, 0, (int) strpos($segment, '{')));
+            if (str_contains($selector, ':focus-visible') && str_contains($selector, ',') && !str_starts_with($selector, 'a:focus-visible, button:focus-visible')) {
+                return true;
+            }
+        }
+        return false;
     }
 }

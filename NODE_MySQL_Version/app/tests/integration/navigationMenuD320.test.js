@@ -32,15 +32,17 @@ describe('D-320: the short left menu, the section menu bars and the order action
     // Reached before only from links inside pages (the TDS register had no link at all).
     '/associates/tds', '/associates/registrations', '/associates/price-requests', '/associates/ladder', '/associates/access-levels',
     '/associates/new', '/reports/associates', '/products/categories', '/pricing/commission-levels',
-    '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
+    '/pricing/specifications', '/products/fix-hs-codes', '/procurement/suppliers', '/admin/sop-access',
     '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
-    '/products/create',
   ];
   // Decided bar (D-320 register): Procurement & suppliers has no "+ Add" entry; + Add supplier stays a button on the
   // Suppliers page, which shows the section's bar.
   const PAGE_BUTTON_ONLY = ['/suppliers/create'];
   // D-362 (13 Nov 2026): reached only from the Products screen's link bar, not from a menu.
   const PRODUCTS_LINK_BAR_ONLY = ['/pricing/settings', '/products/price-rules'];
+  // D-361: "Link suppliers" was removed from the Products menu bar and page, and new products come from
+  // Procurement › Suppliers › + Add product — both routes are kept, unlinked from the menus.
+  const ROUTE_KEPT_UNLINKED = ['/products/link-suppliers', '/products/create'];
   const ALL_FLAGS = {
     superAdmin: true, sopOpen: true, approver: true, mod_supplier_purchase: true, mod_import_stock: true,
     mod_merchant_trade: true, mod_associates: true, mod_team_incentive: true, div_gst: true, div_import_duty: true,
@@ -102,6 +104,11 @@ describe('D-320: the short left menu, the section menu bars and the order action
       expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'procurement']);
     }
     for (const page of PRODUCTS_LINK_BAR_ONLY) {
+      expect([page, linked.has(page)]).toEqual([page, false]);
+      expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'products']);
+    }
+    // QA 13 Nov 2026 (D-361 stale test): no longer in any menu bar, but still part of Products.
+    for (const page of ROUTE_KEPT_UNLINKED) {
       expect([page, linked.has(page)]).toEqual([page, false]);
       expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'products']);
     }

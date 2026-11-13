@@ -15,6 +15,7 @@ use App\Repositories\ProductSupplierRepository;
 use App\Services\PermissionService;
 use App\Services\PricingService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-245 (4 Nov 2026), phase P1: pricing settings (MD only,
@@ -26,6 +27,16 @@ use App\Tests\Support\DbTestCase;
  */
 final class PricingSetupTest extends DbTestCase
 {
+    use PricingFixtures;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // QA 13 Nov 2026 (D-347 stale tests): the figures below are the D-245 worked example
+        // (margin 20 %, other costs 2.5 %) — every pricing setting is pinned, whatever ran before.
+        self::pinWorkedExamplePricing();
+    }
+
     protected function tearDown(): void
     {
         $pdo = Database::connection();
@@ -80,6 +91,8 @@ final class PricingSetupTest extends DbTestCase
     {
         $this->programOn();
         $productId = $this->product();
+        // D-361: the Products list's USD columns are worked out from the configured base price.
+        self::configureProductForQuoting($productId, $this->createTestUser('Admin'));
 
         $this->actAs($this->createTestUser('Managing Director'));
         $page = $this->render(fn () => (new ProductController())->show(['id' => (string) $productId]));

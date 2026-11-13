@@ -82,7 +82,8 @@ describe('Admin nav group visibility (90-item backlog #34)', () => {
     // D-320: HS codes moved to the Products section; the role already opens Products, so the
     // left-menu entry goes to /products and the HS codes link is in that section's menu bar.
     expect(await loginAndGetDashboardHtml(email)).toContain('href="/products" class="" data-nav="products"');
-    const html = await loginAndGetDashboardHtml(email, '/products');
+    // Stale-test fix (QA 13 Nov 2026, D-362): an empty Active tab redirects, so open the All tab (as the PHP twin does).
+    const html = await loginAndGetDashboardHtml(email, '/products?status=all');
 
     expect(html).toContain('href="/hs-codes"');
   });

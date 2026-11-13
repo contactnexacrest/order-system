@@ -21,6 +21,7 @@ use App\Services\OrderProfitabilityService;
 use App\Services\PermissionService;
 use App\Services\PricingService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-245, phase P6: five worked example orders, end to end, to the
@@ -35,6 +36,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class D245WorkedExamplesTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private int $admin;
     /** @var array<string,int> */
     private array $p = [];
@@ -44,6 +47,9 @@ final class D245WorkedExamplesTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // QA 13 Nov 2026 (D-347 stale test): the worked examples use margin 20 % and other costs
+        // 2.5 % (installed values are 15 % / 5.5 % since D-347) — every pricing setting is pinned.
+        self::pinWorkedExamplePricing();
         $_POST = [];
         $this->admin = $this->createTestUser('Admin');
         $this->actAs($this->admin);

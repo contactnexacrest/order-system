@@ -20,7 +20,7 @@ const pricingService = require('../../src/services/pricingService');
 const orderLinePricing = require('../../src/services/orderLinePricing');
 const documentGenerationService = require('../../src/services/documentGenerationService');
 const zohoBooksService = require('../../src/services/zohoBooksService');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, pinWorkedExamplePricing, configureProductForQuoting, baseSpecJson } = require('../support/fixtures');
 
 /**
  * Port of OrderLinePricingTest.php — owner decision D-245, phase P2 (4 Nov 2026):
@@ -38,6 +38,9 @@ describe('Order line pricing (D-245, P2)', () => {
   });
 
   beforeEach(async () => {
+    // QA 13 Nov 2026 (D-347 stale tests): the figures below are the D-245 worked example
+    // (margin 20 %, other costs 2.5 %) — every pricing setting is pinned, whatever ran before.
+    await pinWorkedExamplePricing();
     // Team incentive program on: staff floor USD 1,287.50 sits above the minimum USD 1,250.00.
     await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
   });
@@ -87,6 +90,8 @@ describe('Order line pricing (D-245, P2)', () => {
     const id = await productRepository.create({ name: `P2 Black Galaxy ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Granite block', hs_code: '25161100', reference_unit: 'CBM' }, admin.id);
     const s = await productSupplierRepository.create({ product_id: id, supplier_name: 'Sri Balaji Granites', fob_source: 'direct', fob_value: 80000, is_primary: 1 }, admin.id);
     await pricingRepository.setSupplierDates(s, today(), null);
+    // D-361: only a configured product with an active supplier offer can be picked on an order.
+    await configureProductForQuoting(id, admin.id);
     return id;
   }
 
@@ -150,7 +155,8 @@ describe('Order line pricing (D-245, P2)', () => {
     const md = await user('Managing Director');
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [sales.id]);
     const agent = await login(sales);
-    const base = { catalog_product_id: String(productId), description: 'Black Galaxy block', quantity: '10', unit: 'CBM', line_type: 'goods', hs_code: '25161100' };
+    const base = { catalog_product_id: String(productId), description: 'Black Galaxy block', quantity: '10', unit: 'CBM', line_type: 'goods', hs_code: '25161100',
+      spec_json: await baseSpecJson(productId) };
 
     let msg = await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { ...base, unit_price: '1240.00' });
     expect(msg).toContain('below what NexaCrest can accept');
@@ -265,7 +271,7 @@ describe('Order line pricing (D-245, P2)', () => {
 
     await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { description: 'Fumigation', quantity: '1', unit: 'CBM', unit_price: '40.00', line_type: 'service', sac_code: '998719' });
     await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { description: 'Pallets', quantity: '1', unit: 'CBM', unit_price: '25.00', line_type: 'charge' });
-    await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { catalog_product_id: String(productId), ...hand });
+    await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, { catalog_product_id: String(productId), spec_json: await baseSpecJson(productId), ...hand });
     expect((await orderProductRepository.forOrder(orderId)).map((l) => l.line_type)).toEqual(['service', 'charge', 'goods']);
 
     const eur = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'EUR', null, null, [sales.id]);

@@ -391,16 +391,17 @@ final class D300ProductsPricingTest extends DbTestCase
         $_GET = ['q' => (string) ProductRepository::find($productId)['name']];
         $this->actAs($this->createTestUser('Managing Director'));
         $list = $this->render(fn () => (new ProductController())->index([]));
-        foreach (['Supplier price<br>₹ / CBM', 'Cost<br>USD / CBM', 'Staff lowest', 'Associate lowest', 'Pricing rate ₹82.00 per USD', 'Why?'] as $x) {
+        // QA 13 Nov 2026 (D-364 / D-365 stale test): the Products list's short-view headings.
+        foreach (['<th>Suppliers</th>', '<th>Supplier prices (₹)</th>', '<th>Base price</th>', 'Cost (USD)', 'Min price (USD)', 'Staff lowest (USD)', 'Associate lowest (USD)', 'Pricing rate ₹82.00 per USD', 'Why?'] as $x) {
             self::assertStringContainsString($x, $list, "MD sees {$x}");
         }
         self::assertStringNotContainsString('Headline FOB', $list);
         $this->actAs($this->createTestUser('Export Executive'));
         $list = $this->render(fn () => (new ProductController())->index([]));
-        foreach (['Quote price<br>USD / CBM', 'Your lowest<br>USD / CBM'] as $x) {
+        foreach (['Quote price (USD)', 'Your lowest (USD)'] as $x) {
             self::assertStringContainsString($x, $list, "staff see {$x}");
         }
-        foreach (['Pricing rate', 'Staff lowest', 'Associate lowest', 'Cost<br>', '180,000'] as $x) {
+        foreach (['Pricing rate', 'Staff lowest', 'Associate lowest', 'Cost (USD)', 'Min price (USD)', '<th>Supplier prices (₹)</th>', '180,000'] as $x) {
             self::assertStringNotContainsString($x, $list, "staff never see {$x}");
         }
     }

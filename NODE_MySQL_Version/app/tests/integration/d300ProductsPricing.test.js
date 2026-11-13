@@ -312,11 +312,12 @@ describe('D-300 to D-306 products and pricing', () => {
     await pricingRepository.setSupplierDates(s, todayYmd(), null);
     const q = encodeURIComponent((await productRepository.find(productId)).name);
     let list = (await (await login(await user('Managing Director'))).get(`/products?q=${q}`)).text;
-    for (const x of ['Supplier price<br>₹ / CBM', 'Cost<br>USD / CBM', 'Staff lowest', 'Associate lowest', 'Pricing rate ₹82.00 per USD', 'Why?']) expect(list).toContain(x);
+    // QA 13 Nov 2026 (D-364 / D-365 stale test): the Products list's short-view headings.
+    for (const x of ['<th>Suppliers</th>', '<th>Supplier prices (₹)</th>', '<th>Base price</th>', 'Cost (USD)', 'Min price (USD)', 'Staff lowest (USD)', 'Associate lowest (USD)', 'Pricing rate ₹82.00 per USD', 'Why?']) expect(list).toContain(x);
     expect(list).not.toContain('Headline FOB');
     list = (await (await login(await user('Export Executive'))).get(`/products?q=${q}`)).text;
-    for (const x of ['Quote price<br>USD / CBM', 'Your lowest<br>USD / CBM']) expect(list).toContain(x);
-    for (const x of ['Pricing rate', 'Staff lowest', 'Associate lowest', 'Cost<br>', '180,000']) expect(list).not.toContain(x);
+    for (const x of ['Quote price (USD)', 'Your lowest (USD)']) expect(list).toContain(x);
+    for (const x of ['Pricing rate', 'Staff lowest', 'Associate lowest', 'Cost (USD)', 'Min price (USD)', '<th>Supplier prices (₹)</th>', '180,000']) expect(list).not.toContain(x);
   });
 
   it('an associate order shows this order\'s figures without the associate', async () => {

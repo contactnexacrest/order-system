@@ -9,6 +9,14 @@ const path = require('path');
  * there see no focus outline." Fix direction: add a :focus fallback.
  * Port of FocusFallbackCssTest.php.
  */
+function hasMixedFocusVisibleList(line) {
+  return line.split('}').some((segment) => {
+    if (!segment.includes('{')) return false;
+    const selector = segment.slice(0, segment.indexOf('{')).trim();
+    return selector.includes(':focus-visible') && selector.includes(',') && !selector.startsWith('a:focus-visible, button:focus-visible');
+  });
+}
+
 describe('Focus fallback CSS (External QA report U-22)', () => {
   it('a :focus-visible fallback exists for browsers without :focus-visible support', () => {
     const css = fs.readFileSync(path.join(__dirname, '../../public/css/app.css'), 'utf8');
@@ -34,7 +42,13 @@ describe('Focus fallback CSS (External QA report U-22)', () => {
     expect(js).toContain('function initStepStatusClasses()');
     expect(js).toContain('initStepStatusClasses();');
 
-    const mixed = css.split(/\r?\n/).filter((line) => line.includes(':focus-visible') && line.includes(',') && line.includes('{') && !line.startsWith('a:focus-visible, button:focus-visible'));
+    // Stale-test fix (QA 13 Nov 2026, D-360): only the selector part of a rule
+    // (the text before '{') is checked — a comma inside a declaration such as
+    // var(--navy,#1f3a68) is not a selector list.
+    const mixed = css.split(/\r?\n/).filter(hasMixedFocusVisibleList);
     expect(mixed).toEqual([]);
+    // The check itself still catches a mixed list.
+    expect(hasMixedFocusVisibleList('.x:focus-visible, .y:hover{outline:0}')).toBe(true);
+    expect(hasMixedFocusVisibleList('.offer-switch:focus-visible{outline:2px solid var(--navy,#1f3a68)}')).toBe(false);
   });
 });

@@ -6,7 +6,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const productRepository = require('../../src/repositories/productRepository');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, configureProductForQuoting } = require('../support/fixtures');
 
 /**
  * Port of InactiveProductsTest.php — owner, 12 Nov 2026 (D-334, "fix this" — a deactivated product disappeared):
@@ -62,7 +62,10 @@ describe('D-334 inactive products', () => {
   async function post(from, url, body = {}) {
     const csrf = (await agent.get(from)).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
     const res = await agent.post(url).type('form').send({ _csrf: csrf, ...body });
-    const m = (await agent.get(res.headers.location)).text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/);
+    // D-362: an empty Products tab redirects again (the flash is kept) — follow to the page that shows it.
+    let page = await agent.get(res.headers.location);
+    for (let hops = 0; hops < 5 && page.status === 302 && page.headers.location; hops++) page = await agent.get(page.headers.location);
+    const m = page.text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/);
     return m ? m[2].trim().replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&') : '';
   }
 
@@ -92,7 +95,8 @@ describe('D-334 inactive products', () => {
     await product('Active slab', true);
     await product('Old slab', false);
 
-    expect(await productRepository.statusCounts(tag)).toEqual({ active: 1, inactive: 1, all: 2 });
+    // QA 13 Nov 2026 (D-361 stale test): the counts also carry the configuration filters.
+    expect(await productRepository.statusCounts(tag)).toEqual({ active: 1, inactive: 1, all: 2, not_configured: 2, no_active_supplier: 0, no_supplier_yet: 0 });
     expect((await productRepository.search(tag)).map((p) => p.name)).toEqual([`${tag} Active slab`]);
     expect((await productRepository.search(tag, 'inactive')).map((p) => p.name)).toEqual([`${tag} Old slab`]);
     expect(await productRepository.search(tag, 'all')).toHaveLength(2);
@@ -175,6 +179,16 @@ describe('D-334 inactive products', () => {
     expect(Number((await productRepository.find(id)).is_active)).toBe(0);
     expect(await audits('PRODUCT_DEACTIVATED', id)).toBe(1);
 
+    // QA 13 Nov 2026 (D-361 stale test): a product that is not configured is not switched Active.
+    expect(await post(`/products/${id}`, `/products/${id}/reactivate`, { return_to: 'list' })).toContain('cannot be switched Active yet: Not configured yet — ask the product manager.');
+    expect(Number((await productRepository.find(id)).is_active)).toBe(0);
+    expect(await audits('PRODUCT_REACTIVATED', id)).toBe(0);
+
+    // Configured with an active supplier offer, it is.
+    const offer = await require('../../src/repositories/productSupplierRepository').create({ product_id: id, supplier_name: 'D334 Quarry', location: null, contact_person: null, contact_phone: null, contact_email: null,
+      fob_source: 'direct', fob_value: 4000, factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null, is_primary: 1, notes: null }, admin.id);
+    await require('../../src/repositories/pricingRepository').setSupplierDates(offer, require('../../src/helpers/dbDateTime').todayIst(), null);
+    await configureProductForQuoting(id, admin.id, false);
     expect(await post(`/products/${id}`, `/products/${id}/reactivate`, { return_to: 'list' })).toContain('is active again');
     expect(Number((await productRepository.find(id)).is_active)).toBe(1);
     expect(await audits('PRODUCT_REACTIVATED', id)).toBe(1);

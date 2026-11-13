@@ -34,9 +34,8 @@ final class NavigationMenuD320Test extends DbTestCase
         // Reached before only from links inside pages (the TDS register had no link at all).
         '/associates/tds', '/associates/registrations', '/associates/price-requests', '/associates/ladder', '/associates/access-levels',
         '/associates/new', '/reports/associates', '/products/categories', '/pricing/commission-levels',
-        '/pricing/specifications', '/products/fix-hs-codes', '/products/link-suppliers', '/procurement/suppliers', '/admin/sop-access',
+        '/pricing/specifications', '/products/fix-hs-codes', '/procurement/suppliers', '/admin/sop-access',
         '/settings/document-cleanup', '/port-routes', '/settings/remittance-reasons', '/settings/associate-tds', '/clients/create',
-        '/products/create',
     ];
 
     /**
@@ -47,6 +46,12 @@ final class NavigationMenuD320Test extends DbTestCase
 
     /** D-362 (13 Nov 2026): reached only from the Products screen's link bar, not from a menu. */
     private const PRODUCTS_LINK_BAR_ONLY = ['/pricing/settings', '/products/price-rules'];
+
+    /**
+     * D-361: "Link suppliers" was removed from the Products menu bar and page, and new products come from
+     * Procurement › Suppliers › + Add product — both routes are kept, unlinked from the menus.
+     */
+    private const ROUTE_KEPT_UNLINKED = ['/products/link-suppliers', '/products/create'];
 
     private const ALL_FLAGS = [
         'superAdmin' => true, 'sopOpen' => true, 'approver' => true, 'mod_supplier_purchase' => true, 'mod_import_stock' => true,
@@ -138,6 +143,11 @@ final class NavigationMenuD320Test extends DbTestCase
         }
         foreach (self::PRODUCTS_LINK_BAR_ONLY as $page) {
             self::assertNotContains($page, $linked, "{$page} is a link on the Products screen, not a menu link");
+            self::assertSame('products', Navigation::sectionKeyFor($page), "{$page} keeps Products highlighted");
+        }
+        // QA 13 Nov 2026 (D-361 stale test): no longer in any menu bar, but still part of Products.
+        foreach (self::ROUTE_KEPT_UNLINKED as $page) {
+            self::assertNotContains($page, $linked, "{$page} was removed from the menu (D-361)");
             self::assertSame('products', Navigation::sectionKeyFor($page), "{$page} keeps Products highlighted");
         }
         self::assertSame('dashboard', Navigation::build(static fn (): bool => true, self::ALL_FLAGS, [], '/', [])['currentKey']);

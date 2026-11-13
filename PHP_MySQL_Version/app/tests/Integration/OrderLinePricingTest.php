@@ -16,6 +16,7 @@ use App\Services\PermissionService;
 use App\Services\PricingService;
 use App\Services\ZohoBooksService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner decision D-245, phase P2 (4 Nov 2026): prices on order lines.
@@ -28,9 +29,14 @@ use App\Tests\Support\DbTestCase;
  */
 final class OrderLinePricingTest extends DbTestCase
 {
+    use PricingFixtures;
+
     protected function setUp(): void
     {
         parent::setUp();
+        // QA 13 Nov 2026 (D-347 stale tests): the figures below are the D-245 worked example
+        // (margin 20 %, other costs 2.5 %) — every pricing setting is pinned, whatever ran before.
+        self::pinWorkedExamplePricing();
         // Team incentive program on: staff floor USD 1,287.50 sits above the minimum USD 1,250.00.
         Database::connection()->exec("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
     }
@@ -77,6 +83,8 @@ final class OrderLinePricingTest extends DbTestCase
             'fob_source' => 'direct', 'fob_value' => 80000, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null,
             'is_primary' => 1, 'notes' => null], $admin);
         PricingRepository::setSupplierDates($s, date('Y-m-d'), null);
+        // D-361: only a configured product with an active supplier offer can be picked on an order.
+        self::configureProductForQuoting($id, $admin);
         return $id;
     }
 
@@ -152,7 +160,8 @@ final class OrderLinePricingTest extends DbTestCase
         $md = $this->createTestUser('Managing Director');
         $this->actAs($sales);
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$sales]);
-        $post = ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods', 'hs_code' => '25161100'];
+        $post = ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods', 'hs_code' => '25161100',
+            'spec_json' => self::baseSpecJson($productId)];
 
         $_POST = $post + ['unit_price' => '1240.00'];
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
@@ -294,7 +303,7 @@ final class OrderLinePricingTest extends DbTestCase
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
         $_POST = ['description' => 'Pallets', 'quantity' => '1', 'unit' => 'CBM', 'unit_price' => '25.00', 'line_type' => 'charge'];
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
-        $_POST = ['catalog_product_id' => (string) $productId] + $hand;
+        $_POST = ['catalog_product_id' => (string) $productId, 'spec_json' => self::baseSpecJson($productId)] + $hand;
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
         self::assertSame(['service', 'charge', 'goods'], array_column(OrderProductRepository::forOrder($orderId), 'line_type'));
 

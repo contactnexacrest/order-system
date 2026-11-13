@@ -81,11 +81,25 @@ final class OcAckButtonVisibilityTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $userId;
 
-        ob_start();
-        (new OrderController())->show(['id' => (string) $orderId]);
-        $output = ob_get_clean();
+        // QA 13 Nov 2026 (D-347 stale test): a fresh install starts with Testing mode ON, so the
+        // banner says "sent"; with Testing mode off the OC went out by e-mail and it says "emailed".
+        $before = \App\Repositories\CompanySettingsRepository::get('email_testing_mode');
+        try {
+            \App\Repositories\CompanySettingsRepository::set('email_testing_mode', '1', null);
+            ob_start();
+            (new OrderController())->show(['id' => (string) $orderId]);
+            $held = (string) ob_get_clean();
+            self::assertStringContainsString('Order Confirmation sent to the buyer on', $held, 'Testing mode on: buyer e-mails are held');
 
-        self::assertStringContainsString('Order Confirmation emailed to the buyer on', $output, 'D-280: Testing mode is off in the test database (as installed), so the OC went out by e-mail');
+            \App\Repositories\CompanySettingsRepository::set('email_testing_mode', '0', null);
+            ob_start();
+            (new OrderController())->show(['id' => (string) $orderId]);
+            $output = (string) ob_get_clean();
+        } finally {
+            \App\Repositories\CompanySettingsRepository::set('email_testing_mode', (string) ($before ?? '1'), null);
+        }
+
+        self::assertStringContainsString('Order Confirmation emailed to the buyer on', $output, 'D-280: with Testing mode off the OC went out by e-mail');
         self::assertStringContainsString("Record Buyer's Email Acknowledgement (unlocks Step 7)", $output);
     }
 }

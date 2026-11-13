@@ -65,12 +65,17 @@ final class AdminNavGroupVisibilityTest extends DbTestCase
         // D-320: HS codes moved to the Products section; the role already opens Products, so the
         // left-menu entry goes to /products and the HS codes link is in that section's menu bar.
         self::assertStringContainsString('href="/products" class="" data-nav="products"', $this->renderDashboardAs($userId));
-        $_SERVER['REQUEST_URI'] = '/products';
+        // Stale-test fix (QA 13 Nov 2026, D-362): an empty Active tab now redirects to the
+        // tab that has products, so the page is opened on the All tab (the Node twin follows
+        // that redirect) — the HS codes link sits in the section menu bar either way.
+        $_SERVER['REQUEST_URI'] = '/products?status=all';
+        $_GET = ['status' => 'all'];
         $_SESSION['_auth_user_id'] = $userId;
         ob_start();
         (new \App\Controllers\ProductController())->index([]);
         $output = (string) ob_get_clean();
         unset($_SERVER['REQUEST_URI']);
+        $_GET = [];
 
         self::assertStringContainsString('href="/hs-codes"', $output);
     }

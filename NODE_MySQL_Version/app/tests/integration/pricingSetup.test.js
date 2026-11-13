@@ -14,6 +14,7 @@ const pricingRepository = require('../../src/repositories/pricingRepository');
 const productRepository = require('../../src/repositories/productRepository');
 const productSupplierRepository = require('../../src/repositories/productSupplierRepository');
 const pricingService = require('../../src/services/pricingService');
+const { pinWorkedExamplePricing, configureProductForQuoting } = require('../support/fixtures');
 
 /**
  * Port of PricingSetupTest.php — owner decision D-245 (4 Nov 2026), phase P1:
@@ -27,6 +28,12 @@ describe('Pricing setup (D-245, P1)', () => {
 
   afterAll(async () => {
     await db.pool.end();
+  });
+
+  beforeEach(async () => {
+    // QA 13 Nov 2026 (D-347 stale tests): the figures below are the D-245 worked example
+    // (margin 20 %, other costs 2.5 %) — every pricing setting is pinned, whatever ran before.
+    await pinWorkedExamplePricing();
   });
 
   afterEach(async () => {
@@ -82,6 +89,8 @@ describe('Pricing setup (D-245, P1)', () => {
   it('who sees which price', async () => {
     await programOn();
     const productId = await product();
+    // D-361: the Products list's USD columns are worked out from the configured base price.
+    await configureProductForQuoting(productId, (await user('Admin')).id);
 
     const md = await login(await user('Managing Director'));
     let page = (await md.get(`/products/${productId}`)).text;

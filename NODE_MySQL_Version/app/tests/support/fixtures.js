@@ -269,4 +269,60 @@ async function withDocumentMailsHeld(fn) {
   }
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData, withDocumentMailsHeld };
+/**
+ * QA 13 Nov 2026 (stale-test fixes): the D-245 worked examples (cost 1,000.00 / minimum 1,250.00 /
+ * staff floor 1,287.50 / quote 1,326.13 from a ₹80,000 supplier price) were worked out with margin
+ * 20 % and other costs 2.5 %; D-347 made the installed values 15 % / 5.5 %. A test that relies on
+ * those figures pins EVERY pricing setting it depends on, so its result never depends on what an
+ * earlier test left behind. PHP twin: tests/Support/PricingFixtures.php.
+ */
+async function pinWorkedExamplePricing(overrides = {}) {
+  const { DEFAULTS } = require('../../src/services/pricingService');
+  const values = { ...DEFAULTS, margin_pct: '20.00', other_cost_pct: '2.50', ...overrides };
+  for (const [k, v] of Object.entries(values)) {
+    await db.execute('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k', { k, v });
+  }
+}
+
+/** Every pricing setting back at the code fallbacks (the installed values, D-347). PHP twin: PricingFixtures::resetPricingSettings(). */
+async function resetPricingSettings() {
+  const { DEFAULTS } = require('../../src/services/pricingService');
+  for (const [k, v] of Object.entries(DEFAULTS)) {
+    await db.execute('UPDATE pricing_settings SET setting_value = :v WHERE setting_key = :k', { k, v });
+  }
+}
+
+/**
+ * D-361: only a CONFIGURED product with an active supplier offer is quotable (offered on orders).
+ * Fixes the product's base price at the supplier price "used for pricing" (so every figure stays
+ * the same) and keeps it Active (with activate false the Active flag is left as it is).
+ * PHP twin: PricingFixtures::configureProductForQuoting().
+ */
+async function configureProductForQuoting(productId, userId, activate = true) {
+  const productRepository = require('../../src/repositories/productRepository');
+  const supplierOffers = require('../../src/services/supplierOffers');
+  const product = await productRepository.find(Number(productId));
+  const base = await supplierOffers.configuredBase(product);
+  if (base.inr === null) throw new Error(`Product ${productId} has no usable supplier price to configure from.`);
+  await supplierOffers.setConfiguredBase(Number(productId), base.inr, base.mm, String(base.unit), userId);
+  if (activate) await productRepository.setActive(Number(productId), true, userId);
+}
+
+/**
+ * D-348: a goods line picked from Products must have its "Thickness" / "Size / format" chosen.
+ * The spec_json an order-line form posts with every offered specification on its base option
+ * (or its first option), so the price is the product's base price. PHP twin: PricingFixtures::baseSpecJson().
+ */
+async function baseSpecJson(productId) {
+  const productRepository = require('../../src/repositories/productRepository');
+  const productSpecs = require('../../src/services/productSpecs');
+  const selection = {};
+  for (const s of await productSpecs.offered(await productRepository.find(Number(productId)))) {
+    const base = s.options.find((o) => o.is_base) || s.options[0];
+    selection[String(s.id)] = Number(base.id);
+  }
+  return JSON.stringify(selection);
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData, withDocumentMailsHeld,
+  pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson };

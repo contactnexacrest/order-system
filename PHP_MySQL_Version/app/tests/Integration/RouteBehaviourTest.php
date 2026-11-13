@@ -11,6 +11,7 @@ use App\Helpers\Router;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * QA Round 6, Batch 5 (R5-14): QA found 124 routes that no PHPUnit, Jest or
@@ -24,6 +25,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class RouteBehaviourTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private static ?Router $router = null;
     private int $holder;
 
@@ -63,6 +66,7 @@ final class RouteBehaviourTest extends DbTestCase
         $_SERVER['REQUEST_URI'] = '/';
         $_SERVER['REQUEST_METHOD'] = 'GET';
         http_response_code(200);
+        self::resetPricingSettings();
         parent::tearDown();
     }
 
@@ -642,9 +646,16 @@ final class RouteBehaviourTest extends DbTestCase
         $hs = (string) $this->value('SELECT code FROM hs_codes WHERE is_active = 1 ORDER BY id LIMIT 1');
         $line = $this->insert('order_products', ['order_id' => $order, 'line_no' => 1, 'description' => 'Route line', 'quantity' => 10, 'unit' => 'pcs', 'unit_price' => 12, 'hs_code' => $hs]);
 
-        // D-245 P2: on a USD order a goods line is picked from Products.
-        $picked = \App\Repositories\ProductRepository::create(['name' => 'Route Picked Granite ' . bin2hex(random_bytes(3)), 'specifications' => 'Slab', 'hs_code' => $hs], $this->holder);
-        $r = $this->call('POST', "/orders/{$order}/products/{$line}", ['catalog_product_id' => (string) $picked, 'description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15', 'reason' => 'Route behaviour test edit']);
+        // D-245 P2: on a USD order a goods line is picked from Products — D-361: from a configured
+        // product with an active supplier offer (₹100 a piece, so USD 15 is well above its floor);
+        // D-348: with its Thickness / Size chosen.
+        $picked = \App\Repositories\ProductRepository::create(['name' => 'Route Picked Granite ' . bin2hex(random_bytes(3)), 'specifications' => 'Slab', 'hs_code' => $hs, 'reference_unit' => 'pcs'], $this->holder);
+        $offer = \App\Repositories\ProductSupplierRepository::create(['product_id' => $picked, 'supplier_name' => 'Route Quarry', 'location' => null, 'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
+            'fob_source' => 'direct', 'fob_value' => 100, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], $this->holder);
+        \App\Repositories\PricingRepository::setSupplierDates($offer, date('Y-m-d'), null);
+        self::configureProductForQuoting($picked, $this->holder);
+        $r = $this->call('POST', "/orders/{$order}/products/{$line}", ['catalog_product_id' => (string) $picked, 'description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15',
+            'spec_json' => self::baseSpecJson($picked), 'reason' => 'Route behaviour test edit']);
         $this->assertDone($r, 'POST /orders/{id}/products/{productId}');
         self::assertSame('Route edited line', $this->value("SELECT description FROM order_products WHERE id = {$line}"));
 
@@ -1270,6 +1281,8 @@ final class RouteBehaviourTest extends DbTestCase
     public function testLinePriceApprovalRoutes(): void
     {
         $pdo = Database::connection();
+        // QA 13 Nov 2026 (D-347 stale test): the D-245 worked-example settings (margin 20 %, other costs 2.5 %), all pinned.
+        self::pinWorkedExamplePricing();
         $pdo->exec("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // staff floor 1,287.50 above the minimum 1,250.00
         $orderId = $this->createTestOrder($this->createTestClient());
         $productId = \App\Repositories\ProductRepository::create(['name' => 'Route Priced Granite', 'specifications' => 'Block', 'hs_code' => '68022310', 'reference_unit' => 'CBM'], $this->holder);

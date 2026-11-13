@@ -81,8 +81,9 @@ describe('Email sending off: approved documents count as sent', () => {
     await db.pool.end();
   });
 
-  it('defaults to email sending off in the seed', () => {
-    expect(originalMailSendingEnabled).toBe('0');
+  // QA 13 Nov 2026 (D-347 stale test): a fresh install starts with Testing mode ON (buyer and supplier e-mails held).
+  it('seed default is Testing mode on', () => {
+    expect(originalMailSendingEnabled).toBe('1');
   });
 
   it('marks an approved Quotation sent when email is off, with an audit entry', async () => {

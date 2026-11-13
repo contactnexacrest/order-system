@@ -14,7 +14,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const { todayIst } = require('../../src/helpers/dbDateTime');
-const { createTestClient, createTestOrder, createTestFile, createTestDocument } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, createTestDocument, pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson } = require('../support/fixtures');
 
 /**
  * Port of RouteBehaviourTest.php. QA Round 6, Batch 5 (R5-14): QA found 124
@@ -79,7 +79,13 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
       let type = null;
       let flash = null;
       if (res.status === 302 && res.headers.location && !/^https?:/.test(res.headers.location)) {
-        const m = (await agent.get(res.headers.location)).text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/);
+        // QA 13 Nov 2026 (D-362 stale test): a page can redirect again (an empty Products tab opens
+        // the tab that has products, keeping the flash), so follow redirects to the page that shows it.
+        let page = await agent.get(res.headers.location);
+        for (let hops = 0; hops < 5 && page.status === 302 && page.headers.location && !/^https?:/.test(page.headers.location); hops++) {
+          page = await agent.get(page.headers.location);
+        }
+        const m = page.text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/);
         if (m) [type, flash] = [m[1], m[2].replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').trim()];
       }
       return { status: res.status, body: res.text || '', type, flash };
@@ -95,6 +101,9 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
   });
   beforeEach(async () => {
     holder = await signIn(holderUser);
+  });
+  afterEach(async () => {
+    await resetPricingSettings();
   });
 
   const expectPage = (r, marker, route) => {
@@ -572,9 +581,16 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const hs = await value('SELECT code FROM hs_codes WHERE is_active = 1 ORDER BY id LIMIT 1');
     const line = await insert('order_products', { order_id: order, line_no: 1, description: 'Route line', quantity: 10, unit: 'pcs', unit_price: 12, hs_code: hs });
 
-    // D-245 P2: on a USD order a goods line is picked from Products.
-    const picked = await require('../../src/repositories/productRepository').create({ name: `Route Picked Granite ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Slab', hs_code: hs }, holderUser.id);
-    expectDone(await holder.call('POST', `/orders/${order}/products/${line}`, { catalog_product_id: String(picked), description: 'Route edited line', hs_code: hs, quantity: '12', unit: 'pcs', unit_price: '15', reason: 'Route behaviour test edit' }), 'POST /orders/:id/products/:productId');
+    // D-245 P2: on a USD order a goods line is picked from Products — D-361: from a configured
+    // product with an active supplier offer (₹100 a piece, so USD 15 is well above its floor);
+    // D-348: with its Thickness / Size chosen.
+    const picked = await require('../../src/repositories/productRepository').create({ name: `Route Picked Granite ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Slab', hs_code: hs, reference_unit: 'pcs' }, holderUser.id);
+    const offer = await require('../../src/repositories/productSupplierRepository').create({ product_id: picked, supplier_name: 'Route Quarry', location: null, contact_person: null, contact_phone: null, contact_email: null,
+      fob_source: 'direct', fob_value: 100, factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null, is_primary: 1, notes: null }, holderUser.id);
+    await require('../../src/repositories/pricingRepository').setSupplierDates(offer, todayIst(), null);
+    await configureProductForQuoting(picked, holderUser.id);
+    expectDone(await holder.call('POST', `/orders/${order}/products/${line}`, { catalog_product_id: String(picked), description: 'Route edited line', hs_code: hs, quantity: '12', unit: 'pcs', unit_price: '15',
+      spec_json: await baseSpecJson(picked), reason: 'Route behaviour test edit' }), 'POST /orders/:id/products/:productId');
     expect(await value('SELECT description FROM order_products WHERE id = :id', { id: line })).toBe('Route edited line');
 
     expectDone(await holder.call('POST', `/orders/${order}/products/${line}/duplicate`, { reason: 'Route behaviour test copy' }), 'POST /orders/:id/products/:productId/duplicate');
@@ -1011,6 +1027,8 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
   });
 
   it('line price approval routes (D-245 P2)', async () => {
+    // QA 13 Nov 2026 (D-347 stale test): the D-245 worked-example settings (margin 20 %, other costs 2.5 %), all pinned.
+    await pinWorkedExamplePricing();
     await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // staff floor 1,287.50 above the minimum 1,250.00
     try {
       const orderId = await createTestOrder(await createTestClient());

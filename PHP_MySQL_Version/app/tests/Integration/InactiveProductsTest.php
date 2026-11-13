@@ -9,6 +9,7 @@ use App\Controllers\ProductController;
 use App\Repositories\ProductRepository;
 use App\Services\PermissionService;
 use App\Tests\Support\DbTestCase;
+use App\Tests\Support\PricingFixtures;
 
 /**
  * Owner, 12 Nov 2026 (D-334, "fix this" — a deactivated product disappeared):
@@ -21,6 +22,8 @@ use App\Tests\Support\DbTestCase;
  */
 final class InactiveProductsTest extends DbTestCase
 {
+    use PricingFixtures;
+
     private int $admin;
     private string $tag;
     /** @var list<int> */
@@ -104,7 +107,9 @@ final class InactiveProductsTest extends DbTestCase
         $this->product('Active slab', true);
         $this->product('Old slab', false);
 
-        self::assertSame(['active' => 1, 'inactive' => 1, 'all' => 2], ProductRepository::statusCounts($this->tag));
+        // QA 13 Nov 2026 (D-361 stale test): the counts also carry the configuration filters.
+        self::assertSame(['active' => 1, 'inactive' => 1, 'all' => 2, 'not_configured' => 2, 'no_active_supplier' => 0, 'no_supplier_yet' => 0],
+            ProductRepository::statusCounts($this->tag));
         self::assertSame(["{$this->tag} Active slab"], array_column(ProductRepository::search($this->tag), 'name'), 'a search shows active products by default');
         self::assertSame(["{$this->tag} Old slab"], array_column(ProductRepository::search($this->tag, 'inactive'), 'name'));
         self::assertCount(2, ProductRepository::search($this->tag, 'all'));
@@ -197,6 +202,18 @@ final class InactiveProductsTest extends DbTestCase
         self::assertSame(0, (int) ProductRepository::find($id)['is_active']);
         self::assertSame(1, $this->audits('PRODUCT_DEACTIVATED', $id));
 
+        // QA 13 Nov 2026 (D-361 stale test): a product that is not configured is not switched Active.
+        $_POST = ['return_to' => 'list'];
+        (new ProductController())->reactivate(['id' => (string) $id]);
+        self::assertSame(0, (int) ProductRepository::find($id)['is_active']);
+        self::assertSame(0, $this->audits('PRODUCT_REACTIVATED', $id));
+        self::assertStringContainsString('cannot be switched Active yet: Not configured yet — ask the product manager.', $this->flash());
+
+        // Configured with an active supplier offer, it is.
+        $offer = \App\Repositories\ProductSupplierRepository::create(['product_id' => $id, 'supplier_name' => 'D334 Quarry', 'location' => null, 'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
+            'fob_source' => 'direct', 'fob_value' => 4000, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], $this->admin);
+        \App\Repositories\PricingRepository::setSupplierDates($offer, date('Y-m-d'), null);
+        self::configureProductForQuoting($id, $this->admin, false);
         $_POST = ['return_to' => 'list'];
         (new ProductController())->reactivate(['id' => (string) $id]);
         self::assertSame(1, (int) ProductRepository::find($id)['is_active']);
