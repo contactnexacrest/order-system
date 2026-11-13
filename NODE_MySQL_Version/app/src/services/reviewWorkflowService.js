@@ -90,6 +90,9 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
   }
 }
 
+/** HNT-004: order statuses on which a document review can no longer be approved (status → wording). */
+const DEAD_ORDER_STATUSES = { lost: 'marked lost', cancelled: 'cancelled' };
+
 async function approve(documentReviewId, reviewerUserId, comments) {
   const review = await documentReviewRepository.find(documentReviewId);
   if (!review) {
@@ -115,6 +118,12 @@ async function approve(documentReviewId, reviewerUserId, comments) {
     const latest = await documentRepository.findLatestForOrderAndType(document.order_id, document.document_type_id);
     if (latest && latest.id !== document.id) {
       throw new Error('A newer revision of this document has since been generated — this one can no longer be approved. Review the latest revision instead.');
+    }
+    // HNT-004: once the order is lost or cancelled, nothing on it is approved (no
+    // document becomes "sent", no D-342 prices are fixed). Rejecting stays possible.
+    const order = await require('../repositories/orderRepository').find(Number(document.order_id));
+    if (order && Object.prototype.hasOwnProperty.call(DEAD_ORDER_STATUSES, String(order.status))) {
+      throw new Error(`This order is ${DEAD_ORDER_STATUSES[String(order.status)]} — its documents can no longer be approved. Reject the review if it should be closed.`);
     }
   }
 

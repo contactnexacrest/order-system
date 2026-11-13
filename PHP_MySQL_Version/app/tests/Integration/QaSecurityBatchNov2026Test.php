@@ -171,4 +171,28 @@ final class QaSecurityBatchNov2026Test extends DbTestCase
         self::assertFalse($hit, 'a non-numeric product id reaches no handler');
         self::assertSame(404, http_response_code());
     }
+
+    /** HNT-004: a pending Quotation review cannot be approved once the order is lost or cancelled; it can still be rejected. */
+    public function testHnt004NoApprovalOnLostOrCancelledOrder(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        $ed = $this->createTestUser('Executive Director');
+        foreach (['lost', 'cancelled'] as $status) {
+            $orderId = $this->createTestOrder($this->createTestClient());
+            $docId = $this->createTestDocument($orderId, 'QT', 'in_review');
+            $pdo->prepare('INSERT INTO document_reviews (document_id, reviewer_id) VALUES (:d, :u)')->execute(['d' => $docId, 'u' => $ed]);
+            $reviewId = (int) $pdo->lastInsertId();
+            $pdo->prepare('UPDATE orders SET status = :s, is_locked = 1 WHERE id = :id')->execute(['s' => $status, 'id' => $orderId]);
+            try {
+                \App\Services\ReviewWorkflowService::approve($reviewId, $ed, null);
+                self::fail('approval on a ' . $status . ' order must be refused');
+            } catch (\RuntimeException $e) {
+                self::assertStringContainsString('can no longer be approved', $e->getMessage());
+            }
+            self::assertNotSame('sent', $pdo->query("SELECT status FROM documents WHERE id = {$docId}")->fetchColumn());
+            self::assertNull($pdo->query("SELECT prices_fixed_at FROM orders WHERE id = {$orderId}")->fetchColumn() ?: null);
+            \App\Services\ReviewWorkflowService::reject($reviewId, $ed, 'TEST-QA order lost, closing this review');
+            self::assertSame('rejected', $pdo->query("SELECT status FROM document_reviews WHERE id = {$reviewId}")->fetchColumn());
+        }
+    }
 }

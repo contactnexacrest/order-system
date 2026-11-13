@@ -105,6 +105,10 @@ final class ReviewWorkflowService
         }
     }
 
+    /** HNT-004: order statuses on which a document review can no longer be approved. */
+    private const DEAD_ORDER_STATUSES = ['lost', 'cancelled'];
+    private const DEAD_ORDER_STATUSES_LABEL = ['lost' => 'marked lost', 'cancelled' => 'cancelled'];
+
     public static function approve(int $documentReviewId, int $reviewerUserId, ?string $comments): void
     {
         $review = DocumentReviewRepository::find($documentReviewId);
@@ -131,6 +135,12 @@ final class ReviewWorkflowService
             $latest = DocumentRepository::findLatestForOrderAndType((int) $document['order_id'], (int) $document['document_type_id']);
             if ($latest && (int) $latest['id'] !== (int) $document['id']) {
                 throw new \RuntimeException('A newer revision of this document has since been generated — this one can no longer be approved. Review the latest revision instead.');
+            }
+            // HNT-004: once the order is lost or cancelled, nothing on it is approved (no
+            // document becomes "sent", no D-342 prices are fixed). Rejecting stays possible.
+            $order = \App\Repositories\OrderRepository::find((int) $document['order_id']);
+            if ($order && in_array((string) $order['status'], self::DEAD_ORDER_STATUSES, true)) {
+                throw new \RuntimeException('This order is ' . self::DEAD_ORDER_STATUSES_LABEL[(string) $order['status']] . ' — its documents can no longer be approved. Reject the review if it should be closed.');
             }
         }
 

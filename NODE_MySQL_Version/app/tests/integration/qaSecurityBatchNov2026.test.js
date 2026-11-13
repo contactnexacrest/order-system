@@ -203,4 +203,25 @@ describe('QA Nov 2026 security batch', () => {
       expect(await db.queryOne('SELECT id FROM documents WHERE id = :id', { id: docId })).toBeTruthy();
     });
   });
+
+  describe('HNT-004 reviews on a lost / cancelled order', () => {
+    it('HNT-004: a pending Quotation review cannot be approved once the order is lost; it can still be rejected', async () => {
+      const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
+      const reviewWorkflowService = require('../../src/services/reviewWorkflowService');
+      const ed = await user('Executive Director');
+      for (const status of ['lost', 'cancelled']) {
+        const orderId = await createTestOrder(await createTestClient());
+        const docId = await createTestDocument(orderId, 'QT', 'in_review');
+        const reviewId = (await db.execute('INSERT INTO document_reviews (document_id, reviewer_id) VALUES (:d, :u)', { d: docId, u: ed.id })).insertId;
+        await db.execute('UPDATE orders SET status = :s, is_locked = 1 WHERE id = :id', { s: status, id: orderId });
+        await expect(reviewWorkflowService.approve(reviewId, ed.id, null)).rejects.toThrow(/can no longer be approved/);
+        const doc = await db.queryOne('SELECT status FROM documents WHERE id = :id', { id: docId });
+        expect(doc.status).not.toBe('sent');
+        const order = await db.queryOne('SELECT prices_fixed_at FROM orders WHERE id = :id', { id: orderId });
+        expect(order.prices_fixed_at).toBeNull();
+        await reviewWorkflowService.reject(reviewId, ed.id, 'TEST-QA order lost, closing this review');
+        expect((await db.queryOne('SELECT status FROM document_reviews WHERE id = :id', { id: reviewId })).status).toBe('rejected');
+      }
+    });
+  });
 });
