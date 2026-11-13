@@ -78,6 +78,8 @@ describe('Fields without placeholders (External QA report U-03)', () => {
     const html = view('settings/index.njk');
 
     expect(html).toContain("row.value_type == 'number'");
-    expect(html).toContain('placeholder="e.g., 30"');
+    // QA UI-012: every typed setting has one (settingLabels.placeholder); a number setting still shows "e.g., 30".
+    expect(html).toContain('placeholder="{{ row.placeholder }}"');
+    expect(require('../../src/helpers/settingLabels').placeholder('some_days', 'number')).toBe('e.g., 30');
   });
 });
