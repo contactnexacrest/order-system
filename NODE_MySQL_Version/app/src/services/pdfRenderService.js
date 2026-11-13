@@ -131,10 +131,10 @@ function buildPdfOptions(documentReference) {
     options.margin.bottom = '0.4in';
     options.displayHeaderFooter = true;
     options.headerTemplate = '<div></div>';
-    options.footerTemplate = `<div style="width:100%; font-size:8px; padding:0 42px; color:#5B6573; font-family:sans-serif; display:flex; justify-content:space-between;">
-      <span>${escapeHtml(documentReference)}</span>
-      <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    </div>`;
+    // MTX-006 (owner decision 13 Nov 2026, item 4, confirmed twice): one left-aligned line exactly as the PHP
+    // footer (DocumentGenerationService::addRunningHeaderFooter): "{ref}  —  Page n of N", 8pt, rgb(0.35,0.37,0.45)
+    // = #596075, 42.5pt from the left edge. white-space:pre keeps the two spaces either side of the dash.
+    options.footerTemplate = `<div style="width:100%; margin:0; padding:0 0 0 42.5pt; font-size:8pt; color:#596075; font-family:Aptos, Carlito, sans-serif; text-align:left; white-space:pre;">${escapeHtml(documentReference)}  —  Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`;
   }
   return options;
 }
