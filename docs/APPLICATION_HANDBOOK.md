@@ -86,7 +86,7 @@ The complete description of the NexaCrest export order system: what it is for, h
 - [4. Roles, permissions and access](#4-roles-permissions-and-access)
   - [4.1 How a permission check works](#41-how-a-permission-check-works)
   - [4.2 The 24 roles](#42-the-24-roles)
-  - [4.3 The 94 permissions](#43-the-94-permissions)
+  - [4.3 The 96 permissions](#43-the-96-permissions)
   - [4.4 Departments, designations, "Log in as" and "Preview as"](#44-departments-designations-log-in-as-and-preview-as)
   - [4.5 Who may give rights; Super Admin; protected founder accounts](#45-who-may-give-rights-super-admin-protected-founder-accounts)
   - [4.6 Self-approval rules and approval limits](#46-self-approval-rules-and-approval-limits)
@@ -1015,9 +1015,9 @@ role (D-214).
 
 | # | Role | Department / designation | Seed permissions | In one line |
 |---|---|---|---|---|
-| 1 | Admin | none (keeps own role, D-214) | 93 | Full system access incl. users, roles and audit log. Lacks only `manage_approval_limits`. |
-| 2 | Managing Director | Company Management · director | 94 (all) | Full business authority; the only role with every key. |
-| 3 | Executive Director | Company Management · director | 87 | Same as MD except: `manage_pricing`, `manage_incentives`, `manage_divisions`, `manage_product_specifications`, `manage_associate_bank`, `pay_incentives`, `record_market_prices`. |
+| 1 | Admin | none (keeps own role, D-214) | 94 | Full system access incl. users, roles and audit log. Lacks only `manage_approval_limits` and `approve_buyer_details_change`. |
+| 2 | Managing Director | Company Management · director | 96 (all) | Full business authority; the only role with every key. |
+| 3 | Executive Director | Company Management · director | 89 | Same as MD except: `manage_pricing`, `manage_incentives`, `manage_divisions`, `manage_product_specifications`, `manage_associate_bank`, `pay_incentives`, `record_market_prices`. |
 | 4 | Export Executive | Sales & Export · executive ("Sales/Export Executive") | 22 | Day-to-day order work QT → OC, documents, records (not clears) payments. |
 | 5 | Accounts Executive | Accounts & Finance · executive | 29 | Payment tracking, clearing, supplier payments, INR actuals, CA view. |
 | 6 | Logistics Executive | Logistics · executive | 14 | Packing, freight, BL, shipping documents, logistics bills. |
@@ -1030,8 +1030,8 @@ role (D-214).
 | 13 | Procurement Director | Procurement · director (no limit) | 17 | Manager + cockpit, agreements view. |
 | 14 | Logistics Manager | Logistics · manager | 18 | Executive + logistics partners directory, all orders. |
 | 15 | Logistics Director | Logistics · director | 20 | Manager + cockpit, agreements view. |
-| 16 | Finance Manager | Accounts & Finance · manager | 36 | Accounts + order financials, CAFIN generate, associate bank checks. |
-| 17 | Finance Director | Accounts & Finance · director | 41 | Manager + short-payment approval, payment-terms approval, cockpit. |
+| 16 | Finance Manager | Accounts & Finance · manager | 37 | Accounts + order financials, CAFIN generate, associate bank checks. |
+| 17 | Finance Director | Accounts & Finance · director | 42 | Manager + short-payment approval, payment-terms approval, cockpit. |
 | 18 | System Administrator | Administration · other | 17 | Users, settings, templates, lists. **No business money, no data export.** |
 | 19 | Order Coordinator | Order Desk · executive | 4 | Status of every order, sets department owners, cockpit. No prices. |
 | 20 | Operations Manager | Order Desk · manager | 5 | Coordinator + order assignees. No money (confirmed 1 Nov 2026). |
@@ -1047,7 +1047,7 @@ LogMgr/LogDir, FinMgr/FinDir, SysAdmin = System Administrator, OrdCoord =
 Order Coordinator, OpsMgr = Operations Manager, ECEx/ECMgr/ECDir = Export
 Compliance Executive/Manager/Director.
 
-### 4.3 The 94 permissions
+### 4.3 The 96 permissions
 
 Generated from the seed (`permissions` + `role_permissions`), grouped by the
 `category` column. "What it allows" is the first sentence of the seeded
@@ -1111,7 +1111,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | Key | What it allows | Roles that hold it (seed) |
 |---|---|---|
 | `browse_product_catalog` | Browse the full product catalog list, not just search results. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir |
-| `manage_compliance_task_types` | Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). | Admin, MD, ED, SysAdmin, ECMgr, ECDir |
+| `manage_compliance_task_types` | Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). The order-page checklist itself uses `manage_compliance_checklist`. | Admin, MD, ED, SysAdmin, ECMgr, ECDir |
 | `manage_dropdown_options` | Add, edit, and deactivate the admin-editable option lists used across the app (Container Type, Certificate of Origin Type, etc. | Admin, MD, ED, SysAdmin |
 | `manage_hs_codes` | Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first. | Admin, MD, ED, SysAdmin |
 | `manage_logistics_partners` | Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. | Admin, MD, ED, LogMgr, LogDir |
@@ -1121,7 +1121,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. *Note: also Duplicate a product (D-358) and Configure it — base price, product-level values, switching it Active (D-361; Thickness rules also need `manage_product_specifications`, D-363).* | Admin, MD, ED |
 | `manage_product_specifications` | Change one product's specifications: hide a specification or option, change an option's value, add options or specifications for that product only, reset to the category. | Admin, MD |
 | `manage_suppliers` | Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
-| `record_market_prices` | Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. *Note: also Edit price, the Offer active switch and "+ Add product" (with `manage_suppliers`, D-359 / D-360); since D-361 the selling price comes from the configured base price, and "used for pricing" only picks whose CHA, packing and dates go with it.* | Admin, MD, ProcEx, ProcMgr, ProcDir |
+| `record_market_prices` | Record and edit supplier prices for products (Edit price, base and thickness prices, the one used for pricing, dates) and link prices to suppliers; with `manage_suppliers` also the offer Active switch and "+ Add product". *Note: since D-361 the selling price comes from the configured base price, and "used for pricing" only picks whose CHA, packing and dates go with it.* | Admin, MD, ProcEx, ProcMgr, ProcDir |
 | `view_price_buildup` | See a product's cost, margin, minimum price, team-incentive reserve, every floor and quote price, and the pricing settings. | Admin, MD, ED |
 | `view_product_catalog` | Search and view individual products in the internal product catalog. | Admin, MD, ED, ExpEx, AccEx, LogEx, Viewer, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir |
 | `view_product_pricing` | See product pricing, supplier list, and misc charges. | Admin, MD, ED, ExpEx, AccEx, SalesMgr, SalesDir, FinMgr, FinDir |
@@ -1174,7 +1174,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `assign_order_owner` | Add or remove which staff are assigned to an order (order_assignees). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OpsMgr, ECMgr, ECDir |
 | `clear_payments` | Confirm a buyer payment actually landed in the bank, unlocking the next stage gate — split out of manage_payments so the person who records a payment is never also the one who confirms it. | Admin, MD, ED, AccEx, FinMgr, FinDir |
 | `close_orders` | Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order. | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir |
-| `edit_order_post_confirmation` | Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. *Note: since D-342 product rows and the currency are fixed from the first approved Quotation for everyone, this permission included.* | Admin, MD, ED |
+| `edit_order_post_confirmation` | Edit order details once Order Confirmation has been issued (Stage 4+), with a reason; every use is logged. Product rows and prices are fixed from the first approved Quotation (D-342) and change only by a "Products & prices" amendment. *Note: the currency is fixed from the first approved Quotation too, for everyone, this permission included.* | Admin, MD, ED |
 | `manage_complaints` | View complaints, acknowledge/resolve them, and log one on a client's behalf. | Admin, MD, ED, SalesMgr, SalesDir |
 | `manage_compliance_checklist` | Work the order's compliance checklist (ECGC cover, inspection, fumigation, phytosanitary, due diligence …). | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, ECEx, ECMgr, ECDir |
 | `manage_disputes` | View/raise/update a dispute's status, attach evidence, and enable/disable the client-facing dispute button. | Admin, MD, ED, SalesMgr, SalesDir |
