@@ -881,3 +881,31 @@ parity rule).
 - **Last full run (6 Nov 2026, after incentive caps, backups and associate
   access levels):** PHPUnit 2,425 / 2,425, Jest 2,494 / 2,494, browser suite
   68 / 68 on PHP and 68 / 68 on Node.
+
+## 12. Changes since this round (7–13 Nov 2026) — what the next round must cover
+
+The inventory above is the 5–6 Nov snapshot. Since then (owner decisions D-259 to D-365) the
+schema has **210 tables** and the seed **96 permissions** (24 roles; new: `approve_buyer_details_change`,
+MD and ED, D-337). Per-stack test files added for 11–13 Nov are listed in each stack's
+`docs/QA/TEST_PLAN.md` (sections 15 and 16). D-348 to D-365 were shipped **without running the
+suites** (owner's instruction; syntax checks, document renders and browser checks only), so the next
+full run starts with them.
+
+Behaviour that changed and the matrices that must follow it:
+
+| Area (decisions) | What changed | Where it lands in this plan |
+|---|---|---|
+| Price lock (D-342) | From the first approved Quotation every order-line and currency change is refused on the server for everyone, Super Admin and "Edit an order after confirmation" included; changes go through Amendments › Products & prices (price only down, MD approval, AMD document, re-issue checklist). | §2.4 gates; §3.2 every order-line POST route after an approved QT must refuse; the money matrix for the amendment's balance effect |
+| Buyer details (D-337) | Client edit updates orders with nothing issued; after that a request approved by `approve_buyer_details_change` (self-approval rule `buyer_details_change`, MD and ED). | §2.3 / §3.2 the new permission and its four routes `/orders/{id}/buyer-details/…`; Approvals › Other |
+| Annexures (D-336, D-338, D-341) | "As per annexure" lines (order and reorder), Annexure B made from the CI step, Step 11a annexure choice (A / B / none), one "Save all changes" (`POST /orders/{id}/annexure/save-all`). | §2.4 Stage 8 gate; §2.10 forms; document matrix for CI / PL |
+| Suppliers → products → configure (D-358–D-361) | New routes: `/products/{id}/configure` (+ `/reset`, `/use-price`), `/products/{id}/link-supplier`, `/products/link-prices`, `/products/{id}/duplicate`, `/products/suppliers/{supplierId}/edit-price` (+ `/preview`, `/undo`), `/suppliers/{id}/add-product`, `POST /suppliers/offers/{offerId}/active`. Configure and activation need `manage_product_catalog`; + Add product and the offer switch need `manage_suppliers` + `record_market_prices`; Edit price needs `record_market_prices`. The Products page has no "+ Add Product" any more. Supplier PO terms take a supplier offer; a changed price needs a reason. | §2.1 route table, §3.1 / §3.2 role and single-permission matrices; money matrix: base price, Edit price, supplier prices only for those who may see purchase prices |
+| Pricing levels and names (D-359, D-362, D-363) | Values from product → category → global; `/pricing/settings` = Global pricing settings and `/products/price-rules` = Category price rules, reached only from the Products link bar (left-menu items removed); Configure › Thickness rules per product. | §5 UI crawl (menu paths); §3.2 `manage_pricing` / `view_price_buildup` |
+| Units and lists (D-357, D-364, D-365) | One surface-finish list (Settings › Lists › surface_finish); SQM · SQFT · CBM on every screen, a supplier price per SQFT saved as SQM × 10.7639; the Products list short view with "Show all columns" and the reworked "Pricing ready?". | §2.10 forms; §5 crawl at phone width (the Products table scrolls with the Name column fixed) |
+| Order lines (D-348) | Thickness and Size / format start on "Choose…"; a goods line picked from Products without them is refused on the server. | §2.10 forms; order-line route tests |
+| Documents (D-339, D-343–D-345, D-349, D-352–D-356) | Detailed product table, Indian grouping (INR orders and every Supplier PO), Word section numbers = PDF, COO line, no stars or mandatory note, keep-with-next, Payment Terms box. | Document fixtures (stone fixtures were captured again where the text changed); the incoterm × preset matrix §3.3 |
+| Browser behaviour (D-350, D-351) | `app.js` keeps the pressed button's choice (`keepSubmitterChoice()`) and asks a `data-confirm` written on a button. | §5 crawl: every two-button form (line price approve / refuse, access-level restore defaults, MD-change apply / setting only) |
+| Settings (D-340, D-347, D-349) | "Rate used for prices right now" box; a fresh install starts with e-mail Testing mode ON, team incentive on, other costs 5.5 %, margin 15 %; the MD-change step (`/settings/md-change`). | §3.4 mail matrix (Testing mode on by default); §2.8 settings |
+
+Products still have no Kanban board (D-358 note), so §3.5 is unchanged; the Suppliers list's new
+"No product prices yet" filter and offer rows must appear on both templates if a Suppliers board
+is ever added.

@@ -55,7 +55,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <h1>NexaCrest Export Ops — Architecture</h1>
-<p class="subtitle">Three views of the same system: where files physically live, how one document gets assembled and sent, and how an order is gated stage by stage. Reference alongside <span class="mono">ARCHITECTURE.md</span> and <span class="mono">schema.sql</span>.</p>
+<p class="subtitle">Four views of the same system: where files physically live, how one document gets assembled and sent, how an order is gated stage by stage, and how a supplier price becomes an order-line price. Reference alongside <span class="mono">ARCHITECTURE.md</span> and <span class="mono">schema.sql</span>.</p>
 
 <div class="section">
   <h2>1 — Hosting boundary</h2>
@@ -134,6 +134,7 @@
 
 <div class="section">
   <h2>2 — Document generation pipeline</h2>
+  <p class="lede"><b>Note (13 Nov 2026):</b> the pipeline is unchanged; what it prints grew. Every money document of the order now takes one product table, the shared partial <span class="mono">templates/_line_table.html.twig</span> (<span class="mono">LineTable</span>, D-339; orders older than migration 2026-11-12g keep the classic table); the Word copy (PHPWord) takes its section numbers from the PDF (D-343); the CI and Packing List print the annexure chosen at Step 11a — Annexure B (as shipped), Annexure A (as quoted) or none (<span class="mono">AnnexureChoice</span>, D-336). No mandatory note or label stars on any document (D-352, D-353); headings keep with their first rows (D-354).</p>
   <p class="lede">One Twig template per document type — no Tier 1 / Tier 2 copies. The <span class="mono">payment_presets</span> row assigned to the order is what changes the wording and day-count on Order Confirmation and Commercial Invoice; this is the structural fix for the contamination found in your source documents.</p>
   <figure>
     <div class="scroll">
@@ -236,6 +237,7 @@
 <div class="section">
   <h2>3 — Nine-stage order gate</h2>
   <p class="lede"><b>Note (1 Nov 2026):</b> this drawing is from the original proposal. The stages as built are 1 Enquiry &amp; Quotation · 2 Buyer PO · 3 Proforma Invoice · 4 Order Confirmation · 5 Supplier PO · 6 Freight · 7 Packing &amp; BL · 8 Commercial Invoice &amp; Balance · 9 Despatch &amp; Closure — see <code>ARCHITECTURE.html</code> §G at the repository root and the SOP. Since 1 Nov the Bill of Lading step (10f) also waits for a "before shipment" balance to be cleared and for a Passed pre-shipment inspection (a manager can release it with a written reason). The number of original BLs received is entered as 1 to 10 (not always 3). A document's reviewer is someone other than the person who generated it, unless Users & roles › Self-approval rules allow that person's role (MD and ED by default). Since 2 Nov the COO Prep Sheet can be generated once Stage 8 is open (the BL issued), before the balance clears, and the Export Compliance department works the compliance checklist, the COO Prep Sheet and export benefit claims.</p>
+  <p class="lede"><b>Note (13 Nov 2026):</b> from the first approved Quotation the order's line prices and exchange rate are fixed (D-342); a change to products or prices is an amendment (Amendments › Products &amp; prices), and the order carries on from its current stage. Buyer details follow the client until a document is issued, then only by an approved request (D-337).</p>
   <p class="lede">Every stage is a hard gate: the next stage stays locked until its condition is met, and every gate condition below comes from your spec's Business Rules (Section 15), not from application guesswork.</p>
   <figure>
     <div class="scroll">
@@ -353,4 +355,84 @@
   </div>
 </div>
 
-<footer>NexaCrest International Private Limited — Export Operations Webapp, architecture draft v1.0. Companion files: <span class="mono">ARCHITECTURE.md</span>, <span class="mono">schema.sql</span>.</footer>
+<div class="section">
+  <h2>4 — Supplier price to order line (13 Nov 2026)</h2>
+  <p class="lede">Owner decisions D-359 to D-365 and D-342. A product is priced from its own <b>configured base price</b>, not straight from a supplier: suppliers give offers, a manager configures the product once, and the approved Quotation fixes what the buyer was offered. Nothing in this chain changes a price by itself.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 360" role="img" aria-label="Diagram: a supplier in Procurement and suppliers gives a product offer with an Offer active switch; the usable offers feed the product's configured base price, which is fixed; the pricing levels product, category, global turn it into the cost, minimum, staff lowest and quote prices used on an order line; the first approved Quotation fixes the line prices and the exchange rate, and only a Products and prices amendment changes them. The offers also feed the Supplier PO, where choosing an offer fills the supplier and price and a different price needs a reason.">
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- supplier -->
+      <rect x="20" y="30" width="170" height="78" rx="8" fill="var(--surface)" stroke="currentColor"/>
+      <text x="105" y="56" text-anchor="middle" font-size="12" font-weight="600">Supplier</text>
+      <text x="105" y="73" text-anchor="middle" font-size="10" fill="var(--ink-soft)">Procurement &amp; suppliers ›</text>
+      <text x="105" y="87" text-anchor="middle" font-size="10" fill="var(--ink-soft)">Suppliers › + Add product</text>
+
+      <line x1="190" y1="69" x2="228" y2="69" stroke="currentColor" marker-end="url(#a4)"/>
+
+      <!-- offer -->
+      <rect x="230" y="22" width="190" height="94" rx="8" style="fill:var(--amber-soft);stroke:var(--amber)" stroke-width="1.6"/>
+      <text x="325" y="46" text-anchor="middle" font-size="12" font-weight="700" style="fill:var(--amber)">Supplier offer</text>
+      <text x="325" y="63" text-anchor="middle" font-size="10" style="fill:var(--amber)">₹ per SQM / SQFT / CBM</text>
+      <text x="325" y="77" text-anchor="middle" font-size="10" style="fill:var(--amber)">Offer active switch</text>
+      <text x="325" y="91" text-anchor="middle" font-size="10" style="fill:var(--amber)">used only if supplier active</text>
+      <text x="325" y="105" text-anchor="middle" font-size="9.5" class="mono" style="fill:var(--amber)">SupplierOffers · Edit price</text>
+
+      <line x1="420" y1="69" x2="458" y2="69" stroke="currentColor" marker-end="url(#a4)"/>
+      <text x="424" y="60" font-size="9.5" fill="var(--ink-soft)">usable</text>
+
+      <!-- product -->
+      <rect x="460" y="22" width="200" height="94" rx="8" style="fill:var(--navy-soft);stroke:var(--navy)"/>
+      <text x="560" y="46" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--navy-strong)">Product — Configure</text>
+      <text x="560" y="63" text-anchor="middle" font-size="10" fill="var(--ink-soft)">configured base price, FIXED</text>
+      <text x="560" y="77" text-anchor="middle" font-size="10" fill="var(--ink-soft)">"Supplier prices changed:</text>
+      <text x="560" y="91" text-anchor="middle" font-size="10" fill="var(--ink-soft)">highest is now ₹X — Use ₹X"</text>
+      <text x="560" y="105" text-anchor="middle" font-size="9.5" class="mono" fill="var(--ink-soft)">/products/{id}/configure</text>
+
+      <line x1="660" y1="69" x2="698" y2="69" stroke="currentColor" marker-end="url(#a4)"/>
+
+      <!-- levels -->
+      <rect x="700" y="22" width="280" height="94" rx="8" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+      <text x="840" y="46" text-anchor="middle" font-size="12" font-weight="600">Price build-up</text>
+      <text x="840" y="63" text-anchor="middle" font-size="10" fill="var(--ink-soft)">margin, other costs, buffer, weight, × K:</text>
+      <text x="840" y="77" text-anchor="middle" font-size="10" fill="var(--ink-soft)">This product → Category price rules →</text>
+      <text x="840" y="91" text-anchor="middle" font-size="10" fill="var(--ink-soft)">Global pricing settings</text>
+      <text x="840" y="105" text-anchor="middle" font-size="9.5" class="mono" fill="var(--ink-soft)">PricingLevels · PricingService</text>
+
+      <line x1="840" y1="116" x2="840" y2="168" stroke="currentColor" marker-end="url(#a4)"/>
+      <text x="852" y="146" font-size="9.5" fill="var(--ink-soft)">cost, minimum, staff lowest, quote (USD)</text>
+
+      <!-- order line -->
+      <rect x="700" y="170" width="280" height="76" rx="8" fill="var(--surface)" stroke="currentColor"/>
+      <text x="840" y="194" text-anchor="middle" font-size="12" font-weight="600">Order line</text>
+      <text x="840" y="211" text-anchor="middle" font-size="10" fill="var(--ink-soft)">Pick from Products (quotable only);</text>
+      <text x="840" y="225" text-anchor="middle" font-size="10" fill="var(--ink-soft)">Thickness and Size / format: "Choose…"</text>
+
+      <line x1="700" y1="208" x2="662" y2="208" stroke="currentColor" marker-end="url(#a4)"/>
+
+      <!-- price lock -->
+      <rect x="400" y="166" width="260" height="84" rx="8" style="fill:var(--danger-soft);stroke:var(--danger)"/>
+      <text x="530" y="190" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--danger)">First approved Quotation</text>
+      <text x="530" y="207" text-anchor="middle" font-size="10" style="fill:var(--danger)">line prices and the rate are fixed</text>
+      <text x="530" y="221" text-anchor="middle" font-size="10" style="fill:var(--danger)">change only by Amendments ›</text>
+      <text x="530" y="235" text-anchor="middle" font-size="10" style="fill:var(--danger)">Products &amp; prices (price only down)</text>
+
+      <!-- supplier PO -->
+      <line x1="325" y1="116" x2="325" y2="276" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#a4)"/>
+      <text x="335" y="270" font-size="9.5" fill="var(--ink-soft)">offers of the line's product</text>
+      <rect x="160" y="278" width="330" height="66" rx="8" fill="var(--surface)" stroke="currentColor"/>
+      <text x="325" y="302" text-anchor="middle" font-size="12" font-weight="600">Supplier PO terms (Step 7a)</text>
+      <text x="325" y="319" text-anchor="middle" font-size="10" fill="var(--ink-soft)">choose an offer → supplier and ₹ price filled;</text>
+      <text x="325" y="333" text-anchor="middle" font-size="10" fill="var(--ink-soft)">a different agreed price needs a reason</text>
+    </svg>
+    </div>
+    <figcaption>Data: <span class="mono">catalog_product_suppliers.offer_active</span>, <span class="mono">catalog_products.configured_base_*</span>, <span class="mono">product_categories.margin_pct / other_cost_pct / buffer_pct</span> (migrations 2026-11-13a, 13b); <span class="mono">orders.prices_fixed_at</span>, <span class="mono">order_products.qt_fixed_unit_price</span> (2026-11-12h); <span class="mono">order_supplier_po.supplier_offer_id / price_override_reason</span> (13b). Global pricing settings and Category price rules are reached from the Products page's link bar (D-362). A supplier price typed per SQFT is saved as the SQM price × 10.7639 (D-364).</figcaption>
+  </figure>
+</div>
+
+<footer>NexaCrest International Private Limited — Export Operations Webapp, architecture draft v1.0, notes and section 4 added 13 Nov 2026. Companion files: <span class="mono">ARCHITECTURE.md</span>, <span class="mono">schema.sql</span>.</footer>

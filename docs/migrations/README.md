@@ -66,7 +66,33 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 | `2026-11-12i-monument-option-and-defaults.sql` | D-347 | Part 1: Natural Stone › Size / format option "Monument (cut to size)" (0 %, the base price applies). Part 2 (overwrites): `company_settings.email_testing_mode` = 1, `incentive_settings.program_enabled` = 1, `pricing_settings.other_cost_pct` = 5.50, `margin_pct` = 15.00 — the same as a fresh install (seed.sql). Checked 12 Nov 2026: applied twice to both development databases; fresh install has the option once. |
 | `2026-11-12j-surface-finish-one-list.sql` | D-357 | One list of surface-finish names. New columns `spec_definitions.list_key` (`'surface_finish'` on the Surface finish specification only) and `spec_options.dropdown_option_id` (+ index `idx_spec_options_dropdown_option`). Merge: the base finish — Settings "Natural Polish", "Polished" or "Mirror Finish" (the live rename), else the default / sort-order-1 row when it is not another known finish name, else a new row — becomes "Natural Polish", the default, linked to the specification's base option (spec "Polished" → "Natural Polish"); Honed and Flamed by name; Settings "Natural/Sandblasted" → "Sandblasted" and "Leather/Satin" → "Leather" (left as they are when the new name already exists); Pricing options Settings lacks (e.g. "Brushed") are added to Settings with their on/off; every Settings row without an option (Rock-Pitched, Bush-Hammered, any value typed differently) gets one with no price change. Order 1–8: Natural Polish, Honed, Flamed, Sandblasted, Leather, Brushed, Rock-Pitched, Bush-Hammered; other values follow. Option names, order and on/off follow Settings; prices unchanged. `order_products.finish` "Polished" / "Mirror Finish" / "Natural/Sandblasted" / "Leather/Satin" → "Natural Polish" / "Natural Polish" / "Sandblasted" / "Leather" only on orders with `prices_fixed_at IS NULL` (Quotation not approved yet). Checked 12 Nov 2026: applied twice to both development databases; on a scratch copy with Settings "Mirror Finish", an extra Settings value and an extra Pricing option it merged as described; on a fresh schema + seed (both stacks) it changes nothing (dump identical). |
 | `2026-11-13a-suppliers-products-configure.sql` | D-359 | Suppliers, products and the configured base price (Push 1). New columns `catalog_product_suppliers.offer_active` (default 1; an offer is used only when ON and its directory supplier is active); `catalog_products.configured_base_price_inr`, `configured_base_unit` ('m2' / 'CBM' / the product's unit), `configured_base_thickness_mm` (0 = 50 mm and above per CBM, NULL = per unit), `configured_base_follows_supplier` (default 1 = follows the usable supplier price "used for pricing", as before), `configured_at`, `configured_by`, `pricing_follow_global` (default 0); `product_categories.margin_pct`, `other_cost_pct`, `buffer_pct` (NULL = follow global). `pricing_settings` rows `weight_t_per_cbm` 2.70, `container_max_t` 27.00, `container_cbm` 8.00, `thick_k_factor` 40 (INSERT IGNORE). Backfill only where empty: the configured base price = the base-thickness price of the grid row used for pricing (its own base, else the category's base thickness option, else 20 mm), or the unit row's price (or the sum of its cost parts). The product's own other-costs value stays in `pricing_other_cost_mode` / `_value` (no new column). Checked 13 Nov 2026: applied twice to both development databases; every product's cost, minimum, staff lowest, staff quote and associate lowest identical before and after (base and every thickness option, 77 lines per stack); on a scratch copy of each database with the 13a columns and settings removed, the check script showed 13a NEEDED, then "already done" after running it (twice). |
-| `2026-11-13b-products-fixed-base-and-link-legacy.sql` | D-361 | Products, Configure and the Supplier PO (Push 3). Data: every product with a base price gets `configured_base_follows_supplier` = 0 at exactly the price it uses today (the stored copy is first refreshed from the usable supplier price "used for pricing", as 13a) — no selling price changes; legacy supplier prices (`catalog_product_suppliers.supplier_id` NULL) linked where the typed name equals exactly one active supplier's legal name (trimmed, case ignored; a "Linked to supplier (migration 13b)" price-history row each); the rest go to Products › "Link these prices". New columns `catalog_products.legacy_no_supplier` (1 = existed before 13b with no linked supplier: active, quotable, "No supplier yet"; set on the first run only), `order_supplier_po.supplier_offer_id`, `quoted_unit_price_inr`, `price_override_reason`. Marker: Audit Log row `MIGRATION_2026_11_13B` with the counts (the read-only check looks for it). Guarded, re-runnable, MySQL-safe, ONLY_FULL_GROUP_BY-safe. |
+| `2026-11-13b-products-fixed-base-and-link-legacy.sql` | D-361 | Products, Configure and the Supplier PO (Push 3). Data: every product with a base price gets `configured_base_follows_supplier` = 0 at exactly the price it uses today (the stored copy is first refreshed from the usable supplier price "used for pricing", as 13a) — no selling price changes; legacy supplier prices (`catalog_product_suppliers.supplier_id` NULL) linked where the typed name equals exactly one active supplier's legal name (trimmed, case ignored; a "Linked to supplier (migration 13b)" price-history row each); the rest go to Products › "Link these prices". New columns `catalog_products.legacy_no_supplier` (1 = existed before 13b with no linked supplier: active, quotable, "No supplier yet"; set on the first run only), `order_supplier_po.supplier_offer_id`, `quoted_unit_price_inr`, `price_override_reason`. Marker: Audit Log row `MIGRATION_2026_11_13B` with the counts (the read-only check looks for it). Guarded, re-runnable, MySQL-safe, ONLY_FULL_GROUP_BY-safe. Checked 13 Nov 2026: applied twice to both development databases; every product's cost, minimum, staff lowest, staff quote and associate lowest identical before and after (77 lines per stack, PHP = Node); on scratch copies the check showed 13b NEEDED, then "already done" (automatic linking checked there too). |
+
+### Before `2026-11-13a`: two read-only checks
+
+Run these on the live database before `2026-11-13a` and keep the output (they change
+nothing). The go-live checklist (section H) says what to do with each row.
+
+```sql
+-- 1. Products priced from an INACTIVE supplier. From 13a on an offer is used only when it is
+--    switched on AND its supplier is active, so these products show "The supplier price used
+--    for pricing is switched off" until the supplier is reactivated or the product is
+--    configured from an active supplier's price.
+SELECT p.id, p.name AS product, s.supplier_legal_name AS supplier
+  FROM catalog_product_suppliers cps
+  JOIN catalog_products p ON p.id = cps.product_id
+  JOIN suppliers s        ON s.id = cps.supplier_id
+ WHERE cps.is_primary = 1 AND s.is_active = 0
+ ORDER BY p.name;
+
+-- 2. Active categories without their own stone weight or 50 mm+ factor. From 13a on they use
+--    the global defaults in pricing_settings (weight_t_per_cbm 2.70, thick_k_factor 40).
+SELECT c.id, c.name, c.weight_t_per_cbm, c.thick_k_factor,
+       (SELECT COUNT(*) FROM catalog_products p WHERE p.category_id = c.id) AS products
+  FROM product_categories c
+ WHERE c.is_active = 1 AND (c.weight_t_per_cbm IS NULL OR c.thick_k_factor IS NULL)
+ ORDER BY c.name;
+```
 
 Each file was checked on 11 Nov 2026 on a scratch copy of the database as it was
 before the 11 Nov build (schema.sql + seed.sql of the last pushed version): all
@@ -100,8 +126,14 @@ databases, and a scratch database from the previous `schema.sql` + `seed.sql` (c
 the file applied twice equals a fresh install from the new `schema.sql` + `seed.sql` on both stacks
 (mysqldump --no-data compared); the scratch databases were dropped.
 
-The live-site order of work (backup, files, cron job, settings to check) is in
-`docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026".
+The files from `2026-11-12f` on were checked as their rows above say. Decisions of 12–13 Nov 2026
+that need no database change (D-340, D-341, D-343–D-346, D-348–D-356, D-358, D-360, D-362–D-365)
+have no file here.
+
+The live-site order of work (backup, files `2026-11-11a` … `2026-11-13b`, the two checks above,
+the exchange-rate cron job at 07:05 IST, settings to check) is in
+`docs/guides/GO_LIVE_CHECKLIST.md`, section "Upgrade of 11 Nov 2026" (it covers the builds of
+11, 12 and 13 Nov 2026).
 
 ### Rules for every migration file (enforced by tests)
 

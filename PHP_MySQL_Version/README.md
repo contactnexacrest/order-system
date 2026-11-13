@@ -65,8 +65,8 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (208 tables, 399 foreign keys as
-  of 2026-11-11 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+- `docs/schema.sql` — full database schema (210 tables, 403 foreign keys as
+  of 2026-11-13 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
   live MariaDB instance after every change in this delivery, including the
@@ -184,7 +184,9 @@ correctly once the password is changed.
    refuses on purpose — so use this block for them (it is safe to run again
    later to correct a typo). Signature blocks on documents print the
    signatory's `users.name` (and `md_name` where no signatory is chosen), so
-   these lines are what make the real names appear on PDFs. You then log in
+   these lines are what make the real names appear on PDFs. (A later change of
+   the MD's name or title on Settings › Company offers to apply it to open orders and
+   draft documents — D-349; it never renames a founder login, so use this block for that.) You then log in
    with the real e-mail and the seeded password below. This step is also on
    the go-live checklist.
    **Company identity, bank, GSTIN, IEC/PAN, LUT and RCMC are entered at
@@ -298,8 +300,8 @@ correctly once the password is changed.
    `https://api.frankfurter.app` (European Central Bank rates) and, if that
    fails, `https://open.er-api.com`. Both are free and need no key. Ask the
    host to allow outbound HTTPS to both if the server is firewalled; check it
-   once with **Fetch now** on Products › Pricing › Pricing settings ›
-   Exchange rate. Without it the rate in use stays as it is and the page and
+   once with **Fetch today's rate now** on Products › Global pricing settings
+   (button at the top of the Products page) › Exchange Rate (USD → INR). Without it the rate in use stays as it is and the page and
    the Setup checklist warn.
 4. **Dependencies — already included, nothing to run.** `app/vendor/` in
    this delivery is a real, working copy of DOMPDF, PHPWord, Twig, and
@@ -523,7 +525,7 @@ Plus the three backup lines (database 02:00, documents 02:30, monthly test-resto
   2026): fetches the USD → INR market rate from Frankfurter (European Central
   Bank reference rate of the previous working day) or, if that fails, from
   open.er-api.com, and keeps it in the history (`fx_rates`). The pricing rate
-  is the market rate minus the cushion (Products › Pricing › Pricing settings:
+  is the market rate minus the cushion (Products › Global pricing settings:
   2 % by default, 0–5 %). A failed fetch keeps the rate in use and shows a
   warning (exit code 1, so cron mails the failure); a change of more than 2 %
   against the rate in use waits for the MD on the Approvals page. Prices on
@@ -1014,12 +1016,13 @@ into the staff checklists and ends with a check query. Not for the existing live
   on the documents until then.
 - **Dates to confirm:** `lut_expiry_date` and `rcmc_valid_until` are seeded as 31 Mar 2027 — confirm them.
 - **ECGC:** `ecgc_policy_no` and `ecgc_policy_valid_to` are empty; fill them only if there is a policy.
-- **Pricing exchange rate (D-301):** fetched automatically every day (Products › Pricing › Pricing settings ›
-  Exchange rate; pricing rate = market rate − 2 % cushion). `pricing_fx_rate` (seeded 82.00) is used only in
-  Manual mode and until the first rate is fetched — press **Fetch now** on go-live day and check the rate.
-- **E-mail (D-280):** Settings › E-mail — every SHOULD e-mail is on and **Testing mode is off** in the seed, so
-  buyers and suppliers are e-mailed from the first day. Switch Testing mode on while you test with real
-  addresses; name the responsible person and backup for the company-level compliance alerts on the same page.
+- **Pricing exchange rate (D-301):** fetched automatically every day (Products › Global pricing settings ›
+  Exchange Rate (USD → INR); pricing rate = market rate − 2 % cushion). `pricing_fx_rate` (seeded 82.00) is used only in
+  Manual mode and until the first rate is fetched — press **Fetch today's rate now** on go-live day and check the
+  box "Rate used for prices right now" (D-340).
+- **E-mail (D-280, D-347):** Settings › E-mail — every SHOULD e-mail is on and, since 12 Nov 2026, **Testing mode
+  is ON** in the seed, so buyers and suppliers get no e-mail until it is switched **off** on go-live day. Keep it on
+  while you test with real addresses; name the responsible person and backup for the company-level compliance alerts on the same page.
 - **Holidays (D-313):** the Indian national holidays of this year and next are seeded; add the state and festival
   holidays (Settings › Holidays) and tick the item on the Setup checklist.
 - **Images:** the four company assets (logo, MD signature, company seal, watermark) show a labelled
@@ -2708,8 +2711,12 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-13a-suppliers-products-c
 mysql -u <user> -p <database> < docs/migrations/2026-11-13b-products-fixed-base-and-link-legacy.sql
 ```
 
+Before `2026-11-13a`, run the two read-only checks in `docs/migrations/README.md` ("Before
+`2026-11-13a`": products priced from an inactive supplier, categories without their own weight or
+50 mm+ factor) and keep the output.
+
 Each file is safe to run twice and MySQL-compatible. They keep the company's real identity, bank,
-GSTIN, LUT and RCMC values (only a fresh install starts with placeholders). Then add the `fetch_fx_rate.php` cron line (07:05 IST, see "Bluehost cron setup"), make sure `storage/sessions/` is writable, check outbound HTTPS to `api.frankfurter.app` and `open.er-api.com` (Products › Pricing › Pricing settings › Fetch now), and
+GSTIN, LUT and RCMC values (only a fresh install starts with placeholders). Then add the `fetch_fx_rate.php` cron line (07:05 IST, see "Bluehost cron setup"), make sure `storage/sessions/` is writable, check outbound HTTPS to `api.frankfurter.app` and `open.er-api.com` (Products › Global pricing settings › Fetch today's rate now), and
 once, as the MD / a product editor: **Products › HS codes › Fix HS codes on products** and
 **Products › Link these prices** (D-361: shown only while supplier prices typed before the Suppliers directory still need a supplier record; migration 13b links exact names itself).
 
@@ -2732,7 +2739,7 @@ be switched off: login codes, set-password invites, forgot-password links (buyer
 associates), the bank-details-changed alert, the backup-code alert and the quotation verification
 code. SHOULD e-mails are on; the only OPTIONAL one, the copy of buyer documents to the associate, is
 off. The old master switch `mail_sending_enabled` is **gone**: **Testing mode — hold e-mails to
-buyers and suppliers** (`email_testing_mode`, off in the seed) holds only buyer and supplier e-mails;
+buyers and suppliers** (`email_testing_mode`; on in the seed since 12 Nov 2026, D-347 — switch it off on go-live day) holds only buyer and supplier e-mails;
 the screen then says so and shows the link with a Copy button, and never says "e-mailed" when
 nothing was sent. Staff e-mails about a buyer, supplier or associate go only to the people of the
 relevant department assigned to the order, else that department's manager (with an "assign
@@ -2758,7 +2765,7 @@ The login-code screen's tick is now **"This is my own office computer"**
 Account, and for Admin on Users › Edit. PHP now keeps its session files in `storage/sessions/` and sets its own garbage-collection lifetime and cookie to the longest idle timeout, so the host default (about 24 minutes) no longer signs people out early — the folder must be writable (Setup checklist item).
 
 **Quote in any unit (D-270–D-273, SOPs 01, 17, 27).** A line may be priced in any unit of its
-category (Natural Stone: CBM, m², sq ft, PCS, Ton, RMT; Set or Lot go to the MD). The price check
+category (Natural Stone: CBM, SQM, SQFT, PCS, Ton, RMT; Set or Lot go to the MD). The price check
 converts it to the product's reference unit with the piece size Length × Width × Thickness in cm
 (`order_products.piece_length_cm` / `_width_cm` / `_thickness_cm`) and the weight per CBM
 (`weight_t_per_cbm`, category 2.7 t, product override). Options show as labels on every line;
@@ -2767,9 +2774,9 @@ table with a side panel. Natural Stone lines in another unit (BOX, NOS, SET, KG,
 their next edit until the MD adds the unit in Products › Categories.
 
 **Products and pricing (D-300–D-306, SOP 27).** One supplier price holds every thickness — 20, 30
-and 40 mm per m² and 50 mm+ per CBM — typed or calculated by the category's **Price rules**
-(Products › Price rules: 30 mm +35 %, 40 mm +70 %, 50 mm+ per CBM = 20 mm × 40, container 8 CBM /
-27 t, stone weight; MD only, with a reason). "Price includes packing and loading" (ticked by
+and 40 mm per SQM and 50 mm+ per CBM — typed or calculated by the category's **Category price rules**
+(Products › Category price rules, a button at the top of the Products page since D-362: 30 mm +35 %,
+40 mm +70 %, 50 mm+ per CBM = 20 mm × 40, container 8 CBM / 27 t, stone weight; MD only, with a reason). "Price includes packing and loading" (ticked by
 default) and CHA + transport per container (per supplier price; the product has a default).
 **Daily exchange rate** (`fx_rates`; `fx_mode` auto, `fx_cushion_pct` 2.0): pricing rate = market
 rate − 2 %; see the job above. **One master for HS code and supplier:** a product's HS code is
@@ -2781,8 +2788,8 @@ product catalogue — choose a master code for each product listed) and **Produc
 names itself; pick or quick-add the supplier for each remaining row; the older `/products/link-suppliers` still works, unlinked). Catalogue columns show currency and unit; "Supplier
 price ₹ / unit" with ≈ USD for product editors; plain names **Staff lowest** and **Associate
 lowest**. Staff see only Quote and Your lowest; associates see no prices in the catalogue.
-Products › Categories › *category* has tabs General · Options and their price effect · Price rules ·
-Products.
+Products › Categories › *category* has tabs General · Options and their price effect · Category price
+rules · Products. (12–13 Nov 2026 changes to products, suppliers and pricing: see the next section.)
 
 **Associates (D-290–D-294, SOP 24).** KYC: document type first, number 5–30 characters (PAN and
 Aadhaar keep their formats); ID proof and Address proof are separate required items (associates
@@ -2824,3 +2831,114 @@ only on error.
 **Tutorial videos.** Many recorded screens changed; the videos are **not** re-recorded. The list of
 what no longer matches is in `tutorials/VIDEO_PROGRESS.md` ("Out of date after the 11 Nov 2026
 build"), waiting for the owner's decision (CLAUDE.md video rule).
+
+## Follow-up (added 2026-11-13): documents, annexures, the price lock, and suppliers → products → configure (D-331 … D-365)
+
+Everything below is in `docs/schema.sql` / `docs/seed.sql` (a new install needs nothing else) and in the
+Application Handbook; the SOP chapters say how staff use it. A **live** database is brought up to date
+with the files of the previous section, `2026-11-11a` … `2026-11-13b`, in that order — before
+`2026-11-13a` run the two read-only checks in `docs/migrations/README.md` ("Before 2026-11-13a") and
+keep their output. Then the `fetch_fx_rate.php` cron line at 07:05 IST (see "Bluehost cron setup") must be in place, and `docs/guides/GO_LIVE_CHECKLIST.md`
+section H lists what to check afterwards (Link these prices, the Products status filters, Testing mode
+after `2026-11-12i`, Settings › Lists › surface_finish). The test suites were not run for D-348 … D-365
+on the owner's instruction (syntax checks and browser checks on both stacks).
+
+**Documents** (every change confirmed twice by the owner; documents already issued are never touched):
+
+- **Annexure B and "As per annexure" (D-336, D-341; `2026-11-12c`).** An order line can say "As per
+  annexure" (no size, quantity still required); next to Annexure A (as quoted) there is **Annexure B (as
+  shipped)**, made from the Commercial Invoice step; Step 11a chooses the annexure printed with the CI and
+  Packing List (`orders.ci_annexure`, `AnnexureChoice`). The annexure page has one **Save all
+  changes** and the buttons Edit / Regenerate Annexure A.
+- **Detailed product table (D-339; `2026-11-12g`).** QT, PI, OC, CI, Buyer PO and Packing List print
+  # · Material / Colour · Surface / Finish · L W H · measure per piece · No. of pcs · measure of all pieces
+  · price per unit · price per piece · total (`templates/_line_table.html.twig`, `LineTable`, `UnitPrices`). Orders that
+  existed before `12g` keep the classic table (`orders.line_table_layout`).
+- **Money and numbers (D-343, D-345).** Indian digit grouping (1,75,000.00) for every amount of an INR
+  order and for every Supplier PO (`MoneyFormat::amount()`); Total CBM worked out from the lines; the Word copy has
+  the same section numbers as the PDF.
+- **Wording (D-344, D-349, D-352, D-353).** "Commercial Invoice" and "Packing List" without "(digitally
+  authorised)"; the Certificate of Origin line reads "3. Certificate of Origin Issued by CAPEXIL" while the
+  COO type is empty or "To Be Confirmed" (`DocumentDataAssembler::cooLine()`); no "Fields marked * are mandatory …" note and no
+  "*" after labels on any generated document (the app's input forms keep their "*").
+- **Layout (D-354, D-355, D-356).** Headings and column headers stay with their first rows (PDF and Word);
+  the Payment Terms on the QT and PI sit in a light grey-blue box with the amounts in bold; a clean
+  spacer under Word headings (PHP).
+
+**Orders and clients:**
+
+- **Buyer details follow the client (D-337; `2026-11-12d`, `2026-11-12f`).** While nothing of the order
+  is issued, a client edit updates the order at once; after that, by a request approved by a holder of
+  **Approve buyer details change** (`approve_buyer_details_change`: MD, ED) — `BuyerDetailsRefreshService`,
+  `BuyerDetailsController`, table `order_buyer_detail_requests`.
+- **Reorders (D-338; `2026-11-12e`).** Reorder lines can say "As per annexure"; duplicating an order copies
+  Annexure A; a worked-out per-CBM price goes to the MD like a price below the floor.
+- **Price lock and the "Products & prices" amendment (D-342; `2026-11-12h`).** From the first approved
+  Quotation the order keeps its exchange rate and every line price (`PriceLock`); lines change only
+  through **Amendments › Products & prices** (prices only go down, MD approval, AMD document
+  `templates/AMD/products_amendment.html.twig`; `ProductsAmendmentService`, table `amendment_product_lines`). `12h` fixes existing orders that
+  already have an approved Quotation.
+- **Exchange rate shown (D-340).** Global pricing settings has the box "Rate used for prices right now";
+  the order page shows MD and ED the rate the prices were worked out at.
+- **Client billing address in parts (D-346).** Line 1, City / Town and Country required; composed by
+  `ClientAddress::compose()`.
+- **Order lines (D-348).** Thickness and Size / format start on "Choose…" — the price fills only once both
+  are chosen; typing Thickness (cm) sets the Thickness option.
+- **MD name (D-349, D-350).** Changing the MD's name or title on Settings › Company offers to apply it to
+  the open orders and Draft / In-review documents (`MdNameSyncService`); approved and sent documents
+  never change; the founder logins still change only by the founder SQL block (First-time setup).
+- **Buttons (D-350, D-351).** On a form with two choice buttons the pressed button's choice always reaches
+  the server, and a question written on a button is asked (`public_html/assets/js/app.js`: `keepSubmitterChoice()`,
+  `initConfirmDialogs()`).
+
+**Products, suppliers and pricing:**
+
+- **Defaults and options (D-347; `2026-11-12i`).** Size / format "Monument (cut to size)" at 0 %; a fresh
+  install starts with e-mail **Testing mode ON** (switch it off on go-live day), team incentive on, other
+  costs 5.5 %, margin 15 %. Part 2 of `12i` sets the same four values on a live database.
+- **One list of surface finishes (D-357; `2026-11-12j`).** Settings › Lists › surface_finish names every
+  finish; Products › Pricing › Specifications › Surface finish keeps only its price
+  (`SurfaceFinishList`). The base finish is "Natural Polish" (was "Polished" / "Mirror Finish").
+- **Duplicate a product (D-358).** **Duplicate** on the Products list and the product page
+  (`/products/{id}/duplicate`, Manage product catalogue, `ProductDuplicateService`); the copy starts
+  Inactive.
+- **Supplier offers and the configured base price (D-359; `2026-11-13a`).** Each supplier price of a
+  product is an *offer* with an **Offer active** switch (`catalog_product_suppliers.offer_active`); an offer
+  is used only when it is on and its supplier is active (`SupplierOffers`). Each product has a configured
+  base price; margin, other costs, buffer and the physical values come from the product, else its
+  category, else Global pricing settings (`PricingLevels`). New **Edit price** form
+  (`/products/suppliers/{id}/edit-price`, Record market prices, `EditPriceController`).
+- **Suppliers pages (D-360).** **Procurement & suppliers › Suppliers** lists under each supplier the
+  products it offers (base price, quoted on / valid until, Offer active, Edit price) and a filter "No
+  product prices yet"; **+ Add product** adds an existing product or creates a new one (Inactive) with its
+  price (`/suppliers/{id}/add-product`; switch `/suppliers/offers/{id}/active`; Manage suppliers + Record
+  market prices).
+- **Products and Configure (D-361; `2026-11-13b`).** The configured base price is **fixed**: it never
+  changes by itself — when supplier prices change the product shows "Supplier prices changed: highest is
+  now ₹X" with **Use ₹X**. **Configure / Edit** (`/products/{id}/configure`, Manage product catalogue,
+  `ProductConfigureController`): base price (default the highest active supplier price), the table Global
+  | Category | This product | Comes from with a reset per row, Reset all to category / global, Active only
+  when quotable. Statuses Configured / Not configured / No active supplier / No supplier yet; **Link a
+  supplier** (`/products/{id}/link-supplier`); **Link these prices (N)** (`/products/link-prices`) replaces
+  "Link suppliers" (the old route still works, unlinked); the Products page no longer has "+ Add Product" —
+  products are added from the supplier. Pick from Products offers only quotable products. The **Supplier
+  PO** terms (Step 7a) show every supplier offer for the line's product; choosing one fills the supplier
+  and unit price, and a different agreed price needs a reason (`order_supplier_po.supplier_offer_id`,
+  `quoted_unit_price_inr`, `price_override_reason`; audit `SUPPLIER_PO_PRICE_OVERRIDE`).
+- **Names and one place (D-362).** `/pricing/settings` is **Global pricing settings** and
+  `/products/price-rules` is **Category price rules**. They are no longer in the left menu or the menu
+  bar ("Price rules", "Pricing settings (margin, buffer, exchange rate)" and "Exchange-rate history" were
+  removed): both are buttons in the **Products link bar** — Categories · Category price rules · Global
+  pricing settings · Fix HS codes · Link these prices (only while some are left) · Go to Suppliers.
+  Products › Pricing keeps Commission levels and ladder, and Specifications. Routes and permissions
+  unchanged.
+- **Products list, category form, thickness rules (D-363, D-365).** Row actions are small buttons (Edit
+  or Configure, View, Duplicate, Link a supplier, Reactivate / Delete); the default columns are Name ·
+  Suppliers · Supplier prices (₹) lowest – highest · Base price · Cost (USD) · Min price (USD) · Staff
+  lowest · Staff quote · Status · Actions, with **Show all columns** for Associate lowest and Latest
+  supplier quote; a product's own thickness % is on **Configure › Thickness rules**. **Pricing ready?**
+  checks the configured base price and an active supplier (no longer the old "used for pricing" price).
+- **Units SQM · SQFT · CBM (D-364).** Every screen says SQM and SQFT (not m² / sq ft); documents are
+  unchanged. A supplier price may be typed per SQFT on + Add product, Edit price and Link a supplier: it is
+  saved as the SQM price (× 10.7639, `LineUnits::SQFT_PER_M2`) and the note keeps what was typed. "Supplier
+  performance" on Procurement is a normal small button.

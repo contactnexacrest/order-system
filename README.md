@@ -30,7 +30,7 @@ Three separate sign-ins, never mixed:
   their access level (Starter, Quoting, Full or Custom). Never costs, margins
   or supplier prices (SOP chapter 24).
 
-What the app does (updated 11 Nov 2026), in brief — details in the SOP:
+What the app does (updated 13 Nov 2026), in brief — details in the SOP:
 
 - The nine-stage export order with every document (PDF and Word), review and
   approval, and the client portal (SOP chapters 01–13).
@@ -43,11 +43,25 @@ What the app does (updated 11 Nov 2026), in brief — details in the SOP:
   lowest prices and quote prices; below the lowest price the MD approves, below
   the minimum nobody does; the Quotation and Proforma Invoice wait for it
   (chapters 01, 27). Since 11 Nov 2026 (D-270–D-306): a line may be quoted in
-  any unit of its category (CBM, m², sq ft, PCS, Ton, RMT) with its piece size;
+  any unit of its category (CBM, SQM, SQFT, PCS, Ton, RMT) with its piece size;
   one supplier price holds every thickness (20/30/40 mm and 50 mm+) and CHA +
-  transport per container; per-category Price rules; the USD→INR rate is
+  transport per container; Category price rules; the USD→INR rate is
   fetched every day (market rate − 2 % cushion); HS codes and suppliers come
   from one master list each.
+- Since 12–13 Nov 2026 (D-336–D-365): suppliers → products → configure.
+  Products are added from Procurement & suppliers › Suppliers › + Add product;
+  each supplier price is an offer that can be switched off; each product has a
+  configured base price that never changes by itself and pricing values from
+  three levels (Global pricing settings → Category price rules → the product,
+  Products › Configure); supplier prices may be typed per SQM, SQFT or CBM;
+  the Supplier PO starts from a supplier offer (a different price needs a
+  reason). Prices and products are fixed by the approved Quotation and change
+  only through a "Products & prices" amendment (D-342). Documents: the
+  detailed product table, "As per annexure" lines and Annexure B (as shipped)
+  for the CI and Packing List, Indian digit grouping for rupee amounts, a
+  Payment Terms box, no stars or mandatory-fields note; buyer details follow
+  the client; one list of surface-finish names; Duplicate a product (chapters
+  01, 08, 10, 22, 27).
 - Associate commission on the invoiced FOB, full payment only (standard
   ladder, an associate's own ladder or a fixed level, set by the MD); payout on
   the last day of the month by default; new bank details confirmed by the
@@ -90,8 +104,9 @@ Where to look:
 - **Database install and changes:** a new install = each stack's `docs/schema.sql`
   then `docs/seed.sql`, no migrations (D-241). An existing (live) database is
   brought up to date with the dated files in `docs/migrations/`, run in filename
-  order after a backup — for the 11–13 Nov 2026 build `2026-11-11a` … `2026-11-13b`
-  (list and rules: `docs/migrations/README.md`; live-site order of work:
+  order after a backup — for the 11–13 Nov 2026 build `2026-11-11a` … `2026-11-13b`,
+  with two read-only checks before `2026-11-13a`
+  (list, checks and rules: `docs/migrations/README.md`; live-site order of work:
   `docs/guides/GO_LIVE_CHECKLIST.md`). `docs/checks/` holds read-only checks for a
   database that already held data before an earlier release; the first live
   install starts empty, so they are not needed there.

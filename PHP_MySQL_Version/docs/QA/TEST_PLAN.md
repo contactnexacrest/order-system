@@ -535,7 +535,7 @@ Existing tests changed on purpose in this round (each listed in the register row
 | Test | What it proves |
 |---|---|
 | `B01RecordingFixesTest`, `B02RecordingFixesTest` | D-268 (Recent Activity scope, the true reason a staff post was not e-mailed — `order_comments.email_status`, Pick from Products button, My Tasks without a department) and D-269 (payment-terms approver wording, Buyer PO note on cancelled / lost orders, Staff Productivity, cockpit shows every department, reason hint only on error) |
-| `D270OrderLineUnitsTest`, `LineUnitsTest` | D-270–D-273: any unit of the category, conversion to the reference unit for the price check (m² ↔ sq ft, by thickness, PCS by L × W × T, RMT, Ton by weight per CBM), "Size needed" instead of "too low", Set / Lot to the MD, options on every line, full Duplicate ("copy of line N", MD approval not copied) |
+| `D270OrderLineUnitsTest`, `LineUnitsTest` | D-270–D-273: any unit of the category, conversion to the reference unit for the price check (SQM ↔ SQFT, by thickness, PCS by L × W × T, RMT, Ton by weight per CBM), "Size needed" instead of "too low", Set / Lot to the MD, options on every line, full Duplicate ("copy of line N", MD approval not copied) |
 | `EmailSettingsD280Test` | D-280–D-282: MUST / SHOULD / OPTIONAL per kind and audience, Testing mode holds only buyer and supplier mail, no false "e-mailed", staff routing to the assigned department (manager, then MD), compliance owners, set-password and forgot-password links with Copy |
 | `SessionTimeoutsD283Test` | D-283: idle limits per area (240 / 120 / 120 minutes), staff 12-hour limit, PHP session life and `storage/sessions`, keep-alive, "This is my own office computer" days |
 | `AssociateOwnerDecisionsNov11Test`, `VendorBankDetailsTest` | D-290–D-294: KYC document type and length, ID and address proof as separate items with the 60-day grace, standard / own ladder / fixed rule by the MD with a reason, "See associate commission rules", payout day (last day, Sunday / holiday rule), bank confirmation by the associate (last 4 digits + code, "This is not me", 7 days), one verifier with at least 2 checks or two people, MD / ED self-verify, wait days 0 / 15; supplier and logistics partner bank changes |
@@ -546,6 +546,27 @@ Existing tests changed on purpose in this round (each listed in the register row
 | `MigrationFileConventionsTest`, `MigrationIdempotencyTest` | The seven live-site files `docs/migrations/2026-11-11a` … `g`: `SET NAMES utf8mb4` first, guarded, no MariaDB-only `IF [NOT] EXISTS` on columns or indexes, applied twice without an error |
 
 The e2e suite (`e2e/`) covers the menus in `01-role-visibility.spec.js`. Tutorial scripts are not tests; the videos that no longer match are listed in `tutorials/VIDEO_PROGRESS.md`.
+
+
+## 16. Added since (12–13 Nov 2026: D-331 – D-365)
+
+| Test | What it proves |
+|---|---|
+| `SettingsPlainLabelsTest` | D-332: Settings › Company shows each setting by a plain name and each section by a plain title; the technical key only as small grey text; no help sentence is a developer note |
+| `D335SupplierPricesBaseTest` | D-335: a typed price always wins; each supplier price has a BASE thickness used by the product and by lines without a thickness; the rules only calculate (ticked thicknesses stored as CALCULATED); rows saved before D-335 keep completing on the fly until the first new price; `2026-11-12b` turns "add up the cost parts" rows into typed prices with the same total |
+| `AnnexureBAndAsPerAnnexureTest` | D-336: "As per annexure" never with "Qty To Be Confirmed", sizes refused while ticked; Annexure B (`?which=B`), Copy everything from Annexure A; the CI / PL annexure choice and its default; generation refused without the annexure the lines point to |
+| `BuyerDetailsRefreshTest` | D-337: automatic update while nothing is issued; request, approve, refuse (note of 10+ characters) and lapse once something is issued; one open request per order; self-approval only where the rule allows (MD and ED) |
+| `FollowUpsD338Test` | D-338: reorder lines "As per annexure"; duplicating an order copies Annexure A; one wording for an annexure line whose size is needed; no new "add up the cost parts" price; a worked-out per-CBM price goes to the MD |
+| `D339DetailedLineTableTest`, `LineTableTest` | D-339: the detailed product table — one-unit, mixed-unit and short variants, "As per annexure" and size-less lines, TOTAL row, Packing List crates; classic orders unchanged |
+| `FxRateBoxD340Test` | D-340: "Rate used for prices right now" box and badges per mode, the order-page rate line (MD / ED only, before and after the PI), the PI keeps the rate prices were built with |
+| `AnnexureOneSaveD341Test` | D-341: one "Save all changes" for the annexure page (nothing saved on an error), the new-revision banner, Annexure B only from the CI step, Start from a copy / Start empty |
+| `PriceLockProductsAmendmentD342Test` | D-342: prices and products fixed at the first approved Quotation (refused for everyone, Super Admin included); the "Products & prices" amendment (price only down, minimum price, one open amendment, MD approval, activation, money and re-issue checklist); migration `2026-11-12h` back-fill |
+| `MoneyFormatTest`, `D343DocumentNumbersTest` | D-343 / D-345: Indian grouping for INR orders and every Supplier PO; Total CBM from the lines; Word section numbers equal to the PDF for every document type |
+| `ClientBillingAddressPartsTest`, `ClientAddressTest` | D-346: Line 1, City / Town and Country required (browser and server); the composed address used by documents and Zoho; a legacy single-box address shown for copying |
+| `SqftSupplierPriceTest` | D-364: a supplier price typed per SQFT is saved as the SQM price × 10.7639, with the typed figure kept in the note |
+| `InactiveProductsTest`, `ScreenshotFixesNov11Test`, `FreshInstallCompleteTest` | D-334: Active · Inactive · All products with "Used on", Reactivate / Deactivate, delete only an inactive unused product; the screenshot fixes of the 11 Nov build; every file in `docs/migrations` is already in `schema.sql` / `seed.sql` (a fresh install never needs one) |
+
+**Not covered by new tests (owner's instruction, 12–13 Nov 2026):** D-348 to D-365 were shipped with syntax checks, before/after renders of every document type and browser checks as the MD on both stacks; the suites were **not run** and no new test file was written except `SqftSupplierPriceTest`. Existing tests whose expected labels changed were updated in the same commits (D-352 / D-353 document stars, D-357 "Natural Polish", D-362 "Global pricing settings" / "Category price rules", D-363 "kept unless you tick", D-364 SQM / SQFT). What the next full run must look at first: the price lock (D-342) against every order-line route; Configure, Edit price, + Add product, the offer switch, Link a supplier and Link these prices (D-359–D-361) for each permission; the Supplier PO offer choice and its override reason; the products list filters and "Pricing ready?" (D-365); the MD-change step (D-349); `keepSubmitterChoice()` / `initConfirmDialogs()` on every two-button form (D-350, D-351); Standard / Kanban parity for the Suppliers list's new filter and offer rows.
 
 ## Appendix
 
