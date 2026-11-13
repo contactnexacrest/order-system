@@ -36,6 +36,11 @@ final class MailSenderService
         // "Testing mode", which holds only buyer and supplier e-mails. Checked
         // here, the one chokepoint every business send passes through.
         self::$lastOutcome = '';
+        // QA MTX-008: nothing leaves while sample data is being loaded.
+        if (EmailService::suppressed($to, $subject)) {
+            self::$lastOutcome = 'held';
+            return false;
+        }
         if ($kind !== null && $audience !== null) {
             $hold = EmailPolicy::holdReason($kind, $audience);
             if ($hold !== null) {

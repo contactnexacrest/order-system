@@ -35,6 +35,11 @@ async function send(to, subject, body, attachments = [], opts = {}) {
   // mode", which holds only buyer and supplier e-mails. Checked here, the one
   // chokepoint every business send passes through.
   state.lastOutcome = '';
+  // QA MTX-008: nothing leaves while sample data is being loaded.
+  if (require('./emailService').suppressed(to, subject)) {
+    state.lastOutcome = 'held';
+    return false;
+  }
   if (opts.kind && opts.audience) {
     const hold = await emailPolicy.holdReason(opts.kind, opts.audience);
     if (hold !== null) {

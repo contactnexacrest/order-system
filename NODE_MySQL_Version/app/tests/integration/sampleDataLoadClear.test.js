@@ -93,7 +93,18 @@ describe('Sample data load / clear', () => {
     const flashAfter = async (res) => ((await agent.get(res.headers.location)).text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/) || []).slice(1).join(' ');
 
     const csrf = csrfOf(page.text);
-    expect(await flashAfter(await agent.post('/sample-data/load').type('form').send({ _csrf: csrf }))).toContain('success Sample data loaded');
+    // QA MTX-008: loading sample data e-mails nobody — every e-mail it would have sent is held and logged.
+    const logged = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((...a) => logged.push(a.map(String).join(' ')));
+    let loaded;
+    try {
+      loaded = await agent.post('/sample-data/load').type('form').send({ _csrf: csrf });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(logged.filter((l) => l.includes('[EMAIL NOT SENT — sample data is being loaded]')).length).toBeGreaterThan(0);
+    expect(logged.filter((l) => l.includes('[EMAIL NOT SENT — no SMTP configured]'))).toEqual([]); // nothing reached a transport
+    expect(await flashAfter(loaded)).toContain('success Sample data loaded');
     expect(Number((await db.queryOne('SELECT COUNT(*) AS c FROM orders WHERE is_sample_data = 1')).c)).toBe(10);
     expect(await flashAfter(await agent.post('/sample-data/clear').type('form').send({ _csrf: csrf }))).toContain('success Sample data cleared');
     expect(Number((await db.queryOne('SELECT COUNT(*) AS c FROM orders WHERE is_sample_data = 1')).c)).toBe(0);

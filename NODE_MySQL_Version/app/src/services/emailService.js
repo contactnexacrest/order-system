@@ -92,6 +92,28 @@ async function identityOptions() {
  * @param {{isSecurityEmail?: boolean}} [opts] — set true for staff 2FA/password-reset emails, which Test Mode never redirects.
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
+// QA MTX-008: while a withoutSending() scope is active (this async call chain only — never other requests),
+// no e-mail of any kind leaves; the reason is logged instead.
+const { AsyncLocalStorage } = require('async_hooks');
+
+const suppression = new AsyncLocalStorage();
+
+/**
+ * QA MTX-008: runs fn with every outgoing e-mail held — security mail included. Used while sample data is
+ * loaded: demo records must not e-mail anyone (buyers, staff). Scoped to this call chain only.
+ */
+function withoutSending(reason, fn) {
+  return suppression.run({ reason }, fn);
+}
+
+/** QA MTX-008: true (and the e-mail written to the log) when sending is suppressed right now. */
+function suppressed(to, subject) {
+  const s = suppression.getStore();
+  if (!s) return false;
+  console.error(`[EMAIL NOT SENT — ${s.reason}] To: ${to} | Subject: ${subject}`);
+  return true;
+}
+
 async function sendPlainText(toEmail, subject, body, opts = {}) {
   // QA batch 3 MAIL-2: every business e-mail (link e-mails, notifications,
   // alerts) goes through mailSenderService — the one place with the "e-mail
@@ -104,6 +126,7 @@ async function sendPlainText(toEmail, subject, body, opts = {}) {
       ? require('./mailSenderService').send(toEmail, subject, body, [], { kind: opts.kind, audience: opts.audience })
       : require('./mailSenderService').send(toEmail, subject, body);
   }
+  if (suppressed(toEmail, subject)) return false; // QA MTX-008
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
     // QA-5 TM-07: Test Mode is on and no test_email is configured — never
@@ -152,6 +175,7 @@ async function sendWithAttachments(toEmail, subject, body, attachments, opts = {
       ? require('./mailSenderService').send(toEmail, subject, body, attachments, { kind: opts.kind, audience: opts.audience })
       : require('./mailSenderService').send(toEmail, subject, body, attachments);
   }
+  if (suppressed(toEmail, subject)) return false; // QA MTX-008
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
     // QA-5 TM-07: see sendPlainText() above.
@@ -230,6 +254,8 @@ async function sendTestEmail(toEmail, subject, body) {
 }
 
 module.exports = {
+  withoutSending,
+  suppressed,
   sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments, sendTestEmail,
   mailDomain, replyToAddress, freshMessageId, smtpSecurityOptions,
 };

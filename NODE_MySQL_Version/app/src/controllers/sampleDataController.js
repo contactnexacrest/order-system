@@ -29,7 +29,8 @@ async function load(req, res) {
   const user = req.user;
   let result;
   try {
-    result = await sampleDataService.load(user.id);
+    // QA MTX-008: loading demo records never e-mails anyone (the sample buyer's portal access, review notices, ...).
+    result = await require('../services/emailService').withoutSending('sample data is being loaded', () => sampleDataService.load(user.id));
   } catch (e) {
     logger.error('SAMPLE DATA LOAD FAILED', e);
     flash.setErrorFromException(req, e, 'Could not load sample data — check the server error log.');

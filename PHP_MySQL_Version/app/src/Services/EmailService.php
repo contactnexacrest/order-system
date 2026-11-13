@@ -20,6 +20,38 @@ use App\Repositories\CompanySettingsRepository;
  */
 final class EmailService
 {
+    /** QA MTX-008: while set, no e-mail of any kind leaves (the reason is logged instead) — see withoutSending(). */
+    private static ?string $suppressed = null;
+
+    /**
+     * QA MTX-008: runs $fn with every outgoing e-mail held — security mail included — and puts the previous
+     * state back. Used while sample data is loaded: demo records must not e-mail anyone (buyers, staff).
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    public static function withoutSending(string $reason, callable $fn): mixed
+    {
+        $before = self::$suppressed;
+        self::$suppressed = $reason;
+        try {
+            return $fn();
+        } finally {
+            self::$suppressed = $before;
+        }
+    }
+
+    /** QA MTX-008: true (and the e-mail written to the error log) when sending is suppressed right now. */
+    public static function suppressed(string $to, string $subject): bool
+    {
+        if (self::$suppressed === null) {
+            return false;
+        }
+        error_log('[EMAIL NOT SENT — ' . self::$suppressed . "] To: {$to} | Subject: {$subject}");
+        return true;
+    }
+
     /**
      * External QA report L-43: customer emails had no Reply-To, so a
      * buyer's reply to a QT/PI/OC (e.g. "we confirm the OC") went to the
@@ -71,6 +103,9 @@ final class EmailService
         // keeps this direct path — those kinds are MUST, never held.
         if (!$isSecurityEmail) {
             return MailSenderService::send($toEmail, $subject, $body, [], false, $kind, $audience);
+        }
+        if (self::suppressed($toEmail, $subject)) {
+            return false; // QA MTX-008
         }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {
@@ -195,6 +230,9 @@ final class EmailService
         // QA batch 3 MAIL-2: business mail goes through MailSenderService (see sendPlainText()).
         if (!$isSecurityEmail) {
             return MailSenderService::send($toEmail, $subject, $body, $attachments, false, $kind, $audience);
+        }
+        if (self::suppressed($toEmail, $subject)) {
+            return false; // QA MTX-008
         }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {

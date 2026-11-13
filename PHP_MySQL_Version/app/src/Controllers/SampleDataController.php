@@ -31,7 +31,8 @@ final class SampleDataController
     {
         $user = AuthService::currentUser();
         try {
-            $result = SampleDataService::load((int) $user['id']);
+            // QA MTX-008: loading demo records never e-mails anyone (the sample buyer's portal access, review notices, ...).
+            $result = \App\Services\EmailService::withoutSending('sample data is being loaded', static fn (): array => SampleDataService::load((int) $user['id']));
         } catch (\Throwable $e) {
             error_log('[SAMPLE DATA LOAD FAILED] ' . $e->getMessage());
             Flash::setErrorFromException($e, 'Could not load sample data — check the server error log.');

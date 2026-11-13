@@ -3480,6 +3480,12 @@ view `settings/setup_checklist`. SOP 15.
   - It uses the **same services** as real users (OrderRepository,
     StageGateService, DocumentGenerationService, AmendmentService …), so it
     behaves exactly like the real system.
+  - **Loading e-mails nobody** (QA MTX-008): every e-mail those services
+    would send while loading — the sample buyer's portal access, review and
+    amendment notices to staff, security mail included — is held and written
+    to the error log as "[EMAIL NOT SENT — sample data is being loaded]",
+    whatever Testing mode says (`EmailService::withoutSending()`, Node
+    `emailService.withoutSending()`, scoped to that one request).
   - Every record is flagged `is_sample_data = 1` and removed cleanly by
     Clear. Loading twice is refused — clear first.
   - Sample orders never reach production Zoho.

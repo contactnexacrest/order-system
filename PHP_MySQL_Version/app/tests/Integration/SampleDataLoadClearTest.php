@@ -59,4 +59,26 @@ final class SampleDataLoadClearTest extends DbTestCase
         self::assertSame(['pending_review', 3], [$rows[0]['status'], (int) $rows[0]['stage_number']], 'the pending one sits on an order at Step 5 (PI)');
         self::assertSame(['applied', 8], [$rows[1]['status'], (int) $rows[1]['stage_number']], 'an order far past Step 5 has its intake applied');
     }
+
+    /** QA MTX-008: loading sample data (Sample data › Load) e-mails nobody — every e-mail it would send is held and logged. */
+    public function testMtx008LoadingSampleDataSendsNoEmail(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $_SESSION['_auth_user_id'] = $userId;
+        $log = tempnam(sys_get_temp_dir(), 'mtx008');
+        $before = ini_get('error_log');
+        ini_set('error_log', $log);
+        try {
+            (new \App\Controllers\SampleDataController())->load([]);
+        } finally {
+            ini_set('error_log', (string) $before);
+            unset($_SESSION['_auth_user_id']);
+            \App\Helpers\Flash::pull();
+        }
+        self::assertTrue(SampleDataService::isLoaded());
+        $text = (string) file_get_contents($log);
+        @unlink($log);
+        self::assertStringContainsString('[EMAIL NOT SENT — sample data is being loaded]', $text);
+        self::assertStringNotContainsString('[EMAIL NOT SENT — no SMTP configured', $text, 'nothing reached a transport');
+    }
 }
