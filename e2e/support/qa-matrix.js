@@ -66,6 +66,8 @@ function resolveIds() {
     '/reference-docs/custom/': 'reference_library_documents', '/signatories/user-assets/': 'user_signature_assets',
     '/procurement/': 'purchase_requirements', '/admin/divisions/': 'divisions', '/import/': 'import_shipments', '/merchant/': 'merchant_deals',
     '/domestic/orders/': 'domestic_orders', '/admin/roles/': 'roles', '/admin/permission-definitions/': 'permissions', '/reorder-requests/': 'order_reorder_requests',
+    // MTX-002: routes added since 5 Nov (more specific prefixes first).
+    '/products/categories/': 'product_categories',
     '/associates/': 'associates', '/agreements/': 'agreements', '/file-store/': 'file_store', '/users/': 'users', '/products/': 'catalog_products',
     '/reports/saved/': 'report_definitions', '/admin/departments/': 'departments', '/admin/designations/': 'designations',
   };
@@ -85,6 +87,7 @@ function resolveIds() {
     if (p.includes('{imageId}')) p = p.replace('{imageId}', firstOf('catalog_product_images') || '0');
     if (p.includes('{bankId}')) p = p.replace('{bankId}', firstOf('associate_bank_accounts') || '0');
     if (p.includes('{docId}')) p = p.replace('{docId}', firstOf('associate_documents') || '0');
+    if (p.includes('{supplierId}')) p = p.replace('{supplierId}', firstOf('catalog_product_suppliers') || '0');
     if (p.includes('{id}')) {
       const prefix = Object.keys(table).find((k) => p.startsWith(k));
       if (prefix === '/file-store/') p = p.replace('{id}', one(`SELECT MIN(id) FROM file_store WHERE order_id = ${ids.order || 0}`) || firstOf('file_store') || '0');

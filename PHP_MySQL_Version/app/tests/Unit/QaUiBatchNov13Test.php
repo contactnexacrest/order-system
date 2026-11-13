@@ -159,6 +159,36 @@ final class QaUiBatchNov13Test extends TestCase
         self::assertSame([], $wrong);
     }
 
+    /** MTX-002: the e2e roles/permissions matrix visits every route, so its inventory lists every route of index.php. */
+    public function testMtx002TheQaRouteInventoryListsEveryRoute(): void
+    {
+        $inventory = json_decode((string) file_get_contents(__DIR__ . '/../../../../e2e/support/qa-inventory.json'), true);
+        $norm = static fn (string $method, string $path): string => $method . ' ' . preg_replace('/\{\w+\}/', '{}', $path);
+        $listed = array_flip(array_map(static fn (array $r): string => $norm($r['method'], $r['path']), $inventory['routes']));
+        $missing = [];
+        $loop = null;
+        foreach (explode("\n", (string) file_get_contents(__DIR__ . '/../../../public_html/index.php')) as $line) {
+            if (preg_match('/^\s*foreach \(\[(.*)\] as \$__a => \$__m\)/', $line, $l)) {
+                preg_match_all("/'(\w+)' =>/", $l[1], $vals);
+                $loop = $vals[1];
+                continue;
+            }
+            if (!preg_match("/^\s*\\\$router->(get|post)\('([^']+)'(\s*\.\s*\\\$__a)?,/", $line, $m)) {
+                continue;
+            }
+            foreach (!empty($m[3]) ? array_map(static fn (string $v): string => $m[2] . $v, $loop) : [$m[2]] as $path) {
+                $key = $norm(strtoupper($m[1]), $path);
+                if (!isset($listed[$key])) {
+                    $missing[] = $key;
+                }
+            }
+        }
+        self::assertSame([], $missing);
+        $keys = array_column($inventory['permissions'], 'key');
+        self::assertContains('approve_buyer_details_change', $keys);
+        self::assertContains('view_associate_commission_rules', $keys);
+    }
+
     /**
      * UI-008: every fixed internal link in a view leads to a page route (the TDS
      * register linked to /associates/report, which does not exist). A route

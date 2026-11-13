@@ -217,6 +217,31 @@ describe('UI-010: text fields carry the maxlength of their database column', () 
   });
 });
 
+/** MTX-002: the e2e roles/permissions matrix visits every route, so its inventory lists every route of server.js. */
+describe('MTX-002: the QA route inventory is complete', () => {
+  it('every app.get / app.post of src/server.js is in e2e/support/qa-inventory.json', () => {
+    const inventory = JSON.parse(read(__dirname, '..', '..', '..', '..', 'e2e', 'support', 'qa-inventory.json'));
+    const norm = (method, p) => `${method} ${p.replace(/\{\w+\}/g, '{}')}`;
+    const listed = new Set(inventory.routes.map((r) => norm(r.method, r.path)));
+    const source = read(__dirname, '..', '..', 'src', 'server.js');
+    const missing = [];
+    let loopValues = null;
+    for (const line of source.split('\n')) {
+      const loop = line.match(/^\s*for \(const \[a, m\] of \[(.*)\]\) \{/);
+      if (loop) { loopValues = [...loop[1].matchAll(/\['(\w+)',/g)].map((m) => m[1]); continue; }
+      const m = line.match(/^\s*app\.(get|post)\((['`])([^'`]+)\2,/);
+      if (!m) continue;
+      const paths = m[3].includes('${a}') ? loopValues.map((v) => m[3].replace('${a}', v)) : [m[3]];
+      for (const p of paths) {
+        const key = norm(m[1].toUpperCase(), p.replace(/:(\w+)(\([^)]*\))?/g, '{$1}'));
+        if (!listed.has(key)) missing.push(key);
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(inventory.permissions.map((p) => p.key)).toEqual(expect.arrayContaining(['approve_buyer_details_change', 'view_associate_commission_rules']));
+  });
+});
+
 /**
  * UI-008: every fixed internal link in a view leads to a page route (the TDS
  * register linked to /associates/report, which does not exist). A route
