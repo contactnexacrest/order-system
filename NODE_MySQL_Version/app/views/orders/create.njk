@@ -9,16 +9,18 @@
     {% endif %}
     <fieldset>
       <legend>Client</legend>
+      {# Owner, 14 Nov 2026 (D-375): opened from a client's page ("Create order"), the drop-down offers only that client. #}
       <label>Client *
         <select name="client_id" required>
-          <option value="">Choose…</option>
-          {% for c in clients %}
+          {% if not onlyClient %}<option value="">Choose…</option>{% endif %}
+          {% for c in ([onlyClient] if onlyClient else clients) %}
             <option value="{{ c.id }}"{% if clientPriceKeys and clientPriceKeys[c.id] %} data-price-key="{{ clientPriceKeys[c.id] }}"{% endif %} {{ 'selected' if c.id == (old.client_id or preselectedClientId) else '' }}>
               {{ c.company_legal_name }} ({{ c.client_unique_number }})
             </option>
           {% endfor %}
         </select>
       </label>
+      {% if onlyClient %}<p class="muted small">Order for this client (opened from the client's page). For another client, start from <a href="/clients">Clients</a>.</p>{% endif %}
       {% if divisionChoices %}{# D-257: company level, several active divisions, "All divisions" chosen #}
       <label>Division *
         <select name="division_id" required>

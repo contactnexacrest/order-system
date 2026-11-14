@@ -15,16 +15,29 @@
     <?php endif; ?>
     <fieldset>
       <legend>Client</legend>
+      <?php
+      // Owner, 14 Nov 2026 (D-375): opened from a client's page ("Create order"), the drop-down offers only that client.
+      $__onlyClient = null;
+      if (!empty($preselectedClientId)) {
+          foreach ($clients as $__c) {
+              if ((int) $__c['id'] === (int) $preselectedClientId) {
+                  $__onlyClient = $__c;
+              }
+          }
+      }
+      $__clientChoices = $__onlyClient !== null ? [$__onlyClient] : $clients;
+      ?>
       <label>Client *
         <select name="client_id" required>
-          <option value="">Choose…</option>
-          <?php foreach ($clients as $c): ?>
+          <?php if ($__onlyClient === null): ?><option value="">Choose…</option><?php endif; ?>
+          <?php foreach ($__clientChoices as $c): ?>
             <option value="<?= (int) $c['id'] ?>"<?= isset($clientPriceKeys[(int) $c['id']]) ? ' data-price-key="' . htmlspecialchars($clientPriceKeys[(int) $c['id']]) . '"' : '' ?> <?= ((int) $c['id'] === (int) ($old['client_id'] ?? $preselectedClientId)) ? 'selected' : '' ?>>
               <?= htmlspecialchars($c['company_legal_name']) ?> (<?= htmlspecialchars($c['client_unique_number']) ?>)
             </option>
           <?php endforeach; ?>
         </select>
       </label>
+      <?php if ($__onlyClient !== null): ?><p class="muted small">Order for this client (opened from the client's page). For another client, start from <a href="/clients">Clients</a>.</p><?php endif; ?>
       <?php if (\App\Services\DivisionService::needsChoiceOnCreate()): // D-257: company level, several active divisions, "All divisions" chosen ?>
       <label>Division *
         <select name="division_id" required>

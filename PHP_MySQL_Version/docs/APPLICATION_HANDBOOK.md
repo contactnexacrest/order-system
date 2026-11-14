@@ -1817,7 +1817,7 @@ Code: `ClientIntakeController`, `ClientIntakeReviewController`,
 
 ### 5.3 Creating the order
 
-From the client page, **Add Order** (`/orders/create`, `manage_orders`).
+From the client page, **Add Order** (`/orders/create?client_id=…`, `manage_orders`): the Client drop-down then offers only that client, with a note "Order for this client (opened from the client's page)" (D-375, 14 Nov 2026); `/orders/create` without a client offers every client.
 On save (`OrderController::store`):
 
 - The order reference is reserved atomically: `NC/SC/ORD/{YY}/{DDMM}{NNN}`,

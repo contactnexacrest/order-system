@@ -413,6 +413,7 @@ async function create(req, res) {
   if (old.estimated_gross_weight_kg === undefined) old.estimated_gross_weight_kg = await companySettingsRepository.get('default_estimated_gross_weight_kg');
   if (old.estimated_net_weight_kg === undefined) old.estimated_net_weight_kg = await companySettingsRepository.get('default_estimated_net_weight_kg');
 
+  const allClients = await clientRepository.all();
   res.renderView(
     'orders/create',
     {
@@ -423,7 +424,7 @@ async function create(req, res) {
         const cid = parseInt(old.client_id || preselectedClientId || 0, 10) || 0;
         return cid > 0 ? require('../services/complianceTrackingService').ecgcPosition(cid) : null;
       })(),
-      clients: await clientRepository.all(),
+      clients: allClients,
       // D-257: company level, several active divisions, "All divisions" chosen — the form asks which division.
       divisionChoices: (await require('../services/divisionService').needsChoiceOnCreate()) ? await require('../services/divisionService').active() : null,
       incoterms,
@@ -440,6 +441,8 @@ async function create(req, res) {
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       hsCodes: await hsCodeRepository.active(),
       preselectedClientId,
+      // Owner, 14 Nov 2026 (D-375): opened from a client's page, the drop-down offers only that client.
+      onlyClient: preselectedClientId ? (allClients.find((c) => Number(c.id) === Number(preselectedClientId)) || null) : null,
       old,
     },
     'layout/base'
