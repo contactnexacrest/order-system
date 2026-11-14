@@ -399,7 +399,7 @@ final class AssociateCommission
             return $inRange;
         }
         if ($currency === 'USD') {
-            $fx = (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+            $fx = FxRateService::rate();
             return $fx > 0 ? $inRange * $fx : null;
         }
         $orderRate = IncentiveService::productRate($order);
@@ -501,7 +501,7 @@ final class AssociateCommission
         // Nothing received yet: the rate expected on the receipts, else the Admin pricing exchange rate (estimated either way).
         $rate = IncentiveService::productRate($order);
         if ($rate <= 0) {
-            $rate = (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+            $rate = FxRateService::rate();
         }
         return ['rate' => $rate, 'estimated' => true];
     }
@@ -610,7 +610,7 @@ final class AssociateCommission
         if (isset($order['pricing_fx_rate_at_pi']) && $order['pricing_fx_rate_at_pi'] !== null && (float) $order['pricing_fx_rate_at_pi'] > 0) {
             return (float) $order['pricing_fx_rate_at_pi'];
         }
-        return (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+        return FxRateService::rate();
     }
 
     /**

@@ -311,7 +311,7 @@ async function estimateInr(order, inRange) {
   const currency = String(order.currency_code || '').toUpperCase();
   if (currency === 'INR') return inRange;
   if (currency === 'USD') {
-    const fx = Number((await pricingRepository.settings()).pricing_fx_rate || 0);
+    const fx = await require('./fxRateService').rate(await pricingRepository.settings());
     return fx > 0 ? inRange * fx : null;
   }
   const orderRate = await require('./incentiveService').productRate(order);
@@ -400,7 +400,7 @@ async function realisedRate(order) {
   if (foreign > 0) return { rate: inr / foreign, estimated };
   // Nothing received yet: the rate expected on the receipts, else the Admin pricing exchange rate (estimated either way).
   let rate = await require('./incentiveService').productRate(order);
-  if (!(rate > 0)) rate = Number((await pricingRepository.settings()).pricing_fx_rate || 0);
+  if (!(rate > 0)) rate = await require('./fxRateService').rate(await pricingRepository.settings());
   return { rate, estimated: true };
 }
 
@@ -413,7 +413,7 @@ async function usdRate(order) {
   if (String(order.currency_code || '').toUpperCase() === 'USD') return (await realisedRate(order)).rate;
   // D-262 / D-245: the pricing exchange rate frozen with the order when its PI was approved.
   if (order.pricing_fx_rate_at_pi !== null && order.pricing_fx_rate_at_pi !== undefined && Number(order.pricing_fx_rate_at_pi) > 0) return Number(order.pricing_fx_rate_at_pi);
-  return Number((await pricingRepository.settings()).pricing_fx_rate || 0);
+  return await require('./fxRateService').rate(await pricingRepository.settings());
 }
 
 /** The order's associate commission as it stands, or null when no associate earns on it. */

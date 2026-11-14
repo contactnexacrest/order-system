@@ -2819,7 +2819,11 @@ the same filters, counts, fields, actions and money rules on both templates
     after clearing advance / freight / balance / milestone and recording LC money; the
     daily job (`daily_digest` / `dailyDigest`) catches up, holds / releases for buyer
     claims, works settlements out again at the same fixed rate, and carries abroad
-    amounts below the minimum (default USD 100) to the next run. The MD may change the
+    amounts below the minimum (default USD 100) to the next run. Before money arrives or the
+    PI fixes a rate, every rupee/USD conversion here (commission estimate, the level fixed at
+    the PI, a fixed USD amount, the USD 100 check) uses the pricing rate in use
+    (`FxRateService::rate()` — Automatic market less cushion, or Manual), never the Manual box
+    while Automatic is on (D-377, 14 Nov 2026). The MD may change the
     amount before payment with a reason (`POST /orders/{id}/incentive/associate-commission`;
     `associate_override_fc`). The MD's lock covers the team incentive only. The portal
     shows the order currency; India adds one fixed-rupee line; abroad never rupees.

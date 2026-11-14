@@ -310,7 +310,7 @@ async function changeCommission(orderId, amountFc, reason, user) {
 
 async function usdEquivalent(p) {
   if (String(p.currency_code || '').toUpperCase() === 'USD') return Number(p.amount_fc);
-  const usd = Number((await require('../repositories/pricingRepository').settings()).pricing_fx_rate || 0);
+  const usd = await require('./fxRateService').rate(await require('../repositories/pricingRepository').settings());
   return usd > 0 ? Number(p.amount_inr) / usd : Number(p.amount_fc);
 }
 
@@ -399,5 +399,5 @@ async function payoutCostsForMonth(month) {
 module.exports = {
   CLAIM_HOLD_REASON, UNPAID_HOLD_REASON, isIndia, payCurrency, rateText, fixedRupeeLine, howFixedBox, fixedMessage, afterPaymentChange, autoFix, costDescription,
   candidateOrderIds, daily, recompute, recomputedMessage, changeCommission, carrySmallAbroad, carriedNote, payoutDifference, recordPaymentCosts,
-  payoutCostDescription, payoutCostsForMonth,
+  payoutCostDescription, payoutCostsForMonth, usdEquivalent,
 };

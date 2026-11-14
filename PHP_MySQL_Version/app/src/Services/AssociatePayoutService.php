@@ -10,7 +10,6 @@ use App\Repositories\AssociateRepository;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\IncentiveRepository;
 use App\Repositories\OrderRepository;
-use App\Repositories\PricingRepository;
 
 /**
  * Owner decision D-264 (7 Nov 2026): an associate's commission is fixed by itself
@@ -387,7 +386,7 @@ final class AssociatePayoutService
         if (strtoupper((string) $p['currency_code']) === 'USD') {
             return (float) $p['amount_fc'];
         }
-        $usd = (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+        $usd = FxRateService::rate();
         return $usd > 0 ? (float) $p['amount_inr'] / $usd : (float) $p['amount_fc'];
     }
 
