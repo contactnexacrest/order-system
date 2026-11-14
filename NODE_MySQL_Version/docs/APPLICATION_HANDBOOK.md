@@ -1929,7 +1929,7 @@ under each price "Priced at ₹92.37 per USD on 14 Nov 2026" (`order_products.pr
 not fixed (`PriceLock::isFixed()`); a copy keeps its original's (`OrderProductRepository::duplicate()`).
 When today's quote differs, **Use today's price (x)** under the check (POST
 `/orders/{id}/products/{productId}/todays-price`, `manage_orders`, refused once fixed) sets the
-quote as the price, records today's rate and logs `ORDER_LINE_TODAYS_PRICE`. Below the goods a
+quote as the price, records today's rate and logs `ORDER_LINE_TODAYS_PRICE`. **Reference only (owner, 14 Nov 2026):** `priced_fx_rate` / `priced_at` are shown on the order page and copied with a duplicated line — no calculation reads them. Quote, lowest and minimum in the Price check use today's pricing rate until the Quotation is approved, then the order's fixed rate (`pricing_fx_rate_at_qt`, D-342); the PI, amendments and the associate commission estimate use the order's rates; money received uses the INR the bank credited. Using the line rate in any calculation needs a new owner decision. Below the goods a
 totals row with the goods value, about … CBM and containers of 8 CBM
 (`OrderLinePricing::totals()`, `LineUnits::CONTAINER_CBM`; lines without a size or
 quantity are named as not counted); charges and services follow in a second table of
