@@ -534,6 +534,18 @@ final class OrderLinePricing
      *
      * @return array{status: string, figures: ?array, fixed: bool, note: ?string, approval: ?array, requested: bool}
      */
+    /** D-374: "Priced at ₹91.82 per USD on 12 Nov 2026", "Rate not recorded", or '' for a line without a price. */
+    public static function pricedAtText(array $line): string
+    {
+        if (($line['unit_price'] ?? null) === null) {
+            return '';
+        }
+        if (($line['priced_fx_rate'] ?? null) === null || empty($line['priced_at'])) {
+            return 'Rate not recorded';
+        }
+        return 'Priced at ₹' . number_format((float) $line['priced_fx_rate'], 2) . ' per USD on ' . date('j M Y', (int) strtotime((string) $line['priced_at']));
+    }
+
     public static function checkLine(array $line, array $ctx, ?array $product = null): array
     {
         $out = ['status' => self::UNCHECKED, 'figures' => null, 'fixed' => false, 'note' => null, 'approval' => null,
@@ -882,6 +894,19 @@ final class OrderLinePricing
         }
         $pdo = Database::connection();
         $orderId = (int) $line['order_id'];
+        // Owner decision D-374 (14 Nov 2026): a line remembers the pricing rate and the day its price was set,
+        // until the approved Quotation fixes the prices. A new line (or one without a record yet) and a changed
+        // price record today's rate; a copy keeps its original's (copied by duplicate()).
+        $__priceSet = $line['unit_price'] !== null && ($before === null
+            ? empty($line['priced_at'])
+            : ($before['unit_price'] === null || abs((float) $before['unit_price'] - (float) $line['unit_price']) > 0.0001));
+        if ($__priceSet) {
+            $__order = OrderRepository::find($orderId);
+            if ($__order !== null && !PriceLock::isFixed($__order)) {
+                OrderProductRepository::setPricedRate($lineId, FxRateService::rate());
+                $line = OrderProductRepository::find($lineId) ?? $line;
+            }
+        }
         // Fresh-eyes review M4: a change of the line's options or unit is a different product for
         // pricing — like a product change it clears the fixed figures and voids the approval.
         $optionsChanged = $before !== null && self::approvalSelectionKey($before) !== self::approvalSelectionKey($line);

@@ -692,6 +692,7 @@ $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProdu
 $router->post('/orders/{id}/products/{productId}/price-approval-request', [$orders, 'requestLinePriceApproval'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/orders/{id}/products/{productId}/price-approval', [$orders, 'linePriceApproval'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
 $router->post('/orders/{id}/products/{productId}/price-approval', [$orders, 'approveLinePrice'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/products/{productId}/todays-price', [$orders, 'useTodaysPrice'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(), PermissionCheck::requires('view_cafin')]);

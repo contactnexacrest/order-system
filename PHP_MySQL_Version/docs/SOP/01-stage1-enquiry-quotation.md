@@ -378,6 +378,17 @@ shows the reason in red, e.g. "Line 1 is below the lowest price for this order �
 raise it, or ask the MD to approve it, before the Quotation (order page →
 Products)." See [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 
+**Which exchange rate a line was priced at** (owner decision D-374, 14 Nov 2026).
+Under each line's price the order page shows the pricing rate and the day the
+price was set, e.g. *"Priced at ₹92.37 per USD on 14 Nov 2026"* (*"Rate not
+recorded"* for a line saved before 14 Nov 2026). The rate moves every day, so a
+line priced a few days ago can differ from today's **Quote** in the Price check
+column. Then a **Use today's price (2,865.84)** button appears under the check:
+one click puts today's quote on the line and records today's rate (it is in the
+Audit Log). Nothing changes until someone clicks. Once the Quotation is approved
+the prices and the rate are fixed (D-342) and the button no longer appears; the
+Proforma Invoice keeps that rate.
+
 The new QT document appears in the documents table as a **draft** — it
 still needs to go through [review and approval](./13-document-review-approval.md)
 before it's the final, sendable version. A draft can be deleted (**Delete

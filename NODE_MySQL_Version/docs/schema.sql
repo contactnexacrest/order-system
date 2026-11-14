@@ -6650,6 +6650,10 @@ ALTER TABLE orders ADD COLUMN buyer_po_amended_by_amendment_id BIGINT UNSIGNED N
 ALTER TABLE orders ADD COLUMN buyer_po_amended_at DATETIME NULL;
 ALTER TABLE orders ADD COLUMN buyer_po_amended_by BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD COLUMN qt_fixed_unit_price DECIMAL(14,2) NULL;
+-- Owner decision D-374 (14 Nov 2026): the pricing rate (₹ per USD) and the time a line's price was set,
+-- recorded until the approved Quotation fixes the prices (orders.pricing_fx_rate_at_qt from then on).
+ALTER TABLE order_products ADD COLUMN priced_fx_rate DECIMAL(12,4) NULL;
+ALTER TABLE order_products ADD COLUMN priced_at DATETIME NULL;
 ALTER TABLE amendments ADD COLUMN amendment_type ENUM('payment_terms','products') NOT NULL DEFAULT 'payment_terms';
 ALTER TABLE amendments ADD COLUMN products_totals_json TEXT NULL;
 ALTER TABLE amendments ADD COLUMN activated_at DATETIME NULL;

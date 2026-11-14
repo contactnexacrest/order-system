@@ -1033,7 +1033,9 @@ async function linePricingViewData(req, orderId) {
   const lines = await orderProductRepository.forOrder(orderId);
   const lineChips = {};
   const copyOf = {};
+  const pricedAt = {}; // D-374: "Priced at ₹… per USD on …" under each price
   for (const l of lines) {
+    pricedAt[Number(l.id)] = olp.pricedAtText(l);
     lineChips[Number(l.id)] = await olp.optionChips(l);
     copyOf[Number(l.id)] = orderProductRepository.copiedFromLineNo(l, lines);
   }
@@ -1043,6 +1045,7 @@ async function linePricingViewData(req, orderId) {
     pcLines,
     lineChips,
     copyOf,
+    pricedAt,
     goodsLines: lines.filter((l) => (l.line_type || 'goods') === 'goods'),
     otherLines: lines.filter((l) => (l.line_type || 'goods') !== 'goods'),
     lineSummary: olp.summary(linePricing.lines),
@@ -1522,6 +1525,45 @@ async function updateProduct(req, res) {
   await require('../services/orderLinePricing').afterSave(productId, product, req.user.id);
   flash.set(req, 'success', await lineSavedMessage(productId, 'Product line updated.'));
   res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Owner decision D-374 (14 Nov 2026): "Use today's price" — the line takes today's quote (the Price check
+ * column's "Quote") and records today's pricing rate. Only while the prices are not fixed (D-342).
+ * Twin of OrderController::useTodaysPrice().
+ */
+async function useTodaysPrice(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const productId = parseInt(req.params.productId, 10);
+  const order = await orderRepository.find(orderId);
+  const product = await orderProductRepository.find(productId);
+  if (!order || !product || Number(product.order_id) !== orderId || Number(product.is_active) !== 1) {
+    res.status(404).send('Product line not found.');
+    return;
+  }
+  if (refuseLockedLines(req, res, order)) return;
+  const olp = require('../services/orderLinePricing');
+  const check = await olp.checkLine(product, await olp.context(order));
+  if (check.fixed || !check.figures) {
+    flash.set(req, 'error', `Line ${Number(product.line_no)} has no price from Products for today — change its price in Edit.`);
+    res.redirect(`/orders/${orderId}#line-${productId}`);
+    return;
+  }
+  const reason = str(req.body.reason);
+  if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_line'))) {
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const price = require('../helpers/money').round2(Number(check.figures.quote)).toFixed(2);
+  await orderProductRepository.setUnitPrice(productId, price);
+  await orderProductRepository.setPriceSetBy(productId, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_LINE_TODAYS_PRICE', 'order_products', productId, 'unit_price',
+    product.unit_price !== null && product.unit_price !== undefined ? String(product.unit_price) : null, price, reason !== '' ? reason : null);
+  await olp.afterSave(productId, product, req.user.id);
+  const rate = await require('../services/fxRateService').rate(await require('../repositories/pricingRepository').settings());
+  const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  flash.set(req, 'success', await lineSavedMessage(productId, `Line ${Number(product.line_no)} now uses today's price: ${order.currency_code || 'USD'} ${fmt(price)} (₹${fmt(rate)} per USD).`));
+  res.redirect(`/orders/${orderId}#line-${productId}`);
 }
 
 async function deleteProduct(req, res) {
@@ -5610,7 +5652,7 @@ module.exports = {
   lineRefusalText, // D-338 (exported for its test)
   recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
-  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, requestLinePriceApproval, linePriceApproval, approveLinePrice,
+  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, useTodaysPrice, requestLinePriceApproval, linePriceApproval, approveLinePrice,
   recordBuyerPo, correctBuyerPoReceivedDate, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, saveLcDates, addLcAmendment, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,

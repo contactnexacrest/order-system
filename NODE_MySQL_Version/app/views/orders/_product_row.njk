@@ -18,9 +18,18 @@
   <td class="num">{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity if p.quantity != null else '') }}</td>
   <td>{{ p.unit or '' }}</td>
   {% if sees.selling %}
-    <td class="num">{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}</td>
+    <td class="num">{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}{% if pricedAt and pricedAt[p.id] %}<div class="muted small priced-at">{{ pricedAt[p.id] }}</div>{% endif %}</td>
     <td class="num">{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
-    <td class="line-check">{% include "orders/_line_price.njk" %}</td>
+    <td class="line-check">{% include "orders/_line_price.njk" %}
+      {# Owner decision D-374: today's price differs from the line's — one click takes it (only while prices are not fixed). #}
+      {% if canEditProducts and not pricesFixed and lc and not lc.fixed and lc.figures and (p.unit_price == null or ((p.unit_price | float) - (lc.figures.quote | float | round(2))) | abs > 0.004) %}
+        <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/todays-price" class="inline-form todays-price">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" aria-label="Reason">{% endif %}
+          <button type="submit" class="btn-sm btn-secondary" title="Today's rate gives this price; nothing changes until you click">Use today's price ({{ lc.figures.quote | money }})</button>
+        </form>
+      {% endif %}
+    </td>
   {% endif %}
   {% if canEditProducts %}
     <td class="line-actions">

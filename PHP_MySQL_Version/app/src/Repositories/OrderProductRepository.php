@@ -158,8 +158,10 @@ final class OrderProductRepository
         Database::connection()->prepare(
             'UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
                     piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf, as_per_annexure = :apa,
-                    pieces_count = :pc, size_note = :sn WHERE id = :id'
+                    pieces_count = :pc, size_note = :sn, priced_fx_rate = :fx, priced_at = :fa WHERE id = :id'
         )->execute([
+            // D-374: a copy keeps the rate and date its price was worked out at (the price is the same).
+            'fx' => $source['priced_fx_rate'] ?? null, 'fa' => $source['priced_at'] ?? null,
             'p' => $source['product_id'] ?? null, 'm' => $source['material'] ?? null, 's' => $source['spec_selection'] ?? null,
             'pr' => $source['price_request_id'] ?? null, 'z' => $source['zoho_item_id'] ?? null,
             'l' => $source['piece_length_cm'] ?? null, 'w' => $source['piece_width_cm'] ?? null, 't' => $source['piece_thickness_cm'] ?? null,
@@ -259,6 +261,28 @@ final class OrderProductRepository
     {
         Database::connection()->prepare('UPDATE order_products SET catalog_product_id = :c WHERE id = :id')
             ->execute(['c' => $catalogProductId, 'id' => $id]);
+    }
+
+    /**
+     * Owner decision D-374 (14 Nov 2026): the line takes today's price ("Use today's price"); its total
+     * follows, worked out as in update().
+     */
+    public static function setUnitPrice(int $id, string $unitPrice): void
+    {
+        $line = self::find($id);
+        if ($line === null) {
+            return;
+        }
+        $fob = ($line['quantity'] !== null && empty($line['quantity_is_tbc'])) ? round((float) $line['quantity'] * (float) $unitPrice, 2) : null;
+        Database::connection()->prepare('UPDATE order_products SET unit_price = :p, fob_value = :f WHERE id = :id')
+            ->execute(['p' => $unitPrice, 'f' => $fob, 'id' => $id]);
+    }
+
+    /** D-374: the pricing rate (₹ per USD) and the time this line's price was set at. */
+    public static function setPricedRate(int $id, float $rate): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET priced_fx_rate = :r, priced_at = NOW() WHERE id = :id')
+            ->execute(['r' => $rate, 'id' => $id]);
     }
 
     public static function setPriceSetBy(int $id, int $userId): void

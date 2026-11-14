@@ -1922,7 +1922,14 @@ compact table (`orders/_products_table.php` / `.njk`): # · product and its opti
 labels (D-271) · size (Dimensions text) · qty · unit · price · total · price-check badge ·
 Edit / Duplicate / Delete. Above it a summary bar
 (`OrderLinePricing::summary()`, e.g. "2 lines OK · 1 line needs MD approval (line 3) —
-the Quotation waits for it." with a **Show** link to Price check); below the goods a
+the Quotation waits for it." with a **Show** link to Price check). **D-374 (14 Nov 2026):**
+under each price "Priced at ₹92.37 per USD on 14 Nov 2026" (`order_products.priced_fx_rate`,
+`priced_at`; "Rate not recorded" for older lines; `OrderLinePricing::pricedAtText()`), recorded by
+`OrderLinePricing::afterSave()` when a line gets a price or its price changes, while the prices are
+not fixed (`PriceLock::isFixed()`); a copy keeps its original's (`OrderProductRepository::duplicate()`).
+When today's quote differs, **Use today's price (x)** under the check (POST
+`/orders/{id}/products/{productId}/todays-price`, `manage_orders`, refused once fixed) sets the
+quote as the price, records today's rate and logs `ORDER_LINE_TODAYS_PRICE`. Below the goods a
 totals row with the goods value, about … CBM and containers of 8 CBM
 (`OrderLinePricing::totals()`, `LineUnits::CONTAINER_CBM`; lines without a size or
 quantity are named as not counted); charges and services follow in a second table of

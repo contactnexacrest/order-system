@@ -1514,6 +1514,50 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * Owner decision D-374 (14 Nov 2026): "Use today's price" — the line takes today's quote (the Price check
+     * column's "Quote") and records today's pricing rate. Only while the prices are not fixed (D-342).
+     */
+    public function useTodaysPrice(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $productId = (int) $params['productId'];
+        $order = OrderRepository::find($orderId);
+        $product = OrderProductRepository::find($productId);
+        if (!$order || !$product || (int) $product['order_id'] !== $orderId || (int) $product['is_active'] !== 1) {
+            http_response_code(404);
+            echo 'Product line not found.';
+            return;
+        }
+        if (self::refuseLockedLines($order)) {
+            return;
+        }
+        $check = \App\Services\OrderLinePricing::checkLine($product, \App\Services\OrderLinePricing::context($order));
+        if ($check['fixed'] || $check['figures'] === null) {
+            Flash::set('error', 'Line ' . (int) $product['line_no'] . ' has no price from Products for today — change its price in Edit.');
+            header("Location: /orders/{$orderId}#line-{$productId}");
+            return;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'order_products', $productId, 'product_line')) {
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $price = number_format((float) $check['figures']['quote'], 2, '.', '');
+        OrderProductRepository::setUnitPrice($productId, $price);
+        OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_LINE_TODAYS_PRICE', 'order_products', $productId, 'unit_price',
+            $product['unit_price'] !== null ? (string) $product['unit_price'] : null, $price, $reason !== '' ? $reason : null);
+        \App\Services\OrderLinePricing::afterSave($productId, $product, (int) $user['id']);
+        $rate = \App\Services\FxRateService::rate();
+        Flash::set('success', self::lineSavedMessage($productId, 'Line ' . (int) $product['line_no'] . ' now uses today\'s price: '
+            . (string) ($order['currency_code'] ?? 'USD') . ' ' . number_format((float) $price, 2) . ' (₹' . number_format($rate, 2) . ' per USD).'));
+        header("Location: /orders/{$orderId}#line-{$productId}");
+    }
+
     public function deleteProduct(array $params): void
     {
         $orderId = (int) $params['id'];

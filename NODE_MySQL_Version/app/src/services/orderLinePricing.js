@@ -395,6 +395,16 @@ function approvalSelectionKey(line) {
 }
 
 /** The check of one line: { status, figures, fixed, note, approval, requested }. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** D-374: "Priced at ₹91.82 per USD on 12 Nov 2026", "Rate not recorded", or '' for a line without a price. Twin of pricedAtText(). */
+function pricedAtText(line) {
+  if (line.unit_price === null || line.unit_price === undefined) return '';
+  if (line.priced_fx_rate === null || line.priced_fx_rate === undefined || !line.priced_at) return 'Rate not recorded';
+  const [y, m, d] = String(line.priced_at).slice(0, 10).split('-').map(Number);
+  const rate = Number(line.priced_fx_rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `Priced at ₹${rate} per USD on ${d} ${MONTHS[m - 1]} ${y}`;
+}
+
 async function checkLine(line, ctx, product = null) {
   const out = { status: UNCHECKED, figures: null, fixed: false, note: null, approval: null, requested: Boolean(line.price_approval_requested_at), reference: null, conversion: null };
   const reason = scope(line, ctx);
@@ -690,6 +700,20 @@ async function afterSave(lineId, before, userId) {
   let line = await orderProductRepository.find(lineId);
   if (!line) return;
   const orderId = Number(line.order_id);
+  // Owner decision D-374 (14 Nov 2026): a line remembers the pricing rate and the day its price was set,
+  // until the approved Quotation fixes the prices. A new line (or one without a record yet) and a changed
+  // price record today's rate; a copy keeps its original's (copied by duplicate()).
+  const hasPrice = line.unit_price !== null && line.unit_price !== undefined;
+  const priceSet = hasPrice && (!before
+    ? !line.priced_at
+    : (before.unit_price === null || before.unit_price === undefined || Math.abs(Number(before.unit_price) - Number(line.unit_price)) > 0.0001));
+  if (priceSet) {
+    const ord = await require('../repositories/orderRepository').find(orderId);
+    if (ord && !require('./priceLock').isFixed(ord)) {
+      await orderProductRepository.setPricedRate(lineId, await require('./fxRateService').rate(await pricingRepository.settings()));
+      line = (await orderProductRepository.find(lineId)) || line;
+    }
+  }
   // Fresh-eyes review M4: a change of the line's options or unit is a different product for
   // pricing — like a product change it clears the fixed figures and voids the approval.
   const optionsChanged = !!before && approvalSelectionKey(before) !== approvalSelectionKey(line);
@@ -932,5 +956,5 @@ module.exports = {
   PICK_MESSAGE, productPickRequired, pickRefusal, notQuotableMessage, documentBlockReason, REQUIRED_SPEC_NAMES, requiredSpecsRefusal,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, snapshotLines, approveByAmendment, pickerPrices, pickerSpecs, clientKeys,
-  selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey,
+  selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey, pricedAtText,
 };

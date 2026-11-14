@@ -47,7 +47,7 @@ mysql -u <user> -p <database> < docs/migrations/<file>.sql
 
 ### Files in this folder (run in this order)
 
-**None yet.** The live site was installed fresh from `schema.sql` + `seed.sql` on
+Since the fresh install: the files in the table below. The live site was installed fresh from `schema.sql` + `seed.sql` on
 14 Nov 2026 (owner decision D-372). Those two files already hold every earlier
 change, so the 25 files of 11–13 Nov 2026 (`2026-11-11a` … `2026-11-13g`) were
 removed from this folder; git history keeps them (last commit with them:
@@ -57,6 +57,7 @@ removed from this folder; git history keeps them (last commit with them:
 
 | File | Owner decisions | What it does |
 |---|---|---|
+| `2026-11-14a-line-priced-rate.sql` | D-374 | New empty columns `order_products.priced_fx_rate` and `priced_at`: the pricing rate (₹ per USD) and the time a line's price was set, until the approved Quotation fixes the prices. **Plain ALTER (D-371):** a second run only says "Duplicate column name". Existing lines show "Rate not recorded". |
 
 ### Rules for every migration file (enforced by tests)
 

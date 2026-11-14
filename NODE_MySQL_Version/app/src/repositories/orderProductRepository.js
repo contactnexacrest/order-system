@@ -134,7 +134,9 @@ async function duplicate(id, targetOrderId = null, atLineNo = null) {
   await db.execute(
     `UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
             piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf, as_per_annexure = :apa,
-            pieces_count = :pc, size_note = :sn WHERE id = :id`, {
+            pieces_count = :pc, size_note = :sn, priced_fx_rate = :fx, priced_at = :fa WHERE id = :id`, {
+      // D-374: a copy keeps the rate and date its price was worked out at (the price is the same).
+      fx: source.priced_fx_rate ?? null, fa: source.priced_at ?? null,
       p: source.product_id ?? null, m: source.material ?? null, s: source.spec_selection ?? null, pr: source.price_request_id ?? null, z: source.zoho_item_id ?? null,
       l: source.piece_length_cm ?? null, w: source.piece_width_cm ?? null, t: source.piece_thickness_cm ?? null, cf: sameOrder ? id : null, apa: Number(source.as_per_annexure || 0),
       // D-339: the No. of pieces and the size note.
@@ -175,6 +177,24 @@ function copiedFromLineNo(line, lines) {
 // hand), and who set its unit price (for the self-approval rule on a discount below the reference price).
 async function setCatalogProduct(id, catalogProductId, executor = db) {
   await executor.execute('UPDATE order_products SET catalog_product_id = :c WHERE id = :id', { c: catalogProductId || null, id });
+}
+
+/**
+ * Owner decision D-374 (14 Nov 2026): the line takes today's price ("Use today's price"); its total
+ * follows, worked out as in update(). Twin of OrderProductRepository::setUnitPrice().
+ */
+async function setUnitPrice(id, unitPrice) {
+  const line = await find(id);
+  if (!line) return;
+  const fob = (line.quantity !== null && line.quantity !== undefined && !Number(line.quantity_is_tbc))
+    ? require('../helpers/money').round2(parseFloat(line.quantity) * parseFloat(unitPrice)).toFixed(2)
+    : null;
+  await db.execute('UPDATE order_products SET unit_price = :p, fob_value = :f WHERE id = :id', { p: unitPrice, f: fob, id });
+}
+
+/** D-374: the pricing rate (₹ per USD) and the time this line's price was set at. */
+async function setPricedRate(id, rate) {
+  await db.execute('UPDATE order_products SET priced_fx_rate = :r, priced_at = NOW() WHERE id = :id', { r: rate, id });
 }
 
 async function setPriceSetBy(id, userId, executor = db) {
@@ -232,4 +252,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, renumber, duplicate, setPieceSize, setPieces, setAsPerAnnexure, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, renumber, duplicate, setUnitPrice, setPricedRate, setPieceSize, setPieces, setAsPerAnnexure, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };

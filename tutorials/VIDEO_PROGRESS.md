@@ -323,6 +323,14 @@ setting "one person" and a verifier with "manage associate bank". (4) D03 / D04 
 `AssociatePortalRepository::stageLabel` (stage 4 = "In production", stage 8 = "Shipping"). (5) A01 — Getting
 Started is a stand-alone page without the section menu bar, so only the left-menu entry is pointed at.
 
+## Also out of date after the 14 Nov 2026 build (noted only; recording still ON HOLD)
+
+No video or script was changed. Owner to decide when videos restart.
+
+| Video | What now differs | Decision |
+|---|---|---|
+| A02-1, B01 Parts 1 and 2, B02 (order page Products table) | Line numbers stay 1, 2, 3 after a line is deleted and added again (D-373); under each price "Priced at ₹… per USD on …" or "Rate not recorded", and a **Use today's price (…)** button under the Price check when today's quote differs (D-374). | Owner to decide when videos restart |
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

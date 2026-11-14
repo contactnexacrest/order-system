@@ -27,7 +27,7 @@ $__money = static fn ($v): string => $v !== null ? number_format((float) $v, 2) 
 $__detailed = ($order['line_table_layout'] ?? 'classic') === 'detailed';
 
 // One table row (goods, or a charge / service line).
-$__row = static function (array $p) use ($products, $linePricing, $sees, $seesPriceBuildup, $canEditProducts, $order, $__copiedId, $__money, $__productReasonRequired): void {
+$__row = static function (array $p) use ($products, $linePricing, $sees, $seesPriceBuildup, $canEditProducts, $order, $__copiedId, $__money, $__productReasonRequired, $pricesFixed): void {
     $__lc = $linePricing['lines'][(int) $p['id']] ?? null;
     $__copyOf = \App\Repositories\OrderProductRepository::copiedFromLineNo($p, $products);
     $__chips = OrderLinePricing::optionChips($p);
@@ -46,9 +46,19 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
       <td class="num"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) ($p['quantity'] ?? '')) ?></td>
       <td><?= htmlspecialchars((string) ($p['unit'] ?? '')) ?></td>
       <?php if ($sees['selling']): ?>
-        <td class="num"><?= $__money($p['unit_price']) ?></td>
+        <td class="num"><?= $__money($p['unit_price']) ?><?php $__pricedAt = OrderLinePricing::pricedAtText($p); if ($__pricedAt !== ''): // D-374 ?><div class="muted small priced-at"><?= htmlspecialchars($__pricedAt) ?></div><?php endif; ?></td>
         <td class="num"><?= $__money($p['fob_value']) ?></td>
-        <td class="line-check"><?php include __DIR__ . '/_line_price.php'; ?></td>
+        <td class="line-check"><?php include __DIR__ . '/_line_price.php'; ?>
+          <?php // Owner decision D-374: today's price differs from the line's — one click takes it (only while prices are not fixed). ?>
+          <?php if ($canEditProducts && empty($pricesFixed) && $__lc !== null && !$__lc['fixed'] && $__lc['figures'] !== null
+                    && ($p['unit_price'] === null || abs((float) $p['unit_price'] - round((float) $__lc['figures']['quote'], 2)) > 0.004)): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/todays-price" class="inline-form todays-price">
+              <?= \App\Helpers\Csrf::field() ?>
+              <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" aria-label="Reason"><?php endif; ?>
+              <button type="submit" class="btn-sm btn-secondary" title="Today's rate gives this price; nothing changes until you click">Use today's price (<?= number_format((float) $__lc['figures']['quote'], 2) ?>)</button>
+            </form>
+          <?php endif; ?>
+        </td>
       <?php endif; ?>
       <?php if ($canEditProducts): ?>
         <td class="line-actions">

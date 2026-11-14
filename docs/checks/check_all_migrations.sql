@@ -13,9 +13,12 @@
 -- (a new column, a new table, or a new setting row). Plain SELECTs only (no variables, no PREPARE).
 SELECT q.migration AS `Migration`, q.what AS `What it does`, q.status AS `Status`
 FROM (
-  SELECT '(none yet)' AS migration,
-         'No migration since the fresh install of 14 Nov 2026 (D-372)' AS what,
-         'nothing to run' AS status
+  SELECT '2026-11-14a' AS migration,
+         'Order lines remember the rate their price was set at (D-374)' AS what,
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'order_products'
+                  AND column_name IN ('priced_fx_rate', 'priced_at'))
+              WHEN 2 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END AS status
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

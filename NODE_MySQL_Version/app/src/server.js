@@ -1165,6 +1165,7 @@ app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermissio
 app.post('/orders/:id/products/:productId/price-approval-request', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.requestLinePriceApproval));
 app.get('/orders/:id/products/:productId/price-approval', requireAuth, requirePermission('manage_pricing'), asyncHandler(ordersController.linePriceApproval));
 app.post('/orders/:id/products/:productId/price-approval', requireAuth, requirePermission('manage_pricing'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approveLinePrice));
+app.post('/orders/:id/products/:productId/todays-price', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.useTodaysPrice));
 app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.duplicateProduct));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/received-date', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.correctBuyerPoReceivedDate));
