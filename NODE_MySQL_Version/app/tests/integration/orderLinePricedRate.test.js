@@ -112,7 +112,7 @@ describe('D-374: the rate a line was priced at', () => {
     const quote = (await orderLinePricing.forOrder(orderId)).lines[line].figures.quote;
     const agent = await login(u);
     const page = await agent.get(`/orders/${orderId}`);
-    expect(page.text).toContain('Use today&#39;s price');
+    expect(page.text).toContain("Use today's price");
     const csrf = page.text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
     await agent.post(`/orders/${orderId}/products/${line}/todays-price`).type('form').send({ _csrf: csrf, reason: '' });
 
