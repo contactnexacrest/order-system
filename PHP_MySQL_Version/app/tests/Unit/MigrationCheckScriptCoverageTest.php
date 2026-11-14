@@ -16,7 +16,8 @@ final class MigrationCheckScriptCoverageTest extends TestCase
     public function testEveryMigrationFileHasARowInTheCheckScript(): void
     {
         $root = dirname(__DIR__, 4);
-        $check = (string) file_get_contents($root . '/docs/checks/check_all_migrations.sql');
+        // Comment lines (the commented example row) do not count as a row.
+        $check = (string) preg_replace('/^\s*--.*$/m', '', (string) file_get_contents($root . '/docs/checks/check_all_migrations.sql'));
         $missing = [];
         foreach (glob($root . '/docs/migrations/*.sql') ?: [] as $file) {
             if (!preg_match('/^(\d{4}-\d{2})-(\d{2}[a-z]+)-/', basename($file), $m)) {

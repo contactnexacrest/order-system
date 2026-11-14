@@ -7,7 +7,8 @@ const path = require('path');
 describe('D-371 migration check script coverage', () => {
   it('every migration file has a row in docs/checks/check_all_migrations.sql', () => {
     const root = path.join(__dirname, '..', '..', '..', '..');
-    const check = fs.readFileSync(path.join(root, 'docs', 'checks', 'check_all_migrations.sql'), 'utf8');
+    // Comment lines (the commented example row) do not count as a row.
+    const check = fs.readFileSync(path.join(root, 'docs', 'checks', 'check_all_migrations.sql'), 'utf8').replace(/^\s*--.*$/gm, '');
     const missing = fs.readdirSync(path.join(root, 'docs', 'migrations'))
       .filter((f) => f.endsWith('.sql'))
       .filter((f) => {

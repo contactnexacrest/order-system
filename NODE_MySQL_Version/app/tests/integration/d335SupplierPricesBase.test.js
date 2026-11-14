@@ -244,19 +244,4 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     expect(Number((await productSupplierRepository.find(Number(row.id))).auto_fill)).toBe(0);
   });
 
-  it('the migration turns "add up the cost parts" into a typed price with the same total', async () => {
-    const productId = await product();
-    await db.execute('UPDATE catalog_products SET default_factory_cost = 900, default_transportation_cost = 60, default_packing_cost = 25, default_loading_cost = NULL, default_cha_cost = 20 WHERE id = :id', { id: productId });
-    const id = (await db.execute(`INSERT INTO catalog_product_suppliers (product_id, supplier_name, fob_source, fob_value, factory_cost, transportation_cost, packing_cost, loading_cost, cha_cost)
-      VALUES (:p, 'D335 computed', 'computed', NULL, 1000, NULL, NULL, 0, NULL)`, { p: productId })).insertId;
-    const before = productService.effectiveFobForSupplier(await productSupplierRepository.find(id), await productRepository.find(productId));
-    expect(before).toBe(1105);
-    const sql = fs.readFileSync(path.join(__dirname, '../../../../docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql'), 'utf8');
-    const update = sql.slice(sql.lastIndexOf('UPDATE catalog_product_suppliers s')).trim().replace(/;\s*$/, '');
-    await db.execute(update);
-    await db.execute(update);
-    const row = await productSupplierRepository.find(id);
-    expect([row.fob_source, String(row.fob_value)]).toEqual(['direct', '1105.00']);
-    expect(productService.effectiveFobForSupplier(row, await productRepository.find(productId))).toBe(before);
-  });
 });

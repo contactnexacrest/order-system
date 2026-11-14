@@ -175,7 +175,7 @@ A fresh installation runs **no migration**: `schema.sql` and `seed.sql` are the 
    README "First-time setup", "Set the company's real details by SQL" (identity, bank, GSTIN,
    IEC/PAN, LUT, RCMC, ECGC). Its last query must return **0**.
 7. **SQL** tab: run the read-only migration check `docs/checks/check_all_migrations.sql` (paste
-   all of it › **Go**). On a fresh install **every** row must say **already done**. (The green
+   all of it › **Go**). On a fresh install **every** row must say **already done** (or, while no migration has been added since the fresh install of 14 Nov 2026, the one row "(none yet) … nothing to run"). (The green
    bar may say "0 total" — a phpMyAdmin display quirk; the table below it is what counts.)
 
 ---
@@ -469,7 +469,7 @@ and every backup made with it, and run 11.5 again.
 
 - [ ] `<site>/login` shows the sign-in page over **https**; the MD logged in with the e-mailed code.
 - [ ] Every address in sections 7.5 and 11.6 gives the expected answer.
-- [ ] `check_all_migrations.sql` shows every row **already done**.
+- [ ] `check_all_migrations.sql` shows every row **already done** (or "nothing to run").
 - [ ] Ten cron jobs are listed, with row 10 Day = `1`; the one-time jobs (server time, key, test
       runs) are deleted; the Cron Email is set.
 - [ ] `<backupfolder>/db/` holds an encrypted backup with its `.sha256`; Settings › Backups shows
@@ -524,7 +524,7 @@ harmless.
    5. Repeat the lock tests (7.5). Then delete the `.manual` copies.
 4. **Database:** phpMyAdmin › `<cpuser>_ops` › **SQL** › paste all of
    `docs/checks/check_all_migrations.sql` › **Go**. Every new migration has its own row.
-   - every row **already done** → nothing to run;
+   - every row **already done** (or the single row "(none yet) … nothing to run") → nothing to run;
    - a row **NEEDED** (or **PARTLY done**) → open that file from `docs/migrations/`, paste it into
      the SQL tab, **Go**. Several → **in date order** (the file names sort in the right order).
    - **#1060 Duplicate column name** on a file marked `PLAIN ALTER (owner D-371)` means that column

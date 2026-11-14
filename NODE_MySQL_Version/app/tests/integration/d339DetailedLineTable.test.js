@@ -72,11 +72,9 @@ describe('D-339 detailed product table, No. of pieces, prices in other units', (
     return req;
   };
 
-  it('new orders get the detailed table and the migration keeps old ones classic', async () => {
+  it('new orders get the detailed table', async () => {
     const col = await db.queryOne("SELECT COLUMN_DEFAULT AS d FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'line_table_layout'");
     expect(String(col.d).replace(/'/g, '')).toBe('detailed');
-    const sql = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'docs', 'migrations', '2026-11-12g-detailed-line-table.sql'), 'utf8');
-    expect(sql).toContain("SET @s := IF(@add_layout, 'UPDATE orders SET line_table_layout = ''classic''', 'SELECT 1');");
   });
 
   it('a classic order prints exactly as before', async () => {

@@ -80,12 +80,10 @@ final class D339DetailedLineTableTest extends DbTestCase
         return self::flat((string) shell_exec('pdftotext ' . escapeshellarg((string) $file['server_path']) . ' -'));
     }
 
-    public function testNewOrdersGetTheDetailedTableAndTheMigrationKeepsOldOnesClassic(): void
+    public function testNewOrdersGetTheDetailedTable(): void
     {
         $default = Database::connection()->query("SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'line_table_layout'")->fetchColumn();
         self::assertSame('detailed', trim((string) $default, "'"));
-        $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-12g-detailed-line-table.sql');
-        self::assertStringContainsString("SET @s := IF(@add_layout, 'UPDATE orders SET line_table_layout = ''classic''', 'SELECT 1');", $sql);
     }
 
     public function testAClassicOrderPrintsExactlyAsBefore(): void

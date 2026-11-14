@@ -342,19 +342,4 @@ describe('Prices fixed by the approved Quotation; the Products & prices amendmen
     expect(fs.readFileSync(path.join(__dirname, '../../templates/AMD/payment_terms_amendment.njk'), 'utf8')).not.toContain('products_amendment');
   });
 
-  it('the migration back-fills orders with an approved Quotation', async () => {
-    const [fixedOrder, ids] = await mockupOrder();
-    const qt = await createTestDocument(fixedOrder, 'QT', 'approved');
-    await db.execute('UPDATE orders SET pricing_fx_rate_at_pi = 84.2500 WHERE id = :o', { o: fixedOrder });
-    const [openOrder] = await mockupOrder();
-    await createTestDocument(openOrder, 'QT', 'draft');
-    const sql = fs.readFileSync(path.join(__dirname, '../../../../docs/migrations/2026-11-12h-price-lock-and-products-amendment.sql'), 'utf8');
-    const args = ['-h', env.get('DB_HOST', '127.0.0.1'), '-P', String(env.get('DB_PORT', '3306')), '-u', env.get('DB_USERNAME'), `-p${env.get('DB_PASSWORD', '')}`, env.get('DB_DATABASE')];
-    for (let run = 0; run < 2; run++) execFileSync('mysql', args, { input: sql });
-    const o = await orderRepository.find(fixedOrder);
-    expect([Number(o.prices_fixed_by_document_id), String(o.pricing_fx_rate_at_qt)]).toEqual([qt, '84.2500']);
-    expect(o.prices_fixed_at).not.toBeNull();
-    expect(String((await orderProductRepository.find(ids[0])).qt_fixed_unit_price)).toBe('1950.00');
-    expect((await orderRepository.find(openOrder)).prices_fixed_at).toBeNull();
-  });
 });

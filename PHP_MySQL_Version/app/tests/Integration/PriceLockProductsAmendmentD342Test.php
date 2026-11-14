@@ -337,30 +337,4 @@ final class PriceLockProductsAmendmentD342Test extends DbTestCase
         self::assertStringNotContainsString('products_amendment', $tpl, 'the payment-terms template is untouched by D-342');
     }
 
-    public function testTheMigrationBackfillsOrdersWithAnApprovedQuotation(): void
-    {
-        $pdo = Database::connection();
-        [$fixedOrder, $ids] = $this->mockupOrder();
-        $qt = $this->createTestDocument($fixedOrder, 'QT', 'approved');
-        $pdo->prepare('UPDATE orders SET pricing_fx_rate_at_pi = 84.2500 WHERE id = :o')->execute(['o' => $fixedOrder]);
-        [$openOrder] = $this->mockupOrder();
-        $this->createTestDocument($openOrder, 'QT', 'draft');
-        $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-12h-price-lock-and-products-amendment.sql');
-        $cmd = ['mysql', '-h', \App\Config\Env::get('DB_HOST', '127.0.0.1'), '-P', \App\Config\Env::get('DB_PORT', '3306'), '-u', \App\Config\Env::get('DB_USERNAME'),
-            '-p' . \App\Config\Env::get('DB_PASSWORD', ''), 'nexacrest_phpunit_test'];
-        for ($run = 0; $run < 2; $run++) {
-            $p = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-            fwrite($pipes[0], $sql);
-            fclose($pipes[0]);
-            $err = stream_get_contents($pipes[2]);
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            self::assertSame(0, proc_close($p), 'the migration runs (twice): ' . $err);
-        }
-        $o = OrderRepository::find($fixedOrder);
-        self::assertSame([$qt, '84.2500'], [(int) $o['prices_fixed_by_document_id'], (string) $o['pricing_fx_rate_at_qt']], 'past the PI: the PI\'s rate');
-        self::assertNotNull($o['prices_fixed_at']);
-        self::assertSame('1950.00', (string) OrderProductRepository::find($ids[0])['qt_fixed_unit_price']);
-        self::assertNull(OrderRepository::find($openOrder)['prices_fixed_at'], 'no approved Quotation: not fixed');
-    }
 }

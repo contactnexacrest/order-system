@@ -2,7 +2,7 @@
 
 Prepared 5 Nov 2026 (Phase 0C.1), updated 13 Nov 2026. Work through it top to bottom on go-live day, and tick each line. The technical install steps are in each stack's `README.md` under "First-time setup"; on Bluehost (cPanel) follow **`docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`**, the click-by-click server guide (sections 0–12 for a new install, 13 for routine checks, 14 for updates). This list is the business view of the same process.
 
-**A site that is already live** (its database already holds data) does not reinstall: it follows section **H. Upgrade of 11 Nov 2026** at the end (it covers the builds of 11, 12 and 13 Nov 2026, migrations `2026-11-11a` … `2026-11-13g`), then checks the settings named there.
+**A site that is already live** (its database already holds data) does not reinstall: it follows section **H. Updating a live site** at the end.
 
 Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries and each section has its own menu bar at the top of the page — written *Left-menu entry › menu-bar item*. Since 13 Nov 2026 (D-362) **Global pricing settings** and **Category price rules** are not in any menu: they are buttons in the link bar at the top of the Products page (Categories · Category price rules · Global pricing settings · Fix HS codes · Link these prices (only while some are left) · Go to Suppliers). Unit names on every screen are **SQM**, **SQFT** and **CBM** (D-364).
 
@@ -159,81 +159,12 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
 - [ ] First payout run (last day of the month): check the "To pay" report; lock the team incentive (associate commissions are already fixed and become due by themselves); pay. For an associate abroad, enter the rupees the bank debited and the charges.
 - [ ] Gather the real "other costs to FOB" from the first 3–5 shipments and update the %.
 
-## H. Upgrade of 11 Nov 2026 (a site that is already live)
+## H. Updating a live site (every new release)
 
-For a database that already holds data. Owner decisions D-268, D-269, D-270–D-330 (11 Nov 2026) and D-331–D-365 (12–13 Nov 2026). Do it outside working hours, in this order:
+The live site was installed fresh from `schema.sql` + `seed.sql` on 14 Nov 2026 (owner decision D-372), so the 11–13 Nov 2026 upgrade files are gone; git history keeps them. For every later release, outside working hours (deployment guide, section 14):
 
-1. [ ] **Back up** the database and the `storage/` folder (Settings › Backups, or run the two backup scripts by hand) and keep the copy until the upgrade is checked.
-2. [ ] Put the new code in place (both stacks are built the same; PHP on Bluehost: cPanel › Git Version Control › Manage › Pull or Deploy › **Update from Remote** — never edit Git files by hand on the server; deployment guide, section 14; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
-3. [ ] Run `docs/checks/check_all_migrations.sql` in phpMyAdmin (read-only). Run only the files whose row says **NEEDED** or **PARTLY done**, from the list below, **in this order** (each is safe to run twice; MySQL-compatible; on a `PLAIN ALTER (owner D-371)` file a second run only says "#1060 Duplicate column name", which is harmless). Run the check again until every row says **already done**:
-   Before file 19 (`2026-11-13a`), run these two **read-only** checks and keep the output (they change nothing):
-
-   ```sql
-   -- 1. Products priced from an INACTIVE supplier. From 13a on such a price is no longer used:
-   --    the product shows "The supplier price used for pricing is switched off".
-   --    Reactivate the supplier (Procurement & suppliers › Suppliers) or, after the upgrade,
-   --    configure the product from an active supplier's price (Products › Configure).
-   SELECT p.id, p.name AS product, s.supplier_legal_name AS supplier
-     FROM catalog_product_suppliers cps
-     JOIN catalog_products p ON p.id = cps.product_id
-     JOIN suppliers s        ON s.id = cps.supplier_id
-    WHERE cps.is_primary = 1 AND s.is_active = 0
-    ORDER BY p.name;
-
-   -- 2. Active categories without their own stone weight or 50 mm+ factor. From 13a on they use
-   --    the global defaults (2.70 t per CBM, 50 mm+ per CBM = base price × 40) from
-   --    Global pricing settings; type the category's own value on Category price rules if it differs.
-   SELECT c.id, c.name, c.weight_t_per_cbm, c.thick_k_factor,
-          (SELECT COUNT(*) FROM catalog_products p WHERE p.category_id = c.id) AS products
-     FROM product_categories c
-    WHERE c.is_active = 1 AND (c.weight_t_per_cbm IS NULL OR c.thick_k_factor IS NULL)
-    ORDER BY c.name;
-   ```
-
-   1. [ ] `docs/migrations/2026-11-11a-quote-any-unit-piece-size.sql` (D-270–D-273)
-   2. [ ] `docs/migrations/2026-11-11b-email-settings-sessions.sql` (D-280–D-283)
-   3. [ ] `docs/migrations/2026-11-11c-associates-kyc-commission-bank.sql` (D-290–D-294)
-   4. [ ] `docs/migrations/2026-11-11d-thickness-prices-fx-hs-suppliers.sql` (D-300–D-306)
-   5. [ ] `docs/migrations/2026-11-11e-approvals-setup-defaults.sql` (D-310–D-313)
-   6. [ ] `docs/migrations/2026-11-11f-plain-language-email-templates.sql` (D-330)
-   7. [ ] `docs/migrations/2026-11-11g-order-comment-email-status.sql` (D-268)
-   8. [ ] `docs/migrations/2026-11-11h-tt-clause-bank-name.sql` (D-331: the T/T definition names the bank from Settings › Company › Bank name; documents print as before)
-   9. [ ] `docs/migrations/2026-11-12a-settings-plain-labels.sql` (D-332: plain help sentences under the settings on Settings › Company; keys and values unchanged)
-   10. [ ] `docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql` (D-335: supplier prices get a BASE for orders and TYPED / CALCULATED marks; "add up the cost parts" prices become typed prices with the same total — no price changes)
-   11. [ ] `docs/migrations/2026-11-12c-annexure-b-as-per-annexure.sql` (D-336: order lines "As per annexure", Annexure B (as shipped), the annexure printed with the CI / PL — new columns only, existing orders print as before)
-   12. [ ] `docs/migrations/2026-11-12d-buyer-details-refresh-approval.sql` (D-337: requests to update the buyer details of an order with an issued document, permission "Approve buyer details change" for MD and ED, self-approval rule MD and ED — new table and rows only, no order changes)
-   13. [ ] `docs/migrations/2026-11-12e-follow-ups-d338.sql` (D-338: reorder request lines can say "As per annexure" — one new column, no data change)
-   14. [ ] `docs/migrations/2026-11-12f-buyer-details-self-approval-md-ed.sql` (D-337: the self-approval rule for buyer details changes ticks the Executive Director too — one row, no order data change)
-   15. [ ] `docs/migrations/2026-11-12g-detailed-line-table.sql` (D-339: the detailed product table on the QT / PI / OC / CI / Buyer PO / Packing List, No. of pieces and Size note on an order line — every order that already exists is set to the classic table, so its documents print exactly as before; orders created after the upgrade get the detailed table)
-   16. [ ] `docs/migrations/2026-11-12h-price-lock-and-products-amendment.sql` (D-342: prices and products fixed by the approved Quotation, the "Products & prices" amendment — every order that already has an approved Quotation is fixed now (its rate: the PI's rate when past the PI, else today's pricing rate) and its lines change only through an amendment from then on)
-   17. [ ] `docs/migrations/2026-11-12i-monument-option-and-defaults.sql` (D-347: Size / format option "Monument (cut to size)" at 0 %; and the owner's defaults — e-mail Testing mode ON, team incentive ON, other costs 5.5 %, margin 15 %. Part 2 overwrites current values: skip it if the live values are already right. Switch Testing mode OFF on go-live day.)
-   18. [ ] `docs/migrations/2026-11-12j-surface-finish-one-list.sql` (D-357: one list of surface-finish names — Settings › Lists › surface_finish names every finish, Pricing › Specifications keeps the price only; the base finish ("Polished", or "Mirror Finish" as renamed on the live site) becomes "Natural Polish", Natural/Sandblasted → Sandblasted, Leather/Satin → Leather, Brushed added to Settings, Rock-Pitched and Bush-Hammered get options with no price change; prices unchanged; lines of orders whose Quotation is not approved yet are renamed, other orders and issued documents keep the old names. Afterwards check Settings › Lists › surface_finish: any value it did not recognise is kept as it is, active, with "no price change yet".)
-   19. [ ] `docs/migrations/2026-11-13a-suppliers-products-configure.sql` (D-359: suppliers, products and the configured base price — a per-offer Active switch on every supplier price (all ON), each product's configured base price filled with the price it is priced from today (it keeps following the supplier price "used for pricing"), the category's own margin / other costs / buffer % (empty = follow global), a "follow global" flag per product, and the global physical defaults 2.70 t/CBM, 27 t, 8 CBM, × 40. No selling price changes. An offer of an inactive supplier is no longer used for pricing: check Suppliers for inactive suppliers whose price is "used for pricing".)
-   20. [ ] `docs/migrations/2026-11-13b-products-fixed-base-and-link-legacy.sql` (D-361: every product's base price becomes FIXED at exactly the price it uses today — no selling price changes; when a supplier's price changes later the product shows "Supplier prices changed: highest is now ₹X — Use ₹X" and nothing changes until a manager clicks it. Supplier prices typed before the Suppliers directory are linked automatically where the typed name equals exactly one active supplier's legal name; the rest are listed under Products › "Link these prices (N)". Products that exist now with no linked supplier stay active and quotable with a red "No supplier yet" badge until a supplier is linked. The Supplier PO keeps the supplier offer chosen, its quoted price and a reason when the agreed price differs. The last line of output shows the counts; afterwards open Products › "Link these prices" and link the remaining rows.)
-   21. [ ] `docs/migrations/2026-11-13c-permission-descriptions.sql` (text only: the descriptions of `record_market_prices`, `edit_order_post_confirmation` and `manage_compliance_task_types` on Users & roles › Roles and permissions say what they really unlock today; no permission, grant or role changes. The last line of output says "3 of 3".)
-   22. [ ] `docs/migrations/2026-11-13d-expense-cost-bank-reference.sql` (owner decision 13 Nov 2026, QA ZOH-005, rule D-212: order expenses and order costs get a "Bank reference (UTR / transaction ID)" — required on the form when paid from the company account — and their Zoho Books description names the order, what it was paid from and the UTR; three new empty columns, no data change. On the next Zoho sync every order expense and order cost already in Books is updated once with the new description (amount, date and accounts unchanged). The last line of output says "3 of 3".)
-   23. [ ] `docs/migrations/2026-11-13e-quantity-warning-levels.sql` (owner decision item 10a: the six large-quantity levels per unit — SQM 30,000, SQFT 300,000, CBM 500, TON 600, PCS 600,000, RMT 60,000 — added to Settings › Orders only where missing. One order line or Domestic Trade line above about 20 containers of its unit then saves only with "I confirm this quantity" ticked (logged); above 1,000,000 in any unit it is refused. The last line of output says "6 of 6".)
-   24. [ ] `docs/migrations/2026-11-13f-remember-office-computer-7-days.sql` (owner decision D-369: "Remember an office computer for … days" becomes 7 where it is still the old 30; a value already changed in Settings is kept). Check Settings › Security shows 7.
-   25. [ ] `docs/migrations/2026-11-13g-freeze-prices-at-pi.sql` (owner decision D-370, closes the D-342 gap HNT-L05: prices, products and the exchange rate are fixed at the first approved Quotation or, if none was approved, at the first approved Proforma Invoice. **First** run the read-only list in `docs/migrations/README.md` ("Before 2026-11-13g") and show it to the owner: those orders — an approved / sent PI (or later document) but prices not fixed — are fixed by this file at their PI: the rate kept at the PI, each line's price as it is now, fixed by the PI. No schema change, no document changes; safe to run twice; it runs in phpMyAdmin too. The last line must say "0 still to fix". Then open one of the listed orders: the products table is read-only with "Prices and products are fixed by the approved Proforma Invoice of …".)
-
-   `mysql -u <user> -p <database> < docs/migrations/<file>.sql` for each. The files keep the company's real details, bank, GSTIN, LUT and RCMC as they are.
-4. [ ] **PHP:** create `storage/sessions/` and make it writable by the web server.
-5. [ ] Add the **exchange-rate job** at 07:05 IST: PHP `5 7 * * * php …/app/cron/fetch_fx_rate.php`; Node `5 7 * * * … node src/jobs/fetchFxRate.js` (or restart the app when `RUN_JOBS_IN_PROCESS=true` — `scheduler.js` runs it).
-6. [ ] Check outbound HTTPS to `api.frankfurter.app` and `open.er-api.com`: **Products › Global pricing settings › Exchange Rate (USD → INR) › Fetch today's rate now** shows today's rate and its source in the box "Rate used for prices right now".
-7. [ ] Log in (PHP: everyone is signed out once, because sessions now live in `storage/sessions/`) and open **Settings › Setup checklist**; deal with every **Needed** item.
-8. [ ] **Settings › E-mail:** check **Testing mode**. It replaced "Mail sending enabled" with the opposite meaning: if mail sending was off, Testing mode is now **on** and buyers and suppliers still get no e-mail. Switch it off when the site should e-mail buyers and suppliers. Name the responsible person and backup for the company-level alerts.
-9. [ ] **Settings › Security:** the new idle timeouts (4 h staff, 2 h buyers and associates, 12 h staff limit) replaced the single 30-minute setting; "This is my own office computer" is 30 days unless you had chosen another number.
-10. [ ] **Settings › Document clean-up:** the upgrade switched the clean-up on where it was off (drafts 90 days, superseded never-sent 365 days, CAFIN latest only) and password expiry off where it was 90 days. Change them back here if the company wants. The nightly clean-up job starts removing copies under these rules.
-11. [ ] **Products › Category price rules** and two or three products: existing supplier prices were turned into thickness rows (the old base price became the 20 mm price per SQM; a per-CBM price became the 50 mm+ price). Check that the 30 mm and 50 mm+ figures are right — a 30 mm price on a product priced per CBM is now worked out from the 20 mm price (D-300).
-    - [ ] **Products › Market prices** of two or three Natural Stone products (D-335): each supplier price shows a price card with its **BASE** (◉). A product sold per CBM whose per-CBM price was typed has "50 mm and above" as the base, others 20 mm; change it with "make base" if needed. Older prices still work out missing thicknesses each time until someone adds a price with "+ Add / update a price".
-12. [ ] **Products › HS codes › Fix HS codes on products** (once): choose a master-list code for every product listed.
-13. [ ] **Products › Link these prices (N)** (once, after migration 13b): pick or quick-add the supplier for each remaining row; complete the details of each supplier marked *Details pending*.
-    - [ ] **Products** list (D-361, D-365): every product priced today is **Configured** at exactly the price it used before (no selling price changed). Check the filters *No active supplier* and *No supplier yet*: link a supplier (**Link a supplier**) or switch on an offer (Procurement & suppliers › Suppliers › Offer active) for each product listed. Compare with the output of the two checks run before 13a.
-    - [ ] **Settings › E-mail:** migration 12i Part 2 switched **Testing mode ON** (and set team incentive on, other costs 5.5 %, margin 15 %). If the live site already e-mails buyers and suppliers, switch Testing mode **OFF** again; correct the margin and other costs on Global pricing settings if the company had other values.
-    - [ ] **Settings › Lists › surface_finish** (D-357): any finish name the merge did not recognise is kept as it is, active, with no price change yet; rename or switch it off here.
-14. [ ] **Open orders with Natural Stone lines in BOX, NOS, SET, KG or MT:** such a line is refused on its next edit until the MD adds the unit (Products › Categories › Natural Stone) or the line is changed to CBM, SQM, SQFT, PCS, Ton or RMT. A line in another unit without its piece size shows "Size needed" and holds the QT / PI until the size is given (D-270).
-15. [ ] **Associates:** associates already accepted have **60 days** from the upgrade day to add an address proof before their payouts are held (D-290). The payout day moved from the 5th to the **last day of the month** (only where it was still 5). Bank changes that were already waiting for staff count as confirmed by the associate.
-    - [ ] **Settings › Orders** (item 10a): the six "Large quantity: confirm a line above …" levels show 30,000 SQM, 300,000 SQFT, 500 CBM, 600 TON, 600,000 PCS and 60,000 RMT; the Admin or MD changes them there if the company's usual container loads differ.
-16. [ ] **Users & roles:** check who holds "See associate commission rules" and the new "Bank details" self-approval rule.
-17. [ ] Tell staff about the new menus (SOP 00, "Finding your way around"), the **Approvals** page and the order action bar; and, from the 12–13 Nov builds: orders with an approved Quotation are fixed (changes only through Amendments › Products & prices, D-342 — migration 12h fixed existing orders); orders that existed before the upgrade keep the classic product table on their documents, new orders get the detailed table (D-339); products are added from Procurement & suppliers › Suppliers › + Add product and configured on Products › Configure (D-360, D-361); the Supplier PO starts from a supplier offer (D-361).
-18. [ ] **Tutorial videos:** do not send the recorded videos to new staff before the owner has decided on `tutorials/VIDEO_PROGRESS.md`, "Out of date after the 11 Nov 2026 build" and "Also out of date after the 12 Nov 2026 build".
+1. [ ] **Back up:** Settings › Backups shows last night's database and documents backups OK (or run `scripts/backup_db.sh` once with a one-time cron job).
+2. [ ] **Code:** cPanel › Git Version Control › Manage › Pull or Deploy › **Update from Remote**. Never edit Git files by hand on the server. Node: replace the app folder and `pm2 restart nexacrest` after step 3.
+3. [ ] **Database:** run `docs/checks/check_all_migrations.sql` in phpMyAdmin (read-only). Run every file in `docs/migrations/` whose row says **NEEDED** or **PARTLY done**, in date order; "#1060 Duplicate column name" on a `PLAIN ALTER (owner D-371)` file is harmless. Run the check again until every row says **already done** (or "nothing to run").
+4. [ ] **After the update:** `scripts/*.sh` still 0700, `app/.env` still 0600, the web-lock tests still answer 403 / Not Acceptable, the cron jobs match the README; log in and open an order.
+5. [ ] **Release notes:** read the README "Follow-up" section of that date for settings to check, and tell staff what changed.

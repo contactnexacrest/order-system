@@ -49,8 +49,8 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
   with the dev seed staff accounts (see `e2e/README.md`).
 * Recording writes demo records to the dev database. Do not record while a test run uses the
   same database (in the cloud session: `flock <scratchpad>/test4.lock node tutorials/run.js C01`).
-* The dev database must have every migration up to and including `2026-11-13b-products-fixed-base-and-link-legacy.sql`
-  (in `docs/migrations`; the 12 Nov ones add "As per annexure", the detailed line table, the price lock,
+* The dev database must be built from the current `schema.sql` + `seed.sql` (or have had every migration up to
+  `2026-11-13b-products-fixed-base-and-link-legacy.sql`, removed 14 Nov 2026 by D-372 and kept in git history; the 12 Nov ones add "As per annexure", the detailed line table, the price lock,
   "Natural Polish" and the e-mail Testing mode default; 13a / 13b add supplier offers and configured base prices).
   The scripts expect the app of 13 Nov 2026: a product is offered in "Pick from Products" only when it is
   configured and has an active supplier (the set-ups `_b01.js` / `_b02.js` create one, linked to the demo

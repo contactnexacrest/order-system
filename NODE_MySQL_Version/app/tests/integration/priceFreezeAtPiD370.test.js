@@ -200,42 +200,4 @@ describe('Prices fixed at the first approved Quotation or, failing that, the fir
     expect(await productsAmendmentService.cannotStart(o)).toBe('Neither a Quotation nor a Proforma Invoice of this order is approved yet — change its lines on the order page (Products).');
   });
 
-  it('the migration fixes orders with a sent PI and a draft Quotation', async () => {
-    const [withRate, ids] = await order();
-    await createTestDocument(withRate, 'QT', 'draft');
-    const pi = await createTestDocument(withRate, 'PI', 'sent');
-    await db.execute('UPDATE orders SET pricing_fx_rate_at_pi = 84.2500 WHERE id = :o', { o: withRate });
-    const [noRate] = await order();
-    const piNoRate = await createTestDocument(noRate, 'PI', 'approved');
-    const [draftOnly] = await order();
-    await createTestDocument(draftOnly, 'PI', 'draft');
-    const [qtFixed] = await order();
-    const qtId = await approve(qtFixed, 'QT');
-    const before = await orderRepository.find(qtFixed);
-    await db.execute("UPDATE pricing_settings SET setting_value = 'manual' WHERE setting_key = 'fx_mode'");
-    await db.execute("UPDATE pricing_settings SET setting_value = '88.1200' WHERE setting_key = 'pricing_fx_rate'");
-
-    const sql = fs.readFileSync(path.join(__dirname, '../../../../docs/migrations/2026-11-13g-freeze-prices-at-pi.sql'), 'utf8');
-    // phpMyAdmin (shared hosting) switches database after an information_schema query and then refuses
-    // PREPAREd statements (#1044, 13 Nov 2026): the file must be plain statements only.
-    const code = sql.replace(/^--.*$/gm, ''); // comments may mention the words
-    expect(code).not.toContain('PREPARE');
-    expect(code.toLowerCase()).not.toContain('information_schema');
-    const args = ['-h', env.get('DB_HOST', '127.0.0.1'), '-P', String(env.get('DB_PORT', '3306')), '-u', env.get('DB_USERNAME'), `-p${env.get('DB_PASSWORD', '')}`, env.get('DB_DATABASE')];
-    for (const text of [sql, sql]) {
-      const out = execFileSync('mysql', args, { input: text }).toString();
-      expect(out).toContain('; 0 still to fix (must be 0).');
-    }
-
-    const o = await orderRepository.find(withRate);
-    expect([Number(o.prices_fixed_by_document_id), o.prices_fixed_by_type, String(o.pricing_fx_rate_at_qt)]).toEqual([pi, 'PI', '84.2500']);
-    expect(o.prices_fixed_at).not.toBeNull();
-    expect(String((await orderProductRepository.find(ids[0])).qt_fixed_unit_price)).toBe('1950.00');
-    const n = await orderRepository.find(noRate);
-    expect([Number(n.prices_fixed_by_document_id), String(n.pricing_fx_rate_at_qt)]).toEqual([piNoRate, '88.1200']);
-    expect((await orderRepository.find(draftOnly)).prices_fixed_at).toBeNull();
-    const q = await orderRepository.find(qtFixed);
-    expect([Number(q.prices_fixed_by_document_id), String(q.prices_fixed_at), String(q.pricing_fx_rate_at_qt)])
-      .toEqual([qtId, String(before.prices_fixed_at), String(before.pricing_fx_rate_at_qt)]);
-  });
 });

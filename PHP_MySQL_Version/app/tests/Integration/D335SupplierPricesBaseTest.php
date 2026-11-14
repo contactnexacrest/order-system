@@ -273,23 +273,4 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         self::assertSame(0, (int) ProductSupplierRepository::find((int) $row['id'])['auto_fill']);
     }
 
-    public function testMigrationTurnsAddUpTheCostPartsIntoATypedPriceWithTheSameTotal(): void
-    {
-        $productId = $this->product();
-        $pdo = Database::connection();
-        $pdo->prepare('UPDATE catalog_products SET default_factory_cost = 900, default_transportation_cost = 60, default_packing_cost = 25, default_loading_cost = NULL, default_cha_cost = 20 WHERE id = :id')
-            ->execute(['id' => $productId]);
-        $pdo->prepare("INSERT INTO catalog_product_suppliers (product_id, supplier_name, fob_source, fob_value, factory_cost, transportation_cost, packing_cost, loading_cost, cha_cost)
-            VALUES (:p, 'D335 computed', 'computed', NULL, 1000, NULL, NULL, 0, NULL)")->execute(['p' => $productId]);
-        $id = (int) $pdo->lastInsertId();
-        $before = (new ProductService())->effectiveFobForSupplier(ProductSupplierRepository::find($id), ProductRepository::find($productId));
-        self::assertSame(1105.0, $before);
-        $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-12b-supplier-prices-base-and-calculated.sql');
-        $update = substr($sql, (int) strrpos($sql, 'UPDATE catalog_product_suppliers s'));
-        $pdo->exec($update);
-        $pdo->exec($update);
-        $row = ProductSupplierRepository::find($id);
-        self::assertSame(['direct', '1105.00'], [$row['fob_source'], (string) $row['fob_value']]);
-        self::assertSame($before, (new ProductService())->effectiveFobForSupplier($row, ProductRepository::find($productId)));
-    }
 }
