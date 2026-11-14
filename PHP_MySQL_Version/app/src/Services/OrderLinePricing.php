@@ -534,8 +534,8 @@ final class OrderLinePricing
      *
      * @return array{status: string, figures: ?array, fixed: bool, note: ?string, approval: ?array, requested: bool}
      */
-    // D-374, owner 14 Nov 2026: priced_fx_rate / priced_at are REFERENCE ONLY — shown here, never used in a calculation
-    // (the Price check uses today's rate, then orders.pricing_fx_rate_at_qt). See CLAUDE.md before using them in one.
+    // D-374, owner 14 Nov 2026: priced_fx_rate / priced_at RECORD the rate that was in use when the line's price was set
+    // (the rate itself is used: today's rate, then orders.pricing_fx_rate_at_qt). No calculation reads these stored values back; see CLAUDE.md first.
     /** D-374: "Priced at ₹91.82 per USD on 12 Nov 2026", "Rate not recorded", or '' for a line without a price. */
     public static function pricedAtText(array $line): string
     {
