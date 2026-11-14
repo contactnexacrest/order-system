@@ -1542,6 +1542,10 @@ async function deleteProduct(req, res) {
   }
 
   await orderProductRepository.softDelete(productId);
+  // Owner, 14 Nov 2026 (D-373): every removal is in the Audit Log (no prices: the log is not money-gated).
+  const qty = product.quantity !== null && product.quantity !== undefined ? ` — ${String(Number(product.quantity))} ${product.unit || ''}` : '';
+  await auditLogRepository.log(req.user.id, 'ORDER_LINE_REMOVED', 'order_products', productId, 'line_no',
+    `Line ${Number(product.line_no)}: ${product.description}${qty}`.trimEnd(), null, reason !== '' ? reason : null);
   await orderProductRepository.renumber(orderId); // owner, 14 Nov 2026: lines stay 1, 2, 3 … with no gap
   flash.set(req, 'success', 'Product line removed.');
   res.redirect(`/orders/${orderId}`);

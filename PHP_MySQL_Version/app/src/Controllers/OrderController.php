@@ -1539,6 +1539,10 @@ final class OrderController
         }
 
         OrderProductRepository::softDelete($productId);
+        // Owner, 14 Nov 2026 (D-373): every removal is in the Audit Log (no prices: the log is not money-gated).
+        $__qty = $product['quantity'] !== null ? ' — ' . (string) (float) $product['quantity'] . ' ' . (string) ($product['unit'] ?? '') : '';
+        AuditLogRepository::log((int) $user['id'], 'ORDER_LINE_REMOVED', 'order_products', $productId, 'line_no',
+            'Line ' . (int) $product['line_no'] . ': ' . (string) $product['description'] . rtrim($__qty), null, $reason !== '' ? $reason : null);
         OrderProductRepository::renumber($orderId); // owner, 14 Nov 2026: lines stay 1, 2, 3 … with no gap
         Flash::set('success', 'Product line removed.');
         header("Location: /orders/{$orderId}");
