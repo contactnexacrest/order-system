@@ -88,9 +88,9 @@
         <label>Port of Discharge (new / not listed)
           <input type="text" name="port_of_discharge_text" value="<?= htmlspecialchars($order['port_of_discharge_text'] ?? '') ?>" placeholder="Buyer's nominated discharge port" maxlength="150">
         </label>
-        <label>Container Type
-          <select name="container_type">
-            <option value="">— To Be Confirmed —</option>
+        <label>Container Type *
+          <select name="container_type" required>
+            <option value="">Choose…</option>
             <?php foreach ($containerTypes as $o): ?>
               <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['option_value'] === $order['container_type'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
             <?php endforeach; ?>

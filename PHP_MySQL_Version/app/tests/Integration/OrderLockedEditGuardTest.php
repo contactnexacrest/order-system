@@ -67,7 +67,7 @@ final class OrderLockedEditGuardTest extends DbTestCase
         $userId = $this->createTestUser('Export Executive');
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = [
-            'incoterm_id' => $original['incoterm_id'] + 0, // keep same incoterm, change currency below
+            'container_type' => '20ft Standard', 'incoterm_id' => $original['incoterm_id'] + 0, // keep same incoterm, change currency below
             'currency_id' => $this->otherCurrencyId((int) $original['currency_id']),
             'reason' => 'Trying to edit a closed order.',
         ];
@@ -88,7 +88,7 @@ final class OrderLockedEditGuardTest extends DbTestCase
         $_SESSION['_auth_user_id'] = $userId;
         $newCurrencyId = $this->otherCurrencyId((int) $original['currency_id']);
         $_POST = [
-            'incoterm_id' => $original['incoterm_id'],
+            'container_type' => '20ft Standard', 'incoterm_id' => $original['incoterm_id'],
             'currency_id' => $newCurrencyId,
             'reason' => 'Correcting a genuine currency mistake found after closure.',
         ];

@@ -505,6 +505,13 @@ async function store(req, res) {
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
   }
+  // Owner decision D-376 (14 Nov 2026): the container type is required.
+  if (!str(body.container_type)) {
+    flash.set(req, 'error', 'Choose the container type.');
+    flash.setOld(req, body);
+    res.redirect(`/orders/create?client_id=${clientId}`);
+    return;
+  }
   // Owner decision D-257 Phase 2: rupees are for Domestic Trade orders only; a domestic order has its own form.
   const inrCurrency = await db.queryOne("SELECT 1 AS x FROM currencies WHERE id = :id AND code = 'INR'", { id: currencyId });
   const domDivisionId = await require('../services/domesticOrderService').divisionId();
@@ -859,6 +866,13 @@ async function updateDetails(req, res) {
   const currencyId = parseInt(body.currency_id || 0, 10);
   if (!incotermId || !currencyId) {
     flash.set(req, 'error', 'Incoterm and currency are both required.');
+    flash.setOld(req, body);
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+  // Owner decision D-376 (14 Nov 2026): the container type is required.
+  if (!str(body.container_type)) {
+    flash.set(req, 'error', 'Choose the container type.');
     flash.setOld(req, body);
     res.redirect(`/orders/${orderId}/edit`);
     return;

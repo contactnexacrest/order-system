@@ -167,7 +167,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
         (new OrderController())->editDetails(['id' => (string) $orderId]);
         $fingerprint = $this->fingerprintFrom((string) ob_get_clean());
         $form = static fn (array $over): array => $over + [
-            'incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'edit_fingerprint' => $fingerprint,
+            'container_type' => '20ft Standard', 'incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'edit_fingerprint' => $fingerprint,
         ];
 
         // A saves first.
@@ -188,7 +188,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
         // Reloaded, B saves normally.
         ob_start();
         (new OrderController())->editDetails(['id' => (string) $orderId]);
-        $_POST = ['incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'port_of_discharge_text' => 'Rotterdam, Netherlands', 'est_lead_time_text' => '45 days', 'edit_fingerprint' => $this->fingerprintFrom((string) ob_get_clean())];
+        $_POST = ['container_type' => '20ft Standard', 'incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'port_of_discharge_text' => 'Rotterdam, Netherlands', 'est_lead_time_text' => '45 days', 'edit_fingerprint' => $this->fingerprintFrom((string) ob_get_clean())];
         (new OrderController())->updateDetails(['id' => (string) $orderId]);
         self::assertSame('success', $this->flash()['type']);
     }

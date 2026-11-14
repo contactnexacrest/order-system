@@ -78,7 +78,7 @@ describe('Stage-gate integrity (QA-1 regression): closeOrder + other stage-skip 
       .send({
         _csrf: orderCsrf,
         client_id: String(clientId),
-        incoterm_id: String(incoterm.id),
+        container_type: '20ft Standard', incoterm_id: String(incoterm.id),
         currency_id: String(currency.id),
         payment_preset_id: String(preset.id),
         'product_description[]': 'Test granite slab, polished',

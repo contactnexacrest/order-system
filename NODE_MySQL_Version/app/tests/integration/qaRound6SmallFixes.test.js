@@ -227,7 +227,7 @@ describe('QA Round 6 — smaller fixes', () => {
       const orderId = await createTestOrder(await createTestClient(), incoterm);
       const order = await orderRepository.find(orderId);
       const page = `/orders/${orderId}/edit`;
-      const res = await post(admin, page, { incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), indicative_freight_amount: '950', indicative_insurance_amount: '120' }, page);
+      const res = await post(admin, page, { container_type: '20ft Standard', incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), indicative_freight_amount: '950', indicative_insurance_amount: '120' }, page);
       expect([incoterm, (await flashAfter(admin, res)).type]).toEqual([incoterm, 'success']);
       const stored = (await db.queryOne('SELECT indicative_insurance_amount AS v FROM orders WHERE id = :o', { o: orderId })).v;
       expect([incoterm, stored === null ? null : String(stored)]).toEqual([incoterm, expected]);

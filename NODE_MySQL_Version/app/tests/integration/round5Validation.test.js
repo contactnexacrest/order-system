@@ -87,7 +87,7 @@ describe('Round 5 validation (Batch 6)', () => {
   it('Edit Order refuses a negative lead time and keeps what was typed', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const order = await orderRepository.find(orderId);
-    const req = fakeReq({ incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), lead_time_min_days: '-1', lead_time_max_days: '60' }, { id: String(orderId) });
+    const req = fakeReq({ container_type: '20ft Standard', incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), lead_time_min_days: '-1', lead_time_max_days: '60' }, { id: String(orderId) });
     await ordersController.updateDetails(req, fakeRes());
 
     const old = req.session._flash_old;

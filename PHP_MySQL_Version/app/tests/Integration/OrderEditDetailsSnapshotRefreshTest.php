@@ -55,7 +55,7 @@ final class OrderEditDetailsSnapshotRefreshTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = [
-            'incoterm_id' => $newIncoterm['id'],
+            'container_type' => '20ft Standard', 'incoterm_id' => $newIncoterm['id'],
             'currency_id' => $newCurrency['id'],
         ];
 
@@ -80,7 +80,7 @@ final class OrderEditDetailsSnapshotRefreshTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $userId;
         $_POST = [
-            'incoterm_id' => $original['incoterm_id'],
+            'container_type' => '20ft Standard', 'incoterm_id' => $original['incoterm_id'],
             'currency_id' => $original['currency_id'],
             'port_of_loading_id' => $newPortId,
         ];
@@ -118,7 +118,7 @@ final class OrderEditDetailsSnapshotRefreshTest extends DbTestCase
         $newIncoterm = $this->otherIncotermId((int) $original['incoterm_id']);
         $userId = $this->createTestUser('Admin');
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['incoterm_id' => $newIncoterm['id'], 'currency_id' => $original['currency_id']];
+        $_POST = ['container_type' => '20ft Standard', 'incoterm_id' => $newIncoterm['id'], 'currency_id' => $original['currency_id']];
 
         ob_start();
         (new OrderController())->updateDetails(['id' => (string) $orderId]);

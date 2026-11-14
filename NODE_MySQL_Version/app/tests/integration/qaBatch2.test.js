@@ -193,7 +193,7 @@ describe('QA batch 2 — orders, workflow, Merchant Trade money and division pag
     const order = await orderRepository.find(orderId);
     const cfr = (await db.queryOne("SELECT id FROM incoterms WHERE code = 'CFR'")).id;
     const admin = await createUser('Admin');
-    const req = fakeReq(admin.id, { id: String(orderId) }, { incoterm_id: String(cfr), currency_id: String(order.currency_id), reason: 'The buyer now wants CFR terms.' });
+    const req = fakeReq(admin.id, { id: String(orderId) }, { container_type: '20ft Standard', incoterm_id: String(cfr), currency_id: String(order.currency_id), reason: 'The buyer now wants CFR terms.' });
     await ordersController.updateDetails(req, fakeRes());
     expect(lastError(req)).toBe('The incoterm can no longer change: the freight stage (Stage 6) is already skipped for the current incoterm. Agree the change with the buyer through an amendment, and ask an administrator to correct the order.');
     expect(Number((await orderRepository.find(orderId)).incoterm_id)).toBe(Number(order.incoterm_id));

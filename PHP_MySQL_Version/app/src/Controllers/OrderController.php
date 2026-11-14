@@ -439,6 +439,13 @@ final class OrderController
             header('Location: /orders/create?client_id=' . $clientId);
             return;
         }
+        // Owner decision D-376 (14 Nov 2026): the container type is required.
+        if (trim((string) ($_POST['container_type'] ?? '')) === '') {
+            Flash::set('error', 'Choose the container type.');
+            Flash::setOld($_POST);
+            header('Location: /orders/create?client_id=' . $clientId);
+            return;
+        }
         // Owner decision D-257 Phase 2: rupees are for Domestic Trade orders only; a domestic order has its own form.
         $__inr = Database::connection()->prepare("SELECT 1 FROM currencies WHERE id = :id AND code = 'INR'");
         $__inr->execute(['id' => $currencyId]);
@@ -830,6 +837,13 @@ final class OrderController
         $currencyId = (int) ($_POST['currency_id'] ?? 0);
         if (!$incotermId || !$currencyId) {
             Flash::set('error', 'Incoterm and currency are both required.');
+            Flash::setOld($_POST);
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+        // Owner decision D-376 (14 Nov 2026): the container type is required.
+        if (trim((string) ($_POST['container_type'] ?? '')) === '') {
+            Flash::set('error', 'Choose the container type.');
             Flash::setOld($_POST);
             header("Location: /orders/{$orderId}/edit");
             return;

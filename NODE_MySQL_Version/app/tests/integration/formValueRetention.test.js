@@ -104,7 +104,7 @@ describe('Form value retention on validation failure (Batch 3 #4)', () => {
     const storeRes = await agent.post('/orders').type('form').send({
       _csrf: csrf,
       client_id: String(clientId),
-      incoterm_id: String(incoterm.id),
+      container_type: '20ft Standard', incoterm_id: String(incoterm.id),
       currency_id: String(currency.id),
       payment_preset_id: String(preset.id),
       est_lead_time_text: '45-60 days from advance receipt',
@@ -133,7 +133,7 @@ describe('Form value retention on validation failure (Batch 3 #4)', () => {
     const storeRes = await agent.post('/orders').type('form').send({
       _csrf: csrf,
       client_id: String(clientId),
-      incoterm_id: String(incoterm.id),
+      container_type: '20ft Standard', incoterm_id: String(incoterm.id),
       currency_id: String(currency.id),
       payment_preset_id: String(preset.id),
       'product_description[]': ['First line granite node', 'Second line marble node'],

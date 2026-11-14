@@ -73,7 +73,7 @@ describe('Order Edit Details snapshot refresh (90-item backlog "standalone order
 
     const req = {
       params: { id: String(orderId) }, session: {}, user: { id: userId }, permissions: {},
-      body: { incoterm_id: String(newIncoterm.id), currency_id: String(newCurrency.id) },
+      body: { container_type: '20ft Standard', incoterm_id: String(newIncoterm.id), currency_id: String(newCurrency.id) },
     };
     await ordersController.updateDetails(req, fakeRes());
 
@@ -92,7 +92,7 @@ describe('Order Edit Details snapshot refresh (90-item backlog "standalone order
 
     const req = {
       params: { id: String(orderId) }, session: {}, user: { id: userId }, permissions: {},
-      body: { incoterm_id: String(original.incoterm_id), currency_id: String(original.currency_id), port_of_loading_id: String(newPortId) },
+      body: { container_type: '20ft Standard', incoterm_id: String(original.incoterm_id), currency_id: String(original.currency_id), port_of_loading_id: String(newPortId) },
     };
     await ordersController.updateDetails(req, fakeRes());
 
@@ -122,7 +122,7 @@ describe('Order Edit Details snapshot refresh (90-item backlog "standalone order
     const userId = await createTestUser('Admin');
     const req = {
       params: { id: String(orderId) }, session: {}, user: { id: userId }, permissions: {},
-      body: { incoterm_id: String(newIncoterm.id), currency_id: String(original.currency_id) },
+      body: { container_type: '20ft Standard', incoterm_id: String(newIncoterm.id), currency_id: String(original.currency_id) },
     };
     await ordersController.updateDetails(req, fakeRes());
 

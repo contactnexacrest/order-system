@@ -86,7 +86,7 @@ describe('Audit log coverage (External QA report L-23)', () => {
     const preset = await db.queryOne("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'");
     const req = fakeReq({ id: userId }, {
       client_id: String(clientId),
-      incoterm_id: String(incoterm.id),
+      container_type: '20ft Standard', incoterm_id: String(incoterm.id),
       currency_id: String(currency.id),
       payment_preset_id: String(preset.id),
       product_description: ['L-23 audit test granite slab'],

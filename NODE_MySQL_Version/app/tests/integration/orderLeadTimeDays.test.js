@@ -58,7 +58,7 @@ describe('Order lead-time min/max days (90-item backlog "dual lead-time fields i
       user: { id: userId },
       body: {
         client_id: String(clientId),
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         payment_preset_id: String(await paymentPresetId()),
         est_lead_time_text: '45-60 days from advance receipt',
@@ -89,7 +89,7 @@ describe('Order lead-time min/max days (90-item backlog "dual lead-time fields i
       user: { id: userId },
       body: {
         client_id: String(clientId),
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         payment_preset_id: String(await paymentPresetId()),
         product_description: ['No lead-time granite slab'],
@@ -116,7 +116,7 @@ describe('Order lead-time min/max days (90-item backlog "dual lead-time fields i
       params: { id: String(orderId) },
       session: {},
       body: {
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         lead_time_min_days: '20',
         lead_time_max_days: '30',

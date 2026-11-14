@@ -146,6 +146,7 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await page.goto('/orders/create');
     await page.locator('select[name="client_id"]').selectOption(String(clientId));
     await page.locator('select[name="incoterm_id"]').selectOption({ label: 'CIF' });
+    await page.locator('select[name="container_type"]').selectOption({ label: '20ft Standard' }); // D-376: required
     const eurValue = await page
       .locator('select[name="currency_id"] option', { hasText: 'EUR' })
       .first()
@@ -242,6 +243,7 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await page.goto('/orders/create');
     await page.locator('select[name="client_id"]').selectOption(String(clientId));
     await page.locator('select[name="incoterm_id"]').selectOption({ label: 'FOB' });
+    await page.locator('select[name="container_type"]').selectOption({ label: '20ft Standard' }); // D-376: required
     const usdValue = await page
       .locator('select[name="currency_id"] option', { hasText: 'USD' })
       .first()

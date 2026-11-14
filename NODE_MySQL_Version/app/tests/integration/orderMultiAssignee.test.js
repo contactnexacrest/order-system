@@ -101,7 +101,7 @@ describe('Order multi-assignee visibility', () => {
     const res = await agent.post('/orders').type('form').send({
       _csrf: csrf,
       client_id: String(clientId),
-      incoterm_id: String(incoterm.id),
+      container_type: '20ft Standard', incoterm_id: String(incoterm.id),
       currency_id: String(currency.id),
       payment_preset_id: String(preset.id),
       'product_description[]': 'Multi-assignee auto-assignment test slab',

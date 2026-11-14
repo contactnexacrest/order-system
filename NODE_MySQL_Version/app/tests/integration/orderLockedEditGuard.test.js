@@ -88,7 +88,7 @@ describe('Order locked edit guard (90-item backlog Phase 6 Item 4)', () => {
     const req = {
       params: { id: String(orderId) }, session: {}, user: { id: userId },
       permissions: { edit_locked_data: false },
-      body: { incoterm_id: String(original.incoterm_id), currency_id: String(newCurrencyId), reason: 'Trying to edit a closed order.' },
+      body: { container_type: '20ft Standard', incoterm_id: String(original.incoterm_id), currency_id: String(newCurrencyId), reason: 'Trying to edit a closed order.' },
     };
 
     await ordersController.updateDetails(req, fakeRes());
@@ -106,7 +106,7 @@ describe('Order locked edit guard (90-item backlog Phase 6 Item 4)', () => {
     const req = {
       params: { id: String(orderId) }, session: {}, user: { id: userId },
       permissions: { edit_locked_data: true },
-      body: { incoterm_id: String(original.incoterm_id), currency_id: String(newCurrencyId), reason: 'Correcting a genuine currency mistake found after closure.' },
+      body: { container_type: '20ft Standard', incoterm_id: String(original.incoterm_id), currency_id: String(newCurrencyId), reason: 'Correcting a genuine currency mistake found after closure.' },
     };
 
     await ordersController.updateDetails(req, fakeRes());

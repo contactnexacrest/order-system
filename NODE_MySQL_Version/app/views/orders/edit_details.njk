@@ -87,9 +87,9 @@
         <label>Port of Discharge (new / not listed)
           <input type="text" name="port_of_discharge_text" value="{{ order.port_of_discharge_text or '' }}" placeholder="Buyer's nominated discharge port" maxlength="150">
         </label>
-        <label>Container Type
-          <select name="container_type">
-            <option value="">— To Be Confirmed —</option>
+        <label>Container Type *
+          <select name="container_type" required>
+            <option value="">Choose…</option>
             {% for o in containerTypes %}
               <option value="{{ o.option_value }}" {{ 'selected' if o.option_value == order.container_type }}>{{ o.option_value }}</option>
             {% endfor %}

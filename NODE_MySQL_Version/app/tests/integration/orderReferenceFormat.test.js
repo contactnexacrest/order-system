@@ -56,7 +56,7 @@ describe('Order reference format (90-item backlog "order-ID prefix change to SC/
       user: { id: userId },
       body: {
         client_id: String(clientId),
-        incoterm_id: String(incoterm.id),
+        container_type: '20ft Standard', incoterm_id: String(incoterm.id),
         currency_id: String(currency.id),
         payment_preset_id: String(preset.id),
         product_description: ['Order ref format test granite slab'],

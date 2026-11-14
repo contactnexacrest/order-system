@@ -124,6 +124,7 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await page.goto('/orders/create');
     await page.locator('select[name="client_id"]').selectOption(String(clientId));
     await page.locator('select[name="incoterm_id"]').selectOption({ label: 'CIF' });
+    await page.locator('select[name="container_type"]').selectOption({ label: '20ft Standard' }); // D-376: required
     const eurValue = await page
       .locator('select[name="currency_id"] option', { hasText: 'EUR' })
       .first()

@@ -74,6 +74,7 @@ module.exports = {
       await d.select('select[name="incoterm_id"]', { label: 'FOB' });
       await d.select('select[name="currency_id"]', { label: 'USD — US Dollar' });
       await d.select('select[name="payment_preset_id"]', { label: 'Standard — New Buyer (40% adv / 60% bal)' });
+      await d.select('select[name="container_type"]', { label: '20ft Standard' }); // D-376: required since 14 Nov 2026
       await d.point('input[name="port_of_discharge_text"]', 900);
     } },
     { caption: 'Pick from Products', say: 'Now the product line. On a US dollar order, a goods line is picked from Products. The list offers only products that are ready to quote: configured by the product manager, with an active supplier. Any other product is greyed at the bottom, under Not offered yet, with the reason. Pick Black Galaxy Granite Slab: the description, the H S code and the unit fill in by themselves, and the product\'s options appear.', do: async (d) => {

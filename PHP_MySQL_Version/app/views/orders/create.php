@@ -94,9 +94,9 @@
             <?php endforeach; ?>
           </select>
         </label>
-        <label>Container Type
-          <select name="container_type">
-            <option value="">— To Be Confirmed —</option>
+        <label>Container Type *
+          <select name="container_type" required>
+            <option value="">Choose…</option>
             <?php foreach ($containerTypes as $o): ?>
               <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= (($old['container_type'] ?? '') === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
             <?php endforeach; ?>

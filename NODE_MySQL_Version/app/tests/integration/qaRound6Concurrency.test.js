@@ -145,7 +145,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     const order = await orderRepository.find(orderId);
     const page = `/orders/${orderId}/edit`;
     const fingerprint = fingerprintFrom((await admin.get(page)).text);
-    const form = (over) => ({ incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), edit_fingerprint: fingerprint, ...over });
+    const form = (over) => ({ container_type: '20ft Standard', incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), edit_fingerprint: fingerprint, ...over });
 
     expect((await flashAfter(await post(page, form({ port_of_discharge_text: 'Rotterdam, Netherlands' }), page))).type).toBe('success');
     const refused = await flashAfter(await post(page, form({ est_lead_time_text: '45 days' }), page));
@@ -156,7 +156,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     expect(saved.est_lead_time_text).not.toBe('45 days');
 
     const fresh = fingerprintFrom((await admin.get(page)).text);
-    const ok = await post(page, { incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), port_of_discharge_text: 'Rotterdam, Netherlands', est_lead_time_text: '45 days', edit_fingerprint: fresh }, page);
+    const ok = await post(page, { container_type: '20ft Standard', incoterm_id: String(order.incoterm_id), currency_id: String(order.currency_id), port_of_discharge_text: 'Rotterdam, Netherlands', est_lead_time_text: '45 days', edit_fingerprint: fresh }, page);
     expect((await flashAfter(ok)).type).toBe('success');
   });
 

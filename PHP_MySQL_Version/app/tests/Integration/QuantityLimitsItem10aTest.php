@@ -141,7 +141,7 @@ final class QuantityLimitsItem10aTest extends DbTestCase
         $count = static fn (): int => (int) $pdo->query('SELECT COUNT(*) FROM orders')->fetchColumn();
         $post = fn (array $confirm): array => [
             'client_id' => (string) $clientId,
-            'incoterm_id' => (string) $pdo->query("SELECT id FROM incoterms WHERE code = 'FOB'")->fetchColumn(),
+            'container_type' => '20ft Standard', 'incoterm_id' => (string) $pdo->query("SELECT id FROM incoterms WHERE code = 'FOB'")->fetchColumn(),
             'currency_id' => (string) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn(),
             'payment_preset_id' => (string) $pdo->query("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'")->fetchColumn(),
             'product_description' => ['Small line item 10a', 'Large line item 10a'],

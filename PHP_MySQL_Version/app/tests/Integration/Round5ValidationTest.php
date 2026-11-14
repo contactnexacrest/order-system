@@ -94,7 +94,7 @@ final class Round5ValidationTest extends DbTestCase
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $order = OrderRepository::find($orderId);
-        $_POST = ['incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'lead_time_min_days' => '-1', 'lead_time_max_days' => '60'];
+        $_POST = ['container_type' => '20ft Standard', 'incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'lead_time_min_days' => '-1', 'lead_time_max_days' => '60'];
         $this->quietly(fn () => (new OrderController())->updateDetails(['id' => (string) $orderId]));
 
         self::assertSame('error', $this->lastFlash()['type']);

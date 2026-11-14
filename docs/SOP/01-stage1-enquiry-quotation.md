@@ -40,9 +40,11 @@ the Consignee section just below it on this same form, since documents
 need these as discrete fields rather than one free-text blob. The older
 single-field Billing Address column is composed automatically from these
 parts behind the scenes, so every existing report or screen that reads it
-keeps working unchanged. **Container Type** is a dropdown (Settings › Lists › Dropdown lists, `container_type`), not free text, with a
-"Not sure yet" option for a buyer who genuinely doesn't
-know yet — same admin-managed-list mechanism as Certificate of Origin Type.
+keeps working unchanged. **Container Type** is a dropdown (Settings › Lists › Dropdown lists, `container_type`), not free text —
+same admin-managed-list mechanism as Certificate of Origin Type. Since 14 Nov 2026 it is **required**
+(D-376): **Container Type \*** starts on "Choose…" on the New Order and Edit order forms, and an order is
+not saved without it ("Choose the container type."). If the buyer has not decided, pick the most likely
+size and change it later on Edit order.
 
 That submission lands in **Orders › Quotation requests**
 (`/client-intake`) as a pending row. The **Quotation requests** item on the Orders menu bar carries a count (e.g. "Quotation requests **2**") whenever

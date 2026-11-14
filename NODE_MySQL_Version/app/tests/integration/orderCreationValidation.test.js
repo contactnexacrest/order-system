@@ -74,7 +74,7 @@ describe('Order creation input validation (QA-5 ORD-04/ORD-05/ORD-06)', () => {
       .send({
         _csrf: csrf,
         client_id: String(clientId),
-        incoterm_id: String(incoterm.id),
+        container_type: '20ft Standard', incoterm_id: String(incoterm.id),
         currency_id: String(currency.id),
         payment_preset_id: String(preset.id),
         'product_description[]': 'ORD-04/05/06 regression test granite slab',

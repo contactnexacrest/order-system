@@ -149,7 +149,7 @@ describe('D-257 Phase 2 — Domestic Trade', () => {
     expect(inr).not.toBeNull();
     const before = (await db.queryOne('SELECT COUNT(*) AS n FROM orders')).n;
     const csrf = (await agent.get('/orders/create')).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
-    await agent.post('/orders').type('form').send({ _csrf: csrf, client_id: String(client), incoterm_id: '1', currency_id: String(inr.id), payment_preset_id: '1' });
+    await agent.post('/orders').type('form').send({ _csrf: csrf, client_id: String(client), container_type: '20ft Standard', incoterm_id: '1', currency_id: String(inr.id), payment_preset_id: '1' });
     expect((await db.queryOne('SELECT COUNT(*) AS n FROM orders')).n).toBe(before);
     expect((await agent.get('/orders/create')).text).toContain('Orders in rupees belong to Domestic Trade');
     const labels = (await divisionRepository.preflight(DOM)).map((i) => i.label);

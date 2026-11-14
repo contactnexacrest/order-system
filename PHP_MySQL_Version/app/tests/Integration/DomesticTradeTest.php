@@ -168,7 +168,7 @@ final class DomesticTradeTest extends DbTestCase
         self::assertDoesNotMatchRegularExpression('/<option[^>]*>\s*INR\b/', $create);
         $inr = (int) Database::connection()->query("SELECT id FROM currencies WHERE code = 'INR'")->fetchColumn();
         self::assertGreaterThan(0, $inr);
-        $_POST = ['client_id' => (string) $this->client, 'incoterm_id' => '1', 'currency_id' => (string) $inr, 'payment_preset_id' => '1'];
+        $_POST = ['client_id' => (string) $this->client, 'container_type' => '20ft Standard', 'incoterm_id' => '1', 'currency_id' => (string) $inr, 'payment_preset_id' => '1'];
         $before = (int) Database::connection()->query('SELECT COUNT(*) FROM orders')->fetchColumn();
         $this->render(fn () => (new OrderController())->store([]));
         self::assertSame($before, (int) Database::connection()->query('SELECT COUNT(*) FROM orders')->fetchColumn());

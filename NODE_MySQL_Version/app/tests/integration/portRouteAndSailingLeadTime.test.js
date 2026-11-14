@@ -124,7 +124,7 @@ describe('Port routes & sailing lead time (90-item backlog item 15)', () => {
       user: { id: userId },
       body: {
         client_id: String(clientId),
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         payment_preset_id: String(await paymentPresetId()),
         port_of_loading_id: String(loadingPortId),
@@ -159,7 +159,7 @@ describe('Port routes & sailing lead time (90-item backlog item 15)', () => {
       user: { id: userId },
       body: {
         client_id: String(clientId),
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         payment_preset_id: String(await paymentPresetId()),
         product_description: ['No sailing-lead-time granite slab'],
@@ -186,7 +186,7 @@ describe('Port routes & sailing lead time (90-item backlog item 15)', () => {
       params: { id: String(orderId) },
       session: {},
       body: {
-        incoterm_id: String(await incotermId('FOB')),
+        container_type: '20ft Standard', incoterm_id: String(await incotermId('FOB')),
         currency_id: String(await currencyId()),
         sailing_lead_time_min_days: '20',
         sailing_lead_time_max_days: '30',

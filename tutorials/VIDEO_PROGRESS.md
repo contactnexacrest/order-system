@@ -329,6 +329,7 @@ No video or script was changed. Owner to decide when videos restart.
 
 | Video | What now differs | Decision |
 |---|---|---|
+| B01 Part 1 (New Order form) | **Container Type** is now required ("Container Type *", starts on "Choose…", D-376); the script picks 20ft Standard (narration unchanged, the field is not mentioned). | Owner to decide when videos restart |
 | A02-1, B01 Parts 1 and 2, B02 (order page Products table) | Line numbers stay 1, 2, 3 after a line is deleted and added again (D-373); under each price "Priced at ₹… per USD on …" or "Rate not recorded", and a **Use today's price (…)** button under the Price check when today's quote differs (D-374). | Owner to decide when videos restart |
 
 ## Resume notes (for a new session)

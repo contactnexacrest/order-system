@@ -59,9 +59,24 @@ describe('UI-013: required drop-downs on create forms start at "Choose…"', () 
     const createPage = (await agent.get('/orders/create')).text;
     const division = (createPage.match(/<select name="division_id"[^>]*>[\s\S]*?<option value="(\d+)"/) || [])[1];
     const r = await post('/orders/create', '/orders', {
-      client_id: String(clientId), incoterm_id: String(incoterm), payment_preset_id: String(preset), currency_id: '', ...(division ? { division_id: division } : {}),
+      client_id: String(clientId), container_type: '20ft Standard', incoterm_id: String(incoterm), payment_preset_id: String(preset), currency_id: '', ...(division ? { division_id: division } : {}),
     });
     expect(r.message).toBe('Choose the order currency.');
     expect(r.page).toMatch(new RegExp(`<option value="${incoterm}"[^>]*selected`)); // the typed values come back
+  });
+
+  it('D-376: a new order without a container type is refused, and the field is required', async () => {
+    const clientId = await createTestClient();
+    const incoterm = (await db.queryOne('SELECT id FROM incoterms ORDER BY id LIMIT 1')).id;
+    const preset = (await db.queryOne('SELECT id FROM payment_presets ORDER BY id LIMIT 1')).id;
+    const currency = (await db.queryOne("SELECT id FROM currencies WHERE code = 'USD'")).id;
+    const createPage = (await agent.get('/orders/create')).text;
+    expect(createPage).toContain('Container Type *');
+    expect(createPage).toMatch(/<select name="container_type" required>\s*<option value="">Choose…<\/option>/);
+    const division = (createPage.match(/<select name="division_id"[^>]*>[\s\S]*?<option value="(\d+)"/) || [])[1];
+    const r = await post('/orders/create', '/orders', {
+      client_id: String(clientId), container_type: '', incoterm_id: String(incoterm), payment_preset_id: String(preset), currency_id: String(currency), ...(division ? { division_id: division } : {}),
+    });
+    expect(r.message).toBe('Choose the container type.');
   });
 });

@@ -58,12 +58,33 @@ final class RequiredDropDownChooseFirstUi013Test extends DbTestCase
         $pdo = Database::connection();
         $incoterm = (int) $pdo->query("SELECT id FROM incoterms ORDER BY id LIMIT 1")->fetchColumn();
         $preset = (int) $pdo->query("SELECT id FROM payment_presets ORDER BY id LIMIT 1")->fetchColumn();
-        $_POST = ['client_id' => (string) $clientId, 'incoterm_id' => (string) $incoterm, 'payment_preset_id' => (string) $preset, 'currency_id' => ''];
+        $_POST = ['client_id' => (string) $clientId, 'container_type' => '20ft Standard', 'incoterm_id' => (string) $incoterm, 'payment_preset_id' => (string) $preset, 'currency_id' => ''];
         ob_start();
         (new OrderController())->store([]);
         ob_end_clean();
         self::assertSame('Choose the order currency.', $this->lastFlash());
         self::assertSame((string) $incoterm, (string) (Flash::pullOld()['incoterm_id'] ?? ''), 'the typed values come back');
+    }
+
+    public function testD376ANewOrderWithoutAContainerTypeIsRefusedAndTheFieldIsRequired(): void
+    {
+        $clientId = $this->createTestClient();
+        $pdo = Database::connection();
+        $incoterm = (int) $pdo->query("SELECT id FROM incoterms ORDER BY id LIMIT 1")->fetchColumn();
+        $preset = (int) $pdo->query("SELECT id FROM payment_presets ORDER BY id LIMIT 1")->fetchColumn();
+        $currency = (int) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn();
+        $_POST = ['client_id' => (string) $clientId, 'incoterm_id' => (string) $incoterm, 'payment_preset_id' => (string) $preset, 'currency_id' => (string) $currency, 'container_type' => ''];
+        ob_start();
+        (new OrderController())->store([]);
+        ob_end_clean();
+        self::assertSame('Choose the container type.', $this->lastFlash());
+        Flash::pullOld();
+
+        ob_start();
+        (new OrderController())->create([]);
+        $page = (string) ob_get_clean();
+        self::assertStringContainsString('Container Type *', $page);
+        self::assertSame(1, preg_match('#<select name="container_type" required>\s*<option value="">Choose…</option>#', $page));
     }
 
     public function testUi013TheNewOrderCurrencyStartsAtChooseWithNothingPreselected(): void

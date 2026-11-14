@@ -203,7 +203,7 @@ final class QaRound6SmallFixesTest extends DbTestCase
         foreach (['CIF' => '120.00', 'CFR' => null, 'FOB' => null] as $incoterm => $expected) {
             $orderId = $this->createTestOrder($this->createTestClient(), $incoterm);
             $order = OrderRepository::find($orderId);
-            $_POST = ['incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'indicative_freight_amount' => '950', 'indicative_insurance_amount' => '120'];
+            $_POST = ['container_type' => '20ft Standard', 'incoterm_id' => (string) $order['incoterm_id'], 'currency_id' => (string) $order['currency_id'], 'indicative_freight_amount' => '950', 'indicative_insurance_amount' => '120'];
             (new OrderController())->updateDetails(['id' => (string) $orderId]);
             self::assertSame('success', $this->flash()['type'], $incoterm);
             $stored = $pdo->query("SELECT indicative_insurance_amount FROM orders WHERE id = {$orderId}")->fetchColumn();

@@ -208,7 +208,7 @@ final class QaBatch2Test extends DbTestCase
         $order = OrderRepository::find($orderId);
         $cfr = (int) Database::connection()->query("SELECT id FROM incoterms WHERE code = 'CFR'")->fetchColumn();
         $this->actAs($this->createTestUser('Admin'));
-        $_POST = ['incoterm_id' => (string) $cfr, 'currency_id' => (string) $order['currency_id'], 'reason' => 'The buyer now wants CFR terms.'];
+        $_POST = ['container_type' => '20ft Standard', 'incoterm_id' => (string) $cfr, 'currency_id' => (string) $order['currency_id'], 'reason' => 'The buyer now wants CFR terms.'];
         $this->render(fn () => (new OrderController())->updateDetails(['id' => (string) $orderId]));
         self::assertSame('The incoterm can no longer change: the freight stage (Stage 6) is already skipped for the current incoterm. Agree the change with the buyer through an amendment, and ask an administrator to correct the order.', self::flashError());
         self::assertSame((int) $order['incoterm_id'], (int) OrderRepository::find($orderId)['incoterm_id']);

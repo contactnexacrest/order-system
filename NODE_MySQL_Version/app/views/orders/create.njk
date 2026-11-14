@@ -77,9 +77,9 @@
             {% endfor %}
           </select>
         </label>
-        <label>Container Type
-          <select name="container_type">
-            <option value="">— To Be Confirmed —</option>
+        <label>Container Type *
+          <select name="container_type" required>
+            <option value="">Choose…</option>
             {% for o in containerTypes %}
               <option value="{{ o.option_value }}" {{ 'selected' if (old.container_type or '') == o.option_value else '' }}>{{ o.option_value }}</option>
             {% endfor %}
