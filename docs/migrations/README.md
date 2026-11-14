@@ -208,3 +208,7 @@ WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'new_permissi
 
 The same pattern works for indexes (`information_schema.STATISTICS`) and
 foreign keys (`information_schema.TABLE_CONSTRAINTS`).
+
+## Which migrations does the live site still need?
+
+Run `docs/checks/check_all_migrations.sql` in phpMyAdmin (your database › SQL › paste › Go). It only reads, changes nothing, and shows one row per migration: **already done**, **NEEDED** or **PARTLY done – run it again**. Every new migration gets a row in it in the same commit (D-371).
