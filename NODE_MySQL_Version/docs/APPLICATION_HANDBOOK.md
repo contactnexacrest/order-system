@@ -517,7 +517,7 @@ The bootstrap (`app/bootstrap.php`) has its own PSR-4 autoloader for `App\`, so 
 
 | Item | Version / note |
 |---|---|
-| Database | MySQL 8 on the host; MariaDB in development. Rules: no `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; queries must pass `ONLY_FULL_GROUP_BY`; `utf8mb4` / `utf8mb4_unicode_ci`. |
+| Database | MySQL 5.7 (5.7.44, checked 14 Nov 2026) on the host; MariaDB in development. No MySQL 8-only SQL (window functions, `WITH` / CTEs; CHECK constraints are parsed but not enforced on 5.7). Rules: no `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; queries must pass `ONLY_FULL_GROUP_BY`; `utf8mb4` / `utf8mb4_unicode_ci`. |
 | E2E | `@playwright/test` ^1.56.1 (locked 1.64.1) in `e2e/` |
 | CI | `.github/workflows/tests.yml`: PHPUnit job and Jest job (installs `poppler-utils` to read generated PDFs/Word text) |
 | Fonts | `app/assets/fonts` in each stack (embedded in PDFs) |
@@ -928,7 +928,7 @@ Typical environments:
 |---|---|
 | Developer machine | `APP_ENV=local`, MariaDB, `php -S` with `_dev_router.php` on 8080 / `npm start` on 3000, Zoho off |
 | Staging / UAT | `APP_ENV=production`, `DEV_SERVER=true`, `ZOHO_ENVIRONMENT=test` (TEST- customers only), often Mail redirect or Test Mode on |
-| Live (PHP on Bluehost) | `APP_ENV=production`, `DEV_SERVER=false`, MySQL 8, cron in `CRON_TZ=Asia/Kolkata`, `ZOHO_ENVIRONMENT=production` once go-live is approved, `ZOHO_EINVOICE_ENABLED=false` until e-invoicing is required |
+| Live (PHP on Bluehost) | `APP_ENV=production`, `DEV_SERVER=false`, MySQL 5.7.44, cron in `CRON_TZ=Asia/Kolkata`, `ZOHO_ENVIRONMENT=production` once go-live is approved, `ZOHO_EINVOICE_ENABLED=false` until e-invoicing is required |
 
 Timezone is fixed to **Asia/Kolkata** on both stacks (`date_default_timezone_set` in PHP; `TZ=Asia/Kolkata` in the Node start script).
 
@@ -5128,7 +5128,7 @@ These rules come from `CLAUDE.md` (project instructions) and register §2 (R1–
 | **Supplier and buyer never cross** (R11) | Vendors and CHA never see the client's details, terms or amounts. Confirmed "already taken care" (D-063). | Commercial confidentiality. |
 | **Browser-side validation on every form** (R12) | One sitewide `fieldError()` in `public_html/assets/js/app.js` (PHP) and `public/js/app.js` (Node); HTML attributes for simple rules; message beside the field; server checks stay. "Re-enter" fields named `<name>_confirm` / `confirm_password` or `data-match`. `FormValidationConventionsTest` / `formValidationConventions.test.js`. | Users lost typed data on server-side refusals; one shared script keeps behaviour identical everywhere. |
 | **Placeholders on every input** (1 Nov 2026) | Every typed input and textarea has a placeholder with an example or format (not date, file, checkbox, radio, hidden). Labels, required "*", and "Choose…" on required drop-downs. `FormPlaceholderTest`, `FormLabelConventionsTest` (+ Node twins). | Staff should know the expected format without asking. |
-| **MySQL compatibility** (R13) | Host = MySQL 8, dev = MariaDB. No `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; guard with information_schema + PREPARE. ONLY_FULL_GROUP_BY. Migrations run-twice-safe, `SET NAMES utf8mb4` first, filename order. | MariaDB-only syntax fails on the live host. |
+| **MySQL compatibility** (R13) | Host = MySQL 5.7 (5.7.44, checked 14 Nov 2026), dev = MariaDB; no window functions or CTEs. No `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; guard with information_schema + PREPARE. ONLY_FULL_GROUP_BY. Migrations run-twice-safe, `SET NAMES utf8mb4` first, filename order. | MariaDB-only syntax fails on the live host. |
 | **SOP** (R14) | Edit `docs/SOP`, then copy to both stacks' `docs/SOP`. | Three copies must match. |
 | **Money descriptions** (D-212) | §7.12. | Zoho and the CA must know what every rupee is. |
 | **Zoho change log** (R15) | Every change in any Zoho app, by anyone, test or real, gets a row in `docs/zoho/zoho-change-log.csv` (UTF-8 with BOM) at the time, with the full column set in CLAUDE.md. Read-only checks too. Test records start `TEST-` and are removed before go-live (logged). | Zoho is the books of account; every change must be traceable and test data must not stay. |
@@ -5186,7 +5186,7 @@ Two hard rules about tests:
 
 **Prerequisites (both unit suites):**
 
-- MySQL 8 or MariaDB running, and the `mysql` command-line client on the PATH (the schema has triggers with `DELIMITER $$`, which only the CLI understands, so both suites shell out to it).
+- MySQL 5.7+ or MariaDB running, and the `mysql` command-line client on the PATH (the schema has triggers with `DELIMITER $$`, which only the CLI understands, so both suites shell out to it).
 - `app/.env` in each stack with a DB user that may **create and drop databases**. Only the database name is overridden by the tests.
 - `poppler-utils` (`pdftotext`, `pdfinfo`) and `unzip` — the document tests read the generated PDFs and the `.docx` XML.
 - Node stack: a Chromium binary for Puppeteer (`PUPPETEER_EXECUTABLE_PATH` in `app/.env`), or the PDF tests fail with "Document generation failed".
@@ -5310,7 +5310,7 @@ These fail the build when a rule in CLAUDE.md is broken. If one fails after your
 - **PHP — PHPUnit:** Ubuntu, PHP 8.3 (`pdo_mysql, mbstring, gd, zip, intl, bcmath`), a MySQL 8.0 service, `composer install`, `.env` copied from `.env.example` with test values (APP_ENV=local, SMTP blank, Zoho off, a CI-only encryption key), `poppler-utils` + `unzip`, then `vendor/bin/phpunit`.
 - **Node — Jest:** Ubuntu, Node 22, the same MySQL 8.0 service, `npm ci` with `PUPPETEER_SKIP_DOWNLOAD`, the same `.env` approach plus `SESSION_SECRET_KEY`, then `npm test`.
 
-Why MySQL 8 in CI: the live host runs MySQL while development runs MariaDB, so CI catches MySQL-only differences and strict mode (R13). **CI does not run the e2e suite** — that needs running servers and seeded dev databases, so it stays a manual step before every push. No secrets are needed in CI.
+Why MySQL in CI: the live host runs MySQL (5.7.44; CI uses 8.0, so it does not catch MySQL 8-only SQL — avoid window functions and CTEs by rule) while development runs MariaDB, so CI catches MySQL-only differences and strict mode (R13). **CI does not run the e2e suite** — that needs running servers and seeded dev databases, so it stays a manual step before every push. No secrets are needed in CI.
 
 ### 11.7 Known slow or fragile tests
 

@@ -82,7 +82,7 @@ storage/
 - **Node.js 22.12 or newer** (22 LTS) — check with `node --version`. The
   bundled `puppeteer-core` needs 22.12+, and `nodemailer` / `node-cron`
   need 20+, so the app does not run on Node 20 or 18.
-- **MySQL 8.0+** on the live server (MariaDB 10.6+ is fine for
+- **MySQL 5.7+** on the live server (the PHP live host runs 5.7.44; no MySQL 8-only SQL; MariaDB 10.6+ is fine for
   development only) — same requirement as the PHP build. `docs/schema.sql` and any
   later change are written for MySQL (see CLAUDE.md's MySQL rule).
 - **Chromium or Google Chrome** installed on the server (for PDF

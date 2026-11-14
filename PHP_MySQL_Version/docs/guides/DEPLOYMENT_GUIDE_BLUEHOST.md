@@ -37,7 +37,7 @@ Placeholders used throughout:
 2. Server software (checked by Bluehost, nothing to install):
    - **PHP 8.1 or newer** with the extensions `pdo_mysql`, `mbstring`, `gd`, `curl`, `zip`,
      `openssl`, `fileinfo`, `dom`/`xml`.
-   - **MySQL 8** (the live host runs MySQL; queries pass ONLY_FULL_GROUP_BY).
+   - **MySQL 5.7 or newer** (the live host runs MySQL 5.7.44, checked 14 Nov 2026 with `SELECT VERSION();`; queries pass ONLY_FULL_GROUP_BY; no MySQL 8-only SQL such as `ROW_NUMBER() OVER` or `WITH`).
    - **Apache with mod_rewrite** (`.htaccess` routing).
    - Outbound HTTPS to `api.frankfurter.app` and `open.er-api.com` (the daily exchange rate).
    - Nothing else: PDF and Word files are made by pure-PHP libraries already in `app/vendor/`

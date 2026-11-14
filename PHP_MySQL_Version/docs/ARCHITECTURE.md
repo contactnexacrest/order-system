@@ -14,7 +14,7 @@ You said the stack must be platform-independent and run identically on Bluehost 
 | Layer | Choice | Why |
 |---|---|---|
 | Language/runtime | PHP 8.1+ | Spec-mandated for Bluehost; runs unmodified on any OS locally (built-in `php -S`, XAMPP/MAMP/Laragon, or Docker) — no compiled binaries, no native modules. |
-| Database | MySQL 8 / MariaDB | Bluehost standard; identical locally. |
+| Database | MySQL 5.7+ (live: 5.7.44) / MariaDB | Bluehost standard; no MySQL 8-only SQL. |
 | Dependency management | Composer | Vendor libraries download once, run anywhere — no build step, no native compilation. |
 | PDF engine | **DOMPDF** | Pure PHP, renders HTML/CSS to PDF, zero external binaries. This is the deciding factor for your "must work everywhere" requirement: Puppeteer needs a Chromium binary + process-spawning rights, which most Bluehost shared plans block outright and which behaves differently across OSes; TCPDF works everywhere too but its layout API is coordinate-based (draw at x,y) rather than CSS-based, which makes matching your exact tables, amber rows, and navy bars far more error-prone. Your source documents are already table-heavy — DOMPDF's HTML/CSS model is the closest fit to "pixel-perfect replica." |
 | DOCX engine | PHPWord | Pure PHP, same portability logic, spec-approved. |
