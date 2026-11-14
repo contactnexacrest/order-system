@@ -1539,6 +1539,7 @@ final class OrderController
         }
 
         OrderProductRepository::softDelete($productId);
+        OrderProductRepository::renumber($orderId); // owner, 14 Nov 2026: lines stay 1, 2, 3 … with no gap
         Flash::set('success', 'Product line removed.');
         header("Location: /orders/{$orderId}");
     }

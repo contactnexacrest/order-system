@@ -1542,6 +1542,7 @@ async function deleteProduct(req, res) {
   }
 
   await orderProductRepository.softDelete(productId);
+  await orderProductRepository.renumber(orderId); // owner, 14 Nov 2026: lines stay 1, 2, 3 … with no gap
   flash.set(req, 'success', 'Product line removed.');
   res.redirect(`/orders/${orderId}`);
 }

@@ -35,7 +35,8 @@ async function find(id) {
 }
 
 async function nextLineNo(orderId) {
-  const row = await db.queryOne('SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line FROM order_products WHERE order_id = :order_id', { order_id: orderId });
+  // Owner, 14 Nov 2026: removed (inactive) lines never count — a new line follows the visible ones.
+  const row = await db.queryOne('SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line FROM order_products WHERE order_id = :order_id AND is_active = 1', { order_id: orderId });
   return parseInt(row.next_line, 10);
 }
 
@@ -71,6 +72,19 @@ async function softDelete(id) {
 }
 
 /**
+ * Owner, 14 Nov 2026: the order's visible lines are always numbered 1, 2, 3 … with no gap, however
+ * often lines are removed and added (the documents already print by position). Called after a line
+ * is removed on the order page. Not after a "Products & prices" amendment: its lines keep the
+ * numbers the signed amendment gives them (D-342). Twin of OrderProductRepository::renumber().
+ */
+async function renumber(orderId) {
+  const rows = await db.query('SELECT id FROM order_products WHERE order_id = :o AND is_active = 1 ORDER BY line_no, id', { o: orderId });
+  for (let i = 0; i < rows.length; i += 1) {
+    await db.execute('UPDATE order_products SET line_no = :n WHERE id = :id', { n: i + 1, id: rows[i].id });
+  }
+}
+
+/**
  * Clones a line's fields into a new row — either a new line on the same
  * order (the common case: "same product, just the name or dimension
  * changed") or, with targetOrderId, onto a different order entirely
@@ -97,7 +111,7 @@ async function duplicate(id, targetOrderId = null, atLineNo = null) {
   } else if (sameOrder) {
     // Right below the original: the lines after it move down by one.
     lineNo = Number(source.line_no) + 1;
-    await db.execute('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC', { o: orderId, n: lineNo });
+    await db.execute('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND is_active = 1 AND line_no >= :n ORDER BY line_no DESC', { o: orderId, n: lineNo });
   }
   const newId = await add(
     orderId,
@@ -218,4 +232,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setPieceSize, setPieces, setAsPerAnnexure, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, renumber, duplicate, setPieceSize, setPieces, setAsPerAnnexure, copiedFromLineNo, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };

@@ -36,7 +36,8 @@ final class OrderProductRepository
     public static function nextLineNo(int $orderId): int
     {
         $stmt = Database::connection()->prepare(
-            'SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line FROM order_products WHERE order_id = :order_id'
+            // Owner, 14 Nov 2026: removed (inactive) lines never count — a new line follows the visible ones.
+            'SELECT COALESCE(MAX(line_no), 0) + 1 AS next_line FROM order_products WHERE order_id = :order_id AND is_active = 1'
         );
         $stmt->execute(['order_id' => $orderId]);
         return (int) $stmt->fetch()['next_line'];
@@ -90,6 +91,23 @@ final class OrderProductRepository
     }
 
     /**
+     * Owner, 14 Nov 2026: the order's visible lines are always numbered 1, 2, 3 … with no gap, however
+     * often lines are removed and added (the documents already print by position). Called after a line
+     * is removed on the order page. Not after a "Products & prices" amendment: its lines keep the
+     * numbers the signed amendment gives them (D-342).
+     */
+    public static function renumber(int $orderId): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id FROM order_products WHERE order_id = :o AND is_active = 1 ORDER BY line_no, id');
+        $stmt->execute(['o' => $orderId]);
+        $upd = $pdo->prepare('UPDATE order_products SET line_no = :n WHERE id = :id');
+        foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN) as $i => $id) {
+            $upd->execute(['n' => $i + 1, 'id' => (int) $id]);
+        }
+    }
+
+    /**
      * Clones a line's fields into a new row — either a new line on the
      * same order (the common case: "same product, just the name or
      * dimension changed") or, with $targetOrderId, onto a different order
@@ -117,7 +135,7 @@ final class OrderProductRepository
         } elseif ($sameOrder) {
             // Right below the original: the lines after it move down by one.
             $lineNo = (int) $source['line_no'] + 1;
-            Database::connection()->prepare('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND line_no >= :n ORDER BY line_no DESC')
+            Database::connection()->prepare('UPDATE order_products SET line_no = line_no + 1 WHERE order_id = :o AND is_active = 1 AND line_no >= :n ORDER BY line_no DESC')
                 ->execute(['o' => $orderId, 'n' => $lineNo]);
         }
         $newId = self::add(
