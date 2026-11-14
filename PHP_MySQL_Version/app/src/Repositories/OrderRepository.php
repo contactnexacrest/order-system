@@ -38,7 +38,7 @@ final class OrderRepository
                     dom.stage AS dom_stage,
                     COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
                     (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
-                    (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
+                    (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id AND op.is_active = 1) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
                         WHERE ops.order_id = o.id AND ops.balance_due_date IS NOT NULL
@@ -73,7 +73,7 @@ final class OrderRepository
                     dom.stage AS dom_stage,
                     COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
                     (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
-                    (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
+                    (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id AND op.is_active = 1) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
                         WHERE ops.order_id = o.id AND ops.balance_due_date IS NOT NULL

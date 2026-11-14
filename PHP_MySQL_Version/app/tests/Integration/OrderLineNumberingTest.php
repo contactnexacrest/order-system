@@ -56,11 +56,22 @@ final class OrderLineNumberingTest extends DbTestCase
             $this->remove($orderId, $id);
         }
         self::assertSame([], $this->lines($orderId));
+        // Owner, 14 Nov 2026: the order list total (cards, Standard list, Kanban) counts only the visible lines.
+        $total = static function (int $id): string {
+            foreach (\App\Repositories\OrderRepository::all() as $o) {
+                if ((int) $o['id'] === $id) {
+                    return number_format((float) $o['total_fob_value'], 2, '.', '');
+                }
+            }
+            return 'missing';
+        };
+        self::assertSame('0.00', $total($orderId), 'removed lines are not in the order total');
 
         $x = $this->addLine($orderId, 'X');
         $y = $this->addLine($orderId, 'Y');
         $this->addLine($orderId, 'Z');
         self::assertSame([[1, 'X'], [2, 'Y'], [3, 'Z']], $this->lines($orderId), 'new lines start again at 1 (the owner\'s 4, 5, 6 case)');
+        self::assertSame(number_format(3 * round(4.68 * 2865.84, 2), 2, '.', ''), $total($orderId), 'the total is the three visible lines only');
 
         $this->remove($orderId, $y);
         self::assertSame([[1, 'X'], [2, 'Z']], $this->lines($orderId), 'removing the middle line closes the gap');

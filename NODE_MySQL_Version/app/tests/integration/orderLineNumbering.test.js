@@ -55,11 +55,18 @@ describe('D-373: order lines stay 1, 2, 3 … after removing and adding again', 
     const first = [await addLine(orderId, 'A'), await addLine(orderId, 'B'), await addLine(orderId, 'C')];
     for (const id of first) await remove(agent, orderId, id);
     expect(await lines(orderId)).toEqual([]);
+    // Owner, 14 Nov 2026: the order list total (cards, Standard list, Kanban) counts only the visible lines.
+    const total = async (id) => {
+      const o = (await require('../../src/repositories/orderRepository').all()).find((r) => Number(r.id) === Number(id));
+      return o ? Number(o.total_fob_value).toFixed(2) : 'missing';
+    };
+    expect(await total(orderId)).toBe('0.00');
 
     const x = await addLine(orderId, 'X');
     const y = await addLine(orderId, 'Y');
     await addLine(orderId, 'Z');
     expect(await lines(orderId)).toEqual([[1, 'X'], [2, 'Y'], [3, 'Z']]);
+    expect(await total(orderId)).toBe((3 * Math.round(4.68 * 2865.84 * 100) / 100).toFixed(2));
 
     await remove(agent, orderId, y);
     expect(await lines(orderId)).toEqual([[1, 'X'], [2, 'Z']]);
