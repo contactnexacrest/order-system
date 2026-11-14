@@ -325,6 +325,11 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   charges) or **SHA**. An associate abroad is paid once the amount due in a
   run reaches the **minimum payout abroad** (default USD 100); smaller amounts
   carry to the next run with a note.
+- **Exchange rate before money arrives (D-377, 14 Nov 2026).** Until the buyer's
+  money is received (or the PI fixes a rate), the commission estimate, the level
+  fixed at the PI, a fixed USD amount and the USD 100 check use the pricing rate
+  in use (Admin › Pricing: Automatic = market less the cushion, or Manual). The
+  payout itself always uses the rupees the bank actually credited.
 
 ## Paying (Accounts)
 

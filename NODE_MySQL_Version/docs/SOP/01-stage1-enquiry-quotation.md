@@ -109,7 +109,9 @@ saving; they're a starting point, not locked in.
 For a walk-in enquiry that didn't come through the public form: **Clients →
 Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
-(buyer inquiry ref, incoterm, payment preset, etc.).
+(buyer inquiry ref, incoterm, payment preset, etc.). Opened from a client's page, the
+New Order form's client drop-down offers **only that client** (D-375, 14 Nov 2026); open
+Orders → New Order to pick any client.
 
 **Billing address in parts (D-346, owner decision 12 Nov 2026).** The Add
 Client, Edit Client and Duplicate Client forms have no single "Billing
