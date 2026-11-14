@@ -77,19 +77,31 @@ final class FreshInstallCompleteTest extends TestCase
     }
 
     /** Runs SQL through the mysql CLI (schema.sql uses DELIMITER, which only the CLI understands). */
-    private function runMysql(string $database, string $sql): string
+    private function runMysql(string $database, string $sql, bool $plainAlter = false): string
     {
         $cmd = array_merge(['mysql'], $this->credentialArgs());
+        if ($plainAlter) {
+            // Owner D-371 (13 Nov 2026): run every statement of a "PLAIN ALTER" file, as phpMyAdmin
+            // would after "Duplicate column name", so the rest of the file is still checked.
+            $cmd[] = '--force';
+        }
         if ($database !== '') {
             $cmd[] = $database;
         }
         [$exit, , $stderr] = $this->runProcess($cmd, $sql);
+        // A "PLAIN ALTER" file on a fresh install may only fail with 1060 Duplicate column name
+        // (its columns are already in schema.sql) — any other error still fails the test.
+        if ($exit !== 0 && $plainAlter && preg_match('/ERROR 1060 \(42S21\)/', $stderr)
+            && !preg_match('/ERROR (?!1060)\d+/', $stderr)) {
+            return '';
+        }
         return $exit === 0 ? '' : "exit {$exit}: {$stderr}";
     }
 
     private function loadFile(string $path): void
     {
-        $error = $this->runMysql($this->dbName, (string) file_get_contents($path));
+        $sql = (string) file_get_contents($path);
+        $error = $this->runMysql($this->dbName, $sql, str_contains($sql, 'PLAIN ALTER (owner D-371'));
         self::assertSame('', $error, basename($path) . ' failed to load: ' . $error);
     }
 

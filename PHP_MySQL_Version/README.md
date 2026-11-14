@@ -108,6 +108,12 @@ correctly once the password is changed.
 
 ## First-time setup (local machine or Bluehost)
 
+> **Installing on Bluehost (cPanel)?** Follow `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md` from top to bottom. It is the click-by-click
+> version of everything below, written from the live installation of 13–14 Nov 2026: folder layout, cPanel Git, subdomain and SSL,
+> databases (including the restore-test database), phpMyAdmin import, `app/.env` line by line, the web lock and its tests, the server
+> clock and the ten cron jobs, the backup folders, key and first test run, the final check, the routine checks, updating a live site
+> (Git pull + `docs/checks/check_all_migrations.sql`) and troubleshooting.
+>
 > **Go-live day:** work through `docs/guides/GO_LIVE_CHECKLIST.md`. It is the business view of these steps, with the settings, people, prices and dry run, in order.
 
 1. **Database.** Create a MySQL/MariaDB database (utf8mb4) and import these two files in order —
@@ -511,10 +517,27 @@ backups. Two `.htaccess` files prevent that and travel with every upload:
 - the project's top folder: `.htaccess` containing `Require all denied`;
 - `PHP_MySQL_Version/public_html/.htaccess` starts with `Require all granted`.
 
-Check after an upload: the login page opens, and
-`https://<another domain on the account>/<path to the project>/PHP_MySQL_Version/README.md`
-answers **403 Forbidden**. Best of all, keep the project outside `public_html` and point the
+Check after an upload, in a private browser window:
+
+| Address | Must show |
+|---|---|
+| `https://<the app's address>/login` | the sign-in page |
+| `https://<another domain on the account>/<path to the project>/PHP_MySQL_Version/README.md` | **403 Forbidden** |
+| `https://<another domain on the account>/<path to the project>/PHP_MySQL_Version/app/.env` | **Not Acceptable** (Bluehost's firewall, Mod_Security, blocks any `.env` request) or 403 Forbidden |
+| `https://<another domain on the account>/<path to the project>/PHP_MySQL_Version/storage/` | 403 Forbidden |
+
+A download or a page of text is a failure. Best of all, keep the project outside `public_html` and point the
 (sub)domain at `PHP_MySQL_Version/public_html` only.
+
+Both `.htaccess` files come from Git. **Never edit them (or any other file that came from Git) by hand on the
+server**: the next cPanel *Update from Remote* then stops with "Your local changes … would be overwritten". If that
+happens, rename or undo the hand-edited file, update again, check the two files came back and repeat the tests
+(`docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`, section 14).
+
+**Updating a live site:** cPanel › Git Version Control › Manage › Pull or Deploy › **Update from Remote**; then run
+`docs/checks/check_all_migrations.sql` in phpMyAdmin (read-only, one row per migration) and run every file whose row
+says **NEEDED**, in date order, until every row says **already done**; then check `scripts/*.sh` are still 0700.
+Full steps: the deployment guide, section 14, and `docs/migrations/README.md`.
 
 ### Bluehost cron setup
 
@@ -623,6 +646,26 @@ Plus the three backup lines (database 02:00, documents 02:30, monthly test-resto
   row per part and exits 0. The `/ca/zoho-sync` page shows this job's log
   alongside Sync Now's.
 
+**On Bluehost (cPanel), as set up on the live server on 13 Nov 2026** — step by step in
+`docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`, sections 9 and 10:
+
+- cPanel's Cron Jobs form has no place for `CRON_TZ`. Find the server's clock first: a one-time job
+  `date > <home>/servertime.txt` (all boxes `*`), read the file after 2 minutes, delete the job. Bluehost
+  normally shows **MST** (Mountain Time): India is 12 h 30 min ahead (11 h 30 min from March to November,
+  when the server is on MDT — every job then runs one hour earlier in India time).
+- Create `<home>/logs` (outside `public_html`) before adding the jobs, and set the **Cron Email** at the top of
+  the page so failures reach an admin.
+- The ten jobs, typed in **server (MST)** hours — Minute / Hour / Day / Month / Weekday (India time):
+  e-mails `0 * * * *` (every hour); OC auto-confirm `30 20 * * *` (09:00); Zoho sync `30 10 * * *` (23:00);
+  alerts `30 17 * * *` (06:00); exchange rate `35 18 * * *` (07:05); digest `45 19 * * *` (08:15);
+  document clean-up `45 13 * * *` (02:15); database backup `30 13 * * *` (02:00); documents backup
+  `0 14 * * *` (02:30); test-restore `30 15 1 * *` (04:00 on the 2nd — **Day must be 1**, not `*`).
+- Those frequencies are the owner's choice for the live site: e-mails hourly, OC auto-confirm and Zoho once a
+  day (staff press **Sync now** / **Sync this order** when something is urgent). The lines above, with
+  e-mails every 10 minutes, auto-confirm every 15 minutes and Zoho hourly, are the general recommendation;
+  both work.
+- If a log says `php: command not found` (or shows an old PHP), use `/usr/local/bin/php`.
+
 All seven scripts print a one-line summary to stdout and exit 0 on
 success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
@@ -660,7 +703,11 @@ The scripts ship in the repository (`scripts/`, the same files on both stacks):
 | `scripts/backup_storage.sh` | Daily snapshot of every document → `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/`. Unchanged files are **stored once** (hard links via `rsync --link-dest`). On the first run of each month also a full encrypted archive → `BACKUP_DIR/storage/archives/` | `30 2 * * *` |
 | `scripts/backup_test_restore.sh` | Monthly proof that the newest copy restores: checksum, decrypt, load into a **separate scratch database** (`BACKUP_RESTORE_TEST_DB`, default `<DB_DATABASE>_restore_test`, never the live one), count tables, drop it again; checks the newest documents archive opens | `0 4 1 * *` |
 
-**Where the copies go is set in `app/.env`, not in the cron line:**
+**Where the copies go is set in `app/.env`, not in the cron line.** "Outside the web root" means: not inside this
+stack's `public_html/`, `app/` or `STORAGE_BASE_PATH` — the scripts refuse those. A folder elsewhere inside the
+hosting account's `public_html` is accepted by the scripts but is only safe with folder permission **0700** plus its
+own `.htaccess` (`Require all denied`); a browser then gets "Forbidden … Server unable to read htaccess file", which is
+the expected, safe answer. Keep the **key in its own folder next to** the backup folder, never inside it.
 
 ```
 BACKUP_DIR=/home/yourcpaneluser/nexacrest_backups            # outside the web root and outside STORAGE_BASE_PATH (the scripts refuse otherwise)
@@ -682,6 +729,10 @@ thinning because each file is stored once. Only files named like a backup, insid
    mkdir -p /home/yourcpaneluser/nexacrest_backups && chmod 700 /home/yourcpaneluser/nexacrest_backups
    openssl rand -base64 48 > /home/yourcpaneluser/.nexacrest_backup_key && chmod 600 /home/yourcpaneluser/.nexacrest_backup_key
    ```
+   Without cPanel Terminal: create the folders in File Manager (permission 0700) and make the key with a one-time cron
+   job (all boxes `*`, delete it after 2 minutes):
+   `[ -f <keyfile> ] || (openssl rand -base64 48 > <keyfile> && chmod 600 <keyfile>)`. The key file is about 65 bytes,
+   permission 0600. Copy its one line into a password manager; never e-mail it or put it in the repository.
 2. Add the keys above to `app/.env`.
 3. Make the scripts executable: `chmod 700 /home/yourcpaneluser/nexacrest_webapp/scripts/*.sh`
 4. Add the cron lines (the scripts read everything else from `app/.env`):
@@ -691,11 +742,18 @@ thinning because each file is stored once. Only files named like a backup, insid
    30 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_storage.sh >> /home/yourcpaneluser/logs/backup_storage.log 2>&1
    0 4 1 * *   /home/yourcpaneluser/nexacrest_webapp/scripts/backup_test_restore.sh >> /home/yourcpaneluser/logs/backup_test_restore.log 2>&1
    ```
-5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand, then open **Settings › Backups** — both
-   rows should say OK.
+5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand (without Terminal: a one-time cron job each,
+   deleted after 2 minutes), then open **Settings › Backups** — both rows should say OK. `BACKUP_DIR` then holds
+   `db/` (a `nexacrest_db_YYYY-MM-DD_HHMMSS.sql.gz.enc` file — server time in the name — and its `.sha256`),
+   `storage/` and `status/`.
 6. The test-restore needs a MySQL user allowed to create and drop the scratch database
-   (`BACKUP_RESTORE_TEST_DB`). On Bluehost create that database once in cPanel → MySQL Databases and give the app
-   user all rights on it.
+   (`BACKUP_RESTORE_TEST_DB`). On Bluehost create that database once in cPanel → MySQL Databases (cPanel puts your
+   account prefix in front — put the **full** name in `.env`) and, under *Add User To Database*, give the app's own
+   database user (`DB_USERNAME`) **ALL PRIVILEGES** on it. No separate user or password: the script uses `DB_USERNAME` /
+   `DB_PASSWORD` through a temporary login file it deletes. Run `scripts/backup_test_restore.sh` once the same way; its
+   log ends `Test-restore OK: … tables, … orders`. Between runs the database may be missing from cPanel's list — normal.
+7. A cPanel Git update can reset the scripts' permissions: after each update check they still show **0700** (a backup
+   job failing with "Permission denied" is the sign).
 
 **Watching it:** Settings › Backups (MD / Admin, read-only) shows the last run of each job, sizes, encryption,
 off-site status and the settings. The daily digest warns whoever manages company settings when a nightly copy is
@@ -2652,7 +2710,7 @@ Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
   first login and keep them offline; each use is audited and the MD is told. *Settings ›
   Security* (`login_remember_browser_days`) was **0 = off** by default (code every time);
   staff only, never buyers or associates. Since 11 Nov 2026 (D-283) the tick reads "This is my own
-  office computer" and the default is 30 days — see the 11 Nov section. Associates keep their own code.
+  office computer" and the default is 30 days — see the 11 Nov section (7 days since D-369, 13 Nov 2026). Associates keep their own code.
 - **SOP access by role (D-266, SOP 15):** *Users & roles › SOP access* — each role sees its own chapters
   (generous defaults are seeded), extra chapters per person on *Users › Edit*, an on/off switch
   for the whole library and for each chapter. MD, ED, Admin and System Administrator always see

@@ -98,6 +98,12 @@ storage/
 
 ## First-time setup (a fresh Linux VPS)
 
+> The live site runs the **PHP** version on Bluehost (cPanel); its click-by-click server guide is
+> `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`. Several of its parts apply to this stack too: the backup
+> folders, key and permissions (section 11 — the same `scripts/`), the first backup test run, the
+> read-only migration check `docs/checks/check_all_migrations.sql` after every update (section 14),
+> the routine checks (section 13) and the troubleshooting table (section 16).
+
 > **Go-live day:** work through `docs/guides/GO_LIVE_CHECKLIST.md`. It is the business view of these steps, with the settings, people, prices and dry run, in order.
 
 1. **Install Node.js 22 LTS.** On Ubuntu/Debian:
@@ -596,7 +602,10 @@ The scripts ship in the repository (`scripts/`, the same files on both stacks):
 | `scripts/backup_storage.sh` | Daily snapshot of every document → `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/`. Unchanged files are **stored once** (hard links via `rsync --link-dest`). On the first run of each month also a full encrypted archive → `BACKUP_DIR/storage/archives/` | `30 2 * * *` |
 | `scripts/backup_test_restore.sh` | Monthly proof that the newest copy restores: checksum, decrypt, load into a **separate scratch database** (`BACKUP_RESTORE_TEST_DB`, default `<DB_DATABASE>_restore_test`, never the live one), count tables, drop it again; checks the newest documents archive opens | `0 4 1 * *` |
 
-**Where the copies go is set in `app/.env`, not in the cron line:**
+**Where the copies go is set in `app/.env`, not in the cron line.** The scripts refuse a `BACKUP_DIR` inside the
+stack's web folder, `app/` or `STORAGE_BASE_PATH`. Keep the key file in its own 0700 folder **next to** `BACKUP_DIR`,
+never inside it. Step by step (written for cPanel, the same for a VPS): `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`,
+section 11.
 
 ```
 BACKUP_DIR=/var/backups/nexacrest            # outside the web root and outside STORAGE_BASE_PATH (the scripts refuse otherwise)
@@ -1626,7 +1635,7 @@ Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
   first login and keep them offline; each use is audited and the MD is told. *Settings ›
   Security* (`login_remember_browser_days`) was **0 = off** by default (code every time);
   staff only, never buyers or associates. Since 11 Nov 2026 (D-283) the tick reads "This is my own
-  office computer" and the default is 30 days — see the 11 Nov section. Associates keep their own code.
+  office computer" and the default is 30 days — see the 11 Nov section (7 days since D-369, 13 Nov 2026). Associates keep their own code.
 - **SOP access by role (D-266, SOP 15):** *Users & roles › SOP access* — each role sees its own chapters
   (generous defaults are seeded), extra chapters per person on *Users › Edit*, an on/off switch
   for the whole library and for each chapter. MD, ED, Admin and System Administrator always see

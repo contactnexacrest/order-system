@@ -1,6 +1,6 @@
 # Go-live checklist (Export division)
 
-Prepared 5 Nov 2026 (Phase 0C.1), updated 13 Nov 2026. Work through it top to bottom on go-live day, and tick each line. The technical install steps are in each stack's `README.md` under "First-time setup". This list is the business view of the same process.
+Prepared 5 Nov 2026 (Phase 0C.1), updated 13 Nov 2026. Work through it top to bottom on go-live day, and tick each line. The technical install steps are in each stack's `README.md` under "First-time setup"; on Bluehost (cPanel) follow **`docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`**, the click-by-click server guide (sections 0–12 for a new install, 13 for routine checks, 14 for updates). This list is the business view of the same process.
 
 **A site that is already live** (its database already holds data) does not reinstall: it follows section **H. Upgrade of 11 Nov 2026** at the end (it covers the builds of 11, 12 and 13 Nov 2026, migrations `2026-11-11a` … `2026-11-13g`), then checks the settings named there.
 
@@ -47,15 +47,22 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
   - [ ] `ZOHO_EINVOICE_ENABLED=false`.
 - [ ] **PHP only:** the folder `storage/sessions/` exists and the web server can write to it (D-283). Without it staff are signed out after about 24 minutes.
 - [ ] Point the web root at `public_html/` (PHP), or start the Node service.
-- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"), in Indian time (`CRON_TZ=Asia/Kolkata`): deferred e-mails, OC auto-confirm, alerts at 06:00, Zoho sync hourly, digest at 08:15, document clean-up at 02:15, **exchange rate at 07:05** (`app/cron/fetch_fx_rate.php` / `src/jobs/fetchFxRate.js`, D-301), backups.
+- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"), in Indian time: deferred e-mails, OC auto-confirm, alerts at 06:00, Zoho sync, digest at 08:15, document clean-up at 02:15, **exchange rate at 07:05** (`app/cron/fetch_fx_rate.php` / `src/jobs/fetchFxRate.js`, D-301), backups.
+  - [ ] **Bluehost:** cPanel has no `CRON_TZ`: first find the server's clock with a one-time `date > <home>/servertime.txt` job (usually **MST**, India = MST + 12 h 30 min), then type the server hours from the deployment guide, section 10 (ten jobs; the test-restore row has **Day = 1**). Delete the one-time job;
+  - [ ] create `<home>/logs` before adding the jobs; set the **Cron Email** to an admin address;
+  - [ ] if a log says `php: command not found`, use `/usr/local/bin/php`.
 - [ ] Set up the **backups** (README, "Backups"; SOP 32; owner decisions D-260):
-  - [ ] create `BACKUP_DIR` outside the web root and outside the storage folder, and the encryption key file;
+  - [ ] create `BACKUP_DIR` outside the web root and outside the storage folder, and the encryption key file in **its own folder next to it** (never inside). Both folders **0700**; if they sit inside the hosting account's `public_html`, each also gets an `.htaccess` with `Require all denied`. Key file **0600**, about 65 bytes (Terminal, or a one-time cron job — deployment guide 11.2);
+  - [ ] create the **restore-test database** in cPanel › MySQL Databases and give the app's database user **ALL PRIVILEGES** on it; put its full name in `BACKUP_RESTORE_TEST_DB`;
+  - [ ] set the four `scripts/*.sh` to **0700**;
   - [ ] keep a copy of the key **away from the server** (without it the copies cannot be opened);
   - [ ] add the `BACKUP_…` lines to `app/.env` (keep 10 years; thin after 120 days);
   - [ ] add the three cron lines (database 02:00, documents 02:30, test-restore 04:00 on the 1st);
   - [ ] run the database and documents backups once by hand; **Settings › Backups** shows both as OK;
   - [ ] run `scripts/backup_test_restore.sh` once; Settings › Backups shows the test-restore as OK (the database copy includes `document_image_blobs`, the permanent document images — always restore the whole database);
   - [ ] off-site copy: when the provider is chosen, set `BACKUP_OFFSITE_TARGET`.
+- [ ] **Migration check:** run `docs/checks/check_all_migrations.sql` in phpMyAdmin — on a fresh install every row says **already done**.
+- [ ] **Backup folders locked:** if the backup and key folders are inside `public_html`, opening them through any domain gives **403 Forbidden** (or Not Acceptable / a page that never loads for the key file) — never a download.
 - [ ] **Web lock (13 Nov 2026):** the project's top-level `.htaccess` (`Require all denied`) and the first line `Require all granted` in `PHP_MySQL_Version/public_html/.htaccess` are both on the server; the login page opens, and `PHP_MySQL_Version/README.md` opened through any other domain of the hosting account answers **403 Forbidden** (see the PHP README, "Web lock").
 
 ## C. First login and company setup
@@ -77,7 +84,7 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
   - [ ] *Session folder storage/sessions is writable* (PHP);
   - [ ] *Settings at the recommended values* — **Apply recommended** sets the ones below in one go;
   - [ ] the three ticks: the MD has checked the global pricing settings (exchange rate and margins) and the commission levels; TDS and export-benefit deadlines confirmed with the CA.
-- [ ] **Settings › Security** (D-283): staff signed out after 4 hours idle (240 minutes), buyers and associates after 2 hours (120), staff log in again at least every 12 hours; **"This is my own office computer"** skips the login code for 30 days on that computer (0 = code at every login).
+- [ ] **Settings › Security** (D-283): staff signed out after 4 hours idle (240 minutes), buyers and associates after 2 hours (120), staff log in again at least every 12 hours; **"This is my own office computer"** skips the login code for **7 days** on that computer (D-369, 13 Nov 2026; 0 = code at every login).
 - [ ] **Settings › Company › MD name and title:** if they change later, the app asks whether to apply the new name to the open orders and the Draft / In-review documents (D-349); approved and sent documents never change. The founder logins themselves change only through the README's founder SQL block.
 - [ ] **Settings › E-mail** (D-280, D-281):
   - [ ] every MUST e-mail is locked on; check the SHOULD switches are on and the OPTIONAL "copy of buyer documents to the associate" is as you want it (off);
@@ -157,8 +164,8 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
 For a database that already holds data. Owner decisions D-268, D-269, D-270–D-330 (11 Nov 2026) and D-331–D-365 (12–13 Nov 2026). Do it outside working hours, in this order:
 
 1. [ ] **Back up** the database and the `storage/` folder (Settings › Backups, or run the two backup scripts by hand) and keep the copy until the upgrade is checked.
-2. [ ] Put the new code in place (both stacks are built the same; PHP: upload the files; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
-3. [ ] Run the database files below, **in this order** (each is safe to run twice; MySQL-compatible):
+2. [ ] Put the new code in place (both stacks are built the same; PHP on Bluehost: cPanel › Git Version Control › Manage › Pull or Deploy › **Update from Remote** — never edit Git files by hand on the server; deployment guide, section 14; Node: replace the app folder and `pm2 restart nexacrest` after step 3).
+3. [ ] Run `docs/checks/check_all_migrations.sql` in phpMyAdmin (read-only). Run only the files whose row says **NEEDED** or **PARTLY done**, from the list below, **in this order** (each is safe to run twice; MySQL-compatible; on a `PLAIN ALTER (owner D-371)` file a second run only says "#1060 Duplicate column name", which is harmless). Run the check again until every row says **already done**:
    Before file 19 (`2026-11-13a`), run these two **read-only** checks and keep the output (they change nothing):
 
    ```sql

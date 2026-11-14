@@ -43,14 +43,23 @@ function run(command, args, input) {
 }
 
 // schema.sql declares triggers with DELIMITER, which only the mysql CLI understands.
-function runMysql(database, sql) {
-  const args = database ? [...CREDENTIALS, database] : CREDENTIALS;
+function runMysql(database, sql, plainAlter = false) {
+  // Owner D-371 (13 Nov 2026): run every statement of a "PLAIN ALTER" file, as phpMyAdmin would
+  // after "Duplicate column name", so the rest of the file is still checked.
+  const base = plainAlter ? [...CREDENTIALS, '--force'] : CREDENTIALS;
+  const args = database ? [...base, database] : base;
   const { status, stderr } = run('mysql', args, sql);
+  // A "PLAIN ALTER" file on a fresh install may only fail with 1060 Duplicate column name
+  // (its columns are already in schema.sql) — any other error still fails the test.
+  if (status !== 0 && plainAlter && /ERROR 1060 \(42S21\)/.test(stderr) && !/ERROR (?!1060)\d+/.test(stderr)) {
+    return '';
+  }
   return status === 0 ? '' : `exit ${status}: ${stderr}`;
 }
 
 function loadFile(filePath) {
-  const error = runMysql(DB_NAME, fs.readFileSync(filePath));
+  const sql = fs.readFileSync(filePath, 'utf8');
+  const error = runMysql(DB_NAME, sql, sql.includes('PLAIN ALTER (owner D-371'));
   if (error) throw new Error(`${path.basename(filePath)} failed to load: ${error}`);
 }
 
