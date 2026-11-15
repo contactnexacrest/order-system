@@ -1,5 +1,10 @@
 # Tutorial videos — progress and resume notes
 
+> **Hold confirmed 15 Nov 2026 (owner: "no videos for now — until I say so").** Known mismatch from the sales
+> targets build (D-378): A01 and B02 show the Edit user form without the new optional **Joining date** field;
+> B01/B02 Dashboard and B02 Cockpit gain a target box **only once targets are set** (off by default). Show them
+> at the next re-record of B01/B02 when the owner lifts the hold.
+>
 > **ON HOLD — owner 13 Nov 2026: do not record until the owner lifts the hold.** No recording, no
 > re-recording, no `tutorials/run.js` (not even `--plan`). The scripts were updated on 13 Nov 2026 so they
 > match the app and are ready for re-recording later — see "Script update of 13 Nov 2026" below. Which videos
