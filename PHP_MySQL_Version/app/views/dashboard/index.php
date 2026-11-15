@@ -3,6 +3,50 @@
   <p>Signed in as <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= htmlspecialchars($user['email']) ?>).</p>
 </div>
 
+<?php if (!empty($salesTarget)): // Owner decision D-378: the signed-in person's own target, containers only
+  $__t = $salesTarget['target']; $__c = $salesTarget['counts'];
+  $__n = static fn ($v): string => rtrim(rtrim(number_format((float) $v, 1, '.', ''), '0'), '.');
+  $__ref = static fn (int $id): string => isset($salesTarget['orders'][$id]) ? '<a href="/orders/' . $id . '">' . htmlspecialchars((string) $salesTarget['orders'][$id]['order_reference']) . '</a>' : '#' . $id;
+  $__kinds = ['lost' => 'lost', 'cancelled' => 'cancelled', 'shipped_difference' => 'shipped a different number of containers', 'reversed' => 'reversed']; ?>
+<div class="card page-wide" id="your-target">
+  <h2 style="margin-top:0;">Your target — <?= htmlspecialchars((string) $salesTarget['period']['label']) ?></h2>
+  <div class="kv-grid">
+    <div><span class="k">Target</span><span class="v"><?= htmlspecialchars($__n($__t['containers'])) ?> containers<?= $__t['in_buildup'] ? ' <span class="muted small">(build-up)</span>' : '' ?></span></div>
+    <div><span class="k">Confirmed</span><span class="v"><?= (int) $__c['counted'] ?></span></div>
+    <div><span class="k">Shipped · awaiting · corrections · new buyers</span><span class="v"><?= (int) $__c['shipped'] ?> · <?= (int) $__c['awaiting'] ?> · <?= ($__c['corrections'] > 0 ? '+' : '') . (int) $__c['corrections'] ?> · <?= (int) $__c['new_buyers'] ?></span></div>
+    <div><span class="k">Still to achieve</span><span class="v"><?= htmlspecialchars($__n($salesTarget['still'])) ?></span></div>
+    <div><span class="k">Pipeline (PI approved or quotation sent)</span><span class="v"><?= count($salesTarget['pipeline']) ?> order(s)</span></div>
+    <div><span class="k">Progress</span><span class="v"><?= (int) $salesTarget['progress'] ?>%</span></div>
+    <?php if ($__t['in_buildup'] && $__t['quotations'] !== null): ?>
+    <div><span class="k">Quotations sent (build-up goal)</span><span class="v"><?= (int) $salesTarget['quotations_sent'] ?> / <?= (int) $__t['quotations'] ?></span></div>
+    <?php endif; ?>
+  </div>
+  <?php if ($__c['rows'] !== [] || $__c['correction_rows'] !== []): ?>
+  <table class="list">
+    <tr><th>Order</th><th>Date</th><th>What</th><th>Containers</th><?php if ($salesTarget['fob'] !== []): ?><th>FOB</th><?php endif; ?></tr>
+    <?php foreach ($__c['rows'] as $__r): $__oid = (int) $__r['order_id']; ?>
+    <tr>
+      <td><?= $__ref($__oid) ?></td>
+      <td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__r['confirmed_on'])) ?></td>
+      <td>Confirmed<?= (int) $__r['is_new_buyer'] === 1 ? ' · new buyer' : '' ?><?= !empty($__r['shipped_on']) ? ' · shipped ' . htmlspecialchars(\App\Helpers\Dates::short((string) $__r['shipped_on'])) : '' ?></td>
+      <td><?= (int) $__r['containers_confirmed'] ?></td>
+      <?php if ($salesTarget['fob'] !== []): ?><td><?= isset($salesTarget['fob'][$__oid]) ? htmlspecialchars(\App\Helpers\MoneyFormat::amount($salesTarget['fob'][$__oid], (string) ($salesTarget['orders'][$__oid]['currency_code'] ?? 'USD')) . ' ' . (string) ($salesTarget['orders'][$__oid]['currency_code'] ?? '')) : '—' ?></td><?php endif; ?>
+    </tr>
+    <?php endforeach; ?>
+    <?php foreach ($__c['correction_rows'] as $__e): ?>
+    <tr>
+      <td><?= $__ref((int) $__e['order_id']) ?></td>
+      <td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__e['date'])) ?></td>
+      <td>Correction — <?= htmlspecialchars($__kinds[$__e['kind']] ?? $__e['kind']) ?></td>
+      <td><?= ($__e['containers'] > 0 ? '+' : '') . (int) $__e['containers'] ?></td>
+      <?php if ($salesTarget['fob'] !== []): ?><td></td><?php endif; ?>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if (!empty($associateUpgrades)): // D-261 / D-263: users with "Manage associates" see this ?>
 <div class="card page-wide" id="associate-upgrades">
   <h2 style="margin-top:0;">Associates ready for the Quoting level? (<?= count($associateUpgrades) ?>)</h2>

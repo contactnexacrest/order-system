@@ -29,6 +29,12 @@ final class UserRepository
         return $row ?: null;
     }
 
+    /** Owner decision D-378: the day the person joined (a new joiner's sales target builds up from it). */
+    public static function setJoinedOn(int $userId, ?string $joinedOn): void
+    {
+        Database::connection()->prepare('UPDATE users SET joined_on = :d WHERE id = :id')->execute(['d' => $joinedOn, 'id' => $userId]);
+    }
+
     public static function incrementFailedLogins(int $userId): void
     {
         Database::connection()->prepare(

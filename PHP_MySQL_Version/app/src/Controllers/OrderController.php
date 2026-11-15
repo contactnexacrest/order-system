@@ -5226,6 +5226,12 @@ final class OrderController
 
         OrderRepository::markLost($orderId, $reason, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'ORDER_MARKED_LOST', 'orders', $orderId, 'status', $order['status'], 'lost', $reason);
+        // Owner decision D-378: the optional lost category, saved only when it is one of the listed values.
+        $category = (string) ($_POST['lost_category'] ?? '');
+        if (isset(\App\Services\SalesTargetService::LOST_CATEGORIES[$category])) {
+            OrderRepository::setLostCategory($orderId, $category);
+            AuditLogRepository::log((int) $user['id'], 'ORDER_LOST_CATEGORY_SET', 'orders', $orderId, 'lost_category', null, $category, $reason);
+        }
         Flash::set('success', 'Order marked as lost.');
         header("Location: /orders/{$orderId}");
     }

@@ -5,10 +5,10 @@
   "reference_stack": "PHP_MySQL_Version",
   "node_route_parity": "835/835 PHP routes also in Node",
   "counts": {
-   "routes": 835,
-   "routes_get": 270,
-   "routes_post": 565,
-   "permissions": 96,
+   "routes": 841,
+   "routes_get": 272,
+   "routes_post": 569,
+   "permissions": 97,
    "staff_roles": 24,
    "payment_presets": 5,
    "email_templates_seeded": 20,
@@ -138,7 +138,7 @@
    "seeded_in": "docs/seed.sql",
    "description": "Full business authority: approvals, all order/document actions, reporting.",
    "is_system_role": false,
-   "permission_count": 96,
+   "permission_count": 97,
    "permissions": [
     "approve_buyer_details_change",
     "approve_documents",
@@ -197,6 +197,7 @@
     "manage_product_specifications",
     "manage_purchasing",
     "manage_report_definitions",
+    "manage_sales_targets",
     "manage_sample_data",
     "manage_shipping",
     "manage_signatories",
@@ -248,7 +249,7 @@
    "seeded_in": "docs/seed.sql",
    "description": "Full business authority: approvals, all order/document actions, reporting.",
    "is_system_role": false,
-   "permission_count": 89,
+   "permission_count": 90,
    "permissions": [
     "approve_buyer_details_change",
     "approve_documents",
@@ -302,6 +303,7 @@
     "manage_product_catalog",
     "manage_purchasing",
     "manage_report_definitions",
+    "manage_sales_targets",
     "manage_sample_data",
     "manage_shipping",
     "manage_signatories",
@@ -4643,6 +4645,32 @@
     "NODE_MySQL_Version/app/src/controllers/reportController.js (1)"
    ],
    "money_permission": false
+  },
+  {
+   "key": "manage_sales_targets",
+   "name": "Manage sales targets",
+   "category": "reports",
+   "description": "Set the company target, the target multiple, designation and personal targets, move an order's target credit; see the Targets page (D-378).",
+   "granted_to_roles": [
+    "Managing Director",
+    "Executive Director"
+   ],
+   "route_gates": [
+    "GET /sales-targets",
+    "GET /sales-targets/settings",
+    "POST /sales-targets/settings",
+    "POST /sales-targets/person/{id}",
+    "POST /sales-targets/associate/{id}",
+    "POST /sales-targets/credit/{orderId}"
+   ],
+   "route_gate_count": 6,
+   "php_check_sites": [
+    "PHP_MySQL_Version/app/src/Services/SalesTargetService.php (1)",
+    "PHP_MySQL_Version/app/src/Helpers/PermittedLinks.php (1)",
+    "PHP_MySQL_Version/public_html/index.php (6)"
+   ],
+   "node_check_sites": [],
+   "money_permission": true
   },
   {
    "key": "view_associate_commission_rules",
@@ -34197,6 +34225,226 @@
     "e2e": []
    },
    "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/sales-targets",
+   "controller": "SalesTargetController",
+   "action": "index",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session"
+   ],
+   "php_line": 1236,
+   "node_line": null,
+   "node_handler": "salesTargetController.index",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "RouteMatrix: Admin page opens without 5xx"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/sales-targets/settings",
+   "controller": "SalesTargetController",
+   "action": "settings",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session"
+   ],
+   "php_line": 1237,
+   "node_line": null,
+   "node_handler": "salesTargetController.settings",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "RouteMatrix: Admin page opens without 5xx"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/sales-targets/settings",
+   "controller": "SalesTargetController",
+   "action": "saveSettings",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1238,
+   "node_line": null,
+   "node_handler": "salesTargetController.saveSettings",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/sales-targets/person/{id}",
+   "controller": "SalesTargetController",
+   "action": "savePerson",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1239,
+   "node_line": null,
+   "node_handler": "salesTargetController.savePerson",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/sales-targets/associate/{id}",
+   "controller": "SalesTargetController",
+   "action": "saveAssociate",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1240,
+   "node_line": null,
+   "node_handler": "salesTargetController.saveAssociate",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/sales-targets/credit/{orderId}",
+   "controller": "SalesTargetController",
+   "action": "moveCredit",
+   "requires_all": [
+    "manage_sales_targets"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1241,
+   "node_line": null,
+   "node_handler": "salesTargetController.moveCredit",
+   "node_difference": "D-378: PHP first; the Node twin (src/controllers/salesTargetController.js) follows",
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SalesTargetsTest.php"
+    ],
+    "node": [
+     "salesTargets.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
    "cafin_route": false
   },
   {

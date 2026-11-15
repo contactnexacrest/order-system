@@ -1372,6 +1372,11 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
   <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
     <?= Csrf::field() ?>
     <input type="hidden" name="reason" class="mark-lost-reason">
+    <?php // Owner decision D-378: an optional lost category (Sales Performance → "Top lost category"); the reason stays required. ?>
+    <select name="lost_category" aria-label="Lost category (optional)">
+      <option value="">Choose… (optional)</option>
+      <?php foreach (\App\Services\SalesTargetService::LOST_CATEGORIES as $__lk => $__ll): ?><option value="<?= htmlspecialchars($__lk) ?>"><?= htmlspecialchars($__ll) ?></option><?php endforeach; ?>
+    </select>
     <button type="button" class="btn-sm btn-danger" onclick="promptMarkLost(this)">Mark as Lost</button>
   </form>
   <script>

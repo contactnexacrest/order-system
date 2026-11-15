@@ -880,9 +880,18 @@ final class ReportController
             Csv::stream('sales_performance_report.csv', $headers, $csvRows);
         }
 
+        // Owner decision D-378: optional "By salesperson" ('' = the page exactly as before; 'all' or a user id).
+        $salesperson = trim((string) ($_GET['salesperson'] ?? ''));
+        if ($salesperson !== 'all' && !ctype_digit($salesperson)) {
+            $salesperson = '';
+        }
         View::render('reports/performance', [
             'report' => $report,
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'preset' => $preset],
+            'salesperson' => $salesperson,
+            'salespeople' => \App\Repositories\SalesTargetRepository::activeStaff(),
+            'bySalesperson' => $salesperson === '' ? null
+                : \App\Services\SalesTargetService::performanceBySalesperson($dateFrom, $dateTo, $salesperson, \App\Services\TestModeService::isEnabled() ? 1 : 0),
         ], 'layout/base');
     }
 

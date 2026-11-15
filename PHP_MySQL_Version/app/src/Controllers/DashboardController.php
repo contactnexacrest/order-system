@@ -81,6 +81,10 @@ final class DashboardController
             $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll($rows);
         }
 
+        // Owner decision D-378: "Your target" — the signed-in person's own target only, containers only
+        // (the order's FOB only for someone who already sees selling prices).
+        $data['salesTarget'] = \App\Services\SalesTargetService::dashboardFor($userId, date('Y-m-d'), \App\Services\MoneyVisibility::can('selling'));
+
         View::render('dashboard/index', $data, 'layout/base');
     }
 

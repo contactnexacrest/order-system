@@ -27,13 +27,19 @@ $presets = [
   <div class="section">
     <div class="btn-row" style="flex-wrap:wrap;margin-bottom:10px;">
       <?php foreach ($presets as $key => $label): ?>
-        <a href="/reports/performance?preset=<?= htmlspecialchars($key) ?>" class="btn-sm <?= $filters['preset'] === $key ? 'btn-accent' : 'btn-secondary' ?>"><?= htmlspecialchars($label) ?></a>
+        <a href="/reports/performance?preset=<?= htmlspecialchars($key) ?><?= ($salesperson ?? '') !== '' ? '&amp;salesperson=' . htmlspecialchars($salesperson) : '' ?>" class="btn-sm <?= $filters['preset'] === $key ? 'btn-accent' : 'btn-secondary' ?>"><?= htmlspecialchars($label) ?></a>
       <?php endforeach; ?>
     </div>
     <form method="get" action="/reports/performance">
       <div class="kv-grid">
         <label>Date From<input type="date" name="date_from" value="<?= htmlspecialchars($filters['dateFrom'] ?? '') ?>"></label>
         <label>Date To<input type="date" name="date_to" value="<?= htmlspecialchars($filters['dateTo'] ?? '') ?>"></label>
+        <label>By salesperson (D-378)
+          <select name="salesperson">
+            <option value="">Not shown</option>
+            <option value="all"<?= ($salesperson ?? '') === 'all' ? ' selected' : '' ?>>Everyone</option>
+            <?php foreach ($salespeople ?? [] as $__sp): ?><option value="<?= (int) $__sp['id'] ?>"<?= ($salesperson ?? '') === (string) $__sp['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__sp['name']) ?></option><?php endforeach; ?>
+          </select></label>
       </div>
       <div class="btn-row">
         <button type="submit" class="btn-sm">Run Custom Range</button>
@@ -118,4 +124,27 @@ $presets = [
       <?php endforeach; ?>
     </table>
   </div>
+<?php if (($bySalesperson ?? null) !== null): // Owner decision D-378: orders credited to each salesperson ?>
+
+  <div class="section" id="performance-by-salesperson">
+    <h2>By salesperson</h2>
+    <p class="muted small">Orders credited to each person (moved credit, else the order's Sales &amp; Export owner). Quotes sent, won (reached PI), lost before / after PI, win rate, average days from the first quotation e-mail to the PI date, and the most common lost category.</p>
+    <table class="list">
+      <tr><th>Salesperson</th><th>Quotes sent</th><th>Won (PI)</th><th>Lost before PI</th><th>Lost after PI</th><th>Win rate</th><th>Avg days QT → PI</th><th>Top lost category</th></tr>
+      <?php foreach ($bySalesperson as $__row): ?>
+      <tr>
+        <td><?= htmlspecialchars((string) $__row['name']) ?></td>
+        <td><?= (int) $__row['quotes'] ?></td>
+        <td><?= (int) $__row['won'] ?></td>
+        <td><?= (int) $__row['lost_before_pi'] ?></td>
+        <td><?= (int) $__row['lost_after_pi'] ?></td>
+        <td><?= $__row['win_rate_pct'] !== null ? $__row['win_rate_pct'] . '%' : '—' ?></td>
+        <td><?= $__row['avg_days_qt_to_pi'] !== null ? $__row['avg_days_qt_to_pi'] : '—' ?></td>
+        <td><?= $__row['top_lost_category'] !== null ? htmlspecialchars((string) $__row['top_lost_category']) : '—' ?></td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if ($bySalesperson === []): ?><tr><td colspan="8" class="muted">No quotation, win or loss in this period for this choice.</td></tr><?php endif; ?>
+    </table>
+  </div>
+<?php endif; ?>
 </div>

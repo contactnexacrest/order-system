@@ -58,6 +58,7 @@ removed from this folder; git history keeps them (last commit with them:
 | File | Owner decisions | What it does |
 |---|---|---|
 | `2026-11-14a-line-priced-rate.sql` | D-374 | New empty columns `order_products.priced_fx_rate` and `priced_at`: the pricing rate (₹ per USD) and the time a line's price was set, until the approved Quotation fixes the prices. **Plain ALTER (D-371):** a second run only says "Duplicate column name". Existing lines show "Rate not recorded". |
+| `2026-11-15a-sales-targets.sql` | D-378 | Sales targets: new tables `sales_target_settings` (with the default settings), `sales_target_company`, `sales_targets`, `sales_target_credits`; new empty columns `users.joined_on`, `orders.lost_category`, `orders.sales_credit_user_id`; permission "Manage sales targets" for the MD and the ED. **Plain ALTER (D-371):** the column ALTERs come last; a second run only says "Duplicate column name". Order data is only read. |
 
 ### Rules for every migration file (enforced by tests)
 

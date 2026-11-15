@@ -132,6 +132,10 @@ final class CoordinationController
             'escalated' => array_values(array_filter($tasks, static fn (array $t): bool => (int) $t['escalated'] === 1)),
             'supplierDelays' => array_values(array_filter($tasks, static fn (array $t): bool => $t['task_key'] === 'chase_supplier' && (int) $t['overdue'] === 1)),
             'ordersByStatus' => DepartmentTaskRepository::ordersByStatus(),
+            // Owner decision D-378: the sales target box — company target ON and manage_sales_targets;
+            // its money lines only with view_price_buildup as well.
+            'salesTargets' => \App\Services\SalesTargetService::canManage() ? \App\Services\SalesTargetService::cockpitBox(date('Y-m-d')) : null,
+            'salesTargetsMoney' => \App\Services\SalesTargetService::canSeeMoney(),
         ], 'layout/base');
     }
 

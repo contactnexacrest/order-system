@@ -2844,3 +2844,25 @@ INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
 INSERT INTO audit_log (user_id, action_type, entity_type, entity_id, field_name, old_value, new_value, reason)
 SELECT NULL, 'MIGRATION_2026_11_13B', 'catalog_products', NULL, 'configured_base_follows_supplier', NULL, 'Fresh install: nothing to fix or link', 'Owner decision D-361 (13 Nov 2026)'
   FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE action_type = 'MIGRATION_2026_11_13B');
+
+-- Owner decision D-378 (15 Nov 2026; migration 2026-11-15a): sales targets — the default settings
+-- (alert recipients NULL = the defaults: MD and ED; for orders with no salesperson MD and the
+-- Sales/Export Manager) and the permission "Manage sales targets" for the MD and the ED.
+INSERT INTO sales_target_settings (setting_key, setting_value)
+SELECT k.setting_key, k.setting_value FROM (
+  SELECT 'period' AS setting_key, 'quarter' AS setting_value
+  UNION ALL SELECT 'multiple', '3'
+  UNION ALL SELECT 'buildup_months', '3'
+  UNION ALL SELECT 'review_months', '12'
+  UNION ALL SELECT 'alert_pct', '60'
+  UNION ALL SELECT 'alert_behind_recipients', NULL
+  UNION ALL SELECT 'alert_review_recipients', NULL
+  UNION ALL SELECT 'alert_no_owner_recipients', NULL
+) k WHERE NOT EXISTS (SELECT 1 FROM sales_target_settings s WHERE s.setting_key = k.setting_key);
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'manage_sales_targets', 'Manage sales targets', 'Set the company target, the target multiple, designation and personal targets, move an order''s target credit; see the Targets page (D-378).', 'reports'
+ WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'manage_sales_targets');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_sales_targets'
+ WHERE r.name IN ('Managing Director', 'Founder & Managing Director', 'Executive Director', 'Founder & Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);

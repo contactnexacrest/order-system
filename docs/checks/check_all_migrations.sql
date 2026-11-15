@@ -19,6 +19,17 @@ FROM (
                 WHERE table_schema = DATABASE() AND table_name = 'order_products'
                   AND column_name IN ('priced_fx_rate', 'priced_at'))
               WHEN 2 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END AS status
+  UNION ALL
+  SELECT '2026-11-15a',
+         'Sales targets: 4 new tables, users.joined_on, orders.lost_category / sales_credit_user_id (D-378)',
+         CASE (SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('sales_target_settings', 'sales_target_company', 'sales_targets', 'sales_target_credits'))
+            + (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND ((table_name = 'users' AND column_name = 'joined_on')
+                    OR (table_name = 'orders' AND column_name IN ('lost_category', 'sales_credit_user_id'))))
+              WHEN 7 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

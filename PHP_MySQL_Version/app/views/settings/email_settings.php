@@ -63,8 +63,21 @@ use App\Services\StaffRouting;
           <?php endforeach; ?>
         </tr>
       <?php endforeach; ?>
+      <?php // Owner decision D-378: the sales target alerts — tick who is told (nobody ticked: the MD). ?>
+      <?php foreach (\App\Services\SalesTargetService::ALERTS as $__kind => [, $__label]): ?>
+        <tr id="target-alert-<?= htmlspecialchars($__kind) ?>">
+          <td><?= htmlspecialchars($__label) ?></td>
+          <td colspan="2">
+            <?php foreach ($staff as $u): ?>
+              <label style="display:inline-block;margin-right:12px"><input type="checkbox" name="target_alerts[<?= htmlspecialchars($__kind) ?>][]" value="<?= (int) $u['id'] ?>"<?= in_array((int) $u['id'], $targetAlerts[$__kind] ?? [], true) ? ' checked' : '' ?>> <?= htmlspecialchars((string) $u['name']) ?></label>
+            <?php endforeach; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
     </table>
     </div>
+    <input type="hidden" name="target_alerts_present" value="1">
+    <p class="muted small">Sales target alerts: not changed here, the defaults are the MD and the ED (the company is behind; a target is due for review) and the MD and the Sales/Export Manager (a confirmed order has no salesperson). Nobody ticked: the MD.</p>
 
     <label>Reason for this change *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Testing finished — buyer e-mails on again"></label>
     <button type="submit" data-testid="email-settings-save">Save</button>

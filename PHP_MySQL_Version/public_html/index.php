@@ -177,6 +177,7 @@ $backups = new BackupController();
 $products = new ProductController();
 $productConfigure = new \App\Controllers\ProductConfigureController(); // D-361
 $pricing = new PricingController();
+$salesTargets = new \App\Controllers\SalesTargetController(); // D-378
 $editPrice = new EditPriceController();
 $testMode = new TestModeController();
 
@@ -1231,6 +1232,13 @@ $router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMis
 // Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
 $router->get('/pricing/settings', [$pricing, 'settings'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
 $router->post('/pricing/settings', [$pricing, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+// Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
+$router->get('/sales-targets', [$salesTargets, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets')]);
+$router->get('/sales-targets/settings', [$salesTargets, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets')]);
+$router->post('/sales-targets/settings', [$salesTargets, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
+$router->post('/sales-targets/person/{id}', [$salesTargets, 'savePerson'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
+$router->post('/sales-targets/associate/{id}', [$salesTargets, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
+$router->post('/sales-targets/credit/{orderId}', [$salesTargets, 'moveCredit'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
 $router->get('/pricing/commission-levels', [$pricing, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
 $router->post('/pricing/commission-levels', [$pricing, 'addLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/commission-levels/{id}', [$pricing, 'updateLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);

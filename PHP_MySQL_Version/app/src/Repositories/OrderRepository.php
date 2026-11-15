@@ -889,6 +889,12 @@ final class OrderRepository
         )->execute(['reason' => $reason, 'user_id' => $userId, 'id' => $orderId]);
     }
 
+    /** Owner decision D-378: the optional category chosen on the Mark Lost form (SalesTargetService::LOST_CATEGORIES). */
+    public static function setLostCategory(int $orderId, string $category): void
+    {
+        Database::connection()->prepare('UPDATE orders SET lost_category = :c WHERE id = :id')->execute(['c' => $category, 'id' => $orderId]);
+    }
+
     /**
      * External QA report M-09 — the formal cancellation workflow's own
      * approval step (OrderController::approveCancellation()) calls this

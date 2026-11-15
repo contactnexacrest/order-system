@@ -177,6 +177,22 @@ final class UserController
             ['role_id', $target['role_id'], $roleId],
         ], static fn(array $c): bool => (string) ($c[1] ?? '') !== (string) ($c[2] ?? ''));
 
+        // Owner decision D-378: the joining date (sales target build-up), only when the form carries it.
+        if (isset($_POST['joined_on_present'])) {
+            $joined = trim((string) ($_POST['joined_on'] ?? ''));
+            $joinedDate = $joined !== '' ? \DateTimeImmutable::createFromFormat('!Y-m-d', $joined) : null;
+            if ($joined !== '' && ($joinedDate === false || $joinedDate->format('Y-m-d') !== $joined)) {
+                Flash::set('error', 'Joined on: enter a valid date.');
+                header("Location: /users/{$userId}/edit");
+                return;
+            }
+            $joined = $joined === '' ? null : $joined;
+            if ((string) ($target['joined_on'] ?? '') !== (string) ($joined ?? '')) {
+                UserRepository::setJoinedOn($userId, $joined);
+                $changes[] = ['joined_on', $target['joined_on'] ?? null, $joined];
+            }
+        }
+
         UserRepository::update($userId, $name, $email, $phone, $roleId);
         // D-259: the team incentive switch — the MD only; anyone else's form does not carry it.
         if (isset($_POST['incentive_eligible_present'])) {

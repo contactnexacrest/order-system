@@ -191,6 +191,7 @@ final class FormLabelConventionsTest extends TestCase
         'pricing/_spec_table.php' => ['kind|required<?= $__ro ?>' => 'edits a saved specification'],
         'products/specifications.php' => ['category_id' => "the product's saved category (product settings)"],
         'pricing/settings.php' => ['fx_mode' => 'Settings page', 'incentive_mode' => 'Settings page'],
+        'sales_targets/settings.php' => ['period' => 'Settings page (D-378: shows the saved target period)'],
         'settings/document_cleanup.php' => ['draft_days' => 'Settings page', 'superseded_days' => 'Settings page', 'cafin_mode' => 'Settings page'],
         'settings/remittance_reasons.php' => ['treatment|aria-label="Treated as"' => 'edits a saved reason'],
     ];

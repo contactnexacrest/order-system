@@ -155,3 +155,11 @@ $__ro = $canManage ? '' : ' disabled';
   </table>
   <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Category price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
 </div>
+
+<?php if (\App\Services\SalesTargetService::canManage()): // Owner decision D-378: a link card only; the settings live on their own page ?>
+<div class="card" id="sales-targets-link">
+  <h2 style="margin-top:0;">Sales targets settings</h2>
+  <p class="muted">The company target, the target period and multiple, the build-up for new joiners, the review interval, the alert level and the default targets per designation.</p>
+  <p><a class="btn-sm" href="/sales-targets/settings">Sales targets settings</a> <a class="btn-sm btn-secondary" href="/sales-targets">Sales targets</a></p>
+</div>
+<?php endif; ?>

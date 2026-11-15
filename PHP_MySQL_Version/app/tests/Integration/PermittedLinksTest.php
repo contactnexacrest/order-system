@@ -56,6 +56,7 @@ final class PermittedLinksTest extends DbTestCase
             '/documents/1/download', '/settings', '/audit-log', '/ca', '/disputes', '/complaints', '/reports', '/clients',
             '/orders', '/client-intake', '/pi-intake-review', '/reorder-requests', '/admin/field-protection',
             '/company-assets', '/signatories', '/ports', '/port-routes', '/users',
+            '/sales-targets', '/sales-targets/settings', // D-378
         ];
         foreach ($samples as $path) {
             $route = null;

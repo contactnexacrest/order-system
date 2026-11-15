@@ -6725,3 +6725,63 @@ ALTER TABLE order_supplier_po ADD COLUMN price_override_reason VARCHAR(500) NULL
 ALTER TABLE order_expenses ADD COLUMN bank_reference VARCHAR(150) NULL;
 ALTER TABLE order_expenses ADD COLUMN zoho_pushed_hash CHAR(64) NULL;
 ALTER TABLE order_cost_entries ADD COLUMN bank_reference VARCHAR(150) NULL;
+
+-- Owner decision D-378 (15 Nov 2026, migration 2026-11-15a): sales targets. The feature only READS
+-- order data; these tables are its own. sales_target_settings: the global choices (period, multiple,
+-- build-up, review, alert % and the alert recipients — NULL = the defaults, '' = nobody ticked, which
+-- falls back to the MD, otherwise comma-separated user ids). sales_target_company: the company target
+-- (monthly costs and profit), the row with the greatest effective_from on or before the period start
+-- applies. sales_targets: designation defaults and personal / associate targets per target period.
+-- sales_target_credits: the snapshot SalesTargetService::sync() keeps (confirmation, shipment and
+-- reversal dates of each order — events keep their dates, so past periods never change).
+-- users.joined_on (build-up), orders.lost_category (Mark Lost), orders.sales_credit_user_id (the
+-- MD / ED moved an order's target credit).
+CREATE TABLE IF NOT EXISTS sales_target_settings (
+  setting_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+  setting_value TEXT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS sales_target_company (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  effective_from DATE NOT NULL,
+  costs_monthly  DECIMAL(14,2) NULL,
+  profit_monthly DECIMAL(14,2) NULL,
+  reason         VARCHAR(500) NOT NULL,
+  created_by     BIGINT UNSIGNED NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_sales_target_company_from (effective_from)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS sales_targets (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  scope           ENUM('designation','user','associate') NOT NULL,
+  ref_id          BIGINT UNSIGNED NOT NULL,
+  containers      DECIMAL(6,1) NULL,
+  new_buyers      INT UNSIGNED NULL,
+  quotations      INT UNSIGNED NULL,
+  multiple        DECIMAL(4,1) NULL,
+  buildup_enabled TINYINT(1) NULL,
+  reason          VARCHAR(500) NULL,
+  reviewed_at     DATETIME NULL,
+  updated_by      BIGINT UNSIGNED NULL,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sales_target (scope, ref_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS sales_target_credits (
+  order_id             BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  client_id            BIGINT UNSIGNED NOT NULL,
+  confirmed_on         DATE NOT NULL,
+  how                  ENUM('advance','lc','po_pi') NOT NULL,
+  containers_confirmed INT NOT NULL,
+  shipped_on           DATE NULL,
+  containers_shipped   INT NULL,
+  reversed_on          DATE NULL,
+  reversed_why         VARCHAR(20) NULL,
+  is_new_buyer         TINYINT(1) NOT NULL DEFAULT 0,
+  created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_sales_target_credits_client (client_id, confirmed_on)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE users ADD COLUMN joined_on DATE NULL;
+ALTER TABLE orders ADD COLUMN lost_category VARCHAR(30) NULL;
+ALTER TABLE orders ADD COLUMN sales_credit_user_id BIGINT UNSIGNED NULL;

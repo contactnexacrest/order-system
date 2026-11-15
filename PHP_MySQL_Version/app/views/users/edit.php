@@ -14,6 +14,11 @@
       <label>Phone
         <input type="text" name="phone" value="<?= htmlspecialchars($target['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
       </label>
+      <?php // Owner decision D-378: the joining date — a new joiner's sales target builds up from it. ?>
+      <input type="hidden" name="joined_on_present" value="1">
+      <label>Joined on
+        <input type="date" name="joined_on" value="<?= htmlspecialchars((string) ($target['joined_on'] ?? '')) ?>">
+      </label>
       <label>Role
         <select name="role_id">
           <option value="">— none —</option>

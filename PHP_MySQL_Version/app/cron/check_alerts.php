@@ -212,6 +212,10 @@ function run(): int
     }
     // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
     $created += \App\Services\ComplianceTrackingService::runReminders($today->format('Y-m-d'));
+    // Owner decision D-378 (15 Nov 2026): sales targets — bring the credit snapshot up to date, then the
+    // three alerts (behind / review due / confirmed order with no salesperson), each sent once.
+    \App\Services\SalesTargetService::sync($today->format('Y-m-d'));
+    $created += \App\Services\SalesTargetService::runAlerts($today->format('Y-m-d'));
 
     // --- RCMC expiry ---
     $rcmcExpiry = CompanySettingsRepository::get('rcmc_valid_until');

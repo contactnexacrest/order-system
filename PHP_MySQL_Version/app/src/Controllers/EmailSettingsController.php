@@ -29,6 +29,8 @@ final class EmailSettingsController
             'testingMode' => EmailPolicy::testingMode(),
             'owners' => StaffRouting::companyOwners(),
             'staff' => $staff,
+            // Owner decision D-378: who is told about the 3 sales target alerts.
+            'targetAlerts' => \App\Services\SalesTargetService::alertRecipientsForForm(),
         ], 'layout/base');
     }
 
@@ -45,6 +47,11 @@ final class EmailSettingsController
         $changes = EmailPolicy::save($on, ($_POST['testing_mode'] ?? '0') === '1', $userId, $reason);
         $owners = is_array($_POST['owners'] ?? null) ? $_POST['owners'] : [];
         $changes = array_merge($changes, array_map(static fn (string $l): string => 'Who is told: ' . $l, StaffRouting::saveCompanyOwners($owners, $userId, $reason)));
+        // Owner decision D-378: the 3 sales target alert rows, only when the form carries them.
+        if (isset($_POST['target_alerts_present'])) {
+            $targetAlerts = is_array($_POST['target_alerts'] ?? null) ? $_POST['target_alerts'] : [];
+            $changes = array_merge($changes, array_map(static fn (string $l): string => 'Who is told: ' . $l, \App\Services\SalesTargetService::saveAlertRecipients($targetAlerts, $userId, $reason)));
+        }
         Flash::set('success', $changes === [] ? 'Nothing changed.' : 'Saved: ' . implode('; ', $changes) . '.');
         header('Location: /admin/email-settings');
     }
