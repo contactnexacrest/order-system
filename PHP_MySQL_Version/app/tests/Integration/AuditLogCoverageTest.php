@@ -71,6 +71,7 @@ final class AuditLogCoverageTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $pdo->query("SELECT id FROM incoterms WHERE code = 'FOB'")->fetchColumn(),
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $pdo->query("SELECT id FROM currencies WHERE code = 'USD'")->fetchColumn(),
             'payment_preset_id'   => (string) $pdo->query("SELECT id FROM payment_presets WHERE preset_name = 'Standard — New Buyer'")->fetchColumn(),
             'product_description' => ['L-23 audit test granite slab'],

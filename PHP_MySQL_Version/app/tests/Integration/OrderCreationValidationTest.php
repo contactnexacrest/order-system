@@ -109,6 +109,7 @@ final class OrderCreationValidationTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $this->incotermId,
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $this->currencyId,
             'payment_preset_id'   => (string) $this->paymentPresetId,
             'product_description' => ['ORD-04/05/06 regression test granite slab'],

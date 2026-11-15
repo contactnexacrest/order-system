@@ -60,6 +60,7 @@ final class OrderMultiAssigneeTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $incotermId,
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $currencyId,
             'payment_preset_id'   => (string) $presetId,
             'product_description' => ['Multi-assignee auto-assignment test slab'],

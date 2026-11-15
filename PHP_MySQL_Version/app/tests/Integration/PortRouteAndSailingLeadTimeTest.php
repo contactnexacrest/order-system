@@ -128,6 +128,7 @@ final class PortRouteAndSailingLeadTimeTest extends DbTestCase
         $_POST = [
             'client_id'                   => (string) $clientId,
             'incoterm_id'                 => (string) $this->incotermId,
+            'container_type'              => '20ft Standard', // D-376: required
             'currency_id'                 => (string) $this->currencyId,
             'payment_preset_id'           => (string) $this->paymentPresetId,
             'port_of_loading_id'          => (string) $this->loadingPortId,
@@ -162,6 +163,7 @@ final class PortRouteAndSailingLeadTimeTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $this->incotermId,
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $this->currencyId,
             'payment_preset_id'   => (string) $this->paymentPresetId,
             'product_description' => ['No sailing-lead-time granite slab'],
@@ -188,6 +190,7 @@ final class PortRouteAndSailingLeadTimeTest extends DbTestCase
 
         $_POST = [
             'incoterm_id'                => (string) $this->incotermId,
+            'container_type'             => '20ft Standard', // D-376: required
             'currency_id'                => (string) $this->currencyId,
             'sailing_lead_time_min_days' => '20',
             'sailing_lead_time_max_days' => '30',

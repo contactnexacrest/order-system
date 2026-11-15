@@ -74,6 +74,15 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_sales_targets'
  WHERE r.name IN ('Managing Director', 'Founder & Managing Director', 'Executive Director', 'Founder & Executive Director')
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+-- SOP chapter 33 (Sales targets): on, and ticked for the management roles (D-266: new chapters are hidden
+-- from other staff until assigned).
+INSERT INTO sop_chapters (slug, is_enabled) SELECT '33-sales-targets', 1 FROM DUAL
+  WHERE NOT EXISTS (SELECT 1 FROM sop_chapters WHERE slug = '33-sales-targets');
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, '33-sales-targets' FROM roles r
+  WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director', 'System Administrator')
+    AND NOT EXISTS (SELECT 1 FROM sop_role_chapters x WHERE x.role_id = r.id AND x.slug = '33-sales-targets');
+
 ALTER TABLE users ADD COLUMN joined_on DATE NULL;
 ALTER TABLE orders ADD COLUMN lost_category VARCHAR(30) NULL;
 ALTER TABLE orders ADD COLUMN sales_credit_user_id BIGINT UNSIGNED NULL;

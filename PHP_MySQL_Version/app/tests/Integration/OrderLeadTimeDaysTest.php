@@ -45,6 +45,7 @@ final class OrderLeadTimeDaysTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $this->incotermId,
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $this->currencyId,
             'payment_preset_id'   => (string) $this->paymentPresetId,
             'est_lead_time_text'  => '45-60 days from advance receipt',
@@ -75,6 +76,7 @@ final class OrderLeadTimeDaysTest extends DbTestCase
         $_POST = [
             'client_id'           => (string) $clientId,
             'incoterm_id'         => (string) $this->incotermId,
+            'container_type'      => '20ft Standard', // D-376: required
             'currency_id'         => (string) $this->currencyId,
             'payment_preset_id'   => (string) $this->paymentPresetId,
             'product_description' => ['No lead-time granite slab'],
@@ -101,6 +103,7 @@ final class OrderLeadTimeDaysTest extends DbTestCase
 
         $_POST = [
             'incoterm_id'          => (string) $this->incotermId,
+            'container_type'       => '20ft Standard', // D-376: required
             'currency_id'          => (string) $this->currencyId,
             'lead_time_min_days'   => '20',
             'lead_time_max_days'   => '30',
