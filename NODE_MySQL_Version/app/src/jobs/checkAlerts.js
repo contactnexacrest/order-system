@@ -189,6 +189,10 @@ async function run() {
   }
   // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
   created += await require('../services/complianceTrackingService').runReminders(todayIst());
+  // Owner decision D-378 (15 Nov 2026): sales targets — bring the credit snapshot up to date, then the
+  // three alerts (behind / review due / confirmed order with no salesperson), each sent once.
+  await require('../services/salesTargetService').sync(todayIst());
+  created += await require('../services/salesTargetService').runAlerts(todayIst());
 
   // --- RCMC expiry ---
   const rcmcExpiry = await companySettingsRepository.get('rcmc_valid_until');

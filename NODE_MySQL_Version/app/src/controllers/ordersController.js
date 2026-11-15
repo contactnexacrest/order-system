@@ -5449,6 +5449,12 @@ async function markLost(req, res) {
 
   await orderRepository.markLost(orderId, reason, user.id);
   await auditLogRepository.log(user.id, 'ORDER_MARKED_LOST', 'orders', orderId, 'status', order.status, 'lost', reason);
+  // Owner decision D-378: the optional lost category, saved only when it is one of the listed values.
+  const category = String((req.body && req.body.lost_category) ?? '');
+  if (Object.prototype.hasOwnProperty.call(require('../services/salesTargetService').LOST_CATEGORIES, category)) {
+    await orderRepository.setLostCategory(orderId, category);
+    await auditLogRepository.log(user.id, 'ORDER_LOST_CATEGORY_SET', 'orders', orderId, 'lost_category', null, category, reason);
+  }
   flash.set(req, 'success', 'Order marked as lost.');
   res.redirect(`/orders/${orderId}`);
 }

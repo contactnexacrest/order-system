@@ -39,6 +39,9 @@ async function index(req, res) {
     testingMode: await emailPolicy.testingMode(),
     items,
     staff,
+    // Owner decision D-378: who is told about the 3 sales target alerts.
+    targetAlerts: await require('../services/salesTargetService').alertRecipientsForForm(),
+    targetAlertRows: Object.entries(require('../services/salesTargetService').ALERTS).map(([kind, [, label]]) => ({ kind, label })),
   });
 }
 
@@ -55,6 +58,11 @@ async function save(req, res) {
   let changes = await emailPolicy.save(on, String(body.testing_mode || '0') === '1', req.user.id, reason);
   const owners = body.owners && typeof body.owners === 'object' ? body.owners : {};
   changes = changes.concat((await staffRouting.saveCompanyOwners(owners, req.user.id, reason)).map((l) => `Who is told: ${l}`));
+  // Owner decision D-378: the 3 sales target alert rows, only when the form carries them.
+  if (body.target_alerts_present !== undefined) {
+    const targetAlerts = body.target_alerts && typeof body.target_alerts === 'object' && !Array.isArray(body.target_alerts) ? body.target_alerts : {};
+    changes = changes.concat((await require('../services/salesTargetService').saveAlertRecipients(targetAlerts, req.user.id, reason)).map((l) => `Who is told: ${l}`));
+  }
   flash.set(req, 'success', changes.length ? `Saved: ${changes.join('; ')}.` : 'Nothing changed.');
   res.redirect('/admin/email-settings');
 }

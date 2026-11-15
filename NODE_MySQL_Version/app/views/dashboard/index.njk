@@ -3,6 +3,49 @@
   <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
 </div>
 
+{% if salesTarget %}{# Owner decision D-378: the signed-in person's own target, containers only #}
+{% set tt = salesTarget.target %}{% set tc = salesTarget.counts %}
+{% set kinds = { 'lost': 'lost', 'cancelled': 'cancelled', 'shipped_difference': 'shipped a different number of containers', 'reversed': 'reversed' } %}
+{% macro targetOrderRef(id, orders) %}{% if orders[id] %}<a href="/orders/{{ id }}">{{ orders[id].order_reference }}</a>{% else %}#{{ id }}{% endif %}{% endmacro %}
+<div class="card page-wide" id="your-target">
+  <h2 style="margin-top:0;">Your target — {{ salesTarget.period.label }}</h2>
+  <div class="kv-grid">
+    <div><span class="k">Target</span><span class="v">{{ tt.containers | targetNum }} containers{% if tt.in_buildup %} <span class="muted small">(build-up)</span>{% endif %}</span></div>
+    <div><span class="k">Confirmed</span><span class="v">{{ tc.counted }}</span></div>
+    <div><span class="k">Shipped · awaiting · corrections · new buyers</span><span class="v">{{ tc.shipped }} · {{ tc.awaiting }} · {{ '+' if tc.corrections > 0 }}{{ tc.corrections }} · {{ tc.new_buyers }}</span></div>
+    <div><span class="k">Still to achieve</span><span class="v">{{ salesTarget.still | targetNum }}</span></div>
+    <div><span class="k">Pipeline (PI approved or quotation sent)</span><span class="v">{{ salesTarget.pipeline.length }} order(s)</span></div>
+    <div><span class="k">Progress</span><span class="v">{{ salesTarget.progress }}%</span></div>
+    {% if tt.in_buildup and tt.quotations != null %}
+    <div><span class="k">Quotations sent (build-up goal)</span><span class="v">{{ salesTarget.quotations_sent }} / {{ tt.quotations }}</span></div>
+    {% endif %}
+  </div>
+  {% if tc.rows.length or tc.correction_rows.length %}
+  <table class="list">
+    <tr><th>Order</th><th>Date</th><th>What</th><th>Containers</th>{% if salesTarget.has_fob %}<th>FOB</th>{% endif %}</tr>
+    {% for tr in tc.rows %}{% set toid = tr.order_id | int %}
+    <tr>
+      <td>{{ targetOrderRef(toid, salesTarget.orders) }}</td>
+      <td>{{ tr.confirmed_on | shortDate }}</td>
+      <td>Confirmed{% if (tr.is_new_buyer | int) == 1 %} · new buyer{% endif %}{% if tr.shipped_on %} · shipped {{ tr.shipped_on | shortDate }}{% endif %}</td>
+      <td>{{ tr.containers_confirmed | int }}</td>
+      {% if salesTarget.has_fob %}{% set tcur = (salesTarget.orders[toid].currency_code if salesTarget.orders[toid] else null) %}<td>{% if salesTarget.fob[toid] != null %}{{ salesTarget.fob[toid] | docAmount(tcur or 'USD') }} {{ tcur or '' }}{% else %}—{% endif %}</td>{% endif %}
+    </tr>
+    {% endfor %}
+    {% for te in tc.correction_rows %}
+    <tr>
+      <td>{{ targetOrderRef(te.order_id, salesTarget.orders) }}</td>
+      <td>{{ te.date | shortDate }}</td>
+      <td>Correction — {{ kinds[te.kind] or te.kind }}</td>
+      <td>{{ '+' if te.containers > 0 }}{{ te.containers }}</td>
+      {% if salesTarget.has_fob %}<td></td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if associateUpgrades and associateUpgrades.length %}{# D-261 / D-263: users with "Manage associates" see this #}
 <div class="card page-wide" id="associate-upgrades">
   <h2 style="margin-top:0;">Associates ready for the Quoting level? ({{ associateUpgrades.length }})</h2>

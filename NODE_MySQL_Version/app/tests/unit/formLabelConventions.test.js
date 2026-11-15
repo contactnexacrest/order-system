@@ -151,6 +151,7 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     'pricing/_spec_table.njk': { 'kind|required{{ ro }}': 'edits a saved specification' },
     'products/specifications.njk': { category_id: "the product's saved category (product settings)" },
     'pricing/settings.njk': { fx_mode: 'Settings page', incentive_mode: 'Settings page' },
+    'sales_targets/settings.njk': { period: 'Settings page (D-378: shows the saved target period)' },
     'settings/document_cleanup.njk': { draft_days: 'Settings page', superseded_days: 'Settings page', cafin_mode: 'Settings page' },
     'settings/remittance_reasons.njk': { 'treatment|aria-label="Treated as"': 'edits a saved reason' },
   };

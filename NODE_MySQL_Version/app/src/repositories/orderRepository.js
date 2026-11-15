@@ -780,6 +780,11 @@ async function markLost(orderId, reason, userId) {
   );
 }
 
+/** Owner decision D-378: the optional category chosen on the Mark Lost form (salesTargetService.LOST_CATEGORIES). */
+async function setLostCategory(orderId, category) {
+  await db.execute('UPDATE orders SET lost_category = :c WHERE id = :id', { c: category, id: orderId });
+}
+
 /**
  * External QA report M-09 — the formal cancellation workflow's own
  * approval step (ordersController.approveCancellation()) calls this
@@ -1035,7 +1040,7 @@ module.exports = {
   markOcLinkGenerated,
   EDIT_DETAIL_FIELDS,
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
-  setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
+  setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, setLostCategory, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setIncludeAnnexureB, setAnnexureBMode, setCiAnnexure, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, clientSnapshot, markPiFormSkipped,
   generatePaymentActionToken, ensurePaymentActionToken, findByValidPaymentActionToken,

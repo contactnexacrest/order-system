@@ -1,0 +1,214 @@
+{#
+  Owner decision D-378 (15 Nov 2026): the Targets page (manage_sales_targets). Containers for
+  everyone who opens it; ₹ figures only with view_price_buildup as well (canMoney).
+  The calculator (#target-calculator) runs in the browser only: its inputs have NO name and sit
+  outside every form, so nothing about a salary is ever posted. "Use this" copies the result into
+  the chosen person's containers field of their edit form below.
+  Port of PHP_MySQL_Version/app/views/sales_targets/index.php.
+#}
+{% set period = data.period %}
+{% set company = data.company %}
+{% set settings = data.settings %}
+{% macro orderLink(id, refs) %}{% if refs[id] %}<a href="/orders/{{ id }}">{{ refs[id].order_reference }}</a>{% else %}#{{ id }}{% endif %}{% endmacro %}
+<div class="card page-wide" id="sales-targets">
+  <p class="muted small"><a href="/sales-targets/settings">Sales targets settings</a></p>
+  <h1>Sales targets — {{ period.label }}</h1>
+  <p class="muted">An order counts for its salesperson on the day it is confirmed (advance received, LC received, or — with no advance — buyer PO received and PI approved), with its estimated containers. Cancellations, losses and a different number of containers shipped are corrections on the day they happen; earlier periods never change.</p>
+  <div class="btn-row" id="target-periods">
+    {% for p in periods %}
+      <a class="btn-sm {{ 'btn-accent' if p.key == period.key else 'btn-secondary' }}" href="/sales-targets?period={{ p.key }}">{{ p.label }}</a>
+    {% endfor %}
+  </div>
+
+  <h2>Company</h2>
+  {% if not company.on %}
+    <p class="muted">No company target for this period (Sales targets settings).</p>
+  {% else %}
+    <div class="kv-grid">
+      <div><span class="k">Containers needed</span><span class="v">{{ company.containers_needed if company.containers_needed != null else 'not enough history yet' }}</span></div>
+      <div><span class="k">Break-even containers</span><span class="v">{{ company.breakeven_containers if company.breakeven_containers != null else '—' }}</span></div>
+      <div><span class="k">Counted this period</span><span class="v">{{ company.counted }}</span></div>
+      <div><span class="k">Shipped · awaiting shipment</span><span class="v">{{ company.shipped }} · {{ company.awaiting }}</span></div>
+      {% if canMoney %}
+      <div><span class="k">Needed (₹)</span><span class="v">{{ company.needed | inr }}</span></div>
+      <div><span class="k">Earned — profit after incentive of orders shipped (₹)</span><span class="v">{{ company.earned | inr }}</span></div>
+      <div><span class="k">Average margin per container, last 3 months (₹)</span><span class="v">{{ (company.avg_margin | inr) if company.avg_margin != null else 'not enough history yet' }}</span></div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <h2>Team</h2>
+  <div class="table-scroll">
+  <table class="list" id="target-team">
+    <tr><th>Person</th><th>Designation</th><th>Multiple (own)</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Pipeline</th><th>New buyers</th><th>Progress</th><th>Last reviewed</th><th></th></tr>
+    {% for r in data.rows %}{% set t = r.target %}{% set c = r.counts %}{% set uid = r.user.id %}
+    <tr data-user-id="{{ uid }}">
+      <td>{{ r.user.name }}</td>
+      <td>{{ t.designation.title if t.designation else '—' }}</td>
+      <td>{% if t.own_multiple != null %}{{ t.own_multiple | targetNum }}{% else %}<span class="muted">{{ t.multiple | targetNum }}</span>{% endif %}</td>
+      <td>{{ (t.containers | targetNum) if t.containers > 0 else '—' }}{% if t.in_buildup %} <span class="badge badge-warning" title="Build-up: {{ (t.factor * 100) | round }}% of {{ (t.base_containers or 0) | targetNum }}">build-up</span>{% endif %}{% if t.source == 'designation' %} <span class="muted small">(designation)</span>{% endif %}</td>
+      <td>{{ c.counted }}{% if c.corrections != 0 %} <span class="muted small">({{ '+' if c.corrections > 0 }}{{ c.corrections }} corrections)</span>{% endif %}</td>
+      <td>{{ c.shipped }}</td>
+      <td>{{ r.pipeline }}</td>
+      <td>{{ c.new_buyers }}{% if t.new_buyers != null %} / {{ t.new_buyers }}{% endif %}</td>
+      <td>{{ (r.progress + '%') if r.progress != null else '—' }}</td>
+      <td>{% if t.reviewed_at != null %}{{ t.reviewed_at | shortDate }}{% else %}<span class="muted">never</span>{% endif %}</td>
+      <td><a href="#edit-target-{{ uid }}" class="btn-sm btn-secondary" onclick="var d=document.getElementById('edit-target-{{ uid }}'); if (d) { d.open = true; }">Edit</a></td>
+    </tr>
+    {% endfor %}
+    {% if data.rows.length == 0 %}<tr><td colspan="11" class="muted">Nobody in Sales &amp; Export yet, and no order credited in this period.</td></tr>{% endif %}
+    <tr id="target-unassigned">
+      <td><strong>Unassigned</strong></td>
+      <td colspan="3" class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</td>
+      <td>{{ data.unassigned.counts.counted }}</td>
+      <td>{{ data.unassigned.counts.shipped }}</td>
+      <td colspan="5">{% if data.unassigned.orders.length == 0 %}<span class="muted">none</span>{% else %}{% for o in data.unassigned.orders %}{{ orderLink(o.id, data.credited_order_refs) }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</td>
+    </tr>
+    <tr id="target-total">
+      <td><strong>Total</strong></td>
+      <td colspan="2"></td>
+      <td><strong>{{ data.team_target | targetNum }}</strong></td>
+      <td><strong>{{ data.total.counted }}</strong></td>
+      <td colspan="6"></td>
+    </tr>
+  </table>
+  </div>
+  <p id="target-check-line" class="small">
+    {% if company.on and company.containers_needed != null %}
+      Check: the team's targets add up to <strong>{{ data.team_target | targetNum }}</strong> containers; the company needs <strong>{{ company.containers_needed }}</strong> this period{% if data.team_target + 0.0001 < company.containers_needed %} — <strong style="color:var(--danger)">{{ (company.containers_needed - data.team_target) | targetNum }} short</strong>{% else %} — covered{% endif %}.
+    {% else %}
+      <span class="muted">Check line: the company's containers needed are not known (no company target, or not enough shipping history yet).</span>
+    {% endif %}
+  </p>
+
+  <h2>Associates</h2>
+  <p class="muted small">The order's earning associate is credited too (containers only). Associates never see targets.</p>
+  <div class="table-scroll">
+  <table class="list" id="target-associates">
+    <tr><th>Associate</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Last reviewed</th><th>Set target</th></tr>
+    {% for a in data.associates %}{% set aid = a.associate.id %}
+    <tr>
+      <td>{{ a.associate.name }}</td>
+      <td>{{ (a.target | targetNum) if a.target > 0 else '—' }}</td>
+      <td>{{ a.counts.counted }}</td>
+      <td>{{ a.counts.shipped }}</td>
+      <td>{% if a.reviewed_at != null %}{{ a.reviewed_at | shortDate }}{% else %}<span class="muted">never</span>{% endif %}</td>
+      <td>
+        <form method="post" action="/sales-targets/associate/{{ aid }}" class="btn-row" style="margin-top:0">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="period" value="{{ period.key }}">
+          <input type="number" name="containers" min="0" step="0.1" value="{{ (a.target | targetNum) if a.target > 0 else '' }}" placeholder="e.g. 2" aria-label="{{ a.associate.name }} — containers per period" style="width:6rem">
+          <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Agreed at the quarterly review" aria-label="Reason for this change">
+          <button type="submit" class="btn-sm">Save</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    {% if data.associates.length == 0 %}<tr><td colspan="6" class="muted">No associate credited in this period and no associate target.</td></tr>{% endif %}
+  </table>
+  </div>
+
+  <h2>Edit a person's target</h2>
+  <p class="muted small">Empty = the designation default (containers, new buyers) or the company multiple. Saving marks the target reviewed today.</p>
+  {% for r in data.rows %}{% set t = r.target %}{% set uid = r.user.id %}{% set own = t.own %}
+  <details id="edit-target-{{ uid }}">
+    <summary>{{ r.user.name }}</summary>
+    <form method="post" action="/sales-targets/person/{{ uid }}" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="period" value="{{ period.key }}">
+      <input type="hidden" name="buildup_present" value="1">
+      <label>Containers per period
+        <input type="number" name="containers" id="target-containers-{{ uid }}" min="0" step="0.1" value="{{ (own.containers | targetNum) if (own and own.containers != null) else '' }}" placeholder="e.g. 6 (empty = designation default)"></label>
+      <label>New buyers per period
+        <input type="number" name="new_buyers" min="0" step="1" value="{{ (own.new_buyers | int) if (own and own.new_buyers != null) else '' }}" placeholder="e.g. 1 (empty = designation default)"></label>
+      <label>Own multiple
+        <input type="number" name="multiple" min="1" max="10" step="0.1" value="{{ (t.own_multiple | targetNum) if t.own_multiple != null else '' }}" placeholder="e.g. 3 (empty = company setting)"></label>
+      <label><input type="checkbox" name="buildup_enabled" value="1"{{ ' checked' if t.buildup_enabled }}> Build-up for a new joiner{% if t.joined_on %} (joined {{ t.joined_on | shortDate }}){% else %} (no joining date on the user){% endif %}</label>
+      <label class="full">Reason for this change *
+        <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Reviewed with them at the quarterly meeting"></label>
+      <div class="btn-row full"><button type="submit" class="btn-sm btn-success">Save target</button></div>
+    </form>
+  </details>
+  {% endfor %}
+
+  <h2>Move an order's target credit</h2>
+  <p class="muted small">The credit goes to the order's Sales &amp; Export owner unless moved here. Only the target credit moves — nothing else on the order changes.</p>
+  <details id="target-move-credit">
+    <summary>Orders counted in {{ period.label }} ({{ data.credited_orders.length }})</summary>
+    <div class="table-scroll">
+    <table class="list">
+      <tr><th>Order</th><th>Credited to</th><th>Move to</th></tr>
+      {% for o in data.credited_orders %}{% set cur = data.owners[o.id] %}
+      <tr>
+        <td>{{ orderLink(o.id, data.credited_order_refs) }}</td>
+        <td>{{ data.staff_names[cur] if (cur != null and data.staff_names[cur] != null) else 'Unassigned' }}</td>
+        <td>
+          <form method="post" action="/sales-targets/credit/{{ o.id }}" class="btn-row" style="margin-top:0">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="period" value="{{ period.key }}">
+            <select name="user_id" required aria-label="Move the credit to">
+              <option value="">Choose…</option>
+              <option value="auto">Back to the Sales &amp; Export owner</option>
+              {% for s in data.staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+            <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
+            <button type="submit" class="btn-sm">Move</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if data.credited_orders.length == 0 %}<tr><td colspan="3" class="muted">No order counted in this period.</td></tr>{% endif %}
+    </table>
+    </div>
+  </details>
+
+  <h2>Calculator</h2>
+  <div id="target-calculator" class="field-grid">
+    <p class="muted small full">Works in your browser only — nothing typed here is saved or sent. Containers per period = monthly cost × multiple × {{ period.months }} month(s) ÷ average margin per container, rounded up. "Use this" puts the result in that person's containers field above; save it there with a reason.</p>
+    <label>Person
+      <select id="calc-person" aria-label="Person">
+        <option value="">Choose…</option>
+        {% for r in data.rows %}<option value="{{ r.user.id }}" data-multiple="{{ r.target.multiple | targetNum }}">{{ r.user.name }}</option>{% endfor %}
+      </select></label>
+    <label>Monthly cost of the person (₹)
+      <input type="number" id="calc-cost" min="0" step="1" placeholder="e.g. 60000" autocomplete="off"></label>
+    <label>Multiple
+      <input type="number" id="calc-multiple" min="1" max="10" step="0.1" value="{{ settings.multiple | targetNum }}" placeholder="e.g. 3"></label>
+    <label>Average margin per container (₹)
+      <input type="number" id="calc-margin" min="1" step="1" value="{{ (avgMargin | round) if (avgMargin != null and avgMargin > 0) else '' }}" placeholder="e.g. 150000"></label>
+    <p class="full">Result: <strong id="calc-result">—</strong> containers per period
+      <button type="button" class="btn-sm" id="calc-use" disabled>Use this</button></p>
+  </div>
+  <script>
+    (function () {
+      var months = {{ period.months | int }};
+      var person = document.getElementById('calc-person');
+      var cost = document.getElementById('calc-cost');
+      var mult = document.getElementById('calc-multiple');
+      var margin = document.getElementById('calc-margin');
+      var out = document.getElementById('calc-result');
+      var use = document.getElementById('calc-use');
+      var result = null;
+      function calc() {
+        var c = parseFloat(cost.value), m = parseFloat(mult.value), g = parseFloat(margin.value);
+        result = (c > 0 && m > 0 && g > 0) ? Math.ceil((c * m * months / g) * 10) / 10 : null;
+        out.textContent = result === null ? '—' : String(result);
+        use.disabled = result === null || person.value === '';
+      }
+      person.addEventListener('change', function () {
+        var opt = person.options[person.selectedIndex];
+        if (opt && opt.getAttribute('data-multiple')) { mult.value = opt.getAttribute('data-multiple'); }
+        calc();
+      });
+      [cost, mult, margin].forEach(function (el) { el.addEventListener('input', calc); });
+      use.addEventListener('click', function () {
+        var field = document.getElementById('target-containers-' + person.value);
+        if (!field || result === null) { return; }
+        field.value = String(result);
+        var box = document.getElementById('edit-target-' + person.value);
+        if (box) { box.open = true; box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        field.focus();
+      });
+    })();
+  </script>
+</div>

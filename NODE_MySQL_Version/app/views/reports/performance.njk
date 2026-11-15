@@ -24,13 +24,19 @@
   <div class="section">
     <div class="btn-row" style="flex-wrap:wrap;margin-bottom:10px;">
       {% for key, label in presets %}
-        <a href="/reports/performance?preset={{ key }}" class="btn-sm {{ 'btn-accent' if filters.preset == key else 'btn-secondary' }}">{{ label }}</a>
+        <a href="/reports/performance?preset={{ key }}{% if salesperson %}&amp;salesperson={{ salesperson }}{% endif %}" class="btn-sm {{ 'btn-accent' if filters.preset == key else 'btn-secondary' }}">{{ label }}</a>
       {% endfor %}
     </div>
     <form method="get" action="/reports/performance">
       <div class="kv-grid">
         <label>Date From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
         <label>Date To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+        <label>By salesperson (D-378)
+          <select name="salesperson">
+            <option value="">Not shown</option>
+            <option value="all"{{ ' selected' if salesperson == 'all' }}>Everyone</option>
+            {% for sp in salespeople or [] %}<option value="{{ sp.id }}"{{ ' selected' if salesperson == (sp.id | string) }}>{{ sp.name }}</option>{% endfor %}
+          </select></label>
       </div>
       <div class="btn-row">
         <button type="submit" class="btn-sm">Run Custom Range</button>
@@ -115,4 +121,27 @@
       {% endfor %}
     </table>
   </div>
+{% if bySalesperson != null %}{# Owner decision D-378: orders credited to each salesperson #}
+
+  <div class="section" id="performance-by-salesperson">
+    <h2>By salesperson</h2>
+    <p class="muted small">Orders credited to each person (moved credit, else the order's Sales &amp; Export owner). Quotes sent, won (reached PI), lost before / after PI, win rate, average days from the first quotation e-mail to the PI date, and the most common lost category.</p>
+    <table class="list">
+      <tr><th>Salesperson</th><th>Quotes sent</th><th>Won (PI)</th><th>Lost before PI</th><th>Lost after PI</th><th>Win rate</th><th>Avg days QT → PI</th><th>Top lost category</th></tr>
+      {% for row in bySalesperson %}
+      <tr>
+        <td>{{ row.name }}</td>
+        <td>{{ row.quotes }}</td>
+        <td>{{ row.won }}</td>
+        <td>{{ row.lost_before_pi }}</td>
+        <td>{{ row.lost_after_pi }}</td>
+        <td>{{ (row.win_rate_pct + '%') if row.win_rate_pct != null else '—' }}</td>
+        <td>{{ row.avg_days_qt_to_pi if row.avg_days_qt_to_pi != null else '—' }}</td>
+        <td>{{ row.top_lost_category if row.top_lost_category != null else '—' }}</td>
+      </tr>
+      {% endfor %}
+      {% if bySalesperson.length == 0 %}<tr><td colspan="8" class="muted">No quotation, win or loss in this period for this choice.</td></tr>{% endif %}
+    </table>
+  </div>
+{% endif %}
 </div>

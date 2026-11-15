@@ -1,5 +1,8 @@
 'use strict';
 
+const salesTargetService = require('../services/salesTargetService'); // D-378
+const { todayIst } = require('../helpers/dbDateTime');
+
 const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const departmentRepository = require('../repositories/departmentRepository');
@@ -114,6 +117,10 @@ async function cockpit(req, res) {
     escalated: tasks.filter((t) => Number(t.escalated) === 1),
     supplierDelays: tasks.filter((t) => t.task_key === 'chase_supplier' && Number(t.overdue) === 1),
     ordersByStatus: await departmentTaskRepository.ordersByStatus(),
+    // Owner decision D-378: the sales target box — company target ON and manage_sales_targets;
+    // its money lines only with view_price_buildup as well.
+    salesTargets: salesTargetService.canManage(req.permissions) ? await salesTargetService.cockpitBox(todayIst()) : null,
+    salesTargetsMoney: salesTargetService.canSeeMoney(req.permissions),
   }, 'layout/base');
 }
 

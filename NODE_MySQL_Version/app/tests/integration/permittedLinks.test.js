@@ -54,6 +54,7 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
       '/reports': '/reports', '/clients': '/clients', '/orders': '/orders', '/client-intake': '/client-intake',
       '/pi-intake-review': '/pi-intake-review', '/reorder-requests': '/reorder-requests', '/admin/field-protection': '/admin/field-protection',
       '/company-assets': '/company-assets', '/signatories': '/signatories', '/ports': '/ports', '/port-routes': '/port-routes', '/users': '/users',
+      '/sales-targets': '/sales-targets', '/sales-targets/settings': '/sales-targets/settings', // D-378
     };
     for (const [samplePath, routePath] of Object.entries(samples)) {
       const line = source.split('\n').find((l) => l.startsWith(`app.get('${routePath}',`));

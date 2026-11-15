@@ -116,6 +116,14 @@ async function editForm(req, res) {
     incentiveFirstName: String(target.name || '').split(' ')[0] }, 'layout/base');
 }
 
+/** D-378: a real calendar date written as YYYY-MM-DD (PHP: createFromFormat('!Y-m-d') round trip). */
+function validYmd(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.toISOString().slice(0, 10) === value;
+}
+
 async function update(req, res) {
   const userId = parseInt(req.params.id, 10);
   const target = await userRepository.findById(userId);
@@ -174,6 +182,21 @@ async function update(req, res) {
     ['phone', target.phone, phone],
     ['role_id', target.role_id, roleId],
   ].filter(([, oldVal, newVal]) => String(oldVal ?? '') !== String(newVal ?? ''));
+
+  // Owner decision D-378: the joining date (sales target build-up), only when the form carries it.
+  if ((req.body || {}).joined_on_present !== undefined) {
+    let joined = String(req.body.joined_on ?? '').trim();
+    if (joined !== '' && !validYmd(joined)) {
+      flash.set(req, 'error', 'Joined on: enter a valid date.');
+      res.redirect(`/users/${userId}/edit`);
+      return;
+    }
+    joined = joined === '' ? null : joined;
+    if (String(target.joined_on ?? '').slice(0, 10) !== String(joined ?? '')) {
+      await userRepository.setJoinedOn(userId, joined);
+      changes.push(['joined_on', target.joined_on ?? null, joined]);
+    }
+  }
 
   await userRepository.update(userId, name, email, phone, roleId);
   // D-259: the team incentive switch — the MD only; anyone else's form does not carry it.

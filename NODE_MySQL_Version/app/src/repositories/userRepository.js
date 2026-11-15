@@ -12,6 +12,11 @@ async function findById(id) {
   return db.queryOne('SELECT * FROM users WHERE id = :id LIMIT 1', { id });
 }
 
+/** Owner decision D-378: the day the person joined (a new joiner's sales target builds up from it). */
+async function setJoinedOn(userId, joinedOn) {
+  await db.execute('UPDATE users SET joined_on = :d WHERE id = :id', { d: joinedOn, id: userId });
+}
+
 async function incrementFailedLogins(userId) {
   await db.execute('UPDATE users SET failed_login_count = failed_login_count + 1 WHERE id = :id', { id: userId });
 }
@@ -224,7 +229,7 @@ async function updateUiTemplatePreference(userId, templateId) {
 
 module.exports = {
   referencingRows,
-  findByEmail, findById, incrementFailedLogins, resetFailedLogins, lockUntil,
+  findByEmail, findById, setJoinedOn, incrementFailedLogins, resetFailedLogins, lockUntil,
   updateLastLogin, updatePassword, flagPasswordExpired, setTwoFactor,
   listActive, listAllForAdmin, statusCounts, create, update, setActive, adminForceResetPassword,
   updateSignature, updateNotificationPreference, updateUiTemplatePreference, archive, unarchive, deleteUser,

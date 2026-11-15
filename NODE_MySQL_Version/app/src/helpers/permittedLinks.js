@@ -38,6 +38,8 @@ const RULES = [
   // SUI-002: the product page's "Pricing ready?" list and Market prices link to these.
   [/^\/products\/\d+\/configure(?:[?#]|$)/, ['manage_product_catalog']],
   [/^\/products\/\d+\/specifications(?:[?#]|$)/, ['view_price_buildup', 'manage_product_specifications', 'manage_pricing']],
+  // Owner decision D-378: the Targets page and its settings.
+  [/^\/sales-targets(?:[/?#]|$)/, ['manage_sales_targets']],
   [/^\/audit-log(?:[/?#]|$)/, ['view_audit_log']],
   [/^\/ca\/cafin-export(?:[/?#]|$)/, ['view_cafin']],
   [/^\/ca\/(?:zoho-sync|fy-locks)(?:[/?#]|$)/, ['ca_module_manage']],

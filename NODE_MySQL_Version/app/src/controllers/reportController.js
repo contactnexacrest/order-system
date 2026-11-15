@@ -921,7 +921,20 @@ async function performance(req, res) {
     return;
   }
 
-  res.renderView('reports/performance', { report, filters: { dateFrom, dateTo, preset } }, 'layout/base');
+  // Owner decision D-378: optional "By salesperson" ('' = the page exactly as before; 'all' or a user id).
+  let salesperson = str(req.query.salesperson);
+  if (salesperson !== 'all' && !/^\d+$/.test(salesperson)) {
+    salesperson = '';
+  }
+  const salesTargetService = require('../services/salesTargetService');
+  res.renderView('reports/performance', {
+    report,
+    filters: { dateFrom, dateTo, preset },
+    salesperson,
+    salespeople: await require('../repositories/salesTargetRepository').activeStaff(),
+    bySalesperson: salesperson === '' ? null
+      : await salesTargetService.performanceBySalesperson(dateFrom, dateTo, salesperson, (await require('../services/testModeService').isEnabled()) ? 1 : 0),
+  }, 'layout/base');
 }
 
 module.exports = {

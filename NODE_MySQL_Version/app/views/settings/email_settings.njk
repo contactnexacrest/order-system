@@ -57,8 +57,21 @@
           {% endfor %}
         </tr>
       {% endfor %}
+      {# Owner decision D-378: the sales target alerts — tick who is told (nobody ticked: the MD). #}
+      {% for ta in targetAlertRows %}
+        <tr id="target-alert-{{ ta.kind }}">
+          <td>{{ ta.label }}</td>
+          <td colspan="2">
+            {% for u in staff %}
+              <label style="display:inline-block;margin-right:12px"><input type="checkbox" name="target_alerts[{{ ta.kind }}][]" value="{{ u.id }}"{{ ' checked' if (u.id | int) in (targetAlerts[ta.kind] or []) }}> {{ u.name }}</label>
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}
     </table>
     </div>
+    <input type="hidden" name="target_alerts_present" value="1">
+    <p class="muted small">Sales target alerts: not changed here, the defaults are the MD and the ED (the company is behind; a target is due for review) and the MD and the Sales/Export Manager (a confirmed order has no salesperson). Nobody ticked: the MD.</p>
 
     <label>Reason for this change *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Testing finished — buyer e-mails on again"></label>
     <button type="submit" data-testid="email-settings-save">Save</button>

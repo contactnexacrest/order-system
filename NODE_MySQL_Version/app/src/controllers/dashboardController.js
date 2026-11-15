@@ -78,6 +78,9 @@ async function index(req, res) {
 
   data.agreementsExpiring = await require('./agreementController').expiringSoon(req);
   data.agreementPartyTypes = require('../repositories/agreementRepository').PARTY_TYPES;
+  // Owner decision D-378: "Your target" — the signed-in person's own target only, containers only
+  // (the order's FOB only for someone who already sees selling prices).
+  data.salesTarget = await require('../services/salesTargetService').dashboardFor(user.id, require('../helpers/dbDateTime').todayIst(), require('../services/moneyVisibility').can(permissions, 'selling'));
   res.renderView('dashboard/index', data, 'layout/base');
 }
 

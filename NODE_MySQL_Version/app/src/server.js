@@ -111,6 +111,7 @@ const productCategoryController = require('./controllers/productCategoryControll
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const pricingController = require('./controllers/pricingController');
+const salesTargetController = require('./controllers/salesTargetController'); // D-378
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
@@ -235,6 +236,13 @@ njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').leg
 // Owner decision D-245 P5: "Estimated" / "Locked" / "Paid" / "Held" beside a commission or incentive amount.
 njkEnv.addGlobal('profitStateLabel', (st) => require('./services/orderProfitabilityService').stateLabel(st));
 njkEnv.addGlobal('incentiveReportStates', require('./services/incentiveReportService').STATES);
+// Owner decision D-378: the optional lost category on the Mark Lost form (stored key => label).
+njkEnv.addGlobal('salesTargetLostCategories', require('./services/salesTargetService').LOST_CATEGORIES);
+// D-378: a container count without trailing zeros (6 → "6", 4.5 → "4.5"), ₹ in Indian grouping, and an
+// order-currency amount as the documents print it — PHP's $__num, MoneyFormat::indian and MoneyFormat::amount.
+njkEnv.addFilter('targetNum', (v) => require('./services/salesTargetService').num1(v));
+njkEnv.addFilter('inr', (v) => require('./helpers/moneyFormat').indian(Number(v) || 0));
+njkEnv.addFilter('docAmount', (v, currency) => require('./helpers/moneyFormat').amount(Number(v) || 0, currency));
 njkEnv.addGlobal('pricingFmt', {
   pct: (v) => require('./services/pricingService').pct(v),
   modeLabel: (m, v) => require('./services/pricingService').modeLabel(m, v),
@@ -1500,6 +1508,13 @@ app.post('/products/misc-charges/:chargeId/delete', requireAuth, requirePermissi
 // Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
 app.get('/pricing/settings', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.settings));
 app.post('/pricing/settings', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveSettings));
+// Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
+app.get('/sales-targets', requireAuth, requirePermission('manage_sales_targets'), asyncHandler(salesTargetController.index));
+app.get('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), asyncHandler(salesTargetController.settings));
+app.post('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.saveSettings));
+app.post('/sales-targets/person/:id', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.savePerson));
+app.post('/sales-targets/associate/:id', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.saveAssociate));
+app.post('/sales-targets/credit/:orderId', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.moveCredit));
 app.get('/pricing/commission-levels', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.levels));
 app.post('/pricing/commission-levels', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.addLevel));
 app.post('/pricing/commission-levels/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.updateLevel));

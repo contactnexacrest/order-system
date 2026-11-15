@@ -1,3 +1,33 @@
+{% if salesTargets %}{# Owner decision D-378: company sales target (containers; ₹ only with view_price_buildup) #}
+{% set st = salesTargets.current %}
+<div class="card page-wide" id="cockpit-sales-target">
+  <h2 style="margin-top:0;">Sales target — {{ st.period.label }}</h2>
+  <div class="kv-grid">
+    <div><span class="k">Containers needed</span><span class="v">{{ st.containers_needed if st.containers_needed != null else 'not enough history yet' }}</span></div>
+    <div><span class="k">Break-even containers</span><span class="v">{{ st.breakeven_containers if st.breakeven_containers != null else '—' }}</span></div>
+    <div><span class="k">Counted (confirmed, with corrections)</span><span class="v">{{ st.counted }}</span></div>
+    <div><span class="k">Shipped · awaiting shipment</span><span class="v">{{ st.shipped }} · {{ st.awaiting }}</span></div>
+    <div><span class="k">Period gone</span><span class="v">{{ salesTargets.elapsed_pct }}%</span></div>
+    {% if salesTargetsMoney %}
+    <div><span class="k">Needed (₹)</span><span class="v">{{ st.needed | inr }}</span></div>
+    <div><span class="k">Earned — orders shipped (₹)</span><span class="v">{{ st.earned | inr }}</span></div>
+    <div><span class="k">Average margin per container (₹)</span><span class="v">{{ (st.avg_margin | inr) if st.avg_margin != null else 'not enough history yet' }}</span></div>
+    {% endif %}
+  </div>
+  <table class="list">
+    <tr><th>Period</th><th>Containers counted</th><th>Shipped</th>{% if salesTargetsMoney %}<th>Needed (₹)</th><th>Earned (₹)</th>{% endif %}</tr>
+    {% for sp in salesTargets.previous %}
+    <tr>
+      <td>{{ sp.period.label }}</td>
+      <td>{{ sp.counted }}</td>
+      <td>{{ sp.shipped }}</td>
+      {% if salesTargetsMoney %}<td>{{ (sp.needed | inr) if sp.on else '—' }}</td><td>{{ (sp.earned | inr) if sp.on else '—' }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  <p><a href="/sales-targets">Open Sales targets →</a></p>
+</div>
+{% endif %}
 <div class="card page-wide">
   <h1>Management cockpit</h1>
   <p class="muted">Open work per department from every order's state — counts and status only, no amounts.</p>
