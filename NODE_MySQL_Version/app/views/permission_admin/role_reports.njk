@@ -1,0 +1,59 @@
+{#
+  Owner decision D-379 (15 Nov 2026): Roles and permissions › <role> › Reports tab (manage_report_access).
+  One row per report, grouped in the 7 sections of the Reports page: a compact Off / Own / Department / All
+  choice (no extra label per D-366), what the report needs and a warning when the role lacks it; a reason is
+  required to save (audit REPORT_ACCESS_CHANGED, one row per changed report). "See Reports as this role" and
+  "Reset to defaults" (POST, reason required). One view for the Standard and the Kanban template.
+  PHP twin: PHP_MySQL_Version/app/views/permission_admin/role_reports.php
+#}
+<div class="card page-wide" id="role-reports">
+  <p class="muted small"><a href="/admin/permissions">&larr; Back to Roles &amp; Permissions</a></p>
+  <h1>Report access — {{ role.name }}</h1>
+  <div class="btn-row" role="tablist" aria-label="Role settings">
+    {% if permissions.manage_permissions %}<a class="btn-sm btn-secondary" role="tab" href="/admin/roles/{{ role.id }}/permissions">Permissions</a>{% endif %}
+    <a class="btn-sm btn-accent" role="tab" aria-selected="true" href="/admin/roles/{{ role.id }}/reports">Reports</a>
+  </div>
+  <p class="muted">How far each report reaches for this role. <strong>Own</strong>: orders the person is assigned to, owns for their department or is the salesperson of — and their clients and own figures. <strong>Department</strong>: also the orders of the people of their departments. <strong>All</strong>: every order. <strong>Off</strong>: not in their menu or Reports page, and the page refuses them. A person with several roles gets the highest level of their roles; a level still needs the report's own permission (money is never shown without it).</p>
+  <div class="btn-row">
+    <a class="btn-sm btn-secondary" id="see-reports-as-role" href="/admin/roles/{{ role.id }}/reports/preview">See Reports as this role</a>
+  </div>
+
+  <form method="post" action="/admin/roles/{{ role.id }}/reports" id="role-reports-form">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="table-scroll">
+    <table class="list" id="role-reports-table">
+      <tr><th>Report</th>{% for l in reportLevels %}<th>{{ levelLabels[l] }}</th>{% endfor %}<th>Needs</th><th>Default</th></tr>
+      {% for sec in sections %}
+      <tr class="report-section-row"><th colspan="7">{{ sec.label }}</th></tr>
+      {% for row in sec.rows %}
+      <tr data-report="{{ row.key }}">
+        <td>{{ row.label }}</td>
+        {% for l in reportLevels %}
+        <td><input type="radio" name="levels[{{ row.key }}]" value="{{ l }}" {{ 'checked' if row.level == l }} aria-label="{{ row.label }}: {{ levelLabels[l] }}"></td>
+        {% endfor %}
+        <td class="small">
+          {% if row.needs %}<span class="muted">{{ row.needs }}</span>{% endif %}
+          {% if row.missing.length > 0 %}<br><span class="badge badge-warning">missing for this role: {{ row.missing | join(', ') }}</span>{% endif %}
+        </td>
+        <td class="small muted">{{ levelLabels[defaults[row.key]] }}</td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </table>
+    </div>
+    <label>Reason for this change *
+      <input type="text" name="reason" required minlength="10" maxlength="500" data-reason-hint="on-error" placeholder="e.g. Sales managers see their department's payments from December">
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save report access</button></div>
+  </form>
+
+  <form method="post" action="/admin/roles/{{ role.id }}/reports/reset" id="role-reports-reset" class="section" onsubmit="return confirm('Put every report of this role back to its default level?');">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <h2>Reset to defaults</h2>
+    <p class="muted small">Every report of this role goes back to the level in the "Default" column (Off for a role that is not in the defaults).</p>
+    <label>Reason for the reset *
+      <input type="text" name="reason" required minlength="10" maxlength="500" data-reason-hint="on-error" placeholder="e.g. Undo the test changes of this week">
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-danger">Reset to defaults</button></div>
+  </form>
+</div>

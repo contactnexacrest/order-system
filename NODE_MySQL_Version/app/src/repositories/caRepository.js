@@ -56,7 +56,8 @@ async function rateGapBankChargesByLeg() {
   return map;
 }
 
-async function settlementRegister() {
+/** @param {string|null} scopeReport D-379: a report key whose level limits the rows to the orders it shows (null = every row, as before) */
+async function settlementRegister(scopeReport = null) {
   const alertDays = parseInt((await companySettingsRepository.get('fema_realization_alert_days')) ?? '270', 10);
   const now = Date.now();
 
@@ -146,7 +147,7 @@ async function settlementRegister() {
     });
   }
   rows.sort((a, b) => String(b.cleared_at).localeCompare(String(a.cleared_at)));
-  return rows;
+  return scopeReport === null ? rows : require('../services/reportAccess').visibleRows(scopeReport, rows);
 }
 
 /** How a leg is named on the CA pages. */
@@ -220,7 +221,8 @@ async function availableCalendarYears() {
  * from settlementRegister() rather than a separate query, so this can
  * never disagree with the register table itself.
  */
-async function revenueReport(mode, period) {
+/** @param {string|null} scopeReport D-379: see settlementRegister() — the totals are over the rows in scope */
+async function revenueReport(mode, period, scopeReport = null) {
   let from;
   let to;
   if (mode === 'fy') {
@@ -232,7 +234,7 @@ async function revenueReport(mode, period) {
     to = `${period}-12-31`;
   }
 
-  const all = await settlementRegister();
+  const all = await settlementRegister(scopeReport);
   const rows = all.filter((r) => {
     const d = String(r.cleared_at).slice(0, 10);
     return d >= from && d <= to;

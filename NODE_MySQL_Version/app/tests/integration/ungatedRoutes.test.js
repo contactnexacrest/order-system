@@ -179,12 +179,15 @@ const PASSWORD = 'UngatedRoutes123!';
 
 /**
  * Every route in src/server.js without a requirePermission, with its
- * middleware names in the order they are registered.
+ * middleware names in the order they are registered. D-379: a route behind
+ * report access only (requireReport / requireAnyReport: /reports and
+ * /sales-targets) is gated too — routeMatrix.test.js and
+ * reportAccess.test.js drive it — so it is not one of these.
  */
 function routes() {
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'server.js'), 'utf8');
   return [...source.matchAll(/app\.(get|post)\('([^']+)',([^\n]*)/g)]
-    .filter(([, , , rest]) => !rest.includes('requirePermission'))
+    .filter(([, , , rest]) => !rest.includes('requirePermission') && !/\brequire(?:Any)?Report\(/.test(rest))
     .map(([, method, pattern, rest]) => {
       const middleware = [...rest.matchAll(/\b(requireAuth|requireClientAuth|requireAssociateAuth|requireSuperAdmin|verifyCsrf|asyncHandler)\b/g)].map((m) => m[1]);
       let guard = 'public';

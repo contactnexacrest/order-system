@@ -15,7 +15,11 @@ function extractCsrf(html) {
   return m[1];
 }
 
-/** Every route in src/server.js with the permission(s) it requires (any one), or null. */
+/**
+ * Every route in src/server.js with the permission(s) it requires (any one), or null, and (owner
+ * decision D-379) its report-access gate: report = the report key of requireReport() ('any' for
+ * requireAnyReport()), reportMin = its lowest level (null = the level that opens the report's page).
+ */
 function routes() {
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'server.js'), 'utf8');
   const list = [];
@@ -26,8 +30,17 @@ function routes() {
     const any = rest.match(/requirePermissionAny\(\[([^\]]+)\]\)/);
     if (one) permissions = [one[1]];
     else if (any) permissions = [...any[1].matchAll(/'([^']+)'/g)].map((k) => k[1]);
+    let report = null;
+    let reportMin = null;
+    const gate = rest.match(/requireReport\('([a-z_]+)'(?:,\s*'([a-z]+)')?\)/);
+    if (gate) {
+      report = gate[1];
+      reportMin = gate[2] || null;
+    } else if (rest.includes('requireAnyReport()')) {
+      report = 'any';
+    }
     const regex = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]+/g, '[^/]+')}$`);
-    list.push({ method: method.toUpperCase(), pattern, regex, permissions });
+    list.push({ method: method.toUpperCase(), pattern, regex, permissions, report, reportMin });
   }
   return list;
 }

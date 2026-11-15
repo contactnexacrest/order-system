@@ -8,6 +8,7 @@ const disputeRepository = require('./disputeRepository');
 const testModeService = require('../services/testModeService');
 const divisionService = require('../services/divisionService');
 const orderProfitabilityService = require('../services/orderProfitabilityService');
+const reportAccess = require('../services/reportAccess');
 const { todayIst } = require('../helpers/dbDateTime');
 const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
@@ -22,6 +23,21 @@ async function isTestModeFlag() {
 }
 
 /**
+ * Owner decision D-379: the condition limiting `orders <alias>` to what this report shows the
+ * signed-in person (reportAccess.scopeSql). A caller may pass its own visibility (tests, older
+ * callers); without one the report's own scope applies. The shared helpers below (the queue rows
+ * and the funnel counts serve Operations queues, Conversion rate and Sales performance alike) are
+ * given the report whose level applies — PHP keeps it in ReportRepository::$scopeReport.
+ *
+ * @returns {Promise<{sql: string, params: object}>}
+ */
+async function scopeOf(report, visibility = null, alias = 'o') {
+  if (visibility) return visibility;
+  if (!report) return { sql: '', params: {} };
+  return reportAccess.scopeSql(report, alias);
+}
+
+/**
  * Port of App\Repositories\ReportRepository. Spec Section 16 — "REPORTS:
  * Per client ... Per order ... Aggregate ... Export to CSV/Excel." Three
  * query shapes, one per report type named in the spec — kept as plain
@@ -30,8 +46,10 @@ async function isTestModeFlag() {
  */
 
 /** @returns {Promise<object>} order history, payments, products, totals for one client */
-async function perClient(clientId, visibility = { sql: '', params: {} }) {
+async function perClient(clientId, visibility = null) {
   const isTestMode = await isTestModeFlag();
+  // QA Round 6, R6-N01 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('per_client', visibility);
   const client = await db.queryOne('SELECT * FROM clients WHERE id = :id', { id: clientId });
   if (client && (parseInt(client.is_test_data, 10) !== isTestMode || !(await divisionService.allowsClient(clientId)))) {
     // A real client while Test Mode is on, or a test client while it's
@@ -182,7 +200,9 @@ async function perOrder(orderId) {
  *
  * @returns {Promise<Array<object>>}
  */
-async function aggregate(dateFrom, dateTo, stageId, incotermId, country, visibility = { sql: '', params: {} }) {
+async function aggregate(dateFrom, dateTo, stageId, incotermId, country, visibility = null) {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('aggregate', visibility);
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
@@ -349,97 +369,107 @@ function sentClause(code) {
   return `${latestDocStatusExpr(code)} = 'sent'`;
 }
 
-async function queueRows(whereSql, extraJoins = '') {
+async function queueRows(whereSql, extraJoins = '', scope = { sql: '', params: {} }) {
   return db.query(
-    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE (${whereSql}) AND o.is_test_data = :is_test_data${divisionService.sql('o.division_id')} ORDER BY o.created_at`,
-    { is_test_data: await isTestModeFlag() }
+    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE (${whereSql}) AND o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql} ORDER BY o.created_at`,
+    { is_test_data: await isTestModeFlag(), ...scope.params }
   );
 }
 
 /** Bucket 1 — Quotation not yet dispatched to the buyer (drafted or not even generated yet). */
-async function quotationAwaitingDispatch() {
-  return queueRows(`o.status = 'active' AND ${notSentClause('QT')}`);
+async function quotationAwaitingDispatch(scope) {
+  return queueRows(`o.status = 'active' AND ${notSentClause('QT')}`, '', scope);
 }
 
 /** Bucket 2 (spec item #15) — QT sent, buyer's own PO not yet recorded (Stage 2, "Buyer PO"). */
-async function awaitingBuyerPo() {
+async function awaitingBuyerPo(scope) {
   return queueRows(
     `o.status = 'active' AND sm.stage_slug = 'buyer_po' AND ${sentClause('QT')}`,
-    'JOIN stages_master sm ON sm.id = o.current_stage_id'
+    'JOIN stages_master sm ON sm.id = o.current_stage_id',
+    scope
   );
 }
 
 /** Spec item #14 — our own Order-Acceptance PO (document type BUYERPO) not yet sent back to the buyer. */
-async function orderAcceptanceAwaitingDispatch() {
+async function orderAcceptanceAwaitingDispatch(scope) {
   return queueRows(
     `o.status = 'active' AND sm.stage_slug NOT IN ('quotation','buyer_po') AND ${notSentClause('BUYERPO')}`,
-    'JOIN stages_master sm ON sm.id = o.current_stage_id'
+    'JOIN stages_master sm ON sm.id = o.current_stage_id',
+    scope
   );
 }
 
 /** Spec item #2 — sitting at the PI stage right now. */
-async function atPiStage() {
-  return queueRows(`o.status = 'active' AND sm.stage_slug = 'pi'`, 'JOIN stages_master sm ON sm.id = o.current_stage_id');
+async function atPiStage(scope) {
+  return queueRows(`o.status = 'active' AND sm.stage_slug = 'pi'`, 'JOIN stages_master sm ON sm.id = o.current_stage_id', scope);
 }
 
 /** Spec item #11 — at the OC stage, OC not yet sent. */
-async function ocAwaitingDispatch() {
+async function ocAwaitingDispatch(scope) {
   return queueRows(
     `o.status = 'active' AND sm.stage_slug = 'oc_production' AND ${notSentClause('OC')}`,
-    'JOIN stages_master sm ON sm.id = o.current_stage_id'
+    'JOIN stages_master sm ON sm.id = o.current_stage_id',
+    scope
   );
 }
 
 /** Spec item #12 — OC sent, buyer's countersigned acknowledgement not yet recorded (confirmBuyerAcknowledged). */
-async function ocAwaitingAcknowledgement() {
+async function ocAwaitingAcknowledgement(scope) {
   return queueRows(
     `o.status = 'active' AND sm.stage_slug = 'oc_production' AND ${sentClause('OC')}`,
-    'JOIN stages_master sm ON sm.id = o.current_stage_id'
+    'JOIN stages_master sm ON sm.id = o.current_stage_id',
+    scope
   );
 }
 
 /** Spec item #16 — reached Supplier PO stage or beyond, nothing drafted yet in order_supplier_po. */
-async function supplierPoNotYetCreated() {
+async function supplierPoNotYetCreated(scope) {
   return queueRows(
     `o.status = 'active'
      AND sm.stage_slug NOT IN ('quotation','buyer_po','pi','oc_production')
      AND NOT EXISTS (SELECT 1 FROM order_supplier_po sp WHERE sp.order_id = o.id)`,
-    'JOIN stages_master sm ON sm.id = o.current_stage_id'
+    'JOIN stages_master sm ON sm.id = o.current_stage_id',
+    scope
   );
 }
 
 /** Spec item #3 — CI sent, balance unpaid, scanned BL not yet sent to the buyer. */
-async function ciAwaitingScannedBl() {
+async function ciAwaitingScannedBl(scope) {
   return queueRows(
     `o.status = 'active' AND ${sentClause('CI')} AND os.scanned_bl_sent_to_buyer_at IS NULL`,
-    'JOIN order_shipping os ON os.order_id = o.id'
+    'JOIN order_shipping os ON os.order_id = o.id',
+    scope
   );
 }
 
 /** Spec item #4 — CI sent, scanned BL already sent, balance payment not yet received. */
-async function ciAwaitingBalancePayment() {
+async function ciAwaitingBalancePayment(scope) {
   return queueRows(
     `o.status = 'active' AND ${sentClause('CI')}
      AND os.scanned_bl_sent_to_buyer_at IS NOT NULL
      AND ops.balance_remittance_received_at IS NULL`,
     `JOIN order_shipping os ON os.order_id = o.id
-     JOIN order_payment_status ops ON ops.order_id = o.id`
+     JOIN order_payment_status ops ON ops.order_id = o.id`,
+    scope
   );
 }
 
 /** Spec item #5 — balance payment cleared, hard-copy document set not yet couriered to the buyer. */
-async function ciAwaitingHardCopyDespatch() {
+async function ciAwaitingHardCopyDespatch(scope) {
   return queueRows(
     `o.status = 'active' AND ${sentClause('CI')}
      AND ops.balance_cleared_at IS NOT NULL
      AND os.courier_sent_at IS NULL`,
     `JOIN order_shipping os ON os.order_id = o.id
-     JOIN order_payment_status ops ON ops.order_id = o.id`
+     JOIN order_payment_status ops ON ops.order_id = o.id`,
+    scope
   );
 }
 
 /** Snapshot dashboard (spec items #1, #2, #3, #4, #5, #11, #12, #14, #15, #16). No date range — "right now". */
-async function operationsQueues() {
+async function operationsQueues(scopeReport = 'queues') {
+  // D-379: every queue limited by the person's level for this report (Operations queues by default).
+  const scope = await scopeOf(scopeReport);
   const [
     quotationAwaitingSend,
     buyerPoAwaited,
@@ -452,16 +482,16 @@ async function operationsQueues() {
     balanceAwaited,
     hardCopyAwaited,
   ] = await Promise.all([
-    quotationAwaitingDispatch(),
-    awaitingBuyerPo(),
-    orderAcceptanceAwaitingDispatch(),
-    atPiStage(),
-    ocAwaitingDispatch(),
-    ocAwaitingAcknowledgement(),
-    supplierPoNotYetCreated(),
-    ciAwaitingScannedBl(),
-    ciAwaitingBalancePayment(),
-    ciAwaitingHardCopyDespatch(),
+    quotationAwaitingDispatch(scope),
+    awaitingBuyerPo(scope),
+    orderAcceptanceAwaitingDispatch(scope),
+    atPiStage(scope),
+    ocAwaitingDispatch(scope),
+    ocAwaitingAcknowledgement(scope),
+    supplierPoNotYetCreated(scope),
+    ciAwaitingScannedBl(scope),
+    ciAwaitingBalancePayment(scope),
+    ciAwaitingHardCopyDespatch(scope),
   ]);
 
   return {
@@ -487,12 +517,16 @@ async function operationsQueues() {
  * dispatch event), not documents.generated_at (drafting), since a document
  * can sit generated-but-unsent for days.
  */
-async function funnelActivity(dateFrom, dateTo) {
+async function funnelActivity(dateFrom, dateTo, scopeReport = 'queues') {
   const isTestMode = await isTestModeFlag();
+  // D-379: the counts limited by the person's level for the report asking (Operations queues by default;
+  // Conversion rate and Sales performance pass their own).
+  const scope = await scopeOf(scopeReport, null, 'o');
+  const scopeOo = await scopeOf(scopeReport, null, 'oo');
 
   async function sentCount(code, dateCol) {
-    const clauses = [`dt.code = :code`, `el.status = 'sent'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`];
-    const p = { code, is_test_data: isTestMode };
+    const clauses = [`dt.code = :code`, `el.status = 'sent'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql}`];
+    const p = { code, is_test_data: isTestMode, ...scope.params };
     if (dateFrom) {
       clauses.push(`DATE(el.${dateCol}) >= :date_from`);
       p.date_from = dateFrom;
@@ -514,8 +548,8 @@ async function funnelActivity(dateFrom, dateTo) {
   }
 
   async function lostCount(reachedPi) {
-    const clauses = [`o.status = 'lost'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`];
-    const p = { is_test_data: isTestMode };
+    const clauses = [`o.status = 'lost'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql}`];
+    const p = { is_test_data: isTestMode, ...scope.params };
     const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
     clauses.push(reachedPi ? reachedClause : `NOT ${reachedClause}`);
     if (dateFrom) {
@@ -533,9 +567,9 @@ async function funnelActivity(dateFrom, dateTo) {
   async function quotationsWon() {
     const clauses = [
       `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
-      `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`,
+      `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql}`,
     ];
-    const p = { is_test_data: isTestMode };
+    const p = { is_test_data: isTestMode, ...scope.params };
     if (dateFrom) {
       clauses.push(`o.pi_date >= :date_from`);
       p.date_from = dateFrom;
@@ -550,9 +584,9 @@ async function funnelActivity(dateFrom, dateTo) {
 
   async function amendmentCount() {
     const clauses = [
-      `EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data${divisionService.sql('oo.division_id')})`,
+      `EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data${divisionService.sql('oo.division_id')}${scopeOo.sql})`,
     ];
-    const p = { is_test_data: isTestMode };
+    const p = { is_test_data: isTestMode, ...scopeOo.params };
     if (dateFrom) {
       clauses.push('DATE(created_at) >= :date_from');
       p.date_from = dateFrom;
@@ -604,7 +638,9 @@ async function funnelActivity(dateFrom, dateTo) {
 // false "0 outstanding".
 
 /** @returns {Promise<{rows: Array<object>, by_currency: object}>} */
-async function paymentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
+async function paymentsReport(dateFrom, dateTo, visibility = null) {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('payments', visibility);
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
@@ -698,7 +734,9 @@ async function paymentsReport(dateFrom, dateTo, visibility = { sql: '', params: 
 // with the detail table.
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, open_count: number, avg_resolution_days: ?number}>} */
-async function disputesReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
+async function disputesReport(dateFrom, dateTo, visibility = null) {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('disputes', visibility);
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
@@ -756,7 +794,9 @@ async function disputesReport(dateFrom, dateTo, visibility = { sql: '', params: 
 // status/requested-by breakdown folded from the same rows.
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, by_requested_by: object}>} */
-async function amendmentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
+async function amendmentsReport(dateFrom, dateTo, visibility = null) {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('amendments', visibility);
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
@@ -809,14 +849,16 @@ async function searchOrders(query) {
     return [];
   }
   const like = `%${q}%`;
+  // D-379: only the orders the person's "Find an order" level shows (closes an unscoped search).
+  const scope = await reportAccess.scopeSql('order_search', 'o');
   return db.query(
     `SELECT o.id, o.order_reference, o.status, o.created_at, o.company_legal_name
      FROM orders o
-     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql}
        AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
      ORDER BY o.created_at DESC, o.id DESC
      LIMIT 25`,
-    { is_test_data: await isTestModeFlag(), q: like, q2: like }
+    { is_test_data: await isTestModeFlag(), q: like, q2: like, ...scope.params }
   );
 }
 
@@ -848,11 +890,14 @@ async function monthlyTrends(months = 12) {
     result[mk] = { month: mk, orders_created: 0, quotations_sent: 0, pi_sent: 0, lost: 0, fob_by_currency: {} };
   }
   const fromDate = `${monthKeys[0]}-01`;
+  // D-379: only the orders the person's Trends level shows (closes an unscoped report).
+  const scope = await reportAccess.scopeSql('trends', 'o');
+  const sp = scope.params;
 
   const ordersRows = await db.query(
-    `SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS n
-     FROM orders WHERE is_test_data = :t${divisionService.sql('division_id')} AND created_at >= :from GROUP BY ym`,
-    { t: isTestMode, from: fromDate }
+    `SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, COUNT(*) AS n
+     FROM orders o WHERE o.is_test_data = :t${divisionService.sql('o.division_id')}${scope.sql} AND o.created_at >= :from GROUP BY ym`,
+    { t: isTestMode, from: fromDate, ...sp }
   );
   for (const row of ordersRows) {
     if (result[row.ym]) result[row.ym].orders_created = Number(row.n);
@@ -862,8 +907,8 @@ async function monthlyTrends(months = 12) {
     `SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, o.currency_code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
      FROM orders o
      JOIN order_products p ON p.order_id = o.id AND p.is_active = 1
-     WHERE o.is_test_data = :t${divisionService.sql('o.division_id')} AND o.created_at >= :from GROUP BY ym, cc`,
-    { t: isTestMode, from: fromDate }
+     WHERE o.is_test_data = :t${divisionService.sql('o.division_id')}${scope.sql} AND o.created_at >= :from GROUP BY ym, cc`,
+    { t: isTestMode, from: fromDate, ...sp }
   );
   for (const row of fobRows) {
     if (result[row.ym]) result[row.ym].fob_by_currency[row.cc] = round2(parseFloat(row.total));
@@ -875,9 +920,9 @@ async function monthlyTrends(months = 12) {
      JOIN documents doc ON doc.id = el.document_id
      JOIN document_types dt ON dt.id = doc.document_type_id
      JOIN orders o ON o.id = doc.order_id
-     WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')} AND el.sent_at >= :from
+     WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')}${scope.sql} AND el.sent_at >= :from
      GROUP BY ym`,
-    { t: isTestMode, from: fromDate }
+    { t: isTestMode, from: fromDate, ...sp }
   );
   for (const row of qtRows) {
     if (result[row.ym]) result[row.ym].quotations_sent = Number(row.n);
@@ -889,18 +934,18 @@ async function monthlyTrends(months = 12) {
      JOIN documents doc ON doc.id = el.document_id
      JOIN document_types dt ON dt.id = doc.document_type_id
      JOIN orders o ON o.id = doc.order_id
-     WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')} AND el.sent_at >= :from
+     WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')}${scope.sql} AND el.sent_at >= :from
      GROUP BY ym`,
-    { t: isTestMode, from: fromDate }
+    { t: isTestMode, from: fromDate, ...sp }
   );
   for (const row of piRows) {
     if (result[row.ym]) result[row.ym].pi_sent = Number(row.n);
   }
 
   const lostRows = await db.query(
-    `SELECT DATE_FORMAT(lost_at, '%Y-%m') AS ym, COUNT(*) AS n
-     FROM orders WHERE is_test_data = :t${divisionService.sql('division_id')} AND status = 'lost' AND lost_at >= :from GROUP BY ym`,
-    { t: isTestMode, from: fromDate }
+    `SELECT DATE_FORMAT(o.lost_at, '%Y-%m') AS ym, COUNT(*) AS n
+     FROM orders o WHERE o.is_test_data = :t${divisionService.sql('o.division_id')}${scope.sql} AND o.status = 'lost' AND o.lost_at >= :from GROUP BY ym`,
+    { t: isTestMode, from: fromDate, ...sp }
   );
   for (const row of lostRows) {
     if (result[row.ym]) result[row.ym].lost = Number(row.n);
@@ -991,6 +1036,15 @@ async function staffProductivity(dateFrom, dateTo) {
     byUser[uid].audit_actions = Number(r.n);
   }
 
+  // D-379: Department = the people of the viewer's departments, Own = the viewer only (unattributed / system rows: All only).
+  const people = await reportAccess.peopleScope('staff_productivity');
+  if (people !== null) {
+    const keep = new Set(people.map(Number));
+    for (const uid of Object.keys(byUser)) {
+      if (!keep.has(Number(uid))) delete byUser[uid];
+    }
+  }
+
   return Object.values(byUser).sort((a, b) => String(a.user_name).localeCompare(String(b.user_name)));
 }
 
@@ -1027,6 +1081,8 @@ function daysBetween(fromDate, toDate) {
 /** @returns {Promise<{rows: Array<object>, by_bucket: object, buckets: Array<string>}>} */
 async function ageingReport() {
   const isTestMode = await isTestModeFlag();
+  // D-379: only the orders the person's Ageing level shows (closes an unscoped report).
+  const scope = await reportAccess.scopeSql('ageing', 'o');
 
   const orders = await db.query(
     `SELECT o.id, o.order_reference, o.created_at, o.company_legal_name, o.currency_code,
@@ -1035,14 +1091,14 @@ async function ageingReport() {
             ops.freight_amount, ops.freight_cleared_at
      FROM orders o
      JOIN order_payment_status ops ON ops.order_id = o.id
-     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')} AND o.status NOT IN ('lost')
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql} AND o.status NOT IN ('lost')
        AND (
          (ops.advance_amount IS NOT NULL AND ops.advance_cleared_at IS NULL) OR
          (ops.balance_amount IS NOT NULL AND ops.balance_cleared_at IS NULL) OR
          (ops.freight_amount IS NOT NULL AND ops.freight_cleared_at IS NULL)
        )
      ORDER BY o.created_at ASC`,
-    { is_test_data: isTestMode }
+    { is_test_data: isTestMode, ...scope.params }
   );
 
   const today = new Date(`${todayIst()}T00:00:00Z`);
@@ -1098,7 +1154,9 @@ async function ageingReport() {
 // ================================================================
 
 /** @returns {Promise<{rows: Array<object>, by_forwarder: object}>} */
-async function freightCostReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
+async function freightCostReport(dateFrom, dateTo, visibility = null) {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('freight_cost', visibility);
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'), 'fr.id IS NOT NULL'];
   const params = { is_test_data: isTestMode };
@@ -1154,8 +1212,10 @@ async function freightCostReport(dateFrom, dateTo, visibility = { sql: '', param
 /** @returns {Promise<{rows: Array<object>, by_hs_code: Array<object>}>} */
 async function productSalesReport(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
-  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'), 'p.is_active = 1'];
-  const params = { is_test_data: isTestMode };
+  // D-379: only the orders the person's Product sales level shows (closes an unscoped report).
+  const scope = await reportAccess.scopeSql('product_sales', 'o');
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id') + scope.sql, 'p.is_active = 1'];
+  const params = { is_test_data: isTestMode, ...scope.params };
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -1219,6 +1279,8 @@ async function productSalesReport(dateFrom, dateTo) {
 /** @returns {Promise<Array<object>>} one row per supplier, most POs first */
 async function supplierPerformanceReport() {
   const isTestMode = await isTestModeFlag();
+  // D-379: only the supplier POs of orders the person's Supplier performance level shows (closes an unscoped report).
+  const scope = await reportAccess.scopeSql('supplier_performance', 'o');
   const rows = await db.query(
     `SELECT s.id AS supplier_id, s.supplier_legal_name,
             spo.order_id, spo.created_at, spo.signed_at, spo.required_delivery_date, spo.status,
@@ -1227,9 +1289,9 @@ async function supplierPerformanceReport() {
      JOIN suppliers s ON s.id = spo.supplier_id
      JOIN orders o ON o.id = spo.order_id
      LEFT JOIN order_packing pk ON pk.order_id = spo.order_id
-     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${scope.sql}
      ORDER BY s.supplier_legal_name`,
-    { is_test_data: isTestMode }
+    { is_test_data: isTestMode, ...scope.params }
   );
 
   const bySupplier = {};
@@ -1275,7 +1337,8 @@ async function supplierPerformanceReport() {
 // ================================================================
 
 async function conversionRateReport(dateFrom, dateTo) {
-  const funnel = await funnelActivity(dateFrom, dateTo);
+  // D-379: the funnel counts limited by the person's Conversion rate level (closes an unscoped report).
+  const funnel = await funnelActivity(dateFrom, dateTo, 'conversion');
 
   const quotationsSent = funnel.quotationsSent;
   const quotationsWon = funnel.quotationsWon;
@@ -1306,28 +1369,28 @@ async function conversionRateReport(dateFrom, dateTo) {
 // preceding period of equal length, with a % change per metric.
 // ================================================================
 
-async function ordersCreatedCount(dateFrom, dateTo) {
-  const clauses = ['is_test_data = :is_test_data' + divisionService.sql('division_id')];
-  const params = { is_test_data: await isTestModeFlag() };
+async function ordersCreatedCount(dateFrom, dateTo, scope = { sql: '', params: {} }) {
+  const clauses = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id') + scope.sql];
+  const params = { is_test_data: await isTestModeFlag(), ...scope.params };
   if (dateFrom) {
-    clauses.push('DATE(created_at) >= :date_from');
+    clauses.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
   }
   if (dateTo) {
-    clauses.push('DATE(created_at) <= :date_to');
+    clauses.push('DATE(o.created_at) <= :date_to');
     params.date_to = dateTo;
   }
-  const row = await db.queryOne(`SELECT COUNT(*) AS n FROM orders WHERE ${clauses.join(' AND ')}`, params);
+  const row = await db.queryOne(`SELECT COUNT(*) AS n FROM orders o WHERE ${clauses.join(' AND ')}`, params);
   return Number(row?.n ?? 0);
 }
 
 /** @returns {Promise<Object<string, number>>} currency code => total FOB value of orders that reached PI (pi_date) in the period */
-async function fobWonByCurrency(dateFrom, dateTo) {
+async function fobWonByCurrency(dateFrom, dateTo, scope = { sql: '', params: {} }) {
   const clauses = [
     `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
-    'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'),
+    'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id') + scope.sql,
   ];
-  const params = { is_test_data: await isTestModeFlag() };
+  const params = { is_test_data: await isTestModeFlag(), ...scope.params };
   if (dateFrom) {
     clauses.push('o.pi_date >= :date_from');
     params.date_from = dateFrom;
@@ -1350,10 +1413,10 @@ async function fobWonByCurrency(dateFrom, dateTo) {
 }
 
 /** @returns {Promise<Array<Object>>} every order marked lost in the period, newest first, with its own reason text */
-async function lostOrdersDetail(dateFrom, dateTo) {
+async function lostOrdersDetail(dateFrom, dateTo, scope = { sql: '', params: {} }) {
   const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
-  const clauses = [`o.status = 'lost'`, 'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
-  const params = { is_test_data: await isTestModeFlag() };
+  const clauses = [`o.status = 'lost'`, 'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id') + scope.sql];
+  const params = { is_test_data: await isTestModeFlag(), ...scope.params };
   if (dateFrom) {
     clauses.push('DATE(o.lost_at) >= :date_from');
     params.date_from = dateFrom;
@@ -1373,16 +1436,16 @@ async function lostOrdersDetail(dateFrom, dateTo) {
   return rows.map((r) => ({ ...r, reached_pi: !!r.reached_pi }));
 }
 
-async function performancePeriod(dateFrom, dateTo) {
-  const funnel = await funnelActivity(dateFrom, dateTo);
+async function performancePeriod(dateFrom, dateTo, scope = { sql: '', params: {} }) {
+  const funnel = await funnelActivity(dateFrom, dateTo, 'performance');
   const quotationsSent = funnel.quotationsSent;
   const won = funnel.quotationsWon;
   const lostBeforePi = funnel.quotationsLost;
   const lostAfterPi = funnel.piLost;
 
   const [ordersCreated, fobByCurrency] = await Promise.all([
-    ordersCreatedCount(dateFrom, dateTo),
-    fobWonByCurrency(dateFrom, dateTo),
+    ordersCreatedCount(dateFrom, dateTo, scope),
+    fobWonByCurrency(dateFrom, dateTo, scope),
   ]);
 
   return {
@@ -1428,12 +1491,14 @@ function pctChange(current, previous) {
 }
 
 async function salesPerformanceReport(dateFrom, dateTo) {
-  const current = await performancePeriod(dateFrom, dateTo);
+  // D-379: every count limited by the person's Sales performance level (closes an unscoped report).
+  const scope = await scopeOf('performance');
+  const current = await performancePeriod(dateFrom, dateTo, scope);
 
   let previous = null;
   const previousRange = previousPeriodRange(dateFrom, dateTo);
   if (previousRange !== null) {
-    previous = await performancePeriod(previousRange[0], previousRange[1]);
+    previous = await performancePeriod(previousRange[0], previousRange[1], scope);
   }
 
   let comparison = null;
@@ -1449,7 +1514,7 @@ async function salesPerformanceReport(dateFrom, dateTo) {
     previous,
     previous_range: previousRange,
     comparison,
-    lost_orders: await lostOrdersDetail(dateFrom, dateTo),
+    lost_orders: await lostOrdersDetail(dateFrom, dateTo, scope),
   };
 }
 
@@ -1470,7 +1535,9 @@ async function salesPerformanceReport(dateFrom, dateTo) {
  * (an export business's order volume), not meant for a dataset large
  * enough to need real aggregation.
  */
-async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: '', params: {} }, scope = 'all') {
+async function orderProfitabilityReport(dateFrom, dateTo, visibility = null, scope = 'all') {
+  // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+  visibility = await scopeOf('profitability', visibility);
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: isTestMode };

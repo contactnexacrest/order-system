@@ -8,7 +8,8 @@
  * holds the same logic).
  *
  * Pure: it is given what the person may do (can), the facts the config asks
- * about (flags), the live counts and the page being shown, and returns plain
+ * about (flags — D-379: including the report-access facts report:<key>,
+ * report:<key>:<level> and report:any), the live counts and the page being shown, and returns plain
  * objects for views/layout/base.njk and views/partials/section_nav.njk. A
  * page joins its section's menu bar by its path alone, so a new page under a
  * section's prefix gets the bar without any change to the page.
@@ -51,6 +52,12 @@ function allowed(when, can, flags) {
   if (!when) return true;
   for (const flag of when.flags || []) {
     if (!flags[flag]) return false;
+  }
+  // Owner decision D-379: report access — the fact "report:<key>" (the page opens), "report:<key>:<level>"
+  // (the level reaches reportMin) or "report:any", worked out by the layout from reportAccess.navFlags().
+  if (when.report !== undefined && when.report !== null) {
+    const fact = `report:${when.report}${when.reportMin !== undefined && when.reportMin !== null ? `:${when.reportMin}` : ''}`;
+    if (!flags[fact]) return false;
   }
   for (const perm of when.all || []) {
     if (!can(perm)) return false;
@@ -204,6 +211,7 @@ function forRequest(req) {
     mod_team_incentive: modules.team_incentive !== false,
     div_gst: activeCodes.includes('DOM') || activeCodes.includes('IMP'), // QA UI-12
     div_import_duty: activeCodes.includes('IMP'),
+    ...(req.reportNavFlags || {}), // D-379: report:<key>, report:<key>:<level>, report:any (sessionAuth, reportAccess.navFlagsFor)
   };
   const tabs = req.approvalTabCounts || {};
   const counts = {

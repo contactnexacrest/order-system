@@ -36387,9 +36387,9 @@
     "session"
    ],
    "php_line": 320,
-   "node_line": null,
+   "node_line": 821,
    "node_handler": "reportAccessController.roleTab",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)"
    ],
@@ -36423,9 +36423,9 @@
     "csrf"
    ],
    "php_line": 321,
-   "node_line": null,
+   "node_line": 822,
    "node_handler": "reportAccessController.saveRole",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)",
     "UngatedRoutes: CSRF required"
@@ -36460,9 +36460,9 @@
     "csrf"
    ],
    "php_line": 322,
-   "node_line": null,
+   "node_line": 823,
    "node_handler": "reportAccessController.resetRole",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)",
     "UngatedRoutes: CSRF required"
@@ -36496,9 +36496,9 @@
     "session"
    ],
    "php_line": 323,
-   "node_line": null,
+   "node_line": 824,
    "node_handler": "reportAccessController.preview",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)"
    ],
@@ -36532,9 +36532,9 @@
     "csrf"
    ],
    "php_line": 324,
-   "node_line": null,
+   "node_line": 825,
    "node_handler": "reportAccessController.addUserExtra",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)",
     "UngatedRoutes: CSRF required"
@@ -36569,9 +36569,9 @@
     "csrf"
    ],
    "php_line": 325,
-   "node_line": null,
+   "node_line": 826,
    "node_handler": "reportAccessController.removeUserExtra",
-   "node_difference": "D-379: PHP first; the Node twin (src/controllers/reportAccessController.js) follows",
+   "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)",
     "UngatedRoutes: CSRF required"

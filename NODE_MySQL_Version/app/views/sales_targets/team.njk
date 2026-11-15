@@ -1,0 +1,33 @@
+{#
+  Owner decision D-379 (15 Nov 2026): Sales targets at the Department level — a read-only table of the
+  people of the viewer's departments (target, confirmed, shipped, pipeline, new buyers, progress), in
+  containers. No Edit, no money, no calculator, no associates, no settings link (those are the All level:
+  views/sales_targets/index.njk). One view for the Standard and the Kanban template.
+  PHP twin: PHP_MySQL_Version/app/views/sales_targets/team.php
+#}
+<div class="card page-wide" id="sales-targets-team">
+  <h1>Sales targets — {{ period.label }}</h1>
+  <p class="muted">Your department's people, in containers. An order counts for its salesperson on the day it is confirmed; cancellations, losses and a different number of containers shipped are corrections on the day they happen.</p>
+  <div class="btn-row" id="target-periods">
+    {% for p in periods %}
+      <a class="btn-sm {{ 'btn-accent' if p.key == period.key else 'btn-secondary' }}" href="/sales-targets?period={{ p.key }}">{{ p.label }}</a>
+    {% endfor %}
+  </div>
+  <div class="table-scroll">
+  <table class="list target-team" id="target-team-view">
+    <tr><th>Person</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Pipeline</th><th>New buyers</th><th>Progress</th></tr>
+    {% for r in rows %}{% set t = r.target %}{% set c = r.counts %}
+    <tr data-user-id="{{ r.user.id }}">
+      <td>{{ r.user.name }}</td>
+      <td>{{ (t.containers | targetNum) if t.containers > 0 else '—' }}</td>
+      <td>{{ c.counted | int }}</td>
+      <td>{{ c.shipped | int }}</td>
+      <td>{{ r.pipeline | int }}</td>
+      <td>{{ c.new_buyers | int }}{% if t.new_buyers != null %} / {{ t.new_buyers | int }}{% endif %}</td>
+      <td>{{ ((r.progress | int) + '%') if r.progress != null else '—' }}</td>
+    </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="7" class="muted">Nobody in your departments has a target or a credited order in this period.</td></tr>{% endif %}
+  </table>
+  </div>
+</div>

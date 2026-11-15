@@ -132,6 +132,9 @@ describe('D-257 divisions — isolation', () => {
       await db.execute("INSERT INTO email_log (order_id, recipient_email, subject, body_snapshot, status) VALUES (:o, 'buyer@division.test', 'Jest division', 'x', 'pending_approval')", { o: orderId });
     }
     await db.execute(`UPDATE orders SET status = 'active', is_test_data = 0, is_sample_data = 0 WHERE id IN (${expOrder}, ${domOrder})`);
+    // D-379: the Sales/Export Manager's reports reach their department's orders (no longer every order through
+    // view_all_orders), so each division's order is assigned to its own staff member.
+    await db.execute(`INSERT IGNORE INTO order_assignees (order_id, user_id) VALUES (${expOrder}, ${expStaff.id}), (${domOrder}, ${domStaff.id})`);
     const cases = [[expStaff, 1, expOrder, domOrder, expClient, domClient], [domStaff, DOM, domOrder, expOrder, domClient, expClient]];
     for (const [user, division, own, other, ownClient, otherClient] of cases) {
       const agent = await loginAs(user);

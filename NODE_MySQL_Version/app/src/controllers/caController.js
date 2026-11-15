@@ -111,7 +111,8 @@ async function cafinExport(req, res) {
   const fy = years.includes(String(q.fy || '')) ? String(q.fy) : financialYear.current();
   const status = cafinExportService.STATUSES[String(q.status || 'all')] ? String(q.status || 'all') : 'all';
   const format = String(q.format || '');
-  let ids = await cafinExportService.orderIds(fy, status);
+  // D-379: only the orders the person's CAFIN export level shows.
+  let ids = await require('../services/reportAccess').orderIdsInScope('cafin', await cafinExportService.orderIds(fy, status));
   // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
   const scope = q.scope === 'locked' ? 'locked' : 'all';
   if (scope === 'locked') ids = await cafinExportService.lockedOnly(ids);
@@ -138,7 +139,8 @@ async function cafinExport(req, res) {
 async function index(req, res) {
   res.renderView('ca/index', {
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
-    settlements: await caRepository.settlementRegister(),
+    // D-379: the settlement register limited to the orders the person's CA reports level shows.
+    settlements: await caRepository.settlementRegister('ca_reports'),
     usersById: await usersById(),
     // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
     // stricter ca_module_manage, not the plain ca_module_view every other
@@ -167,7 +169,7 @@ async function reports(req, res) {
       : String(availableCalendar[0] || new Date().getFullYear());
   }
 
-  const report = await caRepository.revenueReport(mode, period);
+  const report = await caRepository.revenueReport(mode, period, 'ca_reports'); // D-379: rows and totals within the person's level
 
   // 90-item backlog item #13: same format=csv convention as
   // reportController's reports, and the exact same columns the table
@@ -545,7 +547,18 @@ async function generateInternalDoc(req, res) {
  * import for it.
  */
 async function exportBenefits(req, res) {
-  const benefits = await caExportBenefitRepository.all();
+  let benefits = await caExportBenefitRepository.all();
+  let totalClaimed = await caExportBenefitRepository.totalClaimed();
+  let totalReceived = await caExportBenefitRepository.totalReceived();
+  // D-379: below All, only the claims of orders in the person's CA reports level (company-level claims with no order: All only),
+  // and the totals over those claims.
+  const reportAccess = require('../services/reportAccess');
+  const caLevel = await reportAccess.level('ca_reports');
+  if (caLevel === reportAccess.OWN || caLevel === reportAccess.DEPARTMENT) {
+    benefits = await reportAccess.visibleRows('ca_reports', benefits);
+    totalClaimed = benefits.reduce((sum, b) => sum + (parseFloat(b.claimed_amount ?? 0) || 0), 0);
+    totalReceived = benefits.reduce((sum, b) => sum + (parseFloat(b.received_amount ?? 0) || 0), 0);
+  }
   for (const b of benefits) {
     b.lockMessage = b.received_amount === null ? await caFyLockRepository.lockMessageForDate(b.claimed_at) : null;
   }
@@ -562,8 +575,8 @@ async function exportBenefits(req, res) {
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     benefits,
     schemeOptions: await lookupRepository.dropdownOptions('export_benefit_scheme'),
-    totalClaimed: await caExportBenefitRepository.totalClaimed(),
-    totalReceived: await caExportBenefitRepository.totalReceived(),
+    totalClaimed,
+    totalReceived,
     canOverrideFyLock: caFyLockGuard.canOverride(req),
   }, 'layout/base');
 }

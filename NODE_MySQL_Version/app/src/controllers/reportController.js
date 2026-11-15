@@ -13,7 +13,7 @@ const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const reportDefinitionRepository = require('../repositories/reportDefinitionRepository');
 const reportRepository = require('../repositories/reportRepository');
-const orderAccessService = require('../services/orderAccessService');
+const reportAccess = require('../services/reportAccess');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const { todayIst } = require('../helpers/dbDateTime');
@@ -25,24 +25,63 @@ function str(v, fallback = '') {
   return String(v ?? fallback).trim();
 }
 
+/**
+ * Owner decision D-379: the Reports page — 7 section boxes holding only the reports the person
+ * may open (reportAccess), with the "own business" / "department" banner. Also drawn read-only
+ * for "See Reports as this role" (reportAccessController.preview(), previewRole set).
+ */
 async function index(req, res) {
-  const user = req.user;
-  const query = str(req.query.q);
-  res.renderView(
-    'reports/index',
-    {
-      clients: await clientRepository.all(),
-      incoterms: await lookupRepository.incoterms(),
-      stages: await lookupRepository.stagesMaster(),
-      countries: await reportRepository.distinctCountries(),
-      savedReports: await reportDefinitionRepository.visibleTo(user.id),
-      searchQuery: query,
-      searchResults: query !== '' ? await reportRepository.searchOrders(query) : [],
-      canViewStaffReports: !!(req.permissions && req.permissions.view_staff_reports),
-      canManageOrderFinancials: !!(req.permissions && req.permissions.manage_order_financials),
-    },
-    'layout/base'
-  );
+  res.renderView('reports/index', await indexData(str(req.query.q), null), 'layout/base');
+}
+
+/**
+ * @param {object|null} previewRole the role shown by the preview (nothing is queried then)
+ * @returns {Promise<object>} what views/reports/index.njk draws
+ */
+async function indexData(query, previewRole) {
+  const ctx = require('../helpers/requestContext').get();
+  const userId = ctx && ctx.userId ? Number(ctx.userId) : null;
+  const sections = {};
+  const sectionList = [];
+  for (const [section, keys] of Object.entries(reportAccess.bySection())) {
+    const open = [];
+    for (const k of keys) {
+      if (await reportAccess.canOpenPage(k)) open.push(k);
+    }
+    if (open.length > 0) {
+      sections[section] = open;
+      sectionList.push({ key: section, keys: open });
+    }
+  }
+  const levels = await reportAccess.levels();
+  const live = previewRole === null && userId !== null;
+  const searchOpen = live && (await reportAccess.canOpenPage('order_search'));
+  const clientsOpen = live && (await reportAccess.canOpenPage('per_client'));
+  let clients = [];
+  if (clientsOpen) {
+    clients = await clientRepository.all();
+    // D-379: Own / Department list only the clients of the orders in scope.
+    const inScope = await reportAccess.clientIdsInScope('per_client');
+    if (inScope !== null) {
+      const keep = new Set(inScope);
+      clients = clients.filter((c) => keep.has(Number(c.id)));
+    }
+  }
+  return {
+    sections,
+    sectionList,
+    levels,
+    banner: await reportAccess.banner(),
+    previewRole,
+    clients,
+    savedReports: live && (await reportAccess.canOpenPage('aggregate')) ? await reportDefinitionRepository.visibleTo(userId) : [],
+    searchQuery: searchOpen ? query : '',
+    searchResults: searchOpen && query !== '' ? await reportRepository.searchOrders(query) : [],
+    // The registry the view draws from (PHP reads ReportAccess's constants in the view).
+    reportRegistry: reportAccess.REPORTS,
+    reportSections: reportAccess.SECTIONS,
+    levelLabels: reportAccess.LEVEL_LABELS,
+  };
 }
 
 /**
@@ -76,7 +115,13 @@ function refusedForMoney(req, res, classes) {
 async function client(req, res) {
   if (refusedForMoney(req, res, ['selling', 'buyer_payments'])) return;
   const clientId = parseInt(req.params.clientId, 10);
-  const data = await reportRepository.perClient(clientId, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  // D-379: at Own / Department a client is in the report only through an order in scope.
+  const inScope = await reportAccess.clientIdsInScope('per_client');
+  if (inScope !== null && !inScope.includes(clientId)) {
+    res.status(403).send(reportAccess.REFUSED);
+    return;
+  }
+  const data = await reportRepository.perClient(clientId);
   if (!data.client) {
     res.status(404).send('Client not found.');
     return;
@@ -154,7 +199,7 @@ async function aggregate(req, res) {
   const incotermId = req.query.incoterm_id ? (parseInt(req.query.incoterm_id, 10) || null) : null;
   const country = str(req.query.country) || null;
 
-  const rows = await reportRepository.aggregate(dateFrom, dateTo, stageId, incotermId, country, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const rows = await reportRepository.aggregate(dateFrom, dateTo, stageId, incotermId, country);
 
   if (req.query.format === 'csv') {
     const csvRows = rows.map((r) => ({
@@ -279,7 +324,7 @@ async function disputes(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.disputesReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const data = await reportRepository.disputesReport(dateFrom, dateTo);
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -315,7 +360,7 @@ async function amendments(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.amendmentsReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const data = await reportRepository.amendmentsReport(dateFrom, dateTo);
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -432,7 +477,7 @@ async function payments(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.paymentsReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const data = await reportRepository.paymentsReport(dateFrom, dateTo);
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -488,10 +533,10 @@ async function todaysPayments(req, res) {
   // payments.
   const canManageSupplierPayments = !!req.permissions.manage_supplier_payments;
 
-  // QA Round 6, R6-N01: only the orders this user may open.
-  const incoming = await orderAccessService.visibleRows(await orderPaymentStatusRepository.clearedOnDate(date), req.user.id, req.permissions);
+  // QA Round 6, R6-N01 / D-379: only the orders the person's Today's payments level shows.
+  const incoming = await reportAccess.visibleRows('todays_payments', await orderPaymentStatusRepository.clearedOnDate(date));
   const supplier = canManageSupplierPayments
-    ? await orderAccessService.visibleRows(await orderSupplierPoRepository.paidOnDate(date), req.user.id, req.permissions)
+    ? await reportAccess.visibleRows('todays_payments', await orderSupplierPoRepository.paidOnDate(date))
     : [];
 
   if (req.query.format === 'csv') {
@@ -683,7 +728,7 @@ async function freightCost(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.freightCostReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const data = await reportRepository.freightCostReport(dateFrom, dateTo);
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -793,7 +838,7 @@ async function profitability(req, res) {
   // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
   const scope = req.query.scope === 'locked' ? 'locked' : 'all';
 
-  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions), scope);
+  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, null, scope);
 
   const p = req.permissions || {};
   const seeIncentives = !!(p.manage_incentives || p.pay_incentives || p.view_price_buildup);
@@ -927,18 +972,32 @@ async function performance(req, res) {
     salesperson = '';
   }
   const salesTargetService = require('../services/salesTargetService');
+  // D-379: at Own / Department the salesperson table covers only the viewer / their department's people.
+  let salespeople = await require('../repositories/salesTargetRepository').activeStaff();
+  const people = await reportAccess.peopleScope('performance');
+  const keep = new Set(people || []);
+  if (people !== null) {
+    salespeople = salespeople.filter((p) => keep.has(Number(p.id)));
+    if (salesperson !== '' && salesperson !== 'all' && !keep.has(parseInt(salesperson, 10))) {
+      salesperson = 'all';
+    }
+  }
+  let bySalesperson = salesperson === '' ? null
+    : await salesTargetService.performanceBySalesperson(dateFrom, dateTo, salesperson, (await require('../services/testModeService').isEnabled()) ? 1 : 0);
+  if (bySalesperson !== null && people !== null) {
+    bySalesperson = bySalesperson.filter((r) => r.user_id !== null && r.user_id !== undefined && keep.has(Number(r.user_id)));
+  }
   res.renderView('reports/performance', {
     report,
     filters: { dateFrom, dateTo, preset },
     salesperson,
-    salespeople: await require('../repositories/salesTargetRepository').activeStaff(),
-    bySalesperson: salesperson === '' ? null
-      : await salesTargetService.performanceBySalesperson(dateFrom, dateTo, salesperson, (await require('../services/testModeService').isEnabled()) ? 1 : 0),
+    salespeople,
+    bySalesperson,
   }, 'layout/base');
 }
 
 module.exports = {
-  index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
+  index, indexData, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
   payments, todaysPayments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
   profitability, profitabilityCsvRows, PROFITABILITY_HEADERS, performance, presetRange,
   trendsCsvRows, staffCsvRows, suppliersCsvRows, conversionCsvRows, performanceCsvRows, orderAuditCsvRows,

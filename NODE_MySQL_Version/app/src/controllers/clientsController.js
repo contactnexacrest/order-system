@@ -257,6 +257,9 @@ async function show(req, res) {
   // D-257 Phase 2: GST registration for Domestic Trade, shown only once Domestic Trade is active.
   const domesticActive = await require('../services/domesticOrderService').isActive();
   res.renderView('clients/show', {
+    // D-379: the per-client report also needs the person's report access (and the money it shows) — the same answer as its route.
+    canClientReport: !!(req.permissions && req.permissions.view_reports)
+      && require('../helpers/permittedLinks').mayOpen(`/reports/client/${Number(client.id)}`, req.permissions, null, null, req.reportLevels || null),
     domesticActive,
     gstStates: domesticActive ? await require('../repositories/domesticOrderRepository').states() : [],
     agreementCard: await require('./agreementController').partyCard(req, 'client', client.id),

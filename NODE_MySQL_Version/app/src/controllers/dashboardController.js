@@ -80,7 +80,9 @@ async function index(req, res) {
   data.agreementPartyTypes = require('../repositories/agreementRepository').PARTY_TYPES;
   // Owner decision D-378: "Your target" — the signed-in person's own target only, containers only
   // (the order's FOB only for someone who already sees selling prices).
-  data.salesTarget = await require('../services/salesTargetService').dashboardFor(user.id, require('../helpers/dbDateTime').todayIst(), require('../services/moneyVisibility').can(permissions, 'selling'));
+  // D-379: the "Your target" box is the Own level of the Sales targets report (off = no box).
+  data.salesTarget = (await require('../services/reportAccess').can('sales_targets', 'own'))
+    ? await require('../services/salesTargetService').dashboardFor(user.id, require('../helpers/dbDateTime').todayIst(), require('../services/moneyVisibility').can(permissions, 'selling')) : null;
   res.renderView('dashboard/index', data, 'layout/base');
 }
 

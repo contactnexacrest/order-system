@@ -16,9 +16,10 @@
       {% for d in duplicatedInto %}{{ ', ' if not loop.first }}<a href="/clients/{{ d.id }}">{{ d.company_legal_name }}</a>{% endfor %}.
     </p>
   {% endif %}
-  {% if permissions.manage_orders or permissions.view_reports %}{# D-320 (point 26): the main buttons stay at the top while scrolling #}
+  {# D-379: the per-client report also needs the person's report access (and the money it shows) — canClientReport, the same answer as its route. #}
+  {% if permissions.manage_orders or canClientReport %}{# D-320 (point 26): the main buttons stay at the top while scrolling #}
   <div class="btn-row sticky-actions" data-testid="client-actions">
-    {% if permissions.view_reports %}<a class="btn-sm btn-secondary" href="/reports/client/{{ client.id }}">Full report</a>{% endif %}
+    {% if canClientReport %}<a class="btn-sm btn-secondary" href="/reports/client/{{ client.id }}">Full report</a>{% endif %}
     {% if permissions.manage_orders %}
     <a class="btn-sm" href="/clients/{{ client.id }}/edit">Edit</a>
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>

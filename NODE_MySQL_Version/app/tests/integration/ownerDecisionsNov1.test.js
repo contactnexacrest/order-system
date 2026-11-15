@@ -121,7 +121,9 @@ describe('Owner decisions of 1 Nov 2026', () => {
     const logistics = await staff('Logistics Manager');
     expect((await logistics.get('/reports/freight-cost')).status).toBe(200);
     expect((await logistics.get('/reports/suppliers')).status).toBe(403);
-    expect((await logistics.get('/')).text).toContain('href="/reports/freight-cost"');
+    // D-379: the Reports menu entry now opens the Reports page for anyone with one open report; Freight cost is on it.
+    expect((await logistics.get('/')).text).toContain('href="/reports"');
+    expect((await logistics.get('/reports')).text).toContain('href="/reports/freight-cost"');
 
     const sales = await staff('Export Executive');
     expect((await sales.get('/reports/suppliers')).status).toBe(403);

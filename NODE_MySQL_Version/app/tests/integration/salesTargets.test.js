@@ -365,6 +365,11 @@ describe('D-378: sales targets', () => {
       `INSERT IGNORE INTO role_permissions (role_id, permission_id)
        SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_sales_targets' WHERE r.name = 'Test Role — Targets Only'`
     );
+    // D-379: the full Targets page is the All level of the Sales targets report.
+    await db.execute(
+      `INSERT IGNORE INTO role_report_access (role_id, report_key, level)
+       SELECT r.id, 'sales_targets', 'all' FROM roles r WHERE r.name = 'Test Role — Targets Only'`
+    );
     companyRows.push(await salesTargetRepository.insertCompanyRow('2000-01-01', 100000.0, 50000.0, 'Jest D-378 money', 1));
 
     let agent = await signIn(await createTestUser('Test Role — Targets Only'));
@@ -420,8 +425,14 @@ describe('D-378: sales targets', () => {
     const lines = routes.split('\n').filter((l) => /^app\.(?:get|post)\('\/sales-targets[^']*',/.test(l));
     expect(lines).toHaveLength(6);
     for (const line of lines) {
-      expect(line).toContain("requirePermission('manage_sales_targets')");
       expect(line).not.toContain('associateAuth');
+      if (line.startsWith("app.get('/sales-targets',")) {
+        // D-379: the page opens at the Department level of the Sales targets report (read-only team view).
+        expect(line).toContain("requireReport('sales_targets', 'department')");
+        continue;
+      }
+      expect(line).toContain("requirePermission('manage_sales_targets')");
+      expect(line).toContain("requireReport('sales_targets', 'all')");
     }
   });
 

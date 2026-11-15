@@ -190,6 +190,8 @@ function required() {
     const ctxStore = {
       userId: user.id, effectiveRoleId: acting.effectiveRoleId, previewing: acting.previewing, actingAs: acting.actingAs,
       divisionIds: divisionScope.ids, divisionSeesAll: divisionScope.seesAll, divisionUser: user,
+      // Owner decision D-379: what services/reportAccess.js asks of the signed-in person (PHP PermissionService::can / SuperAdminService).
+      permissions: req.permissions, isSuperAdmin: req.isSuperAdmin,
     };
     await requestContext.run(ctxStore, async () => {
       const allDivisions = await divisionService.all();
@@ -336,6 +338,12 @@ function required() {
         }
       }
 
+      // Owner decision D-379: this person's report levels, worked out once per request (in the request's division
+      // scope) — for the menu (report:<key> facts) and for permittedLinks (a report link they cannot open is plain text).
+      const reportAccess = require('../services/reportAccess');
+      req.reportLevels = await reportAccess.levels();
+      ctxStore.reportLevels = req.reportLevels;
+      req.reportNavFlags = reportAccess.navFlagsFor(req.reportLevels);
 
       next();
     });

@@ -51,10 +51,10 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
       '/clients/1/additional-documents/removed': '/clients/:id/additional-documents/removed',
       '/documents/1/download': '/documents/:documentId/download',
       '/settings': '/settings', '/audit-log': '/audit-log', '/ca': '/ca', '/disputes': '/disputes', '/complaints': '/complaints',
-      '/reports': '/reports', '/clients': '/clients', '/orders': '/orders', '/client-intake': '/client-intake',
+      '/reports/aggregate': '/reports/aggregate', '/clients': '/clients', '/orders': '/orders', '/client-intake': '/client-intake',
       '/pi-intake-review': '/pi-intake-review', '/reorder-requests': '/reorder-requests', '/admin/field-protection': '/admin/field-protection',
       '/company-assets': '/company-assets', '/signatories': '/signatories', '/ports': '/ports', '/port-routes': '/port-routes', '/users': '/users',
-      '/sales-targets': '/sales-targets', '/sales-targets/settings': '/sales-targets/settings', // D-378
+      '/sales-targets/settings': '/sales-targets/settings', // D-378 (D-379: /reports and /sales-targets open by report access — see the report-gate test)
     };
     for (const [samplePath, routePath] of Object.entries(samples)) {
       const line = source.split('\n').find((l) => l.startsWith(`app.get('${routePath}',`));
@@ -86,6 +86,31 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
     expect((await agent.get('/getting-started')).text).toContain('href="/settings"');
     // D-320 (point 26): PI-stage details is in the Orders menu bar, shown on every Orders page.
     expect((await agent.get('/client-intake')).text).toContain('href="/pi-intake-review"');
+  });
+
+  /**
+   * Owner decision D-379: every route behind report access (requireReport / requireAnyReport) has the
+   * same gate in permittedLinks.REPORT_ROUTES, and every page under a REPORT_ROUTES pattern has that
+   * gate on its route, so a link the person's report level would refuse is plain text.
+   */
+  it('every report route has its report gate (D-379)', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'server.js'), 'utf8');
+    let checked = 0;
+    for (const line of source.split('\n')) {
+      const route = line.match(/^app\.get\('([^']+)',/);
+      if (!route) continue;
+      const samplePath = route[1].replace(/:[A-Za-z]+/g, '1');
+      const rule = permittedLinks.reportRequiredFor(samplePath);
+      const gate = line.match(/requireReport\('([a-z_]+)'(?:,\s*'([a-z]+)')?\)/);
+      const expected = gate ? [gate[1], gate[2] || null] : (line.includes('requireAnyReport()') ? ['any', null] : null);
+      if (expected === null) {
+        expect([route[1], rule]).toEqual([route[1], null]);
+        continue;
+      }
+      expect([route[1], rule]).toEqual([route[1], expected]);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(30);
   });
 
   // QA Round 6, R6-N02: every page route under a rule needs exactly what

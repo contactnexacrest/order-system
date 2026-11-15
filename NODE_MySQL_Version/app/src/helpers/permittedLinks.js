@@ -38,8 +38,8 @@ const RULES = [
   // SUI-002: the product page's "Pricing ready?" list and Market prices link to these.
   [/^\/products\/\d+\/configure(?:[?#]|$)/, ['manage_product_catalog']],
   [/^\/products\/\d+\/specifications(?:[?#]|$)/, ['view_price_buildup', 'manage_product_specifications', 'manage_pricing']],
-  // Owner decision D-378: the Targets page and its settings.
-  [/^\/sales-targets(?:[/?#]|$)/, ['manage_sales_targets']],
+  // Owner decision D-378: the Targets settings (D-379: the Targets page itself opens by report access — REPORT_ROUTES).
+  [/^\/sales-targets\//, ['manage_sales_targets']],
   [/^\/audit-log(?:[/?#]|$)/, ['view_audit_log']],
   [/^\/ca\/cafin-export(?:[/?#]|$)/, ['view_cafin']],
   [/^\/ca\/(?:zoho-sync|fy-locks)(?:[/?#]|$)/, ['ca_module_manage']],
@@ -69,7 +69,8 @@ const RULES = [
   [/^\/reports\/suppliers(?:[/?#]|$)/, ['view_purchase_prices']],
   // D-234 (2 Nov 2026): Missing eBRC / FIRC report.
   [/^\/reports\/missing-ebrc(?:[/?#]|$)/, ['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials']],
-  [/^\/reports(?:[/?#]|$)/, ['view_reports']],
+  // D-379: /reports itself opens by report access (REPORT_ROUTES); every page under it still needs view_reports unless listed above.
+  [/^\/reports\//, ['view_reports']],
   [/^\/clients(?:[/?#]|$)/, ['manage_orders', 'view_clients']],
   [/^\/orders(?:[/?#]|$)/, ['manage_orders', 'view_orders']],
   [/^\/(?:client-intake|pi-intake-review|reorder-requests)(?:[/?#]|$)/, ['manage_orders']],
@@ -106,6 +107,57 @@ function moneyRequiredFor(path) {
   return rule ? rule[1] : null;
 }
 
+/**
+ * Owner decision D-379: report pages also need the person's report access (services/reportAccess.js) —
+ * the report key and the lowest level (null = the level that opens its page). Kept apart from RULES,
+ * which mirror the route permissions exactly; these mirror the reportAccessCheck middleware of the
+ * same routes (permittedLinks.test.js checks they match). More specific paths come first.
+ */
+const REPORT_ROUTES = [
+  [/^\/reports\/client\/\d+(?:[/?#]|$)/, ['per_client', null]],
+  [/^\/reports\/(?:aggregate|saved\/\d+\/run)(?:[/?#]|$)/, ['aggregate', null]],
+  [/^\/reports\/queues(?:[/?#]|$)/, ['queues', null]],
+  [/^\/reports\/payments(?:[/?#]|$)/, ['payments', null]],
+  [/^\/reports\/todays-payments(?:[/?#]|$)/, ['todays_payments', null]],
+  [/^\/reports\/disputes(?:[/?#]|$)/, ['disputes', null]],
+  [/^\/reports\/amendments(?:[/?#]|$)/, ['amendments', null]],
+  [/^\/reports\/trends(?:[/?#]|$)/, ['trends', null]],
+  [/^\/reports\/staff(?:[/?#]|$)/, ['staff_productivity', null]],
+  [/^\/reports\/ageing(?:[/?#]|$)/, ['ageing', null]],
+  [/^\/reports\/freight-cost(?:[/?#]|$)/, ['freight_cost', null]],
+  [/^\/reports\/products(?:[/?#]|$)/, ['product_sales', null]],
+  [/^\/reports\/suppliers(?:[/?#]|$)/, ['supplier_performance', null]],
+  [/^\/reports\/order-profitability(?:[/?#]|$)/, ['profitability', null]],
+  [/^\/reports\/incentives(?:[/?#]|$)/, ['incentives', null]],
+  [/^\/reports\/conversion(?:[/?#]|$)/, ['conversion', null]],
+  [/^\/reports\/performance(?:[/?#]|$)/, ['performance', null]],
+  [/^\/reports\/missing-ebrc(?:[/?#]|$)/, ['missing_ebrc', null]],
+  [/^\/reports(?:[?#]|$)/, ['any', null]],
+  [/^\/cockpit(?:[/?#]|$)/, ['cockpit', null]],
+  [/^\/audit-log(?:[/?#]|$)/, ['audit_log', null]],
+  [/^\/ca\/cafin-export(?:[/?#]|$)/, ['cafin', null]],
+  [/^\/ca\/(?:expenses|tds-summary|bank-statement|reconciliation|gst-refunds)(?:[?#]|$)/, ['ca_reports', 'all']],
+  [/^\/ca\/(?:reports|export-benefits)(?:[?#]|$)/, ['ca_reports', null]],
+  [/^\/ca(?:[?#]|$)/, ['ca_reports', null]],
+  [/^\/sales-targets\/settings(?:[?#]|$)/, ['sales_targets', 'all']],
+  [/^\/sales-targets(?:[?#]|$)/, ['sales_targets', 'department']],
+];
+
+/** @returns {[string, string|null]|null} [report key or 'any', lowest level] the path's report gate, or null */
+function reportRequiredFor(path) {
+  const rule = REPORT_ROUTES.find(([pattern]) => pattern.test(path));
+  return rule ? rule[1] : null;
+}
+
+/**
+ * D-379: the person's report levels for mayOpen() — given, else the ones sessionAuth put in the
+ * request context; null outside a staff request (no report check then).
+ */
+function currentReportLevels() {
+  const ctx = require('./requestContext').get();
+  return ctx && ctx.reportLevels ? ctx.reportLevels : null;
+}
+
 /** QA Round 6, R6-N02: pages of one order also need that order to be visible to the user (D-118). */
 const ORDER_PAGE = /^\/(?:orders|reports\/order)\/(\d+)(?:[/?#]|$)/;
 
@@ -119,21 +171,30 @@ function requiredFor(path) {
  * canSeeOrder (optional): orderAccessService.orderVisibilityChecker()'s
  * function; without it, links to one order are judged by permission only.
  */
-function mayOpen(path, permissions, canSeeOrder = null, isDisabledPath = null) {
+function mayOpen(path, permissions, canSeeOrder = null, isDisabledPath = null, reportLevels = null) {
   // D-257: a module switched off for the request's division(s).
   if (isDisabledPath && isDisabledPath(path.split(/[?#]/)[0])) return false;
   const order = canSeeOrder ? path.match(ORDER_PAGE) : null;
   if (order && !canSeeOrder(Number(order[1]))) return false;
+  // D-379: and the person's report access (the levels sessionAuth worked out for this request).
+  const report = reportRequiredFor(path);
+  const levels = reportLevels || currentReportLevels();
+  if (report !== null && levels !== null) {
+    const reportAccess = require('../services/reportAccess');
+    const [key, min] = report;
+    const open = key === 'any' ? reportAccess.anyOpenIn(levels) : reportAccess.canIn(levels, key, min);
+    if (!open) return false;
+  }
   if ((moneyRequiredFor(path) || []).some((cls) => !moneyVisibility.can(permissions, cls))) return false;
   const required = requiredFor(path);
   return required === null || required.some((key) => !!(permissions && permissions[key]));
 }
 
 /** Replaces every internal link the user may not open with its plain text. */
-function filterHtml(html, permissions, canSeeOrder = null, isDisabledPath = null) {
+function filterHtml(html, permissions, canSeeOrder = null, isDisabledPath = null, reportLevels = null) {
   return String(html).replace(/<a\s[^>]*href="(\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/g, (whole, href, text) => (
-    mayOpen(href.replace(/&amp;/g, '&'), permissions, canSeeOrder, isDisabledPath) ? whole : `<span class="link-not-permitted">${text}</span>`
+    mayOpen(href.replace(/&amp;/g, '&'), permissions, canSeeOrder, isDisabledPath, reportLevels) ? whole : `<span class="link-not-permitted">${text}</span>`
   ));
 }
 
-module.exports = { RULES, MONEY_REPORTS, ORDER_PAGE, requiredFor, moneyRequiredFor, mayOpen, filterHtml };
+module.exports = { RULES, MONEY_REPORTS, REPORT_ROUTES, ORDER_PAGE, requiredFor, moneyRequiredFor, reportRequiredFor, mayOpen, filterHtml };

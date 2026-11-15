@@ -42,6 +42,7 @@ process.on('unhandledRejection', (reason) => {
 });
 const sessionAuth = require('./middleware/sessionAuth');
 const permissionCheck = require('./middleware/permissionCheck');
+const reportAccessCheck = require('./middleware/reportAccessCheck');
 const csrfCheck = require('./middleware/csrfCheck');
 const testModeGate = require('./middleware/testModeGate');
 const orderLockGuard = require('./middleware/orderLockGuard');
@@ -513,6 +514,7 @@ app.use((req, res, next) => {
       setupNeededCount: req.setupNeededCount || 0, // D-312
       sopLibraryOpen: req.sopLibraryOpen !== false, // D-266
       sopExtrasCard: req.sopExtrasCard || null, // D-266: Users › Edit
+      reportExtrasCard: req.reportExtrasCard || null, // D-379: Users › Edit
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
       zohoWaitingMenu: req.zohoWaitingMenu ?? null,
@@ -549,12 +551,12 @@ app.use((req, res, next) => {
     const perms = req.permissions || {};
     const linksToOneOrder = /href="\/(?:orders|reports\/order)\/\d+/.test(content) && !(perms.view_all_orders && perms.view_archived_orders);
     if (!linksToOneOrder) {
-      content = permittedLinks.filterHtml(content, perms, null, req.divisionUi ? req.divisionUi.isDisabledPath : null);
+      content = permittedLinks.filterHtml(content, perms, null, req.divisionUi ? req.divisionUi.isDisabledPath : null, req.reportLevels || null);
       sendPage();
       return;
     }
     orderAccessService.orderVisibilityChecker(req.user.id, perms).then((canSeeOrder) => {
-      content = permittedLinks.filterHtml(content, perms, canSeeOrder, req.divisionUi ? req.divisionUi.isDisabledPath : null);
+      content = permittedLinks.filterHtml(content, perms, canSeeOrder, req.divisionUi ? req.divisionUi.isDisabledPath : null, req.reportLevels || null);
       sendPage();
     }).catch(next);
   };
@@ -669,6 +671,13 @@ function requirePermission(key) {
 }
 function requirePermissionAny(keys) {
   return asyncHandler(permissionCheck.requiresAny(keys));
+}
+// Owner decision D-379: the report-access gate (after the permission check, before CSRF), as PHP ReportAccessCheck.
+function requireReport(key, min = null) {
+  return asyncHandler(reportAccessCheck.requires(key, min));
+}
+function requireAnyReport() {
+  return asyncHandler(reportAccessCheck.anyReport());
 }
 const verifyCsrf = csrfCheck.verify();
 const checkOrderLock = asyncHandler(orderLockGuard.check());
@@ -801,12 +810,20 @@ app.post('/settings/document-cleanup', requireAuth, requirePermission('manage_co
 app.post('/settings/document-cleanup/run', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(documentCleanupController.run));
 // Owner decision D-266 (7 Nov 2026): who sees which SOP chapter.
 const sopAccessController = require('./controllers/sopAccessController');
+const reportAccessController = require('./controllers/reportAccessController'); // D-379
 app.get('/admin/sop-access', requireAuth, requirePermission('manage_company_settings'), asyncHandler(sopAccessController.index));
 app.post('/admin/sop-access/library', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveLibrary));
 app.post('/admin/sop-access/chapter', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveChapter));
 app.post('/admin/sop-access/role', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveRole));
 app.post('/users/:id/sop-chapters', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.addUserExtra));
 app.post('/users/:id/sop-chapters/remove', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.removeUserExtra));
+// Owner decision D-379 (15 Nov 2026): Roles and permissions › <role> › Reports tab, its preview and reset, and a person's extra report access.
+app.get('/admin/roles/:id/reports', requireAuth, requirePermission('manage_report_access'), asyncHandler(reportAccessController.roleTab));
+app.post('/admin/roles/:id/reports', requireAuth, requirePermission('manage_report_access'), verifyCsrf, asyncHandler(reportAccessController.saveRole));
+app.post('/admin/roles/:id/reports/reset', requireAuth, requirePermission('manage_report_access'), verifyCsrf, asyncHandler(reportAccessController.resetRole));
+app.get('/admin/roles/:id/reports/preview', requireAuth, requirePermission('manage_report_access'), asyncHandler(reportAccessController.preview));
+app.post('/users/:id/report-extras', requireAuth, requirePermission('manage_report_access'), verifyCsrf, asyncHandler(reportAccessController.addUserExtra));
+app.post('/users/:id/report-extras/remove', requireAuth, requirePermission('manage_report_access'), verifyCsrf, asyncHandler(reportAccessController.removeUserExtra));
 // Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
 const remittanceReasonController = require('./controllers/remittanceReasonController');
 // Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
@@ -992,7 +1009,7 @@ app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCs
 
 // Owner decision D-214, phase 4: the system coordinates — My tasks, owners per department, the cockpit, task due days.
 app.get('/my-tasks', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(coordinationController.myTasks));
-app.get('/cockpit', requireAuth, requirePermission('view_cockpit'), asyncHandler(coordinationController.cockpit));
+app.get('/cockpit', requireAuth, requirePermission('view_cockpit'), requireReport('cockpit'), asyncHandler(coordinationController.cockpit));
 app.get('/admin/task-types', requireAuth, requirePermission('manage_task_types'), asyncHandler(coordinationController.taskTypes));
 app.post('/admin/task-types', requireAuth, requirePermission('manage_task_types'), verifyCsrf, asyncHandler(coordinationController.updateTaskTypes));
 app.post('/orders/:id/department-owners', requireAuth, requirePermission('assign_department_owner'), checkOrderLock, verifyCsrf, asyncHandler(coordinationController.setOwner));
@@ -1182,9 +1199,9 @@ app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manag
 app.post('/orders/:id/additional-documents', requireAuth, requirePermissionAny(['manage_orders', 'upload_order_documents']), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
 app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
 app.get('/orders/:id/additional-documents/removed', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.showRemovedAdditionalDocuments));
-app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
-app.get('/ca/cafin-export', requireAuth, requirePermission('view_cafin'), asyncHandler(caController.cafinExport));
-app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
+app.get('/ca', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports'), asyncHandler(caController.index));
+app.get('/ca/cafin-export', requireAuth, requirePermission('view_cafin'), requireReport('cafin'), asyncHandler(caController.cafinExport));
+app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
 // Owner decision 2 Nov 2026 (D-238): send every client and product to Zoho Books again.
@@ -1192,8 +1209,8 @@ app.post('/ca/zoho-sync/repush-master-data', requireAuth, requirePermission('ca_
 app.get('/orders/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.orderZohoCheck));
 // Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
 app.post('/orders/:id/zoho-sync', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.syncOrderToZoho));
-app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
-app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
+app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports', 'all'), asyncHandler(caController.expenses));
+app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports', 'all'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
 app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.toggleInternalDoc));
@@ -1214,7 +1231,7 @@ const complianceTrackingController = require('./controllers/complianceTrackingCo
 app.post('/clients/:id/ecgc', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'ca_module_manage']), uploadLarge.single('ecgc_limit_file'), verifyCsrf, asyncHandler(complianceTrackingController.saveClientEcgc));
 app.post('/orders/:id/ecgc-declaration', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'ca_module_manage']), checkOrderLock, verifyCsrf, asyncHandler(complianceTrackingController.declareShipment));
 app.post('/orders/:id/export-benefits/:benefitId/tracking', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'manage_order_financials']), checkOrderLock, verifyCsrf, asyncHandler(complianceTrackingController.saveClaimTracking));
-app.get('/reports/missing-ebrc', requireAuth, requirePermissionAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials']), asyncHandler(complianceTrackingController.missingEbrcReport));
+app.get('/reports/missing-ebrc', requireAuth, requirePermissionAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials']), requireReport('missing_ebrc'), asyncHandler(complianceTrackingController.missingEbrcReport));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/lc-received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcReceived));
 app.post('/orders/:id/payment/lc/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcFirc));
@@ -1304,17 +1321,17 @@ app.post('/incentives/payouts/paid-all', requireAuth, requirePermission('pay_inc
 app.post('/incentives/payouts/:payoutId/paid', requireAuth, requirePermission('pay_incentives'), uploadLarge.fields([{ name: 'form_15ca_file', maxCount: 1 }, { name: 'form_15cb_file', maxCount: 1 }]), verifyCsrf, asyncHandler(incentiveController.markPaid));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
 app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
-app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
+app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports', 'all'), asyncHandler(caController.bankStatement));
 app.post('/ca/bank-statement/upload', requireAuth, requirePermission('inr_actual_edit'), upload.single('statement'), verifyCsrf, asyncHandler(caController.uploadBankStatement));
 app.post('/ca/bank-statement/:id/match-revenue', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToRevenue));
 app.post('/ca/bank-statement/:id/match-expense', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.matchBankLineToExpense));
 app.post('/ca/bank-statement/:id/unmatch', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.unmatchBankLine));
-app.get('/ca/reconciliation', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reconciliation));
-app.get('/ca/export-benefits', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.exportBenefits));
+app.get('/ca/reconciliation', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports', 'all'), asyncHandler(caController.reconciliation));
+app.get('/ca/export-benefits', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports'), asyncHandler(caController.exportBenefits));
 app.post('/ca/export-benefits', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.recordExportBenefit));
 app.post('/ca/export-benefits/:id/mark-received', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.markExportBenefitReceived));
 // Owner decision 2026-10-31 (option A): GST refunds under LUT — claims per period, bank credits, Zoho journals.
-app.get('/ca/gst-refunds', requireAuth, requirePermission('ca_module_view'), asyncHandler(gstRefundController.index));
+app.get('/ca/gst-refunds', requireAuth, requirePermission('ca_module_view'), requireReport('ca_reports', 'all'), asyncHandler(gstRefundController.index));
 app.post('/ca/gst-refunds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.recordClaim));
 app.post('/ca/gst-refunds/:id/credits', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.recordCredit));
 app.post('/ca/gst-refunds/credits/:creditId/delete', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.deleteCredit));
@@ -1509,12 +1526,13 @@ app.post('/products/misc-charges/:chargeId/delete', requireAuth, requirePermissi
 app.get('/pricing/settings', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.settings));
 app.post('/pricing/settings', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveSettings));
 // Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
-app.get('/sales-targets', requireAuth, requirePermission('manage_sales_targets'), asyncHandler(salesTargetController.index));
-app.get('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), asyncHandler(salesTargetController.settings));
-app.post('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.saveSettings));
-app.post('/sales-targets/person/:id', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.savePerson));
-app.post('/sales-targets/associate/:id', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.saveAssociate));
-app.post('/sales-targets/credit/:orderId', requireAuth, requirePermission('manage_sales_targets'), verifyCsrf, asyncHandler(salesTargetController.moveCredit));
+// D-379: Department level = the read-only team view; All (with manage_sales_targets) = the full page.
+app.get('/sales-targets', requireAuth, requireReport('sales_targets', 'department'), asyncHandler(salesTargetController.index));
+app.get('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), asyncHandler(salesTargetController.settings));
+app.post('/sales-targets/settings', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.saveSettings));
+app.post('/sales-targets/person/:id', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.savePerson));
+app.post('/sales-targets/associate/:id', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.saveAssociate));
+app.post('/sales-targets/credit/:orderId', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.moveCredit));
 app.get('/pricing/commission-levels', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.levels));
 app.post('/pricing/commission-levels', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.addLevel));
 app.post('/pricing/commission-levels/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.updateLevel));
@@ -1630,7 +1648,7 @@ app.post('/orders/:id/complaints', requireAuth, requirePermission('manage_compla
 app.post('/complaints/:complaintId/status', requireAuth, requirePermission('manage_complaints'), verifyCsrf, asyncHandler(complaintController.updateStatus));
 app.post('/complaints/:complaintId/replies', requireAuth, requirePermission('respond_to_complaints'), verifyCsrf, asyncHandler(complaintController.postReply));
 
-app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.index));
+app.get('/audit-log', requireAuth, requirePermission('view_audit_log'), requireReport('audit_log'), asyncHandler(auditLogController.index));
 app.get('/orders/:id/audit-log', requireAuth, requirePermission('view_audit_log'), asyncHandler(auditLogController.forOrder));
 app.get('/orders/:id/dossier', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.downloadDossier));
 app.post('/orders/:id/pi-form-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generatePiFormLink));
@@ -1641,35 +1659,36 @@ app.post('/orders/:id/payment-action-link', requireAuth, requirePermission('mana
 app.get('/notifications', requireAuth, asyncHandler(notificationController.index));
 
 // --- Phase E: dashboard/reports, admin field-override system, user management, sample data ---
-app.get('/reports', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.index));
-app.get('/reports/client/:clientId', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.client));
+// D-379: /reports opens when at least one report is open to the person (no longer view_reports itself).
+app.get('/reports', requireAuth, requireAnyReport(), asyncHandler(reportController.index));
+app.get('/reports/client/:clientId', requireAuth, requirePermission('view_reports'), requireReport('per_client'), asyncHandler(reportController.client));
 app.get('/reports/order/:orderId', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.order));
-app.get('/reports/aggregate', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.aggregate));
-app.get('/reports/queues', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.queues));
-app.get('/reports/payments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.payments));
-app.get('/reports/todays-payments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.todaysPayments));
-app.get('/reports/disputes', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.disputes));
-app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.amendments));
-app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));
-app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), asyncHandler(reportController.staff));
-app.get('/reports/ageing', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.ageing));
+app.get('/reports/aggregate', requireAuth, requirePermission('view_reports'), requireReport('aggregate'), asyncHandler(reportController.aggregate));
+app.get('/reports/queues', requireAuth, requirePermission('view_reports'), requireReport('queues'), asyncHandler(reportController.queues));
+app.get('/reports/payments', requireAuth, requirePermission('view_reports'), requireReport('payments'), asyncHandler(reportController.payments));
+app.get('/reports/todays-payments', requireAuth, requirePermission('view_reports'), requireReport('todays_payments'), asyncHandler(reportController.todaysPayments));
+app.get('/reports/disputes', requireAuth, requirePermission('view_reports'), requireReport('disputes'), asyncHandler(reportController.disputes));
+app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), requireReport('amendments'), asyncHandler(reportController.amendments));
+app.get('/reports/trends', requireAuth, requirePermission('view_reports'), requireReport('trends'), asyncHandler(reportController.trends));
+app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), requireReport('staff_productivity'), asyncHandler(reportController.staff));
+app.get('/reports/ageing', requireAuth, requirePermission('view_reports'), requireReport('ageing'), asyncHandler(reportController.ageing));
 // Owner decision 1 Nov 2026 (A-7 / A-9): each of these two reports needs only the money it shows.
-app.get('/reports/freight-cost', requireAuth, requirePermission('view_logistics_costs'), asyncHandler(reportController.freightCost));
-app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
-app.get('/reports/suppliers', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(reportController.suppliers));
-app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
-app.get('/reports/performance', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.performance));
-app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), asyncHandler(reportController.profitability));
+app.get('/reports/freight-cost', requireAuth, requirePermission('view_logistics_costs'), requireReport('freight_cost'), asyncHandler(reportController.freightCost));
+app.get('/reports/products', requireAuth, requirePermission('view_reports'), requireReport('product_sales'), asyncHandler(reportController.products));
+app.get('/reports/suppliers', requireAuth, requirePermission('view_purchase_prices'), requireReport('supplier_performance'), asyncHandler(reportController.suppliers));
+app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), requireReport('conversion'), asyncHandler(reportController.conversion));
+app.get('/reports/performance', requireAuth, requirePermission('view_reports'), requireReport('performance'), asyncHandler(reportController.performance));
+app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), requireReport('profitability'), asyncHandler(reportController.profitability));
 // Owner decision D-245 P5: incentive & commission reports (MD / ED / Accounts — whoever manages or pays incentives or sees the price build-up).
 const incentiveReportController = require('./controllers/incentiveReportController');
-app.get('/reports/incentives', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.register));
-app.get('/reports/incentives/to-pay', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.toPay));
-app.get('/reports/incentives/owed', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.owed));
-app.get('/reports/incentives/statement', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.statement));
-app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
-app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
-app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));
-app.post('/reports/saved/:reportId/delete', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.deleteDefinition));
+app.get('/reports/incentives', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), requireReport('incentives'), asyncHandler(incentiveReportController.register));
+app.get('/reports/incentives/to-pay', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), requireReport('incentives'), asyncHandler(incentiveReportController.toPay));
+app.get('/reports/incentives/owed', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), requireReport('incentives'), asyncHandler(incentiveReportController.owed));
+app.get('/reports/incentives/statement', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), requireReport('incentives'), asyncHandler(incentiveReportController.statement));
+app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), requireReport('aggregate'), verifyCsrf, asyncHandler(reportController.saveDefinition));
+app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), requireReport('aggregate'), asyncHandler(reportController.runDefinition));
+app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), requireReport('aggregate'), verifyCsrf, asyncHandler(reportController.updateDefinition));
+app.post('/reports/saved/:reportId/delete', requireAuth, requirePermission('manage_report_definitions'), requireReport('aggregate'), verifyCsrf, asyncHandler(reportController.deleteDefinition));
 
 app.get('/admin/overrides', requireAuth, requirePermission('edit_locked_data'), asyncHandler(adminOverrideController.index));
 app.post('/admin/overrides/document-types', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(adminOverrideController.updateDocumentTypes));
@@ -1689,7 +1708,7 @@ app.get('/admin/data-export/data', requireAuth, requirePermission('data_export_r
 
 app.get('/users', requireAuth, requirePermission('manage_users'), asyncHandler(userController.index));
 app.post('/users/create', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.create));
-app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(require('./controllers/sopAccessController').loadUserExtrasCard), asyncHandler(userController.editForm));
+app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(require('./controllers/sopAccessController').loadUserExtrasCard), asyncHandler(require('./controllers/reportAccessController').loadUserExtrasCard), asyncHandler(userController.editForm));
 app.post('/users/:id/update', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.update));
 app.post('/users/:id/toggle-active', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.toggleActive));
 app.post('/users/:id/archive', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.archive));

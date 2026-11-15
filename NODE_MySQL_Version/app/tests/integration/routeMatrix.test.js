@@ -13,7 +13,12 @@ function extractCsrf(html) {
   return m[1];
 }
 
-/** Every route in src/server.js with the permission(s) it requires (any one), or null. */
+/**
+ * Every route in src/server.js with the permission(s) it requires (any one), or null — and (owner
+ * decision D-379) its report-access gate: report = the report key of requireReport() ('any' for
+ * requireAnyReport()), or null. A route behind report access only (e.g. /reports and /sales-targets)
+ * is gated too — a user whose roles have no report level gets the same 403.
+ */
 function routes() {
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'server.js'), 'utf8');
   return [...source.matchAll(/app\.(get|post)\('([^']+)',([^\n]*)/g)].map(([, method, pattern, rest]) => {
@@ -22,7 +27,9 @@ function routes() {
     let permissions = null;
     if (one) permissions = [one[1]];
     else if (any) permissions = [...any[1].matchAll(/'([^']+)'/g)].map((k) => k[1]);
-    return { method: method.toUpperCase(), pattern, permissions };
+    const gate = rest.match(/requireReport\('([a-z_]+)'(?:,\s*'([a-z]+)')?\)/);
+    const report = gate ? gate[1] : (rest.includes('requireAnyReport()') ? 'any' : null);
+    return { method: method.toUpperCase(), pattern, permissions, report };
   });
 }
 
@@ -32,8 +39,9 @@ const concrete = (pattern) => pattern.replace(/:[A-Za-z]+/g, '999999');
  * Port of RouteMatrixTest.php. QA Round 5, R5-14: 87 routes had no test in
  * any suite. This drives every route registered in src/server.js through
  * the real app and its real middleware:
- *  - every staff route that requires a permission refuses (403) a
- *    signed-in user who holds no permission at all — GET and POST;
+ *  - every staff route that requires a permission (or, D-379, report
+ *    access) refuses (403) a signed-in user who holds no permission and no
+ *    report level at all — GET and POST;
  *  - every staff page without a :param opens for Admin without a server
  *    error;
  *  - every public page without a :param opens for a signed-out visitor.
@@ -64,7 +72,7 @@ describe('Route matrix (QA Round 5, R5-14)', () => {
     const agent = await loginWithRole('Test Role — No Permissions');
     const notRefused = [];
     let checked = 0;
-    for (const route of routes().filter((r) => r.permissions !== null)) {
+    for (const route of routes().filter((r) => r.permissions !== null || r.report !== null)) {
       const res = route.method === 'GET' ? await agent.get(concrete(route.pattern)) : await agent.post(concrete(route.pattern)).type('form').send({});
       if (res.status !== 403) notRefused.push(`${route.method} ${route.pattern} → ${res.status}`);
       checked++;
@@ -77,7 +85,7 @@ describe('Route matrix (QA Round 5, R5-14)', () => {
     const agent = await loginWithRole('Admin');
     const failed = [];
     let checked = 0;
-    for (const route of routes().filter((r) => r.method === 'GET' && r.permissions !== null && !r.pattern.includes(':'))) {
+    for (const route of routes().filter((r) => r.method === 'GET' && (r.permissions !== null || r.report !== null) && !r.pattern.includes(':'))) {
       const res = await agent.get(route.pattern);
       if (res.status >= 500) failed.push(`${route.pattern} → ${res.status}`);
       checked++;

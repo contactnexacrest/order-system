@@ -8,7 +8,9 @@ const salesTargetService = require('../services/salesTargetService');
 
 /**
  * Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings and the
- * MD / ED's edits. Every route needs manage_sales_targets (src/server.js); money figures
+ * MD / ED's edits. D-379: GET /sales-targets opens at the Department level of the "Sales targets"
+ * report (read-only team view of the viewer's departments, views/sales_targets/team.njk); the full
+ * page and every other route need the All level, which itself needs manage_sales_targets; money figures
  * (₹, margins, average margin per container) also need view_price_buildup
  * (salesTargetService.canSeeMoney()). Salary is never posted: the calculator on the Targets page
  * runs in the browser only, its inputs have no name and sit outside every form.
@@ -33,6 +35,19 @@ async function index(req, res) {
   let chosen = periods[0];
   for (const p of periods) {
     if (String(req.query.period ?? '') === p.key) chosen = p;
+  }
+  // Owner decision D-379: below All (Department level), the read-only team view of the viewer's departments —
+  // containers only: no Edit, no money, no calculator, no associates, no settings link.
+  const reportAccess = require('../services/reportAccess');
+  if ((await reportAccess.level('sales_targets')) !== reportAccess.ALL) {
+    const team = await salesTargetService.teamData(chosen, today);
+    const members = new Set(await reportAccess.departmentMemberIds(Number(req.user.id)));
+    res.renderView('sales_targets/team', {
+      periods,
+      period: chosen,
+      rows: team.rows.filter((r) => members.has(Number(r.user.id))),
+    }, 'layout/base');
+    return;
   }
   const canMoney = salesTargetService.canSeeMoney(req.permissions);
   res.renderView('sales_targets/index', {

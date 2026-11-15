@@ -5,9 +5,31 @@
  * and a person's statement. For whoever manages or pays incentives or sees the price build-up
  * (MD / ED / Accounts) — staff see only their own amounts on My incentives, associates on their
  * portal. Twin of PHP IncentiveReportController.
+ *
+ * Owner decision D-379: the person's level for "Incentives & commission" limits the rows — Own = their
+ * own shares, Department = the shares of the people of their departments; associates' commission only
+ * at All (reportAccess.peopleScope()).
  */
 const csv = require('../helpers/csv');
 const svc = require('../services/incentiveReportService');
+const reportAccess = require('../services/reportAccess');
+
+/** D-379: the rows the person's level shows. */
+async function scoped(rows) {
+  const people = await reportAccess.peopleScope('incentives');
+  if (people === null) return rows;
+  const keep = new Set(people.map(Number));
+  return rows.filter((r) => (r.payee_kind || '') === 'staff' && r.user_id !== null && r.user_id !== undefined && keep.has(Number(r.user_id)));
+}
+
+/** D-379: the payees the person's level may pick ({people, associates}). */
+async function payees() {
+  const p = await svc.payeeOptions();
+  const people = await reportAccess.peopleScope('incentives');
+  if (people === null) return p;
+  const keep = new Set(people.map(Number));
+  return { people: p.people.filter((x) => keep.has(Number(x.id))), associates: [] };
+}
 
 function today() {
   const d = new Date();
@@ -39,19 +61,20 @@ function query(obj) {
 async function register(req, res) {
   const f = filters(req.query || {});
   // D-259: the register also lists what the company kept from people who were not eligible.
-  const rows = await svc.rows({ ...f, with_kept: true });
+  const rows = await scoped(await svc.rows({ ...f, with_kept: true }));
   if (req.query.format === 'csv') {
     csv.stream(res, 'incentive_commission_register.csv', svc.HEADERS, svc.csvRows(rows));
     return;
   }
   // D-245 P6: one page on screen; the totals (and the CSV) are over the whole filtered set.
   const pg = svc.page(rows, parseInt(req.query.page, 10) || 1);
-  res.renderView('incentives/report_register', { rows: pg.rows, page: pg.page, pages: pg.pages, totals: svc.totals(rows), filters: f, csvQuery: query(f), ...(await svc.payeeOptions()) }, 'layout/base');
+  res.renderView('incentives/report_register', { rows: pg.rows, page: pg.page, pages: pg.pages, totals: svc.totals(rows), filters: f, csvQuery: query(f), ...(await payees()) }, 'layout/base');
 }
 
 async function toPay(req, res) {
   const kind = ['staff', 'associate'].includes(req.query.payee) ? req.query.payee : '';
   const groups = await svc.toPay(kind);
+  for (const g of Object.values(groups)) g.rows = await scoped(g.rows);
   if (req.query.format === 'csv') {
     const rows = [];
     for (const g of Object.values(groups)) for (const r of svc.csvRows(g.rows)) rows.push({ Group: g.label, ...r });
@@ -71,7 +94,7 @@ async function owed(req, res) {
     const [y, m] = t.split('-').map(Number);
     date = `${t.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
   }
-  const rows = await svc.owedAt(date);
+  const rows = await scoped(await svc.owedAt(date));
   if (req.query.format === 'csv') {
     csv.stream(res, `incentive_owed_${date}.csv`, svc.HEADERS, svc.csvRows(rows));
     return;
@@ -80,14 +103,18 @@ async function owed(req, res) {
 }
 
 async function statement(req, res) {
-  const userId = Math.max(0, parseInt(req.query.user_id, 10) || 0);
-  const associateId = userId > 0 ? 0 : Math.max(0, parseInt(req.query.associate_id, 10) || 0);
-  const rows = await svc.statement(userId || null, associateId || null);
+  let userId = Math.max(0, parseInt(req.query.user_id, 10) || 0);
+  let associateId = userId > 0 ? 0 : Math.max(0, parseInt(req.query.associate_id, 10) || 0);
+  const p = await payees();
+  // D-379: only a payee the person's level covers (Own: themselves).
+  const limited = (await reportAccess.peopleScope('incentives')) !== null;
+  if (userId > 0 && limited && !p.people.some((x) => x.id === userId)) userId = 0;
+  if (associateId > 0 && limited && !p.associates.some((x) => x.id === associateId)) associateId = 0;
+  const rows = await scoped(await svc.statement(userId || null, associateId || null));
   if (req.query.format === 'csv' && rows.length > 0) {
     csv.stream(res, 'incentive_statement.csv', svc.HEADERS, svc.csvRows(rows));
     return;
   }
-  const p = await svc.payeeOptions();
   const find = (list, id) => (list.find((x) => x.id === id) || {}).name || '';
   const name = userId ? find(p.people, userId) : (associateId ? find(p.associates, associateId) : '');
   res.renderView('incentives/report_statement', { rows, totals: svc.totals(rows), userId, associateId, name, csvQuery: query({ user_id: userId, associate_id: associateId }), ...p }, 'layout/base');

@@ -37,9 +37,13 @@ async function log(userId, actionType, entityType = null, entityId = null, field
   // notificationRepository.create() at the action itself.
 }
 
-async function search({ entityType = null, entityId = null, userId = null, actionType = null, dateFrom = null, dateTo = null, limit = 100, offset = 0 } = {}) {
+async function search({ entityType = null, entityId = null, userId = null, actionType = null, dateFrom = null, dateTo = null, limit = 100, offset = 0, userIds = null } = {}) {
   const where = [];
   const params = {};
+  // D-379: the Audit log at Own / Department — only these people's actions (an empty list matches nothing).
+  if (userIds !== null && userIds !== undefined) {
+    where.push(userIds.length === 0 ? '1 = 0' : `al.user_id IN (${userIds.map((v) => parseInt(v, 10)).filter((v) => Number.isInteger(v)).join(',')})`);
+  }
   if (entityType) { where.push('al.entity_type = :entity_type'); params.entity_type = entityType; }
   if (entityId) { where.push('al.entity_id = :entity_id'); params.entity_id = entityId; }
   if (userId) { where.push('al.user_id = :user_id'); params.user_id = userId; }

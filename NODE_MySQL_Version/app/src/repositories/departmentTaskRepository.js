@@ -204,8 +204,12 @@ async function setOwner(orderId, departmentId, userId, assignedBy) {
 }
 
 /** Active orders by status, for the cockpit. */
-async function ordersByStatus() {
-  const rows = await db.query(`SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled')${divisionService.sql('division_id')} GROUP BY status ORDER BY status`);
+/** @param {{sql: string, params: object}|null} scope D-379: reportAccess.scopeSql('cockpit', 'o') at Own / Department; null = every order */
+async function ordersByStatus(scope = null) {
+  const rows = await db.query(
+    `SELECT o.status, COUNT(*) AS n FROM orders o WHERE o.status NOT IN ('complete', 'lost', 'cancelled')${divisionService.sql('o.division_id')}${scope ? scope.sql : ''} GROUP BY o.status ORDER BY o.status`,
+    scope ? scope.params : {}
+  );
   const out = {};
   for (const r of rows) {
     out[r.status] = Number(r.n);

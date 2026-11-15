@@ -98,10 +98,20 @@ async function myTasks(req, res) {
 }
 
 async function cockpit(req, res) {
-  const tasks = await visible(req, await departmentTaskRepository.open());
+  // Owner decision D-379: Department = the rows of the viewer's departments only; Own = their departments'
+  // rows with only the work they own; All = every department (as before).
+  const reportAccess = require('../services/reportAccess');
+  const level = await reportAccess.level('cockpit');
+  const me = Number((req.user && req.user.id) || 0);
+  const codes = (level === reportAccess.OWN || level === reportAccess.DEPARTMENT) ? await reportAccess.departmentCodes(me) : null;
+  let tasks = await visible(req, await departmentTaskRepository.open(codes));
+  if (level === reportAccess.OWN) {
+    tasks = tasks.filter((t) => t.owner_id !== null && t.owner_id !== undefined && Number(t.owner_id) === me);
+  }
   // D-269: every active department has a row, with zeros when it has no open work.
   const byDepartment = {};
   for (const d of await departmentRepository.departments(true)) {
+    if (codes !== null && !codes.includes(String(d.code))) continue;
     byDepartment[String(d.name)] = { color: d.color, open: 0, overdue: 0, escalated: 0, unowned: 0 };
   }
   for (const t of tasks) {
@@ -116,10 +126,11 @@ async function cockpit(req, res) {
     byDepartment,
     escalated: tasks.filter((t) => Number(t.escalated) === 1),
     supplierDelays: tasks.filter((t) => t.task_key === 'chase_supplier' && Number(t.overdue) === 1),
-    ordersByStatus: await departmentTaskRepository.ordersByStatus(),
+    ordersByStatus: await departmentTaskRepository.ordersByStatus(codes !== null ? await reportAccess.scopeSql('cockpit', 'o') : null),
     // Owner decision D-378: the sales target box — company target ON and manage_sales_targets;
     // its money lines only with view_price_buildup as well.
-    salesTargets: salesTargetService.canManage(req.permissions) ? await salesTargetService.cockpitBox(todayIst()) : null,
+    // D-379: and only at the cockpit's All level (the company target is company-wide).
+    salesTargets: salesTargetService.canManage(req.permissions) && codes === null ? await salesTargetService.cockpitBox(todayIst()) : null,
     salesTargetsMoney: salesTargetService.canSeeMoney(req.permissions),
   }, 'layout/base');
 }

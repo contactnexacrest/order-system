@@ -7,6 +7,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const navigation = require('../../src/services/navigation');
+const reportAccess = require('../../src/services/reportAccess');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
@@ -47,6 +48,15 @@ describe('D-320: the short left menu, the section menu bars and the order action
     superAdmin: true, sopOpen: true, approver: true, mod_supplier_purchase: true, mod_import_stock: true,
     mod_merchant_trade: true, mod_associates: true, mod_team_incentive: true, div_gst: true, div_import_duty: true,
   };
+  /** D-379: every report-access fact true (an effective Super Admin: All for every report). */
+  const allFlags = () => {
+    const flags = { ...ALL_FLAGS, 'report:any': true };
+    for (const key of Object.keys(reportAccess.REPORTS)) {
+      flags[`report:${key}`] = true;
+      for (const level of ['own', 'department', 'all']) flags[`report:${key}:${level}`] = true;
+    }
+    return flags;
+  };
   const all = () => true;
   const only = (...keys) => (p) => keys.includes(p);
   const pathOf = (href) => href.split('?')[0].split('#')[0];
@@ -83,12 +93,14 @@ describe('D-320: the short left menu, the section menu bars and the order action
     expect(fs.readFileSync(path.join(__dirname, '../../src/config/navigation.json'), 'utf8')).toBe(fs.readFileSync(php, 'utf8'));
   });
 
-  it('the left menu has 13 entries in the decided order', () => {
+  // D-379 (15 Nov 2026): the Overview group gets "Sales targets" after Reports — 14 entries for whoever may open every page.
+  it('the left menu has 14 entries in the decided order', () => {
     const sections = navigation.config().sections;
-    expect(sections.map((s) => s.key)).toEqual(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'help', 'users', 'settings']);
-    expect(sections.map((s) => s.label)).toEqual(['Dashboard', 'Approvals', 'My tasks', 'Orders', 'Clients', 'Associates', 'Products', 'Procurement & suppliers', 'Finance & accounts', 'Reports', 'Help & SOP', 'Users & roles', 'Settings']);
-    const built = navigation.build(all, ALL_FLAGS, {}, '/', {});
-    expect(built.sidebar).toHaveLength(13);
+    expect(sections.map((s) => s.key)).toEqual(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'sales_targets', 'help', 'users', 'settings']);
+    expect(sections.map((s) => s.label)).toEqual(['Dashboard', 'Approvals', 'My tasks', 'Orders', 'Clients', 'Associates', 'Products', 'Procurement & suppliers', 'Finance & accounts', 'Reports', 'Sales targets', 'Help & SOP', 'Users & roles', 'Settings']);
+    const built = navigation.build(all, allFlags(), {}, '/', {});
+    expect(built.sidebar).toHaveLength(14);
+    expect(sections[10].group).toBe('overview'); // Sales targets sits in the Overview group, after Reports
     expect(built.sidebar.map((s) => s.heading).filter(Boolean)).toEqual(['Work', 'Overview', 'Help', 'Admin']);
   });
 
@@ -112,7 +124,7 @@ describe('D-320: the short left menu, the section menu bars and the order action
       expect([page, linked.has(page)]).toEqual([page, false]);
       expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'products']);
     }
-    expect(navigation.build(all, ALL_FLAGS, {}, '/', {}).currentKey).toBe('dashboard');
+    expect(navigation.build(all, allFlags(), {}, '/', {}).currentKey).toBe('dashboard');
   });
 
   it('every menu link needs exactly what its route needs (the same permissions, or Super Admin)', () => {
@@ -130,6 +142,10 @@ describe('D-320: the short left menu, the section menu bars and the order action
       }
       const menu = leaf.when && leaf.when.any ? [...leaf.when.any].sort() : null;
       expect([leaf.href, menu]).toEqual([leaf.href, route ? route.sort() : null]);
+      // D-379: and the same report-access gate (report key and lowest level).
+      const gate = line.match(/requireReport\('([a-z_]+)'(?:,\s*'([a-z]+)')?\)/);
+      const routeReport = gate ? [gate[1], gate[2] || null] : (line.includes('requireAnyReport()') ? ['any', null] : [null, null]);
+      expect([leaf.href, [(leaf.when || {}).report || null, (leaf.when || {}).reportMin || null]]).toEqual([leaf.href, routeReport]);
       if (((leaf.when || {}).flags || []).includes('superAdmin')) expect([p, line.includes('requireSuperAdmin')]).toEqual([p, true]);
     }
   });
@@ -143,14 +159,21 @@ describe('D-320: the short left menu, the section menu bars and the order action
     expect(ports.sidebar.map((s) => s.key)).toEqual(['dashboard', 'approvals', 'help', 'settings']);
     expect(ports.sidebar[3].href).toBe('/ports');
 
-    const viewer = navigation.build(only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), {}, {}, '/', {});
+    // D-379: the Reports entry also needs report access (the facts the layout takes from reportAccess.navFlags()).
+    const viewer = navigation.build(only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), { 'report:any': true, 'report:audit_log': true }, {}, '/', {});
     expect(viewer.sidebar.map((s) => s.key)).toEqual(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'reports', 'help']);
+    const noReports = navigation.build(only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), {}, {}, '/', {});
+    expect(noReports.sidebar.map((s) => s.key)).not.toContain('reports'); // view_reports alone no longer shows Reports: every report is Off
+    const targets = navigation.build(only(), { 'report:sales_targets:department': true }, {}, '/', {});
+    expect(targets.sidebar.map((s) => s.key)).toContain('sales_targets'); // Sales targets at the Department level
+    expect(targets.sidebar.find((s) => s.key === 'sales_targets').href).toBe('/sales-targets');
+    expect(navigation.build(only(), { 'report:sales_targets:own': true }, {}, '/', {}).sidebar.map((s) => s.key)).not.toContain('sales_targets'); // Own is the Dashboard box only
 
     // A module switched off (D-257) hides its pages; a Super Admin page needs the Super Admin.
     expect(navigation.build(only('view_purchase_prices'), { mod_import_stock: false, mod_merchant_trade: false }, {}, '/', {}).sidebar.map((s) => s.key)).not.toContain('procurement');
     const buyer = navigation.build(only('view_purchase_prices'), { mod_merchant_trade: true }, {}, '/merchant', {});
     expect(buyer.sidebar.find((s) => s.key === 'procurement').href).toBe('/merchant');
-    const admin = navigation.build(all, { ...ALL_FLAGS, superAdmin: false }, {}, '/users', {});
+    const admin = navigation.build(all, { ...allFlags(), superAdmin: false }, {}, '/users', {});
     const labels = admin.bar.items.map((i) => i.label);
     expect(labels).not.toContain('Self-approval rules');
     expect(labels).toContain('Roles and permissions');
@@ -166,13 +189,13 @@ describe('D-320: the short left menu, the section menu bars and the order action
       }
       return out;
     };
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/orders/12', {}))).toEqual(['Active']);
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/orders/archived', {}))).toEqual(['Archived']);
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/reports/associates', {}))).toEqual(['Report']); // the longest prefix wins
+    expect(active(navigation.build(all, allFlags(), {}, '/orders/12', {}))).toEqual(['Active']);
+    expect(active(navigation.build(all, allFlags(), {}, '/orders/archived', {}))).toEqual(['Archived']);
+    expect(active(navigation.build(all, allFlags(), {}, '/reports/associates', {}))).toEqual(['Report']); // the longest prefix wins
     // D-362: Global pricing settings is reached only from the Products link bar — no menu item is marked.
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/pricing/settings', {}))).toEqual([]);
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/approvals', { tab: 'prices' }))).toEqual(['Prices']);
-    expect(active(navigation.build(all, ALL_FLAGS, {}, '/approvals', {}))).toEqual(['All']);
+    expect(active(navigation.build(all, allFlags(), {}, '/pricing/settings', {}))).toEqual([]);
+    expect(active(navigation.build(all, allFlags(), {}, '/approvals', { tab: 'prices' }))).toEqual(['Prices']);
+    expect(active(navigation.build(all, allFlags(), {}, '/approvals', {}))).toEqual(['All']);
     expect(navigation.sectionKeyFor('/cafin')).toBeNull(); // "/ca" never covers "/cafin"
 
     const built = navigation.build(all, ALL_FLAGS, { associateRegistrations: 2, approvals: 5, myTasks: 3, settingsExpiry: 1 }, '/associates', {});

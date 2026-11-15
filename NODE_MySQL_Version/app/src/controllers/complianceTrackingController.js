@@ -110,7 +110,8 @@ async function saveClaimTracking(req, res) {
 }
 
 async function missingEbrcReport(req, res) {
-  const rows = await complianceTrackingService.missingFircReport();
+  // D-379: only the orders the person's Missing eBRC / FIRC level shows (closes an unscoped report).
+  const rows = await require('../services/reportAccess').visibleRows('missing_ebrc', await complianceTrackingService.missingFircReport());
   const showAmounts = moneyVisibility.can(req.permissions, moneyVisibility.BUYER_PAYMENTS || 'buyer_payments');
   if ((req.query || {}).format === 'csv') {
     const headers = ['Order', 'Buyer', 'Payment', 'Received on', 'Days since receipt', 'Owner'];

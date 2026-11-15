@@ -41,6 +41,8 @@ async function index(req, res) {
     dateTo,
     limit: PAGE_SIZE,
     offset: PAGE_SIZE * (page - 1),
+    // Owner decision D-379: Own = the viewer's own actions, Department = the actions of the people of their departments.
+    userIds: await require('../services/reportAccess').peopleScope('audit_log'),
   }).then((r) => auditMoneyMask.maskAll(req.permissions, r));
 
   const filters = { entity_type: entityType, entity_id: entityId, user_id: userId, action_type: actionType, date_from: dateFrom, date_to: dateTo };
