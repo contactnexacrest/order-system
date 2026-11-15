@@ -12,13 +12,13 @@ use App\Helpers\View;
  * the chosen person's containers field of their edit form below.
  * Node twin: NODE_MySQL_Version/app/views/sales_targets/index.njk
  */
-$period = $data['period'];
-$company = $data['company'];
-$settings = $data['settings'];
+$period = $team['period'];
+$company = $team['company'];
+$settings = $team['settings'];
 $__num = static fn ($v): string => rtrim(rtrim(number_format((float) $v, 1, '.', ''), '0'), '.');
 $__signed = static fn (int $n): string => ($n > 0 ? '+' : '') . $n;
-$__order = static function (int $id) use ($data): string {
-    $o = $data['credited_orders'][$id] ?? null;
+$__order = static function (int $id) use ($team): string {
+    $o = $team['credited_orders'][$id] ?? null;
     return $o === null ? '#' . $id : '<a href="/orders/' . $id . '">' . View::e((string) $o['order_reference']) . '</a>';
 };
 ?>
@@ -53,7 +53,7 @@ $__order = static function (int $id) use ($data): string {
   <div class="table-scroll">
   <table class="list" id="target-team">
     <tr><th>Person</th><th>Designation</th><th>Multiple (own)</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Pipeline</th><th>New buyers</th><th>Progress</th><th>Last reviewed</th><th></th></tr>
-    <?php foreach ($data['rows'] as $r): $t = $r['target']; $c = $r['counts']; $uid = (int) $r['user']['id']; ?>
+    <?php foreach ($team['rows'] as $r): $t = $r['target']; $c = $r['counts']; $uid = (int) $r['user']['id']; ?>
     <tr data-user-id="<?= $uid ?>">
       <td><?= View::e((string) $r['user']['name']) ?></td>
       <td><?= View::e($t['designation']['title'] ?? '—') ?></td>
@@ -68,26 +68,26 @@ $__order = static function (int $id) use ($data): string {
       <td><a href="#edit-target-<?= $uid ?>" class="btn-sm btn-secondary" onclick="var d=document.getElementById('edit-target-<?= $uid ?>'); if (d) { d.open = true; }">Edit</a></td>
     </tr>
     <?php endforeach; ?>
-    <?php if ($data['rows'] === []): ?><tr><td colspan="11" class="muted">Nobody in Sales &amp; Export yet, and no order credited in this period.</td></tr><?php endif; ?>
+    <?php if ($team['rows'] === []): ?><tr><td colspan="11" class="muted">Nobody in Sales &amp; Export yet, and no order credited in this period.</td></tr><?php endif; ?>
     <tr id="target-unassigned">
       <td><strong>Unassigned</strong></td>
       <td colspan="3" class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</td>
-      <td><?= (int) $data['unassigned']['counts']['counted'] ?></td>
-      <td><?= (int) $data['unassigned']['counts']['shipped'] ?></td>
-      <td colspan="5"><?php $__refs = []; foreach ($data['unassigned']['orders'] as $oid => $o) { $__refs[] = $__order((int) $oid); } echo $__refs === [] ? '<span class="muted">none</span>' : implode(', ', $__refs); ?></td>
+      <td><?= (int) $team['unassigned']['counts']['counted'] ?></td>
+      <td><?= (int) $team['unassigned']['counts']['shipped'] ?></td>
+      <td colspan="5"><?php $__refs = []; foreach ($team['unassigned']['orders'] as $oid => $o) { $__refs[] = $__order((int) $oid); } echo $__refs === [] ? '<span class="muted">none</span>' : implode(', ', $__refs); ?></td>
     </tr>
     <tr id="target-total">
       <td><strong>Total</strong></td>
       <td colspan="2"></td>
-      <td><strong><?= View::e($__num($data['team_target'])) ?></strong></td>
-      <td><strong><?= (int) $data['total']['counted'] ?></strong></td>
+      <td><strong><?= View::e($__num($team['team_target'])) ?></strong></td>
+      <td><strong><?= (int) $team['total']['counted'] ?></strong></td>
       <td colspan="6"></td>
     </tr>
   </table>
   </div>
   <p id="target-check-line" class="small">
     <?php if ($company['on'] && $company['containers_needed'] !== null): ?>
-      Check: the team's targets add up to <strong><?= View::e($__num($data['team_target'])) ?></strong> containers; the company needs <strong><?= (int) $company['containers_needed'] ?></strong> this period<?= $data['team_target'] + 0.0001 < $company['containers_needed'] ? ' — <strong style="color:var(--danger)">' . View::e($__num($company['containers_needed'] - $data['team_target'])) . ' short</strong>' : ' — covered' ?>.
+      Check: the team's targets add up to <strong><?= View::e($__num($team['team_target'])) ?></strong> containers; the company needs <strong><?= (int) $company['containers_needed'] ?></strong> this period<?= $team['team_target'] + 0.0001 < $company['containers_needed'] ? ' — <strong style="color:var(--danger)">' . View::e($__num($company['containers_needed'] - $team['team_target'])) . ' short</strong>' : ' — covered' ?>.
     <?php else: ?>
       <span class="muted">Check line: the company's containers needed are not known (no company target, or not enough shipping history yet).</span>
     <?php endif; ?>
@@ -98,7 +98,7 @@ $__order = static function (int $id) use ($data): string {
   <div class="table-scroll">
   <table class="list" id="target-associates">
     <tr><th>Associate</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Last reviewed</th><th>Set target</th></tr>
-    <?php foreach ($data['associates'] as $a): $aid = (int) $a['associate']['id']; ?>
+    <?php foreach ($team['associates'] as $a): $aid = (int) $a['associate']['id']; ?>
     <tr>
       <td><?= View::e((string) $a['associate']['name']) ?></td>
       <td><?= $a['target'] > 0 ? View::e($__num($a['target'])) : '—' ?></td>
@@ -116,13 +116,13 @@ $__order = static function (int $id) use ($data): string {
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if ($data['associates'] === []): ?><tr><td colspan="6" class="muted">No associate credited in this period and no associate target.</td></tr><?php endif; ?>
+    <?php if ($team['associates'] === []): ?><tr><td colspan="6" class="muted">No associate credited in this period and no associate target.</td></tr><?php endif; ?>
   </table>
   </div>
 
   <h2>Edit a person's target</h2>
   <p class="muted small">Empty = the designation default (containers, new buyers) or the company multiple. Saving marks the target reviewed today.</p>
-  <?php foreach ($data['rows'] as $r): $t = $r['target']; $uid = (int) $r['user']['id']; $own = $t['own']; ?>
+  <?php foreach ($team['rows'] as $r): $t = $r['target']; $uid = (int) $r['user']['id']; $own = $t['own']; ?>
   <details id="edit-target-<?= $uid ?>">
     <summary><?= View::e((string) $r['user']['name']) ?></summary>
     <form method="post" action="/sales-targets/person/<?= $uid ?>" class="field-grid">
@@ -146,14 +146,14 @@ $__order = static function (int $id) use ($data): string {
   <h2>Move an order's target credit</h2>
   <p class="muted small">The credit goes to the order's Sales &amp; Export owner unless moved here. Only the target credit moves — nothing else on the order changes.</p>
   <details id="target-move-credit">
-    <summary>Orders counted in <?= View::e($period['label']) ?> (<?= count($data['credited_orders']) ?>)</summary>
+    <summary>Orders counted in <?= View::e($period['label']) ?> (<?= count($team['credited_orders']) ?>)</summary>
     <div class="table-scroll">
     <table class="list">
       <tr><th>Order</th><th>Credited to</th><th>Move to</th></tr>
-      <?php foreach ($data['credited_orders'] as $oid => $o): $__cur = $data['owners'][(int) $oid] ?? null; ?>
+      <?php foreach ($team['credited_orders'] as $oid => $o): $__cur = $team['owners'][(int) $oid] ?? null; ?>
       <tr>
         <td><?= $__order((int) $oid) ?></td>
-        <td><?php $__name = 'Unassigned'; foreach ($data['staff'] as $s) { if ($s['id'] === $__cur) { $__name = $s['name']; } } echo View::e($__name); ?></td>
+        <td><?php $__name = 'Unassigned'; foreach ($team['staff'] as $s) { if ($s['id'] === $__cur) { $__name = $s['name']; } } echo View::e($__name); ?></td>
         <td>
           <form method="post" action="/sales-targets/credit/<?= (int) $oid ?>" class="btn-row" style="margin-top:0">
             <?= Csrf::field() ?>
@@ -161,7 +161,7 @@ $__order = static function (int $id) use ($data): string {
             <select name="user_id" required aria-label="Move the credit to">
               <option value="">Choose…</option>
               <option value="auto">Back to the Sales &amp; Export owner</option>
-              <?php foreach ($data['staff'] as $s): ?><option value="<?= (int) $s['id'] ?>"><?= View::e($s['name']) ?></option><?php endforeach; ?>
+              <?php foreach ($team['staff'] as $s): ?><option value="<?= (int) $s['id'] ?>"><?= View::e($s['name']) ?></option><?php endforeach; ?>
             </select>
             <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
             <button type="submit" class="btn-sm">Move</button>
@@ -169,7 +169,7 @@ $__order = static function (int $id) use ($data): string {
         </td>
       </tr>
       <?php endforeach; ?>
-      <?php if ($data['credited_orders'] === []): ?><tr><td colspan="3" class="muted">No order counted in this period.</td></tr><?php endif; ?>
+      <?php if ($team['credited_orders'] === []): ?><tr><td colspan="3" class="muted">No order counted in this period.</td></tr><?php endif; ?>
     </table>
     </div>
   </details>
@@ -180,7 +180,7 @@ $__order = static function (int $id) use ($data): string {
     <label>Person
       <select id="calc-person" aria-label="Person">
         <option value="">Choose…</option>
-        <?php foreach ($data['rows'] as $r): ?><option value="<?= (int) $r['user']['id'] ?>" data-multiple="<?= View::e($__num($r['target']['multiple'])) ?>"><?= View::e((string) $r['user']['name']) ?></option><?php endforeach; ?>
+        <?php foreach ($team['rows'] as $r): ?><option value="<?= (int) $r['user']['id'] ?>" data-multiple="<?= View::e($__num($r['target']['multiple'])) ?>"><?= View::e((string) $r['user']['name']) ?></option><?php endforeach; ?>
       </select></label>
     <label>Monthly cost of the person (₹)
       <input type="number" id="calc-cost" min="0" step="1" placeholder="e.g. 60000" autocomplete="off"></label>

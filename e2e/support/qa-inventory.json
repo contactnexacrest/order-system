@@ -5,9 +5,9 @@
   "reference_stack": "PHP_MySQL_Version",
   "node_route_parity": "835/835 PHP routes also in Node",
   "counts": {
-   "routes": 841,
+   "routes": 842,
    "routes_get": 272,
-   "routes_post": 569,
+   "routes_post": 570,
    "permissions": 97,
    "staff_roles": 24,
    "payment_presets": 5,
@@ -16,7 +16,7 @@
    "forms": 547,
    "data_entry_forms": 379,
    "tables": 190,
-   "money_routes": 206,
+   "money_routes": 207,
    "cafin_routes": 2
   },
   "notes": [
@@ -19230,6 +19230,44 @@
     "e2e": []
    },
    "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/orders/{id}/products/{productId}/todays-price",
+   "controller": "OrderController",
+   "action": "useTodaysPrice",
+   "requires_all": [
+    "manage_orders"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf",
+    "order_lock"
+   ],
+   "php_line": 696,
+   "node_line": 1176,
+   "node_handler": "ordersController.useTodaysPrice",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "OrderLinePricedRateTest.php"
+    ],
+    "node": [
+     "orderLinePricedRate.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": true,
    "cafin_route": false
   },
   {

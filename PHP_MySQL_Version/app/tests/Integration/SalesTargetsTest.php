@@ -22,7 +22,7 @@ use App\Tests\Support\DbTestCase;
  * (docs/decisions/D-378-sales-targets-spec.md).
  *
  * The disposable test database is shared by every test class and never reset between
- * them, so every scenario that confirms orders uses its own far-future dates (2085+) as a
+ * them, so every scenario that confirms orders uses its own future dates (2033-2037; TIMESTAMP columns stop at 2038) as a
  * private sandbox, and compares only its own credit rows. Rows this class adds to the
  * feature's own tables (company target, targets, settings) are removed in tearDown().
  *
@@ -81,6 +81,7 @@ final class SalesTargetsTest extends DbTestCase
 
     private function signIn(int $userId): void
     {
+        self::router(); // loading public_html/index.php resets $_SESSION, so it must happen before signing in
         $_SESSION = ['_auth_user_id' => $userId, '_session_version' => 0];
         $_SESSION['_session_version'] = (int) Database::connection()->query("SELECT session_version FROM users WHERE id = {$userId}")->fetchColumn();
         PermissionService::resetCache();
@@ -191,45 +192,45 @@ final class SalesTargetsTest extends DbTestCase
 
     public function testConfirmationRulesAsPureFacts(): void
     {
-        self::assertSame(['2085-01-05', 'advance'], SalesTargetService::confirmation(['advance_receipt_on' => '2085-01-05', 'advance_status_on' => '2085-01-01', 'advance_pct' => '40']));
-        self::assertSame(['2085-01-01', 'advance'], SalesTargetService::confirmation(['advance_receipt_on' => null, 'advance_status_on' => '2085-01-01', 'advance_pct' => '40']));
-        self::assertSame(['2085-01-03', 'lc'], SalesTargetService::confirmation(['advance_receipt_on' => '2085-01-09', 'lc_received_on' => '2085-01-03', 'advance_pct' => '40']));
+        self::assertSame(['2034-01-05', 'advance'], SalesTargetService::confirmation(['advance_receipt_on' => '2034-01-05', 'advance_status_on' => '2034-01-01', 'advance_pct' => '40']));
+        self::assertSame(['2034-01-01', 'advance'], SalesTargetService::confirmation(['advance_receipt_on' => null, 'advance_status_on' => '2034-01-01', 'advance_pct' => '40']));
+        self::assertSame(['2034-01-03', 'lc'], SalesTargetService::confirmation(['advance_receipt_on' => '2034-01-09', 'lc_received_on' => '2034-01-03', 'advance_pct' => '40']));
         // PO + PI: only with no advance, the later of the two.
-        $poPi = ['advance_pct' => '0.00', 'buyer_po_received_on' => '2085-01-10', 'frozen_on' => '2085-01-07'];
-        self::assertSame(['2085-01-10', 'po_pi'], SalesTargetService::confirmation($poPi));
+        $poPi = ['advance_pct' => '0.00', 'buyer_po_received_on' => '2034-01-10', 'frozen_on' => '2034-01-07'];
+        self::assertSame(['2034-01-10', 'po_pi'], SalesTargetService::confirmation($poPi));
         self::assertSame([null, null], SalesTargetService::confirmation(['advance_pct' => '40.00'] + $poPi));
-        self::assertSame(['2085-01-10', 'po_pi'], SalesTargetService::confirmation(['advance_pct' => null] + $poPi), 'no advance % counts as 0');
-        self::assertSame([null, null], SalesTargetService::confirmation(['advance_pct' => '0', 'buyer_po_received_on' => '2085-01-10', 'frozen_on' => null]));
+        self::assertSame(['2034-01-10', 'po_pi'], SalesTargetService::confirmation(['advance_pct' => null] + $poPi), 'no advance % counts as 0');
+        self::assertSame([null, null], SalesTargetService::confirmation(['advance_pct' => '0', 'buyer_po_received_on' => '2034-01-10', 'frozen_on' => null]));
     }
 
     public function testSyncConfirmsByAdvanceLcAndPoPiAndSkipsTestData(): void
     {
         $pdo = Database::connection();
         $advance = $this->order();
-        $this->receipt($advance, '2085-02-10');
+        $this->receipt($advance, '2034-02-10');
         $fallback = $this->order();
         \App\Repositories\OrderPaymentStatusRepository::initializeForOrder($fallback);
-        $pdo->exec("UPDATE order_payment_status SET advance_remittance_received_at = '2085-02-18 09:00:00' WHERE order_id = {$fallback}");
+        $pdo->exec("UPDATE order_payment_status SET advance_remittance_received_at = '2034-02-18 09:00:00' WHERE order_id = {$fallback}");
         $lc = $this->order();
-        $pdo->exec("INSERT INTO order_lc_details (order_id, lc_number, lc_received_at) VALUES ({$lc}, 'LC-D378', '2085-02-12')");
+        $pdo->exec("INSERT INTO order_lc_details (order_id, lc_number, lc_received_at) VALUES ({$lc}, 'LC-D378', '2034-02-12')");
         $poPi = $this->order();
-        $pdo->exec("UPDATE orders SET advance_pct = 0, buyer_po_received_on = '2085-02-14', frozen_at = '2085-02-16 10:00:00' WHERE id = {$poPi}");
+        $pdo->exec("UPDATE orders SET advance_pct = 0, buyer_po_received_on = '2034-02-14', frozen_at = '2034-02-16 10:00:00' WHERE id = {$poPi}");
         $withAdvanceTerms = $this->order();
-        $pdo->exec("UPDATE orders SET advance_pct = 40, buyer_po_received_on = '2085-02-14', frozen_at = '2085-02-16 10:00:00' WHERE id = {$withAdvanceTerms}");
+        $pdo->exec("UPDATE orders SET advance_pct = 40, buyer_po_received_on = '2034-02-14', frozen_at = '2034-02-16 10:00:00' WHERE id = {$withAdvanceTerms}");
         $testData = $this->order();
         $pdo->exec("UPDATE orders SET is_test_data = 1 WHERE id = {$testData}");
-        $this->receipt($testData, '2085-02-10');
+        $this->receipt($testData, '2034-02-10');
         $lostFirst = $this->order();
-        $pdo->exec("UPDATE orders SET status = 'lost', lost_at = '2085-02-01 10:00:00' WHERE id = {$lostFirst}");
-        $this->receipt($lostFirst, '2085-02-03');
+        $pdo->exec("UPDATE orders SET status = 'lost', lost_at = '2034-02-01 10:00:00' WHERE id = {$lostFirst}");
+        $this->receipt($lostFirst, '2034-02-03');
 
-        SalesTargetService::sync('2085-03-01');
+        SalesTargetService::sync('2034-03-01');
         $c = $this->credits([$advance, $fallback, $lc, $poPi, $withAdvanceTerms, $testData, $lostFirst]);
 
-        self::assertSame(['2085-02-10', 'advance'], [$c[$advance]['confirmed_on'], $c[$advance]['how']]);
-        self::assertSame(['2085-02-18', 'advance'], [$c[$fallback]['confirmed_on'], $c[$fallback]['how']]);
-        self::assertSame(['2085-02-12', 'lc'], [$c[$lc]['confirmed_on'], $c[$lc]['how']]);
-        self::assertSame(['2085-02-16', 'po_pi'], [$c[$poPi]['confirmed_on'], $c[$poPi]['how']]);
+        self::assertSame(['2034-02-10', 'advance'], [$c[$advance]['confirmed_on'], $c[$advance]['how']]);
+        self::assertSame(['2034-02-18', 'advance'], [$c[$fallback]['confirmed_on'], $c[$fallback]['how']]);
+        self::assertSame(['2034-02-12', 'lc'], [$c[$lc]['confirmed_on'], $c[$lc]['how']]);
+        self::assertSame(['2034-02-16', 'po_pi'], [$c[$poPi]['confirmed_on'], $c[$poPi]['how']]);
         self::assertArrayNotHasKey($withAdvanceTerms, $c, 'PO + PI counts only on no-advance terms');
         self::assertArrayNotHasKey($testData, $c, 'test data never counts');
         self::assertArrayNotHasKey($lostFirst, $c, 'lost before it was confirmed never counts');
@@ -238,9 +239,9 @@ final class SalesTargetsTest extends DbTestCase
         self::assertSame(1, SalesTargetService::estimatedContainers($advance));
 
         // A second run changes nothing (dates are kept).
-        $pdo->exec("UPDATE order_payment_receipts SET received_on = '2085-01-01' WHERE order_id = {$advance}");
-        SalesTargetService::sync('2085-03-02');
-        self::assertSame('2085-02-10', $this->credits([$advance])[$advance]['confirmed_on']);
+        $pdo->exec("UPDATE order_payment_receipts SET received_on = '2034-01-01' WHERE order_id = {$advance}");
+        SalesTargetService::sync('2034-03-02');
+        self::assertSame('2034-02-10', $this->credits([$advance])[$advance]['confirmed_on']);
     }
 
     // ---------------------------------------------------------------- corrections
@@ -252,17 +253,17 @@ final class SalesTargetsTest extends DbTestCase
             'shipped_on' => $shipped, 'containers_shipped' => $cs, 'reversed_on' => $rev, 'reversed_why' => $rev ? 'cancelled' : null, 'is_new_buyer' => 0,
         ];
         // Cancelled in the same period: 0.
-        self::assertSame(0, SalesTargetService::periodCounts([1 => $row(1, '2086-04-05', 2, null, null, '2086-05-01')], '2086-04-01', '2086-06-30')['counted']);
+        self::assertSame(0, SalesTargetService::periodCounts([1 => $row(1, '2035-04-05', 2, null, null, '2035-05-01')], '2035-04-01', '2035-06-30')['counted']);
         // Cancelled in a later period: +2 stays in Apr–Jun, −2 in Jul–Sep.
-        $later = [1 => $row(1, '2086-04-05', 2, null, null, '2086-07-20')];
-        self::assertSame(2, SalesTargetService::periodCounts($later, '2086-04-01', '2086-06-30')['counted']);
-        $q3 = SalesTargetService::periodCounts($later, '2086-07-01', '2086-09-30');
+        $later = [1 => $row(1, '2035-04-05', 2, null, null, '2035-07-20')];
+        self::assertSame(2, SalesTargetService::periodCounts($later, '2035-04-01', '2035-06-30')['counted']);
+        $q3 = SalesTargetService::periodCounts($later, '2035-07-01', '2035-09-30');
         self::assertSame([-2, -2], [$q3['counted'], $q3['corrections']]);
         // Shipped fewer containers than confirmed: the difference on the shipping day.
-        $less = [1 => $row(1, '2086-04-05', 3, '2086-08-02', 2)];
-        self::assertSame(3, SalesTargetService::periodCounts($less, '2086-04-01', '2086-06-30')['counted']);
-        self::assertSame(-1, SalesTargetService::periodCounts($less, '2086-07-01', '2086-09-30')['counted']);
-        $same = SalesTargetService::periodCounts([1 => $row(1, '2086-04-05', 3, '2086-05-02', 2)], '2086-04-01', '2086-06-30');
+        $less = [1 => $row(1, '2035-04-05', 3, '2035-08-02', 2)];
+        self::assertSame(3, SalesTargetService::periodCounts($less, '2035-04-01', '2035-06-30')['counted']);
+        self::assertSame(-1, SalesTargetService::periodCounts($less, '2035-07-01', '2035-09-30')['counted']);
+        $same = SalesTargetService::periodCounts([1 => $row(1, '2035-04-05', 3, '2035-05-02', 2)], '2035-04-01', '2035-06-30');
         self::assertSame([2, 3, -1, 2, 0], [$same['counted'], $same['confirmed'], $same['corrections'], $same['shipped'], $same['awaiting']]);
     }
 
@@ -271,30 +272,30 @@ final class SalesTargetsTest extends DbTestCase
         $pdo = Database::connection();
         $requester = $this->createTestUser('Export Executive');
         $cancelledLater = $this->order();
-        $this->receipt($cancelledLater, '2087-04-05');
+        $this->receipt($cancelledLater, '2036-04-05');
         $lostSame = $this->order();
-        $this->receipt($lostSame, '2087-04-06');
+        $this->receipt($lostSame, '2036-04-06');
         $shipped = $this->order();
-        $this->receipt($shipped, '2087-04-07');
-        SalesTargetService::sync('2087-04-10');
+        $this->receipt($shipped, '2036-04-07');
+        SalesTargetService::sync('2036-04-10');
 
         $pdo->exec("UPDATE orders SET status = 'cancelled' WHERE id = {$cancelledLater}");
-        $pdo->exec("INSERT INTO order_cancellations (order_id, reason, requested_by, status, decided_at) VALUES ({$cancelledLater}, 'PHPUnit D-378 cancellation', {$requester}, 'approved', '2087-07-20 10:00:00')");
-        $pdo->exec("UPDATE orders SET status = 'lost', lost_at = '2087-05-01 10:00:00' WHERE id = {$lostSame}");
+        $pdo->exec("INSERT INTO order_cancellations (order_id, reason, requested_by, status, decided_at) VALUES ({$cancelledLater}, 'PHPUnit D-378 cancellation', {$requester}, 'approved', '2036-07-20 10:00:00')");
+        $pdo->exec("UPDATE orders SET status = 'lost', lost_at = '2036-05-01 10:00:00' WHERE id = {$lostSame}");
         $ci = $this->createTestDocument($shipped, 'CI', 'approved');
-        $pdo->exec("UPDATE documents SET document_date = '2087-05-10' WHERE id = {$ci}");
+        $pdo->exec("UPDATE documents SET document_date = '2036-05-10' WHERE id = {$ci}");
         $pdo->exec("INSERT INTO order_shipping (order_id, container_count) VALUES ({$shipped}, 3)");
-        SalesTargetService::sync('2087-08-01');
+        SalesTargetService::sync('2036-08-01');
 
         $c = $this->credits([$cancelledLater, $lostSame, $shipped]);
-        self::assertSame(['2087-07-20', 'cancelled'], [$c[$cancelledLater]['reversed_on'], $c[$cancelledLater]['reversed_why']]);
-        self::assertSame(['2087-05-01', 'lost'], [$c[$lostSame]['reversed_on'], $c[$lostSame]['reversed_why']]);
-        self::assertSame(['2087-05-10', 3], [$c[$shipped]['shipped_on'], (int) $c[$shipped]['containers_shipped']]);
+        self::assertSame(['2036-07-20', 'cancelled'], [$c[$cancelledLater]['reversed_on'], $c[$cancelledLater]['reversed_why']]);
+        self::assertSame(['2036-05-01', 'lost'], [$c[$lostSame]['reversed_on'], $c[$lostSame]['reversed_why']]);
+        self::assertSame(['2036-05-10', 3], [$c[$shipped]['shipped_on'], (int) $c[$shipped]['containers_shipped']]);
 
-        $q2 = SalesTargetService::periodCounts($c, '2087-04-01', '2087-06-30');
+        $q2 = SalesTargetService::periodCounts($c, '2036-04-01', '2036-06-30');
         // +1 +1 +1 confirmed, −1 lost the same quarter, +2 shipped more than confirmed.
         self::assertSame([4, 3, 1], [$q2['counted'], $q2['confirmed'], $q2['corrections']]);
-        self::assertSame(-1, SalesTargetService::periodCounts($c, '2087-07-01', '2087-09-30')['counted'], 'the later cancellation is a correction in its own quarter');
+        self::assertSame(-1, SalesTargetService::periodCounts($c, '2036-07-01', '2036-09-30')['counted'], 'the later cancellation is a correction in its own quarter');
     }
 
     // ---------------------------------------------------------------- new buyer and credit
@@ -303,14 +304,14 @@ final class SalesTargetsTest extends DbTestCase
     {
         $client = $this->createTestClient();
         $second = $this->order($client);
-        $this->receipt($second, '2085-08-02');
+        $this->receipt($second, '2034-08-02');
         $first = $this->order($client);
-        $this->receipt($first, '2085-08-01');
-        SalesTargetService::sync('2085-08-10');
+        $this->receipt($first, '2034-08-01');
+        SalesTargetService::sync('2034-08-10');
         $c = $this->credits([$first, $second]);
         self::assertSame(1, (int) $c[$first]['is_new_buyer']);
         self::assertSame(0, (int) $c[$second]['is_new_buyer']);
-        self::assertSame(1, SalesTargetService::periodCounts($c, '2085-07-01', '2085-09-30')['new_buyers']);
+        self::assertSame(1, SalesTargetService::periodCounts($c, '2034-07-01', '2034-09-30')['new_buyers']);
     }
 
     public function testCreditGoesToTheSalesOwnerUnlessTheMdMovedIt(): void
@@ -335,12 +336,12 @@ final class SalesTargetsTest extends DbTestCase
 
     public function testCompanyTargetOffBreakEvenAndProfit(): void
     {
-        $period = SalesTargetService::period('quarter', '2088-11-15');
-        self::assertFalse(SalesTargetService::companyTarget($period, '2088-11-15', [])['on'], 'no row: off');
-        $this->companyRows[] = SalesTargetRepository::insertCompanyRow('2088-10-01', 0.0, 0.0, 'PHPUnit D-378 zero', 1);
-        self::assertFalse(SalesTargetService::companyTarget($period, '2088-11-15', [])['on'], 'costs and profit 0: off');
-        $this->companyRows[] = SalesTargetRepository::insertCompanyRow('2088-10-01', 100000.0, 50000.0, 'PHPUnit D-378 target', 1);
-        $on = SalesTargetService::companyTarget($period, '2088-11-15', []);
+        $period = SalesTargetService::period('quarter', '2037-11-15');
+        self::assertFalse(SalesTargetService::companyTarget($period, '2037-11-15', [])['on'], 'no row: off');
+        $this->companyRows[] = SalesTargetRepository::insertCompanyRow('2037-10-01', 0.0, 0.0, 'PHPUnit D-378 zero', 1);
+        self::assertFalse(SalesTargetService::companyTarget($period, '2037-11-15', [])['on'], 'costs and profit 0: off');
+        $this->companyRows[] = SalesTargetRepository::insertCompanyRow('2037-10-01', 100000.0, 50000.0, 'PHPUnit D-378 target', 1);
+        $on = SalesTargetService::companyTarget($period, '2037-11-15', []);
         self::assertTrue($on['on']);
         self::assertSame(450000.0, $on['needed'], '(costs + profit) × 3 months');
         self::assertNull($on['avg_margin'], 'no shipment in the last 3 months: not enough history yet');
@@ -354,7 +355,7 @@ final class SalesTargetsTest extends DbTestCase
         ], 'rounded up');
         self::assertNull(SalesTargetService::companyMath(100000.0, 0.0, 3, null)['breakeven_containers']);
         // The row that applies is the latest one on or before the period start.
-        self::assertFalse(SalesTargetService::companyTarget(SalesTargetService::period('quarter', '2088-08-15'), '2088-08-15', [])['on']);
+        self::assertFalse(SalesTargetService::companyTarget(SalesTargetService::period('quarter', '2037-08-15'), '2037-08-15', [])['on']);
     }
 
     // ---------------------------------------------------------------- build-up and personal targets
@@ -366,8 +367,8 @@ final class SalesTargetsTest extends DbTestCase
         self::assertSame(1.0, SalesTargetService::buildupFactor(1, 1));
         self::assertSame(1.0, SalesTargetService::buildupFactor(1, 0));
         self::assertSame(0.0, SalesTargetService::buildupFactor(0, 0), 'a month before joining');
-        self::assertSame(1, SalesTargetService::monthsSinceJoining('2085-11-20', '2085-11-01'));
-        self::assertSame(3, SalesTargetService::monthsSinceJoining('2085-11-20', '2086-01-01'));
+        self::assertSame(1, SalesTargetService::monthsSinceJoining('2034-11-20', '2034-11-01'));
+        self::assertSame(3, SalesTargetService::monthsSinceJoining('2034-11-20', '2035-01-01'));
     }
 
     public function testPersonalTargetUsesTheDesignationDefaultAndTheBuildUp(): void
@@ -376,18 +377,18 @@ final class SalesTargetsTest extends DbTestCase
         $designation = $this->salesDesignationId();
         $this->member($person, $designation);
         SalesTargetRepository::saveTarget('designation', $designation, ['containers' => 6, 'quotations' => 10, 'reason' => 'PHPUnit D-378 default'], 1);
-        Database::connection()->exec("UPDATE users SET joined_on = '2085-11-10' WHERE id = {$person}");
+        Database::connection()->exec("UPDATE users SET joined_on = '2034-11-10' WHERE id = {$person}");
         $settings = ['buildup_months' => '3'] + SalesTargetService::settings();
 
         // Oct (before joining) 0, Nov (month 1) 0, Dec (month 2) 0.5 → 6 × 0.5 / 3 = 1.
-        $t = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2085-11-15'), $settings);
+        $t = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2034-11-15'), $settings);
         self::assertSame([1.0, 'designation', true, 10], [$t['containers'], $t['source'], $t['in_buildup'], $t['quotations']]);
-        $full = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2086-05-15'), $settings);
+        $full = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2035-05-15'), $settings);
         self::assertSame([6.0, false], [$full['containers'], $full['in_buildup']]);
 
         // Own target wins; build-up switched off for the person.
         SalesTargetRepository::saveTarget('user', $person, ['containers' => 9, 'buildup_enabled' => 0, 'multiple' => 2.5, 'reason' => 'PHPUnit D-378 own'], 1);
-        $own = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2085-11-15'), $settings);
+        $own = SalesTargetService::personalTarget($person, SalesTargetService::period('quarter', '2034-11-15'), $settings);
         self::assertSame([9.0, 'own', false, 2.5], [$own['containers'], $own['source'], $own['in_buildup'], $own['multiple']]);
     }
 
@@ -510,9 +511,9 @@ final class SalesTargetsTest extends DbTestCase
     public function testSalesPerformanceDefaultPageIsUnchangedAndBySalespersonIsOptional(): void
     {
         $this->signIn($this->createTestUser('Managing Director'));
-        $_GET = ['date_from' => '2089-03-01', 'date_to' => '2089-03-31'];
+        $_GET = ['date_from' => '2033-03-01', 'date_to' => '2033-03-31'];
         $plain = $this->render(fn () => (new ReportController())->performance([]));
-        $_GET = ['date_from' => '2089-03-01', 'date_to' => '2089-03-31', 'salesperson' => ''];
+        $_GET = ['date_from' => '2033-03-01', 'date_to' => '2033-03-31', 'salesperson' => ''];
         $empty = $this->render(fn () => (new ReportController())->performance([]));
         self::assertSame($plain, $empty, "salesperson '' renders exactly the default page");
         self::assertStringNotContainsString('id="performance-by-salesperson"', $plain);
@@ -520,20 +521,20 @@ final class SalesTargetsTest extends DbTestCase
         $seller = $this->createTestUser('Export Executive');
         $won = $this->order();
         $this->salesOwner($won, $seller);
-        $this->sendQt($won, '2089-03-05 10:00:00');
+        $this->sendQt($won, '2033-03-05 10:00:00');
         $this->createTestDocument($won, 'PI', 'sent');
-        Database::connection()->exec("UPDATE orders SET pi_date = '2089-03-20' WHERE id = {$won}");
+        Database::connection()->exec("UPDATE orders SET pi_date = '2033-03-20' WHERE id = {$won}");
         $lost = $this->order();
         $this->salesOwner($lost, $seller);
-        Database::connection()->exec("UPDATE orders SET status = 'lost', lost_at = '2089-03-10 10:00:00', lost_category = 'price' WHERE id = {$lost}");
+        Database::connection()->exec("UPDATE orders SET status = 'lost', lost_at = '2033-03-10 10:00:00', lost_category = 'price' WHERE id = {$lost}");
 
-        $rows = SalesTargetService::performanceBySalesperson('2089-03-01', '2089-03-31', (string) $seller);
+        $rows = SalesTargetService::performanceBySalesperson('2033-03-01', '2033-03-31', (string) $seller);
         self::assertCount(1, $rows);
         self::assertSame([1, 1, 1, 0, 100.0, 15.0, 'Price'], [
             $rows[0]['quotes'], $rows[0]['won'], $rows[0]['lost_before_pi'], $rows[0]['lost_after_pi'],
             $rows[0]['win_rate_pct'], $rows[0]['avg_days_qt_to_pi'], $rows[0]['top_lost_category'],
         ]);
-        $_GET = ['date_from' => '2089-03-01', 'date_to' => '2089-03-31', 'salesperson' => 'all'];
+        $_GET = ['date_from' => '2033-03-01', 'date_to' => '2033-03-31', 'salesperson' => 'all'];
         $all = $this->render(fn () => (new ReportController())->performance([]));
         self::assertStringContainsString('id="performance-by-salesperson"', $all);
         // The CSV export is unchanged (the lost-orders table only).
@@ -614,13 +615,13 @@ final class SalesTargetsTest extends DbTestCase
     public function testAnOrderWithNoSalespersonIsAlertedOnce(): void
     {
         $orderId = $this->order();
-        $this->receipt($orderId, '2086-04-02');
-        SalesTargetService::sync('2086-04-05');
+        $this->receipt($orderId, '2035-04-02');
+        SalesTargetService::sync('2035-04-05');
         $count = static fn (): int => (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE type = 'sales_target_no_owner' AND related_order_id = {$orderId}")->fetchColumn();
-        SalesTargetService::runAlerts('2086-04-05');
+        SalesTargetService::runAlerts('2035-04-05');
         $first = $count();
         self::assertGreaterThan(0, $first);
-        SalesTargetService::runAlerts('2086-04-06');
+        SalesTargetService::runAlerts('2035-04-06');
         self::assertSame($first, $count(), 'once per order');
     }
 

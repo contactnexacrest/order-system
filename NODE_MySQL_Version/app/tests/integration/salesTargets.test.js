@@ -18,7 +18,7 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
  * (docs/decisions/D-378-sales-targets-spec.md).
  *
  * The disposable test database is shared by every test file and never reset between
- * them, so every scenario that confirms orders uses its own far-future dates (2085+) as a
+ * them, so every scenario that confirms orders uses its own future dates (2033-2037; TIMESTAMP columns stop at 2038) as a
  * private sandbox, and compares only its own credit rows. Rows this file adds to the
  * feature's own tables (company target, targets, settings) are removed after each test.
  *
@@ -134,43 +134,43 @@ describe('D-378: sales targets', () => {
   // ---------------------------------------------------------------- confirmation
 
   test('confirmation rules as pure facts', () => {
-    expect(salesTargetService.confirmation({ advance_receipt_on: '2085-01-05', advance_status_on: '2085-01-01', advance_pct: '40' })).toEqual(['2085-01-05', 'advance']);
-    expect(salesTargetService.confirmation({ advance_receipt_on: null, advance_status_on: '2085-01-01', advance_pct: '40' })).toEqual(['2085-01-01', 'advance']);
-    expect(salesTargetService.confirmation({ advance_receipt_on: '2085-01-09', lc_received_on: '2085-01-03', advance_pct: '40' })).toEqual(['2085-01-03', 'lc']);
+    expect(salesTargetService.confirmation({ advance_receipt_on: '2034-01-05', advance_status_on: '2034-01-01', advance_pct: '40' })).toEqual(['2034-01-05', 'advance']);
+    expect(salesTargetService.confirmation({ advance_receipt_on: null, advance_status_on: '2034-01-01', advance_pct: '40' })).toEqual(['2034-01-01', 'advance']);
+    expect(salesTargetService.confirmation({ advance_receipt_on: '2034-01-09', lc_received_on: '2034-01-03', advance_pct: '40' })).toEqual(['2034-01-03', 'lc']);
     // PO + PI: only with no advance, the later of the two.
-    const poPi = { advance_pct: '0.00', buyer_po_received_on: '2085-01-10', frozen_on: '2085-01-07' };
-    expect(salesTargetService.confirmation(poPi)).toEqual(['2085-01-10', 'po_pi']);
+    const poPi = { advance_pct: '0.00', buyer_po_received_on: '2034-01-10', frozen_on: '2034-01-07' };
+    expect(salesTargetService.confirmation(poPi)).toEqual(['2034-01-10', 'po_pi']);
     expect(salesTargetService.confirmation({ ...poPi, advance_pct: '40.00' })).toEqual([null, null]);
-    expect(salesTargetService.confirmation({ ...poPi, advance_pct: null })).toEqual(['2085-01-10', 'po_pi']); // no advance % counts as 0
-    expect(salesTargetService.confirmation({ advance_pct: '0', buyer_po_received_on: '2085-01-10', frozen_on: null })).toEqual([null, null]);
+    expect(salesTargetService.confirmation({ ...poPi, advance_pct: null })).toEqual(['2034-01-10', 'po_pi']); // no advance % counts as 0
+    expect(salesTargetService.confirmation({ advance_pct: '0', buyer_po_received_on: '2034-01-10', frozen_on: null })).toEqual([null, null]);
   });
 
   test('sync confirms by advance, LC and PO + PI, and skips test data', async () => {
     const advance = await order();
-    await receipt(advance, '2085-02-10');
+    await receipt(advance, '2034-02-10');
     const fallback = await order();
     await require('../../src/repositories/orderPaymentStatusRepository').initializeForOrder(fallback);
-    await db.execute("UPDATE order_payment_status SET advance_remittance_received_at = '2085-02-18 09:00:00' WHERE order_id = :o", { o: fallback });
+    await db.execute("UPDATE order_payment_status SET advance_remittance_received_at = '2034-02-18 09:00:00' WHERE order_id = :o", { o: fallback });
     const lc = await order();
-    await db.execute("INSERT INTO order_lc_details (order_id, lc_number, lc_received_at) VALUES (:o, 'LC-D378', '2085-02-12')", { o: lc });
+    await db.execute("INSERT INTO order_lc_details (order_id, lc_number, lc_received_at) VALUES (:o, 'LC-D378', '2034-02-12')", { o: lc });
     const poPi = await order();
-    await db.execute("UPDATE orders SET advance_pct = 0, buyer_po_received_on = '2085-02-14', frozen_at = '2085-02-16 10:00:00' WHERE id = :o", { o: poPi });
+    await db.execute("UPDATE orders SET advance_pct = 0, buyer_po_received_on = '2034-02-14', frozen_at = '2034-02-16 10:00:00' WHERE id = :o", { o: poPi });
     const withAdvanceTerms = await order();
-    await db.execute("UPDATE orders SET advance_pct = 40, buyer_po_received_on = '2085-02-14', frozen_at = '2085-02-16 10:00:00' WHERE id = :o", { o: withAdvanceTerms });
+    await db.execute("UPDATE orders SET advance_pct = 40, buyer_po_received_on = '2034-02-14', frozen_at = '2034-02-16 10:00:00' WHERE id = :o", { o: withAdvanceTerms });
     const testData = await order();
     await db.execute('UPDATE orders SET is_test_data = 1 WHERE id = :o', { o: testData });
-    await receipt(testData, '2085-02-10');
+    await receipt(testData, '2034-02-10');
     const lostFirst = await order();
-    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2085-02-01 10:00:00' WHERE id = :o", { o: lostFirst });
-    await receipt(lostFirst, '2085-02-03');
+    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2034-02-01 10:00:00' WHERE id = :o", { o: lostFirst });
+    await receipt(lostFirst, '2034-02-03');
 
-    await salesTargetService.sync('2085-03-01');
+    await salesTargetService.sync('2034-03-01');
     const c = await credits([advance, fallback, lc, poPi, withAdvanceTerms, testData, lostFirst]);
 
-    expect([ymd(c.get(advance).confirmed_on), c.get(advance).how]).toEqual(['2085-02-10', 'advance']);
-    expect([ymd(c.get(fallback).confirmed_on), c.get(fallback).how]).toEqual(['2085-02-18', 'advance']);
-    expect([ymd(c.get(lc).confirmed_on), c.get(lc).how]).toEqual(['2085-02-12', 'lc']);
-    expect([ymd(c.get(poPi).confirmed_on), c.get(poPi).how]).toEqual(['2085-02-16', 'po_pi']);
+    expect([ymd(c.get(advance).confirmed_on), c.get(advance).how]).toEqual(['2034-02-10', 'advance']);
+    expect([ymd(c.get(fallback).confirmed_on), c.get(fallback).how]).toEqual(['2034-02-18', 'advance']);
+    expect([ymd(c.get(lc).confirmed_on), c.get(lc).how]).toEqual(['2034-02-12', 'lc']);
+    expect([ymd(c.get(poPi).confirmed_on), c.get(poPi).how]).toEqual(['2034-02-16', 'po_pi']);
     expect(c.has(withAdvanceTerms)).toBe(false); // PO + PI counts only on no-advance terms
     expect(c.has(testData)).toBe(false); // test data never counts
     expect(c.has(lostFirst)).toBe(false); // lost before it was confirmed never counts
@@ -179,9 +179,9 @@ describe('D-378: sales targets', () => {
     expect(await salesTargetService.estimatedContainers(advance)).toBe(1);
 
     // A second run changes nothing (dates are kept).
-    await db.execute("UPDATE order_payment_receipts SET received_on = '2085-01-01' WHERE order_id = :o", { o: advance });
-    await salesTargetService.sync('2085-03-02');
-    expect(ymd((await credits([advance])).get(advance).confirmed_on)).toBe('2085-02-10');
+    await db.execute("UPDATE order_payment_receipts SET received_on = '2034-01-01' WHERE order_id = :o", { o: advance });
+    await salesTargetService.sync('2034-03-02');
+    expect(ymd((await credits([advance])).get(advance).confirmed_on)).toBe('2034-02-10');
   });
 
   // ---------------------------------------------------------------- corrections
@@ -192,51 +192,51 @@ describe('D-378: sales targets', () => {
       shipped_on: shipped, containers_shipped: cs, reversed_on: rev, reversed_why: rev ? 'cancelled' : null, is_new_buyer: 0,
     });
     // Cancelled in the same period: 0.
-    expect(salesTargetService.periodCounts([row(1, '2086-04-05', 2, null, null, '2086-05-01')], '2086-04-01', '2086-06-30').counted).toBe(0);
+    expect(salesTargetService.periodCounts([row(1, '2035-04-05', 2, null, null, '2035-05-01')], '2035-04-01', '2035-06-30').counted).toBe(0);
     // Cancelled in a later period: +2 stays in Apr–Jun, −2 in Jul–Sep.
-    const later = [row(1, '2086-04-05', 2, null, null, '2086-07-20')];
-    expect(salesTargetService.periodCounts(later, '2086-04-01', '2086-06-30').counted).toBe(2);
-    const q3 = salesTargetService.periodCounts(later, '2086-07-01', '2086-09-30');
+    const later = [row(1, '2035-04-05', 2, null, null, '2035-07-20')];
+    expect(salesTargetService.periodCounts(later, '2035-04-01', '2035-06-30').counted).toBe(2);
+    const q3 = salesTargetService.periodCounts(later, '2035-07-01', '2035-09-30');
     expect([q3.counted, q3.corrections]).toEqual([-2, -2]);
     // Shipped fewer containers than confirmed: the difference on the shipping day.
-    const less = [row(1, '2086-04-05', 3, '2086-08-02', 2)];
-    expect(salesTargetService.periodCounts(less, '2086-04-01', '2086-06-30').counted).toBe(3);
-    expect(salesTargetService.periodCounts(less, '2086-07-01', '2086-09-30').counted).toBe(-1);
-    const same = salesTargetService.periodCounts([row(1, '2086-04-05', 3, '2086-05-02', 2)], '2086-04-01', '2086-06-30');
+    const less = [row(1, '2035-04-05', 3, '2035-08-02', 2)];
+    expect(salesTargetService.periodCounts(less, '2035-04-01', '2035-06-30').counted).toBe(3);
+    expect(salesTargetService.periodCounts(less, '2035-07-01', '2035-09-30').counted).toBe(-1);
+    const same = salesTargetService.periodCounts([row(1, '2035-04-05', 3, '2035-05-02', 2)], '2035-04-01', '2035-06-30');
     expect([same.counted, same.confirmed, same.corrections, same.shipped, same.awaiting]).toEqual([2, 3, -1, 2, 0]);
   });
 
   test('sync records a cancellation, a loss and a shipment', async () => {
     const requester = await createTestUser('Export Executive');
     const cancelledLater = await order();
-    await receipt(cancelledLater, '2087-04-05');
+    await receipt(cancelledLater, '2036-04-05');
     const lostSame = await order();
-    await receipt(lostSame, '2087-04-06');
+    await receipt(lostSame, '2036-04-06');
     const shipped = await order();
-    await receipt(shipped, '2087-04-07');
-    await salesTargetService.sync('2087-04-10');
+    await receipt(shipped, '2036-04-07');
+    await salesTargetService.sync('2036-04-10');
 
     await db.execute("UPDATE orders SET status = 'cancelled' WHERE id = :o", { o: cancelledLater });
     await db.execute(
-      "INSERT INTO order_cancellations (order_id, reason, requested_by, status, decided_at) VALUES (:o, 'Jest D-378 cancellation', :u, 'approved', '2087-07-20 10:00:00')",
+      "INSERT INTO order_cancellations (order_id, reason, requested_by, status, decided_at) VALUES (:o, 'Jest D-378 cancellation', :u, 'approved', '2036-07-20 10:00:00')",
       { o: cancelledLater, u: requester }
     );
-    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2087-05-01 10:00:00' WHERE id = :o", { o: lostSame });
+    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2036-05-01 10:00:00' WHERE id = :o", { o: lostSame });
     const ci = await createTestDocument(shipped, 'CI', 'approved');
-    await db.execute("UPDATE documents SET document_date = '2087-05-10' WHERE id = :id", { id: ci });
+    await db.execute("UPDATE documents SET document_date = '2036-05-10' WHERE id = :id", { id: ci });
     await db.execute('INSERT INTO order_shipping (order_id, container_count) VALUES (:o, 3)', { o: shipped });
-    await salesTargetService.sync('2087-08-01');
+    await salesTargetService.sync('2036-08-01');
 
     const c = await credits([cancelledLater, lostSame, shipped]);
-    expect([ymd(c.get(cancelledLater).reversed_on), c.get(cancelledLater).reversed_why]).toEqual(['2087-07-20', 'cancelled']);
-    expect([ymd(c.get(lostSame).reversed_on), c.get(lostSame).reversed_why]).toEqual(['2087-05-01', 'lost']);
-    expect([ymd(c.get(shipped).shipped_on), Number(c.get(shipped).containers_shipped)]).toEqual(['2087-05-10', 3]);
+    expect([ymd(c.get(cancelledLater).reversed_on), c.get(cancelledLater).reversed_why]).toEqual(['2036-07-20', 'cancelled']);
+    expect([ymd(c.get(lostSame).reversed_on), c.get(lostSame).reversed_why]).toEqual(['2036-05-01', 'lost']);
+    expect([ymd(c.get(shipped).shipped_on), Number(c.get(shipped).containers_shipped)]).toEqual(['2036-05-10', 3]);
 
-    const q2 = salesTargetService.periodCounts(c, '2087-04-01', '2087-06-30');
+    const q2 = salesTargetService.periodCounts(c, '2036-04-01', '2036-06-30');
     // +1 +1 +1 confirmed, −1 lost the same quarter, +2 shipped more than confirmed.
     expect([q2.counted, q2.confirmed, q2.corrections]).toEqual([4, 3, 1]);
     // The later cancellation is a correction in its own quarter.
-    expect(salesTargetService.periodCounts(c, '2087-07-01', '2087-09-30').counted).toBe(-1);
+    expect(salesTargetService.periodCounts(c, '2036-07-01', '2036-09-30').counted).toBe(-1);
   });
 
   // ---------------------------------------------------------------- new buyer and credit
@@ -244,14 +244,14 @@ describe('D-378: sales targets', () => {
   test('the first confirmed order of a client is the new buyer', async () => {
     const client = await createTestClient();
     const second = await order(client);
-    await receipt(second, '2085-08-02');
+    await receipt(second, '2034-08-02');
     const first = await order(client);
-    await receipt(first, '2085-08-01');
-    await salesTargetService.sync('2085-08-10');
+    await receipt(first, '2034-08-01');
+    await salesTargetService.sync('2034-08-10');
     const c = await credits([first, second]);
     expect(Number(c.get(first).is_new_buyer)).toBe(1);
     expect(Number(c.get(second).is_new_buyer)).toBe(0);
-    expect(salesTargetService.periodCounts(c, '2085-07-01', '2085-09-30').new_buyers).toBe(1);
+    expect(salesTargetService.periodCounts(c, '2034-07-01', '2034-09-30').new_buyers).toBe(1);
   });
 
   test('the credit goes to the Sales & Export owner unless the MD moved it', async () => {
@@ -275,12 +275,12 @@ describe('D-378: sales targets', () => {
   // ---------------------------------------------------------------- company target
 
   test('company target: off, break-even and profit', async () => {
-    const p = salesTargetService.period('quarter', '2088-11-15');
-    expect((await salesTargetService.companyTarget(p, '2088-11-15', [])).on).toBe(false); // no row: off
-    companyRows.push(await salesTargetRepository.insertCompanyRow('2088-10-01', 0.0, 0.0, 'Jest D-378 zero', 1));
-    expect((await salesTargetService.companyTarget(p, '2088-11-15', [])).on).toBe(false); // costs and profit 0: off
-    companyRows.push(await salesTargetRepository.insertCompanyRow('2088-10-01', 100000.0, 50000.0, 'Jest D-378 target', 1));
-    const on = await salesTargetService.companyTarget(p, '2088-11-15', []);
+    const p = salesTargetService.period('quarter', '2037-11-15');
+    expect((await salesTargetService.companyTarget(p, '2037-11-15', [])).on).toBe(false); // no row: off
+    companyRows.push(await salesTargetRepository.insertCompanyRow('2037-10-01', 0.0, 0.0, 'Jest D-378 zero', 1));
+    expect((await salesTargetService.companyTarget(p, '2037-11-15', [])).on).toBe(false); // costs and profit 0: off
+    companyRows.push(await salesTargetRepository.insertCompanyRow('2037-10-01', 100000.0, 50000.0, 'Jest D-378 target', 1));
+    const on = await salesTargetService.companyTarget(p, '2037-11-15', []);
     expect(on.on).toBe(true);
     expect(on.needed).toBe(450000); // (costs + profit) × 3 months
     expect(on.avg_margin).toBeNull(); // no shipment in the last 3 months: not enough history yet
@@ -292,7 +292,7 @@ describe('D-378: sales targets', () => {
     expect([m29.containers_needed, m29.breakeven_containers]).toEqual([16, 11]); // rounded up
     expect(salesTargetService.companyMath(100000.0, 0.0, 3, null).breakeven_containers).toBeNull();
     // The row that applies is the latest one on or before the period start.
-    expect((await salesTargetService.companyTarget(salesTargetService.period('quarter', '2088-08-15'), '2088-08-15', [])).on).toBe(false);
+    expect((await salesTargetService.companyTarget(salesTargetService.period('quarter', '2037-08-15'), '2037-08-15', [])).on).toBe(false);
   });
 
   // ---------------------------------------------------------------- build-up and personal targets
@@ -303,8 +303,8 @@ describe('D-378: sales targets', () => {
     expect(salesTargetService.buildupFactor(1, 1)).toBe(1);
     expect(salesTargetService.buildupFactor(1, 0)).toBe(1);
     expect(salesTargetService.buildupFactor(0, 0)).toBe(0); // a month before joining
-    expect(salesTargetService.monthsSinceJoining('2085-11-20', '2085-11-01')).toBe(1);
-    expect(salesTargetService.monthsSinceJoining('2085-11-20', '2086-01-01')).toBe(3);
+    expect(salesTargetService.monthsSinceJoining('2034-11-20', '2034-11-01')).toBe(1);
+    expect(salesTargetService.monthsSinceJoining('2034-11-20', '2035-01-01')).toBe(3);
   });
 
   test('a personal target uses the designation default and the build-up', async () => {
@@ -312,18 +312,18 @@ describe('D-378: sales targets', () => {
     const designation = await salesDesignationId();
     await member(person, designation);
     await salesTargetRepository.saveTarget('designation', designation, { containers: 6, quotations: 10, reason: 'Jest D-378 default' }, 1);
-    await db.execute("UPDATE users SET joined_on = '2085-11-10' WHERE id = :id", { id: person });
+    await db.execute("UPDATE users SET joined_on = '2034-11-10' WHERE id = :id", { id: person });
     const settings = { ...(await salesTargetService.settings()), buildup_months: '3' };
 
     // Oct (before joining) 0, Nov (month 1) 0, Dec (month 2) 0.5 → 6 × 0.5 / 3 = 1.
-    const t = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2085-11-15'), settings);
+    const t = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2034-11-15'), settings);
     expect([t.containers, t.source, t.in_buildup, t.quotations]).toEqual([1, 'designation', true, 10]);
-    const full = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2086-05-15'), settings);
+    const full = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2035-05-15'), settings);
     expect([full.containers, full.in_buildup]).toEqual([6, false]);
 
     // Own target wins; build-up switched off for the person.
     await salesTargetRepository.saveTarget('user', person, { containers: 9, buildup_enabled: 0, multiple: 2.5, reason: 'Jest D-378 own' }, 1);
-    const own = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2085-11-15'), settings);
+    const own = await salesTargetService.personalTarget(person, salesTargetService.period('quarter', '2034-11-15'), settings);
     expect([own.containers, own.source, own.in_buildup, own.multiple]).toEqual([9, 'own', false, 2.5]);
   });
 
@@ -441,26 +441,26 @@ describe('D-378: sales targets', () => {
 
   test('Sales Performance: the default page is unchanged and By salesperson is optional', async () => {
     const agent = await signIn(await createTestUser('Managing Director'));
-    const plain = (await agent.get('/reports/performance?date_from=2089-03-01&date_to=2089-03-31')).text;
-    const empty = (await agent.get('/reports/performance?date_from=2089-03-01&date_to=2089-03-31&salesperson=')).text;
+    const plain = (await agent.get('/reports/performance?date_from=2033-03-01&date_to=2033-03-31')).text;
+    const empty = (await agent.get('/reports/performance?date_from=2033-03-01&date_to=2033-03-31&salesperson=')).text;
     expect(empty).toBe(plain); // salesperson '' renders exactly the default page
     expect(plain).not.toContain('id="performance-by-salesperson"');
 
     const seller = await createTestUser('Export Executive');
     const won = await order();
     await salesOwner(won, seller);
-    await sendQt(won, '2089-03-05 10:00:00');
+    await sendQt(won, '2033-03-05 10:00:00');
     await createTestDocument(won, 'PI', 'sent');
-    await db.execute("UPDATE orders SET pi_date = '2089-03-20' WHERE id = :o", { o: won });
+    await db.execute("UPDATE orders SET pi_date = '2033-03-20' WHERE id = :o", { o: won });
     const lost = await order();
     await salesOwner(lost, seller);
-    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2089-03-10 10:00:00', lost_category = 'price' WHERE id = :o", { o: lost });
+    await db.execute("UPDATE orders SET status = 'lost', lost_at = '2033-03-10 10:00:00', lost_category = 'price' WHERE id = :o", { o: lost });
 
-    const rows = await salesTargetService.performanceBySalesperson('2089-03-01', '2089-03-31', String(seller));
+    const rows = await salesTargetService.performanceBySalesperson('2033-03-01', '2033-03-31', String(seller));
     expect(rows).toHaveLength(1);
     expect([rows[0].quotes, rows[0].won, rows[0].lost_before_pi, rows[0].lost_after_pi, rows[0].win_rate_pct, rows[0].avg_days_qt_to_pi, rows[0].top_lost_category])
       .toEqual([1, 1, 1, 0, 100, 15, 'Price']);
-    const all = (await agent.get('/reports/performance?date_from=2089-03-01&date_to=2089-03-31&salesperson=all')).text;
+    const all = (await agent.get('/reports/performance?date_from=2033-03-01&date_to=2033-03-31&salesperson=all')).text;
     expect(all).toContain('id="performance-by-salesperson"');
     // The CSV export is unchanged (the lost-orders table only).
     expect(performanceCsvRows({ lost_orders: [] }).headers).toEqual(['Order', 'Client', 'Lost On', 'Stage Reached', 'Reason']);
@@ -472,13 +472,15 @@ describe('D-378: sales targets', () => {
     const agent = await signIn(await createTestUser('Managing Director'));
     for (const [posted, expected] of [['price', 'price'], ['bogus', null], ['', null]]) {
       const orderId = await order();
+      const csrf = await csrfOf(agent); // fetched before agent.post(): a request started in between refuses the connection
       await agent.post(`/orders/${orderId}/mark-lost`).type('form')
-        .send({ _csrf: await csrfOf(agent), reason: 'Jest D-378 buyer chose another supplier', lost_category: posted });
+        .send({ _csrf: csrf, reason: 'Jest D-378 buyer chose another supplier', lost_category: posted });
       const row = await db.queryOne('SELECT status, lost_category FROM orders WHERE id = :id', { id: orderId });
       expect([posted, row.status, row.lost_category]).toEqual([posted, 'lost', expected]);
     }
     const orderId = await order();
-    await agent.post(`/orders/${orderId}/mark-lost`).type('form').send({ _csrf: await csrfOf(agent), reason: '', lost_category: 'price' });
+    const csrf = await csrfOf(agent);
+    await agent.post(`/orders/${orderId}/mark-lost`).type('form').send({ _csrf: csrf, reason: '', lost_category: 'price' });
     expect((await db.queryOne('SELECT status FROM orders WHERE id = :id', { id: orderId })).status).toBe('active'); // the reason stays required
   });
 
@@ -491,7 +493,10 @@ describe('D-378: sales targets', () => {
       const r = await db.queryOne('SELECT joined_on FROM users WHERE id = :id', { id: person });
       return r.joined_on === null ? null : String(r.joined_on).slice(0, 10);
     };
-    const post = async (extra) => agent.post(`/users/${person}/update`).type('form').send({ _csrf: await csrfOf(agent), ...base, ...extra });
+    const post = async (extra) => {
+      const csrf = await csrfOf(agent); // fetched before agent.post(), as above
+      return agent.post(`/users/${person}/update`).type('form').send({ _csrf: csrf, ...base, ...extra });
+    };
 
     await post({ joined_on_present: '1', joined_on: '2026-03-01' });
     expect(await joined()).toBe('2026-03-01');
@@ -533,15 +538,15 @@ describe('D-378: sales targets', () => {
 
   test('an order with no salesperson is alerted once', async () => {
     const orderId = await order();
-    await receipt(orderId, '2086-04-02');
-    await salesTargetService.sync('2086-04-05');
+    await receipt(orderId, '2035-04-02');
+    await salesTargetService.sync('2035-04-05');
     const count = async () => Number((await db.queryOne(
       "SELECT COUNT(*) AS n FROM notifications WHERE type = 'sales_target_no_owner' AND related_order_id = :o", { o: orderId }
     )).n);
-    await salesTargetService.runAlerts('2086-04-05');
+    await salesTargetService.runAlerts('2035-04-05');
     const first = await count();
     expect(first).toBeGreaterThan(0);
-    await salesTargetService.runAlerts('2086-04-06');
+    await salesTargetService.runAlerts('2035-04-06');
     expect(await count()).toBe(first); // once per order
   });
 

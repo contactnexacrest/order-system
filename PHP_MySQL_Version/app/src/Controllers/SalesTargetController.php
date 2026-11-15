@@ -47,7 +47,8 @@ final class SalesTargetController
         $canMoney = SalesTargetService::canSeeMoney();
         View::render('sales_targets/index', [
             'periods' => $periods,
-            'data' => SalesTargetService::teamData($chosen, $today),
+            // Not 'data': View::capture() extracts with EXTR_SKIP, so a 'data' key would never reach the view.
+            'team' => SalesTargetService::teamData($chosen, $today),
             'canMoney' => $canMoney,
             // Printed for the calculator only to holders of view_price_buildup; otherwise typed.
             'avgMargin' => $canMoney ? SalesTargetService::avgMarginPerContainer($today) : null,
