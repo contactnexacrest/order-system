@@ -173,6 +173,8 @@ describe('D-378: sales targets', () => {
     expect([ymd(c.get(poPi).confirmed_on), c.get(poPi).how]).toEqual(['2034-02-16', 'po_pi']);
     expect(c.has(withAdvanceTerms)).toBe(false); // PO + PI counts only on no-advance terms
     expect(c.has(testData)).toBe(false); // test data never counts
+    // Leave no test data behind: Test Mode cannot be switched off while any exists (later suites rely on it).
+    await db.execute('UPDATE orders SET is_test_data = 0 WHERE id = :o', { o: testData });
     expect(c.has(lostFirst)).toBe(false); // lost before it was confirmed never counts
     // Containers: the estimate from the goods lines, at least 1 (these orders have none).
     expect(Number(c.get(advance).containers_confirmed)).toBe(1);

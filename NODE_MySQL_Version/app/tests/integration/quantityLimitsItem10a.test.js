@@ -152,6 +152,7 @@ describe('Order line quantity limits (owner decision item 10a)', () => {
       p.append('_csrf', await csrfOf(`/orders/create?client_id=${clientId}`));
       p.append('client_id', String(clientId));
       p.append('incoterm_id', String(incoterm.id));
+      p.append('container_type', '20ft Standard'); // D-376: required
       p.append('currency_id', String(currency.id));
       p.append('payment_preset_id', String(preset.id));
       for (const [d, q, u, c] of [['Small line item 10a', '10', 'SQM', confirm[0]], ['Large line item 10a', '600', 'CBM', confirm[1]]]) {

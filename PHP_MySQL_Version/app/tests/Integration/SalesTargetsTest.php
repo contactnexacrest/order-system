@@ -233,6 +233,7 @@ final class SalesTargetsTest extends DbTestCase
         self::assertSame(['2034-02-16', 'po_pi'], [$c[$poPi]['confirmed_on'], $c[$poPi]['how']]);
         self::assertArrayNotHasKey($withAdvanceTerms, $c, 'PO + PI counts only on no-advance terms');
         self::assertArrayNotHasKey($testData, $c, 'test data never counts');
+        $pdo->exec("UPDATE orders SET is_test_data = 0 WHERE id = {$testData}"); // leave no test data behind (Test Mode cannot be switched off while any exists)
         self::assertArrayNotHasKey($lostFirst, $c, 'lost before it was confirmed never counts');
         // Containers: the estimate from the goods lines, at least 1 (these orders have none).
         self::assertSame(1, (int) $c[$advance]['containers_confirmed']);
