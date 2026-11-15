@@ -78,6 +78,7 @@ use App\Middleware\ClientAuth;
 use App\Middleware\CsrfCheck;
 use App\Middleware\OrderLockGuard;
 use App\Middleware\PermissionCheck;
+use App\Middleware\ReportAccessCheck;
 use App\Middleware\SessionAuth;
 
 $router = new Router();
@@ -314,6 +315,14 @@ $router->post('/admin/sop-access/chapter', [$sopAccess, 'saveChapter'], [Session
 $router->post('/admin/sop-access/role', [$sopAccess, 'saveRole'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/users/{id}/sop-chapters', [$sopAccess, 'addUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/users/{id}/sop-chapters/remove', [$sopAccess, 'removeUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// Owner decision D-379 (15 Nov 2026): Roles and permissions › <role> › Reports tab, its preview and reset, and a person's extra report access.
+$reportAccess = new \App\Controllers\ReportAccessController();
+$router->get('/admin/roles/{id}/reports', [$reportAccess, 'roleTab'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access')]);
+$router->post('/admin/roles/{id}/reports', [$reportAccess, 'saveRole'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access'), CsrfCheck::verify()]);
+$router->post('/admin/roles/{id}/reports/reset', [$reportAccess, 'resetRole'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access'), CsrfCheck::verify()]);
+$router->get('/admin/roles/{id}/reports/preview', [$reportAccess, 'preview'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access')]);
+$router->post('/users/{id}/report-extras', [$reportAccess, 'addUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access'), CsrfCheck::verify()]);
+$router->post('/users/{id}/report-extras/remove', [$reportAccess, 'removeUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_report_access'), CsrfCheck::verify()]);
 // Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
 // Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
 $associateTds = new \App\Controllers\AssociateTdsController();
@@ -501,7 +510,7 @@ $router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [Ses
 
 // Owner decision D-214, phase 4: the system coordinates — My tasks, owners per department, the cockpit, task due days.
 $router->get('/my-tasks', [$coordination, 'myTasks'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
-$router->get('/cockpit', [$coordination, 'cockpit'], [SessionAuth::required(), PermissionCheck::requires('view_cockpit')]);
+$router->get('/cockpit', [$coordination, 'cockpit'], [SessionAuth::required(), PermissionCheck::requires('view_cockpit'), ReportAccessCheck::requires('cockpit')]);
 $router->get('/admin/task-types', [$coordination, 'taskTypes'], [SessionAuth::required(), PermissionCheck::requires('manage_task_types')]);
 $router->post('/admin/task-types', [$coordination, 'updateTaskTypes'], [SessionAuth::required(), PermissionCheck::requires('manage_task_types'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/department-owners', [$coordination, 'setOwner'], [SessionAuth::required(), PermissionCheck::requires('assign_department_owner'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -695,9 +704,9 @@ $router->get('/orders/{id}/products/{productId}/price-approval', [$orders, 'line
 $router->post('/orders/{id}/products/{productId}/price-approval', [$orders, 'approveLinePrice'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/todays-price', [$orders, 'useTodaysPrice'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
-$router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(), PermissionCheck::requires('view_cafin')]);
-$router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports')]);
+$router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(), PermissionCheck::requires('view_cafin'), ReportAccessCheck::requires('cafin')]);
+$router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports')]);
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 // Owner decision 2 Nov 2026 (D-238): send every client and product to Zoho Books again.
@@ -705,8 +714,8 @@ $router->post('/ca/zoho-sync/repush-master-data', [$ca, 'repushMasterData'], [Se
 $router->get('/orders/{id}/zoho-check', [$ca, 'orderZohoCheck'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 // Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
 $router->post('/orders/{id}/zoho-sync', [$ca, 'syncOrderToZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
-$router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
-$router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports', 'all')]);
+$router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports', 'all')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/expenses/{id}/link-order', [$ca, 'linkExpenseToOrder'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -727,7 +736,7 @@ $complianceTracking = new \App\Controllers\ComplianceTrackingController();
 $router->post('/clients/{id}/ecgc', [$complianceTracking, 'saveClientEcgc'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'ca_module_manage']), CsrfCheck::verify()]);
 $router->post('/orders/{id}/ecgc-declaration', [$complianceTracking, 'declareShipment'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'ca_module_manage']), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/tracking', [$complianceTracking, 'saveClaimTracking'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'manage_order_financials']), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->get('/reports/missing-ebrc', [$complianceTracking, 'missingEbrcReport'], [SessionAuth::required(), PermissionCheck::requiresAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials'])]);
+$router->get('/reports/missing-ebrc', [$complianceTracking, 'missingEbrcReport'], [SessionAuth::required(), PermissionCheck::requiresAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials']), ReportAccessCheck::requires('missing_ebrc')]);
 $router->post('/orders/{id}/lc-details', [$orderFinancials, 'saveLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/lc-received', [$orderFinancials, 'recordLcReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/lc/firc', [$orderFinancials, 'recordLcFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -816,18 +825,18 @@ $router->post('/incentives/payouts/paid-all', [$incentives, 'markPaid'], [Sessio
 $router->post('/incentives/payouts/{payoutId}/paid', [$incentives, 'markPaid'], [SessionAuth::required(), PermissionCheck::requires('pay_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cost-entries', [$orderFinancials, 'addCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cost-entries/{entryId}/delete', [$orderFinancials, 'deleteCostEntry'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/bank-statement', [$ca, 'bankStatement'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports', 'all')]);
 $router->post('/ca/bank-statement/upload', [$ca, 'uploadBankStatement'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/match-revenue', [$ca, 'matchBankLineToRevenue'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/match-expense', [$ca, 'matchBankLineToExpense'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/bank-statement/{id}/unmatch', [$ca, 'unmatchBankLine'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
-$router->get('/ca/reconciliation', [$ca, 'reconciliation'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
-$router->get('/ca/export-benefits', [$ca, 'exportBenefits'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/reconciliation', [$ca, 'reconciliation'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports', 'all')]);
+$router->get('/ca/export-benefits', [$ca, 'exportBenefits'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports')]);
 $router->post('/ca/export-benefits', [$ca, 'recordExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/export-benefits/{id}/mark-received', [$ca, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 // Owner decision 2026-10-31 (option A): GST refunds under LUT — claims per period, bank credits, Zoho journals.
 $gstRefunds = new \App\Controllers\GstRefundController();
-$router->get('/ca/gst-refunds', [$gstRefunds, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/gst-refunds', [$gstRefunds, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view'), ReportAccessCheck::requires('ca_reports', 'all')]);
 $router->post('/ca/gst-refunds', [$gstRefunds, 'recordClaim'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/gst-refunds/{id}/credits', [$gstRefunds, 'recordCredit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/gst-refunds/credits/{creditId}/delete', [$gstRefunds, 'deleteCredit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
@@ -1035,7 +1044,7 @@ $router->post('/complaints/{complaintId}/status', [$complaints, 'updateStatus'],
 $router->post('/complaints/{complaintId}/replies', [$complaints, 'postReply'], [SessionAuth::required(), PermissionCheck::requires('respond_to_complaints'), CsrfCheck::verify()]);
 
 // Audit log viewer (Section 14/17) — read-only, no delete route exists anywhere.
-$router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
+$router->get('/audit-log', [$auditLog, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log'), ReportAccessCheck::requires('audit_log')]);
 $router->get('/orders/{id}/audit-log', [$auditLog, 'forOrder'], [SessionAuth::required(), PermissionCheck::requires('view_audit_log')]);
 $router->get('/orders/{id}/dossier', [$orders, 'downloadDossier'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/pi-form-link', [$orders, 'generatePiFormLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -1048,36 +1057,37 @@ $router->get('/notifications', [$notifications, 'index'], [SessionAuth::required
 
 // --- Phase E: dashboard/reports (Section 16), gated on view_reports; saving/deleting a
 // saved report additionally requires manage_report_definitions. ---
-$router->get('/reports', [$reports, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/client/{clientId}', [$reports, 'client'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+// D-379: /reports opens when at least one report is open to the person (no longer view_reports itself).
+$router->get('/reports', [$reports, 'index'], [SessionAuth::required(), ReportAccessCheck::anyReport()]);
+$router->get('/reports/client/{clientId}', [$reports, 'client'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('per_client')]);
 $router->get('/reports/order/{orderId}', [$reports, 'order'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/aggregate', [$reports, 'aggregate'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/queues', [$reports, 'queues'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/payments', [$reports, 'payments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/todays-payments', [$reports, 'todaysPayments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/disputes', [$reports, 'disputes'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports')]);
-$router->get('/reports/ageing', [$reports, 'ageing'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/aggregate', [$reports, 'aggregate'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('aggregate')]);
+$router->get('/reports/queues', [$reports, 'queues'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('queues')]);
+$router->get('/reports/payments', [$reports, 'payments'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('payments')]);
+$router->get('/reports/todays-payments', [$reports, 'todaysPayments'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('todays_payments')]);
+$router->get('/reports/disputes', [$reports, 'disputes'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('disputes')]);
+$router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('amendments')]);
+$router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('trends')]);
+$router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports'), ReportAccessCheck::requires('staff_productivity')]);
+$router->get('/reports/ageing', [$reports, 'ageing'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('ageing')]);
 // Owner decision 1 Nov 2026 (A-7 / A-9): each of these two reports needs only the money it shows.
-$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_logistics_costs')]);
-$router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
-$router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials')]);
+$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_logistics_costs'), ReportAccessCheck::requires('freight_cost')]);
+$router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('product_sales')]);
+$router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices'), ReportAccessCheck::requires('supplier_performance')]);
+$router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), ReportAccessCheck::requires('profitability')]);
 // Owner decision D-245 P5: incentive & commission reports (MD / ED / Accounts — whoever manages or pays incentives or sees the price build-up).
 $incentiveReports = new \App\Controllers\IncentiveReportController();
-$incentiveReportGate = [SessionAuth::required(), PermissionCheck::requiresAny(['manage_incentives', 'pay_incentives', 'view_price_buildup'])];
+$incentiveReportGate = [SessionAuth::required(), PermissionCheck::requiresAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), ReportAccessCheck::requires('incentives')];
 $router->get('/reports/incentives', [$incentiveReports, 'register'], $incentiveReportGate);
 $router->get('/reports/incentives/to-pay', [$incentiveReports, 'toPay'], $incentiveReportGate);
 $router->get('/reports/incentives/owed', [$incentiveReports, 'owed'], $incentiveReportGate);
 $router->get('/reports/incentives/statement', [$incentiveReports, 'statement'], $incentiveReportGate);
-$router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/performance', [$reports, 'performance'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
-$router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
-$router->post('/reports/saved/{reportId}/delete', [$reports, 'deleteDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);
+$router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('conversion')]);
+$router->get('/reports/performance', [$reports, 'performance'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('performance')]);
+$router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), ReportAccessCheck::requires('aggregate'), CsrfCheck::verify()]);
+$router->get('/reports/saved/{reportId}/run', [$reports, 'runDefinition'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), ReportAccessCheck::requires('aggregate')]);
+$router->post('/reports/saved/{reportId}/update', [$reports, 'updateDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), ReportAccessCheck::requires('aggregate'), CsrfCheck::verify()]);
+$router->post('/reports/saved/{reportId}/delete', [$reports, 'deleteDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), ReportAccessCheck::requires('aggregate'), CsrfCheck::verify()]);
 
 // --- Phase E: admin field-override system (Section 13) — every route requires
 // edit_locked_data (Admin/MD by default via the seeded wildcard grant), a mandatory
@@ -1233,12 +1243,13 @@ $router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMis
 $router->get('/pricing/settings', [$pricing, 'settings'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
 $router->post('/pricing/settings', [$pricing, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 // Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
-$router->get('/sales-targets', [$salesTargets, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets')]);
-$router->get('/sales-targets/settings', [$salesTargets, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets')]);
-$router->post('/sales-targets/settings', [$salesTargets, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
-$router->post('/sales-targets/person/{id}', [$salesTargets, 'savePerson'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
-$router->post('/sales-targets/associate/{id}', [$salesTargets, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
-$router->post('/sales-targets/credit/{orderId}', [$salesTargets, 'moveCredit'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), CsrfCheck::verify()]);
+// D-379: Department level = the read-only team view; All (with manage_sales_targets) = the full page.
+$router->get('/sales-targets', [$salesTargets, 'index'], [SessionAuth::required(), ReportAccessCheck::requires('sales_targets', 'department')]);
+$router->get('/sales-targets/settings', [$salesTargets, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all')]);
+$router->post('/sales-targets/settings', [$salesTargets, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
+$router->post('/sales-targets/person/{id}', [$salesTargets, 'savePerson'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
+$router->post('/sales-targets/associate/{id}', [$salesTargets, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
+$router->post('/sales-targets/credit/{orderId}', [$salesTargets, 'moveCredit'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
 $router->get('/pricing/commission-levels', [$pricing, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
 $router->post('/pricing/commission-levels', [$pricing, 'addLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/commission-levels/{id}', [$pricing, 'updateLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);

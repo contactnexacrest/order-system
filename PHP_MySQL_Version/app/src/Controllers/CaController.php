@@ -122,7 +122,8 @@ final class CaController
         $status = (string) ($_GET['status'] ?? 'all');
         $status = isset(\App\Services\CafinExportService::STATUSES[$status]) ? $status : 'all';
         $format = (string) ($_GET['format'] ?? '');
-        $orderIds = \App\Services\CafinExportService::orderIds($fy, $status);
+        // D-379: only the orders the person's CAFIN export level shows.
+        $orderIds = \App\Services\ReportAccess::orderIdsInScope('cafin', \App\Services\CafinExportService::orderIds($fy, $status));
         // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
         $scope = ($_GET['scope'] ?? '') === 'locked' ? 'locked' : 'all';
         if ($scope === 'locked') {
@@ -153,7 +154,8 @@ final class CaController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 
         View::render('ca/index', [
-            'settlements' => CaRepository::settlementRegister(),
+            // D-379: the settlement register limited to the orders the person's CA reports level shows.
+            'settlements' => CaRepository::settlementRegister('ca_reports'),
             'usersById' => $this->usersById(),
             // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
             // stricter ca_module_manage, not the plain ca_module_view every
@@ -183,7 +185,7 @@ final class CaController
                 : (string) ($availableCalendar[0] ?? date('Y'));
         }
 
-        $report = CaRepository::revenueReport($mode, $period);
+        $report = CaRepository::revenueReport($mode, $period, 'ca_reports'); // D-379: rows and totals within the person's level
 
         // 90-item backlog item #13: the CA section had zero CSV export
         // anywhere — the CSV code that existed there was all for
@@ -581,6 +583,16 @@ final class CaController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 
         $benefits = CaExportBenefitRepository::all();
+        $totalClaimed = CaExportBenefitRepository::totalClaimed();
+        $totalReceived = CaExportBenefitRepository::totalReceived();
+        // D-379: below All, only the claims of orders in the person's CA reports level (company-level claims with no order: All only),
+        // and the totals over those claims.
+        $caLevel = \App\Services\ReportAccess::level('ca_reports');
+        if ($caLevel === \App\Services\ReportAccess::OWN || $caLevel === \App\Services\ReportAccess::DEPARTMENT) {
+            $benefits = \App\Services\ReportAccess::visibleRows('ca_reports', $benefits);
+            $totalClaimed = array_sum(array_map(static fn (array $b): float => (float) ($b['claimed_amount'] ?? 0), $benefits));
+            $totalReceived = array_sum(array_map(static fn (array $b): float => (float) ($b['received_amount'] ?? 0), $benefits));
+        }
 
         // 90-item backlog item #13: same CSV-export convention as reports()
         // above — columns match ca/export_benefits.php's table exactly.
@@ -592,8 +604,8 @@ final class CaController
         View::render('ca/export_benefits', [
             'benefits' => $benefits,
             'schemeOptions' => LookupRepository::dropdownOptions('export_benefit_scheme'),
-            'totalClaimed' => CaExportBenefitRepository::totalClaimed(),
-            'totalReceived' => CaExportBenefitRepository::totalReceived(),
+            'totalClaimed' => $totalClaimed,
+            'totalReceived' => $totalReceived,
             'canOverrideFyLock' => CaFyLockGuard::canOverride((int) $user['id'], $roleId),
         ], 'layout/base');
     }

@@ -30,6 +30,14 @@ FROM (
                   AND ((table_name = 'users' AND column_name = 'joined_on')
                     OR (table_name = 'orders' AND column_name IN ('lost_category', 'sales_credit_user_id'))))
               WHEN 7 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-15b',
+         'Report access per role: 2 new tables and the permission Manage report access (D-379)',
+         CASE (SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('role_report_access', 'user_report_extras'))
+            + (SELECT COUNT(*) FROM permissions WHERE permission_key = 'manage_report_access')
+              WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

@@ -70,10 +70,15 @@ final class AuditLogRepository
         ?string $dateFrom = null,
         ?string $dateTo = null,
         int $limit = 100,
-        int $offset = 0
+        int $offset = 0,
+        ?array $userIds = null
     ): array {
         $where = [];
         $params = [];
+        // D-379: the Audit log at Own / Department — only these people's actions (an empty list matches nothing).
+        if ($userIds !== null) {
+            $where[] = $userIds === [] ? '1 = 0' : 'al.user_id IN (' . implode(',', array_map('intval', $userIds)) . ')';
+        }
         if ($entityType) {
             $where[] = 'al.entity_type = :entity_type';
             $params['entity_type'] = $entityType;

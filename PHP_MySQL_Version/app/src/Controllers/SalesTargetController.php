@@ -15,7 +15,9 @@ use App\Services\SalesTargetService;
 
 /**
  * Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings and the
- * MD / ED's edits. Every route needs manage_sales_targets (public_html/index.php); money figures
+ * MD / ED's edits. D-379: GET /sales-targets opens at the Department level of the "Sales targets"
+ * report (read-only team view of the viewer's departments, views/sales_targets/team.php); the full
+ * page and every other route need the All level, which itself needs manage_sales_targets; money figures
  * (₹, margins, average margin per container) also need view_price_buildup
  * (SalesTargetService::canSeeMoney()). Salary is never posted: the calculator on the Targets page
  * runs in the browser only, its inputs have no name and sit outside every form.
@@ -43,6 +45,19 @@ final class SalesTargetController
             if (($_GET['period'] ?? '') === $p['key']) {
                 $chosen = $p;
             }
+        }
+        // Owner decision D-379: below All (Department level), the read-only team view of the viewer's departments —
+        // containers only: no Edit, no money, no calculator, no associates, no settings link.
+        if (\App\Services\ReportAccess::level('sales_targets') !== \App\Services\ReportAccess::ALL) {
+            $team = SalesTargetService::teamData($chosen, $today);
+            $me = (int) (AuthService::currentUser()['id'] ?? 0);
+            $members = array_flip(\App\Services\ReportAccess::departmentMemberIds($me));
+            View::render('sales_targets/team', [
+                'periods' => $periods,
+                'period' => $chosen,
+                'rows' => array_values(array_filter($team['rows'], static fn (array $r): bool => isset($members[(int) $r['user']['id']]))),
+            ], 'layout/base');
+            return;
         }
         $canMoney = SalesTargetService::canSeeMoney();
         View::render('sales_targets/index', [

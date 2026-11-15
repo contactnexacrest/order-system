@@ -94,7 +94,9 @@ final class AuditLogController
             $dateFrom,
             $dateTo,
             self::PAGE_SIZE,
-            (self::PAGE_SIZE) * ($page - 1)
+            (self::PAGE_SIZE) * ($page - 1),
+            // Owner decision D-379: Own = the viewer's own actions, Department = the actions of the people of their departments.
+            \App\Services\ReportAccess::peopleScope('audit_log')
         );
         $rows = \App\Services\AuditMoneyMask::maskAll($rows);
 

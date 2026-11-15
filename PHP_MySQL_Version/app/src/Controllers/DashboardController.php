@@ -83,7 +83,9 @@ final class DashboardController
 
         // Owner decision D-378: "Your target" — the signed-in person's own target only, containers only
         // (the order's FOB only for someone who already sees selling prices).
-        $data['salesTarget'] = \App\Services\SalesTargetService::dashboardFor($userId, date('Y-m-d'), \App\Services\MoneyVisibility::can('selling'));
+        // D-379: the "Your target" box is the Own level of the Sales targets report (off = no box).
+        $data['salesTarget'] = \App\Services\ReportAccess::can('sales_targets', \App\Services\ReportAccess::OWN)
+            ? \App\Services\SalesTargetService::dashboardFor($userId, date('Y-m-d'), \App\Services\MoneyVisibility::can('selling')) : null;
 
         View::render('dashboard/index', $data, 'layout/base');
     }

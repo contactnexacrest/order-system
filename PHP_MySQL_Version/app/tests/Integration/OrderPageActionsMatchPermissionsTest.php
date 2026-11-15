@@ -28,10 +28,20 @@ final class OrderPageActionsMatchPermissionsTest extends DbTestCase
         parent::tearDown();
     }
 
-    /** @return array<int, array{method: string, pattern: string, regex: string, permissions: ?array}> */
+    /**
+     * Every route of index.php with its permission gate and (owner decision D-379) its report-access gate:
+     * report = the report key of ReportAccessCheck::requires() ('any' for ReportAccessCheck::anyReport()),
+     * reportMin = its lowest level (null = the level that opens the report's page).
+     *
+     * @return array<int, array{method: string, pattern: string, regex: string, permissions: ?array, report: ?string, reportMin: ?string}>
+     */
     public static function routes(): array
     {
         $source = (string) file_get_contents(dirname(__DIR__, 3) . '/public_html/index.php');
+        // D-379: a gate list kept in a variable ($incentiveReportGate) is read as if written in place.
+        if (preg_match('#\\$incentiveReportGate = \\[(.*?)\\];#', $source, $gate)) {
+            $source = str_replace('$incentiveReportGate);', '[' . $gate[1] . ']);', $source);
+        }
         preg_match_all("#\\\$router->(get|post)\\('([^']+)',\\s*\\[[^\\]]*\\],\\s*\\[(.*?)\\]\\);#", $source, $matches, PREG_SET_ORDER);
         $routes = [];
         foreach ($matches as [, $method, $pattern, $middleware]) {
@@ -42,8 +52,16 @@ final class OrderPageActionsMatchPermissionsTest extends DbTestCase
                 preg_match_all("#'([^']+)'#", $m[1], $keys);
                 $permissions = $keys[1];
             }
+            $report = null;
+            $reportMin = null;
+            if (preg_match("#ReportAccessCheck::requires\\('([a-z_]+)'(?:,\\s*'([a-z]+)')?\\)#", $middleware, $m)) {
+                $report = $m[1];
+                $reportMin = ($m[2] ?? '') !== '' ? $m[2] : null;
+            } elseif (str_contains($middleware, 'ReportAccessCheck::anyReport()')) {
+                $report = 'any';
+            }
             $regex = '#^' . preg_replace('#\\\\\{[^}]+\\\\\}#', '[^/]+', preg_quote($pattern, '#')) . '$#';
-            $routes[] = ['method' => strtoupper($method), 'pattern' => $pattern, 'regex' => $regex, 'permissions' => $permissions];
+            $routes[] = ['method' => strtoupper($method), 'pattern' => $pattern, 'regex' => $regex, 'permissions' => $permissions, 'report' => $report, 'reportMin' => $reportMin];
         }
         return $routes;
     }

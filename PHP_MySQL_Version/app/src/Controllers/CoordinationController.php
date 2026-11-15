@@ -113,10 +113,22 @@ final class CoordinationController
 
     public function cockpit(array $params): void
     {
-        $tasks = self::visible(DepartmentTaskRepository::open());
+        // Owner decision D-379: Department = the rows of the viewer's departments only; Own = their departments'
+        // rows with only the work they own; All = every department (as before).
+        $level = \App\Services\ReportAccess::level('cockpit');
+        $me = (int) (\App\Services\AuthService::currentUser()['id'] ?? 0);
+        $codes = ($level === \App\Services\ReportAccess::OWN || $level === \App\Services\ReportAccess::DEPARTMENT)
+            ? \App\Services\ReportAccess::departmentCodes($me) : null;
+        $tasks = self::visible(DepartmentTaskRepository::open($codes));
+        if ($level === \App\Services\ReportAccess::OWN) {
+            $tasks = array_values(array_filter($tasks, static fn (array $t): bool => $t['owner_id'] !== null && (int) $t['owner_id'] === $me));
+        }
         // D-269: every active department has a row, with zeros when it has no open work.
         $byDepartment = [];
         foreach (\App\Repositories\DepartmentRepository::departments(true) as $d) {
+            if ($codes !== null && !in_array((string) $d['code'], $codes, true)) {
+                continue;
+            }
             $byDepartment[(string) $d['name']] = ['color' => $d['color'], 'open' => 0, 'overdue' => 0, 'escalated' => 0, 'unowned' => 0];
         }
         foreach ($tasks as $t) {
@@ -131,10 +143,11 @@ final class CoordinationController
             'byDepartment' => $byDepartment,
             'escalated' => array_values(array_filter($tasks, static fn (array $t): bool => (int) $t['escalated'] === 1)),
             'supplierDelays' => array_values(array_filter($tasks, static fn (array $t): bool => $t['task_key'] === 'chase_supplier' && (int) $t['overdue'] === 1)),
-            'ordersByStatus' => DepartmentTaskRepository::ordersByStatus(),
+            'ordersByStatus' => DepartmentTaskRepository::ordersByStatus($codes !== null ? \App\Services\ReportAccess::scopeSql('cockpit', 'o') : null),
             // Owner decision D-378: the sales target box — company target ON and manage_sales_targets;
             // its money lines only with view_price_buildup as well.
-            'salesTargets' => \App\Services\SalesTargetService::canManage() ? \App\Services\SalesTargetService::cockpitBox(date('Y-m-d')) : null,
+            // D-379: and only at the cockpit's All level (the company target is company-wide).
+            'salesTargets' => \App\Services\SalesTargetService::canManage() && $codes === null ? \App\Services\SalesTargetService::cockpitBox(date('Y-m-d')) : null,
             'salesTargetsMoney' => \App\Services\SalesTargetService::canSeeMoney(),
         ], 'layout/base');
     }

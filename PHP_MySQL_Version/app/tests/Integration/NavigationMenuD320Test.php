@@ -58,6 +58,19 @@ final class NavigationMenuD320Test extends DbTestCase
         'mod_merchant_trade' => true, 'mod_associates' => true, 'mod_team_incentive' => true, 'div_gst' => true, 'div_import_duty' => true,
     ];
 
+    /** D-379: every report-access fact true (an effective Super Admin: All for every report). */
+    private static function allFlags(): array
+    {
+        $flags = self::ALL_FLAGS + ['report:any' => true];
+        foreach (array_keys(\App\Services\ReportAccess::REPORTS) as $key) {
+            $flags['report:' . $key] = true;
+            foreach (['own', 'department', 'all'] as $level) {
+                $flags['report:' . $key . ':' . $level] = true;
+            }
+        }
+        return $flags;
+    }
+
     protected function tearDown(): void
     {
         unset($_SERVER['REQUEST_URI']);
@@ -112,19 +125,21 @@ final class NavigationMenuD320Test extends DbTestCase
         );
     }
 
-    public function testTheLeftMenuHasThirteenEntriesInTheDecidedOrder(): void
+    /** D-379 (15 Nov 2026): the Overview group gets "Sales targets" after Reports — 14 entries for whoever may open every page. */
+    public function testTheLeftMenuHasFourteenEntriesInTheDecidedOrder(): void
     {
         $sections = Navigation::config()['sections'];
         self::assertSame(
-            ['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'help', 'users', 'settings'],
+            ['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'sales_targets', 'help', 'users', 'settings'],
             array_column($sections, 'key')
         );
         self::assertSame(
-            ['Dashboard', 'Approvals', 'My tasks', 'Orders', 'Clients', 'Associates', 'Products', 'Procurement & suppliers', 'Finance & accounts', 'Reports', 'Help & SOP', 'Users & roles', 'Settings'],
+            ['Dashboard', 'Approvals', 'My tasks', 'Orders', 'Clients', 'Associates', 'Products', 'Procurement & suppliers', 'Finance & accounts', 'Reports', 'Sales targets', 'Help & SOP', 'Users & roles', 'Settings'],
             array_column($sections, 'label')
         );
-        $built = Navigation::build(static fn (): bool => true, self::ALL_FLAGS, [], '/', []);
-        self::assertCount(13, $built['sidebar']);
+        $built = Navigation::build(static fn (): bool => true, self::allFlags(), [], '/', []);
+        self::assertCount(14, $built['sidebar']);
+        self::assertSame('overview', Navigation::config()['sections'][10]['group'], 'Sales targets sits in the Overview group, after Reports');
         self::assertSame(['Work', 'Overview', 'Help', 'Admin'], array_values(array_filter(array_column($built['sidebar'], 'heading'))));
     }
 
@@ -150,7 +165,7 @@ final class NavigationMenuD320Test extends DbTestCase
             self::assertNotContains($page, $linked, "{$page} was removed from the menu (D-361)");
             self::assertSame('products', Navigation::sectionKeyFor($page), "{$page} keeps Products highlighted");
         }
-        self::assertSame('dashboard', Navigation::build(static fn (): bool => true, self::ALL_FLAGS, [], '/', [])['currentKey']);
+        self::assertSame('dashboard', Navigation::build(static fn (): bool => true, self::allFlags(), [], '/', [])['currentKey']);
     }
 
     /** A menu link is shown exactly to those its route lets in: the same permissions, or Super Admin. */
@@ -180,6 +195,8 @@ final class NavigationMenuD320Test extends DbTestCase
                 return $a;
             };
             self::assertSame($sorted($route['permissions']), $sorted($menu), "{$leaf['href']}: menu condition = route permissions");
+            // D-379: and the same report-access gate (report key and lowest level).
+            self::assertSame([$route['report'], $route['reportMin']], [$leaf['when']['report'] ?? null, $leaf['when']['reportMin'] ?? null], "{$leaf['href']}: menu report condition = route report gate");
             if (in_array('superAdmin', $leaf['when']['flags'] ?? [], true)) {
                 self::assertMatchesRegularExpression('#\$router->get\(\'' . preg_quote($path, '#') . '\',[^\n]*SuperAdminOnly#', $source, "{$path} is Super Admin only");
             }
@@ -198,15 +215,22 @@ final class NavigationMenuD320Test extends DbTestCase
         self::assertSame(['dashboard', 'approvals', 'help', 'settings'], array_column($ports['sidebar'], 'key'));
         self::assertSame('/ports', $ports['sidebar'][3]['href']);
 
-        $viewer = Navigation::build($only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), [], [], '/', []);
+        // D-379: the Reports entry also needs report access (the facts the layout takes from ReportAccess::navFlags()).
+        $viewer = Navigation::build($only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), ['report:any' => true, 'report:audit_log' => true], [], '/', []);
         self::assertSame(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'reports', 'help'], array_column($viewer['sidebar'], 'key'));
+        $noReports = Navigation::build($only('view_orders', 'view_clients', 'view_reports', 'view_audit_log'), [], [], '/', []);
+        self::assertNotContains('reports', array_column($noReports['sidebar'], 'key'), 'view_reports alone no longer shows Reports: every report is Off');
+        $targets = Navigation::build($only(), ['report:sales_targets:department' => true], [], '/', []);
+        self::assertContains('sales_targets', array_column($targets['sidebar'], 'key'), 'Sales targets at the Department level');
+        self::assertSame('/sales-targets', $targets['sidebar'][array_search('sales_targets', array_column($targets['sidebar'], 'key'), true)]['href']);
+        self::assertNotContains('sales_targets', array_column(Navigation::build($only(), ['report:sales_targets:own' => true], [], '/', [])['sidebar'], 'key'), 'Own is the Dashboard box only');
 
         // A module switched off (D-257) hides its pages; a Super Admin page needs the Super Admin.
         $buyer = Navigation::build($only('view_purchase_prices'), ['mod_import_stock' => false, 'mod_merchant_trade' => false], [], '/', []);
         self::assertNotContains('procurement', array_column($buyer['sidebar'], 'key'));
         $buyer = Navigation::build($only('view_purchase_prices'), ['mod_merchant_trade' => true], [], '/merchant', []);
         self::assertSame('/merchant', $buyer['sidebar'][array_search('procurement', array_column($buyer['sidebar'], 'key'), true)]['href']);
-        $admin = Navigation::build(static fn (): bool => true, ['superAdmin' => false] + self::ALL_FLAGS, [], '/users', []);
+        $admin = Navigation::build(static fn (): bool => true, ['superAdmin' => false] + self::allFlags(), [], '/users', []);
         $labels = array_column($admin['bar']['items'], 'label');
         self::assertNotContains('Self-approval rules', $labels);
         self::assertContains('Roles and permissions', $labels);
@@ -229,13 +253,13 @@ final class NavigationMenuD320Test extends DbTestCase
             }
             return $out;
         };
-        self::assertSame(['Active'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/orders/12', [])));
-        self::assertSame(['Archived'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/orders/archived', [])));
-        self::assertSame(['Report'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/reports/associates', [])), 'the longest prefix wins');
+        self::assertSame(['Active'], $active(Navigation::build($all, self::allFlags(), [], '/orders/12', [])));
+        self::assertSame(['Archived'], $active(Navigation::build($all, self::allFlags(), [], '/orders/archived', [])));
+        self::assertSame(['Report'], $active(Navigation::build($all, self::allFlags(), [], '/reports/associates', [])), 'the longest prefix wins');
         // D-362: Global pricing settings is reached only from the Products link bar — no menu item is marked.
-        self::assertSame([], $active(Navigation::build($all, self::ALL_FLAGS, [], '/pricing/settings', [])));
-        self::assertSame(['Prices'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/approvals', ['tab' => 'prices'])));
-        self::assertSame(['All'], $active(Navigation::build($all, self::ALL_FLAGS, [], '/approvals', [])));
+        self::assertSame([], $active(Navigation::build($all, self::allFlags(), [], '/pricing/settings', [])));
+        self::assertSame(['Prices'], $active(Navigation::build($all, self::allFlags(), [], '/approvals', ['tab' => 'prices'])));
+        self::assertSame(['All'], $active(Navigation::build($all, self::allFlags(), [], '/approvals', [])));
         self::assertNull(Navigation::sectionKeyFor('/cafin'), '"/ca" never covers "/cafin"');
 
         $built = Navigation::build($all, self::ALL_FLAGS, ['associateRegistrations' => 2, 'approvals' => 5, 'myTasks' => 3, 'settingsExpiry' => 1], '/associates', []);

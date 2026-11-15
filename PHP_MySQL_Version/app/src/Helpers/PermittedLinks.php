@@ -45,8 +45,8 @@ final class PermittedLinks
         // SUI-002: the product page's "Pricing ready?" list and Market prices link to these.
         '#^/products/\d+/configure(?:[?\#]|$)#'                   => ['manage_product_catalog'],
         '#^/products/\d+/specifications(?:[?\#]|$)#'              => ['view_price_buildup', 'manage_product_specifications', 'manage_pricing'],
-        // Owner decision D-378: the Targets page and its settings.
-        '#^/sales-targets(?:[/?\#]|$)#'                             => ['manage_sales_targets'],
+        // Owner decision D-378: the Targets settings (D-379: the Targets page itself opens by report access — REPORT_ROUTES).
+        '#^/sales-targets/#'                                        => ['manage_sales_targets'],
         '#^/audit-log(?:[/?\#]|$)#'                                 => ['view_audit_log'],
         '#^/ca/cafin-export(?:[/?\#]|$)#'                           => ['view_cafin'],
         '#^/ca/(?:zoho-sync|fy-locks)(?:[/?\#]|$)#'                 => ['ca_module_manage'],
@@ -76,7 +76,8 @@ final class PermittedLinks
         '#^/reports/suppliers(?:[/?\#]|$)#'                         => ['view_purchase_prices'],
         // D-234 (2 Nov 2026): Missing eBRC / FIRC report.
         '#^/reports/missing-ebrc(?:[/?\#]|$)#'                     => ['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials'],
-        '#^/reports(?:[/?\#]|$)#'                                   => ['view_reports'],
+        // D-379: /reports itself opens by report access (REPORT_ROUTES); every page under it still needs view_reports unless listed above.
+        '#^/reports/#'                                              => ['view_reports'],
         '#^/clients(?:[/?\#]|$)#'                                   => ['manage_orders', 'view_clients'],
         '#^/orders(?:[/?\#]|$)#'                                    => ['manage_orders', 'view_orders'],
         '#^/(?:client-intake|pi-intake-review|reorder-requests)(?:[/?\#]|$)#' => ['manage_orders'],
@@ -106,6 +107,53 @@ final class PermittedLinks
         '#^/reports/(?:aggregate|amendments|trends|products|performance)(?:[/?\#]|$)#' => ['selling'],
         '#^/reports/(?:payments|todays-payments|ageing)(?:[/?\#]|$)#'                 => ['buyer_payments'],
     ];
+
+    /**
+     * Owner decision D-379: report pages also need the person's report access (ReportAccess) — the report
+     * key and the lowest level (null = the level that opens its page). Kept apart from RULES, which mirror
+     * the route permissions exactly; these mirror the ReportAccessCheck middleware of the same routes
+     * (PermittedLinksTest checks they match). More specific paths come first.
+     */
+    public const REPORT_ROUTES = [
+        '#^/reports/client/\d+(?:[/?\#]|$)#'                       => ['per_client', null],
+        '#^/reports/(?:aggregate|saved/\d+/run)(?:[/?\#]|$)#'      => ['aggregate', null],
+        '#^/reports/queues(?:[/?\#]|$)#'                           => ['queues', null],
+        '#^/reports/payments(?:[/?\#]|$)#'                         => ['payments', null],
+        '#^/reports/todays-payments(?:[/?\#]|$)#'                  => ['todays_payments', null],
+        '#^/reports/disputes(?:[/?\#]|$)#'                         => ['disputes', null],
+        '#^/reports/amendments(?:[/?\#]|$)#'                       => ['amendments', null],
+        '#^/reports/trends(?:[/?\#]|$)#'                           => ['trends', null],
+        '#^/reports/staff(?:[/?\#]|$)#'                            => ['staff_productivity', null],
+        '#^/reports/ageing(?:[/?\#]|$)#'                           => ['ageing', null],
+        '#^/reports/freight-cost(?:[/?\#]|$)#'                     => ['freight_cost', null],
+        '#^/reports/products(?:[/?\#]|$)#'                         => ['product_sales', null],
+        '#^/reports/suppliers(?:[/?\#]|$)#'                        => ['supplier_performance', null],
+        '#^/reports/order-profitability(?:[/?\#]|$)#'              => ['profitability', null],
+        '#^/reports/incentives(?:[/?\#]|$)#'                       => ['incentives', null],
+        '#^/reports/conversion(?:[/?\#]|$)#'                       => ['conversion', null],
+        '#^/reports/performance(?:[/?\#]|$)#'                      => ['performance', null],
+        '#^/reports/missing-ebrc(?:[/?\#]|$)#'                     => ['missing_ebrc', null],
+        '#^/reports(?:[?\#]|$)#'                                   => ['any', null],
+        '#^/cockpit(?:[/?\#]|$)#'                                  => ['cockpit', null],
+        '#^/audit-log(?:[/?\#]|$)#'                                => ['audit_log', null],
+        '#^/ca/cafin-export(?:[/?\#]|$)#'                          => ['cafin', null],
+        '#^/ca/(?:expenses|tds-summary|bank-statement|reconciliation|gst-refunds)(?:[?\#]|$)#' => ['ca_reports', 'all'],
+        '#^/ca/(?:reports|export-benefits)(?:[?\#]|$)#'            => ['ca_reports', null],
+        '#^/ca(?:[?\#]|$)#'                                        => ['ca_reports', null],
+        '#^/sales-targets/settings(?:[?\#]|$)#'                    => ['sales_targets', 'all'],
+        '#^/sales-targets(?:[?\#]|$)#'                             => ['sales_targets', 'department'],
+    ];
+
+    /** @return array{0: string, 1: ?string}|null [report key or 'any', lowest level] the path's report gate, or null */
+    public static function reportRequiredFor(string $path): ?array
+    {
+        foreach (self::REPORT_ROUTES as $pattern => $gate) {
+            if (preg_match($pattern, $path)) {
+                return $gate;
+            }
+        }
+        return null;
+    }
 
     /** @return list<string>|null the money classes (all of them) the report page needs, or null */
     public static function moneyRequiredFor(string $path): ?array
@@ -140,6 +188,14 @@ final class PermittedLinks
         }
         if (preg_match(self::ORDER_PAGE, $path, $m) && !\App\Services\OrderAccessService::currentUserMaySeeOrderId((int) $m[1])) {
             return false;
+        }
+        $report = self::reportRequiredFor($path);
+        if ($report !== null) {
+            [$key, $min] = $report;
+            $open = $key === 'any' ? \App\Services\ReportAccess::anyOpen() : \App\Services\ReportAccess::can($key, $min ?? \App\Services\ReportAccess::pageMin($key));
+            if (!$open) {
+                return false;
+            }
         }
         foreach (self::moneyRequiredFor($path) ?? [] as $class) {
             if (!\App\Services\MoneyVisibility::can($class)) {

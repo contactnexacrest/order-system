@@ -1,208 +1,142 @@
 <?php
+/**
+ * Owner decision D-379 (15 Nov 2026): the Reports page — 7 section boxes in a fixed order, each with
+ * only the reports this person may open (App\Services\ReportAccess; button text = the report's label),
+ * and a banner when every open order report shows only their own business or their department's.
+ * With $previewRole set it is "See Reports as this role": the same boxes, read-only (no links, no data).
+ * One view for the Standard and the Kanban template. Node twin: NODE_MySQL_Version/app/views/reports/index.njk
+ */
 use App\Helpers\Csrf;
 use App\Services\AuthService;
+use App\Services\ReportAccess;
 $__u = AuthService::currentUser();
 $__uid = $__u ? (int) $__u['id'] : 0;
+$__preview = $previewRole !== null;
+$__button = static function (string $key) use ($__preview): string {
+    $r = ReportAccess::REPORTS[$key];
+    $label = htmlspecialchars($r['label']);
+    if ($__preview || $r['href'] === null) {
+        return '<span class="btn-sm btn-secondary" aria-disabled="true">' . $label . '</span>';
+    }
+    return '<a class="btn-sm" href="' . htmlspecialchars($r['href']) . '">' . $label . '</a>';
+};
 ?>
-<div class="card page-wide">
+<div class="card page-wide" id="reports-page">
+  <?php if ($__preview): ?>
+    <div class="alert alert-info" id="reports-preview-banner">Preview as <?= htmlspecialchars((string) $previewRole['name']) ?> — what this role sees on the Reports page (its own levels and permissions; a person's extra report access is not included). Read-only. <a href="/admin/roles/<?= (int) $previewRole['id'] ?>/reports">Back to the Reports tab</a></div>
+  <?php endif; ?>
   <h1>Reports</h1>
-  <p class="muted">Per-client and per-order reports are one click from that client's or order's own screen. This page covers the aggregate report and your saved report definitions.</p>
-
-  <?php // UI-006: a report that shows amounts is offered only to people who may see them (the page answers 403 otherwise). ?>
-  <?php if (!empty($sees['selling'])): ?>
-  <div class="section">
-    <h2>Aggregate Report</h2>
-    <p class="muted">Filter orders by date range, stage, Incoterm, or country.</p>
-    <a class="btn-sm" href="/reports/aggregate">Open Aggregate Report</a>
-  </div>
+  <p class="muted">Per-order reports are one click from the order's own screen ("Full report").</p>
+  <?php if ($banner !== null): ?>
+    <div class="alert alert-info" id="reports-scope-banner"><?= htmlspecialchars($banner) ?></div>
+  <?php endif; ?>
+  <?php if ($sections === []): ?>
+    <p class="muted">No report is open to <?= $__preview ? 'this role' : 'you' ?>.</p>
   <?php endif; ?>
 
-  <div class="section">
-    <h2>Operations Queues</h2>
-    <p class="muted">How many quotations/PIs/POs/CIs are sitting in each queue right now, plus quotation/PI sent-won-lost totals for a date range.</p>
-    <a class="btn-sm" href="/reports/queues">Open Operations Queues</a>
-  </div>
-
-  <?php if (!empty($sees['buyer_payments'])): ?>
-  <div class="section">
-    <h2>Payments Report</h2>
-    <p class="muted">Total collected vs. outstanding across the whole business, by currency — advance, balance, and freight.</p>
-    <a class="btn-sm" href="/reports/payments">Open Payments Report</a>
-  </div>
-  <?php endif; ?>
-
-  <?php if (!empty($sees['buyer_payments'])): ?>
-  <div class="section">
-    <h2>Today's Payments</h2>
-    <p class="muted">What actually cleared/was paid on a specific day, both incoming (buyer) and outgoing (supplier).</p>
-    <a class="btn-sm" href="/reports/todays-payments">Open Today's Payments</a>
-  </div>
-  <?php endif; ?>
-
-  <?php if (!empty($sees['buyer_payments'])): ?>
-  <div class="section">
-    <h2>Debtors / Receivables Ageing</h2>
-    <p class="muted">Every outstanding leg, bucketed by how overdue it is — Current, 1-30, 31-60, 61-90, 90+ days.</p>
-    <a class="btn-sm" href="/reports/ageing">Open Ageing Report</a>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
-    <h2>Missing eBRC / FIRC</h2>
-    <p class="muted">Buyer payments received with no FIRC / eBRC reference yet — settling an order does not wait for them, this list does the chasing.</p>
-    <a class="btn-sm" href="/reports/missing-ebrc">Open Missing eBRC / FIRC</a>
-  </div>
-
-  <div class="section">
-    <h2>Disputes &amp; Amendments</h2>
-    <p class="muted">Status/aging breakdown for disputes, and status/requested-by breakdown for amendments — across all orders.</p>
-    <div class="btn-row">
-      <a class="btn-sm" href="/reports/disputes">Open Dispute Report</a>
-      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/amendments">Open Amendment Report</a><?php endif; ?>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Trends &amp; Conversion</h2>
-    <p class="muted">Orders created, quotations/PI sent, lost, and FOB value month over month; plus the funnel shown as conversion percentages.</p>
-    <div class="btn-row">
-      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/trends">Open Trends</a><?php endif; ?>
-      <a class="btn-sm" href="/reports/conversion">Open Conversion Rate Report</a>
-      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/performance">Open Sales Performance Report</a><?php endif; ?>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Freight, Products &amp; Suppliers</h2>
-    <p class="muted">Freight cost by forwarder, sales by product/HS code, and supplier signing/delivery performance.</p>
-    <div class="btn-row">
-      <?php if ($sees['logistics']): ?><a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a><?php endif; ?>
-      <?php if (!empty($sees['selling'])): ?><a class="btn-sm" href="/reports/products">Open Product Sales Report</a><?php endif; ?>
-      <?php if ($sees['purchase'] ?? false): ?><a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a><?php endif; ?>
-    </div>
-  </div>
-
-  <?php if ($canViewStaffReports): ?>
-  <div class="section">
-    <h2>Staff Productivity</h2>
-    <p class="muted">Documents generated and audit-log activity per user.</p>
-    <a class="btn-sm" href="/reports/staff">Open Staff Productivity Report</a>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($canManageOrderFinancials): ?>
-  <div class="section">
-    <h2>Order Profitability</h2>
-    <p class="muted">Revenue vs. every direct cost, per order, for any date range — month, quarter, half-year, or financial year. Visible only to Super Admin and roles specifically granted "Manage order financials".</p>
-    <a class="btn-sm" href="/reports/order-profitability">Open Order Profitability Report</a>
-  </div>
-  <?php endif; ?>
-
-  <?php // Owner decision D-245 P5: incentive & commission reports. ?>
-  <?php if ($__u && (\App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_incentives') || \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'pay_incentives') || \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_price_buildup'))): ?>
-  <div class="section">
-    <h2>Incentives &amp; Commission</h2>
-    <p class="muted">Every staff share and associate commission per order — estimated until the MD locks the order, then locked, held or paid. What falls in this month's and next month's payout run, what is owed at a date, and one person's statement.</p>
-    <a class="btn-sm" href="/reports/incentives">Register</a> <a class="btn-sm" href="/reports/incentives/to-pay">To pay</a> <a class="btn-sm" href="/reports/incentives/owed">Owed at month end</a> <a class="btn-sm" href="/reports/incentives/statement">Person statement</a>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($__u && \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_cafin')): ?>
-  <div class="section">
-    <h2>CAFIN export</h2>
-    <p class="muted">The CA Financial Annexure of every order of a financial year, as CSV: a summary row per order, or every CAFIN line. Internal only — never for the client.</p>
-    <a class="btn-sm" href="/ca/cafin-export">Open CAFIN export</a>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
-    <h2>Find an Order</h2>
-    <p class="muted">Search by order reference or client company name to jump straight to that order's Full Report.</p>
-    <form method="get" action="/reports" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-      <label style="display:inline-block;width:auto;">Order reference or client name
-        <input type="text" name="q" value="<?= htmlspecialchars($searchQuery ?? '') ?>" placeholder="e.g., NC/SC/ORD/26/0411001 or Test Company Ltd" style="width:280px;">
-      </label>
-      <button type="submit" class="btn-sm">Search</button>
-    </form>
-    <?php if (($searchQuery ?? '') !== ''): ?>
-      <table class="list" style="margin-top:0.75rem;">
-        <tr><th>Order Ref</th><th>Client</th><th>Status</th><th>Created</th><th></th></tr>
-        <?php foreach ($searchResults as $sr): ?>
-        <tr>
-          <td><?= htmlspecialchars($sr['order_reference']) ?></td>
-          <td><?= htmlspecialchars($sr['company_legal_name']) ?></td>
-          <td><?= htmlspecialchars(ucfirst($sr['status'])) ?></td>
-          <td><?= htmlspecialchars($sr['created_at']) ?></td>
-          <td><a href="/reports/order/<?= (int) $sr['id'] ?>">Full Report</a> · <a href="/orders/<?= (int) $sr['id'] ?>">View Order</a></td>
-        </tr>
-        <?php endforeach; ?>
-        <?php if (empty($searchResults)): ?><tr><td colspan="5" class="muted">No orders match "<?= htmlspecialchars($searchQuery) ?>".</td></tr><?php endif; ?>
-      </table>
-    <?php endif; ?>
-  </div>
-
-  <?php if (!empty($sees['selling']) && !empty($sees['buyer_payments'])): ?>
-  <div class="section">
-    <h2>Per-Client Report</h2>
-    <table class="list">
-      <tr><th>Buyer Inquiry Ref</th><th>Company</th><th></th></tr>
-      <?php foreach ($clients as $c): ?>
-      <tr>
-        <td><?= htmlspecialchars($c['client_unique_number']) ?></td>
-        <td><?= htmlspecialchars($c['company_legal_name']) ?></td>
-        <td><a href="/reports/client/<?= (int) $c['id'] ?>">Run Report</a></td>
-      </tr>
-      <?php endforeach; ?>
-      <?php if (empty($clients)): ?><tr><td colspan="3" class="muted">No clients yet.</td></tr><?php endif; ?>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
-    <h2>Per-Order Report</h2>
-    <p class="muted">Open any order and use its "Full Report" link, or go directly to <code>/reports/order/&lt;id&gt;</code>.</p>
-  </div>
-
-  <div class="section">
-    <h2>Saved Reports</h2>
-    <?php if (empty($savedReports)): ?>
-      <p class="muted">No saved reports yet — save one from the Aggregate Report screen.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
-        <?php foreach ($savedReports as $r): ?>
-        <tr>
-          <?php if ((int) $r['owner_user_id'] === $__uid): ?>
-          <td colspan="5">
-            <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <?= Csrf::field() ?>
-              <input type="text" name="name" value="<?= htmlspecialchars($r['name']) ?>" placeholder="Report name" aria-label="Report name" required style="width:200px">
-              <select name="visibility" aria-label="Visibility">
-                <option value="private" <?= $r['visibility'] === 'private' ? 'selected' : '' ?>>Private</option>
-                <option value="shared" <?= $r['visibility'] === 'shared' ? 'selected' : '' ?>>Shared</option>
-              </select>
-              <button type="submit" class="btn-sm">Save</button>
-              <span class="muted small"><?= htmlspecialchars($r['report_type']) ?> &middot; last run <?= htmlspecialchars($r['last_run_at'] ?? 'never') ?></span>
-            </form>
-          </td>
+  <?php foreach ($sections as $__section => $__keys): ?>
+  <div class="section report-section" id="reports-<?= htmlspecialchars($__section) ?>" data-report-section="<?= htmlspecialchars($__section) ?>">
+    <h2><?= htmlspecialchars(ReportAccess::SECTIONS[$__section]) ?></h2>
+    <?php foreach ($__keys as $__key): $__r = ReportAccess::REPORTS[$__key]; ?>
+    <div class="report-item" data-report="<?= htmlspecialchars($__key) ?>" style="margin:0 0 0.75rem">
+      <?php if ($__key === 'order_search'): ?>
+        <strong><?= htmlspecialchars($__r['label']) ?></strong> <span class="muted small"><?= htmlspecialchars($__r['description']) ?></span>
+        <?php if (!$__preview): ?>
+        <form method="get" action="/reports" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:4px">
+          <input type="text" name="q" value="<?= htmlspecialchars($searchQuery ?? '') ?>" placeholder="e.g., NC/SC/ORD/26/0411001 or Test Company Ltd" aria-label="Order reference or client name" required maxlength="100" style="width:280px;">
+          <button type="submit" class="btn-sm">Search</button>
+        </form>
+        <?php if (($searchQuery ?? '') !== ''): ?>
+          <table class="list" style="margin-top:0.75rem;">
+            <tr><th>Order Ref</th><th>Client</th><th>Status</th><th>Created</th><th></th></tr>
+            <?php foreach ($searchResults as $sr): ?>
+            <tr>
+              <td><?= htmlspecialchars($sr['order_reference']) ?></td>
+              <td><?= htmlspecialchars($sr['company_legal_name']) ?></td>
+              <td><?= htmlspecialchars(ucfirst($sr['status'])) ?></td>
+              <td><?= htmlspecialchars($sr['created_at']) ?></td>
+              <td><a href="/reports/order/<?= (int) $sr['id'] ?>">Full Report</a> · <a href="/orders/<?= (int) $sr['id'] ?>">View Order</a></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php if (empty($searchResults)): ?><tr><td colspan="5" class="muted">No orders match "<?= htmlspecialchars($searchQuery) ?>".</td></tr><?php endif; ?>
+          </table>
+        <?php endif; ?>
+        <?php endif; ?>
+      <?php elseif ($__key === 'per_client'): ?>
+        <?php if ($__preview): ?>
+          <?= $__button($__key) ?> <span class="muted small"><?= htmlspecialchars($__r['description']) ?></span>
+        <?php else: ?>
+        <details id="per-client">
+          <summary class="btn-sm"><?= htmlspecialchars($__r['label']) ?></summary>
+          <table class="list" style="margin-top:0.5rem">
+            <tr><th>Buyer Inquiry Ref</th><th>Company</th><th></th></tr>
+            <?php foreach ($clients as $c): ?>
+            <tr>
+              <td><?= htmlspecialchars($c['client_unique_number']) ?></td>
+              <td><?= htmlspecialchars($c['company_legal_name']) ?></td>
+              <td><a href="/reports/client/<?= (int) $c['id'] ?>">Run Report</a></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php if (empty($clients)): ?><tr><td colspan="3" class="muted">No clients yet.</td></tr><?php endif; ?>
+          </table>
+        </details>
+        <span class="muted small"><?= htmlspecialchars($__r['description']) ?></span>
+        <?php endif; ?>
+      <?php else: ?>
+        <?= $__button($__key) ?> <span class="muted small"><?= htmlspecialchars($__r['description']) ?></span>
+        <?php if ($__key === 'incentives' && !$__preview): ?>
+          <span class="small"><a href="/reports/incentives/to-pay">To pay</a> · <a href="/reports/incentives/owed">Owed at month end</a> · <a href="/reports/incentives/statement">Person statement</a></span>
+        <?php endif; ?>
+        <?php if ($__key === 'aggregate' && !$__preview): ?>
+        <div class="saved-reports" id="saved-reports" style="margin-top:0.5rem">
+          <strong class="small">Saved reports</strong>
+          <?php if (empty($savedReports)): ?>
+            <p class="muted small">No saved reports yet — save one from the Aggregate report screen.</p>
           <?php else: ?>
-          <td><?= htmlspecialchars($r['name']) ?></td>
-          <td><?= htmlspecialchars($r['report_type']) ?></td>
-          <td><?= htmlspecialchars($r['owner_name']) ?></td>
-          <td><?= htmlspecialchars(ucfirst($r['visibility'])) ?></td>
+            <table class="list">
+              <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
+              <?php foreach ($savedReports as $r): ?>
+              <tr>
+                <?php if ((int) $r['owner_user_id'] === $__uid): ?>
+                <td colspan="5">
+                  <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <?= Csrf::field() ?>
+                    <input type="text" name="name" value="<?= htmlspecialchars($r['name']) ?>" placeholder="Report name" aria-label="Report name" required style="width:200px">
+                    <select name="visibility" aria-label="Visibility">
+                      <option value="private" <?= $r['visibility'] === 'private' ? 'selected' : '' ?>>Private</option>
+                      <option value="shared" <?= $r['visibility'] === 'shared' ? 'selected' : '' ?>>Shared</option>
+                    </select>
+                    <button type="submit" class="btn-sm">Save</button>
+                    <span class="muted small"><?= htmlspecialchars($r['report_type']) ?> &middot; last run <?= htmlspecialchars($r['last_run_at'] ?? 'never') ?></span>
+                  </form>
+                </td>
+                <?php else: ?>
+                <td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= htmlspecialchars($r['report_type']) ?></td>
+                <td><?= htmlspecialchars($r['owner_name']) ?></td>
+                <td><?= htmlspecialchars(ucfirst($r['visibility'])) ?></td>
+                <?php endif; ?>
+                <td>
+                  <a href="/reports/saved/<?= (int) $r['id'] ?>/run">Run</a>
+                  <?php if ((int) $r['owner_user_id'] === $__uid): ?>
+                  <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/delete" style="display:inline">
+                    <?= Csrf::field() ?>
+                    <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this saved report?')">Delete</button>
+                  </form>
+                  <?php endif; ?>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </table>
           <?php endif; ?>
-          <td>
-            <a href="/reports/saved/<?= (int) $r['id'] ?>/run">Run</a>
-            <?php if ((int) $r['owner_user_id'] === $__uid): ?>
-            <form method="post" action="/reports/saved/<?= (int) $r['id'] ?>/delete" style="display:inline">
-              <?= Csrf::field() ?>
-              <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this saved report?')">Delete</button>
-            </form>
-            <?php endif; ?>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </table>
-    <?php endif; ?>
+        </div>
+        <?php endif; ?>
+      <?php endif; ?>
+      <?php if (($levels[$__key] ?? 'all') !== ReportAccess::ALL): ?>
+        <span class="badge badge-info small" title="How far this report reaches for <?= $__preview ? 'this role' : 'you' ?>"><?= htmlspecialchars(ReportAccess::LEVEL_LABELS[$levels[$__key]]) ?></span>
+      <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
   </div>
+  <?php endforeach; ?>
 </div>

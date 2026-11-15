@@ -12,7 +12,8 @@ namespace App\Services;
  * holds the same logic).
  *
  * Pure: it is given what the person may do ($can), the facts the config
- * asks about ($flags), the live counts and the page being shown, and returns
+ * asks about ($flags — D-379: including the report-access facts report:<key>,
+ * report:<key>:<level> and report:any), the live counts and the page being shown, and returns
  * plain arrays for views/layout/base.php and views/partials/section_nav.php.
  * A page joins its section's menu bar by its path alone, so a new page under
  * a section's prefix gets the bar without any change to the page.
@@ -68,6 +69,14 @@ final class Navigation
         }
         foreach ($when['flags'] ?? [] as $flag) {
             if (empty($flags[$flag])) {
+                return false;
+            }
+        }
+        // Owner decision D-379: report access — the fact "report:<key>" (the page opens), "report:<key>:<level>"
+        // (the level reaches reportMin) or "report:any", worked out by the layout from ReportAccess::navFlags().
+        if (isset($when['report'])) {
+            $fact = 'report:' . $when['report'] . (isset($when['reportMin']) ? ':' . $when['reportMin'] : '');
+            if (empty($flags[$fact])) {
                 return false;
             }
         }

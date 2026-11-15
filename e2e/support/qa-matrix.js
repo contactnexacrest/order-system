@@ -98,16 +98,32 @@ function resolveIds() {
   };
 }
 
-/** Gate verdict for a permission set: true = allow, false = deny, null = not decided by a permission. */
-function gateAllows(route, perms) {
+const LEVEL_RANK = { off: 0, own: 1, department: 2, all: 3 };
+
+/**
+ * Owner decision D-379: the report-access verdict of a route for a role's report levels (Map report key => level),
+ * or null when the route has no report gate (inventory route.report_access {report, min_level}).
+ * 'any' = at least one report not Off (the /reports gate); Sales targets opens its page at Department.
+ */
+function reportAllows(route, levels) {
+  const ra = route.report_access;
+  if (!ra || !levels) return null;
+  if (ra.report === 'any') return [...levels.values()].some((l) => (LEVEL_RANK[l] || 0) >= 1);
+  const min = ra.min_level || (ra.report === 'sales_targets' ? 'department' : 'own');
+  return (LEVEL_RANK[levels.get(ra.report) || 'off'] || 0) >= LEVEL_RANK[min];
+}
+
+/** Gate verdict for a permission set (and, D-379, report levels): true = allow, false = deny, null = not decided by a permission. */
+function gateAllows(route, perms, levels = null) {
   // Inventory gates: a string must be held; an array is "any one of these".
   const terms = [...(route.requires_all || []), ...(route.requires_any || [])];
-  if (!terms.length) return null;
+  const report = reportAllows(route, levels);
+  if (!terms.length) return report;
   const has = (t) => (Array.isArray(t) ? t.some((k) => has(k)) : perms.has(t));
   const all = (route.requires_all || []).every(has);
   const anyList = route.requires_any || [];
   const anyOk = !anyList.length || (anyList.every((t) => Array.isArray(t)) ? anyList.every(has) : anyList.some(has));
-  return all && anyOk;
+  return all && anyOk && report !== false;
 }
 
 const ERROR_MARKERS = [
@@ -165,6 +181,8 @@ function setup(inventory) {
   if (order) sql(`INSERT IGNORE INTO order_assignees (order_id, user_id) SELECT ${order}, id FROM users WHERE email LIKE '%@${MAIL_DOMAIN}'`);
   for (const u of users) {
     u.perms = new Set(rows(`SELECT p.permission_key FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ${u.roleId} AND rp.is_enabled = 1`).map((r) => r[0]));
+    // D-379: the role's report levels (no row = Off); a level opens nothing without the report's own permission.
+    u.reportLevels = new Map(rows(`SELECT report_key, level FROM role_report_access WHERE role_id = ${u.roleId}`).map((r) => [r[0], r[1]]));
   }
   return users;
 }
@@ -183,7 +201,7 @@ function cleanup() {
 }
 
 function classify(route, user, status, body, location) {
-  const gate = gateAllows(route, user.perms);
+  const gate = gateAllows(route, user.perms, user.reportLevels);
   const issues = [];
   if (status >= 500) issues.push(`HTTP ${status}`);
   const hit = ERROR_MARKERS.find((re) => re.test(body));
@@ -247,4 +265,4 @@ function loadInventory() {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-module.exports = { setup, cleanup, run, divisionSample, loadInventory, gateAllows, isNode, baseUrl, PASSWORD, MAIL_DOMAIN, sql, rows };
+module.exports = { setup, cleanup, run, divisionSample, loadInventory, gateAllows, reportAllows, isNode, baseUrl, PASSWORD, MAIL_DOMAIN, sql, rows };

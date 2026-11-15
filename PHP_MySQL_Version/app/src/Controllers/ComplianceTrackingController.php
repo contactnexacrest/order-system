@@ -139,7 +139,8 @@ final class ComplianceTrackingController
     /** GET /reports/missing-ebrc (?format=csv) */
     public function missingEbrcReport(array $params): void
     {
-        $rows = ComplianceTrackingService::missingFircReport();
+        // D-379: only the orders the person's Missing eBRC / FIRC level shows (closes an unscoped report).
+        $rows = \App\Services\ReportAccess::visibleRows('missing_ebrc', ComplianceTrackingService::missingFircReport());
         $showAmounts = MoneyVisibility::can(MoneyVisibility::BUYER_PAYMENTS);
         if (($_GET['format'] ?? '') === 'csv') {
             $headers = ['Order', 'Buyer', 'Payment', 'Received on', 'Days since receipt', 'Owner'];

@@ -1,5 +1,5 @@
 {
-  "_about": "Owner decision D-320 (11 Nov 2026, point 26): the one menu config. The left menu (13 entries) and every section's menu bar are built from this file by App\\Services\\Navigation (PHP) and src/services/navigation.js (Node). The file is the same, byte for byte, in both stacks (navigationConfig tests). A section owns the pages whose path starts with one of its prefixes (the longest prefix wins). 'count' on a section shows that count beside its left-menu entry on every page (Approvals, My tasks, Zoho waiting, settings near expiry). A section is shown when the person can open at least one of its items; its left-menu link is the first such item that opens in the same tab. 'when': any = at least one of these permissions, all = every one, flags = every one of these facts (worked out by each stack: superAdmin, sopOpen, approver, mod_<module>, div_gst, div_import_duty). 'count' names a live count. 'children' makes a drop-down. 'activeQuery' marks the item active only for these values of a query parameter ('' = not given). An item whose link has a #part is never marked active.",
+  "_about": "Owner decision D-320 (11 Nov 2026, point 26): the one menu config. The left menu (13 entries) and every section's menu bar are built from this file by App\\Services\\Navigation (PHP) and src/services/navigation.js (Node). The file is the same, byte for byte, in both stacks (navigationConfig tests). A section owns the pages whose path starts with one of its prefixes (the longest prefix wins). 'count' on a section shows that count beside its left-menu entry on every page (Approvals, My tasks, Zoho waiting, settings near expiry). A section is shown when the person can open at least one of its items; its left-menu link is the first such item that opens in the same tab. 'when': any = at least one of these permissions, all = every one, flags = every one of these facts (worked out by each stack: superAdmin, sopOpen, approver, mod_<module>, div_gst, div_import_duty). 'count' names a live count. 'children' makes a drop-down. 'activeQuery' marks the item active only for these values of a query parameter ('' = not given). An item whose link has a #part is never marked active. Owner decision D-379: 'when': report = the person's report access (App\\Services\\ReportAccess / src/services/reportAccess.js) must open that report's page ('any' = at least one report), reportMin = the lowest level it needs (own / department / all); each stack gives these as the facts report:<key>, report:<key>:<level> and report:any.",
   "groups": {
     "work": "Work",
     "overview": "Overview",
@@ -142,14 +142,14 @@
       "prefixes": ["/ca", "/incentives", "/my-incentives"],
       "icon": "<line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"23\"></line><path d=\"M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\"></path>",
       "items": [
-        { "label": "CA / Accounting", "href": "/ca", "when": { "any": ["ca_module_view"] } },
+        { "label": "CA / Accounting", "href": "/ca", "when": { "any": ["ca_module_view"], "report": "ca_reports" } },
         { "label": "Zoho sync", "href": "/ca/zoho-sync", "when": { "any": ["ca_module_manage"] }, "count": "zohoWaiting" },
         { "label": "Incentive payouts", "href": "/incentives/payouts", "when": { "any": ["pay_incentives"], "flags": ["mod_team_incentive"] } },
         { "label": "My incentives", "href": "/my-incentives", "when": { "any": ["view_own_incentives"], "flags": ["mod_team_incentive"] } },
         { "label": "Team incentive settings", "href": "/incentives/settings", "match": ["/incentives/ready"], "when": { "any": ["manage_incentives"], "flags": ["mod_team_incentive"] } }
       ],
       "crossLinks": [
-        { "label": "Open in Reports ›", "href": "/reports", "onPaths": ["/ca"], "when": { "any": ["view_reports"] } }
+        { "label": "Open in Reports ›", "href": "/reports", "onPaths": ["/ca"], "when": { "report": "any" } }
       ]
     },
     {
@@ -159,11 +159,22 @@
       "prefixes": ["/reports", "/cockpit", "/audit-log"],
       "icon": "<path d=\"M3 3v18h18\"></path><path d=\"M18 17V9\"></path><path d=\"M13 17V5\"></path><path d=\"M8 17v-3\"></path>",
       "items": [
-        { "label": "All reports", "href": "/reports", "when": { "any": ["view_reports"] } },
-        { "label": "Freight cost", "href": "/reports/freight-cost", "when": { "any": ["view_logistics_costs"] } },
-        { "label": "Supplier report", "href": "/reports/suppliers", "when": { "any": ["view_purchase_prices"] } },
-        { "label": "Management cockpit", "href": "/cockpit", "when": { "any": ["view_cockpit"] } },
-        { "label": "Audit log", "href": "/audit-log", "when": { "any": ["view_audit_log"] } }
+        { "label": "All reports", "href": "/reports", "when": { "report": "any" } },
+        { "label": "Freight cost", "href": "/reports/freight-cost", "when": { "any": ["view_logistics_costs"], "report": "freight_cost" } },
+        { "label": "Supplier report", "href": "/reports/suppliers", "when": { "any": ["view_purchase_prices"], "report": "supplier_performance" } },
+        { "label": "Management cockpit", "href": "/cockpit", "when": { "any": ["view_cockpit"], "report": "cockpit" } },
+        { "label": "Audit log", "href": "/audit-log", "when": { "any": ["view_audit_log"], "report": "audit_log" } }
+      ]
+    },
+    {
+      "key": "sales_targets",
+      "label": "Sales targets",
+      "group": "overview",
+      "prefixes": ["/sales-targets"],
+      "icon": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><circle cx=\"12\" cy=\"12\" r=\"6\"></circle><circle cx=\"12\" cy=\"12\" r=\"2\"></circle>",
+      "items": [
+        { "label": "Sales targets", "href": "/sales-targets", "when": { "report": "sales_targets", "reportMin": "department" } },
+        { "label": "Settings", "href": "/sales-targets/settings", "when": { "any": ["manage_sales_targets"], "report": "sales_targets", "reportMin": "all" } }
       ]
     },
     {

@@ -151,6 +151,9 @@ final class DivisionIsolationTest extends DbTestCase
             $pdo->prepare("INSERT INTO email_log (order_id, recipient_email, subject, body_snapshot, status) VALUES (:o, 'buyer@division.test', 'PHPUnit division', 'x', 'pending_approval')")->execute(['o' => $orderId]);
         }
         $pdo->exec("UPDATE orders SET status = 'active' WHERE id IN ({$this->expOrder}, {$this->domOrder})");
+        // D-379: the Sales/Export Manager's reports reach their department's orders (no longer every order through
+        // view_all_orders), so each division's order is assigned to its own staff member.
+        $pdo->exec("INSERT IGNORE INTO order_assignees (order_id, user_id) VALUES ({$this->expOrder}, {$this->expStaff}), ({$this->domOrder}, {$this->domStaff})");
 
         foreach ([[$this->expStaff, $this->expOrder, $this->domOrder, $this->expClient, $this->domClient], [$this->domStaff, $this->domOrder, $this->expOrder, $this->domClient, $this->expClient]] as [$user, $own, $other, $ownClient, $otherClient]) {
             $this->actAs($user);

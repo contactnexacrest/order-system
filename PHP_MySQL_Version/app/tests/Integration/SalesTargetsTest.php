@@ -430,6 +430,9 @@ final class SalesTargetsTest extends DbTestCase
         $pdo->exec("INSERT IGNORE INTO roles (name, description, is_system_role) VALUES ('Test Role — Targets Only', 'Test only', 0)");
         $pdo->exec("INSERT IGNORE INTO role_permissions (role_id, permission_id)
                     SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_sales_targets' WHERE r.name = 'Test Role — Targets Only'");
+        // D-379: the full Targets page is the All level of the Sales targets report.
+        $pdo->exec("INSERT IGNORE INTO role_report_access (role_id, report_key, level)
+                    SELECT r.id, 'sales_targets', 'all' FROM roles r WHERE r.name = 'Test Role — Targets Only'");
         $this->companyRows[] = SalesTargetRepository::insertCompanyRow('2000-01-01', 100000.0, 50000.0, 'PHPUnit D-378 money', 1);
 
         $this->signIn($this->createTestUser('Test Role — Targets Only'));
@@ -487,8 +490,14 @@ final class SalesTargetsTest extends DbTestCase
         preg_match_all("#\\\$router->(?:get|post)\\('/sales-targets[^']*',[^\n]*#", $routes, $m);
         self::assertCount(6, $m[0]);
         foreach ($m[0] as $line) {
-            self::assertStringContainsString("PermissionCheck::requires('manage_sales_targets')", $line);
             self::assertStringNotContainsString('AssociateAuth', $line);
+            if (str_starts_with($line, "\$router->get('/sales-targets',")) {
+                // D-379: the page opens at the Department level of the Sales targets report (read-only team view).
+                self::assertStringContainsString("ReportAccessCheck::requires('sales_targets', 'department')", $line);
+                continue;
+            }
+            self::assertStringContainsString("PermissionCheck::requires('manage_sales_targets')", $line);
+            self::assertStringContainsString("ReportAccessCheck::requires('sales_targets', 'all')", $line);
         }
     }
 

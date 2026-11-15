@@ -15,8 +15,9 @@ use App\Tests\Support\DbTestCase;
  * QA Round 5, R5-14: 87 routes had no test in any suite. This drives
  * every route registered in public_html/index.php through the real
  * Router with its real middleware:
- *  - every staff route that requires a permission refuses (403) a
- *    signed-in user who holds no permission at all — GET and POST;
+ *  - every staff route that requires a permission (or, D-379, report
+ *    access) refuses (403) a signed-in user who holds no permission and no
+ *    report level at all — GET and POST;
  *  - every staff page without a {param} opens for Admin without a server
  *    error;
  *  - every public page without a {param} opens for a signed-out visitor.
@@ -41,11 +42,16 @@ final class RouteMatrixTest extends DbTestCase
         return self::$router;
     }
 
-    /** @return array<int, array{method: string, pattern: string, permissions: ?array}> */
+    /**
+     * Owner decision D-379: a route behind report access only (ReportAccessCheck, e.g. /reports and
+     * /sales-targets) is gated too — a user whose roles have no report level gets the same 403.
+     *
+     * @return array<int, array{method: string, pattern: string, permissions: ?array, report: ?string}>
+     */
     private static function routes(): array
     {
         return array_map(
-            static fn (array $r): array => ['method' => $r['method'], 'pattern' => $r['pattern'], 'permissions' => $r['permissions']],
+            static fn (array $r): array => ['method' => $r['method'], 'pattern' => $r['pattern'], 'permissions' => $r['permissions'], 'report' => $r['report']],
             OrderPageActionsMatchPermissionsTest::routes()
         );
     }
@@ -107,7 +113,7 @@ final class RouteMatrixTest extends DbTestCase
         $checked = 0;
         $notRefused = [];
         foreach (self::routes() as $route) {
-            if ($route['permissions'] === null) {
+            if ($route['permissions'] === null && $route['report'] === null) {
                 continue;
             }
             [$code] = $this->dispatch($route['method'], self::concrete($route['pattern']));
@@ -129,7 +135,7 @@ final class RouteMatrixTest extends DbTestCase
         $checked = 0;
         $failed = [];
         foreach (self::routes() as $route) {
-            if ($route['method'] !== 'GET' || $route['permissions'] === null || str_contains($route['pattern'], '{')) {
+            if ($route['method'] !== 'GET' || ($route['permissions'] === null && $route['report'] === null) || str_contains($route['pattern'], '{')) {
                 continue;
             }
             $this->signIn($adminId);

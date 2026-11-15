@@ -179,8 +179,10 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         $logistics = $this->createTestUser('Logistics Manager');
         self::assertSame(200, $this->call($logistics, 'GET', '/reports/freight-cost')['code']);
         self::assertSame(403, $this->call($logistics, 'GET', '/reports/suppliers')['code']);
+        // D-379: the Reports menu entry now opens the Reports page for anyone with one open report; Freight cost is on it.
         $nav = $this->call($logistics, 'GET', '/')['body'];
-        self::assertStringContainsString('href="/reports/freight-cost"', $nav);
+        self::assertStringContainsString('href="/reports"', $nav);
+        self::assertStringContainsString('href="/reports/freight-cost"', $this->call($logistics, 'GET', '/reports')['body']);
 
         $sales = $this->createTestUser('Export Executive');
         self::assertSame(403, $this->call($sales, 'GET', '/reports/suppliers')['code']);

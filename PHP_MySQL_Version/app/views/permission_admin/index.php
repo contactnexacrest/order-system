@@ -16,6 +16,7 @@
           <div class="action-buttons">
             <a href="/admin/roles/<?= (int) $r['id'] ?>/edit" class="btn-sm btn-secondary">Edit</a>
             <a href="/admin/roles/<?= (int) $r['id'] ?>/permissions" class="btn-sm btn-secondary">Edit Permissions</a>
+            <?php if (\App\Helpers\PermittedLinks::currentUserHas('manage_report_access')): // D-379 ?><a href="/admin/roles/<?= (int) $r['id'] ?>/reports" class="btn-sm btn-secondary">Reports</a><?php endif; ?>
             <?php if (empty($r['is_system_role'])): ?>
             <form method="post" action="/admin/roles/<?= (int) $r['id'] ?>/delete" onsubmit="return confirm('Delete role &quot;<?= htmlspecialchars(addslashes($r['name'])) ?>&quot;? This only works if no user currently has this role.');">
               <?= Csrf::field() ?>

@@ -59,6 +59,7 @@ removed from this folder; git history keeps them (last commit with them:
 |---|---|---|
 | `2026-11-14a-line-priced-rate.sql` | D-374 | New empty columns `order_products.priced_fx_rate` and `priced_at`: the pricing rate (₹ per USD) and the time a line's price was set, until the approved Quotation fixes the prices. **Plain ALTER (D-371):** a second run only says "Duplicate column name". Existing lines show "Rate not recorded". |
 | `2026-11-15a-sales-targets.sql` | D-378 | Sales targets: new tables `sales_target_settings` (with the default settings), `sales_target_company`, `sales_targets`, `sales_target_credits`; new empty columns `users.joined_on`, `orders.lost_category`, `orders.sales_credit_user_id`; permission "Manage sales targets" for the MD and the ED. **Plain ALTER (D-371):** the column ALTERs come last; a second run only says "Duplicate column name". Order data is only read. |
+| `2026-11-15b-report-access.sql` | D-379 | Report access per role: new tables `role_report_access` (the level of each role for each report: Off / Own / Department / All; no row = Off) and `user_report_extras` (a person's extra level for one report, with the reason); the default levels of every role; permission "Manage report access" for the MD and the ED. No column is added (no ALTER); every statement is guarded (`CREATE TABLE IF NOT EXISTS`, `INSERT … WHERE NOT EXISTS`), so a second run changes nothing and a level already set is never overwritten. Order data is only read. |
 
 ### Rules for every migration file (enforced by tests)
 

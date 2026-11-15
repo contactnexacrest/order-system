@@ -2,6 +2,13 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/admin/permissions">&larr; Back to Permissions</a></p>
   <h1>Edit Permissions — <?= htmlspecialchars($role['name']) ?></h1>
+  <?php // Owner decision D-379: the role's Reports tab (manage_report_access). ?>
+  <?php if (\App\Helpers\PermittedLinks::currentUserHas('manage_report_access')): ?>
+  <div class="btn-row" role="tablist" aria-label="Role settings">
+    <a class="btn-sm btn-accent" role="tab" aria-selected="true" href="/admin/roles/<?= (int) $role['id'] ?>/permissions">Permissions</a>
+    <a class="btn-sm btn-secondary" role="tab" href="/admin/roles/<?= (int) $role['id'] ?>/reports">Reports</a>
+  </div>
+  <?php endif; ?>
   <p class="muted">Check every permission this role should grant. Saving replaces the role's entire permission set — a per-user extra permission (granted from the main Roles &amp; Permissions page) still applies on top of this regardless.</p>
   <form method="post" action="/admin/roles/<?= (int) $role['id'] ?>/permissions">
     <?= Csrf::field() ?>

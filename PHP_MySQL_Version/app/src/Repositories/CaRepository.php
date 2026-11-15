@@ -60,7 +60,8 @@ final class CaRepository
         return $map;
     }
 
-    public static function settlementRegister(): array
+    /** @param string|null $scopeReport D-379: a report key whose level limits the rows to the orders it shows (null = every row, as before) */
+    public static function settlementRegister(?string $scopeReport = null): array
     {
         $alertDays = (int) (CompanySettingsRepository::get('fema_realization_alert_days') ?? '270');
         $todayTs = time();
@@ -151,7 +152,7 @@ final class CaRepository
             ];
         }
         usort($rows, static fn(array $a, array $b): int => strcmp((string) $b['cleared_at'], (string) $a['cleared_at']));
-        return $rows;
+        return $scopeReport === null ? $rows : \App\Services\ReportAccess::visibleRows($scopeReport, $rows);
     }
 
     /** How a leg is named on the CA pages. */
@@ -251,7 +252,8 @@ final class CaRepository
      *
      * @param 'fy'|'calendar' $mode
      */
-    public static function revenueReport(string $mode, string $period): array
+    /** @param string|null $scopeReport D-379: see settlementRegister() — the totals are over the rows in scope */
+    public static function revenueReport(string $mode, string $period, ?string $scopeReport = null): array
     {
         if ($mode === 'fy') {
             $bounds = FinancialYear::bounds($period);
@@ -263,7 +265,7 @@ final class CaRepository
         }
 
         $rows = array_values(array_filter(
-            self::settlementRegister(),
+            self::settlementRegister($scopeReport),
             static fn(array $r): bool => substr((string) $r['cleared_at'], 0, 10) >= $from && substr((string) $r['cleared_at'], 0, 10) <= $to
         ));
 

@@ -38,7 +38,9 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       <?php foreach ($duplicatedInto as $i => $d): ?><?= $i > 0 ? ', ' : '' ?><a href="/clients/<?= (int) $d['id'] ?>"><?= htmlspecialchars($d['company_legal_name']) ?></a><?php endforeach; ?>.
     </p>
   <?php endif; ?>
-  <?php $__canClientReport = PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_reports'); ?>
+  <?php // D-379: the per-client report also needs the person's report access (and the money it shows) — the same answer as its route.
+  $__canClientReport = PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_reports')
+      && \App\Helpers\PermittedLinks::currentUserMayOpen('/reports/client/' . (int) $client['id']); ?>
   <?php if ($canManageOrders || $__canClientReport): // D-320 (point 26): the main buttons stay at the top while scrolling ?>
   <div class="btn-row sticky-actions" data-testid="client-actions">
     <?php if ($__canClientReport): ?><a class="btn-sm btn-secondary" href="/reports/client/<?= (int) $client['id'] ?>">Full report</a><?php endif; ?>

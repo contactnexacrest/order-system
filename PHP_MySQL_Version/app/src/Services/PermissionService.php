@@ -55,5 +55,6 @@ final class PermissionService
         self::$superAdminCachedForUserId = null;
         OrderAccessService::resetCache();
         DivisionService::resetCache();
+        ReportAccess::resetCache(); // D-379: report levels are cached per request too
     }
 }

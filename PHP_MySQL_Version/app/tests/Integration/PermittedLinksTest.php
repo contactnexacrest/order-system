@@ -53,10 +53,10 @@ final class PermittedLinksTest extends DbTestCase
         $routes = OrderPageActionsMatchPermissionsTest::routes();
         $samples = [
             '/orders/1/dossier', '/orders/1/additional-documents/removed', '/clients/1/additional-documents/removed',
-            '/documents/1/download', '/settings', '/audit-log', '/ca', '/disputes', '/complaints', '/reports', '/clients',
+            '/documents/1/download', '/settings', '/audit-log', '/ca', '/disputes', '/complaints', '/reports/aggregate', '/clients',
             '/orders', '/client-intake', '/pi-intake-review', '/reorder-requests', '/admin/field-protection',
             '/company-assets', '/signatories', '/ports', '/port-routes', '/users',
-            '/sales-targets', '/sales-targets/settings', // D-378
+            '/sales-targets/settings', // D-378 (D-379: /reports and /sales-targets open by report access — testEveryReportRouteHasItsReportGate)
         ];
         foreach ($samples as $path) {
             $route = null;
@@ -69,6 +69,30 @@ final class PermittedLinksTest extends DbTestCase
             self::assertNotNull($route, $path);
             self::assertEqualsCanonicalizing($route['permissions'], PermittedLinks::requiredFor($path), $path);
         }
+    }
+
+    /**
+     * Owner decision D-379: every route behind report access (ReportAccessCheck) has the same gate in
+     * PermittedLinks::REPORT_ROUTES, and every page under a REPORT_ROUTES pattern has that gate on its route,
+     * so a link the person's report level would refuse is plain text.
+     */
+    public function testEveryReportRouteHasItsReportGate(): void
+    {
+        $checked = 0;
+        foreach (OrderPageActionsMatchPermissionsTest::routes() as $route) {
+            if ($route['method'] !== 'GET') {
+                continue;
+            }
+            $path = preg_replace('#\{[^}]+\}#', '1', $route['pattern']);
+            $rule = PermittedLinks::reportRequiredFor($path);
+            if ($route['report'] === null) {
+                self::assertNull($rule, "{$route['pattern']} has no report gate, so no REPORT_ROUTES rule");
+                continue;
+            }
+            self::assertSame([$route['report'], $route['reportMin']], $rule, $route['pattern']);
+            $checked++;
+        }
+        self::assertGreaterThanOrEqual(30, $checked);
     }
 
     public function testAViewerSeesNoLinkToAPageItCannotOpen(): void

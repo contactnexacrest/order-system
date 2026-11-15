@@ -36,7 +36,7 @@ if ($current) {
         'mod_team_incentive' => \App\Services\DivisionService::moduleEnabled('team_incentive'),
         'div_gst' => array_intersect(['DOM', 'IMP'], $__activeCodes) !== [], // QA UI-12
         'div_import_duty' => in_array('IMP', $__activeCodes, true),
-    ];
+    ] + \App\Services\ReportAccess::navFlags(); // D-379: report:<key>, report:<key>:<level>, report:any
     // Live counts on every page load (not cached), each queried only for
     // people who could act on it — the same counts the old menu showed.
     $__approvalsCount = \App\Services\ApprovalsInbox::countFor($__uid, $roleId); // D-310

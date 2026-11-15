@@ -232,9 +232,12 @@ final class DepartmentTaskRepository
     }
 
     /** @return array<string,int> active orders by status, for the cockpit */
-    public static function ordersByStatus(): array
+    /** @param array{sql: string, params: array<string,int>}|null $scope D-379: ReportAccess::scopeSql('cockpit', 'o') at Own / Department; null = every order */
+    public static function ordersByStatus(?array $scope = null): array
     {
-        $rows = Database::connection()->query("SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled')" . \App\Services\DivisionService::sql('division_id') . " GROUP BY status ORDER BY status")->fetchAll();
+        $stmt = Database::connection()->prepare("SELECT o.status, COUNT(*) AS n FROM orders o WHERE o.status NOT IN ('complete', 'lost', 'cancelled')" . \App\Services\DivisionService::sql('o.division_id') . ($scope['sql'] ?? '') . " GROUP BY o.status ORDER BY o.status");
+        $stmt->execute($scope['params'] ?? []);
+        $rows = $stmt->fetchAll();
         $out = [];
         foreach ($rows as $r) {
             $out[(string) $r['status']] = (int) $r['n'];

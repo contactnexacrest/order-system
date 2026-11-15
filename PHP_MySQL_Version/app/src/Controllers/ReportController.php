@@ -40,23 +40,51 @@ final class ReportController
         return false;
     }
 
+    /**
+     * Owner decision D-379: the Reports page — 7 section boxes holding only the reports the person
+     * may open (ReportAccess), with the "own business" / "department" banner. Also drawn read-only
+     * for "See Reports as this role" (ReportAccessController::preview(), $previewRole set).
+     */
     public function index(array $params): void
     {
-        $user = AuthService::currentUser();
-        $query = trim((string) ($_GET['q'] ?? ''));
-        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        View::render('reports/index', self::indexData(trim((string) ($_GET['q'] ?? '')), null), 'layout/base');
+    }
 
-        View::render('reports/index', [
-            'clients' => ClientRepository::all(),
-            'incoterms' => LookupRepository::incoterms(),
-            'stages' => LookupRepository::stagesMaster(),
-            'countries' => ReportRepository::distinctCountries(),
-            'savedReports' => ReportDefinitionRepository::visibleTo((int) $user['id']),
-            'searchQuery' => $query,
-            'searchResults' => $query !== '' ? ReportRepository::searchOrders($query) : [],
-            'canViewStaffReports' => PermissionService::can((int) $user['id'], $roleId, 'view_staff_reports'),
-            'canManageOrderFinancials' => PermissionService::can((int) $user['id'], $roleId, 'manage_order_financials'),
-        ], 'layout/base');
+    /** @return array<string,mixed> what views/reports/index.php draws; $previewRole = the role shown by the preview (nothing is queried then) */
+    public static function indexData(string $query, ?array $previewRole): array
+    {
+        $user = AuthService::currentUser();
+        $sections = [];
+        foreach (\App\Services\ReportAccess::bySection() as $section => $keys) {
+            $open = array_values(array_filter($keys, static fn (string $k): bool => \App\Services\ReportAccess::canOpenPage($k)));
+            if ($open !== []) {
+                $sections[$section] = $open;
+            }
+        }
+        $levels = \App\Services\ReportAccess::levels();
+        $live = $previewRole === null && $user !== null;
+        $searchOpen = $live && \App\Services\ReportAccess::canOpenPage('order_search');
+        $clientsOpen = $live && \App\Services\ReportAccess::canOpenPage('per_client');
+        $clients = [];
+        if ($clientsOpen) {
+            $clients = ClientRepository::all();
+            // D-379: Own / Department list only the clients of the orders in scope.
+            $inScope = \App\Services\ReportAccess::clientIdsInScope('per_client');
+            if ($inScope !== null) {
+                $keep = array_flip($inScope);
+                $clients = array_values(array_filter($clients, static fn (array $c): bool => isset($keep[(int) $c['id']])));
+            }
+        }
+        return [
+            'sections' => $sections,
+            'levels' => $levels,
+            'banner' => \App\Services\ReportAccess::banner(),
+            'previewRole' => $previewRole,
+            'clients' => $clients,
+            'savedReports' => $live && \App\Services\ReportAccess::canOpenPage('aggregate') ? ReportDefinitionRepository::visibleTo((int) $user['id']) : [],
+            'searchQuery' => $searchOpen ? $query : '',
+            'searchResults' => $searchOpen && $query !== '' ? ReportRepository::searchOrders($query) : [],
+        ];
     }
 
     public function client(array $params): void
@@ -65,6 +93,13 @@ final class ReportController
             return;
         }
         $clientId = (int) $params['clientId'];
+        // D-379: at Own / Department a client is in the report only through an order in scope.
+        $inScope = \App\Services\ReportAccess::clientIdsInScope('per_client');
+        if ($inScope !== null && !in_array($clientId, $inScope, true)) {
+            http_response_code(403);
+            echo \App\Services\ReportAccess::REFUSED;
+            return;
+        }
         $data = ReportRepository::perClient($clientId);
         if (!$data['client']) {
             http_response_code(404);
@@ -331,9 +366,9 @@ final class ReportController
         $user = AuthService::currentUser();
         $canManageSupplierPayments = $user && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_supplier_payments');
 
-        // QA Round 6, R6-N01: only the orders this user may open.
-        $incoming = \App\Services\OrderAccessService::visibleRows(OrderPaymentStatusRepository::clearedOnDate($date));
-        $supplier = $canManageSupplierPayments ? \App\Services\OrderAccessService::visibleRows(OrderSupplierPoRepository::paidOnDate($date)) : [];
+        // QA Round 6, R6-N01 / D-379: only the orders the person's Today's payments level shows.
+        $incoming = \App\Services\ReportAccess::visibleRows('todays_payments', OrderPaymentStatusRepository::clearedOnDate($date));
+        $supplier = $canManageSupplierPayments ? \App\Services\ReportAccess::visibleRows('todays_payments', OrderSupplierPoRepository::paidOnDate($date)) : [];
 
         if (($_GET['format'] ?? '') === 'csv') {
             $rows = [];
@@ -885,13 +920,27 @@ final class ReportController
         if ($salesperson !== 'all' && !ctype_digit($salesperson)) {
             $salesperson = '';
         }
+        // D-379: at Own / Department the salesperson table covers only the viewer / their department's people.
+        $salespeople = \App\Repositories\SalesTargetRepository::activeStaff();
+        $people = \App\Services\ReportAccess::peopleScope('performance');
+        if ($people !== null) {
+            $keep = array_flip($people);
+            $salespeople = array_values(array_filter($salespeople, static fn (array $p): bool => isset($keep[(int) $p['id']])));
+            if ($salesperson !== '' && $salesperson !== 'all' && !isset($keep[(int) $salesperson])) {
+                $salesperson = 'all';
+            }
+        }
+        $bySalesperson = $salesperson === '' ? null
+            : \App\Services\SalesTargetService::performanceBySalesperson($dateFrom, $dateTo, $salesperson, \App\Services\TestModeService::isEnabled() ? 1 : 0);
+        if ($bySalesperson !== null && $people !== null) {
+            $bySalesperson = array_values(array_filter($bySalesperson, static fn (array $r): bool => $r['user_id'] !== null && isset($keep[(int) $r['user_id']])));
+        }
         View::render('reports/performance', [
             'report' => $report,
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'preset' => $preset],
             'salesperson' => $salesperson,
-            'salespeople' => \App\Repositories\SalesTargetRepository::activeStaff(),
-            'bySalesperson' => $salesperson === '' ? null
-                : \App\Services\SalesTargetService::performanceBySalesperson($dateFrom, $dateTo, $salesperson, \App\Services\TestModeService::isEnabled() ? 1 : 0),
+            'salespeople' => $salespeople,
+            'bySalesperson' => $bySalesperson,
         ], 'layout/base');
     }
 

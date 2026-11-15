@@ -7,6 +7,7 @@ namespace App\Repositories;
 use App\Config\Database;
 use App\Services\DivisionService;
 use App\Services\OrderProfitabilityService;
+use App\Services\ReportAccess;
 use App\Services\TestModeService;
 
 /**
@@ -27,6 +28,41 @@ final class ReportRepository
         return TestModeService::isEnabled() ? 1 : 0;
     }
 
+    /**
+     * Owner decision D-379: the report whose access level limits the shared helpers below (the funnel
+     * counts serve Operations queues, Conversion rate and Sales performance alike). Set by the public
+     * entry point through inScope(); null = no report context (no limit beyond the queries' own).
+     */
+    private static ?string $scopeReport = null;
+
+    /**
+     * @template T
+     * @param callable():T $fn
+     * @return T
+     */
+    private static function inScope(string $report, callable $fn)
+    {
+        if (self::$scopeReport !== null) {
+            return $fn(); // already inside a report: its level applies
+        }
+        self::$scopeReport = $report;
+        try {
+            return $fn();
+        } finally {
+            self::$scopeReport = null;
+        }
+    }
+
+    /** @return array{0: string, 1: array<string,int>} " AND …" limiting `orders {$alias}` to the current report's scope, and its params */
+    private static function scope(string $alias = 'o'): array
+    {
+        if (self::$scopeReport === null) {
+            return ['', []];
+        }
+        $s = ReportAccess::scopeSql(self::$scopeReport, $alias);
+        return [$s['sql'], $s['params']];
+    }
+
     /** @return array<string,mixed> order history, payments, products, totals for one client */
     public static function perClient(int $clientId): array
     {
@@ -42,8 +78,8 @@ final class ReportRepository
             return ['client' => null, 'orders' => [], 'documents' => [], 'payments' => [], 'products' => [], 'total_fob_value_by_currency' => [], 'total_cleared_by_currency' => []];
         }
 
-        // QA Round 6, R6-N01: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('per_client', 'o'); // D-379: the person's level for this report
         $orders = $pdo->prepare(
             "SELECT o.id, o.order_reference, o.status, o.created_at,
                     o.incoterm_code, o.currency_code,
@@ -206,8 +242,8 @@ final class ReportRepository
     ): array {
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
         $params = ['is_test_data' => self::isTestModeFlag()];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('aggregate', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -356,8 +392,8 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
         $params = ['is_test_data' => self::isTestModeFlag()];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('payments', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -493,10 +529,11 @@ final class ReportRepository
     /** @return array<int, array<string,mixed>> */
     private static function queueRows(string $whereSql, string $extraJoins = ''): array
     {
+        [$scopeSql, $scopeParams] = self::scope('o');
         $stmt = Database::connection()->prepare(
-            'SELECT ' . self::ORDER_ROW_COLS . ' ' . self::ORDER_ROW_JOIN . " {$extraJoins} WHERE ({$whereSql}) AND o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . " ORDER BY o.created_at"
+            'SELECT ' . self::ORDER_ROW_COLS . ' ' . self::ORDER_ROW_JOIN . " {$extraJoins} WHERE ({$whereSql}) AND o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . $scopeSql . " ORDER BY o.created_at"
         );
-        $stmt->execute(['is_test_data' => self::isTestModeFlag()]);
+        $stmt->execute(['is_test_data' => self::isTestModeFlag()] + $scopeParams);
         return $stmt->fetchAll();
     }
 
@@ -595,6 +632,12 @@ final class ReportRepository
     /** Snapshot dashboard (spec items #1, #2, #3, #4, #5, #11, #12, #14, #15, #16). No date range — "right now". */
     public static function operationsQueues(): array
     {
+        return self::inScope('queues', static fn (): array => self::operationsQueuesInScope());
+    }
+
+    /** @return array<string, array<int, array<string,mixed>>> */
+    private static function operationsQueuesInScope(): array
+    {
         return [
             'quotationAwaitingSend' => self::quotationAwaitingDispatch(), // #1
             'buyerPoAwaited' => self::awaitingBuyerPo(), // #15
@@ -611,8 +654,9 @@ final class ReportRepository
 
     private static function sentCount(string $code, string $dateCol, ?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ['dt.code = :code', "el.status = 'sent'", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
-        $params = ['code' => $code, 'is_test_data' => self::isTestModeFlag()];
+        [$scopeSql, $scopeParams] = self::scope('o');
+        $clauses = ['dt.code = :code', "el.status = 'sent'", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql];
+        $params = ['code' => $code, 'is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = "DATE(el.{$dateCol}) >= :date_from";
             $params['date_from'] = $dateFrom;
@@ -637,8 +681,9 @@ final class ReportRepository
     private static function lostCount(bool $reachedPi, ?string $dateFrom, ?string $dateTo): int
     {
         $reachedClause = "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)";
-        $clauses = ["o.status = 'lost'", $reachedPi ? $reachedClause : "NOT {$reachedClause}", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        [$scopeSql, $scopeParams] = self::scope('o');
+        $clauses = ["o.status = 'lost'", $reachedPi ? $reachedClause : "NOT {$reachedClause}", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = 'DATE(o.lost_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -657,11 +702,12 @@ final class ReportRepository
 
     private static function quotationsWonCount(?string $dateFrom, ?string $dateTo): int
     {
+        [$scopeSql, $scopeParams] = self::scope('o');
         $clauses = [
             "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)",
-            'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id'),
+            'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql,
         ];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = 'o.pi_date >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -680,8 +726,9 @@ final class ReportRepository
 
     private static function amendmentCount(?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ["EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data" . DivisionService::sql('oo.division_id') . ")"];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        [$scopeSql, $scopeParams] = self::scope('oo');
+        $clauses = ["EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data" . DivisionService::sql('oo.division_id') . $scopeSql . ")"];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = 'DATE(created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -709,6 +756,12 @@ final class ReportRepository
      */
     public static function funnelActivity(?string $dateFrom, ?string $dateTo): array
     {
+        return self::inScope('queues', static fn (): array => self::funnelActivityInScope($dateFrom, $dateTo));
+    }
+
+    /** @return array<string,int> */
+    private static function funnelActivityInScope(?string $dateFrom, ?string $dateTo): array
+    {
         return [
             'quotationsSent' => self::sentCount('QT', 'sent_at', $dateFrom, $dateTo), // #6
             'quotationsLost' => self::lostCount(false, $dateFrom, $dateTo), // #7
@@ -735,8 +788,8 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
         $params = ['is_test_data' => self::isTestModeFlag()];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('disputes', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -798,8 +851,8 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
         $params = ['is_test_data' => self::isTestModeFlag()];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('amendments', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -853,16 +906,18 @@ final class ReportRepository
         if ($query === '') {
             return [];
         }
+        // D-379: only the orders the person's "Find an order" level shows (closes an unscoped search).
+        $scope = ReportAccess::scopeSql('order_search', 'o');
         $stmt = Database::connection()->prepare(
             'SELECT o.id, o.order_reference, o.status, o.created_at, o.company_legal_name
              FROM orders o
-             WHERE o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . '
+             WHERE o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scope['sql'] . '
                AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
              ORDER BY o.created_at DESC, o.id DESC
              LIMIT 25'
         );
         $like = '%' . $query . '%';
-        $stmt->execute(['is_test_data' => self::isTestModeFlag(), 'q' => $like, 'q2' => $like]);
+        $stmt->execute(['is_test_data' => self::isTestModeFlag(), 'q' => $like, 'q2' => $like] + $scope['params']);
         return $stmt->fetchAll();
     }
 
@@ -894,12 +949,15 @@ final class ReportRepository
             $result[$mk] = ['month' => $mk, 'orders_created' => 0, 'quotations_sent' => 0, 'pi_sent' => 0, 'lost' => 0, 'fob_by_currency' => []];
         }
         $fromDate = $monthKeys[0] . '-01';
+        // D-379: only the orders the person's Trends level shows (closes an unscoped report).
+        $scope = ReportAccess::scopeSql('trends', 'o');
+        $sp = $scope['params'];
 
         $stmt = $pdo->prepare(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS n
-             FROM orders WHERE is_test_data = :t" . DivisionService::sql('division_id') . " AND created_at >= :from GROUP BY ym"
+            "SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, COUNT(*) AS n
+             FROM orders o WHERE o.is_test_data = :t" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND o.created_at >= :from GROUP BY ym"
         );
-        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate] + $sp);
         foreach ($stmt->fetchAll() as $row) {
             if (isset($result[$row['ym']])) {
                 $result[$row['ym']]['orders_created'] = (int) $row['n'];
@@ -910,9 +968,9 @@ final class ReportRepository
             "SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, o.currency_code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
              FROM orders o
              JOIN order_products p ON p.order_id = o.id AND p.is_active = 1
-             WHERE o.is_test_data = :t" . DivisionService::sql('o.division_id') . " AND o.created_at >= :from GROUP BY ym, cc"
+             WHERE o.is_test_data = :t" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND o.created_at >= :from GROUP BY ym, cc"
         );
-        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate] + $sp);
         foreach ($stmt->fetchAll() as $row) {
             if (isset($result[$row['ym']])) {
                 $result[$row['ym']]['fob_by_currency'][$row['cc']] = round((float) $row['total'], 2);
@@ -925,10 +983,10 @@ final class ReportRepository
              JOIN documents doc ON doc.id = el.document_id
              JOIN document_types dt ON dt.id = doc.document_type_id
              JOIN orders o ON o.id = doc.order_id
-             WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t" . DivisionService::sql('o.division_id') . " AND el.sent_at >= :from
+             WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND el.sent_at >= :from
              GROUP BY ym"
         );
-        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate] + $sp);
         foreach ($stmt->fetchAll() as $row) {
             if (isset($result[$row['ym']])) {
                 $result[$row['ym']]['quotations_sent'] = (int) $row['n'];
@@ -941,10 +999,10 @@ final class ReportRepository
              JOIN documents doc ON doc.id = el.document_id
              JOIN document_types dt ON dt.id = doc.document_type_id
              JOIN orders o ON o.id = doc.order_id
-             WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t" . DivisionService::sql('o.division_id') . " AND el.sent_at >= :from
+             WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND el.sent_at >= :from
              GROUP BY ym"
         );
-        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate] + $sp);
         foreach ($stmt->fetchAll() as $row) {
             if (isset($result[$row['ym']])) {
                 $result[$row['ym']]['pi_sent'] = (int) $row['n'];
@@ -952,10 +1010,10 @@ final class ReportRepository
         }
 
         $stmt = $pdo->prepare(
-            "SELECT DATE_FORMAT(lost_at, '%Y-%m') AS ym, COUNT(*) AS n
-             FROM orders WHERE is_test_data = :t" . DivisionService::sql('division_id') . " AND status = 'lost' AND lost_at >= :from GROUP BY ym"
+            "SELECT DATE_FORMAT(o.lost_at, '%Y-%m') AS ym, COUNT(*) AS n
+             FROM orders o WHERE o.is_test_data = :t" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND o.status = 'lost' AND o.lost_at >= :from GROUP BY ym"
         );
-        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate]);
+        $stmt->execute(['t' => $isTestMode, 'from' => $fromDate] + $sp);
         foreach ($stmt->fetchAll() as $row) {
             if (isset($result[$row['ym']])) {
                 $result[$row['ym']]['lost'] = (int) $row['n'];
@@ -1062,6 +1120,12 @@ final class ReportRepository
             $byUser[$uid]['audit_actions'] = (int) $r['n'];
         }
 
+        // D-379: Department = the people of the viewer's departments, Own = the viewer only (unattributed / system rows: All only).
+        $people = ReportAccess::peopleScope('staff_productivity');
+        if ($people !== null) {
+            $byUser = array_intersect_key($byUser, array_flip($people));
+        }
+
         usort($byUser, static fn(array $a, array $b): int => strcmp((string) $a['user_name'], (string) $b['user_name']));
         return array_values($byUser);
     }
@@ -1105,6 +1169,8 @@ final class ReportRepository
     {
         $isTestMode = self::isTestModeFlag();
         $pdo = Database::connection();
+        // D-379: only the orders the person's Ageing level shows (closes an unscoped report).
+        $scope = ReportAccess::scopeSql('ageing', 'o');
 
         $stmt = $pdo->prepare(
             "SELECT o.id, o.order_reference, o.created_at, o.company_legal_name, o.currency_code,
@@ -1113,7 +1179,7 @@ final class ReportRepository
                     ops.freight_amount, ops.freight_cleared_at
              FROM orders o
              JOIN order_payment_status ops ON ops.order_id = o.id
-             WHERE o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . " AND o.status NOT IN ('lost')
+             WHERE o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . $scope['sql'] . " AND o.status NOT IN ('lost')
                AND (
                  (ops.advance_amount IS NOT NULL AND ops.advance_cleared_at IS NULL) OR
                  (ops.balance_amount IS NOT NULL AND ops.balance_cleared_at IS NULL) OR
@@ -1121,7 +1187,7 @@ final class ReportRepository
                )
              ORDER BY o.created_at ASC"
         );
-        $stmt->execute(['is_test_data' => $isTestMode]);
+        $stmt->execute(['is_test_data' => $isTestMode] + $scope['params']);
         $orders = $stmt->fetchAll();
 
         $today = new \DateTimeImmutable('today');
@@ -1189,8 +1255,8 @@ final class ReportRepository
         $isTestMode = self::isTestModeFlag();
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id'), 'fr.id IS NOT NULL'];
         $params = ['is_test_data' => $isTestMode];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('freight_cost', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -1258,8 +1324,8 @@ final class ReportRepository
         $isTestMode = self::isTestModeFlag();
         $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
         $params = ['is_test_data' => $isTestMode];
-        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
-        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        // QA Round 6, R6-N01 / Q-R6-4 / D-379: only the orders this report shows the person.
+        ['sql' => $visibleSql, 'params' => $visibleParams] = ReportAccess::scopeSql('profitability', 'o'); // D-379: the person's level for this report
         if ($visibleSql !== '') {
             $where[] = substr($visibleSql, 5);
             $params += $visibleParams;
@@ -1336,8 +1402,10 @@ final class ReportRepository
     public static function productSalesReport(?string $dateFrom, ?string $dateTo): array
     {
         $isTestMode = self::isTestModeFlag();
-        $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id'), 'p.is_active = 1'];
-        $params = ['is_test_data' => $isTestMode];
+        // D-379: only the orders the person's Product sales level shows (closes an unscoped report).
+        $scope = ReportAccess::scopeSql('product_sales', 'o');
+        $where = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scope['sql'], 'p.is_active = 1'];
+        $params = ['is_test_data' => $isTestMode] + $scope['params'];
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -1394,6 +1462,8 @@ final class ReportRepository
     public static function supplierPerformanceReport(): array
     {
         $isTestMode = self::isTestModeFlag();
+        // D-379: only the supplier POs of orders the person's Supplier performance level shows (closes an unscoped report).
+        $scope = ReportAccess::scopeSql('supplier_performance', 'o');
         $sql = "SELECT s.id AS supplier_id, s.supplier_legal_name,
                        spo.order_id, spo.created_at, spo.signed_at, spo.required_delivery_date, spo.status,
                        pk.packing_date
@@ -1401,11 +1471,11 @@ final class ReportRepository
                 JOIN suppliers s ON s.id = spo.supplier_id
                 JOIN orders o ON o.id = spo.order_id
                 LEFT JOIN order_packing pk ON pk.order_id = spo.order_id
-                WHERE o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . "
+                WHERE o.is_test_data = :is_test_data" . DivisionService::sql('o.division_id') . $scope['sql'] . "
                 ORDER BY s.supplier_legal_name";
 
         $stmt = Database::connection()->prepare($sql);
-        $stmt->execute(['is_test_data' => $isTestMode]);
+        $stmt->execute(['is_test_data' => $isTestMode] + $scope['params']);
         $rows = $stmt->fetchAll();
 
         $bySupplier = [];
@@ -1453,7 +1523,8 @@ final class ReportRepository
 
     public static function conversionRateReport(?string $dateFrom, ?string $dateTo): array
     {
-        $funnel = self::funnelActivity($dateFrom, $dateTo);
+        // D-379: the funnel counts limited by the person's Conversion rate level (closes an unscoped report).
+        $funnel = self::inScope('conversion', static fn (): array => self::funnelActivity($dateFrom, $dateTo));
 
         $quotationsSent = (int) $funnel['quotationsSent'];
         $quotationsWon = (int) $funnel['quotationsWon'];
@@ -1487,6 +1558,13 @@ final class ReportRepository
 
     /** @return array<string,mixed> */
     public static function salesPerformanceReport(?string $dateFrom, ?string $dateTo): array
+    {
+        // D-379: every count limited by the person's Sales performance level (closes an unscoped report).
+        return self::inScope('performance', static fn (): array => self::salesPerformanceInScope($dateFrom, $dateTo));
+    }
+
+    /** @return array<string,mixed> */
+    private static function salesPerformanceInScope(?string $dateFrom, ?string $dateTo): array
     {
         $current = self::performancePeriod($dateFrom, $dateTo);
 
@@ -1537,17 +1615,18 @@ final class ReportRepository
 
     private static function ordersCreatedCount(?string $dateFrom, ?string $dateTo): int
     {
-        $clauses = ['is_test_data = :is_test_data' . DivisionService::sql('division_id')];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        [$scopeSql, $scopeParams] = self::scope('o');
+        $clauses = ['o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
-            $clauses[] = 'DATE(created_at) >= :date_from';
+            $clauses[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
         }
         if ($dateTo) {
-            $clauses[] = 'DATE(created_at) <= :date_to';
+            $clauses[] = 'DATE(o.created_at) <= :date_to';
             $params['date_to'] = $dateTo;
         }
-        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM orders WHERE ' . implode(' AND ', $clauses));
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM orders o WHERE ' . implode(' AND ', $clauses));
         $stmt->execute($params);
         return (int) $stmt->fetchColumn();
     }
@@ -1555,11 +1634,12 @@ final class ReportRepository
     /** @return array<string,float> currency code => total FOB value of orders that reached PI (pi_date) in the period */
     private static function fobWonByCurrency(?string $dateFrom, ?string $dateTo): array
     {
+        [$scopeSql, $scopeParams] = self::scope('o');
         $clauses = [
             "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)",
-            'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id'),
+            'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql,
         ];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = 'o.pi_date >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -1585,8 +1665,9 @@ final class ReportRepository
     private static function lostOrdersDetail(?string $dateFrom, ?string $dateTo): array
     {
         $reachedClause = "EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)";
-        $clauses = ["o.status = 'lost'", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id')];
-        $params = ['is_test_data' => self::isTestModeFlag()];
+        [$scopeSql, $scopeParams] = self::scope('o');
+        $clauses = ["o.status = 'lost'", 'o.is_test_data = :is_test_data' . DivisionService::sql('o.division_id') . $scopeSql];
+        $params = ['is_test_data' => self::isTestModeFlag()] + $scopeParams;
         if ($dateFrom) {
             $clauses[] = 'DATE(o.lost_at) >= :date_from';
             $params['date_from'] = $dateFrom;
