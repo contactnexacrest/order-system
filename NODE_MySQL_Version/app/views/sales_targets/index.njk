@@ -39,7 +39,7 @@
 
   <h2>Team</h2>
   <div class="table-scroll">
-  <table class="list" id="target-team">
+  <table class="list target-team" id="target-team">
     <tr><th>Person</th><th>Designation</th><th>Multiple (own)</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Pipeline</th><th>New buyers</th><th>Progress</th><th>Last reviewed</th><th></th></tr>
     {% for r in data.rows %}{% set t = r.target %}{% set c = r.counts %}{% set uid = r.user.id %}
     <tr data-user-id="{{ uid }}">
@@ -57,19 +57,30 @@
     </tr>
     {% endfor %}
     {% if data.rows.length == 0 %}<tr><td colspan="11" class="muted">Nobody in Sales &amp; Export yet, and no order credited in this period.</td></tr>{% endif %}
+    {% set ua = data.unassigned %}{% set uaMore = ua.order_count - ua.recent_ids.length %}
     <tr id="target-unassigned">
       <td><strong>Unassigned</strong></td>
-      <td colspan="3" class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</td>
-      <td>{{ data.unassigned.counts.counted }}</td>
-      <td>{{ data.unassigned.counts.shipped }}</td>
-      <td colspan="5">{% if data.unassigned.orders.length == 0 %}<span class="muted">none</span>{% else %}{% for o in data.unassigned.orders %}{{ orderLink(o.id, data.credited_order_refs) }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</td>
+      <td colspan="3"><span class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</span>
+        <div class="target-unassigned-orders small" id="target-unassigned-orders">
+          {% if ua.order_count == 0 %}<span class="muted">No order.</span>
+          {% else %}<strong>{{ ua.order_count }} order{{ '' if ua.order_count == 1 else 's' }}</strong>{{ (' — newest ' + ua.recent_ids.length) if uaMore > 0 else '' }}: {% for oid in ua.recent_ids %}{{ orderLink(oid, data.credited_order_refs) }}{{ ', ' if not loop.last }}{% endfor %}{% if uaMore > 0 %} <span class="muted">and {{ uaMore }} more</span>{% endif %}
+          {% endif %}
+        </div></td>
+      <td>{{ ua.counts.counted }}</td>
+      <td>{{ ua.counts.shipped }}</td>
+      <td>{{ ua.pipeline }}</td>
+      <td>{{ ua.counts.new_buyers }}</td>
+      <td colspan="3"></td>
     </tr>
     <tr id="target-total">
       <td><strong>Total</strong></td>
       <td colspan="2"></td>
       <td><strong>{{ data.team_target | targetNum }}</strong></td>
       <td><strong>{{ data.total.counted }}</strong></td>
-      <td colspan="6"></td>
+      <td><strong>{{ data.total.shipped }}</strong></td>
+      <td><strong>{{ data.total_pipeline }}</strong></td>
+      <td><strong>{{ data.total.new_buyers }}</strong></td>
+      <td colspan="3"></td>
     </tr>
   </table>
   </div>
@@ -94,11 +105,11 @@
       <td>{{ a.counts.shipped }}</td>
       <td>{% if a.reviewed_at != null %}{{ a.reviewed_at | shortDate }}{% else %}<span class="muted">never</span>{% endif %}</td>
       <td>
-        <form method="post" action="/sales-targets/associate/{{ aid }}" class="btn-row" style="margin-top:0">
+        <form method="post" action="/sales-targets/associate/{{ aid }}" class="btn-row target-inline-form">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="period" value="{{ period.key }}">
           <input type="number" name="containers" min="0" step="0.1" value="{{ (a.target | targetNum) if a.target > 0 else '' }}" placeholder="e.g. 2" aria-label="{{ a.associate.name }} — containers per period" style="width:6rem">
-          <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Agreed at the quarterly review" aria-label="Reason for this change">
+          <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Agreed at the quarterly review" aria-label="Reason for this change">
           <button type="submit" class="btn-sm">Save</button>
         </form>
       </td>
@@ -125,7 +136,7 @@
         <input type="number" name="multiple" min="1" max="10" step="0.1" value="{{ (t.own_multiple | targetNum) if t.own_multiple != null else '' }}" placeholder="e.g. 3 (empty = company setting)"></label>
       <label><input type="checkbox" name="buildup_enabled" value="1"{{ ' checked' if t.buildup_enabled }}> Build-up for a new joiner{% if t.joined_on %} (joined {{ t.joined_on | shortDate }}){% else %} (no joining date on the user){% endif %}</label>
       <label class="full">Reason for this change *
-        <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Reviewed with them at the quarterly meeting"></label>
+        <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Reviewed with them at the quarterly meeting"></label>
       <div class="btn-row full"><button type="submit" class="btn-sm btn-success">Save target</button></div>
     </form>
   </details>
@@ -135,15 +146,18 @@
   <p class="muted small">The credit goes to the order's Sales &amp; Export owner unless moved here. Only the target credit moves — nothing else on the order changes.</p>
   <details id="target-move-credit">
     <summary>Orders counted in {{ period.label }} ({{ data.credited_orders.length }})</summary>
+    {% if data.credited_orders.length > data.move_ids.length %}
+    <p class="muted small" id="target-move-note">Showing the {{ data.move_ids.length }} most recently confirmed of the {{ data.credited_orders.length }} orders counted in this period (newest first).</p>
+    {% endif %}
     <div class="table-scroll">
     <table class="list">
       <tr><th>Order</th><th>Credited to</th><th>Move to</th></tr>
-      {% for o in data.credited_orders %}{% set cur = data.owners[o.id] %}
+      {% for oid in data.move_ids %}{% set cur = data.owners[oid] %}
       <tr>
-        <td>{{ orderLink(o.id, data.credited_order_refs) }}</td>
+        <td>{{ orderLink(oid, data.credited_order_refs) }}</td>
         <td>{{ data.staff_names[cur] if (cur != null and data.staff_names[cur] != null) else 'Unassigned' }}</td>
         <td>
-          <form method="post" action="/sales-targets/credit/{{ o.id }}" class="btn-row" style="margin-top:0">
+          <form method="post" action="/sales-targets/credit/{{ oid }}" class="btn-row target-inline-form">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <input type="hidden" name="period" value="{{ period.key }}">
             <select name="user_id" required aria-label="Move the credit to">
@@ -151,7 +165,7 @@
               <option value="auto">Back to the Sales &amp; Export owner</option>
               {% for s in data.staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
             </select>
-            <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
+            <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
             <button type="submit" class="btn-sm">Move</button>
           </form>
         </td>

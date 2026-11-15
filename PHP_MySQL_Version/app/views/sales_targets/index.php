@@ -51,7 +51,7 @@ $__order = static function (int $id) use ($team): string {
 
   <h2>Team</h2>
   <div class="table-scroll">
-  <table class="list" id="target-team">
+  <table class="list target-team" id="target-team">
     <tr><th>Person</th><th>Designation</th><th>Multiple (own)</th><th>Target</th><th>Confirmed</th><th>Shipped</th><th>Pipeline</th><th>New buyers</th><th>Progress</th><th>Last reviewed</th><th></th></tr>
     <?php foreach ($team['rows'] as $r): $t = $r['target']; $c = $r['counts']; $uid = (int) $r['user']['id']; ?>
     <tr data-user-id="<?= $uid ?>">
@@ -69,19 +69,30 @@ $__order = static function (int $id) use ($team): string {
     </tr>
     <?php endforeach; ?>
     <?php if ($team['rows'] === []): ?><tr><td colspan="11" class="muted">Nobody in Sales &amp; Export yet, and no order credited in this period.</td></tr><?php endif; ?>
+    <?php $__ua = $team['unassigned']; $__uaMore = $__ua['order_count'] - count($__ua['recent_ids']); ?>
     <tr id="target-unassigned">
       <td><strong>Unassigned</strong></td>
-      <td colspan="3" class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</td>
-      <td><?= (int) $team['unassigned']['counts']['counted'] ?></td>
-      <td><?= (int) $team['unassigned']['counts']['shipped'] ?></td>
-      <td colspan="5"><?php $__refs = []; foreach ($team['unassigned']['orders'] as $oid => $o) { $__refs[] = $__order((int) $oid); } echo $__refs === [] ? '<span class="muted">none</span>' : implode(', ', $__refs); ?></td>
+      <td colspan="3"><span class="muted small">Confirmed orders with no Sales &amp; Export owner and no moved credit</span>
+        <div class="target-unassigned-orders small" id="target-unassigned-orders">
+          <?php if ($__ua['order_count'] === 0): ?><span class="muted">No order.</span>
+          <?php else: ?><strong><?= (int) $__ua['order_count'] ?> order<?= $__ua['order_count'] === 1 ? '' : 's' ?></strong><?= $__uaMore > 0 ? ' — newest ' . count($__ua['recent_ids']) : '' ?>: <?= implode(', ', array_map(static fn (int $oid): string => $__order($oid), $__ua['recent_ids'])) ?><?php if ($__uaMore > 0): ?> <span class="muted">and <?= (int) $__uaMore ?> more</span><?php endif; ?>
+          <?php endif; ?>
+        </div></td>
+      <td><?= (int) $__ua['counts']['counted'] ?></td>
+      <td><?= (int) $__ua['counts']['shipped'] ?></td>
+      <td><?= (int) $__ua['pipeline'] ?></td>
+      <td><?= (int) $__ua['counts']['new_buyers'] ?></td>
+      <td colspan="3"></td>
     </tr>
     <tr id="target-total">
       <td><strong>Total</strong></td>
       <td colspan="2"></td>
       <td><strong><?= View::e($__num($team['team_target'])) ?></strong></td>
       <td><strong><?= (int) $team['total']['counted'] ?></strong></td>
-      <td colspan="6"></td>
+      <td><strong><?= (int) $team['total']['shipped'] ?></strong></td>
+      <td><strong><?= (int) $team['total_pipeline'] ?></strong></td>
+      <td><strong><?= (int) $team['total']['new_buyers'] ?></strong></td>
+      <td colspan="3"></td>
     </tr>
   </table>
   </div>
@@ -106,11 +117,11 @@ $__order = static function (int $id) use ($team): string {
       <td><?= (int) $a['counts']['shipped'] ?></td>
       <td><?= $a['reviewed_at'] !== null ? View::e(Dates::short((string) $a['reviewed_at'])) : '<span class="muted">never</span>' ?></td>
       <td>
-        <form method="post" action="/sales-targets/associate/<?= $aid ?>" class="btn-row" style="margin-top:0">
+        <form method="post" action="/sales-targets/associate/<?= $aid ?>" class="btn-row target-inline-form">
           <?= Csrf::field() ?>
           <input type="hidden" name="period" value="<?= View::e($period['key']) ?>">
           <input type="number" name="containers" min="0" step="0.1" value="<?= $a['target'] > 0 ? View::e($__num($a['target'])) : '' ?>" placeholder="e.g. 2" aria-label="<?= View::e($a['associate']['name'] . ' — containers per period') ?>" style="width:6rem">
-          <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Agreed at the quarterly review" aria-label="Reason for this change">
+          <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Agreed at the quarterly review" aria-label="Reason for this change">
           <button type="submit" class="btn-sm">Save</button>
         </form>
       </td>
@@ -137,7 +148,7 @@ $__order = static function (int $id) use ($team): string {
         <input type="number" name="multiple" min="1" max="10" step="0.1" value="<?= $t['own_multiple'] !== null ? View::e($__num($t['own_multiple'])) : '' ?>" placeholder="e.g. 3 (empty = company setting)"></label>
       <label><input type="checkbox" name="buildup_enabled" value="1"<?= $t['buildup_enabled'] ? ' checked' : '' ?>> Build-up for a new joiner<?= $t['joined_on'] ? ' (joined ' . View::e(Dates::short((string) $t['joined_on'])) . ')' : ' (no joining date on the user)' ?></label>
       <label class="full">Reason for this change *
-        <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Reviewed with them at the quarterly meeting"></label>
+        <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Reviewed with them at the quarterly meeting"></label>
       <div class="btn-row full"><button type="submit" class="btn-sm btn-success">Save target</button></div>
     </form>
   </details>
@@ -147,15 +158,18 @@ $__order = static function (int $id) use ($team): string {
   <p class="muted small">The credit goes to the order's Sales &amp; Export owner unless moved here. Only the target credit moves — nothing else on the order changes.</p>
   <details id="target-move-credit">
     <summary>Orders counted in <?= View::e($period['label']) ?> (<?= count($team['credited_orders']) ?>)</summary>
+    <?php if (count($team['credited_orders']) > count($team['move_ids'])): ?>
+    <p class="muted small" id="target-move-note">Showing the <?= count($team['move_ids']) ?> most recently confirmed of the <?= count($team['credited_orders']) ?> orders counted in this period (newest first).</p>
+    <?php endif; ?>
     <div class="table-scroll">
     <table class="list">
       <tr><th>Order</th><th>Credited to</th><th>Move to</th></tr>
-      <?php foreach ($team['credited_orders'] as $oid => $o): $__cur = $team['owners'][(int) $oid] ?? null; ?>
+      <?php foreach ($team['move_ids'] as $oid): $__cur = $team['owners'][(int) $oid] ?? null; ?>
       <tr>
         <td><?= $__order((int) $oid) ?></td>
         <td><?php $__name = 'Unassigned'; foreach ($team['staff'] as $s) { if ($s['id'] === $__cur) { $__name = $s['name']; } } echo View::e($__name); ?></td>
         <td>
-          <form method="post" action="/sales-targets/credit/<?= (int) $oid ?>" class="btn-row" style="margin-top:0">
+          <form method="post" action="/sales-targets/credit/<?= (int) $oid ?>" class="btn-row target-inline-form">
             <?= Csrf::field() ?>
             <input type="hidden" name="period" value="<?= View::e($period['key']) ?>">
             <select name="user_id" required aria-label="Move the credit to">
@@ -163,7 +177,7 @@ $__order = static function (int $id) use ($team): string {
               <option value="auto">Back to the Sales &amp; Export owner</option>
               <?php foreach ($team['staff'] as $s): ?><option value="<?= (int) $s['id'] ?>"><?= View::e($s['name']) ?></option><?php endforeach; ?>
             </select>
-            <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
+            <input type="text" name="reason" required minlength="10" data-reason-hint="on-error" maxlength="500" placeholder="e.g. Closed by them while the owner was on leave" aria-label="Reason for moving the credit">
             <button type="submit" class="btn-sm">Move</button>
           </form>
         </td>

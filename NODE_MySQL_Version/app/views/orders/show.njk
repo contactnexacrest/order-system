@@ -727,14 +727,15 @@
     </form>
   {% endif %}
   {% if order.status == 'active' and permissions.close_orders %}
-  <form method="post" action="/orders/{{ order.id }}/mark-lost" style="display:inline" onsubmit="return confirmMarkLost(this);">
+  <form method="post" action="/orders/{{ order.id }}/mark-lost" class="mark-lost-form" onsubmit="return confirmMarkLost(this);">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <input type="hidden" name="reason" class="mark-lost-reason">
     {# Owner decision D-378: an optional lost category (Sales Performance → "Top lost category"); the reason stays required. #}
-    <select name="lost_category" aria-label="Lost category (optional)">
+    <label class="mark-lost-category">Lost reason category (optional)
+    <select name="lost_category">
       <option value="">Choose… (optional)</option>
       {% for lk, ll in salesTargetLostCategories %}<option value="{{ lk }}">{{ ll }}</option>{% endfor %}
-    </select>
+    </select></label>
     <button type="button" class="btn-sm btn-danger" onclick="promptMarkLost(this)">Mark as Lost</button>
   </form>
   <script>

@@ -78,6 +78,11 @@ final class SalesTargetService
         'no_owner' => ['alert_no_owner_recipients', 'Sales target — a confirmed order has no salesperson', ['Managing Director', 'Sales/Export Manager']],
     ];
 
+    /** D-378 review: the Unassigned row names this many orders (newest first), then "and N more". */
+    public const UNASSIGNED_SHOWN = 10;
+    /** D-378 review: the move-credit list shows this many orders of the period (newest first). */
+    public const MOVE_SHOWN = 50;
+
     private const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     /** @var array<int, float>|null order id => profit after incentive (one request) */
@@ -742,16 +747,31 @@ final class SalesTargetService
         $unassignedIds = array_values(array_filter($periodOrderIds, static fn (int $oid): bool => ($owners[$oid] ?? null) === null));
         $unassigned = self::periodCounts(array_intersect_key($credits, array_flip($unassignedIds)), $period['start'], $period['end']);
         $company = self::companyTarget($period, $today, $credits);
+        // D-378 review: long lists are shown newest first (confirmed date, then order id) and cut —
+        // the Unassigned row names at most UNASSIGNED_SHOWN orders, the move-credit list at most MOVE_SHOWN.
+        $newestFirst = static function (array $ids) use ($credits): array {
+            $ids = array_values(array_map('intval', $ids));
+            usort($ids, static fn (int $a, int $b): int => [(string) ($credits[$b]['confirmed_on'] ?? ''), $b] <=> [(string) ($credits[$a]['confirmed_on'] ?? ''), $a]);
+            return $ids;
+        };
+        $unassignedPipeline = count(array_filter($pipeline, static fn (array $o): bool => ($owners[(int) $o['id']] ?? null) === null));
         return [
             'settings' => $settings,
             'period' => $period,
             'rows' => $rows,
-            'unassigned' => ['counts' => $unassigned, 'orders' => SalesTargetRepository::ordersByIds($unassignedIds)],
+            'unassigned' => [
+                'counts' => $unassigned,
+                'order_count' => count($unassignedIds),
+                'recent_ids' => array_slice($newestFirst($unassignedIds), 0, self::UNASSIGNED_SHOWN),
+                'pipeline' => $unassignedPipeline,
+            ],
             'associates' => self::associateRows($period, $credits, $periodOrderIds),
             'total' => $inPeriod,
+            'total_pipeline' => count($pipeline),
             'team_target' => round($teamTarget, 1),
             'company' => $company,
             'credited_orders' => SalesTargetRepository::ordersByIds($periodOrderIds),
+            'move_ids' => array_slice($newestFirst($periodOrderIds), 0, self::MOVE_SHOWN),
             'owners' => $owners,
             'staff' => SalesTargetRepository::activeStaff(),
         ];

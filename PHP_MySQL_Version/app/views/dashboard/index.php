@@ -23,7 +23,7 @@
   </div>
   <?php if ($__c['rows'] !== [] || $__c['correction_rows'] !== []): ?>
   <table class="list">
-    <tr><th>Order</th><th>Date</th><th>What</th><th>Containers</th><?php if ($salesTarget['fob'] !== []): ?><th>FOB</th><?php endif; ?></tr>
+    <tr><th>Order</th><th>Date</th><th>What</th><th>Containers</th><?php if ($salesTarget['fob'] !== []): ?><th title="The goods FOB value of the order, in the order's currency">Value</th><?php endif; ?></tr>
     <?php foreach ($__c['rows'] as $__r): $__oid = (int) $__r['order_id']; ?>
     <tr>
       <td><?= $__ref($__oid) ?></td>

@@ -261,10 +261,10 @@ fieldset.intake-step{padding-top:1.25rem;}
 label{display:block;margin-bottom:1rem;font-size:0.9rem;color:var(--ink);font-weight:700;}
 input::placeholder,textarea::placeholder{color:var(--ink-soft);font-weight:400;font-style:italic;opacity:1;}
 input[type=text],input[type=email],input[type=password],input[type=file],
-input[type=date],input[type=number],input[type=datetime-local],input[type=tel],input[type=url]{
+input[type=date],input[type=month],input[type=number],input[type=datetime-local],input[type=tel],input[type=url]{
   display:block;width:100%;padding:0.6rem 0.75rem;margin-top:0.35rem;border:1px solid var(--line);border-radius:10px;font-size:1rem;color:var(--ink);background:#fff;font-family:inherit;
 }
-input[type=text]:focus,input[type=email]:focus,input[type=password]:focus,input[type=date]:focus,
+input[type=text]:focus,input[type=email]:focus,input[type=password]:focus,input[type=date]:focus,input[type=month]:focus,
 input[type=number]:focus,input[type=datetime-local]:focus,input[type=tel]:focus,input[type=url]:focus,
 select:focus,textarea:focus{
   outline:none;border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-soft);
@@ -315,7 +315,7 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .setting-row input{flex:1;margin-top:0;}
 /* D-332: plain setting name first; its help sentence below; the technical key small and grey (for support). */
 .setting-label .setting-name{font-weight:600;}
-.setting-label .setting-help{display:block;margin-top:2px;}
+.setting-label .setting-help{display:block;margin-top:0.3rem;font-weight:400;line-height:1.4;}
 .setting-label .setting-key{display:block;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.7rem;opacity:0.7;}
 .badge{display:inline-block;font-size:0.7rem;padding:0.15rem 0.5rem;border-radius:6px;margin-left:0.4rem;font-weight:600;}
 .badge-sensitive{background:var(--danger-soft);color:var(--danger);}
@@ -1277,3 +1277,25 @@ table.product-list .unit-tail + br { display: none; }
 
 /* QA SUI-004 (13 Nov 2026): long unbroken values (e-mail addresses, references) in key/value tables wrap instead of widening the page on a phone. */
 table.kv td, table.kv th { overflow-wrap: anywhere; }
+
+/* D-378 review: Mark as Lost keeps its optional category inside its own small form, captioned,
+   beside the button (not a full-width drop-down above Mark as Lost and Request Cancellation). */
+.mark-lost-form{display:inline-flex;align-items:flex-end;gap:0.5rem;flex-wrap:wrap;vertical-align:bottom;margin:0 0.5rem 0 0;}
+.mark-lost-form .mark-lost-category{display:inline-block;margin:0;font-size:0.8rem;font-weight:600;color:var(--ink-soft);}
+.mark-lost-form .mark-lost-category select{display:block;width:auto;min-width:12rem;margin-top:0.2rem;padding:0.35rem 0.6rem;font-size:0.85rem;}
+
+/* D-378 review: the Targets page team table fits its card at 1280px (no forced horizontal scroll):
+   tighter cells, the Edit button never cut, and the Unassigned order references wrap. */
+table.list.target-team th,table.list.target-team td{padding:0.45rem 0.4rem;font-size:0.8rem;}
+table.list.target-team th{font-size:0.76rem;}
+table.list.target-team td:last-child{white-space:nowrap;width:1%;}
+table.list.target-team .btn-sm{padding:0.3rem 0.6rem;font-size:0.8rem;}
+.target-unassigned-orders{margin-top:0.3rem;line-height:1.5;overflow-wrap:anywhere;}
+.target-unassigned-orders a{white-space:nowrap;}
+/* D-378 review: the one-line forms in the Targets page tables (set an associate's target, move a credit). */
+.target-inline-form{margin-top:0;flex-wrap:nowrap;align-items:center;gap:0.4rem;}
+.target-inline-form select,.target-inline-form input{margin-top:0;padding:0.35rem 0.55rem;font-size:0.85rem;}
+.target-inline-form select{width:auto;max-width:16rem;flex:0 0 auto;}
+.target-inline-form input[type=text]{flex:1 1 14rem;min-width:10rem;}
+.target-inline-form input[type=number]{flex:0 0 6rem;width:6rem;}
+form.btn-row.target-inline-form > button{flex:0 0 auto;margin:0;}

@@ -74,6 +74,11 @@ const ALERTS = {
   no_owner: ['alert_no_owner_recipients', 'Sales target — a confirmed order has no salesperson', ['Managing Director', 'Sales/Export Manager']],
 };
 
+/** D-378 review: the Unassigned row names this many orders (newest first), then "and N more". */
+const UNASSIGNED_SHOWN = 10;
+/** D-378 review: the move-credit list shows this many orders of the period (newest first). */
+const MOVE_SHOWN = 50;
+
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
@@ -769,6 +774,19 @@ async function teamData(p, today) {
   const unassigned = periodCounts(unassignedCredits, p.start, p.end);
   const company = await companyTarget(p, today, credits);
   const credited = ordersView(await salesTargetRepository.ordersByIds(periodOrderIds));
+  // D-378 review: long lists are shown newest first (confirmed date, then order id) and cut —
+  // the Unassigned row names at most UNASSIGNED_SHOWN orders, the move-credit list at most MOVE_SHOWN (as PHP).
+  const confirmedOf = (oid) => {
+    const c = mapGet(credits, oid);
+    return c === undefined || c === null || c.confirmed_on == null ? '' : String(c.confirmed_on);
+  };
+  const newestFirst = (ids) => ids.map(Number).sort((a, b) => {
+    const da = confirmedOf(a);
+    const db2 = confirmedOf(b);
+    if (da !== db2) return db2 < da ? -1 : 1;
+    return b - a;
+  });
+  const unassignedPipeline = pipeline.filter((o) => ownerOf(owners, Number(o.id)) === null).length;
   const ownersObj = {};
   for (const [oid, uid] of owners) ownersObj[oid] = uid;
   const staff = await salesTargetRepository.activeStaff();
@@ -778,13 +796,20 @@ async function teamData(p, today) {
     settings: s,
     period: p,
     rows,
-    unassigned: { counts: unassigned, orders: ordersView(await salesTargetRepository.ordersByIds(unassignedIds)).list },
+    unassigned: {
+      counts: unassigned,
+      order_count: unassignedIds.length,
+      recent_ids: newestFirst(unassignedIds).slice(0, UNASSIGNED_SHOWN),
+      pipeline: unassignedPipeline,
+    },
     associates: await associateRows(p, credits, periodOrderIds),
     total: inPeriod,
+    total_pipeline: pipeline.length,
     team_target: phpRound(teamTarget, 1),
     company,
     credited_orders: credited.list,
     credited_order_refs: credited.byId,
+    move_ids: newestFirst(periodOrderIds).slice(0, MOVE_SHOWN),
     owners: ownersObj,
     staff,
     staff_names: staffNames, // "Credited to": an active staff member's name, else Unassigned (as PHP)
@@ -1212,7 +1237,7 @@ async function runAlerts(today) {
 }
 
 module.exports = {
-  PERMISSION, DEFAULTS, PERIOD_TYPES, LOST_CATEGORIES, ALERTS,
+  PERMISSION, DEFAULTS, PERIOD_TYPES, LOST_CATEGORIES, ALERTS, UNASSIGNED_SHOWN, MOVE_SHOWN,
   resetCache, canManage, canSeeMoney, num1,
   settings, validateSettings, saveSettings,
   period, previous, recentPeriods, monthsOf,
