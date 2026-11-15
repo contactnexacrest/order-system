@@ -138,6 +138,7 @@ The complete description of the NexaCrest export order system: what it is for, h
   - [6.14 Zoho Books sync](#614-zoho-books-sync)
   - [6.15 Divisions: Domestic Trade, Import & Distribution, Merchant Trade](#615-divisions-domestic-trade-import--distribution-merchant-trade)
   - [6.16 Backups](#616-backups)
+  - [6.16b Sales targets (D-378, 15 Nov 2026)](#616b-sales-targets-d-378-15-nov-2026)
   - [6.17 Admin pages](#617-admin-pages)
   - [6.17b Setup checklist (D-312)](#617b-setup-checklist-d-312-11-nov-2026)
   - [6.18 Sample data playground](#618-sample-data-playground)
@@ -3438,6 +3439,35 @@ D-262.
   `data_export_run`: structure-only + data-only dump for a fresh
   reinstall; SOP 18; `MysqlDumpService`).
 - **SOP / decisions.** SOP 32, 18; D-260.
+
+### 6.16b Sales targets (D-378, 15 Nov 2026)
+
+- **Purpose.** Show whether the margin earned covers the company's costs plus the profit wanted, and give
+  each salesperson a fair personal target. Measures only: pays nothing, changes no price, document or gate.
+- **Screens.** `/sales-targets` (team table, Unassigned row, associates row, check line, calculator),
+  `/sales-targets/settings` (company costs/profit with effective-from history, period, multiple, build-up,
+  review, alert %, designation defaults), POST `/sales-targets/person/{id}`, `/sales-targets/associate/{id}`,
+  `/sales-targets/credit/{orderId}` — all `manage_sales_targets` (MD, ED). Cockpit box (money lines only with
+  `view_price_buildup`); Dashboard "Your target" box (own containers only); Sales Performance optional
+  `salesperson` select (empty = page as before); Mark Lost optional `lost_category`; Edit user `joined_on`;
+  E-mail settings section E: 3 tick-list alerts.
+- **Key rules.** Period month / quarter (default) / half (Apr–Sep, Oct–Mar) / year (Apr–Mar). Company target
+  = (monthly costs + monthly profit) × months, earned = `profit_after_incentive_inr` of orders shipped (CI
+  date) in the period; avg margin per container = last 3 months' shipped margin ÷ containers. Personal targets
+  in containers (every container 1): own, else designation default; build-up 0 % / 50 % / 100 % from
+  `users.joined_on`. Credit counts at confirmation (first advance receipt, LC received, or for advance 0 %:
+  buyer PO + PI approved); credit = `orders.sales_credit_user_id`, else the Sales & Export owner, else
+  Unassigned. Corrections are dated events (reversal when cancelled/lost, shipped − confirmed when it ships);
+  closed periods are never rewritten. Calculator inputs have no `name` (salary never posted). Alerts: behind
+  (≥ 50 % of the period gone and below `alert_pct`), review due, confirmed with no Sales owner — recipients
+  `alert_*_recipients` (NULL = defaults, '' = MD).
+- **Tables.** `sales_target_settings`, `sales_target_company`, `sales_targets`, `sales_target_credits`
+  (snapshot written by `sync()` in `check_alerts` and on opening the page); columns `users.joined_on`,
+  `orders.lost_category`, `orders.sales_credit_user_id`. Migration `2026-11-15a`.
+- **Code.** `SalesTargetController`, `SalesTargetService`, `SalesTargetRepository` (Node
+  `salesTargetController.js`, `salesTargetService.js`, `salesTargetRepository.js`); tests `SalesTargetsTest` /
+  `salesTargets.test.js`.
+- **SOP / decisions.** SOP 33; D-378; spec `docs/decisions/D-378-sales-targets-spec.md`.
 
 ### 6.17 Admin pages
 
