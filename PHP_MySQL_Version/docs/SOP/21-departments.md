@@ -98,6 +98,12 @@ permission** takes a reason and, now, an optional **Until** date. From the
 day after that date the exception no longer applies; the list shows it as
 "ended".
 
+## Which reports a role sees (D-379)
+
+Besides permissions, each role has a **Reports** tab (Off / Own / Department / All per report) — see
+SOP 14. Department means the person's current departments here. A person in several departments gets the
+highest level of their roles; an extra on Edit user can raise one report for one person.
+
 ## Who sees which money
 
 Each designation's role says which money its people may see. The default

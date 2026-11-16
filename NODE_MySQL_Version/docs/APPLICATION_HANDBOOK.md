@@ -3206,6 +3206,19 @@ the same filters, counts, fields, actions and money rules on both templates
   `DashboardRepository`, `DivisionProfitService`, `IncentiveReportService`.
 - **SOP / decisions.** SOP 14; D-104, D-118, D-183, D-204.
 
+**Report access per role (D-379, 15 Nov 2026).** `ReportAccess` (Node `reportAccess.js`) holds the registry of
+24 reports in 7 sections and each role's level per report — `off` / `own` / `department` / `all` — in
+`role_report_access` (seeded defaults for every role), raised per person by `user_report_extras` (raise only,
+reason, audit USER_REPORT_EXTRA_ADDED/_REMOVED). Effective level = highest across the person's roles, Super
+Admin = all; the report's base permission(s) and the money classes stay a ceiling. `ReportAccessCheck` gates
+every report route after its permission check (403, PERMISSION_DENIED `report:<key>`); `ReportAccess::scopeSql`
+limits rows (own = assignee / department owner / sales credit; department = orders of anyone in the viewer's
+departments; all = every order in their divisions). `/reports` needs at least one open report; the page shows
+7 section boxes and a scope banner. Roles › Reports tab (`/admin/roles/{id}/reports`, save / reset / preview)
+and Edit user extras need `manage_report_access` (MD, ED). Sidebar Overview › **Sales targets** for level
+department/all (department = read-only team view). Migration `2026-11-15b`. Spec
+`docs/decisions/D-379-report-access-spec.md`; tests `ReportAccessTest` / `reportAccess.test.js`.
+
 ### 6.11b Approvals page (D-310, 11 Nov 2026)
 
 - **Purpose.** One place for everything a person may approve, so nothing

@@ -1,5 +1,9 @@
 # Tutorial videos — progress and resume notes
 
+> **D-379 (15 Nov 2026) known mismatch:** A01, A02 (parts 1–2), B01, B02, B11 and C04 show the Reports page,
+> the roles screen or the menu as before report access per role (7-section Reports page, Reports tab on roles,
+> Overview › Sales targets, Admin without money reports). Re-record only when the owner lifts the hold.
+>
 > **Hold confirmed 15 Nov 2026 (owner: "no videos for now — until I say so").** Known mismatch from the sales
 > targets build (D-378): A01 and B02 show the Edit user form without the new optional **Joining date** field;
 > B01/B02 Dashboard and B02 Cockpit gain a target box **only once targets are set** (off by default). Show them

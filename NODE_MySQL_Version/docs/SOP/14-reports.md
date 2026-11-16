@@ -34,6 +34,21 @@ staff having to open every order individually.
   your role doesn't have) is shown as plain text instead of a link that
   would answer "not permitted" (QA Round 6, R6-N02).
 
+## Who sees which report, and how far (D-379, 15 Nov 2026)
+
+Each role has its own setting per report in **Users & roles › Roles and permissions › <role> › Reports**:
+**Off** (not shown, refused even by typing the address), **Own** (orders the person is assigned to or owns,
+their clients and their own figures), **Department** (orders handled by anyone in their department) or **All**.
+The money permissions still decide which amounts appear, and CAFIN still needs *View CAFIN*. The Reports page
+shows only the reports a person may open, in 7 sections (Sales & orders · Payments & receivables · Disputes &
+amendments · Freight, products & suppliers · People · Finance & CA · Management), with a banner when they
+see only their own business or their department. **See Reports as this role** previews it; **Reset to
+defaults** restores the installed set-up. One person can be given more than their role on **Edit user ›
+Extra report access** (with a reason; never less). By default an Export Executive sees only their own
+business, managers their department, directors and MD/ED everything in their area, Admin only Management and
+order search, and an Investor totals and trends only. Changing these settings needs *Manage report access*
+(MD, ED).
+
 ## What staff do
 
 Everything starts from the **Reports** hub:
