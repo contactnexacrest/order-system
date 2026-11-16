@@ -1,0 +1,12 @@
+{#
+  D-379 cosmetic follow-up (16 Nov 2026, owner-approved mockup): the 403 refusal page of the report gates
+  (reportAccessCheck) and of permissionCheck, inside the normal app layout — a red "Not open to you" pill,
+  the title, the existing explanatory text and a "← Back" button. Drawn by helpers/refusalPage.js.
+  PHP twin: PHP_MySQL_Version/app/views/errors/refused.php
+#}
+<div class="card page-wide refused-page" id="refused-page" data-refused>
+  <span class="refused-pill">Not open to you</span>
+  <h1>{{ title }}</h1>
+  <p class="refused-text">{{ message }}</p>
+  <p><a class="btn" href="{{ backUrl }}">&larr; {{ backLabel }}</a></p>
+</div>

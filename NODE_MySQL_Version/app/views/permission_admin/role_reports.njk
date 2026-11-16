@@ -1,7 +1,8 @@
 {#
   Owner decision D-379 (15 Nov 2026): Roles and permissions › <role> › Reports tab (manage_report_access).
   One row per report, grouped in the 7 sections of the Reports page: a compact Off / Own / Department / All
-  choice (no extra label per D-366), what the report needs and a warning when the role lacks it; a reason is
+  choice (no extra label per D-366), what the report needs in plain words (✓ green when the role has it, ⚠ red
+  "missing for this role" when the level set needs it and the role lacks it — D-379 cosmetic follow-up); a reason is
   required to save (audit REPORT_ACCESS_CHANGED, one row per changed report). "See Reports as this role" and
   "Reset to defaults" (POST, reason required). One view for the Standard and the Kanban template.
   PHP twin: PHP_MySQL_Version/app/views/permission_admin/role_reports.php
@@ -31,9 +32,13 @@
         {% for l in reportLevels %}
         <td><input type="radio" name="levels[{{ row.key }}]" value="{{ l }}" {{ 'checked' if row.level == l }} aria-label="{{ row.label }}: {{ levelLabels[l] }}"></td>
         {% endfor %}
-        <td class="small">
-          {% if row.needs %}<span class="muted">{{ row.needs }}</span>{% endif %}
-          {% if row.missing.length > 0 %}<br><span class="badge badge-warning">missing for this role: {{ row.missing | join(', ') }}</span>{% endif %}
+        <td class="small report-needs">
+          {% for need in row.needsItems %}
+            {% if need.has %}<span class="need need-ok">&#10003; {{ need.text }}</span>
+            {% elif need.missing %}<span class="need need-missing">&#9888; {{ need.text }} — missing for this role</span>
+            {% else %}<span class="need muted">{{ need.text }}</span>
+            {% endif %}
+          {% endfor %}
         </td>
         <td class="small muted">{{ levelLabels[defaults[row.key]] }}</td>
       </tr>

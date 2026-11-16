@@ -57,6 +57,8 @@ async function roleTab(req, res) {
         label: reportAccess.REPORTS[key].label,
         level,
         needs: reportAccess.needsText(key),
+        // D-379 cosmetic follow-up: the "Needs" column, one plain-word entry per need (✓ / ⚠).
+        needsItems: reportAccess.needsItems(can, key, level),
         // "missing for this role": the level set here opens nothing without these permissions.
         missing: level === reportAccess.OFF ? [] : reportAccess.missingPermissions(can, key, level),
       };

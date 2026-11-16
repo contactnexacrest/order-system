@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Helpers\RefusalPage;
 use App\Repositories\AuditLogRepository;
 use App\Services\AuthService;
 use App\Services\ReportAccess;
@@ -11,7 +12,7 @@ use App\Services\ReportAccess;
 /**
  * Owner decision D-379: the route gate of every report in ReportAccess::REPORTS. It runs after
  * PermissionCheck (the base permission stays on the route as the ceiling) and refuses — the
- * same 403 page as PermissionCheck, for the page and its CSV alike — when the signed-in person's
+ * same 403 page as PermissionCheck (App\Helpers\RefusalPage), for the page and its CSV alike — when the signed-in person's
  * effective level for the report is below $min (default: the level that opens its page).
  *
  * Node twin: NODE_MySQL_Version/app/src/middleware/reportAccessCheck.js
@@ -30,8 +31,7 @@ final class ReportAccessCheck
                 return true;
             }
             AuditLogRepository::log((int) $user['id'], 'PERMISSION_DENIED', 'permissions', null, 'report:' . $reportKey);
-            http_response_code(403);
-            echo '<h1>403 — Not permitted</h1><p>' . htmlspecialchars(ReportAccess::REFUSED) . '</p><p><a href="/">Back to dashboard</a></p>';
+            RefusalPage::report(ReportAccess::REFUSED); // D-379 cosmetic follow-up: 403 inside the app layout, back to Reports
             return false;
         };
     }
@@ -49,8 +49,7 @@ final class ReportAccessCheck
                 return true;
             }
             AuditLogRepository::log((int) $user['id'], 'PERMISSION_DENIED', 'permissions', null, 'report:any');
-            http_response_code(403);
-            echo '<h1>403 — Not permitted</h1><p>' . htmlspecialchars(ReportAccess::REFUSED) . '</p><p><a href="/">Back to dashboard</a></p>';
+            RefusalPage::report(ReportAccess::REFUSED, false); // no report opens: back to the dashboard
             return false;
         };
     }

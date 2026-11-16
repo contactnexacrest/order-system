@@ -69,6 +69,8 @@ final class ReportAccessController
                     'label' => ReportAccess::REPORTS[$key]['label'],
                     'level' => $level,
                     'needs' => ReportAccess::needsText($key),
+                    // D-379 cosmetic follow-up: the "Needs" column, one plain-word entry per need (✓ / ⚠).
+                    'needsItems' => ReportAccess::needsItems($can, $key, $level),
                     // "missing for this role": the level set here opens nothing without these permissions.
                     'missing' => $level === ReportAccess::OFF ? [] : ReportAccess::missingPermissions($can, $key, $level),
                 ];

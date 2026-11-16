@@ -2,7 +2,8 @@
 /**
  * Owner decision D-379 (15 Nov 2026): Roles and permissions › <role> › Reports tab (manage_report_access).
  * One row per report, grouped in the 7 sections of the Reports page: a compact Off / Own / Department / All
- * choice (no extra label per D-366), what the report needs and a warning when the role lacks it; a reason is
+ * choice (no extra label per D-366), what the report needs in plain words (✓ green when the role has it, ⚠ red
+ * "missing for this role" when the level set needs it and the role lacks it — D-379 cosmetic follow-up); a reason is
  * required to save (audit REPORT_ACCESS_CHANGED, one row per changed report). "See Reports as this role" and
  * "Reset to defaults" (POST, reason required). One view for the Standard and the Kanban template.
  * Node twin: NODE_MySQL_Version/app/views/permission_admin/role_reports.njk
@@ -36,9 +37,13 @@ $__roleId = (int) $role['id'];
         <?php foreach (ReportAccess::LEVELS as $__l): ?>
         <td><input type="radio" name="levels[<?= htmlspecialchars($__row['key']) ?>]" value="<?= $__l ?>" <?= $__row['level'] === $__l ? 'checked' : '' ?> aria-label="<?= htmlspecialchars($__row['label'] . ': ' . ReportAccess::LEVEL_LABELS[$__l]) ?>"></td>
         <?php endforeach; ?>
-        <td class="small">
-          <?php if ($__row['needs'] !== ''): ?><span class="muted"><?= htmlspecialchars($__row['needs']) ?></span><?php endif; ?>
-          <?php if ($__row['missing'] !== []): ?><br><span class="badge badge-warning">missing for this role: <?= htmlspecialchars(implode(', ', $__row['missing'])) ?></span><?php endif; ?>
+        <td class="small report-needs">
+          <?php foreach ($__row['needsItems'] as $__need): ?>
+            <?php if ($__need['has']): ?><span class="need need-ok">&#10003; <?= htmlspecialchars($__need['text']) ?></span>
+            <?php elseif ($__need['missing']): ?><span class="need need-missing">&#9888; <?= htmlspecialchars($__need['text']) ?> — missing for this role</span>
+            <?php else: ?><span class="need muted"><?= htmlspecialchars($__need['text']) ?></span>
+            <?php endif; ?>
+          <?php endforeach; ?>
         </td>
         <td class="small muted"><?= htmlspecialchars(ReportAccess::LEVEL_LABELS[$defaults[$__row['key']]]) ?></td>
       </tr>

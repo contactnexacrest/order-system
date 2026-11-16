@@ -58,6 +58,9 @@ const LEVELS = [OFF, OWN, DEPARTMENT, ALL];
 
 const LEVEL_LABELS = { [OFF]: 'Off', [OWN]: 'Own', [DEPARTMENT]: 'Department', [ALL]: 'All' };
 
+/** D-379 cosmetic follow-up (16 Nov 2026): the pill beside a report on the Reports page (none for All). */
+const TAG_LABELS = { [OWN]: 'Your orders', [DEPARTMENT]: 'Your department' };
+
 /** The 7 headings of the Reports page and of the Reports tab, in order. */
 const SECTIONS = {
   sales: 'Sales & orders',
@@ -169,12 +172,37 @@ const DEFAULTS = {
   'Investor (view only)': { performance: 'all', trends: 'all', conversion: 'all', cockpit: 'all', queues: 'all' },
 };
 
-/** Plain-word names of the permissions the Reports tab may say are missing. */
-const PERMISSION_WORDS = {
-  view_selling_prices: 'selling prices',
-  view_buyer_payments: 'buyer payments',
-  view_purchase_prices: 'buying prices',
-  view_logistics_costs: 'logistics costs',
+/**
+ * D-379 cosmetic follow-up (16 Nov 2026): what each permission is called in the Reports tab's
+ * "Needs" column — the name of the permission in the permissions table (Roles and permissions).
+ */
+const PERMISSION_NAMES = {
+  view_reports: 'View reports',
+  view_staff_reports: 'View staff productivity reports',
+  manage_order_financials: 'Manage order financials',
+  view_cafin: 'View & download CAFIN',
+  ca_module_view: 'View CA / Accounting module',
+  view_cockpit: 'Management cockpit',
+  view_audit_log: 'View audit log',
+  manage_sales_targets: 'Manage sales targets',
+};
+
+/** Money permissions in plain words ("see buyer payments"). */
+const MONEY_WORDS = {
+  view_selling_prices: 'see selling prices',
+  view_buyer_payments: 'see buyer payments',
+  view_purchase_prices: 'see purchase prices',
+  view_logistics_costs: 'see logistics costs',
+};
+
+/** Short words for an "any of" group ("CA module, export benefit claims or order financials"). */
+const ANY_WORDS = {
+  ca_module_view: 'CA module',
+  manage_export_benefit_claims: 'export benefit claims',
+  manage_order_financials: 'order financials',
+  manage_incentives: 'manage team incentives',
+  pay_incentives: 'pay incentives',
+  view_price_buildup: 'see the full price build-up',
 };
 
 // ================================================================ caches (one request)
@@ -400,18 +428,55 @@ function missingPermissions(can, key, level = OWN) {
   return missing;
 }
 
-/** "needs: selling prices" wording for the Reports tab (money in plain words, other keys as they are). */
-function needsText(key) {
+/** One permission in plain words: money as "see …", others as '"Name" permission'. */
+function permissionWords(perm) {
+  if (MONEY_WORDS[perm]) return MONEY_WORDS[perm];
+  return `"${PERMISSION_NAMES[perm] || perm}" permission`;
+}
+
+/** "a, b or c" */
+function orList(words) {
+  const rest = words.slice(0, -1);
+  const last = words[words.length - 1];
+  return rest.length === 0 ? String(last) : `${rest.join(', ')} or ${last}`;
+}
+
+/**
+ * D-379 cosmetic follow-up (16 Nov 2026): the Reports tab's "Needs" column in plain words, one entry
+ * per need: text, has = the role holds it (shown ✓ in green), missing = the level set here opens
+ * nothing without it (shown ⚠ "missing for this role" in red) — the same rule as missingPermissions().
+ *
+ * @param {function(string): boolean} can
+ * @returns {{text: string, has: boolean, missing: boolean}[]}
+ */
+function needsItems(can, key, level) {
   const r = REPORTS[key];
-  const words = [];
-  for (const perm of r.all) words.push(PERMISSION_WORDS[perm] || perm);
-  if (r.any.length > 0) words.push(r.any.join(' or '));
+  const on = level !== OFF;
+  const items = [];
+  for (const perm of r.all) {
+    const has = !!can(perm);
+    items.push({ text: permissionWords(perm), has, missing: on && !has });
+  }
+  if (r.any.length > 0) {
+    const has = r.any.some((perm) => can(perm));
+    const words = r.any.map((perm) => ANY_WORDS[perm] || PERMISSION_NAMES[perm] || perm);
+    items.push({ text: orList(words), has, missing: on && !has });
+  }
   for (const cls of r.money) {
     const perm = moneyVisibility.PERMISSIONS[cls];
-    words.push(PERMISSION_WORDS[perm] || perm);
+    const has = !!can(perm);
+    items.push({ text: permissionWords(perm), has, missing: on && !has });
   }
-  if (r.all_level_needs && r.all_level_needs.length > 0) words.push(`All: ${r.all_level_needs.join(', ')}`);
-  return words.length === 0 ? '' : `needs: ${words.join(', ')}`;
+  for (const perm of r.all_level_needs || []) {
+    const has = !!can(perm);
+    items.push({ text: `All needs "${PERMISSION_NAMES[perm] || perm}"`, has, missing: level === ALL && !has });
+  }
+  return items;
+}
+
+/** The "Needs" column as one line of plain words (no marks), e.g. '"View reports" permission, see selling prices'. */
+function needsText(key) {
+  return needsItems(() => false, key, OFF).map((i) => i.text).join(', ');
 }
 
 /** Applies the base-permission ceiling to a raw level. */
@@ -769,10 +834,10 @@ async function roleGivesFor(userId, roleId) {
 }
 
 module.exports = {
-  OFF, OWN, DEPARTMENT, ALL, LEVELS, LEVEL_LABELS, SECTIONS, BANNER_OWN, BANNER_DEPARTMENT, REFUSED,
+  OFF, OWN, DEPARTMENT, ALL, LEVELS, LEVEL_LABELS, TAG_LABELS, SECTIONS, BANNER_OWN, BANNER_DEPARTMENT, REFUSED,
   REPORTS, MD_ROLE_NAMES, DEFAULTS,
   resetCache, isReport, isLevel, rank, higher, pageMin, bySection, defaultsForRoleName, asViewer,
-  roleLevels, roleLevel, userExtras, roleIdsFor, rawLevelFor, missingPermissions, needsText,
+  roleLevels, roleLevel, userExtras, roleIdsFor, rawLevelFor, missingPermissions, needsItems, needsText,
   effectiveLevelFor, effectiveLevelForRole, previewAsRole, previewRoleId, level, can, canOpenPage,
   levels, anyOpen, anyOpenIn, canIn, navFlags, navFlagsFor, banner,
   departmentIds, departmentCodes, departmentMemberIds, scopeSql, scopeSqlFor, orderIdsInScope,

@@ -42,7 +42,9 @@ their clients and their own figures), **Department** (orders handled by anyone i
 The money permissions still decide which amounts appear, and CAFIN still needs *View CAFIN*. The Reports page
 shows only the reports a person may open, in 7 sections (Sales & orders · Payments & receivables · Disputes &
 amendments · Freight, products & suppliers · People · Finance & CA · Management), with a banner when they
-see only their own business or their department. **See Reports as this role** previews it; **Reset to
+see only their own business or their department; a report that reaches only part of the business carries a
+small tag on the right — "Your orders" or "Your department" (16 Nov 2026). Opening a report that is not open to
+you shows a "Not open to you" page with a **← Back to Reports** button. **See Reports as this role** previews it; **Reset to
 defaults** restores the installed set-up. One person can be given more than their role on **Edit user ›
 Extra report access** (with a reason; never less). By default an Export Executive sees only their own
 business, managers their department, directors and MD/ED everything in their area, Admin only Management and
@@ -121,7 +123,7 @@ Everything starts from the **Reports** hub:
   the PO's required delivery date). Supplier identity is buying-side
   information: the report needs **See purchase prices** (Procurement,
   Accounts & Finance, MD/ED) and is hidden from Sales (owner decision
-  1 Nov 2026). Procurement opens it from **Reports › Supplier report**.
+  1 Nov 2026). Procurement opens it from **Reports › Supplier performance**.
 - **Order Profitability** — revenue, total cost, profit and margin % per
   order for any date range, with a totals row. Visible only to Super
   Admin and roles granted **Manage order financials**; see [Order

@@ -2,19 +2,25 @@
   Owner decision D-379 (15 Nov 2026): the Reports page — 7 section boxes in a fixed order, each with
   only the reports this person may open (services/reportAccess.js; button text = the report's label),
   and a banner when every open order report shows only their own business or their department's.
-  With previewRole set it is "See Reports as this role": the same boxes, read-only (no links, no data).
+  With previewRole set it is "See Reports as this role": the same rows, read-only (names as plain text,
+  the search box read-only, no data). D-379 cosmetic follow-up (16 Nov 2026): one row per report with a pill.
   One view for the Standard and the Kanban template. PHP twin: PHP_MySQL_Version/app/views/reports/index.php
 #}
 {% set isPreview = true if previewRole else false %}
-{% macro reportButton(key, r, isPreview) %}{% if isPreview or not r.href %}<span class="btn-sm btn-secondary" aria-disabled="true">{{ r.label }}</span>{% else %}<a class="btn-sm" href="{{ r.href }}">{{ r.label }}</a>{% endif %}{% endmacro %}
-<div class="card page-wide" id="reports-page">
+{#- D-379 cosmetic follow-up (16 Nov 2026, owner-approved mockup cosmetic_1): one row per report — name link ·
+    description · a pill on the right ("Your orders" / "Your department"; none for All). The preview draws the
+    very same rows, with the names as plain text and the search box read-only. #}
+{% macro reportName(r, isPreview) %}{% if isPreview or not r.href %}<span class="report-link is-preview" aria-disabled="true">{{ r.label }}</span>{% else %}<a class="report-link" href="{{ r.href }}">{{ r.label }}</a>{% endif %}{% endmacro %}
+{% macro reportTag(lvl, tagLabels, isPreview) %}{% if tagLabels[lvl] %}<span class="report-tag" title="How far this report reaches for {{ 'this role' if isPreview else 'you' }}">{{ tagLabels[lvl] }}</span>{% endif %}{% endmacro %}
+{% if banner %}{% set bannerParts = banner.split(' — ') %}{% endif %}
+<div class="card page-wide" id="reports-page"{% if isPreview %} data-preview{% endif %}>
   {% if isPreview %}
-    <div class="alert alert-info" id="reports-preview-banner">Preview as {{ previewRole.name }} — what this role sees on the Reports page (its own levels and permissions; a person's extra report access is not included). Read-only. <a href="/admin/roles/{{ previewRole.id }}/reports">Back to the Reports tab</a></div>
+    <div class="alert alert-warning" id="reports-preview-banner"><strong>Preview as {{ previewRole.name }}</strong> — what this role sees on the Reports page (its own levels and permissions; a person's extra report access is not included). Read-only. <a href="/admin/roles/{{ previewRole.id }}/reports">Back to the Reports tab</a></div>
   {% endif %}
   <h1>Reports</h1>
   <p class="muted">Per-order reports are one click from the order's own screen ("Full report").</p>
   {% if banner %}
-    <div class="alert alert-info" id="reports-scope-banner">{{ banner }}</div>
+    <div class="alert alert-info" id="reports-scope-banner"><strong>{{ bannerParts[0] }}</strong>{% if bannerParts.length > 1 %} — {{ bannerParts.slice(1).join(' — ') }}{% endif %}</div>
   {% endif %}
   {% if sectionList.length == 0 %}
     <p class="muted">No report is open to {{ 'this role' if isPreview else 'you' }}.</p>
@@ -23,13 +29,19 @@
   {% for sec in sectionList %}
   <div class="section report-section" id="reports-{{ sec.key }}" data-report-section="{{ sec.key }}">
     <h2>{{ reportSections[sec.key] }}</h2>
-    {% for key in sec.keys %}{% set r = reportRegistry[key] %}
-    <div class="report-item" data-report="{{ key }}" style="margin:0 0 0.75rem">
+    <div class="report-list">
+    {% for key in sec.keys %}{% set r = reportRegistry[key] %}{% set lvl = levels[key] or 'all' %}
       {% if key == 'order_search' %}
-        <strong>{{ r.label }}</strong> <span class="muted small">{{ r.description }}</span>
-        {% if not isPreview %}
-        <form method="get" action="/reports" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:4px">
-          <input type="text" name="q" value="{{ searchQuery or '' }}" placeholder="e.g., NC/SC/ORD/26/0411001 or Test Company Ltd" aria-label="Order reference or client name" required maxlength="100" style="width:280px;">
+      <div class="report-item report-search" data-report="{{ key }}">
+        <div class="report-search-head"><span class="report-search-label">{{ r.label }}</span>{{ reportTag(lvl, tagLabels, isPreview) }}</div>
+        {% if isPreview %}
+        <div class="report-search-form">
+          <input type="text" name="q" value="" placeholder="Order no. or client — e.g. SC/ORD/26/001" aria-label="Order reference or client name" readonly>
+          <button type="button" class="btn-sm" disabled>Search</button>
+        </div>
+        {% else %}
+        <form method="get" action="/reports" class="report-search-form">
+          <input type="text" name="q" value="{{ searchQuery or '' }}" placeholder="Order no. or client — e.g. SC/ORD/26/001" aria-label="Order reference or client name" required maxlength="100">
           <button type="submit" class="btn-sm">Search</button>
         </form>
         {% if searchQuery %}
@@ -48,82 +60,85 @@
           </table>
         {% endif %}
         {% endif %}
-      {% elif key == 'per_client' %}
-        {% if isPreview %}
-          {{ reportButton(key, r, isPreview) }} <span class="muted small">{{ r.description }}</span>
-        {% else %}
-        <details id="per-client">
-          <summary class="btn-sm">{{ r.label }}</summary>
-          <table class="list" style="margin-top:0.5rem">
-            <tr><th>Buyer Inquiry Ref</th><th>Company</th><th></th></tr>
-            {% for c in clients %}
-            <tr>
-              <td>{{ c.client_unique_number }}</td>
-              <td>{{ c.company_legal_name }}</td>
-              <td><a href="/reports/client/{{ c.id }}">Run Report</a></td>
-            </tr>
-            {% endfor %}
-            {% if not clients or clients.length == 0 %}<tr><td colspan="3" class="muted">No clients yet.</td></tr>{% endif %}
-          </table>
-        </details>
-        <span class="muted small">{{ r.description }}</span>
-        {% endif %}
+      </div>
+      {% elif key == 'per_client' and not isPreview %}
+      <details class="report-item report-details" id="per-client" data-report="{{ key }}">
+        <summary class="report-row"><span class="report-name"><span class="report-link">{{ r.label }}</span></span><span class="report-desc">{{ r.description }}</span><span class="report-tag-cell">{{ reportTag(lvl, tagLabels, isPreview) }}</span></summary>
+        <table class="list report-details-body">
+          <tr><th>Buyer Inquiry Ref</th><th>Company</th><th></th></tr>
+          {% for c in clients %}
+          <tr>
+            <td>{{ c.client_unique_number }}</td>
+            <td>{{ c.company_legal_name }}</td>
+            <td><a href="/reports/client/{{ c.id }}">Run Report</a></td>
+          </tr>
+          {% endfor %}
+          {% if not clients or clients.length == 0 %}<tr><td colspan="3" class="muted">No clients yet.</td></tr>{% endif %}
+        </table>
+      </details>
       {% else %}
-        {{ reportButton(key, r, isPreview) }} <span class="muted small">{{ r.description }}</span>
-        {% if key == 'incentives' and not isPreview %}
-          <span class="small"><a href="/reports/incentives/to-pay">To pay</a> · <a href="/reports/incentives/owed">Owed at month end</a> · <a href="/reports/incentives/statement">Person statement</a></span>
-        {% endif %}
-        {% if key == 'aggregate' and not isPreview %}
-        <div class="saved-reports" id="saved-reports" style="margin-top:0.5rem">
-          <strong class="small">Saved reports</strong>
-          {% if not savedReports or savedReports.length == 0 %}
-            <p class="muted small">No saved reports yet — save one from the Aggregate report screen.</p>
-          {% else %}
-            <table class="list">
-              <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
-              {% for sv in savedReports %}
-              <tr>
-                {% if currentUser and sv.owner_user_id == currentUser.id %}
-                <td colspan="5">
-                  <form method="post" action="/reports/saved/{{ sv.id }}/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                    <input type="text" name="name" value="{{ sv.name }}" placeholder="Report name" aria-label="Report name" required style="width:200px">
-                    <select name="visibility" aria-label="Visibility">
-                      <option value="private" {{ 'selected' if sv.visibility == 'private' }}>Private</option>
-                      <option value="shared" {{ 'selected' if sv.visibility == 'shared' }}>Shared</option>
-                    </select>
-                    <button type="submit" class="btn-sm">Save</button>
-                    <span class="muted small">{{ sv.report_type }} &middot; last run {{ sv.last_run_at or 'never' }}</span>
-                  </form>
-                </td>
-                {% else %}
-                <td>{{ sv.name }}</td>
-                <td>{{ sv.report_type }}</td>
-                <td>{{ sv.owner_name }}</td>
-                <td>{{ sv.visibility | capitalize }}</td>
-                {% endif %}
-                <td>
-                  <a href="/reports/saved/{{ sv.id }}/run">Run</a>
-                  {% if currentUser and sv.owner_user_id == currentUser.id %}
-                  <form method="post" action="/reports/saved/{{ sv.id }}/delete" style="display:inline">
-                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                    <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this saved report?')">Delete</button>
-                  </form>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </table>
+      <div class="report-item report-row" data-report="{{ key }}">
+        <span class="report-name">{{ reportName(r, isPreview) }}</span>
+        <span class="report-desc">{{ r.description }}
+          {% if key == 'incentives' %}
+            {% if isPreview %}
+            <span class="report-sublinks"><span class="report-link is-preview">To pay</span> · <span class="report-link is-preview">Owed at month end</span> · <span class="report-link is-preview">Person statement</span></span>
+            {% else %}
+            <span class="report-sublinks"><a class="report-link" href="/reports/incentives/to-pay">To pay</a> · <a class="report-link" href="/reports/incentives/owed">Owed at month end</a> · <a class="report-link" href="/reports/incentives/statement">Person statement</a></span>
+            {% endif %}
           {% endif %}
-        </div>
-        {% endif %}
+        </span>
+        <span class="report-tag-cell">{{ reportTag(lvl, tagLabels, isPreview) }}</span>
+      </div>
       {% endif %}
-      {% set lvl = levels[key] or 'all' %}
-      {% if lvl != 'all' %}
-        <span class="badge badge-info small" title="How far this report reaches for {{ 'this role' if isPreview else 'you' }}">{{ levelLabels[lvl] }}</span>
+    {% endfor %}
+    </div>
+    {% if 'aggregate' in sec.keys %}
+    <div class="saved-reports" id="saved-reports">
+      {% if isPreview %}
+        <p class="muted small"><strong>Saved reports:</strong> each person's own and shared saved reports are listed here.</p>
+      {% elif not savedReports or savedReports.length == 0 %}
+        <p class="muted small"><strong>Saved reports:</strong> no saved reports yet — save one from the Aggregate report screen.</p>
+      {% else %}
+        <strong class="small">Saved reports</strong>
+        <table class="list">
+          <tr><th>Name</th><th>Type</th><th>Owner</th><th>Visibility</th><th>Last Run</th><th></th></tr>
+          {% for sv in savedReports %}
+          <tr>
+            {% if currentUser and sv.owner_user_id == currentUser.id %}
+            <td colspan="5">
+              <form method="post" action="/reports/saved/{{ sv.id }}/update" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="text" name="name" value="{{ sv.name }}" placeholder="Report name" aria-label="Report name" required style="width:200px">
+                <select name="visibility" aria-label="Visibility">
+                  <option value="private" {{ 'selected' if sv.visibility == 'private' }}>Private</option>
+                  <option value="shared" {{ 'selected' if sv.visibility == 'shared' }}>Shared</option>
+                </select>
+                <button type="submit" class="btn-sm">Save</button>
+                <span class="muted small">{{ sv.report_type }} &middot; last run {{ sv.last_run_at or 'never' }}</span>
+              </form>
+            </td>
+            {% else %}
+            <td>{{ sv.name }}</td>
+            <td>{{ sv.report_type }}</td>
+            <td>{{ sv.owner_name }}</td>
+            <td>{{ sv.visibility | capitalize }}</td>
+            {% endif %}
+            <td>
+              <a href="/reports/saved/{{ sv.id }}/run">Run</a>
+              {% if currentUser and sv.owner_user_id == currentUser.id %}
+              <form method="post" action="/reports/saved/{{ sv.id }}/delete" style="display:inline">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this saved report?')">Delete</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
       {% endif %}
     </div>
-    {% endfor %}
+    {% endif %}
   </div>
   {% endfor %}
 </div>

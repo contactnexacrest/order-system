@@ -48,6 +48,9 @@ final class ReportAccess
 
     public const LEVEL_LABELS = [self::OFF => 'Off', self::OWN => 'Own', self::DEPARTMENT => 'Department', self::ALL => 'All'];
 
+    /** D-379 cosmetic follow-up (16 Nov 2026): the pill beside a report on the Reports page (none for All). */
+    public const TAG_LABELS = [self::OWN => 'Your orders', self::DEPARTMENT => 'Your department'];
+
     /** The 7 headings of the Reports page and of the Reports tab, in order. */
     public const SECTIONS = [
         'sales' => 'Sales & orders',
@@ -157,12 +160,37 @@ final class ReportAccess
         'Investor (view only)' => ['performance' => 'all', 'trends' => 'all', 'conversion' => 'all', 'cockpit' => 'all', 'queues' => 'all'],
     ];
 
-    /** Plain-word names of the permissions the Reports tab may say are missing. */
-    private const PERMISSION_WORDS = [
-        'view_selling_prices' => 'selling prices',
-        'view_buyer_payments' => 'buyer payments',
-        'view_purchase_prices' => 'buying prices',
-        'view_logistics_costs' => 'logistics costs',
+    /**
+     * D-379 cosmetic follow-up (16 Nov 2026): what each permission is called in the Reports tab's
+     * "Needs" column — the name of the permission in the permissions table (Roles and permissions).
+     */
+    private const PERMISSION_NAMES = [
+        'view_reports' => 'View reports',
+        'view_staff_reports' => 'View staff productivity reports',
+        'manage_order_financials' => 'Manage order financials',
+        'view_cafin' => 'View & download CAFIN',
+        'ca_module_view' => 'View CA / Accounting module',
+        'view_cockpit' => 'Management cockpit',
+        'view_audit_log' => 'View audit log',
+        'manage_sales_targets' => 'Manage sales targets',
+    ];
+
+    /** Money permissions in plain words ("see buyer payments"). */
+    private const MONEY_WORDS = [
+        'view_selling_prices' => 'see selling prices',
+        'view_buyer_payments' => 'see buyer payments',
+        'view_purchase_prices' => 'see purchase prices',
+        'view_logistics_costs' => 'see logistics costs',
+    ];
+
+    /** Short words for an "any of" group ("CA module, export benefit claims or order financials"). */
+    private const ANY_WORDS = [
+        'ca_module_view' => 'CA module',
+        'manage_export_benefit_claims' => 'export benefit claims',
+        'manage_order_financials' => 'order financials',
+        'manage_incentives' => 'manage team incentives',
+        'pay_incentives' => 'pay incentives',
+        'view_price_buildup' => 'see the full price build-up',
     ];
 
     /** @var array<int, array<string,string>> role id => report key => level (one request) */
@@ -359,25 +387,65 @@ final class ReportAccess
         return $missing;
     }
 
-    /** "needs: selling prices" wording for the Reports tab (money in plain words, other keys as they are). */
-    public static function needsText(string $key): string
+    /** One permission in plain words: money as "see …", others as '"Name" permission'. */
+    private static function permissionWords(string $perm): string
+    {
+        if (isset(self::MONEY_WORDS[$perm])) {
+            return self::MONEY_WORDS[$perm];
+        }
+        return '"' . (self::PERMISSION_NAMES[$perm] ?? $perm) . '" permission';
+    }
+
+    /** "a, b or c" */
+    private static function orList(array $words): string
+    {
+        $last = array_pop($words);
+        return $words === [] ? (string) $last : implode(', ', $words) . ' or ' . $last;
+    }
+
+    /**
+     * D-379 cosmetic follow-up (16 Nov 2026): the Reports tab's "Needs" column in plain words, one entry
+     * per need: text, has = the role holds it (shown ✓ in green), missing = the level set here opens
+     * nothing without it (shown ⚠ "missing for this role" in red) — the same rule as missingPermissions().
+     *
+     * @param callable(string):bool $can
+     * @return list<array{text:string, has:bool, missing:bool}>
+     */
+    public static function needsItems(callable $can, string $key, string $level): array
     {
         $r = self::REPORTS[$key];
-        $words = [];
+        $on = $level !== self::OFF;
+        $items = [];
         foreach ($r['all'] as $perm) {
-            $words[] = self::PERMISSION_WORDS[$perm] ?? $perm;
+            $has = $can($perm);
+            $items[] = ['text' => self::permissionWords($perm), 'has' => $has, 'missing' => $on && !$has];
         }
         if ($r['any'] !== []) {
-            $words[] = implode(' or ', $r['any']);
+            $has = false;
+            $words = [];
+            foreach ($r['any'] as $perm) {
+                $has = $has || $can($perm);
+                $words[] = self::ANY_WORDS[$perm] ?? (self::PERMISSION_NAMES[$perm] ?? $perm);
+            }
+            $items[] = ['text' => self::orList($words), 'has' => $has, 'missing' => $on && !$has];
         }
         foreach ($r['money'] as $class) {
             $perm = MoneyVisibility::PERMISSIONS[$class];
-            $words[] = self::PERMISSION_WORDS[$perm] ?? $perm;
+            $has = $can($perm);
+            $items[] = ['text' => self::permissionWords($perm), 'has' => $has, 'missing' => $on && !$has];
         }
-        if (!empty($r['all_level_needs'])) {
-            $words[] = 'All: ' . implode(', ', $r['all_level_needs']);
+        foreach ($r['all_level_needs'] ?? [] as $perm) {
+            $has = $can($perm);
+            $items[] = ['text' => 'All needs "' . (self::PERMISSION_NAMES[$perm] ?? $perm) . '"', 'has' => $has, 'missing' => $level === self::ALL && !$has];
         }
-        return $words === [] ? '' : 'needs: ' . implode(', ', $words);
+        return $items;
+    }
+
+    /** The "Needs" column as one line of plain words (no marks), e.g. '"View reports" permission, see selling prices'. */
+    public static function needsText(string $key): string
+    {
+        $none = static fn (string $perm): bool => false;
+        return implode(', ', array_map(static fn (array $i): string => $i['text'], self::needsItems($none, $key, self::OFF)));
     }
 
     /** Applies the base-permission ceiling to a raw level. */

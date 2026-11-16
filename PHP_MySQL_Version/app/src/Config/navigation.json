@@ -161,7 +161,7 @@
       "items": [
         { "label": "All reports", "href": "/reports", "when": { "report": "any" } },
         { "label": "Freight cost", "href": "/reports/freight-cost", "when": { "any": ["view_logistics_costs"], "report": "freight_cost" } },
-        { "label": "Supplier report", "href": "/reports/suppliers", "when": { "any": ["view_purchase_prices"], "report": "supplier_performance" } },
+        { "label": "Supplier performance", "href": "/reports/suppliers", "when": { "any": ["view_purchase_prices"], "report": "supplier_performance" } },
         { "label": "Management cockpit", "href": "/cockpit", "when": { "any": ["view_cockpit"], "report": "cockpit" } },
         { "label": "Audit log", "href": "/audit-log", "when": { "any": ["view_audit_log"], "report": "audit_log" } }
       ]
@@ -194,7 +194,7 @@
       "key": "users",
       "label": "Users & roles",
       "group": "admin",
-      "prefixes": ["/users", "/admin/permissions", "/admin/departments", "/admin/task-types", "/admin/self-approval", "/admin/sop-access", "/admin/field-protection"],
+      "prefixes": ["/users", "/admin/permissions", "/admin/roles", "/admin/departments", "/admin/task-types", "/admin/self-approval", "/admin/sop-access", "/admin/field-protection"],
       "icon": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M19 8v6\"></path><path d=\"M22 11h-6\"></path>",
       "items": [
         { "label": "Users", "href": "/users", "when": { "any": ["manage_users"] } },

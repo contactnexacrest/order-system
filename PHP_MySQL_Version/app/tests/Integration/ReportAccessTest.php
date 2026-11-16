@@ -360,7 +360,10 @@ final class ReportAccessTest extends DbTestCase
         foreach (['/reports/aggregate', '/reports/aggregate?format=csv', '/reports/payments', '/reports/disputes?format=csv', '/ca'] as $path) {
             $r = $this->call('GET', $path);
             self::assertSame(403, $r['code'], $path);
-            self::assertStringContainsString('403 — Not permitted', $r['body']);
+            // D-379 cosmetic follow-up (16 Nov 2026): the refusal is drawn inside the app layout.
+            self::assertStringContainsString('<span class="refused-pill">Not open to you</span>', $r['body']);
+            self::assertStringContainsString('This report is not open to your role', $r['body']);
+            self::assertStringContainsString('This report is not open to you. Ask whoever manages report access', $r['body']);
         }
         self::assertSame(200, $this->call('GET', '/reports/queues')['code'], 'Admin: Operations queues is All');
     }
@@ -386,12 +389,14 @@ final class ReportAccessTest extends DbTestCase
         $this->signIn($exec);
         self::assertSame('off', ReportAccess::level('supplier_performance'), 'no view_purchase_prices');
 
-        // The Reports tab says what is missing.
+        // The Reports tab says what is missing — in plain words (D-379 cosmetic follow-up, 16 Nov 2026):
+        // ✓ green when the role has it, ⚠ red "missing for this role" when the level set needs it.
         $this->signIn($this->createTestUser('Managing Director'));
         $tab = $this->call('GET', '/admin/roles/' . $role . '/reports');
         self::assertSame(200, $tab['code']);
-        self::assertStringContainsString('missing for this role: view_logistics_costs', $tab['body']);
-        self::assertStringContainsString('needs: view_reports, selling prices', $tab['body']);
+        self::assertStringContainsString('<span class="need need-missing">&#9888; see logistics costs — missing for this role</span>', $tab['body']);
+        self::assertStringContainsString('<span class="need need-ok">&#10003; &quot;View reports&quot; permission</span>', $tab['body']);
+        self::assertStringContainsString('<span class="need need-missing">&#9888; see selling prices — missing for this role</span>', $tab['body']);
     }
 
     public function testInvestorCannotOpenThePerClientReport(): void
@@ -468,7 +473,9 @@ final class ReportAccessTest extends DbTestCase
         $page = $this->call('GET', '/reports');
         self::assertSame(200, $page['code']);
         self::assertSame(['sales', 'payments', 'disputes'], $sectionsOf($page['body']));
-        self::assertStringContainsString(ReportAccess::BANNER_OWN, $page['body']);
+        // D-379 cosmetic follow-up (16 Nov 2026): the banner sits in a light-blue box with its lead in bold.
+        self::assertStringContainsString('<div class="alert alert-info" id="reports-scope-banner"><strong>Showing your own business</strong> — orders you are assigned to or own, your clients and your own figures.</div>', $page['body']);
+        self::assertStringContainsString('<span class="report-tag" title="How far this report reaches for you">Your orders</span>', $page['body']);
         self::assertNotContains('freight_cost', $reportsOf($page['body']));
 
         $this->signIn($this->createTestUser('Sales/Export Manager'));

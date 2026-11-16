@@ -261,6 +261,10 @@ final class NavigationMenuD320Test extends DbTestCase
         self::assertSame(['Prices'], $active(Navigation::build($all, self::allFlags(), [], '/approvals', ['tab' => 'prices'])));
         self::assertSame(['All'], $active(Navigation::build($all, self::allFlags(), [], '/approvals', [])));
         self::assertNull(Navigation::sectionKeyFor('/cafin'), '"/ca" never covers "/cafin"');
+        // D-379 cosmetic follow-up (16 Nov 2026): a role's Reports tab, its preview and a person's report extras sit under Users & roles.
+        foreach (['/admin/roles/3/reports', '/admin/roles/3/reports/preview', '/admin/roles/3/permissions', '/users/5/report-extras'] as $page) {
+            self::assertSame('users', Navigation::sectionKeyFor($page), "{$page} highlights Users & roles");
+        }
 
         $built = Navigation::build($all, self::ALL_FLAGS, ['associateRegistrations' => 2, 'approvals' => 5, 'myTasks' => 3, 'settingsExpiry' => 1], '/associates', []);
         $items = array_column($built['bar']['items'], 'count', 'label');

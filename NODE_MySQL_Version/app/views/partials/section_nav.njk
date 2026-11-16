@@ -3,8 +3,12 @@
    Standard and the Kanban template (PHP twin: partials/section_nav.php).
    Expects bar from services/navigation.js. Items with sub-pages open a small
    drop-down; a count shows where something waits. #}
+{#- D-379 cosmetic follow-up (16 Nov 2026): a bar whose only item repeats the heading (Sales targets for a
+    person without its Settings page) shows the heading only — no duplicate tab. #}
+{% set headingOnly = bar.items.length == 1 and not bar.items[0].children and bar.items[0].label == bar.label %}
 <nav class="section-nav" aria-label="{{ bar.label }} menu" data-section="{{ bar.key }}">
   <span class="section-nav-title">{{ bar.label }}</span>
+  {% if not headingOnly %}
   <ul class="section-nav-items">
     {% for item in bar.items %}
       {% if item.children %}
@@ -23,6 +27,7 @@
       {% endif %}
     {% endfor %}
   </ul>
+  {% endif %}
   {% for cross in bar.crossLinks %}
     <a class="btn-sm btn-secondary section-nav-cross" href="{{ cross.href }}">{{ cross.label }}</a>
   {% endfor %}

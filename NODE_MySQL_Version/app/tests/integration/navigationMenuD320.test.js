@@ -197,6 +197,10 @@ describe('D-320: the short left menu, the section menu bars and the order action
     expect(active(navigation.build(all, allFlags(), {}, '/approvals', { tab: 'prices' }))).toEqual(['Prices']);
     expect(active(navigation.build(all, allFlags(), {}, '/approvals', {}))).toEqual(['All']);
     expect(navigation.sectionKeyFor('/cafin')).toBeNull(); // "/ca" never covers "/cafin"
+    // D-379 cosmetic follow-up (16 Nov 2026): a role's Reports tab, its preview and a person's report extras sit under Users & roles.
+    for (const page of ['/admin/roles/3/reports', '/admin/roles/3/reports/preview', '/admin/roles/3/permissions', '/users/5/report-extras']) {
+      expect([page, navigation.sectionKeyFor(page)]).toEqual([page, 'users']);
+    }
 
     const built = navigation.build(all, ALL_FLAGS, { associateRegistrations: 2, approvals: 5, myTasks: 3, settingsExpiry: 1 }, '/associates', {});
     expect(built.bar.items.find((i) => i.label === 'Registrations').count).toBe(2);

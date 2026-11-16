@@ -81,6 +81,7 @@ async function indexData(query, previewRole) {
     reportRegistry: reportAccess.REPORTS,
     reportSections: reportAccess.SECTIONS,
     levelLabels: reportAccess.LEVEL_LABELS,
+    tagLabels: reportAccess.TAG_LABELS, // D-379 cosmetic follow-up: the pill beside each report
   };
 }
 

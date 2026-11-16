@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Helpers\RefusalPage;
 use App\Repositories\AuditLogRepository;
 use App\Services\AuthService;
 use App\Services\PermissionService;
@@ -21,8 +22,7 @@ final class PermissionCheck
 
             if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, $permissionKey)) {
                 AuditLogRepository::log((int) $user['id'], 'PERMISSION_DENIED', 'permissions', null, $permissionKey);
-                http_response_code(403);
-                echo '<h1>403 — Not permitted</h1><p>You do not have the "' . htmlspecialchars($permissionKey) . '" permission.</p><p><a href="/">Back to dashboard</a></p>';
+                RefusalPage::permission('You do not have the "' . $permissionKey . '" permission.'); // D-379 cosmetic follow-up: inside the app layout
                 return false;
             }
 
@@ -55,8 +55,7 @@ final class PermissionCheck
             }
 
             AuditLogRepository::log((int) $user['id'], 'PERMISSION_DENIED', 'permissions', null, implode('|', $permissionKeys));
-            http_response_code(403);
-            echo '<h1>403 — Not permitted</h1><p>You do not have any of the required permissions.</p><p><a href="/">Back to dashboard</a></p>';
+            RefusalPage::permission('You do not have any of the required permissions.');
             return false;
         };
     }

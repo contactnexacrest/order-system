@@ -2478,7 +2478,7 @@ the same filters, counts, fields, actions and money rules on both templates
 | Products | All · Categories · Pricing ▾ (commission levels and ladder, specifications) · Price requests · HS codes ▾ (HS codes, fix HS codes on products); button "Open Suppliers in Procurement ›" (D-361: "+ Add" and "Link suppliers" removed — products come from Procurement › Suppliers › + Add product; "Link these prices (N)" is a button on the Products page) |
 | Procurement & suppliers | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
 | Finance & accounts | CA / Accounting · Zoho sync (n) · Incentive payouts · My incentives · Team incentive settings; on CA pages "Open in Reports ›" |
-| Reports | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
+| Reports | All reports · Freight cost · Supplier performance · Management cockpit · Audit log |
 | Help & SOP | Getting started · SOP · Reference library · Gallery |
 | Users & roles | Users · + Add user · Roles and permissions · Departments · Task due days · Self-approval rules · SOP access · Field protection |
 | Settings | Setup checklist (n) · Company (n) · E-mail · Security · Holidays · Document clean-up · Backups · Zoho · Documents ▾ (email templates, watermarks, signatories, assets, UI templates) · Lists ▾ (ports, port routes, payment presets, dropdown lists, GST rates, import duty, compliance task types, remittance difference reasons, associate TDS rules, reference library categories) · Divisions · Admin overrides · Data export · Sample data · Test mode · Super Admin |
@@ -3218,6 +3218,22 @@ departments; all = every order in their divisions). `/reports` needs at least on
 and Edit user extras need `manage_report_access` (MD, ED). Sidebar Overview › **Sales targets** for level
 department/all (department = read-only team view). Migration `2026-11-15b`. Spec
 `docs/decisions/D-379-report-access-spec.md`; tests `ReportAccessTest` / `reportAccess.test.js`.
+
+**Report access — presentation (D-379 cosmetic follow-up, 16 Nov 2026; nothing about who sees what changed).**
+The Reports page draws one row per report: name link · description · a pill on the right ("Your orders" for
+own, "Your department" for department, none for all; `ReportAccess::TAG_LABELS`), the scope banner in a
+light-blue box, the Find-an-order tag beside its label and the placeholder "Order no. or client — e.g.
+SC/ORD/26/001"; the Incentives row's "To pay · Owed at month end · Person statement" sit under its description.
+"See Reports as this role" uses the same markup with a "Preview as <role>" banner (names as plain text, search
+box read-only). The Roles › Reports tab's "Needs" column names permissions in plain words
+(`ReportAccess::needsItems`: the permission's name in the permissions table, money as "see …", Sales targets
+"All needs “Manage sales targets”"), ✓ green when the role has it, ⚠ red "missing for this role" when the level
+set needs it. The sidebar highlights Users & roles on `/admin/roles/…` (navigation.json prefix). The Reports
+menu bar says "Supplier performance". A section bar whose only item repeats its heading (Sales targets without
+Settings) shows the heading only. The 403 of the report gates and of `PermissionCheck` is drawn in the app
+layout (`App\Helpers\RefusalPage` / `helpers/refusalPage.js`, view `errors/refused`): red "Not open to you"
+pill, title, the same text and a "← Back" button (to /reports for a report refusal, else /); HTTP 403 and the
+PERMISSION_DENIED audit row are unchanged, and the old plain page is sent if the layout cannot be drawn.
 
 ### 6.11b Approvals page (D-310, 11 Nov 2026)
 

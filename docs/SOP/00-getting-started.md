@@ -112,7 +112,7 @@ on every page:
 | **Products** | All products · Categories · Pricing (commission levels and ladder, specifications) · Price requests · HS codes ▾ (HS codes, Fix HS codes on products) · Open Suppliers in Procurement › (new products come from Procurement › Suppliers › + Add product — D-361; **Category price rules** and **Global pricing settings** are links on the Products screen — D-362) |
 | **Procurement & suppliers** | Procurement · Suppliers · Logistics partners · Supplier performance · Imports & stock · Merchant trade |
 | **Finance & accounts** | CA / Accounting · Zoho sync · Incentive payouts · My incentives · Team incentive settings |
-| *Overview* — **Reports** | All reports · Freight cost · Supplier report · Management cockpit · Audit log |
+| *Overview* — **Reports** | All reports · Freight cost · Supplier performance · Management cockpit · Audit log |
 | *Help* — **Help & SOP** | Getting started · SOP · Reference library · Gallery |
 | *Admin* — **Users & roles** | Users · + Add user · Roles and permissions · Departments · Task due days · Self-approval rules · SOP access · Field protection |
 | **Settings** | Setup checklist · Company · E-mail · Security · Holidays · Document clean-up · Backups · Zoho · Documents ▾ · Lists ▾ · Divisions · Admin overrides · Data export · Sample data · Test mode · Super Admin |

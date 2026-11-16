@@ -173,7 +173,7 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         self::assertSame('success', $this->call($this->createTestUser('Managing Director'), 'POST', "/users/{$colleague}/memberships", ['designation_id' => (string) $financeDirector, 'starts_on' => date('Y-m-d')])['type']);
     }
 
-    /** A-7 / A-9: the Freight Cost report needs only freight costs; the Supplier report needs buying prices. */
+    /** A-7 / A-9: the Freight Cost report needs only freight costs; the Supplier performance report needs buying prices. */
     public function testEachReportNeedsOnlyTheMoneyItShows(): void
     {
         $logistics = $this->createTestUser('Logistics Manager');

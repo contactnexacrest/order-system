@@ -309,7 +309,10 @@ describe('D-379: report access per role', () => {
     for (const p of ['/reports/aggregate', '/reports/aggregate?format=csv', '/reports/payments', '/reports/disputes?format=csv', '/ca']) {
       const r = await agent.get(p);
       expect([p, r.status]).toEqual([p, 403]);
-      expect(r.text).toContain('403 — Not permitted');
+      // D-379 cosmetic follow-up (16 Nov 2026): the refusal is drawn inside the app layout.
+      expect(r.text).toContain('<span class="refused-pill">Not open to you</span>');
+      expect(r.text).toContain('This report is not open to your role');
+      expect(r.text).toContain('This report is not open to you. Ask whoever manages report access');
     }
     expect((await agent.get('/reports/queues')).status).toBe(200); // Admin: Operations queues is All
   }, 60000);
@@ -337,12 +340,14 @@ describe('D-379: report access per role', () => {
       expect(await reportAccess.level('supplier_performance')).toBe('off'); // no view_purchase_prices
     });
 
-    // The Reports tab says what is missing.
+    // The Reports tab says what is missing — in plain words (D-379 cosmetic follow-up, 16 Nov 2026):
+    // ✓ green when the role has it, ⚠ red "missing for this role" when the level set needs it.
     const md = await signIn(await createTestUser('Managing Director'));
     const tab = await md.get(`/admin/roles/${role}/reports`);
     expect(tab.status).toBe(200);
-    expect(tab.text).toContain('missing for this role: view_logistics_costs');
-    expect(tab.text).toContain('needs: view_reports, selling prices');
+    expect(tab.text).toContain('<span class="need need-missing">&#9888; see logistics costs — missing for this role</span>');
+    expect(tab.text).toContain('<span class="need need-ok">&#10003; &quot;View reports&quot; permission</span>');
+    expect(tab.text).toContain('<span class="need need-missing">&#9888; see selling prices — missing for this role</span>');
   }, 60000);
 
   test('the Investor cannot open the per-client report', async () => {
@@ -417,7 +422,9 @@ describe('D-379: report access per role', () => {
     let page = await agent.get('/reports');
     expect(page.status).toBe(200);
     expect(sectionsOf(page.text)).toEqual(['sales', 'payments', 'disputes']);
-    expect(page.text).toContain(reportAccess.BANNER_OWN);
+    // D-379 cosmetic follow-up (16 Nov 2026): the banner sits in a light-blue box with its lead in bold.
+    expect(page.text).toContain('<div class="alert alert-info" id="reports-scope-banner"><strong>Showing your own business</strong> — orders you are assigned to or own, your clients and your own figures.</div>');
+    expect(page.text).toContain('<span class="report-tag" title="How far this report reaches for you">Your orders</span>');
     expect(reportsOf(page.text)).not.toContain('freight_cost');
 
     agent = await signIn(await createTestUser('Sales/Export Manager'));

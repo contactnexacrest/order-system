@@ -53976,7 +53976,7 @@
     {
      "name": "q",
      "type": "text",
-     "placeholder": "e.g., NC/SC/ORD/26/0411001 or Test Company Ltd"
+     "placeholder": "Order no. or client — e.g. SC/ORD/26/001"
     }
    ],
    "data_entry": true,
