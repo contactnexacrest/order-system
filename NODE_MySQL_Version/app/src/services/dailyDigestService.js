@@ -18,9 +18,14 @@ const mailSenderService = require('./mailSenderService');
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayLabel = (ymd) => { const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
 
-async function itemsFor(userId) {
+/**
+ * @param {number} userId
+ * @param {object[]|null} openTasks departmentTaskRepository.open(), when the caller already has it (run() reads it once
+ *   for everybody — 16 Nov 2026: reading it again per person made the job take ~25 ms × every active user)
+ */
+async function itemsFor(userId, openTasks = null) {
   const departmentIds = (await departmentRepository.activeMembershipsForUser(userId)).map((m) => Number(m.department_id));
-  const tasks = (await departmentTaskRepository.open()).filter((t) => Number(t.owner_id || 0) === Number(userId)
+  const tasks = (openTasks ?? await departmentTaskRepository.open()).filter((t) => Number(t.owner_id || 0) === Number(userId)
     || ((t.owner_id === null || t.owner_id === undefined) && departmentIds.includes(Number(t.department_id || 0))));
   tasks.sort((a, b) => (Number(b.escalated) - Number(a.escalated)) || (Number(b.overdue) - Number(a.overdue)) || String(a.due_on).localeCompare(String(b.due_on)));
   const items = tasks.map((t) => {
@@ -31,10 +36,14 @@ async function itemsFor(userId) {
     items.push({ kind: 'review', text: `${r.document_reference} (${r.document_type_name}) — waiting for your review` });
   }
   // D-260: a missing, failed or too-old backup goes to whoever manages company settings (MD / Admin).
-  const u = await db.queryOne('SELECT role_id FROM users WHERE id = :id', { id: userId });
-  const perms = await require('./permissionService').load(userId, u && u.role_id !== null ? Number(u.role_id) : null);
-  if (perms.manage_company_settings) {
-    for (const problem of require('./backupStatusService').problems()) items.push({ kind: 'backup', text: problem });
+  // (The person's permissions are only looked up when there is a backup problem to tell.)
+  const problems = require('./backupStatusService').problems();
+  if (problems.length > 0) {
+    const u = await db.queryOne('SELECT role_id FROM users WHERE id = :id', { id: userId });
+    const perms = await require('./permissionService').load(userId, u && u.role_id !== null ? Number(u.role_id) : null);
+    if (perms.manage_company_settings) {
+      for (const problem of problems) items.push({ kind: 'backup', text: problem });
+    }
   }
   return items;
 }
@@ -84,8 +93,9 @@ async function run(date = null) {
   let sent = 0;
   let skipped = 0;
   let failed = 0;
+  const openTasks = await departmentTaskRepository.open(); // once for everybody (itemsFor())
   for (const u of users) {
-    const items = await itemsFor(Number(u.id));
+    const items = await itemsFor(Number(u.id), openTasks);
     if (!items.length) { skipped++; continue; }
     // Once a day per person, even if the job runs twice.
     const claim = await db.execute('INSERT IGNORE INTO daily_digest_log (user_id, digest_date, items) VALUES (:u, :d, :n)', { u: u.id, d: day, n: items.length });

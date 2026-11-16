@@ -295,8 +295,11 @@ async function exportComplianceManagers() {
   const roleIds = roles.map((r) => Number(r.id));
   if (roleIds.length === 0) return [];
   const out = [];
-  for (const u of await db.query('SELECT id, role_id FROM users WHERE is_active = 1')) {
-    let ids = (await departmentRepository.activeRoleIdsForUser(Number(u.id))).map(Number);
+  const users = await db.query('SELECT id, role_id FROM users WHERE is_active = 1');
+  // 16 Nov 2026: everyone's current memberships in one query, not one query per person.
+  const memberRoles = await departmentRepository.activeRoleIdsByUser(users.map((u) => u.id));
+  for (const u of users) {
+    let ids = (memberRoles.get(Number(u.id)) || []).map(Number);
     if (ids.length === 0 && u.role_id !== null) ids = [Number(u.role_id)];
     if (ids.some((id) => roleIds.includes(id))) out.push(Number(u.id));
   }

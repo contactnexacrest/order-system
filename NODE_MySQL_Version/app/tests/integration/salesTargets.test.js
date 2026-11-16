@@ -27,8 +27,22 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
 describe('D-378: sales targets', () => {
   const PASSWORD = 'JestSalesTargets!1';
   let companyRows = [];
+  // What this file leaves behind is removed at the end: sync() credits every confirmed order of the
+  // shared database, and runAlerts() records its "once" guards and notices.
+  let started = null;
+
+  beforeAll(async () => {
+    started = {
+      at: Number((await db.queryOne('SELECT UNIX_TIMESTAMP() AS t')).t), // seconds: the same in every session time zone
+      alertId: Number((await db.queryOne('SELECT COALESCE(MAX(id), 0) AS m FROM compliance_alerts_sent')).m),
+      noticeId: Number((await db.queryOne('SELECT COALESCE(MAX(id), 0) AS m FROM notifications')).m),
+    };
+  });
 
   afterAll(async () => {
+    await db.execute('DELETE FROM sales_target_credits WHERE UNIX_TIMESTAMP(created_at) >= :t', { t: started.at });
+    await db.execute("DELETE FROM compliance_alerts_sent WHERE id > :i AND alert_kind LIKE 'sales_target_%'", { i: started.alertId });
+    await db.execute("DELETE FROM notifications WHERE id > :i AND type LIKE 'sales_target_%'", { i: started.noticeId });
     await db.pool.end();
   });
 
@@ -550,6 +564,11 @@ describe('D-378: sales targets', () => {
   });
 
   test('an order with no salesperson is alerted once', async () => {
+    // One person ticked for this alert (Admin › E-mail settings): sync() credits every confirmed order of the
+    // shared test database, and the defaults (every MD and Sales/Export Manager the other files made) would
+    // multiply the notices by hundreds. The defaults themselves are checked in "alert recipients" above.
+    const recipient = await createTestUser('Managing Director');
+    await db.execute("UPDATE sales_target_settings SET setting_value = :v WHERE setting_key = 'alert_no_owner_recipients'", { v: String(recipient) });
     const orderId = await order();
     await receipt(orderId, '2035-04-02');
     await salesTargetService.sync('2035-04-05');
@@ -557,10 +576,9 @@ describe('D-378: sales targets', () => {
       "SELECT COUNT(*) AS n FROM notifications WHERE type = 'sales_target_no_owner' AND related_order_id = :o", { o: orderId }
     )).n);
     await salesTargetService.runAlerts('2035-04-05');
-    const first = await count();
-    expect(first).toBeGreaterThan(0);
+    expect(await count()).toBe(1); // the one person ticked
     await salesTargetService.runAlerts('2035-04-06');
-    expect(await count()).toBe(first); // once per order
+    expect(await count()).toBe(1); // once per order
   });
 
   // ---------------------------------------------------------------- seed

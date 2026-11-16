@@ -38,7 +38,16 @@ describe('D-379: report access per role', () => {
   let designations = [];
   let roles = [];
 
+  // Opening Sales targets brings the credit snapshot up to date (salesTargetService.sync() credits every
+  // confirmed order of the shared database); what this file adds there is removed at the end.
+  let startedAt = null;
+
+  beforeAll(async () => {
+    startedAt = Number((await db.queryOne('SELECT UNIX_TIMESTAMP() AS t')).t);
+  });
+
   afterAll(async () => {
+    await db.execute('DELETE FROM sales_target_credits WHERE UNIX_TIMESTAMP(created_at) >= :t', { t: startedAt });
     await db.pool.end();
   });
 
@@ -60,6 +69,7 @@ describe('D-379: report access per role', () => {
     departments = [];
     designations = [];
     roles = [];
+    await db.execute("DELETE FROM user_report_extras WHERE reason LIKE 'Jest D-379%'");
     reportAccess.resetCache();
   });
 

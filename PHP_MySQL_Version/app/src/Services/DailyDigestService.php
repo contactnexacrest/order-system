@@ -20,10 +20,12 @@ use App\Repositories\DocumentReviewRepository;
 final class DailyDigestService
 {
     /** @return list<array{kind:string, text:string}> */
-    public static function itemsFor(int $userId): array
+    public static function itemsFor(int $userId, ?array $openTasks = null): array
     {
+        // $openTasks: DepartmentTaskRepository::open(), when the caller already has it (run() reads it once for
+        // everybody — 16 Nov 2026: reading it again per person made the job take ~25 ms × every active user).
         $departmentIds = array_map(static fn (array $m): int => (int) $m['department_id'], DepartmentRepository::activeMembershipsForUser($userId));
-        $tasks = array_values(array_filter(DepartmentTaskRepository::open(), static fn (array $t): bool =>
+        $tasks = array_values(array_filter($openTasks ?? DepartmentTaskRepository::open(), static fn (array $t): bool =>
             (int) ($t['owner_id'] ?? 0) === $userId
             || ($t['owner_id'] === null && in_array((int) ($t['department_id'] ?? 0), $departmentIds, true))));
         usort($tasks, static fn (array $a, array $b): int => [(int) $b['escalated'], (int) $b['overdue'], (string) $a['due_on']] <=> [(int) $a['escalated'], (int) $a['overdue'], (string) $b['due_on']]);
@@ -37,12 +39,16 @@ final class DailyDigestService
             $items[] = ['kind' => 'review', 'text' => "{$r['document_reference']} ({$r['document_type_name']}) — waiting for your review"];
         }
         // D-260: a missing, failed or too-old backup goes to whoever manages company settings (MD / Admin).
-        $roleId = Database::connection()->prepare('SELECT role_id FROM users WHERE id = :id');
-        $roleId->execute(['id' => $userId]);
-        $role = $roleId->fetchColumn();
-        if (\App\Services\PermissionService::can($userId, $role !== false && $role !== null ? (int) $role : null, 'manage_company_settings')) {
-            foreach (\App\Services\BackupStatusService::problems() as $problem) {
-                $items[] = ['kind' => 'backup', 'text' => $problem];
+        // (The person's permissions are only looked up when there is a backup problem to tell.)
+        $problems = \App\Services\BackupStatusService::problems();
+        if ($problems !== []) {
+            $roleId = Database::connection()->prepare('SELECT role_id FROM users WHERE id = :id');
+            $roleId->execute(['id' => $userId]);
+            $role = $roleId->fetchColumn();
+            if (\App\Services\PermissionService::can($userId, $role !== false && $role !== null ? (int) $role : null, 'manage_company_settings')) {
+                foreach ($problems as $problem) {
+                    $items[] = ['kind' => 'backup', 'text' => $problem];
+                }
             }
         }
         return $items;
@@ -113,8 +119,9 @@ final class DailyDigestService
         $sent = 0;
         $skipped = 0;
         $failed = 0;
+        $openTasks = DepartmentTaskRepository::open(); // once for everybody (itemsFor())
         foreach ($users as $u) {
-            $items = self::itemsFor((int) $u['id']);
+            $items = self::itemsFor((int) $u['id'], $openTasks);
             if ($items === []) {
                 $skipped++;
                 continue;

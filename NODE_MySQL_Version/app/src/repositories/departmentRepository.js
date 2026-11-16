@@ -150,9 +150,38 @@ async function activeRoleIdsForUser(userId) {
   return [...new Set((await activeMembershipsForUser(userId)).map((m) => Number(m.role_id)))];
 }
 
+/**
+ * activeRoleIdsForUser() for many people in one query (the daily alert job's recipient lists).
+ *
+ * @param {number[]} userIds
+ * @returns {Promise<Map<number, number[]>>} user id => role ids of their current memberships (absent = none)
+ */
+async function activeRoleIdsByUser(userIds) {
+  const out = new Map();
+  const ids = [...new Set((userIds || []).map((v) => parseInt(v, 10)).filter((v) => Number.isInteger(v)))];
+  if (ids.length === 0) return out;
+  const rows = await db.query(
+    `SELECT m.user_id, dd.role_id
+       FROM user_department_memberships m
+       JOIN department_designations dd ON dd.id = m.designation_id
+       JOIN departments d ON d.id = dd.department_id
+       JOIN roles r ON r.id = dd.role_id
+      WHERE m.user_id IN (${ids.join(',')}) AND m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+        AND dd.is_active = 1 AND d.is_active = 1
+      ORDER BY m.user_id, m.is_default DESC, d.sort_order, dd.sort_order`
+  );
+  for (const r of rows) {
+    const uid = Number(r.user_id);
+    if (!out.has(uid)) out.set(uid, []);
+    const rid = Number(r.role_id);
+    if (!out.get(uid).includes(rid)) out.get(uid).push(rid);
+  }
+  return out;
+}
+
 module.exports = {
   LEVELS, departments, findDepartment, designations, findDesignation, createDepartment, updateDepartment,
   departmentNameTaken, departmentCodeTaken, createDesignation, updateDesignation, designationTitleTaken,
   membershipsForUser, activeMembershipsForUser, findMembership, addMembership, hasOpenMembership,
-  endMembership, setDefault, activeRoleIdsForUser,
+  endMembership, setDefault, activeRoleIdsForUser, activeRoleIdsByUser,
 };

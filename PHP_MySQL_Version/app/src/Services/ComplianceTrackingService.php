@@ -316,8 +316,11 @@ final class ComplianceTrackingService
             return [];
         }
         $out = [];
-        foreach ($pdo->query('SELECT id, role_id FROM users WHERE is_active = 1')->fetchAll() as $u) {
-            $ids = DepartmentRepository::activeRoleIdsForUser((int) $u['id']);
+        $users = $pdo->query('SELECT id, role_id FROM users WHERE is_active = 1')->fetchAll();
+        // 16 Nov 2026: everyone's current memberships in one query, not one query per person.
+        $memberRoles = DepartmentRepository::activeRoleIdsByUser(array_map(static fn (array $u): int => (int) $u['id'], $users));
+        foreach ($users as $u) {
+            $ids = $memberRoles[(int) $u['id']] ?? [];
             if ($ids === [] && $u['role_id'] !== null) {
                 $ids = [(int) $u['role_id']];
             }

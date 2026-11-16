@@ -838,7 +838,9 @@ async function profitability(req, res) {
   // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
   const scope = req.query.scope === 'locked' ? 'locked' : 'all';
 
-  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, null, scope);
+  // D-379: the orders this report shows the person of this request (reportAccess.asViewer: never "every order"
+  // because the request context is missing).
+  const data = await require('../services/reportAccess').asViewer(req, () => reportRepository.orderProfitabilityReport(dateFrom, dateTo, null, scope));
 
   const p = req.permissions || {};
   const seeIncentives = !!(p.manage_incentives || p.pay_incentives || p.view_price_buildup);

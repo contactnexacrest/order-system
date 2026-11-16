@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
-use App\Services\SuperAdminService;
 
 final class PermissionRepository
 {
@@ -93,21 +92,58 @@ final class PermissionRepository
         );
         $stmt->execute(['k1' => $permissionKey, 'k2' => $permissionKey, 'k3' => $permissionKey]);
         $activeUsers = $stmt->fetchAll();
+        if ($activeUsers === []) {
+            return [];
+        }
+        // 16 Nov 2026 (full-suite timeouts): the candidates are checked together — 4 queries in all,
+        // not ~5 per candidate — with the same rules as SuperAdminService::isEffective(),
+        // DepartmentRepository::activeRoleIdsForUser() and effectivePermissions() (role grant, then a
+        // personal exception that has not expired). Node twin: permissionRepository.usersWithPermission().
+        $pdo = Database::connection();
+        $inList = implode(',', array_map(static fn (array $u): int => (int) $u['id'], $activeUsers)); // integers, safe to inline
+        $supers = array_flip(array_map('intval', $pdo->query(
+            "SELECT u.id FROM users u
+              WHERE u.id IN ({$inList})
+                AND (u.is_super_admin = 1
+                     OR EXISTS (SELECT 1 FROM super_admin_delegations s
+                                 WHERE s.delegate_user_id = u.id AND s.revoked_at IS NULL
+                                   AND (s.expires_at IS NULL OR s.expires_at > NOW())))"
+        )->fetchAll(\PDO::FETCH_COLUMN)));
+        $memberRoles = DepartmentRepository::activeRoleIdsByUser(array_map(static fn (array $u): int => (int) $u['id'], $activeUsers));
+        $roleGrants = []; // role id => is_enabled of its row for this permission
+        $stmt = $pdo->prepare('SELECT rp.role_id, rp.is_enabled FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+                                WHERE p.permission_key = :k');
+        $stmt->execute(['k' => $permissionKey]);
+        foreach ($stmt->fetchAll() as $r) {
+            $roleGrants[(int) $r['role_id']] = (bool) $r['is_enabled'];
+        }
+        $overrides = []; // user id => is_enabled of a personal exception still in force
+        $stmt = $pdo->prepare("SELECT up.user_id, up.is_enabled FROM user_permissions up JOIN permissions p ON p.id = up.permission_id
+                                WHERE p.permission_key = :k AND up.user_id IN ({$inList}) AND (up.expires_at IS NULL OR up.expires_at >= CURDATE())");
+        $stmt->execute(['k' => $permissionKey]);
+        foreach ($stmt->fetchAll() as $r) {
+            $overrides[(int) $r['user_id']] = (bool) $r['is_enabled'];
+        }
+
         $matched = [];
         foreach ($activeUsers as $u) {
             $userId = (int) $u['id'];
-            if (SuperAdminService::isEffective($userId)) {
+            if (isset($supers[$userId])) {
                 $matched[] = $userId;
                 continue;
             }
             // Owner decision D-214: a person in departments holds what any of
             // their current memberships' roles holds; with none, their own role.
-            $roleIds = DepartmentRepository::activeRoleIdsForUser($userId);
+            $roleIds = $memberRoles[$userId] ?? [];
             if ($roleIds === []) {
                 $roleIds = [$u['role_id'] !== null ? (int) $u['role_id'] : null];
             }
             foreach ($roleIds as $roleId) {
-                if (!empty(self::effectivePermissions($userId, $roleId)[$permissionKey])) {
+                // effectivePermissions(): the role's row, then the personal exception wins.
+                $holds = array_key_exists($userId, $overrides)
+                    ? $overrides[$userId]
+                    : ($roleId !== null && ($roleGrants[$roleId] ?? false) === true);
+                if ($holds) {
                     $matched[] = $userId;
                     break;
                 }

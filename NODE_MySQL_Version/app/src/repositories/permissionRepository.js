@@ -1,7 +1,6 @@
 'use strict';
 
 const db = require('../config/db');
-const superAdminService = require('../services/superAdminService');
 const departmentRepository = require('./departmentRepository');
 
 // Port of App\Repositories\PermissionRepository.
@@ -76,25 +75,58 @@ const CANDIDATES_SQL = `SELECT u.id, u.role_id FROM users u
  * @returns {Promise<Array<number>>} user ids
  */
 async function usersWithPermission(permissionKey) {
-  // Only people who could hold it are checked one by one (CI 6 Nov 2026: with thousands of
-  // users, checking everyone made the daily alert job take ~30 s per run). Anyone who holds the
-  // permission is a Super Admin or delegate, has a personal grant, or has a role (own or through
-  // a department) that grants it — the exact rules below then decide, unchanged.
+  // Only people who could hold it are checked (CI 6 Nov 2026: with thousands of users, checking
+  // everyone made the daily alert job take ~30 s per run). Anyone who holds the permission is a
+  // Super Admin or delegate, has a personal grant, or has a role (own or through a department)
+  // that grants it — the exact rules below then decide, unchanged.
   const activeUsers = await db.query(CANDIDATES_SQL, { k1: permissionKey, k2: permissionKey, k3: permissionKey });
+  if (activeUsers.length === 0) return [];
+  // 16 Nov 2026 (full-suite timeouts): the candidates are checked together — 4 queries in all, not
+  // ~5 per candidate — with the same rules as superAdminService.isEffective(),
+  // departmentRepository.activeRoleIdsForUser() and effectivePermissions() (role grant, then a
+  // personal exception that has not expired). PHP twin: PermissionRepository::usersWithPermission().
+  const inList = activeUsers.map((u) => parseInt(u.id, 10)).join(','); // integers, safe to inline
+  const supers = new Set((await db.query(
+    `SELECT u.id FROM users u
+      WHERE u.id IN (${inList})
+        AND (u.is_super_admin = 1
+             OR EXISTS (SELECT 1 FROM super_admin_delegations s
+                         WHERE s.delegate_user_id = u.id AND s.revoked_at IS NULL
+                           AND (s.expires_at IS NULL OR s.expires_at > NOW())))`
+  )).map((r) => Number(r.id)));
+  const memberRoles = await departmentRepository.activeRoleIdsByUser(activeUsers.map((u) => u.id));
+  const roleGrants = new Map(); // role id => is_enabled of its row for this permission
+  for (const r of await db.query(
+    `SELECT rp.role_id, rp.is_enabled FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.permission_key = :k`,
+    { k: permissionKey }
+  )) roleGrants.set(Number(r.role_id), !!r.is_enabled);
+  const overrides = new Map(); // user id => is_enabled of a personal exception still in force
+  for (const r of await db.query(
+    `SELECT up.user_id, up.is_enabled FROM user_permissions up JOIN permissions p ON p.id = up.permission_id
+      WHERE p.permission_key = :k AND up.user_id IN (${inList}) AND (up.expires_at IS NULL OR up.expires_at >= CURDATE())`,
+    { k: permissionKey }
+  )) overrides.set(Number(r.user_id), !!r.is_enabled);
+
   const matched = [];
   for (const u of activeUsers) {
-    if (await superAdminService.isEffective(u.id)) {
+    const id = Number(u.id);
+    if (supers.has(id)) {
       matched.push(u.id);
       continue;
     }
     // Owner decision D-214: a person in departments holds what any of
     // their current memberships' roles holds; with none, their own role.
-    let roleIds = await departmentRepository.activeRoleIdsForUser(u.id);
+    let roleIds = memberRoles.get(id) || [];
     if (roleIds.length === 0) {
       roleIds = [u.role_id];
     }
     for (const roleId of roleIds) {
-      if ((await effectivePermissions(u.id, roleId))[permissionKey]) {
+      // effectivePermissions(): the role's row, then the personal exception wins.
+      const holds = overrides.has(id)
+        ? overrides.get(id)
+        : (roleId !== null && roleId !== undefined && roleGrants.get(Number(roleId)) === true);
+      if (holds) {
         matched.push(u.id);
         break;
       }

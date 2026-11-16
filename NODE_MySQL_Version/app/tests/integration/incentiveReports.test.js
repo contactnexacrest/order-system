@@ -123,11 +123,14 @@ describe('Incentive & commission reports and the profit layer (D-245 P5)', () =>
     const open = await order();
     const locked = await order();
     expect(await incentiveService.lockIfReady(locked, admin)).toBeNull();
-    const all = await reportRepository.orderProfitabilityReport(null, null, undefined, 'all');
+    // Only this test's two orders (the report's own visibility condition): the shared test database holds
+    // thousands of orders by the end of a full run, and the report works each one out.
+    const mine = { sql: ' AND o.id IN (:p5_open, :p5_locked)', params: { p5_open: open, p5_locked: locked } };
+    const all = await reportRepository.orderProfitabilityReport(null, null, mine, 'all');
     const ids = all.rows.map((r) => r.order_id);
     expect(ids).toContain(open);
     expect(ids).toContain(locked);
-    const onlyLocked = await reportRepository.orderProfitabilityReport(null, null, undefined, 'locked');
+    const onlyLocked = await reportRepository.orderProfitabilityReport(null, null, mine, 'locked');
     expect(onlyLocked.rows.map((r) => r.order_id)).not.toContain(open);
     expect(onlyLocked.rows.map((r) => r.order_id)).toContain(locked);
     for (const data of [all, onlyLocked]) {

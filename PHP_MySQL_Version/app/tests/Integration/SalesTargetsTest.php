@@ -35,6 +35,37 @@ final class SalesTargetsTest extends DbTestCase
     /** @var list<int> sales_target_company ids to remove */
     private array $companyRows = [];
 
+    /**
+     * What this class leaves behind is removed at the end: sync() credits every confirmed order of the
+     * shared database, and runAlerts() records its "once" guards and notices.
+     *
+     * @var array{at:int, alert_id:int, notice_id:int}|null
+     */
+    private static ?array $started = null;
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        $pdo = Database::connection();
+        self::$started = [
+            'at' => (int) $pdo->query('SELECT UNIX_TIMESTAMP()')->fetchColumn(), // seconds: the same in every session time zone
+            'alert_id' => (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM compliance_alerts_sent')->fetchColumn(),
+            'notice_id' => (int) $pdo->query('SELECT COALESCE(MAX(id), 0) FROM notifications')->fetchColumn(),
+        ];
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        if (self::$started !== null) {
+            $pdo = Database::connection();
+            $pdo->prepare('DELETE FROM sales_target_credits WHERE UNIX_TIMESTAMP(created_at) >= :t')->execute(['t' => self::$started['at']]);
+            $pdo->prepare("DELETE FROM compliance_alerts_sent WHERE id > :i AND alert_kind LIKE 'sales_target_%'")->execute(['i' => self::$started['alert_id']]);
+            $pdo->prepare("DELETE FROM notifications WHERE id > :i AND type LIKE 'sales_target_%'")->execute(['i' => self::$started['notice_id']]);
+            self::$started = null;
+        }
+        parent::tearDownAfterClass();
+    }
+
     private static function router(): Router
     {
         if (self::$router === null) {
@@ -624,15 +655,19 @@ final class SalesTargetsTest extends DbTestCase
 
     public function testAnOrderWithNoSalespersonIsAlertedOnce(): void
     {
+        // One person ticked for this alert (Admin › E-mail settings): sync() credits every confirmed order of the
+        // shared test database, and the defaults (every MD and Sales/Export Manager the other classes made) would
+        // multiply the notices by hundreds. The defaults themselves are checked in the alert recipients test above.
+        $recipient = $this->createTestUser('Managing Director');
+        Database::connection()->prepare("UPDATE sales_target_settings SET setting_value = :v WHERE setting_key = 'alert_no_owner_recipients'")->execute(['v' => (string) $recipient]);
         $orderId = $this->order();
         $this->receipt($orderId, '2035-04-02');
         SalesTargetService::sync('2035-04-05');
         $count = static fn (): int => (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE type = 'sales_target_no_owner' AND related_order_id = {$orderId}")->fetchColumn();
         SalesTargetService::runAlerts('2035-04-05');
-        $first = $count();
-        self::assertGreaterThan(0, $first);
+        self::assertSame(1, $count(), 'the one person ticked');
         SalesTargetService::runAlerts('2035-04-06');
-        self::assertSame($first, $count(), 'once per order');
+        self::assertSame(1, $count(), 'once per order');
     }
 
     // ---------------------------------------------------------------- seed

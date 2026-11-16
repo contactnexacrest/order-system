@@ -44,6 +44,27 @@ final class ReportAccessTest extends DbTestCase
     /** @var list<int> */
     private array $roles = [];
 
+    /**
+     * Opening Sales targets brings the credit snapshot up to date (SalesTargetService::sync() credits every
+     * confirmed order of the shared database); what this class adds there is removed at the end.
+     */
+    private static ?int $startedAt = null;
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        self::$startedAt = (int) Database::connection()->query('SELECT UNIX_TIMESTAMP()')->fetchColumn();
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        if (self::$startedAt !== null) {
+            Database::connection()->prepare('DELETE FROM sales_target_credits WHERE UNIX_TIMESTAMP(created_at) >= :t')->execute(['t' => self::$startedAt]);
+            self::$startedAt = null;
+        }
+        parent::tearDownAfterClass();
+    }
+
     private static function router(): Router
     {
         if (self::$router === null) {
@@ -84,6 +105,7 @@ final class ReportAccessTest extends DbTestCase
             $pdo->prepare('DELETE FROM role_permissions WHERE role_id = :r')->execute(['r' => $id]);
             $pdo->prepare('DELETE FROM roles WHERE id = :r')->execute(['r' => $id]);
         }
+        $pdo->exec("DELETE FROM user_report_extras WHERE reason LIKE 'PHPUnit D-379%'");
         Flash::pull();
         $_SESSION = [];
         $_POST = [];

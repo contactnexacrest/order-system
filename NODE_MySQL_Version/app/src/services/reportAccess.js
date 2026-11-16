@@ -614,6 +614,30 @@ async function scopeSqlFor(userId, roleId, report, orderAlias = 'o') {
   return { sql: `${sql} AND (${conds.join(' OR ')})`, params };
 }
 
+/**
+ * Runs fn as the person of this staff request. sessionAuth opens the request context for every staff
+ * request; a report controller called without one (a test calling it directly) gets one made from
+ * req — the person, the role they act as and their permissions — so a report never falls back to
+ * "nobody signed in" (every order). Without a person on req, fn runs as it is (cron, scripts).
+ *
+ * @template T
+ * @param {object} req
+ * @param {function(): Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+async function asViewer(req, fn) {
+  const ctx = requestContext.get();
+  if ((ctx && ctx.userId) || !req || !req.user || !req.user.id) return fn();
+  const roleId = req.effectiveRoleId ?? req.user.role_id ?? null;
+  return requestContext.run({
+    userId: Number(req.user.id),
+    effectiveRoleId: roleId !== null ? Number(roleId) : null,
+    previewing: false,
+    permissions: req.permissions || {},
+    isSuperAdmin: req.isSuperAdmin,
+  }, fn);
+}
+
 /** @returns {Promise<number[]>} those of the orders this report shows the signed-in person */
 async function orderIdsInScope(report, orderIds) {
   const ids = [...new Set(orderIds.map((v) => parseInt(v, 10)).filter((v) => Number.isInteger(v)))];
@@ -747,7 +771,7 @@ async function roleGivesFor(userId, roleId) {
 module.exports = {
   OFF, OWN, DEPARTMENT, ALL, LEVELS, LEVEL_LABELS, SECTIONS, BANNER_OWN, BANNER_DEPARTMENT, REFUSED,
   REPORTS, MD_ROLE_NAMES, DEFAULTS,
-  resetCache, isReport, isLevel, rank, higher, pageMin, bySection, defaultsForRoleName,
+  resetCache, isReport, isLevel, rank, higher, pageMin, bySection, defaultsForRoleName, asViewer,
   roleLevels, roleLevel, userExtras, roleIdsFor, rawLevelFor, missingPermissions, needsText,
   effectiveLevelFor, effectiveLevelForRole, previewAsRole, previewRoleId, level, can, canOpenPage,
   levels, anyOpen, anyOpenIn, canIn, navFlags, navFlagsFor, banner,

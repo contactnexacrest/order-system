@@ -183,4 +183,37 @@ final class DepartmentRepository
     {
         return array_values(array_unique(array_map(static fn (array $m): int => (int) $m['role_id'], self::activeMembershipsForUser($userId))));
     }
+
+    /**
+     * activeRoleIdsForUser() for many people in one query (the daily alert job's recipient lists).
+     *
+     * @param list<int> $userIds
+     * @return array<int, list<int>> user id => role ids of their current memberships (absent = none)
+     */
+    public static function activeRoleIdsByUser(array $userIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $userIds)));
+        if ($ids === []) {
+            return [];
+        }
+        $rows = Database::connection()->query(
+            'SELECT m.user_id, dd.role_id
+               FROM user_department_memberships m
+               JOIN department_designations dd ON dd.id = m.designation_id
+               JOIN departments d ON d.id = dd.department_id
+               JOIN roles r ON r.id = dd.role_id
+              WHERE m.user_id IN (' . implode(',', $ids) . ') AND m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+                AND dd.is_active = 1 AND d.is_active = 1
+              ORDER BY m.user_id, m.is_default DESC, d.sort_order, dd.sort_order'
+        )->fetchAll();
+        $out = [];
+        foreach ($rows as $r) {
+            $uid = (int) $r['user_id'];
+            $rid = (int) $r['role_id'];
+            if (!in_array($rid, $out[$uid] ?? [], true)) {
+                $out[$uid][] = $rid;
+            }
+        }
+        return $out;
+    }
 }
