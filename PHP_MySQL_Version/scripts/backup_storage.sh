@@ -36,6 +36,10 @@ if ! ls -1 "$ARCH_DIR" 2>/dev/null | grep -qE "^nexacrest_files_full_${TODAY:0:7
   write_checksum "$ARCH"
   ARCH_NOTE="; monthly full archive $(basename "$ARCH")"
 fi
+# The copy that leaves this server is this month's full archive. Report it as encrypted on every run of the
+# month (not only on the day it is made), so the daily status does not warn "NOT encrypted" while the
+# off-site archive is encrypted. The daily snapshot itself stays plain files inside the 0700 backup folder.
+if ls -1 "$ARCH_DIR" 2>/dev/null | grep -qE "^nexacrest_files_full_${TODAY:0:7}-[0-9]{2}\.tar\.gz\.enc$"; then ENCRYPTED=yes; fi
 
 apply_retention "$SNAPS" '^nexacrest_files_[0-9]{4}-[0-9]{2}-[0-9]{2}$' 1
 apply_retention "$ARCH_DIR" '^nexacrest_files_full_[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz(\.enc)?$' 0
