@@ -493,7 +493,10 @@ describe('Order Financials (Section AP)', () => {
     await orderPaymentStatusRepository.setLegExchangeRate(orderB, 'advance', 80.0, userId); // revenue 80000
     await orderCostEntryRepository.create(orderB, 'other', null, 10000.0, null, userId);
 
-    const data = await reportRepository.orderProfitabilityReport(null, null);
+    // Only this test's two orders: the report works out every order it covers, and on the shared test DB of a
+    // full run (~1,900 orders) the whole-company report runs past the timeout (same scoping as incentiveReports).
+    const mine = { sql: ' AND o.id IN (:fin_a, :fin_b)', params: { fin_a: orderA, fin_b: orderB } };
+    const data = await reportRepository.orderProfitabilityReport(null, null, mine);
     const rowsById = {};
     for (const r of data.rows) rowsById[r.order_id] = r;
 
