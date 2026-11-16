@@ -431,6 +431,16 @@ async function estimatedContainers(orderId) {
  *
  * @returns {Promise<{inserted:number, shipped:number, reversed:number}>}
  */
+/**
+ * Whether sales targets are in use: a company target with costs or profit, or any designation, personal or
+ * associate target. The daily job skips the credit snapshot and the alerts until then. PHP twin: SalesTargetService::inUse().
+ */
+async function inUse() {
+  const row = await require('../config/db').queryOne(`SELECT (EXISTS (SELECT 1 FROM sales_target_company WHERE COALESCE(costs_monthly, 0) > 0 OR COALESCE(profit_monthly, 0) > 0)
+              OR EXISTS (SELECT 1 FROM sales_targets WHERE COALESCE(containers, 0) > 0 OR COALESCE(quotations, 0) > 0 OR COALESCE(new_buyers, 0) > 0)) AS in_use`);
+  return Number(row && row.in_use) === 1;
+}
+
 async function sync(today = null) {
   today = today ?? todayIst();
   const credits = await salesTargetRepository.credits();
@@ -1241,7 +1251,7 @@ module.exports = {
   resetCache, canManage, canSeeMoney, num1,
   settings, validateSettings, saveSettings,
   period, previous, recentPeriods, monthsOf,
-  confirmation, estimatedContainers, sync,
+  confirmation, estimatedContainers, inUse, sync,
   events, periodCounts, creditsFor,
   buildupFactor, monthsSinceJoining, personalTarget,
   avgMarginPerContainer, companyTarget, companyMath,

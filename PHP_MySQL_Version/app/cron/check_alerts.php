@@ -214,8 +214,11 @@ function run(): int
     $created += \App\Services\ComplianceTrackingService::runReminders($today->format('Y-m-d'));
     // Owner decision D-378 (15 Nov 2026): sales targets — bring the credit snapshot up to date, then the
     // three alerts (behind / review due / confirmed order with no salesperson), each sent once.
-    \App\Services\SalesTargetService::sync($today->format('Y-m-d'));
-    $created += \App\Services\SalesTargetService::runAlerts($today->format('Y-m-d'));
+    // Skipped entirely until targets are in use (no cost on a site that does not use them).
+    if (\App\Services\SalesTargetService::inUse()) {
+        \App\Services\SalesTargetService::sync($today->format('Y-m-d'));
+        $created += \App\Services\SalesTargetService::runAlerts($today->format('Y-m-d'));
+    }
 
     // --- RCMC expiry ---
     $rcmcExpiry = CompanySettingsRepository::get('rcmc_valid_until');

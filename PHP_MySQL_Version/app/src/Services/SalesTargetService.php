@@ -381,6 +381,18 @@ final class SalesTargetService
      *
      * @return array{inserted:int, shipped:int, reversed:int}
      */
+    /**
+     * Whether sales targets are in use: a company target with costs or profit, or any designation, personal or
+     * associate target. The daily job skips the credit snapshot and the alerts until then (the Targets page
+     * still brings the snapshot up to date when it is opened). Node twin: salesTargetService.inUse().
+     */
+    public static function inUse(): bool
+    {
+        $sql = "SELECT (EXISTS (SELECT 1 FROM sales_target_company WHERE COALESCE(costs_monthly, 0) > 0 OR COALESCE(profit_monthly, 0) > 0)
+                    OR EXISTS (SELECT 1 FROM sales_targets WHERE COALESCE(containers, 0) > 0 OR COALESCE(quotations, 0) > 0 OR COALESCE(new_buyers, 0) > 0)) AS in_use";
+        return (int) \App\Config\Database::connection()->query($sql)->fetchColumn() === 1;
+    }
+
     public static function sync(?string $today = null): array
     {
         $today ??= date('Y-m-d');
