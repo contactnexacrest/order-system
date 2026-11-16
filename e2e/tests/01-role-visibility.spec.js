@@ -55,14 +55,31 @@ test.describe('Role-based navigation visibility', () => {
     await fullAccess(page);
   });
 
-  // The 'Admin' role is a literal, distinct role (role_id 1) — it gets
-  // the same full CROSS JOIN permission grant as Managing Director and
-  // Executive Director in seed.sql, so it's expected to behave
-  // identically, but it had never actually been logged into or tested as
-  // its own account before — tested explicitly rather than assumed.
-  test('Admin (the literal role, not Managing Director) sees every module too', async ({ page }) => {
+  // The 'Admin' role is a literal, distinct role (role_id 1). It used to get
+  // the same full module set as Managing Director and Executive Director.
+  // Owner decision D-379 (15 Nov 2026, report access per role): Admin's
+  // report levels are Off except Management (cockpit, queues, audit log)
+  // and Find an order — so Admin still has every working module and the
+  // Admin/Settings menus, but the Reports page shows only those reports,
+  // the money reports are refused by direct URL, and Finance & accounts
+  // no longer opens on CA / Accounting (CA reports is Off for Admin).
+  test('Admin (the literal role) sees every working module, but only the Management reports (D-379)', async ({ page }) => {
     await login(page, 'adminRole');
-    await fullAccess(page);
+    await expect(navLink(page, '/orders')).toBeAttached();
+    await expect(navLink(page, '/reports')).toBeAttached();
+    await expect(navLink(page, '/users')).toBeAttached();
+    await expect(menuEntry(page, 'finance')).toBeAttached();
+    await expect(navLink(page, '/ca')).toHaveCount(0);
+    await expect(menuEntry(page, 'sales_targets')).toHaveCount(0);
+    await expect(menuEntry(page, 'settings')).toBeAttached();
+    await page.goto('/reports');
+    await expect(barLink(page, '/audit-log')).toBeAttached();
+    await expect(barLink(page, '/cockpit')).toBeAttached();
+    await expect(barLink(page, '/reports/freight-cost')).toHaveCount(0);
+    await expect(page.locator('main a[href="/reports/aggregate"]')).toHaveCount(0);
+    expect((await page.request.get('/reports/aggregate')).status()).toBe(403);
+    expect((await page.request.get('/reports/order-profitability')).status()).toBe(403);
+    expect((await page.request.get('/ca')).status()).toBe(403);
   });
 
   test('Executive Director sees every module too (same full grant as Admin/MD)', async ({ page }) => {
@@ -70,10 +87,13 @@ test.describe('Role-based navigation visibility', () => {
     await fullAccess(page);
   });
 
-  test('the left menu has at most 13 entries, in the decided order', async ({ page }) => {
+  // D-379: Overview gains "Sales targets" after Reports for the MD / ED
+  // (Sales targets level All; the Sales Director gets the team view).
+  test('the left menu has at most 14 entries, in the decided order', async ({ page }) => {
     await login(page, 'admin');
     const keys = await page.locator('.sidebar-nav a[data-nav]').evaluateAll((els) => els.map((e) => e.dataset.nav));
-    expect(keys).toEqual(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'help', 'users', 'settings']);
+    expect(keys).toEqual(['dashboard', 'approvals', 'tasks', 'orders', 'clients', 'associates', 'products', 'procurement', 'finance', 'reports', 'sales_targets', 'help', 'users', 'settings']);
+    await expect(navLink(page, '/sales-targets')).toBeAttached();
     await expect(page.locator('.sidebar-nav .nav-heading')).toHaveText(['Work', 'Overview', 'Help', 'Admin']);
   });
 
@@ -102,11 +122,23 @@ test.describe('Role-based navigation visibility', () => {
     await expect(menuEntry(page, 'users')).toHaveCount(0);
   });
 
-  test('Logistics Executive sees order handling but never Reports, CA, or Admin', async ({ page }) => {
+  // D-379: the Logistics Executive's Freight cost level is Own (and the role
+  // holds view_logistics_costs), so Reports now opens on that one report,
+  // scoped to the orders they work on. Every other report stays refused.
+  test('Logistics Executive sees order handling and only their own Freight cost report — never CA or Admin', async ({ page }) => {
     await login(page, 'logisticsExecutive');
     await expect(navLink(page, '/orders')).toBeAttached();
-    await expect(navLink(page, '/reports')).toHaveCount(0);
+    await expect(navLink(page, '/reports')).toBeAttached();
     await expect(navLink(page, '/ca')).toHaveCount(0);
+    await expect(menuEntry(page, 'users')).toHaveCount(0);
+    await expect(menuEntry(page, 'settings')).toHaveCount(0);
+    await page.goto('/reports');
+    await expect(page.getByText('Showing your own business')).toBeVisible();
+    await expect(barLink(page, '/reports/freight-cost')).toBeAttached();
+    await expect(barLink(page, '/audit-log')).toHaveCount(0);
+    await expect(barLink(page, '/cockpit')).toHaveCount(0);
+    expect((await page.request.get('/reports/aggregate')).status()).toBe(403);
+    expect((await page.request.get('/reports/disputes')).status()).toBe(403);
     await page.goto('/orders');
     await expect(barLink(page, '/disputes')).toHaveCount(0);
   });
@@ -132,13 +164,21 @@ test.describe('Role-based navigation visibility', () => {
 
   // Owner decision (2026-10-28, migration 2026-10-28d): the CA can open
   // orders read-only (view_orders) to reach each order's CAFIN box — but
-  // still has no order-editing, client or report access.
-  test('CA sees orders read-only and the CA module — no order editing, clients or reports', async ({ page }) => {
+  // still has no order-editing or client access. D-379: Reports now opens
+  // for the CA on the reports its own permissions allow (Missing eBRC,
+  // Freight cost, CAFIN export, CA reports); the sales reports, which need
+  // view_reports, stay refused.
+  test('CA sees orders read-only, the CA module and only the finance reports — no order editing or clients', async ({ page }) => {
     await login(page, 'ca');
     await expect(navLink(page, '/ca')).toBeAttached();
     await expect(navLink(page, '/orders')).toHaveCount(1);
     await expect(menuEntry(page, 'clients')).toHaveCount(0);
-    await expect(navLink(page, '/reports')).toHaveCount(0);
+    await expect(navLink(page, '/reports')).toBeAttached();
+    await page.goto('/reports');
+    await expect(page.locator('main a[href="/ca/cafin-export"]')).toBeAttached();
+    await expect(page.locator('main a[href="/reports/aggregate"]')).toHaveCount(0);
+    expect((await page.request.get('/reports/aggregate')).status()).toBe(403);
+    expect((await page.request.get('/audit-log')).status()).toBe(403);
 
     const res = await page.request.get('/orders/create');
     expect(res.status()).toBe(403);
