@@ -108,7 +108,10 @@ describe('D-379: report access per role', () => {
 
   /** @returns {Promise<{code: number, body: string, flash: ?string, type: ?string}>} one POST and the flash it leaves */
   async function post(agent, url, body = {}) {
-    const res = await agent.post(url).type('form').send({ ...body, _csrf: await csrfOf(agent) });
+    // The token is read before the POST is built: a supertest request opens its own server when it is created, and
+    // another request awaited in between (the token page) left that server refusing the connection.
+    const csrf = await csrfOf(agent);
+    const res = await agent.post(url).type('form').send({ ...body, _csrf: csrf });
     let flash = null;
     let type = null;
     if (res.status === 302 && res.headers.location) {

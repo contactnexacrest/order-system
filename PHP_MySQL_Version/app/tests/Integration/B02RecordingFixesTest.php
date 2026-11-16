@@ -204,8 +204,10 @@ final class B02RecordingFixesTest extends DbTestCase
         self::assertNotNull($this->staffRow($rows, $activeId));
         self::assertNull($this->staffRow($rows, $inactiveId), 'a deactivated user is not listed');
 
-        $this->signIn($this->createTestUser('Admin'));
+        // D-379: read as the MD (Staff productivity: All) — Admin's level is Off by default (owner-approved).
+        $this->signIn($this->createTestUser('Managing Director'));
         $html = $this->capture(fn () => (new ReportController())->staff([]));
+        self::assertStringContainsString('The dates apply to both counts.', $html);
         self::assertStringNotContainsString($inactiveName, $html);
     }
 
@@ -228,7 +230,8 @@ final class B02RecordingFixesTest extends DbTestCase
 
     public function testStaffProductivityFormSaysTheDatesApplyToBothCounts(): void
     {
-        $this->signIn($this->createTestUser('Admin'));
+        // D-379: Staff productivity is read as the MD (All); Admin's level is Off by default (owner-approved).
+        $this->signIn($this->createTestUser('Managing Director'));
         $html = $this->capture(fn () => (new ReportController())->staff([]));
         self::assertStringNotContainsString('(documents generated)', $html);
         self::assertStringContainsString('<label>Date From<input type="date" name="date_from"', $html);

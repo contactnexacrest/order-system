@@ -221,7 +221,10 @@ final class UngatedRoutesTest extends DbTestCase
 
     /**
      * Every route in index.php without a PermissionCheck, with the class
-     * name of each of its middleware in order.
+     * name of each of its middleware in order. D-379: a route behind report
+     * access only (ReportAccessCheck: /reports and /sales-targets) is gated
+     * too — RouteMatrixTest and ReportAccessTest drive it — so it is not one
+     * of these.
      *
      * @return array<int, array{method: string, pattern: string, guard: string, csrf: bool, middleware: array<int, string>}>
      */
@@ -232,7 +235,7 @@ final class UngatedRoutesTest extends DbTestCase
         $routes = [];
         foreach ($matches as $m) {
             $middleware = $m[3] ?? '';
-            if (str_contains($middleware, 'PermissionCheck')) {
+            if (str_contains($middleware, 'PermissionCheck') || str_contains($middleware, 'ReportAccessCheck::')) {
                 continue;
             }
             preg_match_all('#(\w+)::\w+\(#', $middleware, $names);

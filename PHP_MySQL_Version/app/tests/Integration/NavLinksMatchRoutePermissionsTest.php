@@ -117,11 +117,13 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
         self::assertStringNotContainsString('href="/ca/zoho-sync"', $expensesHtml, 'Zoho sync needs ca_module_manage, a step up from the CA role\'s plain ca_module_view');
     }
 
-    public function testAdminSeesOrderReferencesAsRealLinksOnTheCaHub(): void
+    // D-379: Admin's CA reports level is Off by default (owner-approved), so /ca is refused for Admin; the
+    // Managing Director (CA reports: All, and order management) is the order-managing role that opens the hub.
+    public function testManagingDirectorSeesOrderReferencesAsRealLinksOnTheCaHub(): void
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
-        $adminId = $this->createTestUser('Admin');
+        $adminId = $this->createTestUser('Managing Director');
         \App\Repositories\OrderPaymentStatusRepository::initializeForOrder($orderId);
         \App\Repositories\OrderPaymentStatusRepository::markAdvanceCleared($orderId, date('Y-m-d H:i:s'), $adminId);
         $_SESSION['_auth_user_id'] = $adminId;

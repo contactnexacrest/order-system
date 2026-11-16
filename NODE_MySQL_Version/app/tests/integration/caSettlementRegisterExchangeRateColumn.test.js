@@ -27,8 +27,9 @@ describe('CA settlement register Exchange Rate column (backlog #56/#84)', () => 
 
   const PASSWORD = 'Ca-Settlement-Test-1!';
 
+  // D-379: /ca needs CA reports open; Admin's level is Off by default (owner-approved), the MD's is All.
   async function createTestStaffUserWithRealPassword() {
-    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: 'Admin' });
+    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: 'Managing Director' });
     const hash = await passwordHash.hash(PASSWORD);
     const email = `jest-ca-settlement-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
     const result = await db.execute(

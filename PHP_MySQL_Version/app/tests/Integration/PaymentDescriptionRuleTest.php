@@ -30,7 +30,9 @@ final class PaymentDescriptionRuleTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = $this->createTestUser('Admin');
+        // D-379: the CA pages used here (export benefits, expenses) need CA reports open; Admin's level is Off by default
+        // (owner-approved), the Managing Director's is All.
+        $this->admin = $this->createTestUser('Managing Director');
         $_SESSION = ['_auth_user_id' => $this->admin];
         $_POST = [];
     }

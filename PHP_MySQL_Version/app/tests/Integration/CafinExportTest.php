@@ -83,7 +83,8 @@ final class CafinExportTest extends DbTestCase
 
     public function testThePageOpensForWhoeverMaySeeCafinOnly(): void
     {
-        $_SESSION['_auth_user_id'] = $this->createTestUser('Accounts Executive');
+        // D-379: opened by the CA (view_cafin and CAFIN export: All); the Accounts Executive's CAFIN export level is Off by default.
+        $_SESSION['_auth_user_id'] = $this->createTestUser('CA / Chartered Accountant');
         ob_start();
         (new \App\Controllers\CaController())->cafinExport([]);
         $html = (string) ob_get_clean();

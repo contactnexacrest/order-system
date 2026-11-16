@@ -26,7 +26,7 @@ final class CaSettlementRegisterExchangeRateColumnTest extends DbTestCase
 
     public function testSettlementRegisterRendersAnExchangeRateColumnWithEachLegsOwnRate(): void
     {
-        $userId = $this->createTestUser('Admin');
+        $userId = $this->createTestUser('Managing Director'); // D-379: CA reports All (Admin's default is Off)
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.00, '2026-01-10');
@@ -49,7 +49,7 @@ final class CaSettlementRegisterExchangeRateColumnTest extends DbTestCase
 
     public function testSettlementRegisterShowsADashWhenNoRateIsRecordedYet(): void
     {
-        $userId = $this->createTestUser('Admin');
+        $userId = $this->createTestUser('Managing Director'); // D-379: CA reports All (Admin's default is Off)
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 1000.00, '2026-01-10');

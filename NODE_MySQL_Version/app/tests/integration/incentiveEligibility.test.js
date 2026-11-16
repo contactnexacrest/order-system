@@ -1,6 +1,7 @@
 'use strict';
 
 const request = require('supertest');
+const bcrypt = require('bcrypt');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
@@ -160,7 +161,13 @@ describe('D-259 team incentive eligibility and caps', () => {
     const edit = (await agent.get(`/users/${people.sales}/edit`)).text;
     expect(edit).toContain('Eligible for team incentive');
     expect(edit).toContain('Only the MD can change this.'); // greyed for anyone but the MD
-    expect((await agent.get('/reports/incentives')).text).toContain('Kept — not eligible (INR)');
+    // D-379: the incentives report is read as the MD (Incentives: All); Admin's level is Off by default (owner-approved).
+    await db.execute('UPDATE users SET password_hash = :h WHERE id = :u', { h: await bcrypt.hash(TEST_ADMIN_PASSWORD, 4), u: md });
+    const mdAgent = request.agent(app);
+    const mdLogin = await mdAgent.get('/login');
+    const mdEmail = (await db.queryOne('SELECT email FROM users WHERE id = :u', { u: md })).email;
+    await mdAgent.post('/login').type('form').send({ _csrf: mdLogin.text.match(/name="_csrf"\s+value="([^"]+)"/)[1], email: mdEmail, password: TEST_ADMIN_PASSWORD });
+    expect((await mdAgent.get('/reports/incentives')).text).toContain('Kept — not eligible (INR)');
   });
 
   it('only the MD changes eligibility and caps', async () => {

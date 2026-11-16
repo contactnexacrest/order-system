@@ -90,7 +90,8 @@ describe('CAFIN CSV export', () => {
   });
 
   it('the page opens for whoever may see CAFIN only', async () => {
-    const accounts = await createTestUser('Accounts Executive', 'JestCafin1!');
+    // D-379: opened by the CA (view_cafin and CAFIN export: All); the Accounts Executive's CAFIN export level is Off by default.
+    const accounts = await createTestUser('CA / Chartered Accountant', 'JestCafin1!');
     const agent = request.agent(app);
     const login = await agent.get('/login');
     await agent.post('/login').type('form').send({ _csrf: login.text.match(/name="_csrf"\s+value="([^"]+)"/)[1], email: accounts.email, password: 'JestCafin1!' });

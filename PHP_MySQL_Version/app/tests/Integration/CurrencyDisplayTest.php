@@ -56,7 +56,7 @@ final class CurrencyDisplayTest extends DbTestCase
 
     public function testPerClientReportShowsCurrencyColumnsForPaymentsAndProducts(): void
     {
-        $userId = $this->createTestUser('Admin');
+        $userId = $this->createTestUser('Managing Director'); // D-379: per-client report All (Admin's default is Off)
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId, 'FOB');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
@@ -72,7 +72,7 @@ final class CurrencyDisplayTest extends DbTestCase
 
     public function testFreightCostReportShowsCurrencyColumn(): void
     {
-        $userId = $this->createTestUser('Admin');
+        $userId = $this->createTestUser('Managing Director'); // D-379: freight cost report All (Admin's default is Off)
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
         OrderFreightRepository::upsert($orderId, [
             'confirmed_freight_rate' => '1500.00',

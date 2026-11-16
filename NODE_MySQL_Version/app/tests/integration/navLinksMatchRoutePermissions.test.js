@@ -111,10 +111,12 @@ describe('Nav links match their own route permissions (External QA report U-01)'
     expect(expensesRes.text).not.toContain('href="/ca/zoho-sync"');
   });
 
-  test('Admin sees order references as real links on the CA hub', async () => {
+  // D-379: Admin's CA reports level is Off by default (owner-approved), so /ca is refused for Admin; the
+  // Managing Director (CA reports: All, and order management) is the order-managing role that opens the hub.
+  test('Managing Director sees order references as real links on the CA hub', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    const { agent, userId: adminId } = await loginAs('Admin');
+    const { agent, userId: adminId } = await loginAs('Managing Director');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.markAdvanceCleared(orderId, new Date(), adminId);
 

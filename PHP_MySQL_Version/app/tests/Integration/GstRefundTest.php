@@ -31,7 +31,8 @@ final class GstRefundTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = $this->createTestUser('Admin');
+        // D-379: the GST refunds page is a CA report (All only); Admin's CA reports level is Off by default (owner-approved).
+        $this->admin = $this->createTestUser('Managing Director');
         $_SESSION = ['_auth_user_id' => $this->admin];
         $_POST = [];
         $this->tag = strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));

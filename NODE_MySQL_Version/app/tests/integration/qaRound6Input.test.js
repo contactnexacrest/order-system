@@ -200,6 +200,8 @@ describe('QA Round 6 — bad input is refused with a message, never a server err
   it('a page number that is not a number is page 1 (R6-N30)', async () => {
     expect((await admin.get('/audit-log?page=abc')).status).toBe(200);
     expect((await admin.get('/audit-log?entity_id=abc&user_id=abc')).status).toBe(200);
-    expect((await admin.get('/reports/aggregate?stage_id=abc&incoterm_id=abc')).status).toBe(200);
+    // D-379: the aggregate report is read as the MD (All); Admin's level is Off by default (owner-approved).
+    const md = (await loginAdmin('Managing Director')).agent;
+    expect((await md.get('/reports/aggregate?stage_id=abc&incoterm_id=abc')).status).toBe(200);
   });
 });

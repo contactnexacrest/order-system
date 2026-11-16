@@ -1,6 +1,7 @@
 'use strict';
 
 const request = require('supertest');
+const bcrypt = require('bcrypt');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
@@ -38,6 +39,22 @@ describe('Monetary figures show their currency code', () => {
     await db.pool.end();
   });
 
+  // D-379: the per-client and freight cost reports are read as the Managing Director (All); Admin's level for them is
+  // Off by default (owner-approved).
+  async function mdAgent() {
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Managing Director'");
+    const email = `jest-currency-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
+    await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+       VALUES ('Jest Test User', :email, NULL, :hash, :role_id, 1, 0, 0)`,
+      { email, hash: await bcrypt.hash(TEST_ADMIN_PASSWORD, 4), role_id: role.id }
+    );
+    const md = request.agent(app);
+    const csrf = extractCsrf((await md.get('/login')).text);
+    await md.post('/login').type('form').send({ _csrf: csrf, email, password: TEST_ADMIN_PASSWORD });
+    return md;
+  }
+
   it('shows the order currency next to Payment Status amounts on the order page', async () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderPaymentStatusRepository.initializeForOrder(orderId);
@@ -66,7 +83,7 @@ describe('Monetary figures show their currency code', () => {
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1000.0, '2026-06-01');
 
-    const res = await agent.get(`/reports/client/${clientId}`);
+    const res = await (await mdAgent()).get(`/reports/client/${clientId}`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('<th>Currency</th>');
   });
@@ -79,7 +96,7 @@ describe('Monetary figures show their currency code', () => {
       freight_forwarder_name: 'Jest Forwarder',
     });
 
-    const res = await agent.get('/reports/freight-cost');
+    const res = await (await mdAgent()).get('/reports/freight-cost');
     expect(res.status).toBe(200);
     expect(res.text).toContain('<th>Currency</th>');
     expect(res.text).toContain('USD');

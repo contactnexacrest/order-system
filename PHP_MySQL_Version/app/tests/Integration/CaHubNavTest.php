@@ -20,7 +20,9 @@ final class CaHubNavTest extends DbTestCase
 {
     public function testHubShowsCardSectionsNotTheOldInlineLinkParagraph(): void
     {
-        $userId = $this->createTestUser('Admin');
+        // D-379: the hub's report links are live only for a role with CA reports open (Admin's default is Off,
+        // owner-approved), so this runs as the Managing Director (CA reports: All).
+        $userId = $this->createTestUser('Managing Director');
         $_SESSION['_auth_user_id'] = $userId;
 
         $controller = new CaController();

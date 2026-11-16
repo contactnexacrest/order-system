@@ -155,7 +155,9 @@ describe('D-269 fixes found while recording B02', () => {
     expect(staffRow(rows, active.id)).not.toBeNull();
     expect(staffRow(rows, inactive.id)).toBeNull(); // a deactivated user is not listed
 
-    const html = (await (await signIn(await createUser('Admin'))).get('/reports/staff')).text;
+    // D-379: read as the MD (Staff productivity: All) — Admin's level is Off, and a refusal would pass this vacuously.
+    const html = (await (await signIn(await createUser('Managing Director'))).get('/reports/staff')).text;
+    expect(html).toContain('The dates apply to both counts.');
     expect(html).not.toContain(inactive.name);
   });
 
@@ -176,7 +178,8 @@ describe('D-269 fixes found while recording B02', () => {
   });
 
   it('says on the form that the dates apply to both counts', async () => {
-    const html = (await (await signIn(await createUser('Admin'))).get('/reports/staff')).text;
+    // D-379: Staff productivity is read as the MD (All); Admin's level is Off by default (owner-approved).
+    const html = (await (await signIn(await createUser('Managing Director'))).get('/reports/staff')).text;
     expect(html).not.toContain('(documents generated)');
     expect(html).toContain('<label>Date From<input type="date" name="date_from"');
     expect(html).toContain('<label>Date To<input type="date" name="date_to"');

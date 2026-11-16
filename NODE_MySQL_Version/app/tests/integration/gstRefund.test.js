@@ -34,7 +34,8 @@ describe('GST refunds under LUT', () => {
 
   beforeEach(async () => {
     tag = crypto.randomBytes(4).toString('hex').toUpperCase();
-    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Admin'");
+    // D-379: the GST refunds page is a CA report (All only); Admin's CA reports level is Off by default (owner-approved).
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Managing Director'");
     const email = `jest-gst-${tag.toLowerCase()}@nexacrest.test`;
     adminId = (await db.execute(
       `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)

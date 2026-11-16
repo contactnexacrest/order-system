@@ -167,7 +167,8 @@ final class IncentiveEligibilityTest extends DbTestCase
         self::assertStringContainsString('Only the MD can change this.', $edit, 'greyed for anyone but the MD');
         $_SESSION['_auth_user_id'] = $this->md;
         self::assertStringNotContainsString('Only the MD can change this.', $render(fn () => (new \App\Controllers\UserController())->editForm(['id' => (string) $this->people['sales']])));
-        $_SESSION['_auth_user_id'] = $this->admin;
+        // D-379: the incentives report is read as the MD (Incentives: All); Admin's level is Off by default (owner-approved).
+        $_SESSION['_auth_user_id'] = $this->md;
         $_GET = [];
         $register = $render(fn () => (new \App\Controllers\IncentiveReportController())->register([]));
         self::assertStringContainsString('Kept — not eligible (INR)', $register);

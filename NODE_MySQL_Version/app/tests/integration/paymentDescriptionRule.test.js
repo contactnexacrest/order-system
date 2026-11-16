@@ -30,7 +30,9 @@ describe('Rule D-212 — money records need the reference their description is b
   const csrfOf = (html) => html.match(/name="_csrf"\s+value="([^"]+)"/)[1];
 
   beforeEach(async () => {
-    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Admin'");
+    // D-379: the CA pages used here (export benefits, expenses) need CA reports open; Admin's level is Off by default
+    // (owner-approved), the Managing Director's is All.
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Managing Director'");
     const email = `jest-d212-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
     const result = await db.execute(
       `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
