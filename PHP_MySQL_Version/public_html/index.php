@@ -176,6 +176,7 @@ $sampleData = new SampleDataController();
 $dataExport = new DataExportController();
 $backups = new BackupController();
 $products = new ProductController();
+$productForms = new \App\Controllers\ProductFormController();
 $productConfigure = new \App\Controllers\ProductConfigureController(); // D-361
 $pricing = new PricingController();
 $salesTargets = new \App\Controllers\SalesTargetController(); // D-378
@@ -1306,7 +1307,6 @@ $router->post('/products/{pid}/spec-options/{id}/delete', [$specs, 'deleteOption
 $router->post('/products/{pid}/spec-options/{id}', [$specs, 'updateOption'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
 // Owner decisions D-382 … D-384 (18 Nov 2026): Forms of stone, Specifications (HS) — manage_pricing, as Pricing ›
 // Specifications — and a product's "Sold as" ticks (manage_product_specifications, as the rest of its Specifications page).
-$productForms = new \App\Controllers\ProductFormController();
 $router->get('/pricing/forms', [$productForms, 'forms'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
 $router->post('/pricing/forms', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/forms/{id}', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
