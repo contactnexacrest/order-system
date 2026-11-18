@@ -820,8 +820,9 @@ have one; elsewhere it is optional.
 
 Choosing it:
 - fills the **HS code** from the specification — shown read-only, marked "from specification";
-- keeps in **Unit** only the units of its form (a raw block: CBM or TON; a gangsaw slab: SQM, SQFT or CBM) — a new line
-  starts on the form's unit;
+- keeps in **Unit** only the units of its form (a raw block: CBM or TON; a gangsaw slab: SQM, SQFT or CBM) — the unit already
+  selected stays when the form offers it; only a unit the form does not offer is replaced by the form's "Starts on"
+  unit (owner, 18 Nov 2026);
 - keeps in **Surface finish** only the finishes of its form — a block offers only "Roughly trimmed" (raw block) or
   "Sawn" (sawn block); if the finish chosen is not offered, it switches to the form's default finish.
 

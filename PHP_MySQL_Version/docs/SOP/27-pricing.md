@@ -680,7 +680,7 @@ the units the line may use and the finishes it may have. Three lists, set up onc
 
 **1. Forms of stone** — Products › Pricing › **Forms of stone** (`/pricing/forms`; change: MD — manage pricing; view:
 MD and ED). Each form has a **Name \***, **Sold in (units) \*** (ticks of CBM, SQM, SQFT, PCS, TON, RMT, KG),
-**Starts on \*** (the unit a new order line starts with), **Group \*** (which category specifications apply —
+**Starts on \*** (the unit an order line switches to when its selected unit is not one the form offers), **Group \*** (which category specifications apply —
 Blocks use "Size / format", Slabs also "Thickness"), **Default finish**, **Order \*** and **Active**, with a **Reason \***.
 Starting list:
 

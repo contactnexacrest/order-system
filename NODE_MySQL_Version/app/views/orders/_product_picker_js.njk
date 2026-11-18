@@ -401,8 +401,9 @@
     var cur = unit.options[unit.selectedIndex];
     var before = unit.value;
     if (!chosenNow) { return; } // a saved line shows its unit as saved
-    if (pick && preferred) { unit.value = pick.value; }
-    else if (cur && cur.disabled && (pick || first)) { unit.value = (pick || first).value; }
+    // Owner 18 Nov 2026: the unit the line already has stays while the form offers it; only a unit the
+    // form does not offer is replaced (by the form's "starts on" unit, else its first unit).
+    if (cur && cur.disabled && (pick || first)) { unit.value = (pick || first).value; }
     if (unit.value !== before) { unit.dispatchEvent(new Event('change', { bubbles: true })); }
   }
   function filterFinishes(scope, names, preferred, chosenNow) {

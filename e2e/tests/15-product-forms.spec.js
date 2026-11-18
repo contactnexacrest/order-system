@@ -101,6 +101,8 @@ test.describe.serial('Forms of stone, Specifications (HS), Sold as — as a pers
     // Back to Gangsaw slab: HS 68022310 and the slab units.
     await soldAs.selectOption({ index: labels.findIndex((l) => /^Gangsaw slab/.test(l)) });
     await expect(page.locator('[data-sold-as-hs-code]').first()).toHaveText('68022310');
+    // Owner 18 Nov 2026: the unit already selected (CBM from the raw block) stays — a gangsaw slab offers CBM too.
+    expect((await unit.inputValue()).toUpperCase()).toMatch(/^(CBM|M3)$/);
     expect((await visibleUnits()).some((u) => /SQM|M2/i.test(u))).toBe(true);
     await unit.selectOption({ index: 0 }).catch(() => {});
     const sqm = (await visibleUnits()).find((u) => /SQM|M2/i.test(u));

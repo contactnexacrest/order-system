@@ -2683,7 +2683,7 @@ the same filters, counts, fields, actions and money rules on both templates
     approved, plan confirmed twice; migration `2026-11-18a`).**
     **Forms of stone** (Products › Pricing › Forms of stone, `/pricing/forms`; table `product_forms`):
     name, the units it is sold in (ticks of CBM, SQM, SQFT, PCS, TON, RMT, KG — `LineUnits::canonical`
-    codes, SQM stored as M2), **Starts on** (the unit a new line starts with), **Group** (one of the
+    codes, SQM stored as M2), **Starts on** (the unit a line switches to when its selected unit is not offered), **Group** (one of the
     old form keys block / slab / tile / kerb / step / cobble — so `spec_definitions.applies_to` keeps
     working), default finish, order, active. Seeded: Monument slab, Gangsaw slab, Cut-to-size slab, Raw
     block, Sawn block, Tile, Paving stone, Kerbs, setts, cobbles. **Specifications (HS)** (Products ›
@@ -2715,7 +2715,7 @@ the same filters, counts, fields, actions and money rules on both templates
     ("from specification"). Required for a goods line picked from Products on a USD order where picking
     is required; a saved line of the same product without one may stay without one. Choosing it fills
     the HS code (read-only unless the user holds `override_line_hs_code` — MD, Founder & MD, ED,
-    Founder & ED), keeps only the form's units in Unit (a new line starts on the form's unit) and only
+    Founder & ED), keeps only the form's units in Unit (the selected unit stays while the form offers it, else the "Starts on" unit) and only
     the form's finishes (switching to the form's default finish when the current one is not offered).
     With a Sold as, what the line needs follows its unit instead of D-348's Thickness / Size / format:
     CBM / TON nothing more; SQM / SQFT the Thickness option or Thickness (cm); PCS length, width and
