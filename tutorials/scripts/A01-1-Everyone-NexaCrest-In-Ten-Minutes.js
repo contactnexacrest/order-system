@@ -1,5 +1,5 @@
 'use strict';
-// A01 — NexaCrest in ten minutes (Group A, Everyone).
+// A01 Part 1 — NexaCrest in ten minutes (Group A, Everyone). Part 2 (A01-2) tours everything the app can do.
 // What the company does, the three portals, departments and roles, the 9 stages and 19 steps,
 // Standard vs Kanban, and where help lives. Source of truth: docs/APPLICATION_HANDBOOK.md
 // (sections 1.1, 1.3, 3.5, 4.4, 5.1, 6.11, 6.12). Runs on the app's own Sample Data.
@@ -14,11 +14,11 @@ const side = (d, key) => d.page.locator(`nav.sidebar-nav a[data-nav="${key}"]`).
 const row = (d, text) => d.page.locator('tr').filter({ hasText: text }).first();
 
 module.exports = {
-  code: 'A01',
-  file: 'A01-Everyone-NexaCrest-In-Ten-Minutes.mp4',
+  code: 'A01-1',
+  file: 'A01-1-Everyone-NexaCrest-In-Ten-Minutes.mp4',
   group: 'Group A · Everyone',
   title: 'NexaCrest in Ten Minutes',
-  subtitle: 'What we do, who uses the app, how an order moves, and where to find help.',
+  subtitle: 'Part 1 of 2 · What we do, who uses the app, how an order moves, and where to find help.',
   minutes: '10',
   restoreDb: true,
 
@@ -66,7 +66,7 @@ module.exports = {
 
     // ---------- 3. Departments and roles ----------
     { card: 'chapter', title: 'Departments and roles', subtitle: 'Department, designation, role, permissions.', say: 'Part three. Who can do what inside the staff app.' },
-    { as: 'md', goto: '/', caption: 'The staff dashboard', say: 'Now we are staff. Look at the badge, top right: we are the Managing Director. This is the dashboard, everyone\'s starting page: a search box, your approvals, active orders by stage, overdue payments, and recent activity. On the left, a short menu: Dashboard, Approvals, My tasks, then Orders, Clients, Associates, Products, Procurement and suppliers, Finance and accounts, Reports, Help and SOP, Users and roles, and Settings. Each section has its own menu bar at the top of its pages.', do: async (d) => { await d.point('h1', 900); await d.scrollTo(d.page.getByRole('heading', { name: /Active Orders by Stage/ })); await d.ring(d.page.getByRole('heading', { name: /Active Orders by Stage/ })); await d.wait(1200); } },
+    { as: 'md', goto: '/', caption: 'The staff dashboard', say: 'Now we are staff. Look at the badge, top right: we are the Managing Director. This is the dashboard, everyone\'s starting page: a search box, your approvals, active orders by stage, overdue payments, and recent activity. On the left, a short menu: Dashboard, Approvals, My tasks, then Orders, Clients, Associates, Products, Procurement and suppliers, Finance and accounts, Reports, Sales targets, Help and SOP, Users and roles, and Settings. Each section has its own menu bar at the top of its pages.', do: async (d) => { await d.point('h1', 900); await d.scrollTo(d.page.getByRole('heading', { name: /Active Orders by Stage/ })); await d.ring(d.page.getByRole('heading', { name: /Active Orders by Stage/ })); await d.wait(1200); } },
     { goto: '/admin/departments', caption: 'Users & roles › Departments', say: 'Behind the scenes, under Users and roles, Departments, access is organised by departments. Each department has a ladder of designations: executive, manager and director. Each designation carries a role, and the role decides the permissions. So, to give someone access, an admin simply adds them to a department. Nobody edits permissions by hand.', do: async (d) => { await d.point('h1', 1500); } },
     { caption: 'Company Management', say: 'At the top, Company Management: the Managing Director and the Executive Director. They see the whole company and give the final approvals.', do: async (d) => { await d.point(row(d, 'Company Management'), 1800); } },
     { caption: 'Sales & Export', say: 'Sales and Export talks to buyers, prepares quotations and runs the order from the buyer\'s side.', do: async (d) => { await d.point(row(d, 'Sales & Export'), 1500); } },
@@ -129,6 +129,6 @@ module.exports = {
       'Three doors: staff, buyers (client portal) and associates; every login asks for a code e-mailed to you.',
       'Departments decide who sees and does what, including who sees the money.',
       '9 stages, 19 steps; Standard or Kanban; help in Getting Started, the SOP and My Tasks.',
-    ], next: 'A02 · One order, end to end', say: 'Let us recap. NexaCrest exports natural stone from India, and every order is one record, with every document generated from it. There are three doors: staff, buyers and associates, and every login asks for a six-digit code sent by e-mail. Departments decide who sees and does what, including who sees the money. Every order moves through nine stages and nineteen steps. You can work in the Standard view or on the Kanban board. And help is always one click away: Getting Started, the SOP, and My Tasks. Next up, video A02: we follow one order from the first enquiry to the very end, meeting every person who touches it. See you there!' },
+    ], next: 'A01 Part 2 · Everything NexaCrest can do', say: 'Let us recap. NexaCrest exports natural stone from India, and every order is one record, with every document generated from it. There are three doors: staff, buyers and associates, and every login asks for a six-digit code sent by e-mail. Departments decide who sees and does what, including who sees the money. Every order moves through nine stages and nineteen steps. You can work in the Standard view or on the Kanban board. And help is always one click away: Getting Started, the SOP, and My Tasks. In part two of this video, we take a tour of everything else the app can do: clients, associates, products and pricing, procurement, finance, reports, and settings. See you there!' },
   ],
 };

@@ -18,7 +18,7 @@ module.exports = {
     password: process.env.TUT_DB_PASSWORD || 'DevPass123!',
     database: process.env.TUT_DB_NAME || 'nexacrest_php_dev',
   },
-  PHP_APP: path.join(ROOT, 'PHP_MySQL_Version', 'app'),
+  PHP_APP: process.env.TUT_PHP_APP || path.join(ROOT, 'PHP_MySQL_Version', 'app'),
   FONTS: path.join(ROOT, 'PHP_MySQL_Version', 'public_html', 'assets', 'fonts'),
   LOGO: path.join(ROOT, 'PHP_MySQL_Version', 'public_html', 'assets', 'img', 'logo.jpg'),
   // Video geometry: the recording captures CSS pixels, so the viewport is 1920x1080 and the

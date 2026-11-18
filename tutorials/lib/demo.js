@@ -72,15 +72,29 @@ function removeAssociates(emails) {
 function cleanup() { removeAssociates([...made.associates]); made.associates.clear(); removeStaff([...made.staff]); made.staff.clear(); }
 
 // Whole-database snapshot for videos that create clients, orders or payouts.
+// The documents table (generated PDF/Word files, well over 1 GB on the dev DB) is left out of the dump;
+// its highest id is kept beside the dump, and restore() deletes only the documents a recording added.
 function snapshot() {
   const file = path.join(cfg.WORK, 'db-before-recording.sql');
   fs.mkdirSync(cfg.WORK, { recursive: true });
-  const r = spawnSync('sh', ['-c', `mysqldump --single-transaction --routines -u ${cfg.DB.user} -p'${cfg.DB.password}' ${cfg.DB.database} > '${file}'`]);
+  const login = `-u ${cfg.DB.user} -p'${cfg.DB.password}'`;
+  const maxId = spawnSync('sh', ['-c', `mysql ${login} -N -e 'SELECT COALESCE(MAX(id),0) FROM documents' ${cfg.DB.database}`]);
+  if (maxId.status !== 0) throw new Error(`snapshot failed: ${maxId.stderr}`);
+  fs.writeFileSync(`${file}.documents-max-id`, String(maxId.stdout).trim());
+  const r = spawnSync('sh', ['-c', `mysqldump --single-transaction --routines ${login} --ignore-table=${cfg.DB.database}.documents ${cfg.DB.database} > '${file}'`]);
   if (r.status !== 0) throw new Error(`snapshot failed: ${r.stderr}`);
   return file;
 }
 function restore(file = path.join(cfg.WORK, 'db-before-recording.sql')) {
-  const r = spawnSync('sh', ['-c', `mysql -u ${cfg.DB.user} -p'${cfg.DB.password}' ${cfg.DB.database} < '${file}'`]);
+  const login = `-u ${cfg.DB.user} -p'${cfg.DB.password}'`;
+  const idFile = `${file}.documents-max-id`;
+  if (fs.existsSync(idFile)) {
+    const maxId = parseInt(fs.readFileSync(idFile, 'utf8'), 10);
+    if (!Number.isInteger(maxId)) throw new Error(`restore failed: bad ${idFile}`);
+    const d = spawnSync('sh', ['-c', `mysql ${login} -e 'SET FOREIGN_KEY_CHECKS=0; DELETE FROM documents WHERE id > ${maxId}' ${cfg.DB.database}`]);
+    if (d.status !== 0) throw new Error(`restore failed: ${d.stderr}`);
+  }
+  const r = spawnSync('sh', ['-c', `mysql ${login} ${cfg.DB.database} < '${file}'`]);
   if (r.status !== 0) throw new Error(`restore failed: ${r.stderr}`);
 }
 
