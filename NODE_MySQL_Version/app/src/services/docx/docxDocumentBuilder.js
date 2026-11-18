@@ -308,6 +308,8 @@ function paymentTermsLines(context, noAdvanceWording = false, withMilestones = f
   const currency = g(order, 'currency_code', '');
   const lines = [];
   const amount = (label, value) => [[`   ${label}:  `, {}], [`${currency} ${value}`, { bold: true }]];
+  // D-388 extended: the advance / balance amount already carries its currency, or reads "To Be Confirmed".
+  const due = (label, text) => [[`   ${label}:  `, {}], [text, { bold: true }]];
   // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
   const milestoneLines = () => {
     if (!withMilestones) return;
@@ -321,19 +323,19 @@ function paymentTermsLines(context, noAdvanceWording = false, withMilestones = f
     // Credit) has no "0% Advance" lines — same as the PDF.
     milestoneLines();
     lines.push([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}]]);
-    lines.push(amount(`${g(financial, 'balance_pct', '')}% Amount`, g(financial, 'balance_amount', '')));
+    lines.push(due(`${g(financial, 'balance_pct', '')}% Amount`, g(financial, 'balance_due_text', '')));
     return lines.concat(freightAndCurrencyLines(order, currency));
   }
   // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
   lines.push([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}]]);
-  lines.push(amount(`${g(financial, 'advance_pct', '')}% Advance Amount`, g(financial, 'advance_amount', '')));
+  lines.push(due(`${g(financial, 'advance_pct', '')}% Advance Amount`, g(financial, 'advance_due_text', '')));
   // Owner decision (2026-10-28): the Word balance line now prints the
   // order's own balance terms — the same sentence as the PDF (Calendar
   // Days, and the preset's own wording when it has one).
   const balanceText = g(financial, 'balance_terms_text', '');
   milestoneLines();
   lines.push([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}]]);
-  lines.push(amount(`${g(financial, 'balance_pct', '')}% Balance Amount`, g(financial, 'balance_amount', '')));
+  lines.push(due(`${g(financial, 'balance_pct', '')}% Balance Amount`, g(financial, 'balance_due_text', '')));
   return lines.concat(freightAndCurrencyLines(order, currency));
 }
 
@@ -534,16 +536,16 @@ function renderPi(context) {
           ? [
             C.rich([
               ['ADVANCE PAYABLE NOW:  ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
-              [`${currency} ${g(financial, 'advance_amount')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+              [`${g(financial, 'advance_due_text')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
               [`(${g(financial, 'advance_pct')}% of FOB value) — due by ${g(order, 'pi_valid_until', 'To Be Confirmed')}`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
             ]),
-            C.plain(`Balance ${currency} ${g(financial, 'balance_amount')} — not payable now. ${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
+            C.plain(`Balance ${g(financial, 'balance_due_text')} — not payable now. ${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
           ]
           // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
           : [
             C.rich([
               ['NO ADVANCE PAYABLE —  the full FOB value ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
-              [`${currency} ${g(financial, 'balance_amount')} `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+              [`${g(financial, 'balance_due_text')} `, { bold: true, size: 22, color: C.AMBER_VALUE }],
               [`is payable ${financial.payment_method === 'LC' ? 'by Letter of Credit' : 'as below'}.`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
             ]),
             C.plain(`${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
@@ -692,14 +694,14 @@ function renderOc(context) {
   children.push(...C.sectionTitle(`${sn(context, 'payment_status', 4)}. PAYMENT STATUS`));
   const paymentRows = [
     ...(financial.has_advance ? [
-      { label: `${g(financial, 'advance_pct')}% Advance Due (${currency})`, value: g(financial, 'advance_amount') },
+      { label: `${g(financial, 'advance_pct')}% Advance Due (${currency})`, value: g(financial, 'advance_due') },
       { label: `Advance Received (${currency})`, value: g(payment, 'advance_amount', 'To Be Confirmed') },
       { label: 'Advance T/T Received On', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
     ] : []),
     // Owner decision D-215 (5a, confirmed twice): one row per milestone between the advance and the balance.
     ...(financial.milestones || []).map((m) => ({ label: `${m.pct}% Payment Due (${currency})`, value: `${m.amount}  —  ${m.due_text}` })),
     // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
-    { label: `${financial.has_advance ? 'Balance Due' : (financial.payment_method === 'LC' ? 'Payable by Letter of Credit' : 'Payment Due')} (${currency})`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
+    { label: `${financial.has_advance ? 'Balance Due' : (financial.payment_method === 'LC' ? 'Payable by Letter of Credit' : 'Payment Due')} (${currency})`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_due')}  —  ${g(financial, 'balance_terms_text')}` },
     { label: 'Currency', value: currency },
   ];
   if (!order.is_fob) {

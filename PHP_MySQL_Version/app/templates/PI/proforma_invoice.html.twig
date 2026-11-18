@@ -103,10 +103,10 @@
 <div class="banner banner-amber" style="border:1.2pt solid #C27A0E; padding:4pt 8pt; margin-top:4pt;">
   {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00". #}
   {% if financial.has_advance %}
-  <span class="label">ADVANCE PAYABLE NOW:</span> &nbsp;<span class="value">{{ order.currency_code }} {{ financial.advance_amount }}</span> &nbsp;<span class="label">({{ financial.advance_pct }}% of FOB value) — due by {{ order.pi_valid_until ?: 'To Be Confirmed' }}</span><br>
-  <span class="note">Balance {{ order.currency_code }} {{ financial.balance_amount }} — not payable now. {{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance are{% else %} is{% endif %} paid separately against our Debit Note.{% endif %}</span><br>
+  <span class="label">ADVANCE PAYABLE NOW:</span> &nbsp;<span class="value">{{ financial.advance_due_text }}</span> &nbsp;<span class="label">({{ financial.advance_pct }}% of FOB value) — due by {{ order.pi_valid_until ?: 'To Be Confirmed' }}</span><br>
+  <span class="note">Balance {{ financial.balance_due_text }} — not payable now. {{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance are{% else %} is{% endif %} paid separately against our Debit Note.{% endif %}</span><br>
   {% else %}
-  <span class="label">NO ADVANCE PAYABLE —</span> &nbsp;<span class="label">the full FOB value</span> <span class="value">{{ order.currency_code }} {{ financial.balance_amount }}</span> <span class="label">is payable {% if financial.payment_method == 'LC' %}by Letter of Credit{% else %}as below{% endif %}.</span><br>
+  <span class="label">NO ADVANCE PAYABLE —</span> &nbsp;<span class="label">the full FOB value</span> <span class="value">{{ financial.balance_due_text }}</span> <span class="label">is payable {% if financial.payment_method == 'LC' %}by Letter of Credit{% else %}as below{% endif %}.</span><br>
   <span class="note">{{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance are{% else %} is{% endif %} paid separately against our Debit Note.{% endif %}</span><br>
   {% endif %}
   <span class="label" style="font-size:8.5pt;">Bank charges:</span> <span class="note" style="font-style:normal; font-weight:bold;">{{ financial.bank_charges_text }}</span>
@@ -137,14 +137,14 @@
 <div class="bullet-block payment-terms-box">
   {% if financial.has_advance %}
   <p>&#8226; {{ financial.advance_pct }}% Advance Payment on FOB Value against this document.</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.advance_amount }}</strong></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ financial.advance_due_text }}</strong></p>
   {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
   {% for m in financial.milestones %}
   <p>&#8226; {{ m.pct }}% Payment on FOB Value {{ m.due_text }}.</p>
   <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ m.amount }}</strong></p>
   {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Balance Payment on FOB Value {{ financial.balance_terms_text }}</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.balance_amount }}</strong></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ financial.balance_due_text }}</strong></p>
   {% else %}
   {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no "0% Advance" lines. #}
   {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
@@ -153,7 +153,7 @@
   <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ m.amount }}</strong></p>
   {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Payment on FOB Value{% if financial.payment_method == 'LC' %} by Letter of Credit{% endif %} — {{ financial.balance_terms_text }}</p>
-  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ order.currency_code }} {{ financial.balance_amount }}</strong></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Amount:&nbsp;&nbsp;<strong class="pt-amount">{{ financial.balance_due_text }}</strong></p>
   {% endif %}
   {% if not order.is_fob %}
   <p>&#8226; {% if order.is_cif %}Freight &amp; Insurance (CFR/CIF orders only){% else %}Freight (CFR order — buyer arranges insurance){% endif %}: <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>

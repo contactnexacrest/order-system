@@ -326,12 +326,18 @@ async function assemble(orderId, documentTypeCode = null) {
       total_with_services: tbcTotal(money(fobValue + serviceValue), tbcNos, allTbc && serviceValue <= 0),
       advance_pct: trimTrailingZeros(advancePct.toFixed(2)),
       advance_amount: money(advanceAmount),
+      // D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines
+      // read "To Be Confirmed" / "<known> + line 2 To Be Confirmed" like the totals; *_text carries the currency.
+      advance_due: tbcTotal(money(advanceAmount), tbcNos, allTbc),
+      advance_due_text: tbcWithCurrency(moneyCurrency, money(advanceAmount), tbcNos, allTbc),
       advance_trigger_text: order.advance_trigger_text,
       milestones,
       // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
       subtotal_paid_with_milestones: money(round2((payment && payment.advance_amount !== null && payment.advance_amount !== undefined ? parseFloat(payment.advance_amount) : advanceAmount) + milestonesReceived)),
       balance_pct: trimTrailingZeros(balancePct.toFixed(2)),
       balance_amount: money(balanceAmount),
+      balance_due: tbcTotal(money(balanceAmount), tbcNos, allTbc),
+      balance_due_text: tbcWithCurrency(moneyCurrency, money(balanceAmount), tbcNos, allTbc),
       balance_trigger_option: order.balance_trigger_option,
       balance_days: order.balance_days,
       // External QA report L-06: the Commercial Invoice's own "BALANCE
@@ -449,6 +455,12 @@ async function lineTableBlock(order, products, formatted, documentTypeCode, anne
  * @param {object[]} products the document's lines, in order
  * @returns {[number[], boolean]}
  */
+/** D-388: "USD 4,000.00", "USD 4,000.00 + line 2 To Be Confirmed", or "To Be Confirmed" (no currency). */
+function tbcWithCurrency(currency, known, tbcNos, allTbc) {
+  const text = require('./lineTable').tbcTotal(known, tbcNos, allTbc);
+  return text === 'To Be Confirmed' && tbcNos.length > 0 ? text : `${currency} ${text}`.trim();
+}
+
 function tbcLines(products) {
   const nos = [];
   let count = 0;
@@ -1264,6 +1276,7 @@ module.exports = {
   PRODUCT_FORM_DOCUMENTS,
   assemble,
   tbcLines,
+  tbcWithCurrency,
   companyBlock,
   companyFromSnapshot,
   assetsBlock,

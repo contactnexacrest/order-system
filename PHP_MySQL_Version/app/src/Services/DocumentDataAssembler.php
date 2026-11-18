@@ -332,12 +332,18 @@ final class DocumentDataAssembler
                 'total_with_services' => LineTable::tbcTotal($money($fobValue + $serviceValue), $tbcNos, $allTbc && $serviceValue <= 0),
                 'advance_pct'      => rtrim(rtrim(number_format($advancePct, 2), '0'), '.'),
                 'advance_amount'   => $money($advanceAmount),
+                // D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines
+                // read "To Be Confirmed" / "<known> + line 2 To Be Confirmed" like the totals; *_text carries the currency.
+                'advance_due'      => LineTable::tbcTotal($money($advanceAmount), $tbcNos, $allTbc),
+                'advance_due_text' => self::tbcWithCurrency($moneyCurrency, $money($advanceAmount), $tbcNos, $allTbc),
                 'advance_trigger_text' => $order['advance_trigger_text'],
                 'milestones'       => $milestones,
                 // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
                 'subtotal_paid_with_milestones' => $money(round(($payment !== null && $payment['advance_amount'] !== null ? (float) $payment['advance_amount'] : $advanceAmount) + $milestonesReceived, 2)),
                 'balance_pct'      => rtrim(rtrim(number_format($balancePct, 2), '0'), '.'),
                 'balance_amount'   => $money($balanceAmount),
+                'balance_due'      => LineTable::tbcTotal($money($balanceAmount), $tbcNos, $allTbc),
+                'balance_due_text' => self::tbcWithCurrency($moneyCurrency, $money($balanceAmount), $tbcNos, $allTbc),
                 'balance_trigger_option' => $order['balance_trigger_option'],
                 'balance_days'     => $order['balance_days'],
                 // External QA report L-06: the Commercial Invoice's own
@@ -506,6 +512,13 @@ final class DocumentDataAssembler
      * @param list<array<string,mixed>> $products the document's lines, in order
      * @return array{0: list<int>, 1: bool}
      */
+    /** D-388: "USD 4,000.00", "USD 4,000.00 + line 2 To Be Confirmed", or "To Be Confirmed" (no currency). */
+    public static function tbcWithCurrency(string $currency, string $known, array $tbcNos, bool $allTbc): string
+    {
+        $text = LineTable::tbcTotal($known, $tbcNos, $allTbc);
+        return $text === 'To Be Confirmed' && $tbcNos !== [] ? $text : trim($currency . ' ' . $text);
+    }
+
     public static function tbcLines(array $products): array
     {
         $nos = [];

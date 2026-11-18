@@ -262,6 +262,42 @@ describe('D-380 / D-386 / D-387 / D-388 documents (owner, 18 Nov 2026)', () => {
     }
   });
 
+  // D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines.
+  it('D-388: the advance and balance lines never show 0.00', async () => {
+    let orderId = await order('classic');
+    await orderProductRepository.add(orderId, 1, 'Granite Memorial Headstone', null, null, null, true, 'PCS', '1250.00');
+    for (const code of ['QT', 'PI', 'OC']) {
+      const f = (await documentDataAssembler.assemble(orderId, code)).financial;
+      expect([code, f.advance_due, f.advance_due_text, f.balance_due, f.balance_due_text])
+        .toEqual([code, 'To Be Confirmed', 'To Be Confirmed', 'To Be Confirmed', 'To Be Confirmed']);
+    }
+    for (const code of ['QT', 'PI']) {
+      for (const [format, text] of Object.entries(await generate(orderId, code))) {
+        expect([`${code} ${format}`, /Advance Amount:[\s ]*To Be Confirmed/u.test(text)]).toEqual([`${code} ${format}`, true]);
+        expect([`${code} ${format}`, /Balance Amount:[\s ]*To Be Confirmed/u.test(text)]).toEqual([`${code} ${format}`, true]);
+        expect([`${code} ${format}`, /(Advance|Balance) Amount:[\s ]*USD 0\.00/u.test(text)]).toEqual([`${code} ${format}`, false]);
+      }
+    }
+
+    // Line 1 known (10 × 100.00), line 2 To Be Confirmed: the known part + "line 2 To Be Confirmed".
+    orderId = await order('classic');
+    await orderProductRepository.add(orderId, 1, 'Granite Memorial Headstone', null, null, '10', false, 'PCS', '100.00');
+    await orderProductRepository.add(orderId, 2, 'Granite Kerb', null, null, null, true, 'PCS', '50.00');
+    let f = (await documentDataAssembler.assemble(orderId, 'QT')).financial;
+    expect(f.advance_due).toBe(`${f.advance_amount} + line 2 To Be Confirmed`);
+    expect(f.advance_due_text).toBe(`USD ${f.advance_amount} + line 2 To Be Confirmed`);
+    expect(f.balance_due_text).toBe(`USD ${f.balance_amount} + line 2 To Be Confirmed`);
+    for (const [format, text] of Object.entries(await generate(orderId, 'QT'))) {
+      has(`QT ${format}`, text, `USD ${f.advance_amount} + line 2 To Be Confirmed`);
+    }
+
+    // No line To Be Confirmed: exactly as before ("USD <amount>").
+    orderId = await order('classic');
+    await orderProductRepository.add(orderId, 1, 'Granite Memorial Headstone', null, null, '10', false, 'PCS', '100.00');
+    f = (await documentDataAssembler.assemble(orderId, 'PI')).financial;
+    expect([f.advance_due_text, f.balance_due_text, f.advance_due]).toEqual([`USD ${f.advance_amount}`, `USD ${f.balance_amount}`, f.advance_amount]);
+  });
+
   it("D-388: the detailed table's TOTAL row", async () => {
     const orderId = await order('detailed');
     await orderProductRepository.add(orderId, 1, 'CHM Black block', null, 'Roughly trimmed', '5.000', false, 'CBM', '600.00', '25161100');

@@ -396,6 +396,8 @@ final class DocxDocumentBuilder
         $currency = self::g($order, 'currency_code', '');
         $lines = [];
         $amount = static fn(string $label, $value): array => [['   ' . $label . ':  ', []], [$currency . ' ' . $value, ['bold' => true]]];
+        // D-388 extended: the advance / balance amount already carries its currency, or reads "To Be Confirmed".
+        $due = static fn(string $label, string $text): array => [['   ' . $label . ':  ', []], [$text, ['bold' => true]]];
         // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
         $milestoneLines = static function () use (&$lines, $financial, $withMilestones, $amount): void {
             if (!$withMilestones) {
@@ -411,19 +413,19 @@ final class DocxDocumentBuilder
             // Letter of Credit) has no "0% Advance" lines — same as the PDF.
             $milestoneLines();
             $lines[] = [['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []]];
-            $lines[] = $amount(self::g($financial, 'balance_pct', '') . '% Amount', self::g($financial, 'balance_amount', ''));
+            $lines[] = $due(self::g($financial, 'balance_pct', '') . '% Amount', self::g($financial, 'balance_due_text', ''));
             return array_merge($lines, self::freightAndCurrencyLines($order, $currency));
         }
         // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
         $lines[] = [['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []]];
-        $lines[] = $amount(self::g($financial, 'advance_pct', '') . '% Advance Amount', self::g($financial, 'advance_amount', ''));
+        $lines[] = $due(self::g($financial, 'advance_pct', '') . '% Advance Amount', self::g($financial, 'advance_due_text', ''));
         // Owner decision (2026-10-28): the Word balance line now prints the
         // order's own balance terms — the same sentence as the PDF (Calendar
         // Days, and the preset's own wording when it has one).
         $balanceText = self::g($financial, 'balance_terms_text', '');
         $milestoneLines();
         $lines[] = [['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []]];
-        $lines[] = $amount(self::g($financial, 'balance_pct', '') . '% Balance Amount', self::g($financial, 'balance_amount', ''));
+        $lines[] = $due(self::g($financial, 'balance_pct', '') . '% Balance Amount', self::g($financial, 'balance_due_text', ''));
         return array_merge($lines, self::freightAndCurrencyLines($order, $currency));
     }
 
@@ -608,13 +610,13 @@ final class DocxDocumentBuilder
             $run = $cell->addTextRun();
             if (!empty($financial['has_advance'])) {
                 $run->addText('ADVANCE PAYABLE NOW:  ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
-                $run->addText($currency . ' ' . self::g($financial, 'advance_amount') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
+                $run->addText(self::g($financial, 'advance_due_text') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
                 $run->addText('(' . self::g($financial, 'advance_pct') . '% of FOB value) — due by ' . self::g($order, 'pi_valid_until', 'To Be Confirmed'), ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
-                $cell->addText('Balance ' . $currency . ' ' . self::g($financial, 'balance_amount') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+                $cell->addText('Balance ' . self::g($financial, 'balance_due_text') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
             } else {
                 // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
                 $run->addText('NO ADVANCE PAYABLE —  the full FOB value ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
-                $run->addText($currency . ' ' . self::g($financial, 'balance_amount') . ' ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
+                $run->addText(self::g($financial, 'balance_due_text') . ' ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
                 $run->addText('is payable ' . (($financial['payment_method'] ?? null) === 'LC' ? 'by Letter of Credit' : 'as below') . '.', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
                 $cell->addText(self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
             }
@@ -740,7 +742,7 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment_status', 4) . '. PAYMENT STATUS');
         $hasAdvance = !empty($financial['has_advance']);
         $paymentRows = array_merge($hasAdvance ? [
-            ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ')', 'value' => self::g($financial, 'advance_amount')],
+            ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ')', 'value' => self::g($financial, 'advance_due')],
             ['label' => 'Advance Received (' . $currency . ')', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
             ['label' => 'Advance T/T Received On', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
         ] : [], array_map(
@@ -749,7 +751,7 @@ final class DocxDocumentBuilder
             $financial['milestones'] ?? []
         ), [
             // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
-            ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ')', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
+            ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ')', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_due')) . '  —  ' . self::g($financial, 'balance_terms_text')],
             ['label' => 'Currency', 'value' => $currency],
         ]);
         if (empty($order['is_fob'])) {

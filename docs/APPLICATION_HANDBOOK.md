@@ -5102,6 +5102,11 @@ the **TOTAL** row, **FOB Value**, **TOTAL QUOTED VALUE**, the CI's total invoice
 print "To Be Confirmed" when every goods line is TBC, else "<known sum, formatted as before> + line 2 To Be
 Confirmed" (several: "+ lines 2, 4 To Be Confirmed"). `LineTable::tbcLines()` / `LineTable::tbcTotal()` (Node twins).
 Price per unit prints as before. No change to the stored `fob_value`, the app screens, Zoho, CAFIN or profit.
+**Advance and balance lines (D-388 extended, owner 18 Nov 2026, confirmed twice).** On the QT, PI and OC (PDF and Word)
+the "% Advance Amount", "% Balance Amount", the PI's "ADVANCE PAYABLE NOW" box and the OC's "Advance Due" / "Balance
+Due" print "To Be Confirmed" when every goods line is TBC, else "USD 4,000.00 + line 2 To Be Confirmed"; with no TBC
+line they print exactly as before. Fields `financial.advance_due` / `balance_due` (no currency) and `advance_due_text` /
+`balance_due_text` (with the currency), from `DocumentDataAssembler::tbcWithCurrency()` (Node twin). The CI is unchanged.
 
 Tests: `DocumentsBlFormTbcD380D388Test`, `LineTableFormAndTbcD386D388Test` (Node twins); the Natural Stone identity
 fixtures (§8.6) for QT / PI / OC / CI / BLI (PDF and Word) were captured again once for the BL wording.

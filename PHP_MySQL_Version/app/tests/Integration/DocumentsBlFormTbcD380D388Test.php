@@ -272,6 +272,44 @@ final class DocumentsBlFormTbcD380D388Test extends DbTestCase
         }
     }
 
+    /** D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines. */
+    public function testD388AdvanceAndBalanceLinesNeverShowZero(): void
+    {
+        $orderId = $this->order('classic');
+        OrderProductRepository::add($orderId, 1, 'Granite Memorial Headstone', null, null, null, true, 'PCS', '1250.00');
+        foreach (['QT', 'PI', 'OC'] as $code) {
+            $f = DocumentDataAssembler::assemble($orderId, $code)['financial'];
+            self::assertSame(['To Be Confirmed', 'To Be Confirmed', 'To Be Confirmed', 'To Be Confirmed'],
+                [$f['advance_due'], $f['advance_due_text'], $f['balance_due'], $f['balance_due_text']], $code);
+        }
+        foreach (['QT', 'PI'] as $code) {
+            foreach ($this->generate($orderId, $code) as $format => $text) {
+                self::assertMatchesRegularExpression('/Advance Amount:[\s\x{00A0}]*To Be Confirmed/u', $text, "{$code} {$format}");
+                self::assertMatchesRegularExpression('/Balance Amount:[\s\x{00A0}]*To Be Confirmed/u', $text, "{$code} {$format}");
+                self::assertDoesNotMatchRegularExpression('/(Advance|Balance) Amount:[\s\x{00A0}]*USD 0\.00/u', $text, "{$code} {$format}");
+            }
+        }
+
+        // Line 1 known (10 × 100.00), line 2 To Be Confirmed: the known part + "line 2 To Be Confirmed".
+        $orderId = $this->order('classic');
+        OrderProductRepository::add($orderId, 1, 'Granite Memorial Headstone', null, null, '10', false, 'PCS', '100.00');
+        OrderProductRepository::add($orderId, 2, 'Granite Kerb', null, null, null, true, 'PCS', '50.00');
+        $f = DocumentDataAssembler::assemble($orderId, 'QT')['financial'];
+        self::assertSame($f['advance_amount'] . ' + line 2 To Be Confirmed', $f['advance_due']);
+        self::assertSame('USD ' . $f['advance_amount'] . ' + line 2 To Be Confirmed', $f['advance_due_text']);
+        self::assertSame('USD ' . $f['balance_amount'] . ' + line 2 To Be Confirmed', $f['balance_due_text']);
+        foreach ($this->generate($orderId, 'QT') as $format => $text) {
+            self::assertStringContainsString('USD ' . $f['advance_amount'] . ' + line 2 To Be Confirmed', $text, "QT {$format}");
+        }
+
+        // No line To Be Confirmed: exactly as before ("USD <amount>").
+        $orderId = $this->order('classic');
+        OrderProductRepository::add($orderId, 1, 'Granite Memorial Headstone', null, null, '10', false, 'PCS', '100.00');
+        $f = DocumentDataAssembler::assemble($orderId, 'PI')['financial'];
+        self::assertSame(['USD ' . $f['advance_amount'], 'USD ' . $f['balance_amount'], $f['advance_amount']],
+            [$f['advance_due_text'], $f['balance_due_text'], $f['advance_due']]);
+    }
+
     public function testD388TheDetailedTablesTotalRow(): void
     {
         $orderId = $this->order('detailed');
