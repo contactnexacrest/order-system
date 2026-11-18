@@ -15,6 +15,18 @@ async function chooseRequiredSpecs(page) {
       await select.selectOption({ index: 1 });
     }
   }
+  // D-385 (18 Nov 2026): a goods line picked from Products also needs "Sold as" (it sets the HS code
+  // and the units). Gangsaw slab keeps the unit SQM, whose thickness the options above already give.
+  const soldAs = page.locator('select.sold-as-select');
+  const n = await soldAs.count();
+  for (let i = 0; i < n; i++) {
+    const select = soldAs.nth(i);
+    if (await select.isVisible() && (await select.inputValue()) === '') {
+      const labels = await select.locator('option').allTextContents();
+      const idx = labels.findIndex((l) => /Gangsaw slab/.test(l));
+      await select.selectOption({ index: idx > 0 ? idx : 1 });
+    }
+  }
 }
 
 module.exports = { chooseRequiredSpecs };

@@ -175,7 +175,7 @@ A fresh installation runs **no migration**: `schema.sql` and `seed.sql` are the 
    README "First-time setup", "Set the company's real details by SQL" (identity, bank, GSTIN,
    IEC/PAN, LUT, RCMC, ECGC). Its last query must return **0**.
 7. **SQL** tab: run the read-only migration check `docs/checks/check_all_migrations.sql` (paste
-   all of it › **Go**). On a fresh install **every** row must say **already done** (or, while no migration has been added since the fresh install of 14 Nov 2026, the one row "(none yet) … nothing to run"). (The green
+   all of it › **Go**). On a fresh install **every** row must say **already done** (the rows are the files of `docs/migrations/`, from `2026-11-14a` to `2026-11-18c` today). (The green
    bar may say "0 total" — a phpMyAdmin display quirk; the table below it is what counts.)
 
 ---
@@ -526,7 +526,11 @@ harmless.
    `docs/checks/check_all_migrations.sql` › **Go**. Every new migration has its own row.
    - every row **already done** (or the single row "(none yet) … nothing to run") → nothing to run;
    - a row **NEEDED** (or **PARTLY done**) → open that file from `docs/migrations/`, paste it into
-     the SQL tab, **Go**. Several → **in date order** (the file names sort in the right order).
+     the SQL tab, **Go**. Several → **in date order** (the file names sort in the right order). The
+     files since the fresh install of 14 Nov 2026, in order: `2026-11-14a-line-priced-rate.sql`,
+     `2026-11-15a-sales-targets.sql`, `2026-11-15b-report-access.sql`,
+     `2026-11-18a-product-forms-and-hs.sql`, `2026-11-18b-cha-per-supplier.sql`,
+     `2026-11-18c-documents-bl-and-po.sql`.
    - **#1060 Duplicate column name** on a file marked `PLAIN ALTER (owner D-371)` means that column
      is already there — harmless; carry on with the next statement or file.
    - phpMyAdmin refuses `PREPARE` with information_schema (**#1044**); migrations are written

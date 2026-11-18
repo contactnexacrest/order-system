@@ -68,7 +68,7 @@ describe('11 Nov 2026 screenshot fixes', () => {
     // D-362: Global pricing settings and Exchange-rate history left the "Pricing" drop-down.
     expect(activeLabels(pricing)).toEqual([]);
     expect(pricing.items.find((i) => i.label === 'Pricing').children.map((c) => c.label))
-      .toEqual(['Commission levels and ladder', 'Specifications']);
+      .toEqual(['Commission levels and ladder', 'Specifications', 'Forms of stone']); // D-382 (18 Nov 2026): Forms of stone joined the drop-down
     // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
     expect(read('views/partials/section_nav.njk')).toContain('<details class="section-nav-details">');
     const css = read('public/css/app.css');

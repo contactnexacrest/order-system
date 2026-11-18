@@ -789,11 +789,21 @@
     if (!scope) return null;
     var picker = scope.querySelector('select.product-picker');
     var opt = picker && picker.options[picker.selectedIndex];
-    if (!opt || !opt.value) return null;
     var lineType = scope.querySelector('[name="line_type"]');
     if (lineType && lineType.value !== 'goods') return null;
     var unitField = scope.querySelector('[name="unit"]') || scope.querySelector('[name="product_unit[]"]');
     var lineKind = unitKind(unitField ? unitField.value : '');
+    // D-385 (18 Nov 2026): with a "Sold as", what the line needs follows its unit — SQM / SQFT the
+    // thickness (or a Thickness option), PCS the length, width and thickness; CBM / Ton nothing more.
+    // Server twin: productForms.unitNeedsRefusal.
+    var soldAs = scope.querySelector('select.sold-as-select');
+    if (soldAs && soldAs.value) {
+      var soldNeeds = { M2: ['thickness'], SQFT: ['thickness'], PCS: ['length', 'width', 'thickness'] }[lineKind] || [];
+      if (soldNeeds.indexOf(el.dataset.pieceSize) === -1) return null;
+      if (el.dataset.pieceSize === 'thickness' && scope.querySelector('.spec-options option[data-mm]:checked')) return null;
+      return 'Enter the ' + el.dataset.pieceSize + ' — needed for a price per ' + UNIT_LABELS[lineKind] + '.';
+    }
+    if (!opt || !opt.value) return null;
     var thick = scope.querySelector('.spec-options option[data-cbm="1"]:checked');
     var refKind = thick ? 'CBM' : unitKind(opt.dataset.unit);
     var lineRaw = String(unitField ? unitField.value : '').trim().toUpperCase();
@@ -1303,6 +1313,19 @@
       var need = parseInt(spec[1] || '1', 10);
       var ticked = spec[0].split(',').filter(function (n) { var c = el.form.elements.namedItem(n); return c && c.checked; }).length;
       if (ticked < need) return el.dataset.minTickedMessage || 'Tick at least ' + need + '.';
+    }
+    // data-required-if-changed="<name>,<name>": required once any of those fields of the
+    // same form differs from its data-was (D-381: the reason for a supplier's CHA change).
+    if (el.dataset.requiredIfChanged && el.form && value === '') {
+      var changedOne = el.dataset.requiredIfChanged.split(',').some(function (n) {
+        var f = el.form.elements.namedItem(n.trim());
+        if (!f || f.disabled || !('value' in f)) return false;
+        var now = f.value.trim().replace(/,/g, '');
+        var was = f.getAttribute('data-was') || '';
+        if (now !== '' && was !== '' && !isNaN(Number(now)) && !isNaN(Number(was))) return Math.abs(Number(now) - Number(was)) >= 0.005;
+        return now !== was;
+      });
+      if (changedOne) return el.dataset.requiredIfChangedMessage || 'Give a reason for the change.';
     }
     if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url' || type === 'password' || type === 'number')) {
       return 'This field is required.';
@@ -2618,6 +2641,10 @@
         s.units.forEach(function (u, i) {
           var o = option(unit, u.value, u.label, keepUnit !== '' ? u.value === keepUnit : i === 0);
           if (u.sqft) o.setAttribute('data-sqft', '1'); // D-364: typed per SQFT, saved as the SQM price
+          if (u.tonne) { // D-382: typed per tonne, saved as the per-CBM price (× the weight per CBM)
+            o.setAttribute('data-tonne', '1');
+            if (u.t_per_cbm) o.setAttribute('data-t-per-cbm', String(u.t_per_cbm));
+          }
         });
         if (unit.selectedIndex < 0 && unit.options.length) unit.options[0].selected = true;
         syncUnit();
@@ -2714,6 +2741,22 @@
         var opt = unit.options[unit.selectedIndex];
         var v = Number(String(price.value || '').replace(/,/g, '').trim());
         note.textContent = '';
+        // D-382: a block price per tonne — "₹30,000 / tonne = ₹87,000 / CBM (× 2.9 t/CBM) — saved as the CBM price".
+        if (opt && opt.hasAttribute('data-tonne') && v > 0) {
+          var t = Number(opt.getAttribute('data-t-per-cbm') || '');
+          if (!(t > 0)) {
+            note.textContent = 'Set the weight per CBM on the product or its category (Products) — needed to compare a price per Ton.';
+            note.hidden = false;
+            return;
+          }
+          var bt = document.createElement('strong');
+          bt.textContent = rupees(Math.round(v * t * 100) / 100) + ' / CBM';
+          note.appendChild(document.createTextNode(rupees(v) + ' / tonne = '));
+          note.appendChild(bt);
+          note.appendChild(document.createTextNode(' (× ' + t + ' t/CBM) — saved as the CBM price'));
+          note.hidden = false;
+          return;
+        }
         if (!opt || !opt.hasAttribute('data-sqft') || !(v > 0)) { note.hidden = true; return; }
         var b = document.createElement('strong');
         b.textContent = rupees(Math.round(v * SQFT_PER_SQM * 100) / 100) + ' / SQM';

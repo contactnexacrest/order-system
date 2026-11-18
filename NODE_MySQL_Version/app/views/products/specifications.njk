@@ -18,11 +18,31 @@
     <label>Priced per CBM from (mm)<input type="number" name="cbm_from_mm" min="1" max="2000" step="1" value="{{ product.cbm_from_mm if product.cbm_from_mm !== null else '' }}" placeholder="global {{ cbmFrom }}"{{ ro }}></label>
     {# D-270 (point 25): this product's own weight per CBM, for order lines priced per Ton. #}
     <label>Weight per CBM (tonnes) <small class="muted">(empty = the category's)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="{{ (product.weight_t_per_cbm | float) if (product.weight_t_per_cbm !== null and product.weight_t_per_cbm !== undefined) else '' }}" placeholder="e.g. 3.0"{{ ro }}></label>
-    <fieldset class="full"><legend>Forms this product comes in (none ticked = all)</legend>
-      {% for k, l in forms %}<label class="inline"><input type="checkbox" name="forms[]" value="{{ k }}"{% if k in productForms %} checked{% endif %}{{ ro }}> {{ l }}</label> {% endfor %}
-    </fieldset>
     {% if canEdit %}<div><button type="submit" class="btn-sm">Save</button></div>{% endif %}
   </form>
+
+  {# D-384 (18 Nov 2026): "Sold as" — the specifications (each with its HS code) this product is sold as; it replaces the old fixed "Forms" ticks. #}
+  <section class="section" id="sold-as">
+    <h2>Sold as</h2>
+    <p class="muted small">What this product is sold as. An order line of this product offers only these (its HS code comes from the one chosen); the category specifications that apply follow their forms ({{ 'nothing ticked yet' if not soldAsTicked.length else soldAsGroupsText }}). Specifications and their HS codes: <a href="/products/hs-specifications">Products › Specifications (HS)</a>.</p>
+    {% if not soldAsTicked.length %}
+      <p class="notice notice-info small" data-testid="sold-as-none">Nothing ticked yet — order lines offer every specification{% if productForms.length %}, and the specifications follow the forms ticked before ({{ oldFormsLabel }}){% endif %}.</p>
+    {% endif %}
+    <form method="post" action="/products/{{ product.id }}/sold-as" class="field-grid">
+      {{ csrf() }}
+      <fieldset class="full"><legend>Sold as *</legend>
+        {% set soldAsIds %}{% for sa in soldAsSpecs %}sold-as-{{ sa.id }}{% if not loop.last %},{% endif %}{% endfor %}{% endset %}
+        {% for sa in soldAsSpecs %}
+          <label class="inline"><input type="checkbox" name="sold_as[{{ sa.id }}]" value="1" id="sold-as-{{ sa.id }}"{% if soldAsTicked.indexOf(sa.id | int) != -1 %} checked{% endif %}{{ ro }}{% if loop.first %} data-min-ticked="{{ soldAsIds }}:1" data-min-ticked-message="Tick at least one specification the product is sold as."{% endif %}> {{ sa.name }} <span class="tag">HS {{ sa.hs_code }}</span>{% if sa.is_active != 1 or sa.form_is_active != 1 %} <small class="muted">(switched off)</small>{% endif %}</label>
+        {% endfor %}
+        {% if not soldAsSpecs.length %}<span class="muted">No active specifications — add them in Products › Specifications (HS).</span>{% endif %}
+      </fieldset>
+      {% if canEdit %}
+        <label class="full">Reason *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. This granite is also sold as raw blocks"></label>
+        <div><button type="submit" class="btn-sm">Save Sold as</button></div>
+      {% endif %}
+    </form>
+  </section>
 
   <table class="list">
     <tr><th>Specification</th><th>Options for this product</th><th>Actions</th></tr>
@@ -84,7 +104,16 @@
             <table class="list"><tr><th>This product's own options</th><th></th></tr>
               {% for o in own %}
                 <tr><td>{{ o.name }} {{ o.change_label }}</td>
-                  <td><form method="post" action="/products/{{ product.id }}/spec-options/{{ o.id }}/delete" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form></td></tr>
+                  <td>{# D-389: this product's own option's order (the other fields are posted unchanged). #}
+                    <form method="post" action="/products/{{ product.id }}/spec-options/{{ o.id }}" class="inline-form">
+                      {{ csrf() }}
+                      <input type="hidden" name="name" value="{{ o.name }}"><input type="hidden" name="change_type" value="{{ o.change_type }}">
+                      <input type="hidden" name="value" value="{{ o.value if (o.value !== null and o.value !== undefined) else '' }}"><input type="hidden" name="thickness_mm" value="{{ (o.thickness_mm | int) if (o.thickness_mm !== null and o.thickness_mm !== undefined) else '' }}">
+                      {% if o.is_base %}<input type="hidden" name="is_base" value="1">{% endif %}
+                      <input type="number" name="sort_order" min="0" max="999" step="1" value="{{ o.sort_order if (o.sort_order !== null and o.sort_order !== undefined) else 90 }}" aria-label="Order of {{ o.name }}" placeholder="e.g. 90" class="input-order">
+                      <button type="submit" class="btn-sm">Save order</button>
+                    </form>
+                    <form method="post" action="/products/{{ product.id }}/spec-options/{{ o.id }}/delete" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form></td></tr>
               {% endfor %}
             </table>
           {% endif %}
@@ -97,7 +126,7 @@
             <label>Change type *<select name="change_type" required><option value="">Choose…</option>{% for k, l in changeTypes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
             <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00"></label>
             <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 25 (thickness options)"></label>
-            <input type="hidden" name="sort_order" value="90">
+            <label>Order<input type="number" name="sort_order" min="0" max="999" step="1" value="90" placeholder="e.g. 90"></label>
             <label class="inline"><input type="checkbox" name="is_base" value="1"> base option</label>
             <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
           </form>

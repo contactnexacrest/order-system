@@ -134,9 +134,12 @@ async function duplicate(id, targetOrderId = null, atLineNo = null) {
   await db.execute(
     `UPDATE order_products SET product_id = :p, material = :m, spec_selection = :s, price_request_id = :pr, zoho_item_id = :z,
             piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :t, copied_from_id = :cf, as_per_annexure = :apa,
-            pieces_count = :pc, size_note = :sn, priced_fx_rate = :fx, priced_at = :fa WHERE id = :id`, {
+            pieces_count = :pc, size_note = :sn, priced_fx_rate = :fx, priced_at = :fa,
+            hs_spec_id = :hsp, hs_override_reason = :hsr WHERE id = :id`, {
       // D-374: a copy keeps the rate and date its price was worked out at (the price is the same).
       fx: source.priced_fx_rate ?? null, fa: source.priced_at ?? null,
+      // D-385: and its Sold as and any HS code change with its reason (the HS code itself is copied above).
+      hsp: source.hs_spec_id ?? null, hsr: source.hs_override_reason ?? null,
       p: source.product_id ?? null, m: source.material ?? null, s: source.spec_selection ?? null, pr: source.price_request_id ?? null, z: source.zoho_item_id ?? null,
       l: source.piece_length_cm ?? null, w: source.piece_width_cm ?? null, t: source.piece_thickness_cm ?? null, cf: sameOrder ? id : null, apa: Number(source.as_per_annexure || 0),
       // D-339: the No. of pieces and the size note.

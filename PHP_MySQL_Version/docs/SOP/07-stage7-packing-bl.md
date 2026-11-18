@@ -76,6 +76,13 @@ which runs alongside and never locks anything. Then:
    of Lading. Anything left blank in Shipping/Packing above shows as "To Be
    Confirmed" on the generated sheet.
 
+   Since owner decision D-380 (18 Nov 2026, confirmed twice) the sheet asks
+   for the **ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET**: No. of Original
+   Copies reads "Full set as issued by the shipping line (the number is
+   stated on the BL)", and the release line says "CHA to hand the full set of
+   originals to NexaCrest only — never to the buyer or anyone else." It still
+   says DO NOT ISSUE SEA WAYBILL OR EXPRESS BL, with 3 non-negotiable copies.
+
    The BL Type and BL Consignee Instruction rows only appear when the
    order's payment preset has **"Include BL Type / BL Consignee
    Instruction"** checked (Payment presets, under Settings › Lists) — some

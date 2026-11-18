@@ -88,7 +88,9 @@
       {% for p in products %}{% set st = p.standing %}{% set o = p.offers_view %}
         <tr data-product-row="{{ p.id }}">
           <td class="name-col"><a class="product-name" href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}
-            <span class="name-sub">{{ p.name_sub }}</span></td>
+            <span class="name-sub">{{ p.name_sub }}</span>
+            {# D-384 (18 Nov 2026): each product's "Sold as" (its ticked specifications), one query for the page. #}
+            <span class="name-sub sold-as-line" data-testid="sold-as-{{ p.id }}">Sold as: {% if soldAs[p.id] %}{{ soldAs[p.id] | pluck('name') | join(', ') }}{% else %}<span class="muted">not ticked (every specification)</span>{% endif %}</span></td>
           {% if canViewPricing %}
             <td>{{ st.usable }} active{% if st.paused > 0 %}<br><small class="muted">{{ st.paused }} paused</small>{% endif %}</td>
             <td>{% if not o.lowest %}—{% else %}

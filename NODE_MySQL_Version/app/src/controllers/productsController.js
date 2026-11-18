@@ -173,6 +173,8 @@ async function index(req, res) {
     // D-365: "Show all columns" — ?cols=all without JavaScript; remembered per user in the browser.
     showAll: String(req.query.cols || '') === 'all',
     prefUser: Number((req.user || {}).id || 0),
+    // D-384 (18 Nov 2026): each product's "Sold as" (its ticked specifications), one query for the page.
+    soldAs: await require('../services/productForms').soldAsByProduct(products.map((p) => Number(p.id))),
     ...catalogueUnits(products),
   }, 'layout/base');
 }

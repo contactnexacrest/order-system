@@ -75,7 +75,8 @@ Switched off, goods lines may be typed by hand again — and are then not price-
 Every change is in the audit log (PRICING_SETTING_CHANGED).
 
 **Pick from Products** on an order line (New Order form, and the order page's add and edit
-line forms) fills the description, HS code, selling unit and — on a **USD** order, for
+line forms) fills the description, HS code (since D-385 from the line's **Sold as** — see
+"Forms of stone, Specifications (HS) and Sold as" below), selling unit and — on a **USD** order, for
 people who may see selling prices — the **quote price of whoever sells the order**:
 
 - the **staff quote** when the order's client has no associate (or the order is not one the
@@ -258,7 +259,8 @@ check, the MD's approval and the Quotation / PI hold. See
 **A product's own specifications** — Products › a product › **Price options
 (specifications)**. Needs the role permission **Manage a product's
 specifications** (Admin and MD to start). A product follows its category; it can
-set its category, forms and "CBM from"; untick an option (not offered), type its
+set its category and "CBM from" (the old fixed **Forms** ticks are replaced by **Sold as** since D-384 — see
+"Forms of stone, Specifications (HS) and Sold as" below); untick an option (not offered), type its
 own value (empty = follow the category, so later category changes flow through),
 hide a whole specification, add options or whole specifications for itself only,
 and reset one specification or the whole product. Badges show *From category*,
@@ -455,7 +457,8 @@ Not changed in Phase 1: the Certificate of Origin issuer printed on the document
    supplier's price.
 3. **Price includes packing and loading** — leave ticked unless the supplier's price is without them.
 4. **CHA + transport per container (₹)** — e.g. ₹60,000. The screen shows it per CBM (₹7,500 with 8 CBM)
-   and per SQM for each thickness (₹150 at 20 mm). Empty = the product's default.
+   and per SQM for each thickness (₹150 at 20 mm). Empty = the supplier's figure (Edit Supplier, D-381), else the
+   product's default — the box says which ("Empty = supplier's ₹45,000.00 (Mundra)").
 5. **Price for** — keep "Every thickness". Choose "A special combination" only for one exact price such as
    "30 mm · Leather".
 6. **Save price**. (Tick **Use this price for pricing** only to make this supplier's CHA + transport,
@@ -502,7 +505,17 @@ A product can have its own × K or container (Edit product, MD only) — it show
 - **Costs to FOB** — CHA + transport per container (₹; the screen shows "÷ 8.2 CBM per container = ₹9,756.10
   per CBM") and Packing + loading per unit (₹; added only when a supplier price does NOT include packing and
   loading). The old Default factory / transportation / CHA cost fields are gone: the supplier's price is typed
-  on Market prices, and CHA + transport is only here (or on one supplier price).
+  on Market prices, and CHA + transport is here (the product default), on the supplier (D-381, below) or on one
+  supplier price.
+
+**CHA + transport per supplier (D-381, 18 Nov 2026).** CHA + transport depends on how far the supplier's factory is
+from the port, so a supplier can carry its own figure: Procurement & suppliers › Suppliers › the supplier › **Edit** ›
+**CHA + transport per container, factory → port (₹)** (e.g. 45000) and **Port this figure is for** (optional, e.g.
+Mundra); a **Reason** is required when either changes (e.g. "New transporter rate from the quarry to Mundra, Nov
+2026"). Only people who see purchase prices or logistics costs see this box. Which figure a price uses: the price's
+own figure → its supplier's figure → the product default → none. The price build-up shows where it came from as a
+small tag: **this price**, **supplier · Mundra** or **product default**. An older price that already has the CHA inside
+never gets it added again — it shows "CHA already inside this older price". Every change is in the Audit Log.
 - **Price rules in effect for this product** — every rule with "category" or "own rule". The MD can switch on
   **Use own rules for this product** to change × K and the container for this product only; switched off, the
   category's rules apply. The rules are only a calculator: they never change a typed price or the base. Since
@@ -523,12 +536,16 @@ record supplier prices (Procurement, MD).
    shows each thickness's new price next to what it was. To keep a different price for one thickness, click **Type it
    yourself** on its row and type it — that row is then saved as you typed it.
 3. Enter **Quoted on** (the date the supplier gave the price; not in the future) and, if the supplier said so,
-   **Valid until**. **More (optional)** holds CHA + transport per container (empty = the product's default), "Price
+   **Valid until**. **More (optional)** holds CHA + transport per container (empty = the supplier's figure, else the
+   product's default — the box names it, e.g. "Empty = supplier's ₹45,000.00 (Mundra)"), "Price
    includes packing and loading" and Notes.
 4. The MD and ED also see **Selling price after saving** (minimum and quote, and what they were) when this supplier's
    price is the one the selling price comes from. Since D-361 a configured product's selling price does not move when
    you save — the product manager sees "Supplier prices changed … **Use ₹X**" on Configure and decides.
-   The unit can be **SQM**, **SQFT** or **CBM** (D-364, below).
+   The unit can be **SQM**, **SQFT** or **CBM** (D-364, below). A **block priced per CBM** also offers **Priced per \***
+   **Tonne** (D-382): type the supplier's per-tonne price, e.g. ₹30,000 — it is saved as the per-CBM price (× the
+   product's weight per CBM) and shown as "Typed as ₹30,000.00 per tonne = ₹87,000.00 per CBM at 2.9 t/CBM". Without
+   a weight per CBM the tonne price is refused — set the weight first.
 5. Click **Save**. You stay on the page with a green message ("Saved. … ₹old → ₹new …"), **Undo** and **See price
    history**. Undo puts the price back exactly as it was before your save; both the save and the undo are in the price
    history. Quotations and orders already issued never change.
@@ -649,10 +666,83 @@ Nobody else sees this line, and it is never on a document.
 
 - A product's HS code is picked from the HS Code Master List (pre-filled with the category's default).
   People who manage HS codes see **+ Add a new HS code**. Order lines accept only master-list codes.
+  Since D-384 / D-385 (18 Nov 2026) the product's code is its **HS Code (fallback)**: an order line with a **Sold as**
+  takes the specification's HS code (Products › Specifications (HS)), and only the MD / ED can change it, with a reason.
 - One-time clean-up: Products › HS codes › **Fix HS codes on products** (choose the right code for each product listed) and
   Products › **Link these prices (N)** (D-361: shown while some supplier prices still need a supplier record; pick or quick-add the supplier in each row).
 - A supplier's page lists **Prices given for products**; untick **Details pending** once GSTIN, bank and
   contacts are complete.
+
+## Forms of stone, Specifications (HS) and Sold as (owner decisions D-382 – D-385, D-389; 18 Nov 2026)
+
+What a product is **sold as** — raw block, gangsaw slab, monument, tile … — now decides the HS code of an order line,
+the units the line may use and the finishes it may have. Three lists, set up once, then one tick list per product.
+
+**1. Forms of stone** — Products › Pricing › **Forms of stone** (`/pricing/forms`; change: MD — manage pricing; view:
+MD and ED). Each form has a **Name \***, **Sold in (units) \*** (ticks of CBM, SQM, SQFT, PCS, TON, RMT, KG),
+**Starts on \*** (the unit a new order line starts with), **Group \*** (which category specifications apply —
+Blocks use "Size / format", Slabs also "Thickness"), **Default finish**, **Order \*** and **Active**, with a **Reason \***.
+Starting list:
+
+| Form | Sold in | Starts on | Default finish |
+|---|---|---|---|
+| Monument slab | PCS, SQM, SQFT, CBM | PCS | Natural Polish |
+| Gangsaw slab | SQM, SQFT, CBM | SQM | Natural Polish |
+| Cut-to-size slab | SQM, SQFT, CBM, PCS | SQM | Natural Polish |
+| Raw block | CBM, TON | CBM | Roughly trimmed |
+| Sawn block | CBM, TON | CBM | Sawn |
+| Tile | SQM, SQFT, PCS | SQM | Natural Polish |
+| Paving stone | SQM, SQFT, PCS | SQM | Flamed |
+| Kerbs, setts, cobbles | PCS, SQM, RMT | PCS | Flamed |
+
+A form that a specification uses is **switched off** (untick Active), never deleted. The owner chose the wording
+**Product Form** — it is what the documents print (Stage 1 SOP, "Documents from 18 Nov 2026").
+
+**2. Specifications (HS)** — Products › **Specifications (HS)** (`/products/hs-specifications`; same rights). Each
+specification has a **Name \***, **Form \*** ("Choose…"), **Usual finish**, **HS code \*** (an active code of the HS Code
+Master, 6 or 8 digits, no dots), **When to use**, **Order \***, **Active** and a **Reason \***. Starting list:
+
+| Specification | Form | HS code | When to use |
+|---|---|---|---|
+| Raw block | Raw block | 25161100 | As it comes from the quarry |
+| Sawn block | Sawn block | 25161200 | Sawn / cut to size on all sides |
+| Gangsaw slab | Gangsaw slab | 68022310 | |
+| Random slab — irregular | Gangsaw slab | 68022390 | |
+| Cut-to-size slab | Cut-to-size slab | 68022310 | |
+| Tile | Tile | 68022310 | |
+| Monument slab | Monument slab | 68029300 | |
+| Monument — complete set / tombstone | Monument slab | 68029300 | |
+| Paving stone | Paving stone | 68010000 | |
+| Kerbs, setts, cobbles | Kerbs, setts, cobbles | 68010000 | |
+
+Slabs and tiles start on 68022310; whether the CA prefers 68029300 is still open — the rows are editable, so change
+the HS code here once the CA confirms (owner, 18 Nov 2026: no marking needed). Example: customs ask for 68022390 on
+random slabs → open **Random slab — irregular**, check the code, give the reason "Customs asked for 68022390 on random
+slabs", **Save specification**. Lines already saved keep their HS code.
+
+**3. Finishes per form** — Settings › Lists › **surface_finish**, column **Offered for forms** (see SOP 15). **Blocks are
+never polished**: "Roughly trimmed" is offered only for Raw block and "Sawn" only for Sawn block; every other finish
+for every form that is not a block. A form with nothing ticked offers every finish.
+
+**4. The product's Sold as** — Products › a product › **Specifications** › section **Sold as** (Admin and MD — manage a
+product's specifications). Tick every specification the product is sold as (each shows its HS code), give a reason
+(e.g. "This granite is also sold as raw blocks") and **Save Sold as**. At least one tick. Products ticked before
+18 Nov 2026 were mapped once from the old Forms ticks (Blocks → Raw block + Sawn block; Slabs → Gangsaw slab,
+Cut-to-size slab, Monument slab; Tiles → Tile; Kerbs / Steps / Cobbles → Kerbs, setts, cobbles); a product with nothing
+ticked offers every specification. **Products › All products** shows "Sold as: …" under each name. The product's own
+HS code is now labelled **HS Code (fallback)** — it is used only on an order line without a Sold as.
+
+**5. On the order line** — step 1 of the line panel and each New Order row have **Sold as \*** (the product's ticked
+specifications) with the HS code shown read-only from it. See Stage 1 SOP, "Sold as — the form and the HS code of a
+line". Only the MD and the ED (permission "Change a line's HS code from its specification, with a reason") can
+change a line's HS code, with a reason; it is in the Audit Log.
+
+**6. Option order (D-389)** — Products › Pricing › **Specifications** (a category's Options tab) and a product's own
+options: each option has an **Order** box (lowest first on order lines and price requests); change the number and
+**Save** that option (a Surface finish's order is set in Settings › Lists). "Monument (cut to size)" is now first in
+every Size / format.
+
+Everything here needs a reason and is in the Audit Log. Quotations and orders already issued do not change.
 
 ## Catalogue labels and who sees which price (D-304, D-305)
 

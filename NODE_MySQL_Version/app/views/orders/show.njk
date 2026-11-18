@@ -2230,6 +2230,7 @@
           <div><span class="k">Supplier Type</span><span class="v">{{ supplierPo.supplier_type or '—' }}</span></div>
           <div><span class="k">Supplier PO Ref</span><span class="v">{{ supplierPo.supplier_po_reference }}</span></div>
           <div><span class="k">Material</span><span class="v">{{ supplierPo.material_stone_type or '—' }}</span></div>
+          {% if supplierPo.product_form %}<div><span class="k">Product Form</span><span class="v">{{ supplierPo.product_form }}</span></div>{% endif %}
           {% if sees.purchase %}<div><span class="k">Total Payable (INR)</span><span class="v">{{ supplierPo.total_payable_inr or '—' }}</span></div>{% endif %}
           <div><span class="k">Status</span><span class="v">{{ supplierPo.status }}</span></div>
         </div>
@@ -2286,6 +2287,7 @@
             <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
           </label>
           <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite" maxlength="150"></label>
+          <label>Product Form <small class="muted">(from the lines' Sold as — prints on the Supplier PO; empty = not printed)</small><input type="text" name="product_form" maxlength="80" placeholder="e.g., Raw block" value="{{ supplierPoDefaultForm or '' }}"></label>
           <label>Grade<input type="text" name="grade" value="Grade A" placeholder="e.g. Grade A" maxlength="50"></label>
           <label>Surface Finish
             <select name="surface_finish">
@@ -2468,6 +2470,7 @@
           <div><span class="k">Supplier Type</span><span class="v">{{ supplierPo.supplier_type or '—' }}</span></div>
           <div><span class="k">Supplier PO Ref</span><span class="v">{{ supplierPo.supplier_po_reference }}</span></div>
           <div><span class="k">Material</span><span class="v">{{ supplierPo.material_stone_type or '—' }}</span></div>
+          {% if supplierPo.product_form %}<div><span class="k">Product Form</span><span class="v">{{ supplierPo.product_form }}</span></div>{% endif %}
           {% if sees.purchase %}<div><span class="k">Total Payable (INR)</span><span class="v">{{ supplierPo.total_payable_inr or '—' }}</span></div>{% endif %}
           <div><span class="k">Status</span><span class="v">{{ supplierPo.status }}</span></div>
         </div>

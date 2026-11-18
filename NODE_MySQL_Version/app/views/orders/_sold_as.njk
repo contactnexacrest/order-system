@@ -1,0 +1,41 @@
+{#
+  Owner decision D-385 (18 Nov 2026): an order line's "Sold as" — one of the product's ticked
+  specifications (every active one when none is ticked; _product_picker_js.njk keeps only the
+  picked product's), with the HS code it sets shown read-only. Choosing it refills the HS code,
+  the Unit list (only the form's units) and the Surface finish (the form's finishes). Only the MD
+  or the ED (override_line_hs_code) may type another HS code, with a reason (shown when the code
+  differs). Required for a goods line picked from Products on a USD order where picking from
+  Products is required (the browser sets it; the server checks the same in productForms.checkLine).
+
+  In: soldAsSpecs (productForms.pickerSpecifications), canOverrideHs, soldAsName ('hs_spec_id'
+      or 'product_hs_spec_id[]'), soldAsSelected (int), soldAsLine (the saved line or {}),
+      soldAsReasonName ('hs_override_reason' or 'product_hs_override_reason[]'), soldAsReason.
+  Port of views/orders/_sold_as.php.
+#}
+{% set saSelected = (soldAsSelected or 0) | int %}
+{% set saLine = soldAsLine or {} %}
+{% set saIn = ((soldAsSpecs or []) | pluck('id')).indexOf(saSelected) != -1 %}
+{% set saSaved = not not saLine.id %}{# a saved line (else a new line / New Order row) #}
+<label class="sold-as-field">Sold as <small class="muted">(sets the HS code, the units and the finishes)</small>
+  <select name="{{ soldAsName }}" class="sold-as-select" data-required-message="Choose what the product is sold as — it sets the line's HS code."{% if canOverrideHs %} data-can-override="1"{% endif %}
+    {% if not saSaved %} data-new-line="1"{% endif %}{% if saSelected > 0 %} data-saved-spec="{{ saSelected }}"{% endif %}{% if saSaved and saSelected == 0 and saLine.catalog_product_id %} data-saved-without="{{ saLine.catalog_product_id | int }}"{% endif %}>
+    <option value="">Choose…</option>
+    {% for ss in soldAsSpecs or [] %}
+      <option value="{{ ss.id }}" data-hs="{{ ss.hs_code }}" data-form="{{ ss.form }}"
+        data-units="{{ ss.units | join(',') }}" data-default-unit="{{ ss.default_unit }}"
+        data-default-finish="{{ ss.default_finish or '' }}"{% if ss.finishes !== null %} data-finishes="{{ ss.finishes | json }}"{% endif %}
+        {{ 'selected' if ss.id == saSelected else '' }}>{{ ss.name }} · HS {{ ss.hs_code }}</option>
+    {% endfor %}
+    {% if saSelected > 0 and not saIn %}{# a switched-off specification a saved line keeps #}
+      <option value="{{ saSelected }}" selected data-hs="{{ saLine.hs_code or '' }}">The saved Sold as is no longer offered — it stays unless you choose again</option>
+    {% endif %}
+  </select>
+</label>
+<p class="muted small sold-as-hs" data-sold-as-hs aria-live="polite"{% if saSelected <= 0 %} hidden{% endif %}>HS code: <b data-sold-as-hs-code>{{ saLine.hs_code or '' }}</b>
+  <span class="tag" data-sold-as-hs-tag>{{ 'changed by MD/ED' if ((saLine.hs_override_reason or '') | trim) else 'from specification' }}</span>{% if canOverrideHs %} <span class="muted">— you may type another code in More › HS Code, with a reason.</span>{% endif %}</p>
+{% if canOverrideHs %}
+<label class="hs-override-reason" data-hs-override-reason{% if not ((soldAsReason or '') | trim) %} hidden{% endif %}>Reason for changing the HS code
+  <input type="text" name="{{ soldAsReasonName }}" maxlength="500" value="{{ soldAsReason or '' }}" placeholder="e.g. Buyer's customs classify these as worked monuments" data-required-message="Give the reason for changing the HS code from its specification."></label>
+{% else %}
+<input type="hidden" name="{{ soldAsReasonName }}" value="{{ soldAsReason or '' }}">
+{% endif %}

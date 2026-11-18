@@ -76,7 +76,7 @@ async function allowedForms(acc, product) {
   const categoryId = await productSpecs.categoryIdFor(product);
   if (categoryId === null || !Object.prototype.hasOwnProperty.call(acc, categoryId)) return [];
   const allowed = acc[categoryId];
-  const forms = productSpecs.productForms(product);
+  const forms = await productSpecs.productForms(product);
   if (!allowed.length) return null;
   if (!forms.length) return allowed;
   return forms.filter((f) => allowed.includes(f));
@@ -101,7 +101,7 @@ async function catalogue(associate) {
     for (const s of await productSpecs.offered(p)) {
       if (s.name.toLowerCase().includes('finish')) finishes = s.options.map((o) => o.name);
     }
-    const formNames = (forms ?? productSpecs.productForms(p)).map((f) => productSpecs.FORMS[f]);
+    const formNames = (forms ?? await productSpecs.productForms(p)).map((f) => productSpecs.FORMS[f]);
     out.push({ id: Number(p.id), name: String(p.name), description: String(p.specifications ?? ''), forms: formNames, finishes });
   }
   return out;

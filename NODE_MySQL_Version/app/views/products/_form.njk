@@ -7,10 +7,12 @@
     <label>Name *<input type="text" name="name" value="{{ product.name or '' }}" placeholder="e.g., Granite Tiles (Polished)" required></label>
     <label class="full">Specifications *<textarea name="specifications" rows="4" placeholder="e.g., Material, size, finish, and packing details" required>{{ product.specifications or '' }}</textarea></label>
     {# D-302 (point 11): picked from the HS Code Master List, pre-filled with the category's default. #}
-    <label>HS Code * <small class="muted">(from the HS Code Master List)</small><input type="text" name="hs_code" list="product_hs_codes" autocomplete="off" maxlength="8"
+    {# D-384 (18 Nov 2026): an order line's HS code comes from its Sold as; this one is the fallback for a line without one. #}
+    <label>HS Code (fallback) * <small class="muted">(from the HS Code Master List)</small><input type="text" name="hs_code" list="product_hs_codes" autocomplete="off" maxlength="8"
       data-in-list="product_hs_codes" data-in-list-message="Pick a code from the HS Code Master List{{ ' — or add it with &quot;+ Add a new HS code&quot;' if canManageHs else '' }}."
       value="{{ product.hs_code if (product and product.hs_code) else (categoryDefaultHs or '') }}" placeholder="e.g. 68022310 — type the code or words" required>
-      {% if not isEdit and categoryDefaultHs %}<small class="muted">Pre-filled with the default of {{ categoryName }}.</small>{% endif %}</label>
+      {% if not isEdit and categoryDefaultHs %}<small class="muted">Pre-filled with the default of {{ categoryName }}.</small>{% endif %}
+      <small class="muted help-line">Used only on an order line without a "Sold as" — a line's Sold as sets its HS code (Products › Specifications (HS)).</small></label>
     <datalist id="product_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description }}{{ ' · category default' if h.code == categoryDefaultHs else '' }}</option>{% endfor %}</datalist>
     <label>Origin<input type="text" name="origin" value="{{ product.origin or '' }}" placeholder="e.g., Rajasthan, India" maxlength="150"></label>
   </div>

@@ -49,7 +49,9 @@ carries on from where it is.
    (e-mail); discount on line 3 agreed by MD") and **Send to MD for approval**.
 6. The MD approves (not their own request unless the self-approval rule
    allows) → **Generate Agreement Document** (the AMD PDF: 1. Products & prices
-   — as amended, 2. Effect on payment, 3. Acceptance) → send it to the buyer →
+   — as amended, 2. Effect on payment, 3. Acceptance; since D-387, 18 Nov 2026,
+   a line with a Sold as shows "Product Form: <form>" under its product name) →
+   send it to the buyer →
    upload the **signed copy** → the amendment is **active**.
 
 On activation the order's lines become the amended lines, each with its new

@@ -20,7 +20,8 @@
         <td class="num">&#8377;{{ (P.inr_parts.supplier if P.inr_parts else P.supplier_inr) | money }}</td></tr>
       {# D-300 (point 12): FOB cost = supplier price + CHA and transport per unit (+ packing and loading when not included). #}
       {% set IP = P.inr_parts or {} %}
-      {% if IP.cha > 0 %}<tr><td>+ CHA + transport per {{ unitLabel }} <span class="muted small">(per container ÷ what one container holds)</span></td><td class="num">&#8377;{{ IP.cha | money }}</td></tr>{% endif %}
+      {% if IP.cha > 0 %}<tr><td>+ CHA + transport per {{ unitLabel }} <span class="muted small">(per container ÷ what one container holds)</span>{% if IP.cha_source_tag %} <span class="badge badge-inactive cha-source-tag">{{ IP.cha_source_tag }}</span>{% endif %}</td><td class="num">&#8377;{{ IP.cha | money }}</td></tr>{% endif %}
+      {% if IP.note == 'CHA already inside this older price' %}<tr><td colspan="2" class="muted small">CHA already inside this older price</td></tr>{% endif %}
       {% if IP.packing > 0 %}<tr><td>+ packing and loading <span class="muted small">(not in the supplier's price)</span></td><td class="num">&#8377;{{ IP.packing | money }}</td></tr>{% endif %}
       {% if IP.cha > 0 or IP.packing > 0 %}<tr><td>= FOB cost in ₹</td><td class="num">&#8377;{{ P.supplier_inr | money }}</td></tr>{% endif %}
       <tr><td>÷ pricing exchange rate (&#8377;{{ P.settings.pricing_fx_rate | rate4 }})</td><td class="num">USD {{ B.supplier_usd | money }}</td></tr>

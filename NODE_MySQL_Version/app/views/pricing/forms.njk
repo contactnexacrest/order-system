@@ -1,0 +1,96 @@
+{#
+  Owner decision D-382 (18 Nov 2026): Admin › Pricing › Forms of stone — the forms a product is sold
+  in, the units each form is sold in, the unit a new line starts on, its group (which category
+  specifications it uses: Blocks, Slabs, Tiles …) and its default finish. A form used by a
+  specification is switched off, never deleted. Every change needs a reason and is logged.
+  Port of views/pricing/forms.php.
+  In: forms (each with used, units_list, units_text, default_unit_label, group_label), edit, canManage,
+      finishNames, units [{code, label}], groups, old, oldUnits.
+#}
+{% macro formFields(f, units, groups, finishNames, old, oldUnits) %}
+  {% set isNew = not f %}
+  {% set key = 'new' if isNew else (f.id | string) %}
+  {% set useOld = old and (old._form_key | string) == key %}
+  {% if useOld %}
+    {% set vName = old.name or '' %}{% set vDefault = old.default_unit or '' %}{% set vGroup = old.spec_group or '' %}
+    {% set vFinish = old.default_finish or '' %}{% set vOrder = old.sort_order if old.sort_order !== undefined else '' %}
+    {% set tickedUnits = oldUnits %}{% set active = old.is_active %}
+  {% else %}
+    {% set vName = f.name if f else '' %}{% set vDefault = f.default_unit if f else '' %}{% set vGroup = f.spec_group if f else '' %}
+    {% set vFinish = (f.default_finish or '') if f else '' %}{% set vOrder = f.sort_order if f else '' %}
+    {% set tickedUnits = f.units_list if f else [] %}{% set active = isNew or f.is_active == 1 %}
+  {% endif %}
+  {% set unitIds %}{% for u in units %}units-{{ key }}-{{ u.code }}{% if not loop.last %},{% endif %}{% endfor %}{% endset %}
+  <input type="hidden" name="_form_key" value="{{ key }}">
+  <label>Name *<input type="text" name="name" required maxlength="80" value="{{ vName }}" placeholder="e.g. Raw block"></label>
+  <fieldset class="full"><legend>Sold in (units) *</legend>
+    {% for u in units %}<label class="inline"><input type="checkbox" name="units[]" value="{{ u.code }}"{% if tickedUnits.indexOf(u.code) != -1 %} checked{% endif %}{% if loop.first %} data-min-ticked="{{ unitIds }}:1" data-min-ticked-message="Tick at least one unit the form is sold in."{% endif %} id="units-{{ key }}-{{ u.code }}"> {{ u.label }}</label> {% endfor %}
+  </fieldset>
+  <label>Starts on *<select name="default_unit" required>
+    <option value="">Choose…</option>
+    {% for u in units %}<option value="{{ u.code }}"{% if (vDefault | string) == u.code %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
+  </select></label>
+  <label>Group * <small class="muted">(which specifications it uses)</small><select name="spec_group" required>
+    <option value="">Choose…</option>
+    {% for g, label in groups %}<option value="{{ g }}"{% if (vGroup | string) == g %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></label>
+  <label>Default finish<select name="default_finish">
+    <option value="">Choose…</option>
+    {% for fn in finishNames %}<option value="{{ fn }}"{% if (vFinish | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
+  </select></label>
+  <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="{{ vOrder }}" placeholder="e.g. 4"></label>
+  <label class="inline"><input type="checkbox" name="is_active" value="1"{% if active %} checked{% endif %}> Active</label>
+  <label class="full">Reason *<input type="text" name="reason" required minlength="10" maxlength="500" value="{{ (old.reason or '') if useOld else '' }}" placeholder="e.g. New form for cut blocks sold per tonne"></label>
+{% endmacro %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/pricing/specifications">&larr; Pricing › Specifications</a></p>
+  <h1>Forms of stone</h1>
+  <p class="muted">The forms a product is sold in. Each form says which units an order line may use, the unit a new line starts on, which category specifications it uses (its group — e.g. Blocks use "Size / format", Slabs also "Thickness") and the finish a line starts with. The specifications in <a href="/products/hs-specifications">Products › Specifications (HS)</a> each belong to one form. A form a specification uses can only be switched off.</p>
+  <table class="list" data-testid="forms-table">
+    <tr><th>Order</th><th>Form</th><th>Sold in</th><th>Starts on</th><th>Group</th><th>Default finish</th><th>Status</th>{% if canManage %}<th>Actions</th>{% endif %}</tr>
+    {% for f in forms %}
+      <tr id="form-{{ f.id }}">
+        <td>{{ f.sort_order | int }}</td>
+        <td><b>{{ f.name }}</b></td>
+        <td>{{ f.units_text }}</td>
+        <td>{{ f.default_unit_label }}</td>
+        <td>{{ f.group_label }}</td>
+        <td>{{ f.default_finish or '—' }}</td>
+        <td>{% if f.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Switched off</span>{% endif %}</td>
+        {% if canManage %}
+          <td>
+            <a class="btn-sm" href="/pricing/forms?edit={{ f.id }}#form-{{ f.id }}">Edit</a>
+            {% if not f.used %}
+              <form method="post" action="/pricing/forms/{{ f.id }}/delete" class="inline-form" data-confirm="Delete the form &quot;{{ f.name }}&quot;?">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="Reason (required)" aria-label="Reason for deleting">
+                <button type="submit" class="btn-sm btn-secondary">Delete</button>
+              </form>
+            {% else %}<small class="muted">used — can only be switched off</small>{% endif %}
+          </td>
+        {% endif %}
+      </tr>
+      {% if canManage and edit == f.id %}
+        <tr><td colspan="8">
+          <h3>Edit: {{ f.name }}</h3>
+          <form method="post" action="/pricing/forms/{{ f.id }}" class="field-grid">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            {{ formFields(f, units, groups, finishNames, old, oldUnits) }}
+            <div><button type="submit" class="btn-sm">Save form</button> <a class="btn-sm btn-secondary" href="/pricing/forms#form-{{ f.id }}">Cancel</a></div>
+          </form>
+        </td></tr>
+      {% endif %}
+    {% endfor %}
+    {% if not forms.length %}<tr><td colspan="8" class="muted">No forms yet.</td></tr>{% endif %}
+  </table>
+  {% if canManage %}
+    <h2 id="add-form">Add a form</h2>
+    <form method="post" action="/pricing/forms" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {{ formFields(null, units, groups, finishNames, old, oldUnits) }}
+      <div><button type="submit" class="btn-sm btn-accent">+ Add form</button></div>
+    </form>
+  {% else %}
+    <p class="muted small">Changing the forms needs the "Manage pricing" permission.</p>
+  {% endif %}
+</div>

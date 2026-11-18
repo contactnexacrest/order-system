@@ -573,7 +573,7 @@ limit. The Admin or MD can change the six levels in **Settings › Orders**
 **A line without sizes** (CBM-only or SQM-only quote, random blocks): leave
 Length / Width empty and **No. of pieces** empty, type the **Qty** as before, and
 use **Size note** for what the buyer should read under the line (e.g. "Random
-sizes, as available"). If no line of the order has a size, the documents print
+sizes, as available", or a range such as "Length 160–210 cm"). If no line of the order has a size, the documents print
 the short table (Material, Finish, Thickness, Qty, price, total).
 
 **Lines "As per annexure"** work as before (no pieces); on the documents the
@@ -644,6 +644,25 @@ Notify Party as separate sections, and the Legal Terms & Definitions section —
 so the Quotation's Word copy reads "5. SHIPPING / COMMERCIAL TERMS", like the
 PDF.
 
+### Documents from 18 Nov 2026: Bill of Lading, Product Form, quantities To Be Confirmed (owner decisions D-380, D-386, D-388 — confirmed twice)
+
+Printing rules only — nothing to enter. Documents already issued keep what they printed.
+
+- **Bill of Lading (section 7, item 4 of the Quotation, PI and CI, PDF and Word):** "4. Bill of Lading — full set of
+  original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance
+  Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)". It no longer says
+  "3 originals … 1 original retained by NexaCrest" — the shipping line decides how many originals make a full set.
+  The T&C clause 95 starts "Bill of Lading: The full set of original negotiable Bills of Lading, as issued by the
+  shipping line, will be released to the buyer only after …".
+- **Product Form (Quotation, PI, Order Confirmation, CI):** a line with a **Sold as** prints "Product Form: <form>" in
+  its grey detail row — right before "HS Code:" (detailed table) or first (short table), e.g. "Product Form: Monument
+  slab · HS Code: 68029300 · …". Lines without a Sold as print as before. Packing List, BL Instruction, COO prep and
+  Buyer PO do not show it.
+- **Qty To Be Confirmed:** a line whose quantity is still to be confirmed prints its total as **To Be Confirmed**,
+  never 0.00. The TOTAL row, FOB Value, TOTAL QUOTED VALUE and the amount in words print "To Be Confirmed" when every
+  goods line is TBC; otherwise the known sum + the TBC lines, e.g. "USD 9,126.00 + line 2 To Be Confirmed" (several:
+  "+ lines 2, 4 To Be Confirmed"). The price per unit prints as before.
+
 ### How the generated documents look (owner decisions D-344, D-352 – D-356, 12 Nov 2026)
 
 These are printing rules only — nothing to enter. They apply to every
@@ -697,7 +716,8 @@ approved (buyer e-mails held) or sent (buyer e-mails sent). See
 Each product line has a **Line type**:
 
 - **Goods** — as always: description, dimensions, finish, quantity, unit,
-  price and an HS code from the master list.
+  price and an HS code from the master list (since D-385, 18 Nov 2026, set by
+  the line's **Sold as** — see "Sold as — the form and the HS code of a line").
 - **Service** — work NexaCrest does, for example installation supervision.
   It needs its **SAC code** (6 digits starting 99, e.g. 998719) instead of
   an HS code. On the Quotation, Proforma and Order Confirmation it shows
@@ -760,7 +780,8 @@ names, as the documents do (D-364) (Set or Lot only if the MD adds them in Produ
 Categories). The product's prices are per its own unit (per CBM from 50 mm), so the
 app converts your price before checking it — you never have to switch to CBM.
 
-1. Pick the product and its options. **Thickness** and **Size / format** start on
+1. Pick the product and its options. (A line with a **Sold as** follows its unit instead —
+   see "Sold as" below.) **Thickness** and **Size / format** start on
    **"Choose…"** and must be chosen — the price depends on them (owner decision D-348,
    12 Nov 2026). Until both are chosen no price is filled and the line says "Choose the
    Thickness and Size / format to see the price."; saving without them is refused ("Line 1:
@@ -789,6 +810,46 @@ A saved line without its size shows **Size needed** and holds the Quotation unti
 enter it. A Set or Lot line cannot be converted, so it goes to the MD for approval.
 For a second size, use **Duplicate** on the line and change the sizes and price.
 
+### Sold as — the form and the HS code of a line (owner decisions D-382 – D-385, 18 Nov 2026)
+
+After you pick the product, step 1 of the line panel (order page, **+ Add product** / **Edit**) and each New Order
+product row show **Sold as \***: the specifications the product is sold as (Products › a product › Specifications ›
+Sold as; all of them while nothing is ticked there), each with its HS code — e.g. "Raw block · HS 25161100", "Monument
+slab · HS 68029300" (labelled "Sold as (sets the HS code, the units and the finishes)"). On a **USD** order a goods line picked from Products must
+have one; elsewhere it is optional.
+
+Choosing it:
+- fills the **HS code** from the specification — shown read-only, marked "from specification";
+- keeps in **Unit** only the units of its form (a raw block: CBM or TON; a gangsaw slab: SQM, SQFT or CBM) — a new line
+  starts on the form's unit;
+- keeps in **Surface finish** only the finishes of its form — a block offers only "Roughly trimmed" (raw block) or
+  "Sawn" (sawn block); if the finish chosen is not offered, it switches to the form's default finish.
+
+What else the line needs then follows its **unit** (instead of "Thickness and Size / format" below):
+- **CBM** or **TON** — nothing more (a block in tonnes is converted with the weight per CBM);
+- **SQM** or **SQFT** — the Thickness option or the Thickness (cm): "Line 1: choose the Thickness or enter the
+  Thickness (cm) — a price per SQM needs it.";
+- **PCS** — length, width and thickness: "Line 1: enter the length, width and thickness (cm) — a price per piece
+  needs them."
+
+A line without a Sold as (hand-typed lines, other currencies, saved older lines) works exactly as before.
+
+**Changing the HS code.** Only the **MD** and the **ED** (permission "Change a line's HS code from its specification,
+with a reason") may change it: open **More › HS Code**, type another code from the HS Code Master and fill **Reason
+for changing the HS code** (e.g. "Buyer's customs classify these as worked monuments"). The products table then shows "changed by MD/ED —
+<reason>" next to the code, and the change is in the Audit Log. Anyone else who posts a different code, a unit the
+form does not offer or a finish it does not offer is refused.
+
+**A size range** (e.g. raw blocks 160–210 cm long) goes in the existing **Size note** — e.g. "Length 160–210 cm".
+
+The products table shows "Sold as: <specification> (<form>) · HS <code>" under the product. **Duplicate** copies the
+Sold as, the HS code and any MD/ED reason. Lines already saved keep their HS code.
+
+**Example — a raw block in tonnes.** Pick "Absolute Black", choose **Sold as: Raw block** — HS 25161100 appears,
+Unit offers CBM and TON (choose **TON**), Surface finish shows "Roughly trimmed". Type the Qty (e.g. 54), Size note
+"Length 160–210 cm", and the price per tonne. On the Quotation the line's grey row reads "Product Form: Raw block ·
+HS Code: 25161100 · …".
+
 ### The Products section on the order page (owner decisions D-271 – D-273, 11 Nov 2026)
 
 - One table: each line shows its **options as labels** under the description, then
@@ -800,7 +861,8 @@ For a second size, use **Duplicate** on the line and change the sizes and price.
 - The **Total** row shows the goods value, about how many CBM and how many containers
   (8 CBM each). Lines without a size or quantity are left out of the CBM and named.
 - **+ Add product** (top right) and **Edit** open a panel on the right in four steps:
-  1 Product · 2 Options · 3 Size and quantity · 4 Price (with the reference box). The
+  1 Product (with **Sold as** and its HS code, D-385) · 2 Options · 3 Size and quantity · 4 Price (with the
+  reference box). The
   description, Dimensions text, finish, line type, HS / SAC code and category are under
   **More**. Charges and services are listed below the products in the same style.
 - **Finish (D-357).** A line picked from Products takes its finish from the **Surface

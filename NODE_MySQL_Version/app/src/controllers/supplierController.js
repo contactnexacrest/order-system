@@ -176,7 +176,25 @@ async function editForm(req, res) {
       ? Object.fromEntries(((await supplierOffers.forSuppliers([id]))[id] || []).map((o) => [o.id, o])) : {},
     addProduct: canRecordPrices(req) ? await addProductView(req, supplier, 'supplier') : null,
     addOpen: req.query.add !== undefined,
+    // D-381: the supplier's CHA + transport per container box (purchase-price or logistics-cost viewers only).
+    canSeeCha: require('../services/supplierCha').canSee(req.permissions),
+    cha: chaFormView(supplier, flash.pullOld(req)),
   }, 'layout/base');
+}
+
+/** D-381: the values of the Edit Supplier "CHA + transport per container" box (the posted ones after a refusal). */
+function chaFormView(supplier, old) {
+  const has = (k) => Object.prototype.hasOwnProperty.call(old || {}, k);
+  const trim = (v) => Number(v).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  const was = supplier.cha_transport_per_container !== null && supplier.cha_transport_per_container !== undefined && supplier.cha_transport_per_container !== ''
+    ? trim(supplier.cha_transport_per_container) : '';
+  return {
+    amount: has('cha_transport_per_container') ? String(old.cha_transport_per_container) : was,
+    amountWas: was,
+    port: has('cha_port') ? String(old.cha_port) : String(supplier.cha_port ?? ''),
+    portWas: String(supplier.cha_port ?? ''),
+    reason: has('cha_reason') ? String(old.cha_reason) : '',
+  };
 }
 
 /** D-303: "Prices given for products" for the supplier page, or null when the viewer may not see purchase prices. */
@@ -265,7 +283,22 @@ async function update(req, res) {
     return;
   }
 
+  // D-381: CHA + transport per container (factory → port) — only for those who see purchase prices or logistics costs.
+  const supplierCha = require('../services/supplierCha');
+  let chaChange = null;
+  if (supplierCha.canSee(req.permissions)) {
+    const [change, chaError] = supplierCha.read(req.body || {}, supplier);
+    if (chaError !== null) {
+      flash.set(req, 'error', chaError);
+      flash.setOld(req, req.body || {});
+      res.redirect(`/suppliers/${id}/edit#cha-transport`);
+      return;
+    }
+    chaChange = change;
+  }
+
   await supplierRepository.update(id, result.data);
+  if (chaChange !== null) await supplierCha.save(id, supplier, chaChange, req.user.id);
   // D-303: "Details pending" (a supplier added quickly from a product price) is cleared here once completed.
   if (Object.prototype.hasOwnProperty.call(req.body || {}, 'details_pending')) {
     const v = req.body.details_pending;

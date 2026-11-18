@@ -520,13 +520,16 @@ DO NOT regenerate from earlier versions. These are the authoritative final files
   7. FREIGHT & CHARGES — terms, amount, cargo insurance
   8. BILL OF LADING TYPE:
        Red box: MANDATORY — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL
-       BL Type = ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS
+       BL Type = ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET
+       (18 Nov 2026, D-380; was "— 3 ORIGINALS") No. of Original Copies =
+       "Full set as issued by the shipping line (the number is stated on the BL)"
        BL Consignee instruction = TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
        (2 Nov 2026, D3) No "Reason" paragraph (the CHA / shipping line is not
        told the payment terms) and no grey notes under the number of original
        / non-negotiable copies. One line after the table:
-       "Original BL release: CHA to hand all 3 originals to NexaCrest only —
-        never to the buyer or anyone else."
+       "Original BL release: CHA to hand the full set of originals to NexaCrest
+        only — never to the buyer or anyone else." (D-380, 18 Nov 2026; was
+        "all 3 originals")
        What happens to the originals afterwards is stated only on the buyer
        documents (QT/PI/CI "Documents to be provided").
 

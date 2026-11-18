@@ -640,6 +640,12 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Guide underneath it is a separate, read-only "which code do I actually
   use for this product" reference (also bulk importable) — most useful
   for a fresher who has never had to classify a product before.
+  Since D-383 / D-385 (18 Nov 2026) an order line's HS code comes from its
+  **Sold as** — the list Products › **Specifications (HS)** (each
+  specification names its form and an active code from this master, e.g.
+  Raw block 25161100, Monument slab 68029300); only the MD / ED can change a
+  line's code, with a reason. HS 68022310 is now described "Granite blocks or
+  tiles" (was "…, polished"). See [Pricing](./27-pricing.md).
 - **Email Templates** — subject/body/footer for every system email, with
   template-key placeholders merged in at send time (see
   [Document Review & Approval](./13-document-review-approval.md)). This
@@ -719,6 +725,13 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   used on an order — once used, deactivate it instead. Edits here never
   change an existing order: each Supplier PO keeps its own copy of the
   supplier's details from when its terms were saved.
+  - **CHA + transport per container (D-381, 18 Nov 2026).** Edit Supplier
+    has **CHA + transport per container, factory → port (₹)** (e.g. 45000)
+    and **Port this figure is for** (optional, e.g. Mundra), with a
+    **Reason** whenever either changes. Shown only to people who see
+    purchase prices or logistics costs. This supplier's prices without a
+    figure of their own use it (else the product's default) — see
+    [Pricing](./27-pricing.md). Audit log: old → new, with the reason.
 - **Ports** (`/ports`) — the Port of Loading / Port of Discharge options
   offered on the New Order form, gated by its own `manage_ports`
   permission (same tier as Logistics Partners: Admin/MD/ED and Super
@@ -904,6 +917,16 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
     "Polished" and "Mirror Finish" were merged into it; Natural and
     Sandblasted into Sandblasted; Leather and Satin into Leather).
   - A finish name is at most 80 characters and can be in the list only once.
+  - **Offered for forms (D-383, 18 Nov 2026).** Each finish has a column of
+    ticks, one per form of stone (Products › Pricing › Forms of stone). An
+    order line sold as a form offers only the finishes ticked for that form; a
+    form with no finish ticked offers every finish. Started as: **Roughly
+    trimmed** → Raw block only, **Sawn** → Sawn block only (both added on
+    18 Nov 2026, no price change), every other finish → every form that is not
+    a block — **blocks are never polished**. Change the ticks, fill **Reason**
+    (needed when you change the forms a finish is offered for, e.g. "Flamed is
+    not offered on raw blocks") and Save. Lines already saved keep their
+    finish; the change is in the audit log.
 - **Dropdown Option Lists** (`/admin/dropdown-options`) — the admin screen
   for `dropdown_options`, the generic small-option-list table several
   dropdowns elsewhere in the app already read from (Container Type,

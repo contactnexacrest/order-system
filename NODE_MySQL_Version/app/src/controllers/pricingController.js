@@ -336,6 +336,7 @@ const CBM_ORDER = (a, b) => (a === thicknessPrices.CBM) - (b === thicknessPrices
  * its own unit, the BASE, and the product price worked out from the base. Same as PHP priceCard().
  */
 async function priceCard(req, product, row, rules, s, grid) {
+  row = await thicknessPrices.withSupplierCha(row); // D-381: the supplier's CHA figure (the fallback)
   const cbmFrom = Number(rules.cbm_from);
   const baseMm = thicknessPrices.baseOf(row, rules);
   const cha = thicknessPrices.chaPerCbm(thicknessPrices.chaPerContainer(row, product), Number(rules.container_cbm), rules.container_max_t, rules.t_per_cbm);
@@ -372,6 +373,9 @@ async function priceCard(req, product, row, rules, s, grid) {
     lines, base_mm: baseMm, base_label: thicknessPrices.label(baseMm, cbmFrom), base_price: basePrice,
     base_unit: baseMm === thicknessPrices.CBM ? 'CBM' : 'SQM', base_chosen: thicknessPrices.rowBase(row) !== null,
     cha_per_cbm: cha.per_cbm, fits_cbm: thicknessPrices.fmt(Math.round(cha.fits_cbm * 100) / 100), cha_per_container: perContainer,
+    // D-381: where the CHA comes from (this price / supplier · port / product default), or "already inside".
+    cha_source_tag: thicknessPrices.chaSourceTag(thicknessPrices.chaSource(row, product)),
+    cha_inside: thicknessPrices.chaSource(row, product).computed,
     parts, build, auto: thicknessPrices.autoFill(row),
     unit_label: parts ? (require('../services/lineUnits').label(String(parts.unit)) || String(parts.unit)) : '',
     fx: build ? thicknessPrices.fmt(build.fx_rate) : '', margin: build ? thicknessPrices.fmt(build.margin_pct) : '', buffer: build ? thicknessPrices.fmt(build.buffer_pct) : '',
@@ -506,12 +510,15 @@ function gridView(rules, done) {
 function chaView(rules, product, row) {
   const val = row && row.cha_transport_per_container !== null && row.cha_transport_per_container !== undefined ? Number(row.cha_transport_per_container) : null;
   const def = product.cha_transport_per_container !== null && product.cha_transport_per_container !== undefined ? Number(product.cha_transport_per_container) : null;
-  const use = val !== null ? val : def;
+  // D-381: empty = the supplier's figure (when the row has a directory supplier with one), else the product default.
+  const fallback = thicknessPrices.chaFallback(row || {}, product);
+  const fallbackText = fallback.source !== null ? thicknessPrices.chaFallbackText(row || {}, product) : null;
+  const use = val !== null ? val : fallback.value;
   const fit = thicknessPrices.chaPerCbm(use, Number(rules.container_cbm), rules.container_max_t, rules.t_per_cbm);
   const sqft = require('../services/lineUnits').SQFT_PER_M2;
   return {
-    value: val !== null ? val.toFixed(2) : '', placeholder: def !== null ? `product default ${def.toFixed(2)}` : 'e.g. 60000.00',
-    def: def !== null ? fmt2(def) : null, includes: !row || Number(row.includes_packing_loading ?? 1) === 1,
+    value: val !== null ? val.toFixed(2) : '', placeholder: fallbackText !== null ? fallbackText : 'e.g. 60000.00',
+    def: def !== null ? fmt2(def) : null, fallbackText, includes: !row || Number(row.includes_packing_loading ?? 1) === 1,
     containerCbm: thicknessPrices.fmt(rules.container_cbm), containerMaxT: thicknessPrices.fmt(rules.container_max_t),
     ownContainer: rules.own.includes('container'), fitsCbm: fit.fits_cbm.toFixed(4),
     perCbm: fit.per_cbm !== null ? `₹${fmt2(fit.per_cbm)} / CBM` : '—',
@@ -798,7 +805,7 @@ async function savePrice(req, res) {
     await thicknessPrices.history(supplierId, `Price per ${String(product.reference_unit || '') || 'unit'}`, oldPrice, Number(data.fob_value).toFixed(2), userId);
   }
   const newCha = data.cha_transport_per_container !== null ? Number(data.cha_transport_per_container).toFixed(2) : null;
-  if (oldCha !== newCha) await thicknessPrices.history(supplierId, 'CHA + transport per container', oldCha ?? 'product default', newCha ?? 'product default', userId);
+  if (oldCha !== newCha) await thicknessPrices.history(supplierId, 'CHA + transport per container', oldCha ?? 'default (supplier, else product)', newCha ?? 'default (supplier, else product)', userId); // D-381
   if (oldIncl !== data.includes_packing_loading) {
     await thicknessPrices.history(supplierId, 'Price includes packing and loading', oldIncl ? 'yes' : 'no', data.includes_packing_loading ? 'yes' : 'no', userId);
   }

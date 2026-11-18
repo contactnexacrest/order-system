@@ -13,6 +13,11 @@
       <div class="option-chips">{% for chip in rowChips %}<span class="chip{{ ' chip-gone' if chip.gone else '' }}">{{ chip.name }}</span>{% endfor %}</div>
     {% endif %}
     {% if p.finish and not rowChips.length %}<div class="muted small">{{ p.finish }}</div>{% endif %}
+    {# Owner decision D-385 (18 Nov 2026): the line's Sold as and where its HS code comes from. #}
+    {% if lineSoldAs and lineSoldAs[p.id] %}{% set sa = lineSoldAs[p.id] %}{% set hsWhy = (p.hs_override_reason or '') | trim %}
+      <div class="small sold-as-line" data-testid="line-sold-as-{{ p.id }}">Sold as: <b>{{ sa.spec }}</b>{% if sa.form != sa.spec %} <span class="muted">({{ sa.form }})</span>{% endif %} · HS {{ p.hs_code }}
+        {% if hsWhy %}<span class="tag tag-gold" title="{{ hsWhy }}">changed by MD/ED — {{ hsWhy }}</span>{% else %}<span class="tag">from specification</span>{% endif %}</div>
+    {% endif %}
   </td>
   <td>{% if p.as_per_annexure and p.as_per_annexure != '0' %}<span class="muted">As per annexure</span>{% else %}{{ p.dimensions or '' }}{% endif %}{% if p.pieces_count %}<div class="muted small">{{ (p.pieces_count | int).toLocaleString('en-US') }} pcs</div>{% endif %}{% if p.size_note %}<div class="muted small">{{ p.size_note }}</div>{% endif %}</td>
   <td class="num">{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity if p.quantity != null else '') }}</td>

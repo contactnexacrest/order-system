@@ -241,9 +241,10 @@ async function updateOption(req, res) {
   }
   await specRepository.updateOption(Number(o.id), d, uid(req));
   if (d.is_base === 1) await specRepository.clearBase(Number(spec.id), o.product_id !== null ? Number(o.product_id) : null, Number(o.id));
+  // D-389 (18 Nov 2026): the option's order is editable too — logged with it.
   await auditLogRepository.log(uid(req), 'SPEC_OPTION_CHANGED', 'spec_options', Number(o.id), null,
-    `${o.name} ${productSpecs.changeLabel(String(o.change_type), valueOrNull(o.value))}`,
-    `${d.name} ${productSpecs.changeLabel(d.change_type, d.value !== null ? Number(d.value) : null)}`);
+    `${o.name} ${productSpecs.changeLabel(String(o.change_type), valueOrNull(o.value))} · order ${Number(o.sort_order) || 0}`,
+    `${d.name} ${productSpecs.changeLabel(d.change_type, d.value !== null ? Number(d.value) : null)} · order ${Number(d.sort_order) || 0}`);
   flash.set(req, 'success', 'Option saved. New quotes use it; prices already issued do not change.');
   await go(res, to);
 }
@@ -313,14 +314,22 @@ async function product(req, res) {
     o.change_label = productSpecs.changeLabel(o.change_type, o.value);
     o.category_label = productSpecs.changeLabel(o.change_type, o.category_value);
   }
+  // D-384: the "Sold as" ticks — every active specification, and any switched-off one the product still ticks.
+  const productFormsService = require('../services/productForms');
+  const soldAsTicked = await productFormsService.productSpecIds(Number(p.id));
+  const soldAsSpecs = (await productFormsService.specifications())
+    .filter((s) => (Number(s.is_active) === 1 && Number(s.form_is_active) === 1) || soldAsTicked.includes(Number(s.id)));
   res.renderView('products/specifications', {
-    product: p, tree, categories: await productCategoryRepository.all(true),
+    product: p, tree,
+    soldAsSpecs, soldAsTicked,
+    soldAsGroupsText: require('./productFormController').groupsText(soldAsSpecs.filter((s) => soldAsTicked.includes(Number(s.id)))),
+    oldFormsLabel: productSpecs.formsLabel(p.forms ?? null), oldForms: productSpecs.splitForms(p.forms ?? null), categories: await productCategoryRepository.all(true),
     categoryId: await productSpecs.categoryIdFor(p), canEdit: can(req, 'manage_product_specifications'),
     // D-306 (point 20): "From category X — edit for all products in X".
     categoryName: String(((await productCategoryRepository.find(await productSpecs.categoryIdFor(p))) || {}).name || ''),
     cbmFrom: (await pricingService.settings()).cbm_from_mm, edit: id(req.query.edit),
     forms: productSpecs.FORMS, kinds: productSpecs.KINDS, changeTypes: productSpecs.CHANGE_TYPES,
-    productForms: productSpecs.productForms(p),
+    productForms: await productSpecs.productForms(p),
   });
 }
 
@@ -341,7 +350,9 @@ async function saveProductFields(req, res) {
   const errors = [];
   const categoryId = id(body.category_id);
   if (categoryId <= 0 || !(await productCategoryRepository.find(categoryId))) errors.push('Choose a category.');
-  const forms = asList(body.forms).map(String).filter((f) => Object.prototype.hasOwnProperty.call(productSpecs.FORMS, f));
+  // D-384 (18 Nov 2026): the old "Forms" ticks are replaced by "Sold as" (its own form, /products/{id}/sold-as);
+  // the product's old forms value is kept as it is (read-only) — it still applies while nothing is ticked.
+  const forms = productSpecs.splitForms(p.forms ?? null);
   const cbm = String(body.cbm_from_mm ?? '').trim();
   let cbmVal = null;
   if (cbm !== '') {

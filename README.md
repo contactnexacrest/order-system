@@ -106,8 +106,9 @@ Where to look:
   brought up to date with the dated files in `docs/migrations/`, run in filename
   order after a backup; `docs/checks/check_all_migrations.sql` (read-only, run in
   phpMyAdmin) shows which are still needed. The live site was installed fresh on
-  14 Nov 2026 (D-372), so the 11–13 Nov 2026 files were removed and the folder starts
-  empty again (git history keeps them; rules: `docs/migrations/README.md`; server
+  14 Nov 2026 (D-372), so the 11–13 Nov 2026 files were removed and the folder started
+  empty again; since then it holds, in run order, `2026-11-14a`, `2026-11-15a`, `2026-11-15b`,
+  `2026-11-18a`, `2026-11-18b`, `2026-11-18c` (git history keeps the older ones; rules: `docs/migrations/README.md`; server
   steps: `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`). `docs/checks/` holds read-only checks for a
   database that already held data before an earlier release; the first live
   install starts empty, so they are not needed there.

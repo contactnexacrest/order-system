@@ -75,6 +75,9 @@
         </div>
         <section class="line-step"><h4><span class="step-no">1</span> Product</h4>
           {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = lp.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = lp.spec_selection or '' %}{% set pickerOrderId = order.id %}{% set pickerNoSpecBox = true %}{% include "orders/_product_picker.njk" %}{% set pickerNoSpecBox = false %}
+          {# Owner decision D-385 (18 Nov 2026): "Sold as" and the HS code it sets. #}
+          {% set soldAsName = 'hs_spec_id' %}{% set soldAsSelected = lp.hs_spec_id or 0 %}{% set soldAsLine = lp %}{% set soldAsReasonName = 'hs_override_reason' %}{% set soldAsReason = lp.hs_override_reason or '' %}
+          {% include "orders/_sold_as.njk" %}
           {% if isNew and sees.selling and linePricing.ctx.associate %}{# Owner decision D-255: a line from the associate's price request #}
             <label>From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
               <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
@@ -91,8 +94,8 @@
             <label>Thickness (cm)<input type="text" inputmode="decimal" name="piece_thickness_cm" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="{{ lp.piece_thickness_cm | sizeNum }}" placeholder="e.g. 13"></label>
             <label>Unit
               <select name="unit" data-allowed-from="category_id">
-                {% for o in units %}
-                  <option value="{{ o.option_value }}" {{ 'selected' if ((o.is_default) if isNew else (lp.unit == o.option_value)) else '' }}>{{ o.option_value }}</option>
+                {% for o in units %}{# D-385: data-unit-kind — the units a Sold as allows #}
+                  <option value="{{ o.option_value }}" data-unit-kind="{{ unitKinds[o.option_value] or '' }}" {{ 'selected' if ((o.is_default) if isNew else (lp.unit == o.option_value)) else '' }}>{{ o.option_value }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -145,7 +148,7 @@
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (lp.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
+            <label>HS Code <small class="muted">(goods — with a Sold as, it comes from it)</small><input type="text" name="hs_code" class="line-hs-code" value="{{ lp.hs_code or '' }}" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ lp.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
             <label>Category

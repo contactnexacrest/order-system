@@ -1,5 +1,10 @@
 # Tutorial videos — progress and resume notes
 
+> **D-380 … D-389 (18 Nov 2026) known mismatch — on hold, owner to decide when videos restart:** B01 Part 1
+> (New Order: after Pick from Products a required **Sold as** sets the HS code, units and finishes) and the order-page
+> Products table / line panel of A02-1, B01 Part 2 and B02; A02-2 Step 7 (Supplier PO form gains "Product Form").
+> Details in "Also out of date after the 18 Nov 2026 build" below. Nothing re-recorded.
+>
 > **D-379 (15 Nov 2026) known mismatch:** A01, A02 (parts 1–2), B01, B02, B11 and C04 show the Reports page,
 > the roles screen or the menu as before report access per role (7-section Reports page, Reports tab on roles,
 > Overview › Sales targets, Admin without money reports). Re-record only when the owner lifts the hold.
@@ -340,6 +345,20 @@ No video or script was changed. Owner to decide when videos restart.
 |---|---|---|
 | B01 Part 1 (New Order form) | **Container Type** is now required ("Container Type *", starts on "Choose…", D-376); the script picks 20ft Standard (narration unchanged, the field is not mentioned). | Owner to decide when videos restart |
 | A02-1, B01 Parts 1 and 2, B02 (order page Products table) | Line numbers stay 1, 2, 3 after a line is deleted and added again (D-373); under each price "Priced at ₹… per USD on …" or "Rate not recorded", and a **Use today's price (…)** button under the Price check when today's quote differs (D-374). | Owner to decide when videos restart |
+
+## Also out of date after the 18 Nov 2026 build — D-380 … D-389 (noted only; recording still ON HOLD)
+
+No video or script was changed. Owner to decide when videos restart (CLAUDE.md video rule). Checked against every
+script in `tutorials/scripts/` (and `scripts/parts/`).
+
+| Video | What now differs | Decision |
+|---|---|---|
+| B01 Part 1 (New Order form, Pick from Products) | After picking "Black Galaxy Granite Slab (HS 68022390)" a required **Sold as \*** drop-down appears ("<specification> · HS <code>", e.g. "Gangsaw slab · HS 68022310"; the demo product has no Sold as ticks, so every specification is offered). The HS code now comes from the Sold as and is shown read-only ("from specification") — the narration "the description, the H S code and the unit fill in by themselves" is no longer exact. Choosing it limits **Unit** to the form's units and **Surface finish** to the form's finishes. With a Sold as an SQM line needs only the Thickness (Size / format no longer required) — the scene "Two options start empty … the price depends on them" no longer matches word for word. The script must choose a Sold as before **Create Order**, or the line is refused (D-385). | Owner to decide when videos restart |
+| A02-1, B01 Parts 1 and 2, B02 (order page Products table and line panel) | A line with a Sold as shows "Sold as: <specification> (<form>) · HS <code>" with the tag "from specification" (or "changed by MD/ED — <reason>"); **+ Add product** / **Edit** step 1 has **Sold as** with the HS code. The demo lines made by `_a02.js`, `_b01.js`, `_b02.js` have no Sold as, so they look as before; any line entered on camera shows the new field (D-385). | Owner to decide when videos restart |
+| A02-2 (Step 7 · Supplier PO) | The Supplier PO terms form has a new **Product Form** box (filled from the lines' Sold as; empty for the demo lines) and the saved terms show "Product Form" only when filled (D-387). | Owner to decide when videos restart |
+| QT / PI / OC / CI / BLI documents (A01, A02-1, A02-2, B01, B02, D01, D03, D04, D05) | Not affected on screen: no video opens a document's pages (only the review queue, e-mail cards and file names). The new wording — Bill of Lading "full set of original Bills of Lading" (D-380), "Product Form: …" (D-386 / D-387), "To Be Confirmed" totals (D-388) — would show only if a future script opens a PDF. The narrations of A02-2 and D04 already say "the complete set of original …", which matches D-380. | No change needed |
+| Not in any recorded video | Product › Specifications (old **Forms** ticks → **Sold as**), Products list "Sold as: …", Products › Pricing › **Forms of stone**, Products › **Specifications (HS)**, Settings › Lists › surface_finish (**Offered for forms**, new finishes Roughly trimmed / Sawn), Edit Supplier (**CHA + transport per container**), Edit price (CHA fallback text, **Priced per** Tonne), the option **Order** boxes (D-389). To be covered by the B05 (Procurement) and B09 (MD / ED) scripts, not started yet. | — |
+| C04 (associate Price access / Catalogue, "which forms, like slabs or tiles") | Not affected: the associate portal and price access did not change in this build. | No change needed |
 
 ## Resume notes (for a new session)
 

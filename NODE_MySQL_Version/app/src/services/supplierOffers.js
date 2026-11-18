@@ -294,7 +294,7 @@ async function snapshot(offerId) {
   const ymd = (v) => (v instanceof Date ? `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}` : v);
   return {
     offer_id: Number(offerId), product_id: Number(row.product_id),
-    row: pick(row, ['fob_source', 'fob_value', 'auto_fill', 'base_thickness_mm', 'quoted_on', 'valid_until', 'includes_packing_loading', 'cha_transport_per_container', 'notes']),
+    row: pick(row, ['fob_source', 'fob_value', 'auto_fill', 'base_thickness_mm', 'quoted_on', 'valid_until', 'includes_packing_loading', 'cha_transport_per_container', 'notes', 'entered_unit', 'entered_price']),
     thickness: thickness.map((t) => ({ ...t, quoted_on: ymd(t.quoted_on) })),
     product: product ? pick(product, ['configured_base_price_inr', 'configured_base_thickness_mm', 'configured_base_unit', 'configured_at']) : {},
   };
@@ -314,6 +314,10 @@ async function save(product, row, inp, userId) {
   // D-364: a price typed per SQFT is saved as the SQM price; the notes keep what was typed.
   inp = fromSqft({ unit: '', mm: inp.from_mm ?? null, ...inp }, product, grid, String(row.price_basis || 'unit'));
   inp.notes = notesWithTyped(String(inp.notes ?? ''), inp.typed_sqft) ?? '';
+  // D-382: a block price typed per tonne is saved as the per-CBM price; the typed one is kept.
+  inp = await fromTonne(inp, product, grid, String(row.price_basis || 'unit'), rules.t_per_cbm);
+  if (inp.tonne_error !== null) return [null, inp.tonne_error];
+  const tonneText = inp.entered_unit !== null ? tonneTextOf(Number(inp.entered_price), Number(inp.t_per_cbm)) : null;
   // thicknessPrices.addPrice() runs its own transaction for the thickness prices.
   if (grid) {
     const from = Number(inp.from_mm);
@@ -334,6 +338,8 @@ async function save(product, row, inp, userId) {
       await thicknessPrices.history(id, `Price per ${(row.price_basis || '') === 'cbm' ? 'CBM' : (String(product.reference_unit || '') || 'unit')}`,
         isSet(old) ? fix2(old) : null, fix2(inp.price), userId);
     }
+    await setEntered(id, inp.entered_unit, isSet(inp.entered_price) ? Number(inp.entered_price) : null); // D-382
+    if (tonneText !== null) await thicknessPrices.history(id, 'Price typed per tonne', null, tonneText, userId);
   }
   let fresh = (await productSupplierRepository.find(id)) || row;
   await pricingRepository.setSupplierDates(id, String(inp.quoted_on), inp.valid_until !== '' ? inp.valid_until : null);
@@ -341,7 +347,7 @@ async function save(product, row, inp, userId) {
   const newCha = isSet(inp.cha) ? fix2(inp.cha) : null;
   const oldIncl = Number(row.includes_packing_loading ?? 1) === 1;
   await productSupplierRepository.setPriceDetails(id, isSet(fresh.supplier_id) ? Number(fresh.supplier_id) : null, !!inp.includes_packing_loading, inp.cha);
-  if (oldCha !== newCha) await thicknessPrices.history(id, 'CHA + transport per container', oldCha ?? 'product default', newCha ?? 'product default', userId);
+  if (oldCha !== newCha) await thicknessPrices.history(id, 'CHA + transport per container', oldCha ?? 'default (supplier, else product)', newCha ?? 'default (supplier, else product)', userId); // D-381
   if (oldIncl !== !!inp.includes_packing_loading) {
     await thicknessPrices.history(id, 'Price includes packing and loading', oldIncl ? 'yes' : 'no', inp.includes_packing_loading ? 'yes' : 'no', userId);
   }
@@ -359,11 +365,12 @@ async function save(product, row, inp, userId) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const summary = `${row.supplier_name} · ${product.name}: ${before ? `₹${thicknessPrices.amount(before.inr)} → ` : ''}₹${thicknessPrices.amount(Number(inp.price))} ${what}`
     + (isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : '')
+    + (tonneText !== null ? ` (${tonneText})` : '')
     + `, quoted ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}.`
     + (grid && after && before && Number(inp.from_mm) !== (after.mm ?? -1) ? ` Base price now ₹${thicknessPrices.amount(after.inr)} ${after.label}.` : '')
     + (grid ? ' Other thicknesses updated.' : '');
   await auditLogRepository.log(userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', id, null,
-    before ? `₹${ps().numberFormat(before.inr, 2)} ${before.label}` : null, `₹${ps().numberFormat(Number(inp.price), 2)} ${what}${isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : ''} quoted ${inp.quoted_on} (Edit price)`);
+    before ? `₹${ps().numberFormat(before.inr, 2)} ${before.label}` : null, `₹${ps().numberFormat(Number(inp.price), 2)} ${what}${isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : ''}${tonneText !== null ? ` (${tonneText})` : ''} quoted ${inp.quoted_on} (Edit price)`);
   return [summary, null];
 }
 
@@ -383,8 +390,9 @@ async function undo(snap, userId) {
     }
     const r = snap.row;
     await conn.execute(`UPDATE catalog_product_suppliers SET fob_source = :fs, fob_value = :fv, auto_fill = :af, base_thickness_mm = :b, quoted_on = :q, valid_until = :v,
-      includes_packing_loading = :i, cha_transport_per_container = :c, notes = :n, updated_by = :u WHERE id = :id`,
-    { fs: r.fob_source, fv: r.fob_value, af: r.auto_fill, b: r.base_thickness_mm, q: r.quoted_on, v: r.valid_until, i: r.includes_packing_loading, c: r.cha_transport_per_container, n: r.notes, u: userId, id });
+      includes_packing_loading = :i, cha_transport_per_container = :c, notes = :n, entered_unit = :eu, entered_price = :ep, updated_by = :u WHERE id = :id`,
+    { fs: r.fob_source, fv: r.fob_value, af: r.auto_fill, b: r.base_thickness_mm, q: r.quoted_on, v: r.valid_until, i: r.includes_packing_loading, c: r.cha_transport_per_container, n: r.notes,
+      eu: r.entered_unit ?? null, ep: r.entered_price ?? null, u: userId, id });
     if (snap.product && Object.keys(snap.product).length) {
       const p = snap.product;
       await conn.execute('UPDATE catalog_products SET configured_base_price_inr = :p, configured_base_thickness_mm = :mm, configured_base_unit = :un, configured_at = :at WHERE id = :id',
@@ -499,6 +507,8 @@ async function priceShape(product, s = null, newProduct = false) {
     const u = String(product.reference_unit || '');
     units.push({ value: u !== '' ? u : 'unit', label: u !== '' ? (lineUnits.label(u) || u) : 'unit' });
     if (lineUnits.canonical(u) === 'M2') units.push({ value: SQFT_INPUT, label: 'SQFT', sqft: true }); // D-364
+    // D-382: a block priced per CBM may be priced per tonne (saved as the per-CBM price).
+    if (await tonnePriced(product, false)) units.push({ value: TONNE_INPUT, label: 'Tonne', tonne: true, t_per_cbm: rules.t_per_cbm });
   }
   if (!units.some((x) => x.value.toUpperCase() === 'CBM')) units.push({ value: 'CBM', label: 'CBM' });
   return { grid: false, base_mm: null, thicknesses: [], units };
@@ -533,6 +543,82 @@ function fromSqft(inp, product, grid, basis = 'unit') {
   out.price = sqftToSqm(Number(inp.price));
   out.unit = grid ? 'm2' : String(product.reference_unit);
   return out;
+}
+
+// ------------------------------------------------------------------ D-382: a block price typed per tonne
+
+/** D-382: the "Priced per" value for a price per tonne; it is saved as the per-CBM price. */
+const TONNE_INPUT = 'TON';
+
+/**
+ * D-382: whether a product is sold as a block — one of its ticked "Sold as" specifications
+ * is of a form in the 'block' group; with none ticked, its old forms include 'block'.
+ */
+async function isBlockProduct(product) {
+  const id = Number((product && product.id) || 0);
+  // The groups of its ticked specifications' forms (productForms, the same rule as the specifications' applies_to).
+  const groups = id > 0 ? await require('./productForms').productSpecGroups(id) : null;
+  if (groups !== null && groups !== undefined) return groups.includes('block');
+  return require('./productSpecs').splitForms(product && isSet(product.forms) ? String(product.forms) : null).includes('block');
+}
+
+/** D-382: whether "Priced per" offers Tonne — a block product whose one price is per CBM (not a thickness grid). */
+async function tonnePriced(product, grid, basis = 'unit') {
+  if (grid || basis === 'grid' || basis === 'combo') return false;
+  const perCbm = basis === 'cbm' || lineUnits.canonical(String((product && product.reference_unit) || '')) === 'CBM';
+  return perCbm && (await isBlockProduct(product));
+}
+
+/**
+ * D-382: a price typed per tonne becomes the per-CBM price (× the weight per CBM), stored in
+ * the usual fields; entered_unit / entered_price keep what was typed ('TON', the price),
+ * both null for a price typed per CBM. tonne_error is set (and nothing converted) when the
+ * product has no weight per CBM, or when Tonne is not offered for this price.
+ */
+async function fromTonne(inp, product, grid, basis = 'unit', tPerCbm = null) {
+  const out = { ...inp, entered_unit: null, entered_price: null, tonne_error: null };
+  if (String(inp.unit ?? '').trim().toUpperCase() !== TONNE_INPUT) return out;
+  if (!(await tonnePriced(product, grid, basis))) {
+    out.tonne_error = 'Priced per: Tonne is only for a block priced per CBM — choose the unit the price is per.';
+    return out;
+  }
+  let t = tPerCbm;
+  if (!isSet(t)) t = (await thicknessPrices.rules(product)).t_per_cbm;
+  if (!isSet(t) || !(Number(t) > 0)) {
+    out.tonne_error = lineUnits.missingMessage('weight', 'TON', 'CBM');
+    return out;
+  }
+  const round2e = require('./pricingEngine').round2;
+  out.entered_unit = TONNE_INPUT;
+  out.entered_price = round2e(Number(inp.price));
+  out.t_per_cbm = Number(t);
+  out.price = round2e(Number(inp.price) * Number(t));
+  out.unit = basis === 'cbm' ? 'CBM' : String((product && product.reference_unit) ?? 'CBM');
+  return out;
+}
+
+const n2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** D-382: "₹30,000.00 per tonne = ₹87,000.00 per CBM at 2.9 t/CBM". */
+function tonneTextOf(perTonne, tPerCbm) {
+  return `₹${n2(perTonne)} per tonne = ₹${n2(require('./pricingEngine').round2(perTonne * tPerCbm))} per CBM at ${thicknessPrices.fmt(tPerCbm)} t/CBM`;
+}
+
+/** D-382: the tonne text of a stored offer (entered per tonne), or null. */
+function enteredText(row, product) {
+  if (String((row && row.entered_unit) || '').toUpperCase() !== TONNE_INPUT || !isSet(row.entered_price)) return null;
+  const fob = productService.effectiveFobForSupplier(row, product);
+  const perTonne = Number(row.entered_price);
+  if (!isSet(fob) || !(perTonne > 0)) return null;
+  // The weight it was converted at (the stored per-CBM price ÷ the typed per-tonne price).
+  const t = Math.round((Number(fob) / perTonne) * 1000) / 1000;
+  return `₹${n2(perTonne)} per tonne = ₹${n2(fob)} per CBM at ${thicknessPrices.fmt(t)} t/CBM`;
+}
+
+/** D-382: stores what was typed (per tonne) or clears it (typed per CBM). */
+async function setEntered(offerId, unit, price) {
+  await db.execute('UPDATE catalog_product_suppliers SET entered_unit = :u, entered_price = :p WHERE id = :id',
+    { u: unit ?? null, p: isSet(price) ? Number(price).toFixed(2) : null, id: offerId });
 }
 
 /** D-364: "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)". */
@@ -603,6 +689,10 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   const rules = await thicknessPrices.rules(product);
   const grid = inp.mm !== null && rules.grid;
   inp = fromSqft(inp, product, grid); // D-364: a price per SQFT is saved as the SQM price
+  // D-382: a block price typed per tonne is saved as the per-CBM price (× the weight per CBM).
+  inp = await fromTonne(inp, product, grid, 'unit', rules.t_per_cbm);
+  if (inp.tonne_error !== null) throw new Error(inp.tonne_error);
+  const tonneText = inp.entered_unit !== null ? tonneTextOf(Number(inp.entered_price), Number(inp.t_per_cbm)) : null;
   const unitIsCbm = String(inp.unit).toUpperCase() === 'CBM';
   const basis = grid ? 'grid' : (unitIsCbm && lineUnits.canonical(String(product.reference_unit || '')) !== 'CBM' ? 'cbm' : 'unit');
   const primary = basis !== 'cbm' && (await markedForPricing(productId)) === null;
@@ -617,6 +707,7 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   await pricingRepository.setSupplierDates(id, String(inp.quoted_on), inp.valid_until !== '' ? String(inp.valid_until) : null);
   await productSupplierRepository.setPriceDetails(id, Number(supplier.id), true, null);
   await pricingRepository.setSupplierBasis(id, basis);
+  if (inp.entered_unit !== null) await setEntered(id, inp.entered_unit, Number(inp.entered_price)); // D-382
   if (grid) {
     const row = (await productSupplierRepository.find(id)) || { id };
     const others = thicknessPrices.thicknesses(rules).filter((mm) => mm !== Number(inp.mm));
@@ -635,10 +726,12 @@ async function addOffer(supplier, product, inp, userId, newProduct = false) {
   const f2c = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   await thicknessPrices.history(id, 'Offer added (+ Add product)', null, after ? `₹${f2c(after.inr)} ${after.label}` : 'added', userId);
   if (isSet(inp.typed_sqft)) await thicknessPrices.history(id, 'Price typed per SQFT', null, typedText(inp.typed_sqft), userId);
+  if (tonneText !== null) await thicknessPrices.history(id, 'Price typed per tonne', null, tonneText, userId);
   await auditLogRepository.log(userId, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
     `${supplier.supplier_legal_name}: ${product.name} ₹${f2c(inp.price)} `
     + (grid ? `${Number(inp.mm) === thicknessPrices.CBM ? 'per CBM' : 'per SQM'} (${thicknessPrices.label(Number(inp.mm), Number(rules.cbm_from))})` : `per ${inp.unit}`)
     + (isSet(inp.typed_sqft) ? ` (${typedText(inp.typed_sqft)})` : '')
+    + (tonneText !== null ? ` (${tonneText})` : '')
     + ` quoted ${inp.quoted_on} (+ Add product)${primary ? ' (used for pricing)' : ''}`);
   return id;
 }
@@ -894,6 +987,8 @@ module.exports = {
   listRow, forSuppliers, countsBySupplier, existingOffer, priceShape, addProductChoices, createProduct, addOffer,
   // D-364
   SQFT_INPUT, sqftToSqm, sqmPriced, fromSqft, typedText, notesWithTyped,
+  // D-382
+  TONNE_INPUT, isBlockProduct, tonnePriced, fromTonne, tonneText: tonneTextOf, enteredText, setEntered,
   // D-361
   USABLE_SQL, CONFIGURED_SQL, NO_SUPPLIER_YET_SQL, quotableSql, isConfigured, status, supplierLinked, priceChange,
   baseLabel, productRow, unlinkedPrices, unlinkedCount, linkPrice, forOrderPo,

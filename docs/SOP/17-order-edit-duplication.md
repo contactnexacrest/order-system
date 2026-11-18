@@ -143,7 +143,8 @@ size or a renamed variant of a product already on the order. Since owner
 decision D-272 (11 Nov 2026) it is an **exact copy placed right below** the
 original, marked "copy of line N": every option, the piece size, unit,
 quantity, price, HS code, line type, SAC, category, product, material and
-price-request link. The MD's price approval is **not** copied — the copy is
+price-request link — and, since D-385 (18 Nov 2026), the **Sold as**, its HS
+code and any MD/ED reason for a changed HS code. The MD's price approval is **not** copied — the copy is
 checked at once and, if it is below your lowest price, goes to the MD.
 Change only what differs (usually the size and the price). Lines can be
 added, edited, duplicated and deleted only until the order's first

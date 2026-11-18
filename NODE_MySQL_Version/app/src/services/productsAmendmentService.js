@@ -465,6 +465,17 @@ async function applyLine(lineId, l, mdId, userId, reference, before) {
   }
 }
 
+/**
+ * Owner decision D-387 (18 Nov 2026, confirmed twice): the form of an amendment line's order
+ * line ("Sold as" → its form), for the Products Amendment's Product cell; null without one.
+ */
+async function lineFormName(l) {
+  const id = Number(l.order_product_id || 0) || Number(l.source_line_id || 0);
+  const line = id > 0 ? await orderProductRepository.find(id) : null;
+  const name = await require('./productForms').formNameForLine(line || l);
+  return name !== null && name !== undefined && String(name).trim() !== '' ? String(name).trim() : null;
+}
+
 /** The AMD document's "Products & prices" section. */
 async function documentBlock(amendment) {
   const lines = await amendmentRepository.productLines(Number(amendment.id));
@@ -505,6 +516,8 @@ async function documentBlock(amendment) {
     rows.push({
       no: Number(l.line_no),
       product: String(l.description),
+      // D-387: a second line "Product Form: <form>" for a line with a Sold as.
+      product_form: await lineFormName(l),
       size: cell(size(l.new_length_cm, l.new_width_cm, l.new_thickness_cm) || '—', size(l.old_length_cm, l.old_width_cm, l.old_thickness_cm) || '—'),
       pieces: cell(l.new_pieces !== null ? nf(l.new_pieces, 0) : '—', l.old_pieces !== null ? nf(l.old_pieces, 0) : '—'),
       quantity: cell(qtyText(l.new_quantity, l.unit) + suffix, qtyText(l.old_quantity, l.unit) + suffix),

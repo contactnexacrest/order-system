@@ -218,6 +218,8 @@ function buildProductRows(products) {
     // D-339: a line below the detailed table keeps its own number on the document.
     const n = Number(p.no ?? i + 1);
     const lineColor = n % 2 === 1 ? '1D6FA8' : '2D7D56';
+    // Owner decision D-386 (18 Nov 2026, confirmed twice): "Product Form: <form>" first in the grey line (QT / PI / OC / CI, a line with a Sold as).
+    const formRuns = p.product_form ? [['Product Form: ', { bold: true, color: C.NAVY }], [`${p.product_form}   ·   `, {}]] : [];
     // Owner decision D-215: a service line shows its SAC code and is invoiced separately.
     const specText = (p.line_type || 'goods') === 'service'
       ? [
@@ -232,6 +234,7 @@ function buildProductRows(products) {
         ? [
             // D-215 (5a): a line of another product category — its own attributes, then the HS code, as the PDF.
             [`${n}. `, { bold: true, color: lineColor }],
+            ...formRuns,
             ...p.attributes.flatMap((a) => [[`${a.label}: `, { bold: true, color: C.NAVY }], [`${a.value}   ·   `, {}]]),
             ['HS Code: ', { bold: true, color: C.NAVY }],
             [`${p.hs_code || ''}   ·   `, {}],
@@ -241,6 +244,7 @@ function buildProductRows(products) {
       : p.dimensions || p.finish
         ? [
             [`${n}. `, { bold: true, color: lineColor }],
+            ...formRuns,
             ['Dimensions: ', { bold: true, color: C.NAVY }],
             [`${p.dimensions || 'To Be Confirmed'}   ·   `, {}],
             ['Finish: ', { bold: true, color: C.NAVY }],
@@ -421,7 +425,7 @@ function renderQt(context) {
       '1.  Commercial Invoice',
       '2.  Packing List',
       `3.  ${cooLine(order)}`,
-      `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared`,
+      '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
     ])
@@ -611,7 +615,7 @@ function renderPi(context) {
       '1.  Commercial Invoice',
       '2.  Packing List',
       `3.  ${cooLine(order)}`,
-      `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared in NexaCrest bank account`,
+      '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
     ])
@@ -1110,6 +1114,8 @@ function renderSupPo(context) {
   children.push(
     ...C.kvTable([
       { label: `${cd(context).material_label}`, value: g(sp, 'material_stone_type', 'To Be Confirmed') },
+      // Owner decision D-387 (18 Nov 2026, confirmed twice): "Product Form" right after the material row, only when filled.
+      ...(sp.product_form ? [{ label: 'Product Form', value: String(sp.product_form) }] : []),
       { label: 'Grade', value: `${g(sp, 'grade')} only — no mixed grades, no seconds` },
       { label: 'Surface Finish', value: g(sp, 'surface_finish', 'To Be Confirmed') },
       { label: 'Dimensions', value: g(sp, 'dimensions', 'To Be Confirmed') },
@@ -1552,14 +1558,14 @@ function renderBli(context) {
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
       C.plain('MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL', { bold: true, size: 22 }),
-      C.rich([['Always issue: ', { bold: true }], ['ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS', { bold: true, size: 24 }]]),
+      C.rich([['Always issue: ', { bold: true }], ['ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET', { bold: true, size: 24 }]]),
     ])
   );
   const blRows = [];
   if ((bl.type_instruction ?? null) !== null) {
     blRows.push({ label: 'BL Type', value: g(bl, 'type_instruction') });
   }
-  blRows.push({ label: 'No. of Original Copies', value: '3 (three originals)' });
+  blRows.push({ label: 'No. of Original Copies', value: 'Full set as issued by the shipping line (the number is stated on the BL)' });
   blRows.push({ label: 'No. of Non-Negotiable Copies', value: '3' });
   if ((bl.consignee_instruction ?? null) !== null) {
     blRows.push({ label: 'BL Consignee Instruction', value: g(bl, 'consignee_instruction') });
@@ -1570,7 +1576,7 @@ function renderBli(context) {
       C.rich([
         // Owner decision D-224 (D3, 2 Nov 2026, confirmed twice): the CHA gets the instruction only.
         ['Original BL release: ', { bold: true }],
-        ['CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else.', { color: C.BLUE_TEXT }],
+        ['CHA to hand the full set of originals to NexaCrest only — never to the buyer or anyone else.', { color: C.BLUE_TEXT }],
       ]),
     ], 0)
   );
@@ -1742,7 +1748,7 @@ function renderCi(context) {
       '1.  Commercial Invoice (this document)',
       '2.  Packing List',
       `3.  ${cooLine(order)}`,
-      '4.  Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest',
+      '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
       '5.  Fumigation Certificate — provided as standard with every shipment',
       ...qualityLines(context, 5),
     ])

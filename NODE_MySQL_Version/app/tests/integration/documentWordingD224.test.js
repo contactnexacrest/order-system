@@ -101,8 +101,8 @@ describe('D-224 document wording (owner, 2 Nov 2026)', () => {
   it('D3: the BL Instruction gives the CHA the instruction only', async () => {
     for (const [format, text] of Object.entries(await generate(await order(), 'BLI'))) {
       expect(text).toContain('MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL');
-      expect(text).toContain('ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS');
-      expect(text).toMatch(/Original BL release: +CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else\./);
+      expect(text).toContain('ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET'); // D-380
+      expect(text).toMatch(/Original BL release: +CHA to hand the full set of originals to NexaCrest only — never to the buyer or anyone else\./);
       for (const gone of ['Reason:', 'payment terms are', 'NexaCrest will hold all 3 originals', 'released freely',
         'Original BL release process', 'balance T/T', 'ensures the BL is to NexaCrest']) {
         expect([format, gone, text.includes(gone)]).toEqual([format, gone, false]);

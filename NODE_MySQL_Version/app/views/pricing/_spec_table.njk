@@ -38,13 +38,20 @@
           </form>
           {% set linked = s.list_key == 'surface_finish' %}{# D-357: the names come from Settings › Lists › surface_finish #}
           {% if linked %}<p class="notice notice-info small" data-testid="finish-linked-note">Price only here — the names, their order and on/off come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a>. A finish added in Settings appears here automatically at no price change; a finish switched off in Settings disappears from Pick from Products.</p>{% endif %}
+          <p class="small muted">Order: the options are offered in this order on order lines and price requests (lowest first); change a number and Save that option.</p>
           <table class="list">
-            <tr><th>{{ 'Option (name from Settings › Lists)' if linked else 'Option' }}</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
+            <tr><th>{{ 'Order and option (from Settings › Lists)' if linked else 'Order and option' }}</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
             {% for o in s.options %}
               <tr>
                 <td colspan="5">
                   <form method="post" action="/pricing/spec-options/{{ o.id }}" class="inline-form">
                     {{ csrf() }}
+                    {# D-389 (18 Nov 2026): the order is editable (it was a hidden field); a finish's order comes from Settings › Lists. #}
+                    {% if o.dropdown_option_id %}
+                      <input type="hidden" name="sort_order" value="{{ o.sort_order | int }}">
+                    {% else %}
+                      <input type="number" name="sort_order" min="0" max="999" step="1" value="{{ o.sort_order | int }}" aria-label="Order of {{ o.name }}" placeholder="e.g. 1" class="input-order"{{ ro }}>
+                    {% endif %}
                     {% if o.dropdown_option_id %}
                       <input type="text" name="name" readonly class="input-readonly" maxlength="80" value="{{ o.name }}" aria-label="Option name (from Settings › Lists)" placeholder="e.g. Natural Polish"> <a class="small" href="/admin/dropdown-options#list-surface_finish">Rename in Settings › Lists</a>
                     {% else %}
@@ -54,7 +61,6 @@
                     <input type="number" name="value" step="0.0001" value="{{ (o.value | string) | replace(r/0+$/, '') | replace(r/\.$/, '') if o.value !== null else '' }}" aria-label="Value" placeholder="e.g. 4.00 or -8"{{ ro }}>
                     <input type="number" name="thickness_mm" min="1" max="2000" step="1" value="{{ o.thickness_mm if o.thickness_mm !== null else '' }}" aria-label="Thickness in mm" placeholder="e.g. 30"{{ ro }}>
                     <label class="inline"><input type="checkbox" name="is_base" value="1"{% if o.is_base == 1 %} checked{% endif %}{{ ro }}> base</label>
-                    <input type="hidden" name="sort_order" value="{{ o.sort_order }}">
                     {% if canManage %}<button type="submit" class="btn-sm">Save</button>{% endif %}
                   </form>
                 </td>

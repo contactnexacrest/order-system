@@ -80,6 +80,14 @@ required (at least 10 characters); it is kept with the Supplier PO and in the
 Audit Log. The Supplier PO document looks exactly as before; Supplier POs
 already issued never change.
 
+**Product Form (owner decision D-387, 18 Nov 2026, confirmed twice).** The
+form has a **Product Form** box, filled in from the order lines' **Sold as**
+(e.g. "Raw block", "Monument slab"); you may change it like the other
+material fields, or empty it. The Supplier PO prints it in Section 3 as a row
+**Product Form** right after the material row — only when filled — so the
+supplier knows whether to send blocks, gangsaw slabs, monuments …; the order
+page's Supplier PO summary shows it too.
+
 **Basic Value, GST Amount, Total Payable, Advance Amount, and Balance
 Amount auto-calculate** as Quantity, Unit Price, GST Rate, and Advance %
 are filled in (Basic Value = Unit Price × Quantity; GST Amount = Basic

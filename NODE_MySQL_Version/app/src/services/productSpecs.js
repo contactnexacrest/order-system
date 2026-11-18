@@ -81,7 +81,16 @@ function splitForms(value) {
   return String(value).split(',').map((f) => f.trim()).filter((f) => has(FORMS, f));
 }
 
-function productForms(product) {
+/**
+ * The product's forms; [] = all forms.
+ * D-384 (18 Nov 2026): the groups of the forms of its ticked "Sold as" specifications; none
+ * ticked → the old catalog_products.forms (kept, read-only) → all. Async since D-384 (reads the ticks).
+ */
+async function productForms(product) {
+  if (product && product.id) {
+    const groups = await require('./productForms').productSpecGroups(Number(product.id));
+    if (groups !== null) return groups;
+  }
   return splitForms(product.forms ?? null);
 }
 
@@ -105,7 +114,7 @@ function appliesTo(applies, forms) {
 async function tree(product, includeHidden = false) {
   const productId = Number(product.id);
   const categoryId = await categoryIdFor(product);
-  const forms = productForms(product);
+  const forms = await productForms(product);
   const specs = [];
   for (const s of categoryId !== null ? await specRepository.categorySpecs(categoryId, true) : []) {
     if (appliesTo(s.applies_to, forms)) specs.push({ ...s, source: 'category' });
@@ -139,6 +148,9 @@ async function tree(product, includeHidden = false) {
         category_value: own ? null : (o.value !== null ? Number(o.value) : null),
         thickness_mm: o.thickness_mm !== null ? Number(o.thickness_mm) : null,
         source, hidden: oHidden,
+        // D-383: the Settings › Lists row of a Surface finish option (finishes offered per form).
+        dropdown_option_id: o.dropdown_option_id ? Number(o.dropdown_option_id) : null,
+        sort_order: Number(o.sort_order || 0), // D-389: shown and editable
       });
     }
     out.push({

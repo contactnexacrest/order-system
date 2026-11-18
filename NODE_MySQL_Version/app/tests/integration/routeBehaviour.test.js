@@ -14,7 +14,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const { todayIst } = require('../../src/helpers/dbDateTime');
-const { createTestClient, createTestOrder, createTestFile, createTestDocument, pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, createTestDocument, pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson, soldAs } = require('../support/fixtures');
 
 /**
  * Port of RouteBehaviourTest.php. QA Round 6, Batch 5 (R5-14): QA found 124
@@ -589,8 +589,9 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
       fob_source: 'direct', fob_value: 100, factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null, is_primary: 1, notes: null }, holderUser.id);
     await require('../../src/repositories/pricingRepository').setSupplierDates(offer, todayIst(), null);
     await configureProductForQuoting(picked, holderUser.id);
+    // D-385: with its Sold as (Monument slab: per piece, so the piece's length and width too).
     expectDone(await holder.call('POST', `/orders/${order}/products/${line}`, { catalog_product_id: String(picked), description: 'Route edited line', hs_code: hs, quantity: '12', unit: 'pcs', unit_price: '15',
-      spec_json: await baseSpecJson(picked), reason: 'Route behaviour test edit' }), 'POST /orders/:id/products/:productId');
+      piece_length_cm: '180', piece_width_cm: '80', spec_json: await baseSpecJson(picked), reason: 'Route behaviour test edit', ...await soldAs('Monument slab') }), 'POST /orders/:id/products/:productId');
     expect(await value('SELECT description FROM order_products WHERE id = :id', { id: line })).toBe('Route edited line');
 
     expectDone(await holder.call('POST', `/orders/${order}/products/${line}/duplicate`, { reason: 'Route behaviour test copy' }), 'POST /orders/:id/products/:productId/duplicate');

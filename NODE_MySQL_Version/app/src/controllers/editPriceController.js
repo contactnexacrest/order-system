@@ -101,7 +101,14 @@ async function form(req, res) {
   const cha = isSet(old.cha_transport_per_container) ? String(old.cha_transport_per_container)
     : (isSet(row.cha_transport_per_container) ? trimAmount(row.cha_transport_per_container) : '');
   const incl = old.includes_packing_loading !== undefined ? String([].concat(old.includes_packing_loading).pop()) === '1' : Number(row.includes_packing_loading ?? 1) === 1;
-  const prodCha = product.cha_transport_per_container;
+  // D-381: an empty CHA field falls back to the supplier's figure, else the product default — named here.
+  const chaFallbackText = thicknessPrices.chaFallbackText(row, product);
+  const chaHasFallback = thicknessPrices.chaFallback(row, product).source !== null;
+  // D-382: a block priced per CBM — "Priced per" CBM / Tonne (a price per tonne is saved as the per-CBM price).
+  const tonne = (await supplierOffers.tonnePriced(product, grid, String(row.price_basis || 'unit')))
+    ? { cbm: (row.price_basis || '') === 'cbm' ? 'CBM' : String(product.reference_unit ?? ''), t_per_cbm: rules.t_per_cbm } : null;
+  const enteredTon = String(row.entered_unit || '').toUpperCase() === 'TON';
+  const tonneUnit = tonne ? (String(isSet(old.unit) ? old.unit : (enteredTon ? 'TON' : tonne.cbm)).toUpperCase() === 'TON' ? 'TON' : tonne.cbm) : null;
   const amt = (v) => (isSet(v) ? `₹${thicknessPrices.amount(v)}` : '—');
   const sell = preview.selling;
   const ownOld = old.own && typeof old.own === 'object' ? old.own : {};
@@ -116,6 +123,8 @@ async function form(req, res) {
     gridUnit: fromMm === thicknessPrices.CBM || (isSet(old.thickness_mm) && String(old.thickness_mm) === String(thicknessPrices.CBM)) ? 'CBM' : (['m2', 'SQFT'].includes(String(old.unit ?? '')) ? String(old.unit) : 'm2'),
     sqmUnit: !grid && supplierOffers.sqmPriced(product, false, null, String(row.price_basis || 'unit')) ? String(product.reference_unit) : null,
     oldUnit: String(old.unit ?? ''),
+    tonne, tonneUnit, tonneTPerCbm: tonne && isSet(tonne.t_per_cbm) ? thicknessPrices.fmt(tonne.t_per_cbm) : null,
+    enteredText: supplierOffers.enteredText(row, product),
     thicknesses: grid ? supplierOffers.formThicknesses(rules, row).map((mm) => ({
       mm, label: thicknessPrices.label(mm, Number(rules.cbm_from)), unit: mm === thicknessPrices.CBM ? 'CBM' : 'SQM',
       selected: Number(isSet(old.thickness_mm) ? old.thickness_mm : fromMm) === mm, isBase: mm === fromMm, isRuleBase: mm === Number(rules.base_mm),
@@ -124,10 +133,12 @@ async function form(req, res) {
       ...l, newText: isSet(l.price) ? `${amt(l.price)} / ${l.unit}` : '—', wasText: isSet(l.was) ? amt(l.was) : '—',
       placeholder: isSet(l.price) ? trimAmount(l.price) : '4500', own: isSet(ownOld[l.mm]) ? String(ownOld[l.mm]) : '',
     })),
-    priceValue: isSet(old.price) ? String(old.price) : (base ? trimAmount(base.inr) : ''),
+    priceValue: isSet(old.price) ? String(old.price)
+      : (tonne && enteredTon && isSet(row.entered_price) ? trimAmount(row.entered_price) : (base ? trimAmount(base.inr) : '')),
     wasLine: base ? `Was ${amt(base.inr)}` : '',
     quotedOn: isSet(old.quoted_on) ? String(old.quoted_on) : today, validUntil, cha, incl,
-    chaPlaceholder: isSet(prodCha) ? `product default ${thicknessPrices.amount(prodCha)}` : 'e.g. 100000',
+    chaPlaceholder: chaHasFallback ? chaFallbackText : 'e.g. 100000',
+    chaFallbackText,
     notes: isSet(old.notes) ? String(old.notes) : String(row.notes || ''),
     moreOpen: cha !== '' || !incl || !!row.notes,
     canSeeSelling: can(req, 'view_price_buildup'),
@@ -160,16 +171,23 @@ async function preview(req, res) {
   }
   // D-364: a price typed per SQFT is previewed as the SQM price it is saved as.
   const grid = (row.price_basis || '') === 'grid';
-  const inp = supplierOffers.fromSqft({ price, unit: String(q.unit ?? ''), mm: mm ?? (grid ? thicknessPrices.baseOf(row, await thicknessPrices.rules(product)) : null) },
+  let inp = supplierOffers.fromSqft({ price, unit: String(q.unit ?? ''), mm: mm ?? (grid ? thicknessPrices.baseOf(row, await thicknessPrices.rules(product)) : null) },
     product, grid, String(row.price_basis || 'unit'));
-  const out = await supplierOffers.preview(product, row, mm, Number(inp.price), own);
-  out.typed = isSet(inp.typed_sqft) ? supplierOffers.typedText(inp.typed_sqft) : null;
+  // D-382: a block price typed per tonne is previewed as the per-CBM price it is saved as.
+  inp = await supplierOffers.fromTonne(inp, product, grid, String(row.price_basis || 'unit'));
+  const out = await supplierOffers.preview(product, row, mm, inp.tonne_error === null ? Number(inp.price) : 0, own);
+  out.typed = isSet(inp.typed_sqft) ? supplierOffers.typedText(inp.typed_sqft)
+    : (inp.entered_unit !== null ? supplierOffers.tonneText(Number(inp.entered_price), Number(inp.t_per_cbm)) : null);
+  if (inp.tonne_error !== null) {
+    out.ok = false;
+    out.error = inp.tonne_error;
+  }
   if (!can(req, 'view_price_buildup')) out.selling = null; // Procurement sees supplier prices only, never selling prices.
   res.json(out);
 }
 
 /** Reads and checks the form (the same checks the browser does first): [input, error]. */
-function read(body, rules, row, grid) {
+async function read(body, rules, row, grid) {
   const price = money(body.price);
   if (price === null || !(price > 0)) return [{}, 'New price: enter the price in ₹ (above 0, at most 2 decimals).'];
   let fromMm = null;
@@ -192,6 +210,11 @@ function read(body, rules, row, grid) {
   if (unit === supplierOffers.SQFT_INPUT && !supplierOffers.sqmPriced({ reference_unit: row._reference_unit ?? null }, grid, fromMm, String(row.price_basis || 'unit'))) {
     return [{}, 'Per: SQFT is only for a price per SQM — choose the unit the price is per.'];
   }
+  // D-382: Tonne only for a block priced per CBM, and only with a weight per CBM (supplierOffers.fromTonne).
+  if (unit.toUpperCase() === supplierOffers.TONNE_INPUT && row._product) {
+    const check = await supplierOffers.fromTonne({ price, unit }, row._product, grid, String(row.price_basis || 'unit'), rules.t_per_cbm);
+    if (check.tonne_error !== null) return [{}, check.tonne_error];
+  }
   const okDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && ymdOf(new Date(`${v}T00:00:00`)) === v;
   const q = String(body.quoted_on ?? '').trim();
   if (!okDate(q)) return [{}, 'Quoted on: enter the date the supplier quoted this price.'];
@@ -203,7 +226,7 @@ function read(body, rules, row, grid) {
   }
   const chaRaw = String(body.cha_transport_per_container ?? '').replace(/,/g, '').trim();
   if (chaRaw !== '' && !/^\d{1,10}(\.\d{1,2})?$/.test(chaRaw)) {
-    return [{}, "CHA + transport per container: enter ₹ (at most 2 decimals), or leave it empty for the product's default."];
+    return [{}, "CHA + transport per container: enter ₹ (at most 2 decimals), or leave it empty for the supplier's figure (else the product's default)."];
   }
   const notes = String(body.notes ?? '').trim();
   if ([...notes].length > 1000) return [{}, 'Notes: at most 1000 characters.'];
@@ -227,7 +250,7 @@ async function save(req, res) {
   const rules = await thicknessPrices.rules(product);
   const grid = (row.price_basis || '') === 'grid';
   const body = req.body || {};
-  const [inp, error] = read(body, rules, { ...row, _reference_unit: product.reference_unit ?? null }, grid);
+  const [inp, error] = await read(body, rules, { ...row, _reference_unit: product.reference_unit ?? null, _product: product }, grid);
   if (error) {
     flash.set(req, 'error', error);
     flash.setOld(req, body);

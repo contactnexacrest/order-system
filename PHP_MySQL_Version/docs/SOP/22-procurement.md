@@ -91,13 +91,20 @@ products and edit prices, the right to record supplier prices (Procurement, MD).
   lowest / highest supplier price. A supplier marked **Inactive** has its products greyed: "Inactive: none of their
   prices are used anywhere."
 - **Edit price** opens the simple Edit price form (see [Pricing](./27-pricing.md)); Cancel brings you back here.
+- **CHA + transport per container** (D-381, 18 Nov 2026): on the supplier's **Edit** form, "CHA + transport per
+  container, factory → port (₹)" and "Port this figure is for", with a reason when either changes (only for people who
+  see purchase prices or logistics costs). This supplier's prices that have no CHA figure of their own use it, before
+  the product's default ([Pricing](./27-pricing.md)).
 - **+ Add product** (on the supplier's row, or **+ Add product** under **Prices given for products** on the supplier's
   page):
   1. **Product** — pick it from the list (products that have no supplier yet come first and are marked "no supplier
      yet"), or click **create a new product** and enter its **Name** (must be new), **Category** and, if you know it,
-     **HS code** (empty = the category's code).
+     **HS code** (empty = the category's code; it is the product's fallback — an order line takes its HS code from
+     its **Sold as**, D-385).
   2. **Base thickness**, **Price ₹** and **per** (SQM or SQFT for a slab thickness — a price per SQFT is saved as the SQM price — CBM for 50 mm and above; for a product
-     without thicknesses, per its unit or per CBM). The other thicknesses are worked out by the category's price rules.
+     without thicknesses, per its unit or per CBM; a **block** priced per CBM may also be priced per **Tonne** — saved as
+     the per-CBM price × the product's weight per CBM, e.g. "₹30,000.00 per tonne = ₹87,000.00 per CBM at 2.9 t/CBM",
+     D-382). The other thicknesses are worked out by the category's price rules.
      If the supplier quoted per square foot, choose **SQFT** and type that price: the line under the fields shows it
      per SQM ("₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639) — saved as the SQM price"); it is saved per SQM and the notes
      keep "typed ₹185 / SQFT" (D-364).

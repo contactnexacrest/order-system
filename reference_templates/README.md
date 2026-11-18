@@ -24,8 +24,13 @@ where the two disagree, the Developer Spec wins — it says so explicitly).
 - `internal_documents/` — staff-only documents (COO prep sheet, checklists,
   Supplier PO, Payment Terms Amendment, SOPs, Stage Gate, Wall Reference, BL
   Endorsement, BL Reasoning Guide; the BL Reasoning Guide and Checklists
-  were aligned on 2 Nov 2026 with the buyer documents' rule: all 3 originals
-  come to NexaCrest, 2 go to the buyer once the balance clears, 1 is kept).
+  were aligned on 2 Nov 2026 with the buyer documents' rule of that time: all
+  3 originals come to NexaCrest, 2 go to the buyer once the balance clears, 1
+  is kept). Since owner decision D-380 (18 Nov 2026) the app's documents say
+  "the full set of original Bills of Lading as issued by the shipping line",
+  all couriered to the buyer once the balance clears, and HS 68029300 (not
+  6802.93); the Word files in this folder are the older reference samples and
+  were not changed.
   Never shown to a buyer.
 - Staff guidelines that are not document templates live outside this folder:
   the *Supplier & Logistics Payments Guide* (PDF + Word, 2 Nov 2026) is in

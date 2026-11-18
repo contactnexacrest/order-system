@@ -713,7 +713,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 | **Departments & divisions** | `departments`, `department_designations`, `user_department_memberships`, `designations`, `divisions`, `division_modules`, `division_settings`, `client_divisions` |
 | **Signatures & assets** | `assets` (logos, seals, watermarks), `user_signature_assets`, `company_default_signatory`, `document_type_signatories` |
 | **Clients & intake** | `clients`, `client_logins`, `client_password_reset_tokens`, `client_intake_submissions`, `pi_intake_submissions`, `client_payment_reports`, `order_reorder_requests`, `order_reorder_request_products` |
-| **Products & pricing** | `products` (legacy product master), `product_images`, `catalog_products`, `catalog_product_images`, `catalog_product_suppliers`, `catalog_product_supplier_options`, `catalog_product_misc_charges`, `product_categories`, `product_category_attributes`, `spec_definitions`, `spec_options`, `product_spec_hidden`, `product_option_overrides`, `pricing_settings`, `price_requests` |
+| **Products & pricing** | `products` (legacy product master), `product_images`, `catalog_products`, `catalog_product_images`, `catalog_product_suppliers`, `catalog_product_supplier_options`, `catalog_product_misc_charges`, `product_categories`, `product_category_attributes`, `spec_definitions`, `spec_options`, `product_spec_hidden`, `product_option_overrides`, `pricing_settings`, `price_requests`, `product_forms`, `hs_specifications`, `product_hs_specifications`, `surface_finish_forms` (D-382 … D-384) |
 | **Suppliers & logistics** | `suppliers`, `supplier_type_links`, `supplier_factory_addresses`, `logistics_partners` |
 | **Orders (Export) — core** | `orders`, `order_assignees`, `order_stages`, `order_products`, `order_department_owners`, `order_comments`, `order_comment_attachments`, `order_feedback`, `order_cancellations`, `order_annexure_products`, `order_annexure_images`, `order_annexure_terms`, `order_quality_documents` |
 | **Orders — stage data** | `order_production`, `order_supplier_po`, `order_supplier_po_documents`, `order_buyer_po_documents`, `order_oc_acknowledgments`, `order_freight`, `order_packing`, `order_crates`, `order_shipping`, `order_draft_bl_reviews`, `order_bl_endorsements`, `order_inspections`, `order_inspection_fees`, `order_shipment_gate_overrides`, `order_compliance_tasks`, `compliance_task_types` |
@@ -1121,6 +1121,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `manage_payment_presets` | Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). | Admin, MD, ED, SysAdmin |
 | `manage_ports` | Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. | Admin, MD, ED, SysAdmin |
 | `manage_pricing` | Change the pricing settings, a product's pricing overrides, the associate commission levels and ladder, and an associate's commission level. | Admin, MD |
+| `override_line_hs_code` | Change a line's HS code from its specification, with a reason: on an order line with a Sold as, type a different HS code from the HS Code Master instead of the one the specification sets; audited `HS_CODE_OVERRIDDEN` (D-385, 18 Nov 2026). | MD, Founder & MD, ED, Founder & ED |
 | `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. *Note: also Duplicate a product (D-358) and Configure it — base price, product-level values, switching it Active (D-361; Thickness rules also need `manage_product_specifications`, D-363).* | Admin, MD, ED |
 | `manage_product_specifications` | Change one product's specifications: hide a specification or option, change an option's value, add options or specifications for that product only, reset to the category. | Admin, MD |
 | `manage_suppliers` | Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
@@ -2044,7 +2045,7 @@ they change only through a Products & prices amendment.
 
 | | |
 |---|---|
-| User does | First card: **Compliance — with the Supplier PO** (Due Diligence, ECGC by default). Optional **Purchase Requirements** card (Sales raises, Procurement quotes/awards — 6.6). 7a **Save Supplier PO Terms** (D-361: choose the supplier from the table of their quoted prices for the line's product — the price fills in; a different agreed price needs a reason, kept with the PO; supplier from the Suppliers directory, material spec, GST %, advance %, delivery location from the supplier's factory addresses) — creates the record and reference. 7b Generate Supplier PO. 7c Send the **Supplier Link** (no login, 60 days) and/or attach the acknowledgement, or **Skip — supplier did not acknowledge** with a reason. 7d **Confirm Supplier Signed & Returned PO** — gate. 7e **Supplier Advance Paid**: add the supplier's bill (Proforma or Tax invoice, D-091), then **₹ Mark Paid** with the UTR (`manage_supplier_payments`). At 0% advance 7e completes by itself (D-012). |
+| User does | First card: **Compliance — with the Supplier PO** (Due Diligence, ECGC by default). Optional **Purchase Requirements** card (Sales raises, Procurement quotes/awards — 6.6). 7a **Save Supplier PO Terms** (D-361: choose the supplier from the table of their quoted prices for the line's product — the price fills in; a different agreed price needs a reason, kept with the PO; supplier from the Suppliers directory, material spec, GST %, advance %, delivery location from the supplier's factory addresses; D-387: **Product Form**, prefilled from the lines' Sold as, editable, printed in Section 3 right after the material row only when filled) — creates the record and reference. 7b Generate Supplier PO. 7c Send the **Supplier Link** (no login, 60 days) and/or attach the acknowledgement, or **Skip — supplier did not acknowledge** with a reason. 7d **Confirm Supplier Signed & Returned PO** — gate. 7e **Supplier Advance Paid**: add the supplier's bill (Proforma or Tax invoice, D-091), then **₹ Mark Paid** with the UTR (`manage_supplier_payments`). At 0% advance 7e completes by itself (D-012). |
 | Gate | Supplier PO approved; with `wet_signature_required_supplier_po` on, an acknowledgement file or the skip. Needs `manage_supplier_po`. After the gate, **FOB orders auto-skip Stage 6** (`maybeAutoSkipFreightStage`, audit `ORDER_STAGE_GATE_SKIPPED`). |
 | Stored | `order_supplier_po` (with its own snapshot of the supplier, D-086), `order_supplier_po_documents`, `order_vendor_bills`, `order_vendor_bill_payments`, `order_compliance_tasks`. |
 | Document | **SUPPO** `SC/SPO/…` — internal, never to the buyer; the buyer never learns the supplier. |
@@ -2073,7 +2074,7 @@ they change only through a Products & prices amendment.
 | User does | First card: **Compliance — before shipment** (Fumigation, Phytosanitary, PSI). 10a **Supplier Balance Paid** (bill + payment; waits for 7e when an advance was planned). 10b Save Packing & Crates (crate HS code comes from the product, D-036). 10c Generate Packing List. 10d Save Shipping Details (line, vessel, voyage, ETD/ETA, containers, seals). 10e Generate BL Instruction Sheet. CHA **Draft BL review** loop (rounds, approve / request revision; never blocks). 10f **Confirm BL Issued** (BL no. + date, optional scan) — gate. Then **Shipping Bill** (number, date, customs exchange rate). |
 | Gate | PL approved/sent; BLI approved. **Shortfall tolerance:** if packed quantity is short by more than the tolerance %, the buyer's written approval must be uploaded (hard rule). **Shipment gates** (`ShipmentGateService`): the BL waits while (a) a **before-shipment** balance (Standard — New Buyer, Extended Terms — Before Shipment) is not cleared, or (b) a Pre-Shipment Inspection task (fixed key `pre_shipment_inspection`, D-262 gap 7) is not Passed. A holder of `override_shipment_gates` (MD, ED, Admin) may release with a reason ≥ 10 characters (`order_shipment_gate_overrides`). |
 | Stored | `order_packing`, `order_crates`, `order_shipping` (`bl_number`, shipping bill and customs rate), `order_draft_bl_reviews`. |
-| Document | **PL** `SC/PL/…`; **BLI** `SC/BLI/…` (internal). |
+| Document | **PL** `SC/PL/…`; **BLI** `SC/BLI/…` (internal; since D-380 it asks for the "ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET", the full set as issued by the shipping line, all originals to NexaCrest only — §8.12). |
 
 #### Step 11 · Commercial Invoice & Balance (Stage 8)
 
@@ -2726,6 +2727,11 @@ the same filters, counts, fields, actions and money rules on both templates
     ("Line N (<spec>): old → new", reason); a unit or finish the form does not offer is refused. The
     products table shows "Sold as: <spec> (<form>) · HS <code>" with the tag "from specification" or
     "changed by MD/ED — <reason>". Duplicate line copies `hs_spec_id`, `hs_code`, `hs_override_reason`.
+    A size range (e.g. blocks 160–210 cm long) goes in the line's existing **Size note** (help "e.g. Length
+    160–210 cm") — no new field. On the documents a line with a Sold as prints "Product Form: <form>" (D-386,
+    §8.12); the Supplier PO has a "Product Form" row (D-387). A block may be priced per tonne on Edit price /
+    + Add product (D-382, §7.1). Audits of this block: `PRODUCT_FORM_CHANGED`, `HS_SPECIFICATION_CHANGED`,
+    `FINISH_FORMS_CHANGED`, `PRODUCT_SOLD_AS_CHANGED`, `HS_CODE_OVERRIDDEN`, `SPEC_OPTION_CHANGED` (order).
     For documents: `ProductForms::formNameForLine($line)` and `ProductForms::formNameForOrderLines($orderId)`
     (one query, line id ⇒ form name). **D-389:** an option's **Order** is a box on the category's
     Options tab (a Surface finish option's order still comes from Settings › Lists) and on the
@@ -2747,7 +2753,7 @@ the same filters, counts, fields, actions and money rules on both templates
   `manage_product_catalog`, `manage_product_specifications`,
   `view_product_pricing`, `manage_hs_codes`, `manage_pricing` (Forms of stone, Specifications (HS)),
   `override_line_hs_code` (D-385).
-- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358, D-382 … D-385, D-389.
+- **SOP / decisions.** SOP 01 (order lines), 15 (Settings › Lists finishes), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358, D-380 … D-389 (D-380, D-386 – D-388 documents in §8.12; D-381 and the per-tonne price in §7.1).
 
 ### 6.3 Pricing engine and price requests
 
@@ -3038,16 +3044,19 @@ the same filters, counts, fields, actions and money rules on both templates
     Supplier advance/balance: bill first, then pay with UTR (D-089), by
     `manage_supplier_payments` (Accounts). Proforma vs tax invoice (D-091).
   - Suppliers directory: several types per supplier; delete only if never
-    used (D-085). Vendor bank account encrypted, masked, typed twice, IFSC
+    used (D-085). **CHA + transport per container, factory → port (₹)** and
+    "Port this figure is for" on Edit Supplier (D-381, 18 Nov 2026; `suppliers.cha_transport_per_container`,
+    `cha_port`; shown and saved only for people who see purchase prices or logistics costs — `SupplierCha::canSee`;
+    reason required when either changes, audit `SUPPLIER_CHA_CHANGED` old → new) — see 7.1. Vendor bank account encrypted, masked, typed twice, IFSC
     checked; a no-login Vendor Details Link (D-088).
 - **Tables.** `purchase_requirements`, `purchase_quotes`, `suppliers`,
-  `supplier_type_links`, `supplier_factory_addresses`, `order_supplier_po`,
+  `supplier_type_links`, `supplier_factory_addresses`, `order_supplier_po` (D-387 `product_form`),
   `order_supplier_po_documents`, `order_vendor_bills`,
   `order_vendor_bill_payments`, `order_production`, `order_quality_documents`.
 - **Code.** `PurchasingController`, `PurchasingService`,
   `PurchasingRepository`, `SupplierController`, `SupplierActionController`,
   `VendorBillController`, `VendorDetailsController`, `OrderController`
-  (Supplier PO actions).
+  (Supplier PO actions), `SupplierCha` (Node `supplierCha.js`, D-381).
 - **SOP / decisions.** SOP 05, 22; D-011, D-012, D-085–D-094, D-214
   (phase 3), D-216.
 
@@ -4307,6 +4316,40 @@ plist2_t3, plist_r).** No database change, no migration, no price changes (snaps
   (inactive supplier or offer) — choose another supplier price in Configure."; "No price for 50 mm and above (per CBM)
   yet — add a 50 mm+ supplier price, or set a manual price." No migration.
 
+**CHA + transport per supplier and block prices per tonne (D-381, D-382; 18 Nov 2026, mockups approved, plan
+confirmed twice; migration `2026-11-18b`).**
+- **Where the CHA + transport figure comes from.** `ThicknessPrices::chaPerContainer()` (Node twin) now uses, in
+  this order: the supplier-price row's own `catalog_product_suppliers.cha_transport_per_container` → the row's
+  supplier's `suppliers.cha_transport_per_container` (`catalog_product_suppliers.supplier_id` → `suppliers`) → the
+  product default `catalog_products.cha_transport_per_container` → none. `ThicknessPrices::chaSource()` also says
+  where it came from ('row' | 'supplier' | 'product'), and the price build-up / Price check shows it as a small tag
+  next to "+ CHA + transport per <unit>": **this price**, **supplier · <port>**, **product default**
+  (`chaSourceTag`). A row with `fob_source = 'computed'` (an older price with the CHA already inside) never gets the
+  per-container CHA added (`fobParts` / cost) and shows the note "CHA already inside this older price"
+  (`ThicknessPrices::CHA_INSIDE_NOTE`).
+- **Edit Supplier** (`/suppliers/{id}/edit`, fieldset `#cha-transport`): "CHA + transport per container, factory →
+  port (₹)" (placeholder "e.g. 45000", at most 2 decimals), "Port this figure is for" (optional, at most 100
+  characters, only with a figure), "Reason for the change" (required when the figure or the port changes; browser
+  rule `data-required-if-changed`, server ReasonValidator). Shown and saved only for people who see purchase prices
+  or logistics costs (`SupplierCha::canSee()` = MoneyVisibility PURCHASE or LOGISTICS). Audit
+  `SUPPLIER_CHA_CHANGED` ("₹40,000.00 (Mundra) → ₹45,000.00 (Mundra)", with the reason). Empty = none for this
+  supplier.
+- **Edit price › More** and the product's price card: the CHA field's placeholder / help names what an empty field
+  falls back to — "Empty = supplier's ₹45,000.00 (Mundra)", "Empty = product default ₹40,000.00" or "Empty = no
+  CHA + transport" (`ThicknessPrices::chaFallbackText`).
+- **Block prices per tonne (D-382).** On **Edit price** and **+ Add product** (supplier page) a block product whose
+  one price is per CBM (not a thickness grid) has **Priced per \*** CBM / Tonne (`SupplierOffers::tonnePriced`,
+  `TONNE_INPUT = 'TON'`). A price per tonne is stored as the per-CBM price (price × the product's weight per CBM,
+  `PricingLevels` `weight_t_per_cbm`) in the usual fields, and what was typed is kept in the new columns
+  `catalog_product_suppliers.entered_unit` ('TON') / `entered_price`; the page shows "Typed as ₹30,000.00 per
+  tonne = ₹87,000.00 per CBM at 2.9 t/CBM" and the price history has a row "Price typed per tonne". Without a weight
+  per CBM the choice is refused with the LineUnits weight message; Tonne on a product that is not a block priced
+  per CBM is refused ("Priced per: Tonne is only for a block priced per CBM — choose the unit the price is per.").
+- Code: `SupplierCha` (PHP `app/src/Services/SupplierCha.php`, Node `src/services/supplierCha.js`),
+  `ThicknessPrices::chaSource` / `chaFallback` / `chaFallbackText` / `chaSourceTag`, `SupplierOffers::fromTonne` /
+  `tonneText`, `SupplierController::update`, views `suppliers/form`, `products/edit_price`, `_cha_transport`,
+  `_price_card`, `_pricing`. No existing price changes until a supplier figure is entered.
+
 ### 7.2 Order-line pricing and MD approval (D-245 P2)
 
 `OrderLinePricing` checks each line against the floor of **whoever sells the order**:
@@ -5013,9 +5056,55 @@ Owner decision D-343 (12 Nov 2026, owner "1 yes, 2 yes, 3 yes" and "confirm 2").
 
 Tests: `MoneyFormatTest` / `moneyFormat.test.js`, `D343DocumentNumbersTest` / `d343DocumentNumbers.test.js`; `LineTableTest`, `D339DetailedLineTableTest` (INR amounts now in Indian grouping). The Natural Stone Word fixtures of the QT, PI, OC, CI and PL (§8.6) were captured again once, deliberately; the PDF fixtures did not change.
 
-**Word copy of the CI and Debit Note uses the PDF's wording (MTX-005, owner decision 13 Nov 2026, item 3 Option A, confirmed twice).** The Word builders print the Commercial Invoice and the Debit Note in exactly the PDF's words, both stacks: title **DEBIT NOTE** (not "FREIGHT DEBIT NOTE"); "Payment of this Debit Note is required within 3 Calendar Days …"; "Share bank remittance copy … within 24 hours of payment"; "Please quote Debit Note No. … in your T/T remarks"; on the CI "Paid separately via Debit Note No. …", "PAID VIA DEBIT NOTE", "CFR/CIF: Against Debit Note No. …", "Advance + Debit Note (if applicable)", "… paid separately via Debit Note, not through this Advance/Balance schedule …", "To Be Confirmed — must match this invoice date" and the PDF's Bill of Lading line ("3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest"). The internal code "FDN" never appears in the buyer-facing Word text; the SUBTOTAL ALREADY PAID row adds "+ <amount> (freight)" only when a freight amount is recorded (as the PDF). The PDFs did not change. Tests: `DocxDebitNoteWordingMtx005Test` / `docxDebitNoteWordingMtx005.test.js`; the Natural Stone Word CI fixtures (FOB_CI_docx, CIF_CI_docx) were captured again once. Still different between PDF and Word on every document type (left for the owner): the PDF's "Terms used in this document are defined in Section N …" line under the header and its footer line “"NexaCrest" in this document refers to …” are not in the Word copies.
+**Word copy of the CI and Debit Note uses the PDF's wording (MTX-005, owner decision 13 Nov 2026, item 3 Option A, confirmed twice).** The Word builders print the Commercial Invoice and the Debit Note in exactly the PDF's words, both stacks: title **DEBIT NOTE** (not "FREIGHT DEBIT NOTE"); "Payment of this Debit Note is required within 3 Calendar Days …"; "Share bank remittance copy … within 24 hours of payment"; "Please quote Debit Note No. … in your T/T remarks"; on the CI "Paid separately via Debit Note No. …", "PAID VIA DEBIT NOTE", "CFR/CIF: Against Debit Note No. …", "Advance + Debit Note (if applicable)", "… paid separately via Debit Note, not through this Advance/Balance schedule …", "To Be Confirmed — must match this invoice date" and the PDF's Bill of Lading line (then "3 originals issued by the shipping line | 2 originals couriered …"; since D-380, 18 Nov 2026, the "full set of original Bills of Lading" wording of §8.12 in both PDF and Word). The internal code "FDN" never appears in the buyer-facing Word text; the SUBTOTAL ALREADY PAID row adds "+ <amount> (freight)" only when a freight amount is recorded (as the PDF). The PDFs did not change. Tests: `DocxDebitNoteWordingMtx005Test` / `docxDebitNoteWordingMtx005.test.js`; the Natural Stone Word CI fixtures (FOB_CI_docx, CIF_CI_docx) were captured again once. Still different between PDF and Word on every document type (left for the owner): the PDF's "Terms used in this document are defined in Section N …" line under the header and its footer line “"NexaCrest" in this document refers to …” are not in the Word copies.
 
 **PDF page footer, same on both stacks (MTX-006, owner decision 13 Nov 2026, item 4, confirmed twice).** Every PDF page with a document reference carries one left-aligned footer line "`{reference}  —  Page n of N`", 8 pt, grey rgb(0.35, 0.37, 0.45) (#596075), Aptos/Carlito, 42.5 pt from the left edge. PHP draws it in `DocumentGenerationService::addRunningHeaderFooter()` (DOMPDF page script, unchanged); Node uses the same text, size, colour, font and left offset in `pdfRenderService.buildPdfOptions()` (Puppeteer `footerTemplate`; before: reference at the left, "Page n of N" at the right, no dash). The engines still break pages differently, so a document can have a different page count on the two stacks — deliberately not changed. Tests: `PdfFooterFormatMtx006Test` / `pdfRenderServiceFooter.test.js`.
+
+### 8.12 Bill of Lading "full set", Product Form, quantities To Be Confirmed (D-380, D-386, D-387, D-388; 18 Nov 2026)
+
+Owner decisions of 18 Nov 2026 — **document changes, each confirmed twice** (§8.7). PDF (twig / njk) and Word
+builders, both stacks. Documents already issued keep what they printed.
+
+**D-380 Bill of Lading wording.**
+- **QT / PI / CI section 7, item 4** (PDF and Word — the Word QT / PI text, which differed before, is now the same
+  as the PDF): "4. Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to
+  the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release /
+  surrendered BL on request)". (Was: "3 originals issued by the shipping line | 2 originals couriered to Buyer … |
+  1 original retained by NexaCrest".)
+- **T&C clause 95** (seed and, by migration `2026-11-18c`, the live master clause only — per-order frozen copies are
+  not touched): opens "Bill of Lading: The full set of original negotiable Bills of Lading, as issued by the shipping
+  line, will be released to the buyer only after" (was "Original negotiable BL (3 originals) will be released to
+  buyer only after"); the rest of the clause is unchanged.
+- **BL Instruction** (PDF and Word): "Always issue: ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET"; No. of Original
+  Copies "Full set as issued by the shipping line (the number is stated on the BL)"; release banner "CHA to hand the
+  full set of originals to NexaCrest only — never to the buyer or anyone else." "DO NOT ISSUE SEA WAYBILL OR EXPRESS
+  BL" and 3 non-negotiable copies are kept.
+- **Reference-library checklists** (seed and live rows by `REPLACE()` in `2026-11-18c`): "BL TYPE: Original
+  Negotiable Bill of Lading — full set of originals. Telex Release / surrendered BL only on the buyer's request and
+  with MD approval, after the balance is cleared."; "NexaCrest retains the full set of originals until the balance
+  T/T is cleared" (no fixed 60 %); "HS Code: 68029300" (was 6802.93). "NEVER request Sea Waybill or Express BL" kept.
+
+**D-386 "Product Form" on the QT, PI, OC and CI.** A goods line with a Sold as (D-385, §6.2) prints "Product Form:
+<form name>" in its grey detail line — on the detailed table (`LineTable::detail`) immediately before "HS Code:", on
+the simple table as the first item of the spec row. `LineTable::PRODUCT_FORM_DOCUMENTS = ['QT', 'PI', 'OC', 'CI']`;
+the form names come from `ProductForms::formNameForOrderLines($orderId)` (one query). Lines without a Sold as print
+exactly as before; Packing List, BL Instruction, COO prep, Buyer PO and the other documents are unchanged.
+
+**D-387 Supplier PO and Products Amendment.** Supplier PO Section 3: a row "Product Form" right after the material
+row, from the new column `order_supplier_po.product_form` (VARCHAR 80; migration `2026-11-18c`). The Supplier PO form
+(Step 7a) prefills it from the order lines' Sold as forms ("e.g., Raw block"; editable like the other Section 3
+fields; empty = not printed); the order page's Supplier PO summary shows it. Products Amendment (buyer document): a
+second line "Product Form: <form>" in the Product cell for lines with a Sold as (`ProductsAmendmentService`).
+
+**D-388 quantities To Be Confirmed.** On every document built from the line tables (QT, PI, OC, CI and the others that
+can print a TBC line): a goods line with `quantity_is_tbc` prints its **line total** "To Be Confirmed" (never 0.00);
+the **TOTAL** row, **FOB Value**, **TOTAL QUOTED VALUE**, the CI's total invoice value and the **amount in words**
+print "To Be Confirmed" when every goods line is TBC, else "<known sum, formatted as before> + line 2 To Be
+Confirmed" (several: "+ lines 2, 4 To Be Confirmed"). `LineTable::tbcLines()` / `LineTable::tbcTotal()` (Node twins).
+Price per unit prints as before. No change to the stored `fob_value`, the app screens, Zoho, CAFIN or profit.
+
+Tests: `DocumentsBlFormTbcD380D388Test`, `LineTableFormAndTbcD386D388Test` (Node twins); the Natural Stone identity
+fixtures (§8.6) for QT / PI / OC / CI / BLI (PDF and Word) were captured again once for the BL wording.
 
 ---
 
@@ -5671,6 +5760,8 @@ The full register is `docs/decisions/owner-decisions-register.md` (about 260 dec
 
 **Orders, documents and annexures, 12 Nov 2026 (D-336–D-346, D-349, D-352–D-356).** "As per annexure" order lines, Annexure B (as shipped) and the annexure chosen for the CI / PL (D-336, §8.8); reorder lines "As per annexure", a duplicate keeps Annexure A, a worked-out CBM price goes to the MD (D-338); one "Save all changes" on the annexure page, Edit / Regenerate Annexure A, Annexure B from the CI step (D-341); buyer details on orders follow the client — automatic while nothing is issued, by approved request after (D-337); the detailed product table, No. of pieces and prices in other units (D-339, §8.9); prices and products fixed by the first approved Quotation, changed only by a Products & prices amendment (D-342, §8.10); Indian grouping on INR documents, Total CBM from the lines, Word section numbers as the PDF (D-343, §8.11); "Documents to be provided" without "(digitally authorised)" (D-344); every Supplier PO in Indian grouping (D-345); the client billing address in parts only (D-346); the COO line without "TBC" and the MD name / title kept in sync (D-349); no mandatory note or stars, headings kept with their content, the Payment Terms box, a clean Word spacer (D-352–D-356, §8.5).
 
+**Product forms, specifications (HS) and documents, 18 Nov 2026 (D-380–D-389).** Bill of Lading "full set of originals" on QT / PI / CI, clause 95, BLI and the checklists (D-380, §8.12); CHA + transport per supplier, row → supplier → product (D-381, §7.1); Forms of stone with their units, block prices per tonne (D-382); Specifications (HS) and finishes per form — blocks only Roughly trimmed / Sawn (D-383); product Sold as (D-384); order line Sold as with a locked HS code, MD/ED override with a reason (D-385); "Product Form" on QT / PI / OC / CI (D-386) and the Supplier PO / Products Amendment (D-387); TBC quantities print "To Be Confirmed" totals (D-388); option order editable, Monument first (D-389). Migrations 2026-11-18a/b/c.
+
 **Products, suppliers and pricing, 12–13 Nov 2026 (D-340, D-347, D-348, D-357–D-365).** "Rate used for prices right now" box and the order-page rate line (D-340); "Monument (cut to size)" and the installation defaults — Testing mode on, incentive on, other costs 5.5 %, margin 15 % (D-347); Thickness and Size / format always chosen on an order line (D-348); one list of surface-finish names in Settings › Lists, base "Natural Polish" (D-357); Duplicate a product (D-358); supplier offers with an Offer active switch, Edit price and "+ Add product" (D-359, D-360); the configured base price that never changes by itself, Configure with Global / Category / Product values, Link a supplier, Link these prices, quotable-only Pick from Products and the Supplier PO supplier choice (D-361); Global pricing settings and Category price rules reached from the Products link bar (D-362); Products list buttons, the category form, "Also work out" rows and Configure › Thickness rules (D-363); supplier prices per SQFT and the unit names SQM · SQFT · CBM on every screen (D-364); the Products list short view and the "Pricing ready?" rework (D-365). Sitewide buttons: a pressed button's choice always reaches the server, and a question written on a button is asked (D-350, D-351).
 
 ### 13.3 Standing rules in one list
@@ -5733,6 +5824,7 @@ Prepared 6 Nov 2026. Each answer becomes a settings / SOP / checklist update in 
 | | Import & Distribution | Basic duty 20%, SWS 10%, IGST 18%; assessable value; IGST credit timing; landed cost basis |
 | | divisions | Zoho account names (Imported Goods Stock, IGST Paid on Import, Merchanting Trade Sales / Purchases) |
 | | Merchant Trade | GST on merchanting |
+| | Product forms (D-383, 18 Nov 2026) | HS code for granite slabs and tiles: 68022310 (seeded) or 68029300 — the Specifications (HS) rows stay editable, so no marking is needed; change the row on Products › Specifications (HS) once the CA confirms |
 | `AD_bank_questions.md` | Merchant Trade / Import | 9-month whole-deal limit; 4-month outlay limit; advance above USD 500,000 needs LC/BG?; documents per deal; bank approval; switch BL; reporting; import LCs; documents for payments abroad |
 | | current Export business | FIRC per remittance vs eBRC on the DGFT portal |
 | `Lawyer_questions.md` | **Export go-live:** questions 1–3 | Associate agreement redraft; liquidated damages abroad; Sales Manager Schedule A (see `docs/legal/D-245-lawyer-notes.md`); associate access levels |
@@ -5940,7 +6032,7 @@ PHP paths are under `PHP_MySQL_Version/app/src/` (routes: `PHP_MySQL_Version/pub
 | Clients and intake | `ClientController.php`, `ClientIntakeController.php`, `ClientIntakeReviewController.php`, `PiIntakeController.php`, `PiIntakeReviewController.php`, `AssociateIntakeService.php` | `clientsController.js`, `clientIntakeController.js`, `clientIntakeReviewController.js`, `piIntakeController.js`, `piIntakeReviewController.js`, `associateIntakeService.js` | §5.2, §6.1 |
 | Orders, stages, gates | `OrderController.php`, `StageGateService.php`, `ShipmentGateService.php`, `OrderSnapshotService.php`, `OrderEditGuard.php`, `OrderDuplicationService.php`, `ReferenceNumberService.php` | `ordersController.js`, `stageGateService.js`, `shipmentGateService.js`, `orderSnapshotService.js`, `orderEditGuard.js`, `orderDuplicationService.js`, `referenceNumberService.js` | §5 |
 | Amendments, disputes, complaints | `AmendmentController.php`, `AmendmentService.php`, `DisputeController.php`, `ComplaintController.php`, `OrderComplaintService.php` | `amendmentController.js`, `amendmentService.js`, `disputeController.js`, `complaintController.js`, `orderComplaintService.js` | §5.9 |
-| Products, categories, specifications | `ProductController.php`, `ProductCategoryController.php`, `SpecController.php`, `ProductService.php`, `ProductSpecs.php`, `CategoryDocumentProfile.php` | `productsController.js`, `productCategoryController.js`, `specController.js`, `productService.js`, `productSpecs.js`, `categoryDocumentProfile.js` | §6.2 |
+| Products, categories, specifications | `ProductController.php`, `ProductCategoryController.php`, `SpecController.php`, `ProductService.php`, `ProductSpecs.php`, `CategoryDocumentProfile.php`, `ProductForms.php` + `ProductFormController.php` (D-382 … D-385), `SupplierCha.php` (D-381) | `productsController.js`, `productCategoryController.js`, `specController.js`, `productService.js`, `productSpecs.js`, `categoryDocumentProfile.js`, `productForms.js` + `productFormController.js`, `supplierCha.js` | §6.2, §7.1 |
 | Pricing, price requests | `PricingController.php`, `PriceRequestController.php`, `PricingEngine.php`, `PricingService.php`, `OrderLinePricing.php`, `PriceRequestService.php` | `pricingController.js`, `priceRequestController.js`, `pricingEngine.js`, `pricingService.js`, `orderLinePricing.js`, `priceRequestService.js` | §6.3, §7.1–7.2 |
 | Team incentive | `IncentiveController.php`, `IncentiveReportController.php`, `IncentiveService.php`, `IncentiveReportService.php` | `incentiveController.js`, `incentiveReportController.js`, `incentiveService.js`, `incentiveReportService.js` | §6.5, §7.4 |
 | Procurement, suppliers | `PurchasingController.php`, `PurchasingService.php`, `SupplierController.php`, `SupplierActionController.php`, `VendorBillController.php`, `VendorDetailsController.php` | `purchasingController.js`, `purchasingService.js`, `supplierController.js`, `supplierActionController.js`, `vendorBillController.js`, `vendorDetailsController.js` | §6.6 |

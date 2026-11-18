@@ -20,6 +20,8 @@
         data-unit="{{ pp.reference_unit or '' }}"
         {% if ppPrices %}data-prices="{{ ppPrices | dump }}"{% endif %}
         {% if pickerSpecs and pickerSpecs[pp.id] %}data-spec-options="{{ pickerSpecs[pp.id] | dump }}"{% endif %}
+        {# D-385: the product's "Sold as" ticks (none = every specification). #}
+        {% if pickerSoldAs and pickerSoldAs[pp.id] and pickerSoldAs[pp.id].length %}data-sold-as="{{ pickerSoldAs[pp.id] | dump }}"{% endif %}
         {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
     {% endfor %}
     {# D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. #}

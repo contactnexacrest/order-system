@@ -22,6 +22,9 @@ async function index(req, res) {
   res.renderView('dropdown_options/index', {
     grouped: await dropdownOptionRepository.allGrouped(true),
     finishPrices: await surfaceFinishList.priceColumn(),
+    // D-383 (18 Nov 2026): which forms of stone each finish is offered for.
+    productForms: await require('../services/productForms').forms(),
+    finishFormMap: await require('../services/productForms').finishFormMap(),
     finishSaved: finishSaved && typeof finishSaved === 'object' ? finishSaved : null,
     finishListKey: surfaceFinishList.LIST_KEY,
     finishMaxName: surfaceFinishList.MAX_NAME,
@@ -114,6 +117,29 @@ async function update(req, res) {
     }
   }
 
+  // D-383 (18 Nov 2026): surface_finish — "Offered for forms" ticks per finish; a change needs the page's reason.
+  const productFormsService = require('../services/productForms');
+  const finishFormChanges = [];
+  if (listKey === surfaceFinishList.LIST_KEY && req.body.finish_forms_present !== undefined && req.body.finish_forms_present !== '' && req.body.finish_forms_present !== '0') {
+    const formIds = (await productFormsService.forms()).map((f) => Number(f.id));
+    const map = await productFormsService.finishFormMap();
+    const postedForms = req.body.finish_forms && typeof req.body.finish_forms === 'object' ? req.body.finish_forms : {};
+    for (const row of rows) {
+      const id = Number(row.id);
+      const mine = postedForms[id] && typeof postedForms[id] === 'object' ? postedForms[id] : {};
+      const tickedIds = Object.keys(mine).filter((k) => mine[k] !== undefined).map((k) => parseInt(k, 10) || 0);
+      const want = formIds.filter((f) => tickedIds.includes(f)).sort((a, b) => a - b);
+      const have = (map[id] || []).slice().sort((a, b) => a - b);
+      if (JSON.stringify(want) !== JSON.stringify(have)) finishFormChanges.push([id, have, want, String(row.option_value)]);
+    }
+    const reasonError = finishFormChanges.length ? require('../helpers/reasonValidator').check(String(req.body.reason ?? '')) : null;
+    if (reasonError !== null) {
+      flash.set(req, 'error', `Offered for forms: ${reasonError}`);
+      res.redirect(`/admin/dropdown-options#list-${listKey}`);
+      return;
+    }
+  }
+
   let changedCount = 0;
   const renames = [];
   const activeChanged = [];
@@ -143,6 +169,18 @@ async function update(req, res) {
     if (currentDefault !== defaultId) {
       await dropdownOptionRepository.setDefault(defaultId, listKey);
       await auditLogRepository.log(req.user.id, 'DROPDOWN_OPTION_DEFAULT_CHANGED', 'dropdown_options', defaultId, 'is_default', String(currentDefault), String(defaultId));
+      changedCount++;
+    }
+  }
+
+  if (finishFormChanges.length) {
+    const names = {};
+    for (const f of await productFormsService.forms()) names[Number(f.id)] = String(f.name);
+    const text = (ids) => (ids.length ? ids.map((i) => (Object.prototype.hasOwnProperty.call(names, i) ? names[i] : `#${i}`)).join(', ') : 'no form');
+    for (const [id, have, want, finishName] of finishFormChanges) {
+      await productFormsService.setFinishForms(id, want);
+      await auditLogRepository.log(req.user.id, 'FINISH_FORMS_CHANGED', 'dropdown_options', id, 'offered_for_forms',
+        `${finishName}: ${text(have)}`, `${finishName}: ${text(want)}`, String(req.body.reason ?? '').trim());
       changedCount++;
     }
   }

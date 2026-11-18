@@ -44,7 +44,8 @@ done:
   balance clears.
 - **13b · Record Original BLs Received from CHA** — how many original
   Bill of Lading copies came back from the Customs House Agent: a whole
-  number from 1 to 10 (usually 3). A blank, 0, negative or larger number
+  number from 1 to 10 — the full set the shipping line issued, as stated
+  on the BL (often 3; D-380). A blank, 0, negative or larger number
   is refused with "Enter how many original BL copies were received (1 to
   10)." (QA Round 8).
 - **13c · Save BL Endorsement Details** — who to endorse to, BL/vessel/

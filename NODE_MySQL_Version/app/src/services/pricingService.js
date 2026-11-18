@@ -409,15 +409,29 @@ async function buildFromFob(product, fobInr, s = null, program = null) {
 async function fobParts(product, supplier, basis, mm, s = null, gridRules = null) {
   const thicknessPrices = require('./thicknessPrices');
   s = s || (await settings());
+  // D-381: the row's directory supplier's CHA figure (the fallback for a row without its own).
+  supplier = await thicknessPrices.withSupplierCha(supplier);
   if ((supplier.price_basis || '') === 'grid') {
     const r = gridRules || (await thicknessPrices.rules(product, s));
     // D-359: a configured base price carries its own prices (_stored); a supplier row reads its stored ones.
-    return thicknessPrices.cost(r, supplier._stored || (await thicknessPrices.storedFor(Number(supplier.id))), supplier, product, basis, mm);
+    const cost = thicknessPrices.cost(r, supplier._stored || (await thicknessPrices.storedFor(Number(supplier.id))), supplier, product, basis, mm);
+    if (cost !== null) {
+      // D-381: where the CHA came from (a small tag in the Price check / build-up).
+      const src = thicknessPrices.chaSource(supplier, product);
+      cost.cha_source = src.source;
+      cost.cha_source_tag = thicknessPrices.chaSourceTag(src);
+    }
+    return cost;
   }
   const base = productService.effectiveFobForSupplier(supplier, product);
   if (base === null || base === undefined) return null;
   const parts = { supplier: base, cha: 0, packing: 0, total: base, unit: basis === 'cbm' ? 'CBM' : String(product.reference_unit || ''), mm, how: 'typed', note: null };
-  const perContainer = thicknessPrices.chaPerContainer(supplier, product);
+  // D-381: the row's figure → its supplier's → the product default; none on a 'computed' row (CHA already inside).
+  const chaSrc = thicknessPrices.chaSource(supplier, product);
+  parts.cha_source = chaSrc.source;
+  parts.cha_source_tag = thicknessPrices.chaSourceTag(chaSrc);
+  if (chaSrc.computed) parts.note = thicknessPrices.CHA_INSIDE_NOTE;
+  const perContainer = chaSrc.value;
   if (perContainer !== null) {
     const r = gridRules || (await thicknessPrices.rules(product, s));
     const cha = thicknessPrices.chaPerCbm(perContainer, Number(r.container_cbm), r.container_max_t, r.t_per_cbm);
@@ -622,7 +636,7 @@ async function readiness(product, s = null) {
       link: market, link_text: ignored > 0 ? 'Renew in Market prices' : 'Market prices',
     };
   }
-  const forms = productSpecs.productForms(product);
+  const forms = await productSpecs.productForms(product);
   const open = new Set();
   if (categoryId !== null) {
     const rows = await db.query('SELECT apa.forms FROM associate_price_access apa JOIN associates a ON a.id = apa.associate_id WHERE apa.category_id = :c AND a.status = \'active\'', { c: categoryId });

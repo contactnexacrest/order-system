@@ -46,6 +46,27 @@ async function setOfferChoice(id, offerId, quoted, reason) {
     { o: offerId, q: quoted !== null && quoted !== undefined ? Number(quoted).toFixed(2) : null, r: reason ?? null, id });
 }
 
+/** D-387: the Supplier PO "Product Form" as typed — trimmed, at most 80 characters, empty = null (row not printed). */
+function productFormInput(raw) {
+  const v = String(raw ?? '').trim();
+  return v !== '' ? [...v].slice(0, 80).join('') : null;
+}
+
+/**
+ * Owner decision D-387 (18 Nov 2026, confirmed twice): what the Supplier PO form's "Product Form"
+ * starts with — the form of the order's goods lines that have a "Sold as" (productForms), the
+ * different ones joined with ", "; null when no line has one.
+ */
+async function defaultProductForm(orderId) {
+  const forms = (await require('../services/productForms').formNameForOrderLines(orderId)) || {};
+  const names = [];
+  for (const line of await require('./orderProductRepository').forOrder(orderId)) { // active lines, in line order
+    const n = String(forms[Number(line.id)] ?? '').trim();
+    if (n !== '' && (line.line_type || 'goods') === 'goods' && !names.includes(n)) names.push(n);
+  }
+  return names.length > 0 ? [...names.join(', ')].slice(0, 80).join('') : null;
+}
+
 async function create(orderId, supplierId, supplierPoReference, data, status = 'issued') {
   const snapshot = await resolveSupplierSnapshot(supplierId, data.supplier_type);
   const result = await db.execute(
@@ -53,7 +74,7 @@ async function create(orderId, supplierId, supplierPoReference, data, status = '
         (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_city, supplier_state,
          supplier_gstin, supplier_pan, supplier_contact_person, supplier_contact_person_phone,
          supplier_contact_person_whatsapp, supplier_phone, supplier_email, supplier_whatsapp_number, supplier_type,
-         supplier_po_reference, material_stone_type, grade, surface_finish,
+         supplier_po_reference, material_stone_type, product_form, grade, surface_finish,
          dimensions, dimensional_tolerance, quantity, unit, colour_reference, special_requirements,
          unit_price_inr, basic_value_inr, gst_rate_pct, gst_amount_inr, total_payable_inr,
          advance_pct, advance_amount_inr, balance_amount_inr,
@@ -62,7 +83,7 @@ async function create(orderId, supplierId, supplierPoReference, data, status = '
         (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_city, :supplier_state,
          :supplier_gstin, :supplier_pan, :supplier_contact_person, :supplier_contact_person_phone,
          :supplier_contact_person_whatsapp, :supplier_phone, :supplier_email, :supplier_whatsapp_number, :supplier_type,
-         :ref, :material, :grade, :finish,
+         :ref, :material, :product_form, :grade, :finish,
          :dimensions, :tolerance, :quantity, :unit, :colour, :special,
          :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
          :advance_pct, :advance_amount, :balance_amount,
@@ -72,6 +93,8 @@ async function create(orderId, supplierId, supplierPoReference, data, status = '
       ...snapshot,
       ref: supplierPoReference, status,
       material: data.material_stone_type ?? null,
+      // D-387: Section 3 "Product Form" — as typed on the form (empty = not printed); without the field, the order lines' form.
+      product_form: Object.prototype.hasOwnProperty.call(data, 'product_form') ? productFormInput(data.product_form) : await defaultProductForm(orderId),
       grade: data.grade ?? 'Grade A',
       finish: data.surface_finish ?? null,
       dimensions: data.dimensions ?? null,
@@ -196,7 +219,7 @@ async function isAckSkipped(id) {
   return Boolean(row && row.ack_skipped_at);
 }
 
-module.exports = { setOfferChoice,
+module.exports = { setOfferChoice, productFormInput, defaultProductForm,
   create, findLatestForOrder, markSigned, markAdvancePaid, markBalancePaid, paidOnDate,
   generateActionToken, findByValidActionToken, markAckSkipped, isAckSkipped,
 };

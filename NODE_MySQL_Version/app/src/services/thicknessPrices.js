@@ -195,11 +195,101 @@ function cbmPerUnit(unit, mm, tPerCbm) {
   return lineUnits.cbmPerUnit(unit, null, null, mm / 10, tPerCbm);
 }
 
-/** The row's CHA + transport per container, else the product's default (₹). */
+/**
+ * The CHA + transport per container (₹) a price row adds. Owner decision D-381 (18 Nov 2026):
+ * the row's own figure → its directory supplier's figure (catalog_product_suppliers.supplier_id
+ * → suppliers.cha_transport_per_container) → the product's default → none. A row with
+ * fob_source 'computed' (an older price with the CHA already inside) never gets it.
+ */
 function chaPerContainer(row, product) {
-  let v = row.cha_transport_per_container;
-  if (v === null || v === undefined || v === '') v = product.cha_transport_per_container;
-  return v === null || v === undefined || v === '' ? null : Number(v);
+  return chaSource(row, product).value;
+}
+
+/** D-381: the note shown where a 'computed' row adds no per-container CHA. */
+const CHA_INSIDE_NOTE = 'CHA already inside this older price';
+
+const blank = (v) => v === null || v === undefined || v === '';
+
+/**
+ * D-381: the figure chaPerContainer() uses and WHERE it came from: 'row' | 'supplier' |
+ * 'product' | null (none), with the supplier's port when it is the supplier's figure.
+ * 'computed' is true for a row whose price already holds the CHA (value null then).
+ *
+ * @returns {{value: ?number, source: ?string, port: ?string, computed: boolean}}
+ */
+function chaSource(row, product) {
+  if (((row && row.fob_source) || 'direct') === 'computed') return { value: null, source: null, port: null, computed: true };
+  const v = row ? row.cha_transport_per_container : null;
+  if (!blank(v)) return { value: Number(v), source: 'row', port: null, computed: false };
+  return chaFallback(row, product);
+}
+
+/**
+ * D-381: what a row WITHOUT its own figure falls back to — its supplier's figure, else the
+ * product's default (the Edit price placeholder names it).
+ *
+ * @returns {{value: ?number, source: ?string, port: ?string, computed: boolean}}
+ */
+function chaFallback(row, product) {
+  const sup = supplierCha(row || {});
+  if (sup !== null) return { value: sup.value, source: 'supplier', port: sup.port, computed: false };
+  const p = product ? product.cha_transport_per_container : null;
+  if (!blank(p)) return { value: Number(p), source: 'product', port: null, computed: false };
+  return { value: null, source: null, port: null, computed: false };
+}
+
+/**
+ * D-381: the row's directory supplier's CHA + transport per container, or null — from the joined
+ * columns (productSupplierRepository; withSupplierCha() reads them for a row that lacks them).
+ */
+function supplierCha(row) {
+  if (!Object.prototype.hasOwnProperty.call(row, 'supplier_cha_per_container')) return null;
+  const v = row.supplier_cha_per_container;
+  if (blank(v)) return null;
+  const port = !blank(row.supplier_cha_port) && String(row.supplier_cha_port).trim() !== '' ? String(row.supplier_cha_port).trim() : null;
+  return { value: Number(v), port };
+}
+
+/**
+ * D-381: a price row with its directory supplier's CHA columns (supplier_cha_per_container,
+ * supplier_cha_port) — the row itself when it already carries them (productSupplierRepository
+ * joins them) or has no directory supplier; else a copy with them read from suppliers (the
+ * PHP twin reads them inside ThicknessPrices::supplierCha()).
+ */
+async function withSupplierCha(row) {
+  if (!row || Object.prototype.hasOwnProperty.call(row, 'supplier_cha_per_container')) return row;
+  const sid = Number(row.supplier_id || 0);
+  if (!(sid > 0)) return row;
+  const s = await db.queryOne('SELECT cha_transport_per_container, cha_port FROM suppliers WHERE id = :id', { id: sid });
+  if (!s) return row;
+  return { ...row, supplier_cha_per_container: s.cha_transport_per_container, supplier_cha_port: s.cha_port };
+}
+
+/**
+ * D-381: the small source tag beside the CHA in the Price check / build-up: "this price",
+ * "supplier" (+ " · <port>"), "product default"; null when there is no CHA figure.
+ */
+function chaSourceTag(src) {
+  switch ((src && src.source) || null) {
+    case 'row': return 'this price';
+    case 'supplier': return `supplier${src.port ? ` · ${src.port}` : ''}`;
+    case 'product': return 'product default';
+    default: return null;
+  }
+}
+
+const rupees2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * D-381: the Edit price CHA placeholder / help — what an empty field falls back to:
+ * "Empty = supplier's ₹45,000.00 (Mundra)", "Empty = product default ₹40,000.00",
+ * else "Empty = no CHA + transport".
+ */
+function chaFallbackText(row, product) {
+  const f = chaFallback(row, product);
+  if (f.source === 'supplier') return `Empty = supplier's ₹${rupees2(f.value)}${f.port !== null ? ` (${f.port})` : ''}`;
+  if (f.source === 'product') return `Empty = product default ₹${rupees2(f.value)}`;
+  return 'Empty = no CHA + transport';
 }
 
 /** The supplier's cost per the product's unit (or per CBM) for one thickness, from a row; null when unusable. */
@@ -207,7 +297,9 @@ function cost(r, typed, row, product, basis, mm) {
   const auto = autoFill(row);
   const done = values(r, typed, auto);
   if (!done.ok) return null;
-  const cha = chaPerCbm(chaPerContainer(row, product), Number(r.container_cbm), r.container_max_t, r.t_per_cbm);
+  const chaSrc = chaSource(row, product);
+  const cha = chaPerCbm(chaSrc.value, Number(r.container_cbm), r.container_max_t, r.t_per_cbm);
+  const chaNote = chaSrc.computed ? CHA_INSIDE_NOTE : null; // D-381
   const packing = Number(row.includes_packing_loading ?? 1) === 0 ? Number(product.default_packing_cost || 0) + Number(product.default_loading_cost || 0) : 0;
   // D-335: the row's BASE (the user's choice) is what the product-level price uses.
   const baseMm = rowBase(row);
@@ -218,7 +310,7 @@ function cost(r, typed, row, product, basis, mm) {
     // D-338 (2b): a CALCULATED per-CBM price — from which thinner price it was worked out
     // (the stored calc_from_mm, else the row's base) — needs the MD's approval on an order line.
     if (basis === 'cbm') {
-      return { supplier: v.price, cha: chaU, packing, total: v.price + chaU + packing, unit: 'CBM', mm, how: v.how, note: null,
+      return { supplier: v.price, cha: chaU, packing, total: v.price + chaU + packing, unit: 'CBM', mm, how: v.how, note: chaNote,
         calc_from_mm: v.how === 'calculated' ? Number(v.calc_from_mm ?? baseOf(row, r)) : null,
         cbm_from: Number(r.cbm_from) };
     }
@@ -227,7 +319,7 @@ function cost(r, typed, row, product, basis, mm) {
     const per = cbmPerUnit(unit, Number(r.cbm_from), r.t_per_cbm);
     if (per === null) return null;
     const supplier = Number(v.price) * per;
-    return { supplier, cha: chaU * per, packing, total: supplier + chaU * per + packing, unit, mm: null, how: v.how, note: null, base: CBM };
+    return { supplier, cha: chaU * per, packing, total: supplier + chaU * per + packing, unit, mm: null, how: v.how, note: chaNote, base: CBM };
   }
   const m = mm ?? Number(baseMm ?? r.base_mm);
   let v = done.values[Math.round(m)];
@@ -243,7 +335,7 @@ function cost(r, typed, row, product, basis, mm) {
   if (per === null) return null;
   const supplier = perCbm * per;
   const chaU = (cha.per_cbm ?? 0) * per;
-  return { supplier, cha: chaU, packing, total: supplier + chaU + packing, unit, mm: m, how: v.how, note: null };
+  return { supplier, cha: chaU, packing, total: supplier + chaU + packing, unit, mm: m, how: v.how, note: chaNote };
 }
 
 // ------------------------------------------------------------- D-335: typed wins, a base, a calculator
@@ -502,6 +594,7 @@ async function historyFor(productSupplierId) {
 module.exports = {
   CBM, DEFAULT_K, DEFAULT_CONTAINER_CBM, DEFAULT_CONTAINER_MAX_T,
   fmt, label, rules, complete, ordered, readForm, chaPerCbm, m2ToCbm, cbmPerUnit, chaPerContainer, cost,
+  CHA_INSIDE_NOTE, chaSource, chaFallback, withSupplierCha, chaSourceTag, chaFallbackText,
   typedFor, saveTyped, history, historyFor,
   autoFill, rowBase, baseOf, normalise, values, amount, thicknesses, calcFrom, storedFor, addPrice, setBase,
 };

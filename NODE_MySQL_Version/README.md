@@ -1565,7 +1565,7 @@ Zoho Books, built from the facts and including the bank reference.
 
 Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links.sql`, `2026-11-02n-document-copy-cleanup.sql`, `2026-11-02r-export-compliance.sql`, `2026-11-02q-remittance-difference.sql`, `2026-11-02s-agreements-register.sql`, `2026-11-02t-remittance-difference-reasons.sql`, `2026-11-02u-reference-library-payment-guide.sql` (history — now part of schema.sql / seed.sql, D-241). Schema: **148 tables** at that point (**153** at go-live, after D-238 – D-240).
 
-- **Documents (D-223, D-224 — owner confirmed twice):** Quotation and Proforma Invoice have no untitled CoO / Port of Discharge table; the PI prints Buyer's PO / Ref No. in Buyer Details only when entered; the Order Confirmation shows the Buyer's PO; the Debit Note's "To (Buyer)" is the full buyer block; BL Instruction section 8 no longer gives payment terms ("Original BL release: CHA to hand all 3 originals to NexaCrest only"); the Commercial Invoice says "the value declared on the Indian Shipping Bill" (no "IGST refund") and prints the total in words (`src/helpers/amountInWords.js`). PDF and Word alike; the reference Word files (`reference_templates/`) match. Tests: `quotationPiLayout.test.js`, `documentWordingD224.test.js`.
+- **Documents (D-223, D-224 — owner confirmed twice):** Quotation and Proforma Invoice have no untitled CoO / Port of Discharge table; the PI prints Buyer's PO / Ref No. in Buyer Details only when entered; the Order Confirmation shows the Buyer's PO; the Debit Note's "To (Buyer)" is the full buyer block; BL Instruction section 8 no longer gives payment terms ("Original BL release: CHA to hand all 3 originals to NexaCrest only" — since D-380, 18 Nov 2026: "the full set of originals"); the Commercial Invoice says "the value declared on the Indian Shipping Bill" (no "IGST refund") and prints the total in words (`src/helpers/amountInWords.js`). PDF and Word alike; the reference Word files (`reference_templates/`) match. Tests: `quotationPiLayout.test.js`, `documentWordingD224.test.js`.
 - **Freight in rupees (D-225):** Step 9a freight and insurance are order currency; `orderProfitabilityService.js` converts them (freight receipt rate → freight leg → advance/balance rate), flags a missing rate instead of adding foreign units as rupees, and the working line ("EUR 950.00 × 90.50 = ₹85,975.00") shows in Step 12c and CAFIN C1. Fixed incentives are not recalculated. Test: `freightCostInInr.test.js`.
 - **Money never leaks (owner points 6/15):** every generated file carries `file_store.linked_document_id`, so drafts, superseded copies and older CAFIN copies follow the same money rule as the current copy (download, dossier ZIP, All Documents); `src/services/auditMoneyMask.js` hides amounts in the Audit Log, an order's audit log, the order report's Full Audit Trail (and their CSVs) and the dashboard's Recent Activity; reports with selling prices or buyer payments refuse people who may not see that money; product list prices need selling rights; document counts count only what the person may see. Proof: `e2e/tests/12-money-matrix.spec.js` (every role × ~75 screens, files, ZIP; 0 violations). Test: `moneyLeakClosures.test.js`.
 - **All Documents panel:** generated documents and every uploaded file of the order, only those the person may open (Sales sees no supplier or logistics papers). Tests: `orderAllDocumentsPanel.test.js`.
@@ -1946,3 +1946,49 @@ on the owner's instruction (syntax checks and browser checks on both stacks).
   unchanged. A supplier price may be typed per SQFT on + Add product, Edit price and Link a supplier: it is
   saved as the SQM price (× 10.7639, `lineUnits SQFT_PER_M2`) and the note keeps what was typed. "Supplier
   performance" on Procurement is a normal small button.
+
+## Follow-up (added 2026-11-18): forms of stone, Specifications (HS), Bill of Lading "full set", CHA per supplier (D-380 … D-389)
+
+Everything below is in `docs/schema.sql` / `docs/seed.sql` (a new install needs nothing else) and in the
+Application Handbook (§6.2, §7.1, §8.12); the SOP chapters 01, 05, 07, 15, 22 and 27 say how staff use it.
+Decisions: `docs/decisions/owner-decisions-register.md` D-380 … D-389; spec
+`docs/decisions/D-380-product-forms-spec.md`.
+
+**Upgrading a live database.** Back up first, then run `docs/checks/check_all_migrations.sql` in phpMyAdmin
+(read-only) and every file whose row says NEEDED, in this order — the files since the fresh install of
+14 Nov 2026 (D-372):
+
+```bash
+mysql -u <user> -p <database> < docs/migrations/2026-11-14a-line-priced-rate.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-15a-sales-targets.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-15b-report-access.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-18a-product-forms-and-hs.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-18b-cha-per-supplier.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-18c-documents-bl-and-po.sql
+```
+
+The three files of 18 Nov are `PLAIN ALTER (owner D-371)`: a second run only stops with "#1060 Duplicate column
+name", which is harmless. Lines already saved, documents already issued and per-order frozen T&C copies keep
+what they have.
+
+- **Forms of stone** (Products › Pricing › Forms of stone, `/pricing/forms`) and **Specifications (HS)**
+  (Products › Specifications (HS), `/products/hs-specifications`): `manage_pricing` to change, view with
+  `view_price_buildup`; reason and audit on every change. **Finishes per form** on Settings › Lists ›
+  surface_finish (new finishes "Roughly trimmed" and "Sawn", blocks only).
+- **Sold as** on the product's Specifications page (`/products/{id}/sold-as`), replacing the old Forms ticks;
+  the product's HS code becomes "HS Code (fallback)".
+- **Order lines:** Sold as in step 1 of the line panel and on New Order rows; the HS code comes from it and only
+  holders of the new permission `override_line_hs_code` (MD, Founder & MD, ED, Founder & ED) can change it, with a
+  reason (audit `HS_CODE_OVERRIDDEN`).
+- **CHA + transport per supplier** on Edit Supplier (row → supplier → product default); block prices may be typed
+  per tonne on Edit price / + Add product.
+- **Documents** (confirmed twice by the owner): Bill of Lading "full set of original Bills of Lading" on QT / PI /
+  CI, clause 95, BL Instruction and the reference checklists; "Product Form: <form>" on QT / PI / OC / CI, the
+  Supplier PO (Section 3) and the Products Amendment; a quantity To Be Confirmed prints "To Be Confirmed" totals,
+  never 0.00.
+- **After the update:** check a few products' Sold as ticks (Products › All products shows "Sold as: …"), ask the
+  CA whether slabs and tiles stay on HS 68022310 or move to 68029300 (edit the specification rows if so), and enter
+  the CHA + transport figure on the suppliers that have one.
+
+**Tutorial videos.** Several recorded screens changed; the videos are **not** re-recorded. The list is in
+`tutorials/VIDEO_PROGRESS.md` ("Also out of date after the 18 Nov 2026 build"), waiting for the owner's decision.

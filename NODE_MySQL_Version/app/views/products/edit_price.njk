@@ -30,6 +30,7 @@
     <a class="edit-price-close" href="{{ backUrl }}" aria-label="Close">✕ close</a>
     <h1>Edit price — {{ row.supplier_name }} · {{ product.name }}</h1>
     <p class="muted">Today: {{ todayLine }}{% if inactive %} <span class="badge badge-warning">offer or supplier inactive — not used</span>{% endif %}</p>
+    {% if enteredText %}<p class="small muted">Typed as {{ enteredText }}.</p>{% endif %}
 
     <form method="post" action="/products/suppliers/{{ row.id }}/edit-price" class="edit-price-form" data-edit-price
           data-preview-url="/products/suppliers/{{ row.id }}/edit-price/preview" data-was="{{ base.inr if base else '' }}">
@@ -58,6 +59,12 @@
                   <option value="{{ sqmUnit }}"{% if oldUnit != 'SQFT' %} selected{% endif %}>SQM</option>
                   <option value="SQFT" data-sqft="1"{% if oldUnit == 'SQFT' %} selected{% endif %}>SQFT</option>
                 </select></label>
+              {% elif tonne %}
+                {# Owner decision D-382 (18 Nov 2026): a block is priced per CBM or per tonne; a price per tonne is saved as the per-CBM price (× the weight per CBM). #}
+                <label>Priced per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                  <option value="{{ tonne.cbm }}"{% if tonneUnit != 'TON' %} selected{% endif %}>CBM</option>
+                  <option value="TON" data-tonne="1"{% if tonneTPerCbm !== null %} data-t-per-cbm="{{ tonneTPerCbm }}"{% endif %}{% if tonneUnit == 'TON' %} selected{% endif %}>Tonne</option>
+                </select></label>
               {% else %}
                 <span class="edit-price-per">per <strong>{{ unitLabel }}</strong></span>
               {% endif %}
@@ -73,7 +80,8 @@
             <summary><strong>More (optional)</strong> — CHA + transport, packing, notes</summary>
             <div class="field-grid">
               <label>CHA + transport per container (₹)<input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" value="{{ cha }}"
-                     placeholder="{{ chaPlaceholder }}"></label>
+                     placeholder="{{ chaPlaceholder }}">
+                <small class="muted">{{ chaFallbackText }}</small></label>
               <label class="full checkbox-label"><input type="hidden" name="includes_packing_loading" value="0"><input type="checkbox" name="includes_packing_loading" value="1"{% if incl %} checked{% endif %}> Price includes packing and loading</label>
               <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks">{{ notes }}</textarea></label>
             </div>

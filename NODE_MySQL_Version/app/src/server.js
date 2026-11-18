@@ -1489,6 +1489,19 @@ app.get('/products/categories/:id', requireAuth, requirePermissionAny(['manage_p
 app.post('/products/categories/:id/price-rules', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productCategoryController.saveRules));
 app.get('/products/price-rules', requireAuth, requirePermissionAny(['manage_pricing', 'view_price_buildup']), asyncHandler(productCategoryController.priceRules));
 app.get('/products/fix-hs-codes', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(catalogueMasterController.fixHsCodes));
+// Owner decisions D-382 … D-384 (18 Nov 2026): Forms of stone, Specifications (HS) — manage_pricing, as Pricing ›
+// Specifications — and a product's "Sold as" ticks (manage_product_specifications, as the rest of its Specifications page).
+// Before /products/:id, which would match first.
+const productFormController = require('./controllers/productFormController');
+app.get('/pricing/forms', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(productFormController.forms));
+app.post('/pricing/forms', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.saveForm));
+app.post('/pricing/forms/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.saveForm));
+app.post('/pricing/forms/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.deleteForm));
+app.get('/products/hs-specifications', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(productFormController.specifications));
+app.post('/products/hs-specifications', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.saveSpecification));
+app.post('/products/hs-specifications/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.saveSpecification));
+app.post('/products/hs-specifications/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(productFormController.deleteSpecification));
+app.post('/products/:id/sold-as', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(productFormController.saveSoldAs));
 app.post('/products/:id/hs-code', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(catalogueMasterController.saveHsCode));
 app.get('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), asyncHandler(catalogueMasterController.linkSuppliers));
 app.post('/products/link-suppliers', requireAuth, requirePermissionAny(['record_market_prices', 'manage_suppliers']), verifyCsrf, asyncHandler(catalogueMasterController.saveLinks));
@@ -1581,6 +1594,8 @@ app.post('/products/:id/specifications/:specId/options', requireAuth, requirePer
 app.post('/products/:pid/own-specs/:id', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.updateSpec));
 app.post('/products/:pid/own-specs/:id/delete', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.deleteSpec));
 app.post('/products/:pid/spec-options/:id/delete', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.deleteOption));
+// D-389: the order of a product's own option (its other fields are posted unchanged).
+app.post('/products/:pid/spec-options/:id', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.updateOption));
 // The order form's live quote for a product with chosen options (selling-price visibility is checked inside; never cost).
 app.get('/pricing/line-quote', requireAuth, asyncHandler(priceRequestController.lineQuote));
 

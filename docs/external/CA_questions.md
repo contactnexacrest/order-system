@@ -103,5 +103,12 @@ For each question: **Today** is what the system does now; **Where** is the setti
 - Today: no GST on either leg; the sale invoice says the goods do not enter India.
 - Answer: ____________________________________________
 
+
+## F. Export HS codes for product forms (added 18 Nov 2026, owner decision D-383)
+
+**18. HS code for granite slabs and tiles.** An order line's HS code now comes from what the product is sold as (Products › Specifications (HS)). Should polished or unpolished granite slabs (gangsaw and cut-to-size) and tiles be declared under **68022310** or **68029300**? Please also confirm 68022390 (random / irregular slabs), 68029300 (monuments and tombstones), 25161100 (raw granite blocks), 25161200 (sawn granite blocks) and 68010000 (paving stones, kerbs, setts and cobbles).
+- Today: Gangsaw slab, Cut-to-size slab and Tile use 68022310; the rows can be edited by the MD at any time (lines already saved keep their code).
+- Answer: ____________________________________________
+
 ---
 Thank you. Please return this file with the answers filled in, or reply by e-mail quoting the question numbers.

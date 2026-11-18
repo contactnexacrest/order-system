@@ -58,6 +58,9 @@ const CLEARED_FUNDS_SENTENCE = 'The order is confirmed, and production starts, o
 /** D-215: documents that list service lines too (the rest are goods-only). */
 const ALL_LINE_DOCUMENTS = ['QT', 'PI', 'OC', 'BUYERPO', 'AMD', 'ESI'];
 
+/** Owner decision D-386 (18 Nov 2026, confirmed twice): the documents whose grey line prints "Product Form: <form>". */
+const PRODUCT_FORM_DOCUMENTS = ['QT', 'PI', 'OC', 'CI'];
+
 async function assemble(orderId, documentTypeCode = null) {
   const order = await orderRepository.find(orderId);
   if (!order) {
@@ -79,6 +82,12 @@ async function assemble(orderId, documentTypeCode = null) {
   }
   const serviceValue = await orderProductRepository.totalServiceValue(orderId);
   const payment = await orderPaymentStatusRepository.find(orderId);
+  // D-386: the line's form ("Sold as" → its form) on the QT / PI / OC / CI only; lines without a Sold as print as before.
+  const formNames = PRODUCT_FORM_DOCUMENTS.includes(String(documentTypeCode || '').toUpperCase())
+    ? (await require('./productForms').formNameForOrderLines(orderId)) || {} : {};
+  // D-388: the document line numbers (as printed) of the goods / charge lines whose quantity is still to be confirmed.
+  const [tbcNos, allTbc] = tbcLines(products);
+  const { tbcTotal } = require('./lineTable');
 
   const company = await companyBlock();
   const assets = await assetsBlock();
@@ -294,23 +303,27 @@ async function assemble(orderId, documentTypeCode = null) {
       quantity: perAnnexure && !p.quantity_is_tbc ? annexureChoice.quantityText(quantity, annexureLineLetter) : quantity,
       unit: p.unit,
       unit_price: p.unit_price !== null ? money(p.unit_price) : 'To Be Confirmed',
-      amount: p.fob_value !== null ? money(p.fob_value) : 'To Be Confirmed',
+      // D-388: a line whose quantity is to be confirmed never prints 0.00.
+      amount: p.fob_value !== null && p.fob_value !== undefined && !Number(p.quantity_is_tbc || 0) ? money(p.fob_value) : 'To Be Confirmed',
       line_type: p.line_type || 'goods',
       // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
       attributes: require('../repositories/productCategoryRepository').documentAttributes(p),
       sac_code: p.sac_code || null,
+      // D-386: "Product Form: <form>" first in the grey line (QT / PI / OC / CI, a line with a Sold as); null = as before.
+      product_form: formNames[Number(p.id || 0)] ?? null,
       };
     })),
     // Owner decision D-339: the detailed product table on an order with the 'detailed' layout (new orders);
     // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
-    line_table: await lineTableBlock(order, products, formattedProducts, documentTypeCode, annexureLineLetter, orderId),
+    line_table: await lineTableBlock(order, products, formattedProducts, documentTypeCode, annexureLineLetter, orderId, formNames),
     financial: {
-      fob_value: money(fobValue),
+      // D-388: "To Be Confirmed" / "<known> + line 2 To Be Confirmed" while a line's quantity is to be confirmed.
+      fob_value: tbcTotal(money(fobValue), tbcNos, allTbc),
       fob_value_raw: fobValue,
       // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
       has_services: serviceValue > 0,
       service_value: money(serviceValue),
-      total_with_services: money(fobValue + serviceValue),
+      total_with_services: tbcTotal(money(fobValue + serviceValue), tbcNos, allTbc && serviceValue <= 0),
       advance_pct: trimTrailingZeros(advancePct.toFixed(2)),
       advance_amount: money(advanceAmount),
       advance_trigger_text: order.advance_trigger_text,
@@ -341,17 +354,18 @@ async function assemble(orderId, documentTypeCode = null) {
       has_advance: advancePct > 0,
       payment_method: order.payment_method || null,
       // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
-      total_value: money(fobValue),
+      // D-388: "To Be Confirmed" / "<known> + line 2 To Be Confirmed".
+      total_value: tbcTotal(money(fobValue), tbcNos, allTbc),
       // 90-item backlog item #18 (BLOCKER) — see this function's own
       // freightForTotal/totalCommercialInvoiceValue computation above
       // for the full rationale. CI-only; every other document keeps
       // using total_value above.
-      total_commercial_invoice_value: money(totalCommercialInvoiceValue),
+      total_commercial_invoice_value: tbcTotal(money(totalCommercialInvoiceValue), tbcNos, allTbc && Math.abs(totalCommercialInvoiceValue - fobValue) < 0.005),
       // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
       // "Total Invoice Value in Words" line prints the same figure as Total
       // Commercial Invoice Value, in words — never a blank line.
-      total_invoice_value_in_words: amountInWords.format(round2(Number(totalCommercialInvoiceValue)), order.currency_code || null),
-      fob_value_in_words: amountInWords.format(round2(Number(fobValue)), order.currency_code || null),
+      total_invoice_value_in_words: tbcTotal(amountInWords.format(round2(Number(totalCommercialInvoiceValue)), order.currency_code || null), tbcNos, allTbc && Math.abs(totalCommercialInvoiceValue - fobValue) < 0.005),
+      fob_value_in_words: tbcTotal(amountInWords.format(round2(Number(fobValue)), order.currency_code || null), tbcNos, allTbc),
       freight_insurance_amount: freightForTotal !== null ? money(freightForTotal) : null,
       preset_name: order.preset_name,
     },
@@ -406,7 +420,7 @@ async function assemble(orderId, documentTypeCode = null) {
  * of the QT / PI / OC / CI / Buyer PO (with prices) and Packing List (without), on an order
  * whose line_table_layout is 'detailed'. Null on a 'classic' order and on every other document.
  */
-async function lineTableBlock(order, products, formatted, documentTypeCode, annexureLetter, orderId) {
+async function lineTableBlock(order, products, formatted, documentTypeCode, annexureLetter, orderId, formNames = {}) {
   const lineTable = require('./lineTable');
   const code = String(documentTypeCode || '').toUpperCase();
   if ((order.line_table_layout || lineTable.LAYOUT_CLASSIC) !== lineTable.LAYOUT_DETAILED || !lineTable.DOCUMENTS.includes(code)) {
@@ -420,8 +434,30 @@ async function lineTableBlock(order, products, formatted, documentTypeCode, anne
     }
   }
   const names = {};
-  for (const p of products) names[Number(p.id)] = await lineNames(p);
+  for (const p of products) {
+    // D-386: the line's form for the grey line (set only on the QT / PI / OC / CI).
+    names[Number(p.id)] = { ...(await lineNames(p)), form: formNames[Number(p.id)] ?? null };
+  }
   return lineTable.build(products, formatted, String(order.currency_code || ''), annexureLetter, code !== 'PL', crateCounts, names);
+}
+
+/**
+ * Owner decision D-388 (18 Nov 2026, confirmed twice): the document line numbers (1-based, as
+ * printed) of the lines in the FOB value (not services) whose quantity is still to be confirmed,
+ * and whether every such line is.
+ *
+ * @param {object[]} products the document's lines, in order
+ * @returns {[number[], boolean]}
+ */
+function tbcLines(products) {
+  const nos = [];
+  let count = 0;
+  (products || []).forEach((p, i) => {
+    if ((p.line_type || 'goods') === 'service') return;
+    count += 1;
+    if (Number(p.quantity_is_tbc || 0) || p.quantity === null || p.quantity === undefined || p.quantity === '') nos.push(i + 1);
+  });
+  return [nos, count > 0 && nos.length === count];
 }
 
 /**
@@ -550,6 +586,8 @@ async function supplierPoBlock(orderId, currency = '') {
     supplier_phone: row.supplier_phone,
     supplier_type: row.supplier_type,
     material_stone_type: row.material_stone_type,
+    // D-387: Section 3 "Product Form", printed only when filled.
+    product_form: row.product_form !== null && row.product_form !== undefined && String(row.product_form).trim() !== '' ? String(row.product_form).trim() : null,
     grade: row.grade,
     surface_finish: row.surface_finish,
     dimensions: row.dimensions,
@@ -1223,7 +1261,9 @@ function trimTrailingZeros(numStr) {
 }
 
 module.exports = {
+  PRODUCT_FORM_DOCUMENTS,
   assemble,
+  tbcLines,
   companyBlock,
   companyFromSnapshot,
   assetsBlock,

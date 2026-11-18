@@ -15,7 +15,7 @@ const orderLinePricing = require('../../src/services/orderLinePricing');
 const documentDataAssembler = require('../../src/services/documentDataAssembler');
 const zohoInvoiceData = require('../../src/services/zohoInvoiceData');
 const { priceInput } = require('../../src/helpers/orderLineValidator');
-const { createTestClient, createTestOrder, pinWorkedExamplePricing, configureProductForQuoting, baseSpecJson } = require('../support/fixtures');
+const { createTestClient, createTestOrder, pinWorkedExamplePricing, configureProductForQuoting, baseSpecJson, soldAs } = require('../support/fixtures');
 
 /**
  * HNT-011 — owner decision 13 Nov 2026 (item 8, option A, confirm 1 + confirm 2):
@@ -133,9 +133,10 @@ describe('HNT-011: a unit price of 0 is 0.00, a blank price is "no price yet"', 
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [sales.id]);
     const agent = await login(sales);
 
+    // D-385: with its Sold as (Gangsaw slab, sold per CBM too).
     const msg = await post(agent, `/orders/${orderId}`, `/orders/${orderId}/products`, {
       catalog_product_id: String(productId), description: 'Black Galaxy block', quantity: '10', unit: 'CBM', line_type: 'goods',
-      hs_code: '25161100', spec_json: await baseSpecJson(productId), unit_price: '0',
+      hs_code: '25161100', spec_json: await baseSpecJson(productId), unit_price: '0', ...await soldAs(),
     });
     expect(msg).toContain('below what NexaCrest can accept');
     expect(await orderProductRepository.forOrder(orderId)).toEqual([]);

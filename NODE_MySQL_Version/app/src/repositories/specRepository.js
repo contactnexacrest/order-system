@@ -99,8 +99,9 @@ async function createOption(d, userId) {
 }
 
 async function updateOption(id, d, userId) {
-  await db.execute('UPDATE spec_options SET name = :n, is_base = :b, change_type = :t, value = :v, thickness_mm = :mm, updated_by = :u WHERE id = :id',
-    { n: d.name, b: d.is_base, t: d.change_type, v: d.value ?? null, mm: d.thickness_mm ?? null, u: userId, id });
+  // D-389 (18 Nov 2026): the option's order is saved too.
+  await db.execute('UPDATE spec_options SET name = :n, is_base = :b, change_type = :t, value = :v, thickness_mm = :mm, sort_order = :o, updated_by = :u WHERE id = :id',
+    { n: d.name, b: d.is_base, t: d.change_type, v: d.value ?? null, mm: d.thickness_mm ?? null, o: Number(d.sort_order || 0), u: userId, id });
 }
 
 /** Only one base option per specification (per product, for product-only options). */

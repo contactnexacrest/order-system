@@ -12,7 +12,7 @@
       <form method="post" action="/admin/dropdown-options/{{ listKey }}/update">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <table class="list">
-          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th>{% if finish %}<th>Price change (from Pricing › Specifications)</th>{% endif %}</tr>
+          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th>{% if finish %}<th>Price change (from Pricing › Specifications)</th>{% if productForms and productForms.length %}<th>Offered for forms</th>{% endif %}{% endif %}</tr>
           {% for o in options %}
             <tr>
               <td><input type="text" name="option_value[{{ o.id }}]" required{% if finish %} maxlength="{{ finishMaxName }}"{% endif %} value="{{ o.option_value }}" placeholder="{{ 'e.g., Natural Polish' if finish else 'e.g., 20ft Standard' }}" aria-label="Option value">{% if finish and finishSaved and finishSaved.renamed and finishSaved.renamed[o.id] %} <small class="muted">was "{{ finishSaved.renamed[o.id] }}"</small>{% endif %}</td>
@@ -21,10 +21,19 @@
               <td><input type="checkbox" name="is_active[{{ o.id }}]" value="1" {{ 'checked' if o.is_active }} aria-label="Is active"></td>
               {% if finish %}
                 <td class="finish-price">{% for fp in finishPrices[o.id] or [] %}<div>{% if fp.category %}{{ fp.category }}: {% endif %}{{ fp.text }}{% if fp.unset %} <a class="tag tag-gold" href="{{ fp.link }}">set it in Pricing › Specifications</a>{% endif %}</div>{% endfor %}{% if not (finishPrices[o.id] and finishPrices[o.id].length) %}<span class="muted">—</span>{% endif %}</td>
+                {# D-383 (18 Nov 2026): the forms of stone this finish is offered for (a form with no ticks at all offers every finish). #}
+                {% if productForms and productForms.length %}
+                <td class="finish-forms small" data-testid="finish-forms-{{ o.id }}">{% for pf in productForms %}<label class="inline"><input type="checkbox" name="finish_forms[{{ o.id }}][{{ pf.id }}]" value="1"{% if (finishFormMap[o.id] or []).indexOf(pf.id | int) != -1 %} checked{% endif %}> {{ pf.name }}</label> {% endfor %}</td>
+                {% endif %}
               {% endif %}
             </tr>
           {% endfor %}
         </table>
+        {% if finish and productForms and productForms.length %}
+          <input type="hidden" name="finish_forms_present" value="1">
+          <p class="muted small">Offered for forms: an order line sold as a form offers only the finishes ticked for it (<a href="/pricing/forms">Forms of stone</a>); a form with no finish ticked offers every finish. Lines already saved keep their finish.</p>
+          <label>Reason <small class="muted">(needed when you change the forms a finish is offered for)</small><input type="text" name="reason" minlength="10" maxlength="500" placeholder="e.g. Flamed is not offered on raw blocks"></label>
+        {% endif %}
         <button type="submit" class="btn-sm">Save {{ listKey }} Changes</button>
       </form>
       {% if finish and finishSaved and finishSaved.messages and finishSaved.messages.length %}

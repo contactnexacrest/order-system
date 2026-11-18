@@ -285,10 +285,27 @@ function crates(crateCounts, description) {
 }
 
 /**
- * The grey row under a line: "Qty as per Annexure A" · the size note · the Dimensions text of a
- * line without a piece size · another category's attributes · HS Code · Country of Origin.
+ * Owner decision D-388 (18 Nov 2026, confirmed twice): a total over lines some of which are
+ * "To Be Confirmed" — every line TBC: "To Be Confirmed"; some: "<known> + line 2 To Be Confirmed"
+ * (several: "<known> + lines 2, 4 To Be Confirmed"); none: the known total as today.
+ *
+ * @param {string} known the known total, formatted
+ * @param {number[]} tbcNos the document line numbers still to be confirmed
+ * @param {boolean} allTbc every line is still to be confirmed
  */
-function detail(line, f, annexureLetter, hasSize) {
+function tbcTotal(known, tbcNos, allTbc) {
+  if (!tbcNos || tbcNos.length === 0) return known;
+  if (allTbc) return 'To Be Confirmed';
+  const nos = [...new Set(tbcNos.map((n) => parseInt(n, 10) || 0))].sort((a, b) => a - b);
+  return `${known} + ${nos.length === 1 ? 'line ' : 'lines '}${nos.join(', ')} To Be Confirmed`;
+}
+
+/**
+ * The grey row under a line: "Qty as per Annexure A" · the size note · the Dimensions text of a
+ * line without a piece size · another category's attributes · Product Form (D-386: QT / PI / OC /
+ * CI, a line with a "Sold as") · HS Code · Country of Origin.
+ */
+function detail(line, f, annexureLetter, hasSize, form = null) {
   const out = [];
   if (annexureLetter !== null) out.push({ label: null, text: `Qty as per Annexure ${annexureLetter}` });
   const note = String(line.size_note ?? '').trim();
@@ -296,6 +313,9 @@ function detail(line, f, annexureLetter, hasSize) {
   const dims = String(line.dimensions ?? '').trim();
   if (annexureLetter === null && !hasSize && dims !== '' && note === '') out.push({ label: 'Dimensions:', text: dims });
   for (const a of f.attributes || []) out.push({ label: `${a.label}:`, text: String(a.value) });
+  if (form !== null && form !== undefined && String(form).trim() !== '') {
+    out.push({ label: 'Product Form:', text: String(form).trim() }); // D-386
+  }
   out.push({ label: 'HS Code:', text: String(line.hs_code ?? '') });
   out.push({ label: 'Country of Origin:', text: 'India' });
   return out;
@@ -308,7 +328,8 @@ function detail(line, f, annexureLetter, hasSize) {
  * @param {object[]} formatted  the same lines as the documents print them today (documentDataAssembler)
  * @param {string|null} annexureLetter D-336: the annexure "As per annexure" lines point to on this document (null: none)
  * @param {Object<string,number>} crateCounts Packing List: crates per product description (lower case)
- * @param {Object<number,{material?:string, finish?:string}>} names per line id: Material / Colour and Surface / Finish
+ * @param {Object<number,{material?:string, finish?:string, form?:?string}>} names per line id: Material / Colour,
+ *                                             Surface / Finish, and (D-386, QT / PI / OC / CI only) the Product Form
  */
 function build(lines, formatted, currency, annexureLetter, withPrices, crateCounts = {}, names = {}) {
   const stone = [];
@@ -340,6 +361,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
   let pcsAny = false;
   const byUnit = {};
   let amount = 0;
+  const tbcNos = []; // D-388: the document line numbers whose quantity is still to be confirmed
   for (const [line, f] of stone) {
     const u = docUnit(line.unit);
     const suffix = (v) => (mixed && v !== DASH ? `${v} ${u}` : v);
@@ -360,6 +382,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
       pcsAny = true;
     }
     if (qty !== null) byUnit[u] = (byUnit[u] || 0) + qty;
+    else tbcNos.push(Number(f.no));
     if (line.fob_value !== null && line.fob_value !== undefined && line.fob_value !== '') amount += Number(line.fob_value);
     const pricePiece = u === 'PCS' ? price : pricePerPiece(price, per);
     const nm = names[Number(line.id || 0)] || {};
@@ -382,7 +405,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
       price_piece: pricePiece !== null && !perAnnexure && (per !== null || u === 'PCS') ? money(pricePiece, currency) : DASH,
       total: String(f.amount ?? ''),
       crates: crates(crateCounts, line.description),
-      detail: detail(line, f, perAnnexure ? annexureLetter : null, hasSize),
+      detail: detail(line, f, perAnnexure ? annexureLetter : null, hasSize, (names[Number(line.id || 0)] || {}).form ?? null),
     };
     if (u === 'PCS') {
       row.per_piece = DASH;
@@ -398,7 +421,8 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
     pcs: pcsAny ? fmt(pcsTotal, 0) : '',
     // One unit: its total (a PCS-only full table counts the pieces instead). Mixed units are never added up.
     measure: !mixed && byUnit[units[0]] !== undefined && (units[0] !== 'PCS' || out.variant === 'short') ? formatQuantity(byUnit[units[0]], units[0]) : '',
-    amount: money(amount, currency),
+    // D-388: "To Be Confirmed" when every line is TBC, else "<known> + line 2 To Be Confirmed".
+    amount: tbcTotal(money(amount, currency), tbcNos, tbcNos.length === stone.length),
   };
   out.totals_by_unit = mixed && parts.length > 0 ? `Totals by unit: ${parts.join(' · ')}` : null;
   return out;
@@ -407,5 +431,5 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
 module.exports = {
   LAYOUT_CLASSIC, LAYOUT_DETAILED, DOCUMENTS, DASH,
   roundTo, docUnit, isMeasureUnit, perPiece, quantityDecimals, needsPieces, quantityFromPieces, pricePerPiece,
-  readPieces, readSizeNote, serverQuantity, formatPerPiece, formatQuantity, summary, build, totalCbm,
+  readPieces, readSizeNote, serverQuantity, formatPerPiece, formatQuantity, summary, build, totalCbm, tbcTotal,
 };

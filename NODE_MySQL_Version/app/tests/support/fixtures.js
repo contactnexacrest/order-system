@@ -328,5 +328,17 @@ async function baseSpecJson(productId) {
   return JSON.stringify(selection);
 }
 
+/**
+ * D-385 (18 Nov 2026): a goods line picked from Products on a USD order has a "Sold as" — the
+ * seeded specification of that name and the HS code it sets, as the line form posts them.
+ * Spread it last ({ ...post, ...await soldAs() }) so its HS code wins over a typed one.
+ * PHP twin: PricingFixtures::soldAs().
+ */
+async function soldAs(name = 'Gangsaw slab') {
+  const row = await require('../../src/config/db').queryOne('SELECT id, hs_code FROM hs_specifications WHERE name = :n', { n: name });
+  if (!row) throw new Error(`No seeded specification "${name}".`);
+  return { hs_spec_id: String(row.id), hs_code: String(row.hs_code) };
+}
+
 module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData, withDocumentMailsHeld,
-  pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson };
+  pinWorkedExamplePricing, resetPricingSettings, configureProductForQuoting, baseSpecJson, soldAs };

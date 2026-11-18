@@ -541,6 +541,40 @@ async function store(req, res) {
     return;
   }
 
+  // Owner decision D-385 (18 Nov 2026): each row's Sold as sets its HS code (only the MD / ED change it,
+  // with a reason), the units it may use and the finishes; checked before anything is written.
+  const rowSoldAs = {};
+  {
+    const productForms = require('../services/productForms');
+    const storeCurrency = (await lookupRepository.currencies()).find((c) => Number(c.id) === currencyId);
+    const canOverrideHs = productForms.canOverride(req);
+    const postedSpecs = body.product_hs_spec_id !== undefined ? [].concat(body.product_hs_spec_id) : null;
+    body.product_hs_code = [].concat(body.product_hs_code ?? []);
+    for (let i = 0; i < descriptions.length; i++) {
+      if (str(descriptions[i]) === '') continue;
+      rowSoldAs[i] = await productForms.checkLine({
+        line_no: i + 1,
+        posted_spec: postedSpecs !== null ? String(postedSpecs[i] ?? '') : null,
+        catalog_product_id: await catalogProductInput([].concat(body.product_catalog_id || [])[i]),
+        line_type: 'goods',
+        currency_code: storeCurrency ? String(storeCurrency.code) : '',
+        hs_code: String(body.product_hs_code[i] ?? ''),
+        hs_override_reason: String([].concat(body.product_hs_override_reason ?? [])[i] ?? ''),
+        unit: String([].concat(body.product_unit ?? [])[i] ?? ''),
+        selection: require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''),
+        existing: null,
+        can_override: canOverrideHs,
+      });
+      if (rowSoldAs[i].refusal !== null) {
+        flash.set(req, 'error', rowSoldAs[i].refusal);
+        flash.setOld(req, body);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
+      if (rowSoldAs[i].spec !== null) body.product_hs_code[i] = String(rowSoldAs[i].hs_code);
+    }
+  }
+
   // HS code must come from the master list (docs/schema.sql Section AB) —
   // never freehand — so a typo or an invalid code can never reach an
   // order. Checked here, before anything is written, so a bad code never
@@ -626,7 +660,12 @@ async function store(req, res) {
       rowSizes[i] = rowSize;
       rowSels[i] = rowSel;
       // D-348: a line picked from Products has its Thickness and Size / format chosen.
-      const specRefusal = sizeError === null && syncError === null ? await olpRow.requiredSpecsRefusal(i + 1, rowCatalogId, 'goods', rowSel) : null;
+      // D-385: with a Sold as, what is needed follows the unit instead.
+      const specRefusal = sizeError === null && syncError === null
+        ? ((rowSoldAs[i] || {}).spec
+          ? await require('../services/productForms').unitNeedsRefusal(i + 1, str([].concat(body.product_unit || [])[i]) || null, rowSize, rowCatalogId, rowSel)
+          : await olpRow.requiredSpecsRefusal(i + 1, rowCatalogId, 'goods', rowSel))
+        : null;
       if (specRefusal !== null) {
         flash.set(req, 'error', specRefusal);
         flash.setOld(req, body);
@@ -678,6 +717,7 @@ async function store(req, res) {
   const createdSpecs = [];
   const createdSizes = [];
   const createdPieces = []; // D-339
+  const createdSoldAs = []; // D-385
   const { orderId, orderReference } = await divisionService.withDivision(newOrderDivision, () => db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
@@ -766,6 +806,7 @@ async function store(req, res) {
       createdSpecs.push(rowSels[i] !== undefined ? rowSels[i] : require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
       createdSizes.push(rowSizes[i] || {});
       createdPieces.push(rowPieces[i] || [null, null, null]);
+      createdSoldAs.push(rowSoldAs[i] || null);
     }
 
     return result;
@@ -778,6 +819,8 @@ async function store(req, res) {
     await require('../services/orderLinePricing').saveSelection(createdLineIds[k], createdSpecs[k] ?? null, null);
     await orderProductRepository.setPieceSize(createdLineIds[k], createdSizes[k] || {});
     await orderProductRepository.setPieces(createdLineIds[k], (createdPieces[k] || [])[0] ?? null, (createdPieces[k] || [])[1] ?? null);
+    // D-385: the row's Sold as; a changed HS code is audited with its reason.
+    await saveLineSoldAs(createdLineIds[k], createdSoldAs[k] ?? null, user.id, k + 1);
   }
   for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
   for (const [lineId, lineText, qty, unit] of createdLarge) await quantityLimits.audit(user.id, 'order_products', lineId, lineText, qty, unit);
@@ -1024,6 +1067,14 @@ async function pickerViewData(req, withClients = false) {
   const selling = require('../services/moneyVisibility').can(req.permissions, 'selling');
   const out = { pickerProducts, pickerPrices: selling ? await orderLinePricing.pickerPrices(pickerProducts) : {}, pickerSpecs: await orderLinePricing.pickerSpecs(pickerProducts) };
   out.pickerBlocked = await require('../repositories/productRepository').notQuotable(); // D-361
+  // Owner decision D-385 (18 Nov 2026): "Sold as" — the specifications, each product's ticks, who may change the HS code.
+  const productForms = require('../services/productForms');
+  out.soldAsSpecs = await productForms.pickerSpecifications();
+  out.pickerSoldAs = await productForms.pickerSoldAs(pickerProducts);
+  out.canOverrideHs = productForms.canOverride(req);
+  // D-385: each unit option's kind (data-unit-kind) — the units a Sold as allows.
+  out.unitKinds = {};
+  for (const u of await lookupRepository.dropdownOptions('unit')) out.unitKinds[u.option_value] = require('../services/lineUnits').canonical(String(u.option_value)) || '';
   if (withClients) {
     out.clientPriceKeys = selling ? await orderLinePricing.clientKeys(await clientRepository.all()) : {};
     // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
@@ -1058,6 +1109,8 @@ async function linePricingViewData(req, orderId) {
   }
   return {
     ...(await pickerViewData(req)),
+    // Owner decision D-385 (18 Nov 2026): "Sold as" in the products table.
+    lineSoldAs: await require('../services/productForms').soldAsForOrderLines(orderId),
     linePricing,
     pcLines,
     lineChips,
@@ -1152,7 +1205,47 @@ async function approveLinePrice(req, res) {
  */
 function lineRefusalText(refusal) {
   // D-348: "Line N: choose the Thickness …" already names its line.
-  return /^Line \d+(?: says "As per annexure"|: choose the )/.test(refusal) ? refusal : `Product line: ${refusal}`;
+  return /^Line \d+(?: says "As per annexure"|: choose the |: enter the )/.test(refusal) ? refusal : `Product line: ${refusal}`;
+}
+
+/**
+ * Owner decision D-385 (18 Nov 2026): what productForms.checkLine needs from the line form
+ * (the panel's fields; hs_spec_id absent = a form without the field, the saved line keeps its own).
+ */
+async function soldAsInput(req, order, line, lineNo) {
+  const body = req.body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+  const scalar = (v) => v !== undefined && v !== null && typeof v !== 'object';
+  const olp = require('../services/orderLinePricing');
+  const catalogId = has('catalog_product_id') ? await catalogProductInput(body.catalog_product_id)
+    : (line && line.catalog_product_id ? Number(line.catalog_product_id) : null);
+  const selection = has('spec_json') ? olp.selectionInput(body.spec_json) : olp.selectionInput(String((line || {}).spec_selection ?? ''));
+  return {
+    line_no: lineNo,
+    posted_spec: has('hs_spec_id') && scalar(body.hs_spec_id) ? String(body.hs_spec_id) : null,
+    catalog_product_id: catalogId,
+    line_type: String(body.line_type ?? ((line || {}).line_type ?? 'goods')),
+    currency_code: order.currency_code ?? null,
+    hs_code: scalar(body.hs_code) ? String(body.hs_code) : '',
+    hs_override_reason: scalar(body.hs_override_reason) ? String(body.hs_override_reason) : '',
+    unit: scalar(body.unit) ? String(body.unit) : String((line || {}).unit ?? ''),
+    selection,
+    existing: line,
+    can_override: require('../services/productForms').canOverride(req),
+  };
+}
+
+/** D-385: saves a line's Sold as (null result = none) and audits an HS code changed from its specification. */
+async function saveLineSoldAs(lineId, soldAs, userId, lineNo) {
+  const spec = (soldAs || {}).spec || null;
+  await require('../services/productForms').setLineSoldAs(lineId, spec ? Number(spec.id) : null, spec ? (soldAs.reason ?? null) : null);
+  if (spec && soldAs.overridden) {
+    const [from, to] = soldAs.overridden;
+    const line = await orderProductRepository.find(lineId);
+    const no = Number((line || {}).line_no ?? lineNo ?? 0);
+    await auditLogRepository.log(userId, 'HS_CODE_OVERRIDDEN', 'order_products', lineId, 'hs_code',
+      `Line ${no} (${spec.name}): ${from}`, `Line ${no} (${spec.name}): ${to}`, String(soldAs.reason ?? ''));
+  }
 }
 
 // The flash after saving a line, saying when it now waits for the MD.
@@ -1303,6 +1396,14 @@ async function addProduct(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision D-385 (18 Nov 2026): the line's Sold as sets its HS code (locked: only the MD / ED change it, with a reason).
+  const soldAs = await require('../services/productForms').checkLine(await soldAsInput(req, order, null, await orderProductRepository.nextLineNo(orderId)));
+  if (soldAs.refusal !== null) {
+    flash.set(req, 'error', soldAs.refusal);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
+  if (soldAs.spec !== null) body.hs_code = String(soldAs.hs_code);
   // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
   const unitError = await require('../repositories/productCategoryRepository').applyLineDefaults(body);
   if (unitError !== null) {
@@ -1353,7 +1454,10 @@ async function addProduct(req, res) {
     : [null, null];
   const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType, body.catalog_product_id))
     // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
-    ?? (priceRequest ? null : await orderLinePricing.requiredSpecsRefusal(await orderProductRepository.nextLineNo(orderId), pickedId, lineType, specSel))
+    // D-385: with a Sold as, what is needed follows the unit instead (a line "As per annexure" has its size there).
+    ?? (priceRequest ? null : (soldAs.spec !== null
+      ? (perAnnexure ? null : await require('../services/productForms').unitNeedsRefusal(await orderProductRepository.nextLineNo(orderId), str(body.unit) || null, lineSize, pickedId, specSel))
+      : await orderLinePricing.requiredSpecsRefusal(await orderProductRepository.nextLineNo(orderId), pickedId, lineType, specSel)))
     ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
       specSel, str(body.unit) || null, priceRequest, lineSize,
       // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1396,6 +1500,8 @@ async function addProduct(req, res) {
   await orderProductRepository.setPieceSize(newLineId, lineSize);
   await orderProductRepository.setAsPerAnnexure(newLineId, perAnnexure);
   if (detailedLines(order)) await orderProductRepository.setPieces(newLineId, pieces, sizeNote);
+  // D-385: the line's Sold as; a changed HS code is audited with its reason.
+  await saveLineSoldAs(newLineId, lineType === 'goods' ? soldAs : null, req.user.id, null);
   if (priceRequest) await require('../services/priceRequestService').markOrdered(Number(priceRequest.id), orderId);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
@@ -1420,6 +1526,14 @@ async function updateProduct(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision D-385 (18 Nov 2026): the line's Sold as sets its HS code (a form without the field keeps the line's).
+  const soldAs = await require('../services/productForms').checkLine(await soldAsInput(req, order, product, Number(product.line_no)));
+  if (soldAs.refusal !== null) {
+    flash.set(req, 'error', soldAs.refusal);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
+  if (soldAs.spec !== null) body.hs_code = String(soldAs.hs_code);
   // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
   const unitError = await require('../repositories/productCategoryRepository').applyLineDefaults(body);
   if (unitError !== null) {
@@ -1484,8 +1598,13 @@ async function updateProduct(req, res) {
     const orderLinePricing = require('../services/orderLinePricing');
     const refusal = sizeError ?? syncError ?? (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType, Object.prototype.hasOwnProperty.call(body, 'catalog_product_id') ? body.catalog_product_id : null))
       // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
-      ?? (specUnchanged && Number(product.catalog_product_id || 0) === Number(catalogId || 0) ? null
-        : await orderLinePricing.requiredSpecsRefusal(Number(product.line_no), catalogId, lineType, specSel))
+      // D-385: with a Sold as, what is needed follows the unit instead (a line "As per annexure" has its size there).
+      ?? (soldAs.spec !== null
+        ? (perAnnexure || (specUnchanged && sizeUnchanged && Number(product.catalog_product_id || 0) === Number(catalogId || 0)
+            && Number(product.hs_spec_id || 0) === Number(soldAs.spec.id))
+          ? null : await require('../services/productForms').unitNeedsRefusal(Number(product.line_no), str(body.unit) || null, lineSize, catalogId, specSel))
+        : (specUnchanged && Number(product.catalog_product_id || 0) === Number(catalogId || 0) ? null
+          : await orderLinePricing.requiredSpecsRefusal(Number(product.line_no), catalogId, lineType, specSel)))
       ?? (priceUnchanged && specUnchanged && sizeUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
         specSel, str(body.unit) || null, null, lineSize,
         // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1534,6 +1653,8 @@ async function updateProduct(req, res) {
   await orderProductRepository.setPieceSize(productId, lineSize);
   await orderProductRepository.setAsPerAnnexure(productId, perAnnexure);
   if (piecesForm) await orderProductRepository.setPieces(productId, pieces, sizeNote);
+  // D-385: the line's Sold as; a changed HS code is audited with its reason.
+  await saveLineSoldAs(productId, lineType === 'goods' ? soldAs : null, req.user.id, null);
   const newPrice = str(body.unit_price);
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
     await orderProductRepository.setPriceSetBy(productId, req.user.id);
@@ -2066,6 +2187,8 @@ async function show(req, res) {
       logisticsPartners: await logisticsPartnerRepository.all(),
       logisticsServiceTypes: logisticsPartnerRepository.SERVICE_TYPES,
       supplierPo,
+      // D-387: what the Supplier PO form's "Product Form" starts with (the order lines' Sold as forms).
+      supplierPoDefaultForm: await orderSupplierPoRepository.defaultProductForm(orderId),
       // Owner request (2026-10-27): who to pay in 7e / 10a.
       supplierBank: supplierPo && supplierPo.supplier_id ? vendorDetailsRepository.bankDetails(await vendorDetailsRepository.find('supplier', supplierPo.supplier_id)) : null,
       buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(orderId),
@@ -3526,6 +3649,8 @@ async function saveSupplierPo(req, res) {
   const spoId = await orderSupplierPoRepository.create(orderId, supplierId, supplierPoReference, {
     supplier_type: supplierType || null,
     material_stone_type: str(body.material_stone_type) || null,
+    // D-387: the Product Form row (prefilled from the order lines' Sold as; editable; empty = not printed).
+    ...(Object.prototype.hasOwnProperty.call(body, 'product_form') ? { product_form: String(body.product_form ?? '') } : {}),
     grade: str(body.grade) || 'Grade A',
     surface_finish: str(body.surface_finish) || null,
     dimensions: str(body.dimensions) || null,

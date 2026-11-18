@@ -1,0 +1,92 @@
+{#
+  Owner decision D-383 (18 Nov 2026): Products › Specifications (HS) — what a product is sold as and
+  the HS code that goes with it. A product ticks the ones it is sold as (its Specifications page ›
+  Sold as); an order line picks one, which sets the line's HS code. The HS code is an active code of
+  the HS Code Master. A specification ticked on a product or used on an order line can only be
+  switched off. Every change needs a reason and is logged. Port of views/products/hs_specifications.php.
+  In: specs (each with the form's name and used), forms, hsCodes (active), finishNames, edit, canManage, old.
+#}
+{% macro specFields(s, forms, finishNames, old) %}
+  {% set isNew = not s %}
+  {% set key = 'new' if isNew else (s.id | string) %}
+  {% set useOld = old and (old._spec_key | string) == key %}
+  {% if useOld %}
+    {% set vName = old.name or '' %}{% set vForm = old.form_id | int %}{% set vFinish = old.usual_finish or '' %}
+    {% set vHs = old.hs_code or '' %}{% set vWhen = old.when_to_use or '' %}{% set vOrder = old.sort_order if old.sort_order !== undefined else '' %}
+    {% set active = old.is_active %}
+  {% else %}
+    {% set vName = s.name if s else '' %}{% set vForm = (s.form_id | int) if s else 0 %}{% set vFinish = (s.usual_finish or '') if s else '' %}
+    {% set vHs = s.hs_code if s else '' %}{% set vWhen = (s.when_to_use or '') if s else '' %}{% set vOrder = s.sort_order if s else '' %}
+    {% set active = isNew or s.is_active == 1 %}
+  {% endif %}
+  <input type="hidden" name="_spec_key" value="{{ key }}">
+  <label>Name *<input type="text" name="name" required maxlength="120" value="{{ vName }}" placeholder="e.g. Gangsaw slab"></label>
+  <label>Form *<select name="form_id" required>
+    <option value="">Choose…</option>
+    {% for f in forms %}{% if f.is_active == 1 or vForm == (f.id | int) %}
+      <option value="{{ f.id }}"{% if vForm == (f.id | int) %} selected{% endif %}>{{ f.name }}{% if f.is_active != 1 %} (switched off){% endif %}</option>
+    {% endif %}{% endfor %}
+  </select></label>
+  <label>Usual finish<select name="usual_finish">
+    <option value="">Choose…</option>
+    {% for fn in finishNames %}<option value="{{ fn }}"{% if (vFinish | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
+  </select></label>
+  <label>HS code * <small class="muted">(from the HS Code Master, active only)</small><input type="text" name="hs_code" required maxlength="8" pattern="[0-9]{6}([0-9]{2})?" list="hs-spec-codes" data-in-list="hs-spec-codes" data-in-list-message="Pick an active code from the HS Code Master List." autocomplete="off" value="{{ vHs }}" placeholder="e.g. 68022310"></label>
+  <label class="full">When to use<input type="text" name="when_to_use" maxlength="255" value="{{ vWhen }}" placeholder="e.g. As it comes from the quarry"></label>
+  <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="{{ vOrder }}" placeholder="e.g. 3"></label>
+  <label class="inline"><input type="checkbox" name="is_active" value="1"{% if active %} checked{% endif %}> Active</label>
+  <label class="full">Reason *<input type="text" name="reason" required minlength="10" maxlength="500" value="{{ (old.reason or '') if useOld else '' }}" placeholder="e.g. Customs asked for 68022390 on random slabs"></label>
+{% endmacro %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products">&larr; Products</a></p>
+  <h1>Specifications (HS)</h1>
+  <p class="muted">What a product is sold as, and the HS code that goes with it. Tick the ones a product is sold as on its Specifications page (Sold as); an order line then picks one, and its HS code comes from it — only the MD or the ED can change a line's HS code, with a reason. Each specification belongs to one form (<a href="/pricing/forms">Forms of stone</a>), which sets the units and finishes the line offers. Changing a specification here never changes order lines already saved.</p>
+  <table class="list" data-testid="hs-specifications-table">
+    <tr><th>Order</th><th>Specification</th><th>Form</th><th>Usual finish</th><th>HS code</th><th>When to use</th><th>Status</th>{% if canManage %}<th>Actions</th>{% endif %}</tr>
+    {% for s in specs %}
+      <tr id="spec-{{ s.id }}">
+        <td>{{ s.sort_order | int }}</td>
+        <td><b>{{ s.name }}</b></td>
+        <td>{{ s.form_name }}{% if s.form_is_active != 1 %} <small class="muted">(form switched off)</small>{% endif %}</td>
+        <td>{{ s.usual_finish or '—' }}</td>
+        <td><span class="tag">{{ s.hs_code }}</span></td>
+        <td class="small">{{ s.when_to_use or '' }}</td>
+        <td>{% if s.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Switched off</span>{% endif %}</td>
+        {% if canManage %}
+          <td>
+            <a class="btn-sm" href="/products/hs-specifications?edit={{ s.id }}#spec-{{ s.id }}">Edit</a>
+            {% if not s.used %}
+              <form method="post" action="/products/hs-specifications/{{ s.id }}/delete" class="inline-form" data-confirm="Delete the specification &quot;{{ s.name }}&quot;?">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="Reason (required)" aria-label="Reason for deleting">
+                <button type="submit" class="btn-sm btn-secondary">Delete</button>
+              </form>
+            {% else %}<small class="muted">used — can only be switched off</small>{% endif %}
+          </td>
+        {% endif %}
+      </tr>
+      {% if canManage and edit == s.id %}
+        <tr><td colspan="8">
+          <h3>Edit: {{ s.name }}</h3>
+          <form method="post" action="/products/hs-specifications/{{ s.id }}" class="field-grid">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            {{ specFields(s, forms, finishNames, old) }}
+            <div><button type="submit" class="btn-sm">Save specification</button> <a class="btn-sm btn-secondary" href="/products/hs-specifications#spec-{{ s.id }}">Cancel</a></div>
+          </form>
+        </td></tr>
+      {% endif %}
+    {% endfor %}
+    {% if not specs.length %}<tr><td colspan="8" class="muted">No specifications yet.</td></tr>{% endif %}
+  </table>
+  {% if canManage %}
+    <h2 id="add-spec">Add a specification</h2>
+    <form method="post" action="/products/hs-specifications" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {{ specFields(null, forms, finishNames, old) }}
+      <div><button type="submit" class="btn-sm btn-accent">+ Add specification</button></div>
+    </form>
+    <datalist id="hs-spec-codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description }}</option>{% endfor %}</datalist>
+  {% else %}
+    <p class="muted small">Changing the specifications needs the "Manage pricing" permission.</p>
+  {% endif %}
+</div>
