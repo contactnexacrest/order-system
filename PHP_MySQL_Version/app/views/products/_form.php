@@ -11,10 +11,12 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
     <label>Name *<input type="text" name="name" value="<?= View::e($product['name'] ?? '') ?>" placeholder="e.g., Granite Tiles (Polished)" required></label>
     <label class="full">Specifications *<textarea name="specifications" rows="4" placeholder="e.g., Material, size, finish, and packing details" required><?= View::e($product['specifications'] ?? '') ?></textarea></label>
     <?php // D-302 (point 11): picked from the HS Code Master List, pre-filled with the category's default. ?>
-    <label>HS Code * <small class="muted">(from the HS Code Master List)</small><input type="text" name="hs_code" list="product_hs_codes" autocomplete="off" maxlength="8"
+    <?php // D-384 (18 Nov 2026): an order line's HS code comes from its Sold as; this one is the fallback for a line without one. ?>
+    <label>HS Code (fallback) * <small class="muted">(from the HS Code Master List)</small><input type="text" name="hs_code" list="product_hs_codes" autocomplete="off" maxlength="8"
       data-in-list="product_hs_codes" data-in-list-message="Pick a code from the HS Code Master List<?= !empty($canManageHs) ? ' — or add it with &quot;+ Add a new HS code&quot;' : '' ?>."
       value="<?= View::e($product['hs_code'] ?? ($categoryDefaultHs ?? '')) ?>" placeholder="e.g. 68022310 — type the code or words" required>
-      <?php if (!$isEdit && ($categoryDefaultHs ?? '') !== ''): ?><small class="muted">Pre-filled with the default of <?= View::e((string) $categoryName) ?>.</small><?php endif; ?></label>
+      <?php if (!$isEdit && ($categoryDefaultHs ?? '') !== ''): ?><small class="muted">Pre-filled with the default of <?= View::e((string) $categoryName) ?>.</small><?php endif; ?>
+      <small class="muted help-line">Used only on an order line without a "Sold as" — a line's Sold as sets its HS code (Products › Specifications (HS)).</small></label>
     <datalist id="product_hs_codes"><?php foreach ($hsCodes ?? [] as $__h): ?><option value="<?= View::e((string) $__h['code']) ?>"><?= View::e((string) $__h['description']) ?><?= (string) $__h['code'] === (string) ($categoryDefaultHs ?? '') ? ' · category default' : '' ?></option><?php endforeach; ?></datalist>
     <label>Origin<input type="text" name="origin" value="<?= View::e($product['origin'] ?? '') ?>" placeholder="e.g., Rajasthan, India" maxlength="150"></label>
   </div>

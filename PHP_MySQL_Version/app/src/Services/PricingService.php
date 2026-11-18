@@ -459,14 +459,28 @@ final class PricingService
         if (($supplier['price_basis'] ?? '') === 'grid') {
             $gridRules ??= ThicknessPrices::rules($product, $settings);
             // D-359: a configured base price carries its own prices (_stored); a supplier row reads its stored ones.
-            return ThicknessPrices::cost($gridRules, $supplier['_stored'] ?? ThicknessPrices::storedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
+            $cost = ThicknessPrices::cost($gridRules, $supplier['_stored'] ?? ThicknessPrices::storedFor((int) $supplier['id']), $supplier, $product, $basis, $mm);
+            if ($cost !== null) {
+                // D-381: where the CHA came from (a small tag in the Price check / build-up).
+                $src = ThicknessPrices::chaSource($supplier, $product);
+                $cost['cha_source'] = $src['source'];
+                $cost['cha_source_tag'] = ThicknessPrices::chaSourceTag($src);
+            }
+            return $cost;
         }
         $base = (new ProductService())->effectiveFobForSupplier($supplier, $product);
         if ($base === null) {
             return null;
         }
         $parts = ['supplier' => $base, 'cha' => 0.0, 'packing' => 0.0, 'total' => $base, 'unit' => $basis === 'cbm' ? 'CBM' : (string) ($product['reference_unit'] ?? ''), 'mm' => $mm, 'how' => 'typed', 'note' => null];
-        $perContainer = ThicknessPrices::chaPerContainer($supplier, $product);
+        // D-381: the row's figure → its supplier's → the product default; none on a 'computed' row (CHA already inside).
+        $chaSrc = ThicknessPrices::chaSource($supplier, $product);
+        $parts['cha_source'] = $chaSrc['source'];
+        $parts['cha_source_tag'] = ThicknessPrices::chaSourceTag($chaSrc);
+        if ($chaSrc['computed']) {
+            $parts['note'] = ThicknessPrices::CHA_INSIDE_NOTE;
+        }
+        $perContainer = $chaSrc['value'];
         if ($perContainer !== null) {
             $rules = $gridRules ?? ThicknessPrices::rules($product, $settings);
             $cha = ThicknessPrices::chaPerCbm($perContainer, (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);

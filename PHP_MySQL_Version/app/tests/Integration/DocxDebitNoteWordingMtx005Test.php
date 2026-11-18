@@ -100,7 +100,7 @@ final class DocxDebitNoteWordingMtx005Test extends DbTestCase
             'USD 2,184.00 + 1,250.00 (freight)',
             'Advance + Debit Note (if applicable)',
             "{$freightLabel} is paid separately via Debit Note, not through this Advance/Balance schedule",
-            'Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest',
+            'Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)', // D-380
             'Bill of Lading Date To Be Confirmed — must match this invoice date',
         ] as $line) {
             self::assertStringContainsString($line, $ciWord, "MTX-005: Word Commercial Invoice ({$incoterm})");

@@ -175,6 +175,7 @@ final class OrderDuplicationService
                 // rest of the supplier's details are re-read as of today.
                 'supplier_type'         => $sourceSupplierPo['supplier_type'],
                 'material_stone_type'   => $sourceSupplierPo['material_stone_type'],
+                'product_form'          => $sourceSupplierPo['product_form'] ?? null, // D-387
                 'grade'                 => $sourceSupplierPo['grade'],
                 'surface_finish'        => $sourceSupplierPo['surface_finish'],
                 'dimensions'            => $sourceSupplierPo['dimensions'],

@@ -33,6 +33,12 @@ use App\Tests\Support\DbTestCase;
  * Owner decision MTX-005 (13 Nov 2026, item 3 Option A, confirmed twice): the Word CI fixtures (FOB_CI_docx, CIF_CI_docx)
  * were captured again once — the Word CI now uses the PDF's wording (Debit Note, not FDN; "To Be Confirmed"; the PDF's
  * Bill of Lading line; no "+ — (freight)"); the PDF fixtures did not change.
+ * Owner decision D-380 (18 Nov 2026, confirmed twice): the Bill of Lading wording was changed by hand in every PDF and
+ * Word fixture — QT / PI / CI "4. Bill of Lading — full set of original Bills of Lading as issued by the shipping line, …"
+ * (the Word QT / PI now say the same as the PDF), the BL Instruction "FULL SET" banner, original copies and release line,
+ * and T&C clause 95 on the OC ("The full set of original negotiable Bills of Lading, as issued by the shipping line, will
+ * be released to the buyer only after"); nothing else changed. (D-386 / D-388 do not touch these orders: no line has a
+ * Sold as and no quantity is to be confirmed.)
  */
 final class StoneDocumentsUnchangedTest extends DbTestCase
 {

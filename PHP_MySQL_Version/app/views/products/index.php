@@ -66,7 +66,9 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
        the Name column stays put while the table scrolls sideways. */
       $__unitOf = static fn (array $p): string => \App\Services\LineUnits::label((string) ($p['reference_unit'] ?? '')) ?: 'unit';
       $__usdRate = !empty($fx) ? (float) $fx['rate'] : null;
-      $__hasExtra = !empty($canBuildup) || $canViewPricing; ?>
+      $__hasExtra = !empty($canBuildup) || $canViewPricing;
+      // D-384 (18 Nov 2026): each product's "Sold as" (its ticked specifications), one query for the page.
+      $__soldAs = \App\Services\ProductForms::soldAsByProduct(array_map(static fn (array $p): int => (int) $p['id'], $products)); ?>
     <?php if ($__hasExtra): ?>
       <form method="get" action="/products" class="show-all-form">
         <?php if ($status !== 'active'): ?><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php endif; ?>
@@ -96,7 +98,8 @@ $__money = static fn (float $v): string => '₹' . number_format($v, 2);
         $__sub = array_values(array_filter([(string) ($p['hs_code'] ?? ''), (string) ($p['origin'] ?? '')], static fn (string $v): bool => trim($v) !== '')); $__sub[] = 'per ' . $__u; ?>
         <tr data-product-row="<?= (int) $p['id'] ?>">
           <td class="name-col"><a class="product-name" href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && ($p['pricing']['overrides'] ?? []) !== []): ?> <span class="badge badge-warning" title="This product overrides a pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?>
-            <span class="name-sub"><?= View::e(implode(' · ', $__sub)) ?></span></td>
+            <span class="name-sub"><?= View::e(implode(' · ', $__sub)) ?></span>
+            <span class="name-sub sold-as-line" data-testid="sold-as-<?= (int) $p['id'] ?>">Sold as: <?= isset($__soldAs[(int) $p['id']]) ? View::e(implode(', ', array_column($__soldAs[(int) $p['id']], 'name'))) : '<span class="muted">not ticked (every specification)</span>' ?></span></td>
           <?php if ($canViewPricing): ?>
             <td><?= (int) $__st['usable'] ?> active<?php if ((int) $__st['paused'] > 0): ?><br><small class="muted"><?= (int) $__st['paused'] ?> paused</small><?php endif; ?></td>
             <td><?php if ($__o['lowest'] === null): ?>—<?php else: ?>

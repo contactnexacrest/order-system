@@ -105,9 +105,11 @@
       "items": [
         { "label": "All products", "href": "/products", "when": { "any": ["view_product_catalog"] } },
         { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
+        { "label": "Specifications (HS)", "href": "/products/hs-specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
         { "label": "Pricing", "children": [
           { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
-          { "label": "Specifications", "href": "/pricing/specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } }
+          { "label": "Specifications", "href": "/pricing/specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
+          { "label": "Forms of stone", "href": "/pricing/forms", "when": { "any": ["view_price_buildup", "manage_pricing"] } }
         ] },
         { "label": "Price requests", "href": "/associates/price-requests", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } },
         { "label": "HS codes", "children": [

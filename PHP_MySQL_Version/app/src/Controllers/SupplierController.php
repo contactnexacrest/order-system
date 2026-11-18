@@ -111,6 +111,9 @@ final class SupplierController
             'canEditPrice' => self::canRecordPrices(),
             'offerRows' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::PURCHASE) ? array_column(SupplierOffers::forSuppliers([$id])[$id] ?? [], null, 'id') : [],
             'addProduct' => self::canRecordPrices() ? self::addProductView($supplier, 'supplier') : null,
+            // D-381: the supplier's CHA + transport per container box (purchase-price or logistics-cost viewers only).
+            'canSeeCha' => \App\Services\SupplierCha::canSee(),
+            'chaOld' => Flash::pullOld(),
         ], 'layout/base');
     }
 
@@ -142,7 +145,22 @@ final class SupplierController
             return;
         }
 
+        // D-381: CHA + transport per container (factory → port) — only for those who see purchase prices or logistics costs.
+        $chaChange = null;
+        if (\App\Services\SupplierCha::canSee()) {
+            [$chaChange, $chaError] = \App\Services\SupplierCha::read($_POST, $supplier);
+            if ($chaError !== null) {
+                Flash::set('error', $chaError);
+                Flash::setOld($_POST);
+                header("Location: /suppliers/{$id}/edit#cha-transport");
+                return;
+            }
+        }
+
         SupplierRepository::update($id, $data);
+        if ($chaChange !== null) {
+            \App\Services\SupplierCha::save($id, $supplier, $chaChange, (int) AuthService::currentUserId());
+        }
         // D-303: "Details pending" (a supplier added quickly from a price) is cleared here once completed.
         if (array_key_exists('details_pending', $_POST)) {
             SupplierRepository::setDetailsPending($id, (string) $_POST['details_pending'] === '1');

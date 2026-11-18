@@ -35,11 +35,31 @@ foreach ($categories as $__c) {
     <label>Priced per CBM from (mm)<input type="number" name="cbm_from_mm" min="1" max="2000" step="1" value="<?= $product['cbm_from_mm'] !== null ? (int) $product['cbm_from_mm'] : '' ?>" placeholder="global <?= (int) $cbmFrom ?>"<?= $__ro ?>></label>
     <?php // D-270 (point 25): this product's own weight per CBM, for order lines priced per Ton. ?>
     <label>Weight per CBM (tonnes) <small class="muted">(empty = the category's)</small><input type="number" name="weight_t_per_cbm" min="0.1" max="20" step="0.001" value="<?= ($product['weight_t_per_cbm'] ?? null) !== null ? View::e(rtrim(rtrim((string) $product['weight_t_per_cbm'], '0'), '.')) : '' ?>" placeholder="e.g. 3.0"<?= $__ro ?>></label>
-    <fieldset class="full"><legend>Forms this product comes in (none ticked = all)</legend>
-      <?php foreach (ProductSpecs::FORMS as $k => $l): ?><label class="inline"><input type="checkbox" name="forms[]" value="<?= $k ?>"<?= in_array($k, $__forms, true) ? ' checked' : '' ?><?= $__ro ?>> <?= View::e($l) ?></label> <?php endforeach; ?>
-    </fieldset>
     <?php if ($canEdit): ?><div><button type="submit" class="btn-sm">Save</button></div><?php endif; ?>
   </form>
+
+  <?php // D-384 (18 Nov 2026): "Sold as" — the specifications (each with its HS code) this product is sold as; it replaces the old fixed "Forms" ticks. ?>
+  <section class="section" id="sold-as">
+    <h2>Sold as</h2>
+    <p class="muted small">What this product is sold as. An order line of this product offers only these (its HS code comes from the one chosen); the category specifications that apply follow their forms (<?= $soldAsTicked === [] ? 'nothing ticked yet' : View::e(\App\Controllers\ProductFormController::groupsText(array_values(array_filter($soldAsSpecs, static fn (array $s): bool => in_array((int) $s['id'], $soldAsTicked, true))))) ?>). Specifications and their HS codes: <a href="/products/hs-specifications">Products › Specifications (HS)</a>.</p>
+    <?php if ($soldAsTicked === []): ?>
+      <p class="notice notice-info small" data-testid="sold-as-none">Nothing ticked yet — order lines offer every specification<?= $__forms !== [] ? ', and the specifications follow the forms ticked before (' . View::e(ProductSpecs::formsLabel($product['forms'] ?? null)) . ')' : '' ?>.</p>
+    <?php endif; ?>
+    <form method="post" action="/products/<?= (int) $product['id'] ?>/sold-as" class="field-grid">
+      <?= Csrf::field() ?>
+      <fieldset class="full"><legend>Sold as *</legend>
+        <?php $__ids = array_map(static fn (array $s): string => 'sold-as-' . (int) $s['id'], $soldAsSpecs); ?>
+        <?php foreach ($soldAsSpecs as $__i => $__s): ?>
+          <label class="inline"><input type="checkbox" name="sold_as[<?= (int) $__s['id'] ?>]" value="1" id="sold-as-<?= (int) $__s['id'] ?>"<?= in_array((int) $__s['id'], $soldAsTicked, true) ? ' checked' : '' ?><?= $__ro ?><?= $__i === 0 ? ' data-min-ticked="' . View::e(implode(',', $__ids)) . ':1" data-min-ticked-message="Tick at least one specification the product is sold as."' : '' ?>> <?= View::e((string) $__s['name']) ?> <span class="tag">HS <?= View::e((string) $__s['hs_code']) ?></span><?= (int) $__s['is_active'] !== 1 || (int) $__s['form_is_active'] !== 1 ? ' <small class="muted">(switched off)</small>' : '' ?></label>
+        <?php endforeach; ?>
+        <?php if ($soldAsSpecs === []): ?><span class="muted">No active specifications — add them in Products › Specifications (HS).</span><?php endif; ?>
+      </fieldset>
+      <?php if ($canEdit): ?>
+        <label class="full">Reason *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. This granite is also sold as raw blocks"></label>
+        <div><button type="submit" class="btn-sm">Save Sold as</button></div>
+      <?php endif; ?>
+    </form>
+  </section>
 
   <table class="list">
     <tr><th>Specification</th><th>Options for this product</th><th>Actions</th></tr>
@@ -101,7 +121,16 @@ foreach ($categories as $__c) {
             <table class="list"><tr><th>This product's own options</th><th></th></tr>
               <?php foreach ($__own as $o): ?>
                 <tr><td><?= View::e($o['name']) ?> <?= View::e(ProductSpecs::changeLabel($o['change_type'], $o['value'])) ?></td>
-                  <td><form method="post" action="/products/<?= (int) $product['id'] ?>/spec-options/<?= (int) $o['id'] ?>/delete" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Remove</button></form></td></tr>
+                  <td><?php // D-389: this product's own option's order (the other fields are posted unchanged). ?>
+                    <form method="post" action="/products/<?= (int) $product['id'] ?>/spec-options/<?= (int) $o['id'] ?>" class="inline-form">
+                      <?= Csrf::field() ?>
+                      <input type="hidden" name="name" value="<?= View::e($o['name']) ?>"><input type="hidden" name="change_type" value="<?= View::e($o['change_type']) ?>">
+                      <input type="hidden" name="value" value="<?= $o['value'] !== null ? View::e((string) $o['value']) : '' ?>"><input type="hidden" name="thickness_mm" value="<?= $o['thickness_mm'] !== null ? (int) $o['thickness_mm'] : '' ?>">
+                      <?php if ($o['is_base']): ?><input type="hidden" name="is_base" value="1"><?php endif; ?>
+                      <input type="number" name="sort_order" min="0" max="999" step="1" value="<?= (int) ($o['sort_order'] ?? 90) ?>" aria-label="Order of <?= View::e($o['name']) ?>" placeholder="e.g. 90" class="input-order">
+                      <button type="submit" class="btn-sm">Save order</button>
+                    </form>
+                    <form method="post" action="/products/<?= (int) $product['id'] ?>/spec-options/<?= (int) $o['id'] ?>/delete" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Remove</button></form></td></tr>
               <?php endforeach; ?>
             </table>
           <?php endif; ?>
@@ -114,7 +143,7 @@ foreach ($categories as $__c) {
             <label>Change type *<select name="change_type" required><option value="">Choose…</option><?php foreach (ProductSpecs::CHANGE_TYPES as $k => $l): ?><option value="<?= $k ?>"><?= View::e($l) ?></option><?php endforeach; ?></select></label>
             <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00"></label>
             <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 25 (thickness options)"></label>
-            <input type="hidden" name="sort_order" value="90">
+            <label>Order<input type="number" name="sort_order" min="0" max="999" step="1" value="90" placeholder="e.g. 90"></label>
             <label class="inline"><input type="checkbox" name="is_base" value="1"> base option</label>
             <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
           </form>

@@ -1297,6 +1297,20 @@ $router->post('/products/{id}/specifications/{specId}/options', [$specs, 'addPro
 $router->post('/products/{pid}/own-specs/{id}', [$specs, 'updateSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
 $router->post('/products/{pid}/own-specs/{id}/delete', [$specs, 'deleteSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
 $router->post('/products/{pid}/spec-options/{id}/delete', [$specs, 'deleteOption'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+// D-389: the order of a product's own option (its other fields are posted unchanged).
+$router->post('/products/{pid}/spec-options/{id}', [$specs, 'updateOption'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+// Owner decisions D-382 … D-384 (18 Nov 2026): Forms of stone, Specifications (HS) — manage_pricing, as Pricing ›
+// Specifications — and a product's "Sold as" ticks (manage_product_specifications, as the rest of its Specifications page).
+$productForms = new \App\Controllers\ProductFormController();
+$router->get('/pricing/forms', [$productForms, 'forms'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/pricing/forms', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/forms/{id}', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/forms/{id}/delete', [$productForms, 'deleteForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/products/hs-specifications', [$productForms, 'specifications'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/products/hs-specifications', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/hs-specifications/{id}', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/hs-specifications/{id}/delete', [$productForms, 'deleteSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/{id}/sold-as', [$productForms, 'saveSoldAs'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
 // The order form's live quote for a product with chosen options (selling-price visibility is checked inside; never cost).
 $router->get('/pricing/line-quote', [$priceRequests, 'lineQuote'], [SessionAuth::required()]);
 

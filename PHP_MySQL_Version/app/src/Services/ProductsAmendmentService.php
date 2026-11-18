@@ -569,6 +569,18 @@ final class ProductsAmendmentService
     }
 
     /**
+     * Owner decision D-387 (18 Nov 2026, confirmed twice): the form of an amendment line's order
+     * line ("Sold as" → its form), for the Products Amendment's Product cell; null without one.
+     */
+    private static function lineFormName(array $l): ?string
+    {
+        $id = (int) ($l['order_product_id'] ?? 0) ?: (int) ($l['source_line_id'] ?? 0);
+        $line = $id > 0 ? OrderProductRepository::find($id) : null;
+        $name = \App\Services\ProductForms::formNameForLine($line ?? $l);
+        return $name !== null && trim($name) !== '' ? trim($name) : null;
+    }
+
+    /**
      * The AMD document's "Products & prices" section.
      *
      * @return array<string,mixed>
@@ -625,6 +637,8 @@ final class ProductsAmendmentService
             $rows[] = [
                 'no' => (int) $l['line_no'],
                 'product' => (string) $l['description'],
+                // D-387: a second line "Product Form: <form>" for a line with a Sold as.
+                'product_form' => self::lineFormName($l),
                 'size' => $cell($size($l['new_length_cm'], $l['new_width_cm'], $l['new_thickness_cm']) ?: '—', $size($l['old_length_cm'], $l['old_width_cm'], $l['old_thickness_cm']) ?: '—', true),
                 'pieces' => $cell($l['new_pieces'] !== null ? number_format((int) $l['new_pieces']) : '—', $l['old_pieces'] !== null ? number_format((int) $l['old_pieces']) : '—', true),
                 'quantity' => $cell($qtyText($l['new_quantity'], $l['unit']) . ($oneUnit === null ? ' ' . $unitLabel : ''), $qtyText($l['old_quantity'], $l['unit']) . ($oneUnit === null ? ' ' . $unitLabel : ''), true),

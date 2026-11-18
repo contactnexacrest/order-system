@@ -142,7 +142,7 @@
     <td></td>
     <td colspan="5">
       <span class="line-no" style="color:{{ lineColor }};">{{ p.no }}.</span>
-      {% for a in p.attributes %}<span class="spec-label">{{ a.label }}:</span> {{ a.value }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endfor %}<span class="spec-label">HS Code:</span> {{ p.hs_code }}
+      {% if p.product_form %}<span class="spec-label">Product Form:</span> {{ p.product_form }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endif %}{% for a in p.attributes %}<span class="spec-label">{{ a.label }}:</span> {{ a.value }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endfor %}<span class="spec-label">HS Code:</span> {{ p.hs_code }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
     </td>
   </tr>
@@ -151,7 +151,7 @@
     <td></td>
     <td colspan="5">
       <span class="line-no" style="color:{{ lineColor }};">{{ p.no }}.</span>
-      <span class="spec-label">Dimensions:</span> {{ p.dimensions ?: 'To Be Confirmed' }}
+      {% if p.product_form %}<span class="spec-label">Product Form:</span> {{ p.product_form }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endif %}<span class="spec-label">Dimensions:</span> {{ p.dimensions ?: 'To Be Confirmed' }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Finish:</span> {{ p.finish ?: 'To Be Confirmed' }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">HS Code:</span> {{ p.hs_code }}
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India

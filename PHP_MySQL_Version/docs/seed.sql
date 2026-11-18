@@ -419,7 +419,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Subject to Proforma Invoice' AND dt.code IN ('OC');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (95, 'Bill of Lading Release', 'Bill of Lading: Original negotiable BL (3 originals) will be released to buyer only after {balance_pct}% balance payment is CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting BL originals to be released.', 'active', 0);
+  (95, 'Bill of Lading Release', 'Bill of Lading: The full set of original negotiable Bills of Lading, as issued by the shipping line, will be released to the buyer only after {balance_pct}% balance payment is CLEARED in NexaCrest''s bank account. Remittance copy alone does not constitute payment receipt. Please allow 1–2 banking days for clearance confirmation before expecting BL originals to be released.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Bill of Lading Release' AND dt.code IN ('OC');
@@ -1095,7 +1095,7 @@ Pin this page. These are the rules the system enforces automatically — this is
 ## Bill of Lading — Non-Negotiable
 - {bl_type_instruction}
 - Consignee instruction: {bl_consignee_instruction}
-- NexaCrest retains all 3 original BLs until the balance T/T is received and cleared — never release before that.
+- NexaCrest retains the full set of originals until the balance T/T is cleared — never release before that.
 
 ## Quantity Shortfall Tolerance
 - Any shipped quantity within {quantity_shortfall_tolerance_pct}% of the ordered quantity needs no special approval.
@@ -1131,7 +1131,7 @@ Use this checklist when preparing and issuing: Quotation → PI → Order Confir
 - Incoterm stated explicitly with port name — not just ''FOB'' — must say ''FOB Chennai, India''
 - Port of Discharge matches buyer''s stated destination
 - Freight row completed correctly — FOB: NIL. CFR/CIF: indicative range + ''IN ADVANCE'' and ''BEFORE booking'' language present ⚠ NEVER omit freight advance payment condition on CFR/CIF orders
-- HS Code: 6802.93 for all granite/monument products ⚠ Different product = verify HS Code before issuing
+- HS Code: 68029300 for all granite/monument products ⚠ Different product = verify HS Code before issuing
 - Quotation validity: 30 days stated
 - Payment terms: 40% advance T/T + 60% against scanned BL (Tier 2) OR before shipment (Tier 1)
 
@@ -1295,7 +1295,7 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - PI reference on PL matches
 - Buyer name/address on PL matches PI character-for-character
 - Product description on PL matches PI and CI exactly
-- HS Code on PL matches PI and CI: 6802.93 (or correct code per product)
+- HS Code on PL matches PI and CI: 68029300 (or correct code per product)
 - Actual quantity on PL ≤ PI quantity ⚠ HARD RULE — quantity over PI not permitted
 - Crate count on PL matches physical count of sealed crates
 - Shipping marks on PL match marks stencilled on physical crates
@@ -1303,7 +1303,7 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 ## B. BL Instruction Sheet — Before Sending to CHA
 - BL Instruction Sheet completed — all fields filled
 - Buyer name on BL instruction matches PI/PL character-for-character
-- ⚠ MANDATORY — BL TYPE: Original Negotiable Bill of Lading — 3 Originals ONLY. NEVER request Sea Waybill or Express BL. If CHA suggests otherwise — refuse and escalate to MD. BL Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. Reason: Buyer cannot collect cargo until NexaCrest endorses and releases the original BL. NexaCrest retains all 3 originals until 60% balance T/T is cleared.
+- ⚠ MANDATORY — BL TYPE: Original Negotiable Bill of Lading — full set of originals. Telex Release / surrendered BL only on the buyer''s request and with MD approval, after the balance is cleared. NEVER request Sea Waybill or Express BL. If CHA suggests otherwise — refuse and escalate to MD. BL Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. Reason: Buyer cannot collect cargo until NexaCrest endorses and releases the original BL. NexaCrest retains the full set of originals until the balance T/T is cleared.
 - Freight terms on BL instruction: Freight Collect (FOB) or Freight Prepaid (CFR/CIF)
 - BL Instruction Sheet sent to CHA
 - Draft BL received from CHA and approved by NexaCrest in writing before originals are issued (CHA must send the draft BL to NexaCrest for written approval before issuing any original BL. Check every field: consignee (TO ORDER OF NEXACREST), BL type (Original Negotiable), freight terms, port names, vessel, crate count. Reply in writing (email) confirming approval. Original BL must NOT be issued without this written approval.) ⚠⚠ Never let CHA issue original BL without NexaCrest''s written approval — errors on original BL are costly to correct
@@ -1320,7 +1320,7 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - COO received from CAPEXIL — details verified against CI
 
 ## E. BL Received From CHA
-- 3 original BLs received from CHA — count physically ⚠ If fewer than 3 originals received — contact CHA immediately
+- Full set of original BLs received from CHA — count physically against the number stated on the BL ⚠ If fewer originals received than the BL states — contact CHA immediately
 - BL type confirmed: Original Negotiable BL (not Sea Waybill)
 - BL consignee reads: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
 - BL date matches CI date
@@ -1329,18 +1329,18 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - BL gross weight matches PL gross weight
 - Scanned copy of BL sent to buyer immediately (Buyer needs this to initiate 60% balance T/T payment)
 - Scanned copy of BL sent to Accounts to start 7-day countdown
-- All 3 original BLs stored securely at NexaCrest — NOT given to buyer or CHA
+- Full set of original BLs stored securely at NexaCrest — NOT given to buyer or CHA
 
 ## F. 60% Balance Confirmed Cleared — BL Endorsement
 - ONLY after Accounts confirms 60% balance T/T is CLEARED in NexaCrest SBI account. Do not endorse or courier BL originals based on buyer''s remittance copy alone. Wait for bank clearance confirmation — then proceed.
-- BL ENDORSEMENT — on the BACK of each of the 3 original BLs: apply NexaCrest rubber company stamp; sign over the stamp: the Managing Director (wet signature or rubber signature stamp); write date of endorsement; write: For NexaCrest International Private Limited. All 3 originals must be endorsed before couriering. Check all 3 — not just one.
-- All 3 original BLs endorsed (stamp + signature + date on back of each)
+- BL ENDORSEMENT — on the BACK of each original BL of the full set: apply NexaCrest rubber company stamp; sign over the stamp: the Managing Director (wet signature or rubber signature stamp); write date of endorsement; write: For NexaCrest International Private Limited. Every original of the full set must be endorsed before couriering. Check every original — not just one.
+- Full set of original BLs endorsed (stamp + signature + date on back of each)
 - Endorsed originals couriered to buyer with tracking number recorded
 
 ## G. Final Document Set to Buyer
 - Commercial Invoice (signed copy)
 - Packing List (signed copy)
-- 3 original BLs (endorsed)
+- Full set of original BLs (endorsed)
 - Certificate of Origin (CAPEXIL)
 - Fumigation Certificate
 - All documents couriered together — courier tracking number recorded
@@ -1354,10 +1354,10 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - PAYMENT — PRODUCTION: Production starts ONLY after 40% advance T/T is confirmed CLEARED in NexaCrest SBI account. Not on remittance copy. Not on buyer''s word. Cleared.
 - PAYMENT — FREIGHT: CFR/CIF only — Freight Debit Note must be paid and cleared BEFORE shipment booking is confirmed. NexaCrest cannot book container until freight is settled.
 - PAYMENT — BALANCE: 60% balance T/T must be CLEARED in NexaCrest account before BL originals are endorsed or released. Scanned BL copy is sent to buyer to initiate payment. Originals are held until cleared.
-- BILL OF LADING: Always Original Negotiable BL — 3 originals. Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill or Express BL. CHA hands all 3 originals to NexaCrest only.
-- BL ENDORSEMENT: Endorse (rubber stamp + sign + date on back) all 3 originals only AFTER 60% balance is cleared. Courier endorsed originals to buyer. Never courier un-endorsed originals.
+- BILL OF LADING: Always Original Negotiable BL — full set of originals. Telex Release / surrendered BL only on the buyer''s request and with MD approval, after the balance is cleared. Consignee: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill or Express BL. CHA hands the full set of originals to NexaCrest only.
+- BL ENDORSEMENT: Endorse (rubber stamp + sign + date on back) every original of the full set only AFTER the balance is cleared. Courier endorsed originals to buyer. Never courier un-endorsed originals.
 - DOCUMENT MATCHING: Buyer name/address must match character-for-character across ALL documents: Quotation, PI, PL, CI, BL, COO. Any mismatch = customs problem. Fix before issuing next document.
-- HS CODE: 6802.93 for all worked monumental granite products. Must be identical on PI, PL, CI, COO, and Shipping Bill. Different product: verify HS code before issuing.
+- HS CODE: 68029300 for all worked monumental granite products. Must be identical on PI, PL, CI, COO, and Shipping Bill. Different product: verify HS code before issuing.
 - LUT: LUT Order No. AD000000000000X on every Commercial Invoice. Valid FY 2026-27 only. New LUT required before 1 April every year. Wrong/expired LUT = IGST refund rejected.
 - RCMC: Check RCMC validity 60 days before expiry. Expired RCMC = CAPEXIL cannot issue COO = shipment documents incomplete = customs hold at destination.
 - COO SEQUENCE: COO application to CAPEXIL only AFTER Shipping Bill is filed by CHA. Never before. Sequence: Packing done → CHA files Shipping Bill → then apply for COO.
@@ -1388,13 +1388,13 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 - Freight Debit Note amount matches freight line on Commercial Invoice
 
 ## D. BL Instruction — Confirmed Before Sending to CHA
-- ⚠ BL TYPE FINAL CHECK: Original Negotiable BL — 3 originals ONLY. Consignee on BL: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill. NEVER Express BL. If in doubt — call MD before sending instruction.
-- BL type confirmed: Original Negotiable BL — 3 originals
+- ⚠ BL TYPE FINAL CHECK: Original Negotiable Bill of Lading — full set of originals. Telex Release / surrendered BL only on the buyer''s request and with MD approval, after the balance is cleared. Consignee on BL: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED. NEVER Sea Waybill. NEVER Express BL. If in doubt — call MD before sending instruction.
+- BL type confirmed: Original Negotiable BL — full set of originals
 - BL consignee wording confirmed: TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
 - Freight terms on BL instruction correct: Freight Collect (FOB) or Freight Prepaid (CFR/CIF)
 
 ## E. Post-Shipment Actions Noted
-- Reminder set: collect 3 original BLs from CHA after vessel departure
+- Reminder set: collect the full set of original BLs from CHA after vessel departure
 - Reminder set: apply for COO via CAPEXIL after Shipping Bill is filed by CHA
 - Reminder set: send scanned BL copy to buyer and Accounts immediately on receipt
 - Reminder set: 60% balance due within 7 days of BL date (Tier 2) or before shipment (Tier 1)
@@ -1428,7 +1428,7 @@ Applies to the "Established Buyer — Post-BL" payment preset: 40% advance / 60%
 Follow the same 9-stage flow as Tier A, with two differences:
 
 1. Before this preset can be applied to an order, MD approval is required — do not proceed past the advance/balance terms step without it recorded.
-2. The balance due date is computed from the BL issuance date, not from advance clearance — do not release any of the 3 original Bills of Lading to the buyer until the balance T/T is received and cleared in NexaCrest''s bank account. This is the entire point of the Bill of Lading hard rule (see Wall Reference) — releasing the BL early gives up NexaCrest''s only financial leverage over an established buyer''s balance payment.
+2. The balance due date is computed from the BL issuance date, not from advance clearance — do not release any of the original Bills of Lading (the full set) to the buyer until the balance T/T is received and cleared in NexaCrest''s bank account. This is the entire point of the Bill of Lading hard rule (see Wall Reference) — releasing the BL early gives up NexaCrest''s only financial leverage over an established buyer''s balance payment.
 
 Everything else — Quotation through Closure — follows the same Stage Gate Reference as Tier A.'
 FROM document_types dt WHERE dt.code = 'SOP_B_SALES';
@@ -1463,7 +1463,7 @@ FROM (
   UNION ALL SELECT '25169020', 'Other monumental stone - boulders', NULL
   UNION ALL SELECT '25169090', 'Other monumental stone - other', NULL
   UNION ALL SELECT '68010000', 'Setts, curbstones, flagstones (natural stone)', NULL
-  UNION ALL SELECT '68022310', 'Granite blocks or tiles, polished', 'Polished, flat, custom-to-size - custom-to-size slabs, gangsaw-size slabs, granite tiles, or a flat (unshaped) monument blank.'
+  UNION ALL SELECT '68022310', 'Granite blocks or tiles','Polished, flat, custom-to-size - custom-to-size slabs, gangsaw-size slabs, granite tiles, or a flat (unshaped) monument blank.'
   UNION ALL SELECT '68022390', 'Granite - other worked', 'Polished but irregular/random-sized slabs.'
   UNION ALL SELECT '68022900', 'Other worked stone (non-granite/marble)', NULL
   UNION ALL SELECT '68029100', 'Marble, travertine, alabaster - worked', NULL
@@ -3104,3 +3104,66 @@ SELECT r.id, d.report_key, d.level
   UNION ALL SELECT 'Investor (view only)', 'queues', 'all'
   ) d ON d.grp = g.grp
  WHERE NOT EXISTS (SELECT 1 FROM role_report_access x WHERE x.role_id = r.id AND x.report_key = d.report_key);
+
+-- Owner decisions D-382 … D-385 and D-389 (18 Nov 2026; migration 2026-11-18a): the forms of stone, the
+-- specification list (each with its HS code), the finishes "Roughly trimmed" and "Sawn" with their Surface
+-- finish options at no price change (D-357), which finishes each form offers, the permission to change a
+-- line's HS code from its specification (MD, Founder & MD, ED, Founder & ED) and "Monument (cut to size)"
+-- first in Size / format. Products' "Sold as" ticks start empty (= every specification offered).
+INSERT INTO product_forms (code, name, units, default_unit, spec_group, default_finish, sort_order, is_active)
+SELECT f.code, f.name, f.units, f.default_unit, f.spec_group, f.default_finish, f.sort_order, 1 FROM (
+  SELECT 'monument_slab' AS code, 'Monument slab' AS name, 'PCS,M2,SQFT,CBM' AS units, 'PCS' AS default_unit, 'slab' AS spec_group, 'Natural Polish' AS default_finish, 1 AS sort_order
+  UNION ALL SELECT 'gangsaw_slab', 'Gangsaw slab', 'M2,SQFT,CBM', 'M2', 'slab', 'Natural Polish', 2
+  UNION ALL SELECT 'cut_to_size_slab', 'Cut-to-size slab', 'M2,SQFT,CBM,PCS', 'M2', 'slab', 'Natural Polish', 3
+  UNION ALL SELECT 'raw_block', 'Raw block', 'CBM,TON', 'CBM', 'block', 'Roughly trimmed', 4
+  UNION ALL SELECT 'sawn_block', 'Sawn block', 'CBM,TON', 'CBM', 'block', 'Sawn', 5
+  UNION ALL SELECT 'tile', 'Tile', 'M2,SQFT,PCS', 'M2', 'tile', 'Natural Polish', 6
+  UNION ALL SELECT 'paving_stone', 'Paving stone', 'M2,SQFT,PCS', 'M2', 'slab', 'Flamed', 7
+  UNION ALL SELECT 'kerbs_setts_cobbles', 'Kerbs, setts, cobbles', 'PCS,M2,RMT', 'PCS', 'kerb', 'Flamed', 8
+) f WHERE NOT EXISTS (SELECT 1 FROM product_forms x WHERE x.code = f.code);
+INSERT INTO hs_specifications (name, form_id, usual_finish, hs_code, when_to_use, sort_order, is_active)
+SELECT s.name, f.id, s.usual_finish, s.hs_code, s.when_to_use, s.sort_order, 1 FROM (
+  SELECT 'Raw block' AS name, 'raw_block' AS form_code, 'Roughly trimmed' AS usual_finish, '25161100' AS hs_code, 'As it comes from the quarry' AS when_to_use, 1 AS sort_order
+  UNION ALL SELECT 'Sawn block', 'sawn_block', 'Sawn', '25161200', 'Sawn / cut to size on all sides', 2
+  UNION ALL SELECT 'Gangsaw slab', 'gangsaw_slab', 'Natural Polish', '68022310', NULL, 3
+  UNION ALL SELECT 'Random slab — irregular', 'gangsaw_slab', 'Natural Polish', '68022390', NULL, 4
+  UNION ALL SELECT 'Cut-to-size slab', 'cut_to_size_slab', 'Natural Polish', '68022310', NULL, 5
+  UNION ALL SELECT 'Tile', 'tile', 'Natural Polish', '68022310', NULL, 6
+  UNION ALL SELECT 'Monument slab', 'monument_slab', 'Natural Polish', '68029300', NULL, 7
+  UNION ALL SELECT 'Monument — complete set / tombstone', 'monument_slab', 'Natural Polish', '68029300', NULL, 8
+  UNION ALL SELECT 'Paving stone', 'paving_stone', 'Flamed', '68010000', NULL, 9
+  UNION ALL SELECT 'Kerbs, setts, cobbles', 'kerbs_setts_cobbles', 'Flamed', '68010000', NULL, 10
+) s JOIN product_forms f ON f.code = s.form_code
+ WHERE NOT EXISTS (SELECT 1 FROM hs_specifications x WHERE x.name = s.name);
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT 'surface_finish', n.v, n.o + COALESCE((SELECT MAX(d.sort_order) FROM dropdown_options d WHERE d.list_key = 'surface_finish'), 0), 0, 1 FROM (
+  SELECT 'Roughly trimmed' AS v, 1 AS o UNION ALL SELECT 'Sawn', 2
+) n WHERE NOT EXISTS (SELECT 1 FROM dropdown_options x WHERE x.list_key = 'surface_finish' AND x.option_value = n.v);
+INSERT INTO spec_options (spec_id, product_id, name, is_base, change_type, value, thickness_mm, sort_order, is_active, dropdown_option_id)
+SELECT s.id, NULL, LEFT(d.option_value, 80), 0, 'none', NULL, NULL, d.sort_order, d.is_active, d.id
+  FROM spec_definitions s JOIN dropdown_options d ON d.list_key = 'surface_finish'
+ WHERE s.list_key = 'surface_finish' AND s.product_id IS NULL AND d.option_value IN ('Roughly trimmed', 'Sawn')
+   AND NOT EXISTS (SELECT 1 FROM spec_options x WHERE x.spec_id = s.id AND x.product_id IS NULL AND x.dropdown_option_id = d.id);
+SET @sff_empty := (SELECT COUNT(*) = 0 FROM surface_finish_forms);
+INSERT INTO surface_finish_forms (dropdown_option_id, form_id)
+SELECT d.id, f.id FROM dropdown_options d CROSS JOIN product_forms f
+ WHERE @sff_empty = 1 AND d.list_key = 'surface_finish'
+   AND ((d.option_value = 'Roughly trimmed' AND f.code = 'raw_block')
+     OR (d.option_value = 'Sawn' AND f.code = 'sawn_block')
+     OR (d.option_value NOT IN ('Roughly trimmed', 'Sawn') AND f.spec_group <> 'block'));
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'override_line_hs_code', 'Change a line''s HS code from its specification, with a reason', 'On an order line with a Sold as, type a different HS code from the HS Code Master instead of the one the specification sets, with a reason; audited (D-385).', 'catalog'
+ WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'override_line_hs_code');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'override_line_hs_code'
+ WHERE r.name IN ('Managing Director', 'Founder & Managing Director', 'Executive Director', 'Founder & Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+UPDATE spec_options o
+  JOIN spec_definitions s ON s.id = o.spec_id AND s.product_id IS NULL AND s.name = 'Size / format'
+  JOIN spec_options m ON m.spec_id = s.id AND m.product_id IS NULL AND m.name = 'Monument (cut to size)' AND m.sort_order <> 0
+   SET o.sort_order = o.sort_order + 1
+ WHERE o.product_id IS NULL AND o.id <> m.id;
+UPDATE spec_options o
+  JOIN spec_definitions s ON s.id = o.spec_id AND s.product_id IS NULL AND s.name = 'Size / format'
+   SET o.sort_order = 0
+ WHERE o.product_id IS NULL AND o.name = 'Monument (cut to size)' AND o.sort_order <> 0;

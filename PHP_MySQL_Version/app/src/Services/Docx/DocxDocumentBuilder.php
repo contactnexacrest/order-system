@@ -302,6 +302,8 @@ final class DocxDocumentBuilder
             // D-339: a line below the detailed table keeps its own number on the document.
             $n = (int) ($p['no'] ?? $i + 1);
             $lineColor = ($n % 2 === 1) ? '1D6FA8' : '2D7D56';
+            // Owner decision D-386 (18 Nov 2026, confirmed twice): "Product Form: <form>" first in the grey line (QT / PI / OC / CI, a line with a Sold as).
+            $formRuns = !empty($p['product_form']) ? [['Product Form: ', ['bold' => true, 'color' => DocxComponents::NAVY]], [$p['product_form'] . '   ·   ', []]] : [];
             $rows[] = [
                 'cells' => [(string) $n, $p['description'] ?? '', $p['quantity'] ?? '', $p['unit'] ?? '', $p['unit_price'] ?? '', $p['amount'] ?? ''],
                 'lineColor' => $lineColor,
@@ -317,10 +319,12 @@ final class DocxDocumentBuilder
                 ] : (!empty($p['attributes']) ? array_merge(
                     // D-215 (5a): a line of another product category — its own attributes, then the HS code, as the PDF.
                     [["{$n}. ", ['bold' => true, 'color' => $lineColor]]],
+                    $formRuns,
                     array_merge(...array_map(static fn (array $a): array => [[$a['label'] . ': ', ['bold' => true, 'color' => DocxComponents::NAVY]], [$a['value'] . '   ·   ', []]], $p['attributes'])),
                     [['HS Code: ', ['bold' => true, 'color' => DocxComponents::NAVY]], [($p['hs_code'] ?? '') . '   ·   ', []], ['Country of Origin: ', ['bold' => true, 'color' => DocxComponents::NAVY]], ['India', []]]
                 ) : ((!empty($p['dimensions']) || !empty($p['finish'])) ? [
                     ["{$n}. ", ['bold' => true, 'color' => $lineColor]],
+                    ...$formRuns,
                     ['Dimensions: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     [($p['dimensions'] ?: 'To Be Confirmed') . '   ·   ', []],
                     ['Finish: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
@@ -508,7 +512,7 @@ final class DocxDocumentBuilder
             '1.  Commercial Invoice',
             '2.  Packing List',
             '3.  ' . self::cooLine($order),
-            '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared',
+            '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
         ]);
@@ -666,7 +670,7 @@ final class DocxDocumentBuilder
             '1.  Commercial Invoice',
             '2.  Packing List',
             '3.  ' . self::cooLine($order),
-            '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared in NexaCrest bank account',
+            '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
         ]);
@@ -1128,6 +1132,8 @@ final class DocxDocumentBuilder
         });
         DocxComponents::addKvTable($section, array_merge([
             ['label' => self::cd($context)['material_label'], 'value' => self::g($sp, 'material_stone_type', 'To Be Confirmed')],
+            // Owner decision D-387 (18 Nov 2026, confirmed twice): "Product Form" right after the material row, only when filled.
+            ...(!empty($sp['product_form']) ? [['label' => 'Product Form', 'value' => (string) $sp['product_form']]] : []),
             ['label' => 'Grade', 'value' => self::g($sp, 'grade') . ' only — no mixed grades, no seconds'],
             ['label' => 'Surface Finish', 'value' => self::g($sp, 'surface_finish', 'To Be Confirmed')],
             ['label' => 'Dimensions', 'value' => self::g($sp, 'dimensions', 'To Be Confirmed')],
@@ -1517,13 +1523,13 @@ final class DocxDocumentBuilder
             $cell->addText('MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL', ['bold' => true, 'size' => 11], ['spaceAfter' => 60]);
             $run = $cell->addTextRun();
             $run->addText('Always issue: ', ['bold' => true]);
-            $run->addText('ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS', ['bold' => true, 'size' => 12]);
+            $run->addText('ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET', ['bold' => true, 'size' => 12]);
         });
         $blRows = [];
         if (($bl['type_instruction'] ?? null) !== null) {
             $blRows[] = ['label' => 'BL Type', 'value' => self::g($bl, 'type_instruction')];
         }
-        $blRows[] = ['label' => 'No. of Original Copies', 'value' => '3 (three originals)'];
+        $blRows[] = ['label' => 'No. of Original Copies', 'value' => 'Full set as issued by the shipping line (the number is stated on the BL)'];
         $blRows[] = ['label' => 'No. of Non-Negotiable Copies', 'value' => '3'];
         if (($bl['consignee_instruction'] ?? null) !== null) {
             $blRows[] = ['label' => 'BL Consignee Instruction', 'value' => self::g($bl, 'consignee_instruction')];
@@ -1533,7 +1539,7 @@ final class DocxDocumentBuilder
             $run = $cell->addTextRun();
             // Owner decision D-224 (D3, 2 Nov 2026, confirmed twice): the CHA gets the instruction only.
             $run->addText('Original BL release: ', ['bold' => true]);
-            $run->addText('CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else.', ['color' => DocxComponents::BLUE_TEXT]);
+            $run->addText('CHA to hand the full set of originals to NexaCrest only — never to the buyer or anyone else.', ['color' => DocxComponents::BLUE_TEXT]);
         }, 0);
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
@@ -1671,7 +1677,7 @@ final class DocxDocumentBuilder
             '1.  Commercial Invoice (this document)',
             '2.  Packing List',
             '3.  ' . self::cooLine($order),
-            '4.  Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest',
+            '4.  Bill of Lading — full set of original Bills of Lading as issued by the shipping line, couriered to the Buyer within 3 Working Days of the Balance Payment being confirmed as Payment Cleared (or Telex Release / surrendered BL on request)',
             '5.  Fumigation Certificate — provided as standard with every shipment',
             ...self::qualityLines($context, 5),
         ]);

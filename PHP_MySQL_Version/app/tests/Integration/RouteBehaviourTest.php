@@ -654,8 +654,9 @@ final class RouteBehaviourTest extends DbTestCase
             'fob_source' => 'direct', 'fob_value' => 100, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], $this->holder);
         \App\Repositories\PricingRepository::setSupplierDates($offer, date('Y-m-d'), null);
         self::configureProductForQuoting($picked, $this->holder);
-        $r = $this->call('POST', "/orders/{$order}/products/{$line}", ['catalog_product_id' => (string) $picked, 'description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15',
-            'spec_json' => self::baseSpecJson($picked), 'reason' => 'Route behaviour test edit']);
+        // D-385: with its Sold as (Monument slab: per piece, so the piece's length and width too).
+        $r = $this->call('POST', "/orders/{$order}/products/{$line}", self::soldAs('Monument slab') + ['catalog_product_id' => (string) $picked, 'description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15',
+            'piece_length_cm' => '180', 'piece_width_cm' => '80', 'spec_json' => self::baseSpecJson($picked), 'reason' => 'Route behaviour test edit']);
         $this->assertDone($r, 'POST /orders/{id}/products/{productId}');
         self::assertSame('Route edited line', $this->value("SELECT description FROM order_products WHERE id = {$line}"));
 

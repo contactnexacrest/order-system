@@ -783,7 +783,7 @@ CREATE TABLE order_products (
   unit          VARCHAR(20) NULL,
   unit_price    DECIMAL(14,2) NULL,
   fob_value     DECIMAL(14,2) NULL,
-  hs_code       VARCHAR(20) NOT NULL DEFAULT '6802.93',
+  hs_code       VARCHAR(20) NOT NULL DEFAULT '68029300', -- D-385 (migration 2026-11-18a): was '6802.93'
   sac_code      VARCHAR(10) NULL,
   category_id   BIGINT UNSIGNED NULL,
   attribute_values TEXT NULL,
@@ -6809,3 +6809,74 @@ CREATE TABLE IF NOT EXISTS user_report_extras (
   PRIMARY KEY (user_id, report_key),
   CONSTRAINT fk_user_report_extras_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Owner decisions D-382 … D-385 (18 Nov 2026; migration 2026-11-18a): forms of stone and their units,
+-- the specification list that sets an order line's HS code, which finishes each form offers, and a
+-- product's "Sold as" ticks. product_forms.spec_group is one of ProductSpecs::FORMS (block, slab,
+-- tile, kerb, step, cobble), so spec_definitions.applies_to keeps working: a product's forms are the
+-- groups of its ticked specifications' forms. units: comma list of LineUnits::canonical units.
+-- surface_finish_forms: no rows for a form = every finish. hs_specifications.hs_code: an active code
+-- of the HS Code Master, 6 or 8 digits.
+CREATE TABLE IF NOT EXISTS product_forms (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code           VARCHAR(40) NOT NULL,
+  name           VARCHAR(80) NOT NULL,
+  units          VARCHAR(100) NOT NULL,
+  default_unit   VARCHAR(10) NOT NULL,
+  spec_group     VARCHAR(20) NOT NULL,
+  default_finish VARCHAR(80) NULL,
+  sort_order     INT NOT NULL DEFAULT 0,
+  is_active      TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by     BIGINT UNSIGNED NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_product_forms_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS hs_specifications (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name         VARCHAR(120) NOT NULL,
+  form_id      BIGINT UNSIGNED NOT NULL,
+  usual_finish VARCHAR(80) NULL,
+  hs_code      VARCHAR(8) NOT NULL,
+  when_to_use  VARCHAR(255) NULL,
+  sort_order   INT NOT NULL DEFAULT 0,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by   BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_hs_specifications_form (form_id),
+  CONSTRAINT fk_hs_specifications_form FOREIGN KEY (form_id) REFERENCES product_forms(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS product_hs_specifications (
+  product_id BIGINT UNSIGNED NOT NULL,
+  hs_spec_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (product_id, hs_spec_id),
+  KEY idx_product_hs_specifications_spec (hs_spec_id),
+  CONSTRAINT fk_product_hs_specifications_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_product_hs_specifications_spec FOREIGN KEY (hs_spec_id) REFERENCES hs_specifications(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS surface_finish_forms (
+  dropdown_option_id BIGINT UNSIGNED NOT NULL,
+  form_id            BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (dropdown_option_id, form_id),
+  KEY idx_surface_finish_forms_form (form_id),
+  CONSTRAINT fk_surface_finish_forms_form FOREIGN KEY (form_id) REFERENCES product_forms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- D-385: an order line's Sold as (its HS code comes from it) and why the MD / ED changed that code.
+ALTER TABLE order_products ADD COLUMN hs_spec_id BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN hs_override_reason VARCHAR(500) NULL;
+
+-- Owner decision D-381 (18 Nov 2026; migration 2026-11-18b): CHA + transport per container (factory → port)
+-- per supplier — used by its supplier-price rows that have no figure of their own (row → supplier →
+-- product default → none), and the port the figure is for.
+ALTER TABLE suppliers ADD COLUMN cha_transport_per_container DECIMAL(14,2) NULL;
+ALTER TABLE suppliers ADD COLUMN cha_port VARCHAR(100) NULL;
+-- D-382 (migration 2026-11-18b): a block price typed per tonne is stored per CBM in the usual fields;
+-- what was typed is kept for display ("₹30,000.00 per tonne = ₹87,000.00 per CBM at 2.9 t/CBM").
+-- NULL = typed in the stored unit.
+ALTER TABLE catalog_product_suppliers ADD COLUMN entered_unit VARCHAR(10) NULL;
+ALTER TABLE catalog_product_suppliers ADD COLUMN entered_price DECIMAL(14,2) NULL;
+
+-- Owner decision D-387 (18 Nov 2026; migration 2026-11-18c): Supplier PO Section 3 "Product Form",
+-- prefilled from the order lines' form, printed only when filled.
+ALTER TABLE order_supplier_po ADD COLUMN product_form VARCHAR(80) NULL;

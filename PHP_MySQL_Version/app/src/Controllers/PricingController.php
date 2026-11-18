@@ -401,6 +401,9 @@ final class PricingController
             'lines' => $lines, 'base_mm' => $baseMm, 'base_label' => ThicknessPrices::label($baseMm, $cbmFrom), 'base_price' => $basePrice,
             'base_unit' => $baseMm === ThicknessPrices::CBM ? 'CBM' : 'SQM', 'base_chosen' => ThicknessPrices::rowBase($row) !== null,
             'cha_per_cbm' => $cha['per_cbm'], 'fits_cbm' => $cha['fits_cbm'], 'cha_per_container' => ThicknessPrices::chaPerContainer($row, $product),
+            // D-381: where the CHA comes from (this price / supplier · port / product default), or "already inside".
+            'cha_source_tag' => ThicknessPrices::chaSourceTag(ThicknessPrices::chaSource($row, $product)),
+            'cha_inside' => ThicknessPrices::chaSource($row, $product)['computed'],
             'parts' => $parts, 'build' => $build, 'auto' => ThicknessPrices::autoFill($row),
             'unit_label' => $parts !== null ? (\App\Services\LineUnits::label((string) $parts['unit']) ?: (string) $parts['unit']) : '',
         ];
@@ -833,7 +836,7 @@ final class PricingController
         }
         $newCha = $data['cha_transport_per_container'] !== null ? number_format((float) $data['cha_transport_per_container'], 2, '.', '') : null;
         if ($oldCha !== $newCha) {
-            ThicknessPrices::history($supplierId, 'CHA + transport per container', $oldCha ?? 'product default', $newCha ?? 'product default', $userId);
+            ThicknessPrices::history($supplierId, 'CHA + transport per container', $oldCha ?? 'default (supplier, else product)', $newCha ?? 'default (supplier, else product)', $userId); // D-381
         }
         if ($oldIncl !== $data['includes_packing_loading']) {
             ThicknessPrices::history($supplierId, 'Price includes packing and loading', $oldIncl ? 'yes' : 'no', $data['includes_packing_loading'] ? 'yes' : 'no', $userId);

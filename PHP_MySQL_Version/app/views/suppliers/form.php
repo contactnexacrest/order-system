@@ -66,6 +66,33 @@ $selectedTypes = $supplier['types'] ?? [];
         </label>
       </div>
     </fieldset>
+    <?php // Owner decision D-381 (18 Nov 2026): CHA + transport per container for this supplier — used by its prices that have no figure of their own. ?>
+    <?php if ($isEdit && !empty($canSeeCha)):
+      $__chaOld = $chaOld ?? [];
+      $__chaAmt = array_key_exists('cha_transport_per_container', $__chaOld) ? (string) $__chaOld['cha_transport_per_container']
+        : (($supplier['cha_transport_per_container'] ?? null) !== null ? rtrim(rtrim(number_format((float) $supplier['cha_transport_per_container'], 2, '.', ''), '0'), '.') : '');
+      $__chaPort = array_key_exists('cha_port', $__chaOld) ? (string) $__chaOld['cha_port'] : (string) ($supplier['cha_port'] ?? ''); ?>
+    <fieldset id="cha-transport" data-cha-supplier>
+      <legend>CHA + transport per container</legend>
+      <div class="field-grid">
+        <label>CHA + transport per container, factory → port (₹)
+          <input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" maxlength="16"
+                 value="<?= htmlspecialchars($__chaAmt) ?>" data-was="<?= htmlspecialchars(($supplier['cha_transport_per_container'] ?? null) !== null ? rtrim(rtrim(number_format((float) $supplier['cha_transport_per_container'], 2, '.', ''), '0'), '.') : '') ?>"
+                 placeholder="e.g. 45000" data-cha-supplier-field>
+        </label>
+        <label>Port this figure is for
+          <input type="text" name="cha_port" maxlength="100" value="<?= htmlspecialchars($__chaPort) ?>" data-was="<?= htmlspecialchars((string) ($supplier['cha_port'] ?? '')) ?>"
+                 placeholder="e.g. Mundra" data-cha-supplier-field>
+        </label>
+        <label class="full">Reason for the change <small class="muted">(required when the figure or the port changes)</small>
+          <input type="text" name="cha_reason" minlength="10" maxlength="500" value="<?= htmlspecialchars((string) ($__chaOld['cha_reason'] ?? '')) ?>"
+                 placeholder="e.g. New transporter rate from the quarry to Mundra, Nov 2026" data-cha-supplier-reason
+                 data-required-if-changed="cha_transport_per_container,cha_port" data-required-if-changed-message="Give the reason for changing the CHA + transport figure or its port.">
+        </label>
+      </div>
+      <p class="small muted">Used for this supplier's prices that have no CHA + transport figure of their own (else the product's default). Older prices that already include the CHA never get it added. Empty = none for this supplier.</p>
+    </fieldset>
+    <?php endif; ?>
     <?php include __DIR__ . '/../partials/_vendor_bank_fields.php'; ?>
     <label>Notes <textarea name="notes" rows="3" placeholder="Anything else worth recording — material specialities, capacity, payment terms, etc."><?= $v('notes') ?></textarea></label>
     <?php // D-303 (point 15): a supplier added quickly from a product price is "Details pending" until completed here or by its details link. ?>

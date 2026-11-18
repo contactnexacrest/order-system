@@ -2678,19 +2678,76 @@ the same filters, counts, fields, actions and money rules on both templates
     not offered in Pick from Products. Code: `ProductDuplicateService` (PHP
     `app/src/Services/ProductDuplicateService.php`, Node `src/services/productDuplicateService.js`),
     `ProductController::duplicateForm()/duplicate()`, view `products/duplicate`.
+  - **Forms of stone, Specifications (HS) and "Sold as" (D-382 … D-385, D-389; 18 Nov 2026, mockups
+    approved, plan confirmed twice; migration `2026-11-18a`).**
+    **Forms of stone** (Products › Pricing › Forms of stone, `/pricing/forms`; table `product_forms`):
+    name, the units it is sold in (ticks of CBM, SQM, SQFT, PCS, TON, RMT, KG — `LineUnits::canonical`
+    codes, SQM stored as M2), **Starts on** (the unit a new line starts with), **Group** (one of the
+    old form keys block / slab / tile / kerb / step / cobble — so `spec_definitions.applies_to` keeps
+    working), default finish, order, active. Seeded: Monument slab, Gangsaw slab, Cut-to-size slab, Raw
+    block, Sawn block, Tile, Paving stone, Kerbs, setts, cobbles. **Specifications (HS)** (Products ›
+    Specifications (HS), `/products/hs-specifications`; table `hs_specifications`): name, form
+    ("Choose…"), usual finish, HS code (an active code of the HS Code Master, 6 or 8 digits), when to
+    use, order, active; 10 seeded (Raw block 25161100, Sawn block 25161200, Gangsaw slab / Cut-to-size
+    slab / Tile 68022310, Random slab — irregular 68022390, Monument slab and Monument — complete set /
+    tombstone 68029300, Paving stone and Kerbs, setts, cobbles 68010000). Both pages need
+    `manage_pricing` to change (view: `view_price_buildup` or `manage_pricing`); every change needs a
+    reason (ReasonValidator) and is audited (`PRODUCT_FORM_CHANGED`, `HS_SPECIFICATION_CHANGED`); a form
+    a specification uses, or a specification a product ticks or a line has, is switched off, never
+    deleted. **Finishes per form** (Settings › Lists › surface_finish, column "Offered for forms";
+    table `surface_finish_forms`): a form with no row offers every finish; seeded Roughly trimmed → Raw
+    block only, Sawn → Sawn block only, every other finish → every form that is not a block; a change
+    needs the page's Reason and is audited `FINISH_FORMS_CHANGED`. The finishes "Roughly trimmed" and
+    "Sawn" were added with their Surface finish options at no price change (D-357). **Sold as** (the
+    product's Specifications page, section "Sold as"; POST `/products/{id}/sold-as`,
+    `manage_product_specifications`; table `product_hs_specifications`): ticks of the active
+    specifications (name · HS), at least one, reason required, audit `PRODUCT_SOLD_AS_CHANGED`; it
+    replaces the old fixed "Forms" ticks — the product's forms for `applies_to` are the groups of its
+    ticked specifications' forms; none ticked → the old `catalog_products.forms` (kept, read-only) →
+    all. The migration mapped today's forms once (block → Raw + Sawn block; slab → Gangsaw, Cut-to-size,
+    Monument slab; tile → Tile; kerb / step / cobble → Kerbs, setts, cobbles). The Products list shows
+    "Sold as: …" under each name (the same page in the Standard and Kanban templates — it has no board).
+    The product's own HS code is labelled **HS Code (fallback)**: used only on a line without a Sold as.
+    **Order lines** (order page line panel step 1 and New Order rows; `order_products.hs_spec_id`,
+    `hs_override_reason`; the column default HS code is now 68029300): **Sold as** lists the picked
+    product's ticked active specifications (all when none ticked) and shows the HS code it sets
+    ("from specification"). Required for a goods line picked from Products on a USD order where picking
+    is required; a saved line of the same product without one may stay without one. Choosing it fills
+    the HS code (read-only unless the user holds `override_line_hs_code` — MD, Founder & MD, ED,
+    Founder & ED), keeps only the form's units in Unit (a new line starts on the form's unit) and only
+    the form's finishes (switching to the form's default finish when the current one is not offered).
+    With a Sold as, what the line needs follows its unit instead of D-348's Thickness / Size / format:
+    CBM / TON nothing more; SQM / SQFT the Thickness option or Thickness (cm); PCS length, width and
+    thickness ("Line N: choose the Thickness or enter the Thickness (cm) — a price per SQM needs it.",
+    "Line N: enter the length, width and thickness (cm) — a price per piece needs them."). Lines without
+    a Sold as keep D-348 exactly. Server (`ProductForms::checkLine`, `unitNeedsRefusal`): the HS code is
+    the specification's; another code is refused unless the user holds `override_line_hs_code`, gives a
+    reason (ReasonValidator) and the code is an active master code — audited `HS_CODE_OVERRIDDEN`
+    ("Line N (<spec>): old → new", reason); a unit or finish the form does not offer is refused. The
+    products table shows "Sold as: <spec> (<form>) · HS <code>" with the tag "from specification" or
+    "changed by MD/ED — <reason>". Duplicate line copies `hs_spec_id`, `hs_code`, `hs_override_reason`.
+    For documents: `ProductForms::formNameForLine($line)` and `ProductForms::formNameForOrderLines($orderId)`
+    (one query, line id ⇒ form name). **D-389:** an option's **Order** is a box on the category's
+    Options tab (a Surface finish option's order still comes from Settings › Lists) and on the
+    product's own options (POST `/products/{pid}/spec-options/{id}`), audited in `SPEC_OPTION_CHANGED`
+    ("… · order N"); "Monument (cut to size)" is first in every category's Size / format.
+    Code: `ProductForms` (PHP `app/src/Services/ProductForms.php`, Node `src/services/productForms.js`),
+    `ProductFormController`, views `pricing/forms`, `products/hs_specifications`, `orders/_sold_as`.
 - **Tables.** `catalog_products`, `catalog_product_images`,
   `catalog_product_suppliers`, `catalog_product_supplier_options`,
   `catalog_product_misc_charges`, `product_categories`,
   `product_category_attributes`, `spec_definitions`, `spec_options`,
   `product_option_overrides`, `product_spec_hidden`, `hs_codes`,
-  `hs_code_product_examples`.
+  `hs_code_product_examples`, `product_forms`, `hs_specifications`, `product_hs_specifications`,
+  `surface_finish_forms` (D-382 … D-384).
 - **Code.** `ProductController`, `ProductCategoryController`,
   `SpecController`, `ProductService`, `ProductDuplicateService` (D-358), `ProductSpecs`,
   `CategoryDocumentProfile`, `SpecRepository`, `ProductRepository`.
 - **Permissions.** `view_product_catalog`, `browse_product_catalog`,
   `manage_product_catalog`, `manage_product_specifications`,
-  `view_product_pricing`, `manage_hs_codes`.
-- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358.
+  `view_product_pricing`, `manage_hs_codes`, `manage_pricing` (Forms of stone, Specifications (HS)),
+  `override_line_hs_code` (D-385).
+- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358, D-382 … D-385, D-389.
 
 ### 6.3 Pricing engine and price requests
 

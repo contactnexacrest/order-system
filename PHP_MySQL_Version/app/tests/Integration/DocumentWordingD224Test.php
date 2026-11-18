@@ -87,8 +87,8 @@ final class DocumentWordingD224Test extends DbTestCase
     {
         foreach ($this->generate($this->order(), 'BLI') as $format => $text) {
             self::assertStringContainsString('MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL', $text, "BLI {$format}");
-            self::assertStringContainsString('ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS', $text, "BLI {$format}");
-            self::assertStringContainsString('Original BL release: CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else.', $text, "BLI {$format}");
+            self::assertStringContainsString('ORIGINAL NEGOTIABLE BILL OF LADING — FULL SET', $text, "BLI {$format}");
+            self::assertStringContainsString('Original BL release: CHA to hand the full set of originals to NexaCrest only — never to the buyer or anyone else.', $text, "BLI {$format}");
             foreach (['Reason:', 'payment terms are', 'NexaCrest will hold all 3 originals', 'released freely', 'Original BL release process',
                       'balance T/T', 'ensures the BL is to NexaCrest'] as $gone) {
                 self::assertStringNotContainsString($gone, $text, "BLI {$format}: '{$gone}' removed");

@@ -387,6 +387,10 @@ final class OrderController
             'pickerBlocked'   => \App\Repositories\ProductRepository::notQuotable(), // D-361
             'pickerPrices'    => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
             'pickerSpecs'     => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
+            // Owner decision D-385 (18 Nov 2026): "Sold as" — the specifications, each product's ticks, who may change the HS code.
+            'soldAsSpecs'     => \App\Services\ProductForms::pickerSpecifications(),
+            'pickerSoldAs'    => \App\Services\ProductForms::pickerSoldAs(\App\Repositories\ProductRepository::forPicker()),
+            'canOverrideHs'   => \App\Services\ProductForms::canOverride(),
             'clientPriceKeys' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::clientKeys(ClientRepository::all()) : [],
             // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
             'pickRequiredWhen' => self::createPickRequiredWhen(),
@@ -479,6 +483,44 @@ final class OrderController
             Flash::setOld($_POST);
             header('Location: /orders/create?client_id=' . $clientId);
             return;
+        }
+
+        // Owner decision D-385 (18 Nov 2026): each row's Sold as sets its HS code (only the MD / ED change it,
+        // with a reason), the units it may use and the finishes; checked before anything is written.
+        $__storeCurrency = '';
+        foreach (LookupRepository::currencies() as $__cur) {
+            if ((int) $__cur['id'] === $currencyId) {
+                $__storeCurrency = (string) $__cur['code'];
+            }
+        }
+        $__rowSoldAs = [];
+        $__canOverrideHs = \App\Services\ProductForms::canOverride();
+        foreach ($descriptions as $i => $description) {
+            if (trim((string) $description) === '') {
+                continue;
+            }
+            $__rowSoldAs[$i] = \App\Services\ProductForms::checkLine([
+                'line_no' => $i + 1,
+                'posted_spec' => isset($_POST['product_hs_spec_id']) ? (string) ($_POST['product_hs_spec_id'][$i] ?? '') : null,
+                'catalog_product_id' => self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
+                'line_type' => 'goods',
+                'currency_code' => $__storeCurrency,
+                'hs_code' => (string) ($_POST['product_hs_code'][$i] ?? ''),
+                'hs_override_reason' => (string) ($_POST['product_hs_override_reason'][$i] ?? ''),
+                'unit' => (string) ($_POST['product_unit'][$i] ?? ''),
+                'selection' => \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''),
+                'existing' => null,
+                'can_override' => $__canOverrideHs,
+            ]);
+            if ($__rowSoldAs[$i]['refusal'] !== null) {
+                Flash::set('error', $__rowSoldAs[$i]['refusal']);
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
+            if ($__rowSoldAs[$i]['spec'] !== null) {
+                $_POST['product_hs_code'][$i] = (string) $__rowSoldAs[$i]['hs_code'];
+            }
         }
 
         // HS code must come from the master list (docs/schema.sql Section AB) —
@@ -575,8 +617,11 @@ final class OrderController
                 ? \App\Services\OrderLinePricing::syncThickness(self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), $__size['piece_thickness_cm'])
                 : [null, null];
             // D-348: a line picked from Products has its Thickness and Size / format chosen.
+            // D-385: with a Sold as, what is needed follows the unit instead.
             $__specRefusal = $__sizeError === null && $__syncError === null
-                ? \App\Services\OrderLinePricing::requiredSpecsRefusal($i + 1, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods', $__rowSel)
+                ? (($__rowSoldAs[$i]['spec'] ?? null) !== null
+                    ? \App\Services\ProductForms::unitNeedsRefusal($i + 1, trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null, $__size, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), $__rowSel)
+                    : \App\Services\OrderLinePricing::requiredSpecsRefusal($i + 1, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods', $__rowSel))
                 : null;
             if ($__specRefusal !== null) {
                 Flash::set('error', $__specRefusal);
@@ -644,7 +689,7 @@ final class OrderController
         $testModeEnabled = TestModeService::isEnabled();
         ['orderId' => $orderId, 'orderReference' => $orderReference] = DeadlockRetry::run(function () use (
             $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
-            $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user, $__rowPieces
+            $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user, $__rowPieces, $__rowSoldAs
         ): array {
             // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
             $orderReferenceNew = \App\Services\ReferenceNumberService::generateOrderReference();
@@ -733,6 +778,8 @@ final class OrderController
                 \App\Services\OrderLinePricing::saveSelection($__lineId, $__rowSel, null);
                 OrderProductRepository::setPieceSize($__lineId, $__size);
                 OrderProductRepository::setPieces($__lineId, $__rowPieces[$i][0] ?? null, $__rowPieces[$i][1] ?? null);
+                // D-385: the row's Sold as; a changed HS code is audited with its reason.
+                self::saveLineSoldAs($__lineId, $__rowSoldAs[$i] ?? null, (int) $user['id'], $lineNo - 1);
                 // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
                 \App\Services\OrderLinePricing::afterSave($__lineId, null, (int) $user['id']);
             }
@@ -1181,7 +1228,7 @@ final class OrderController
     private static function lineRefusalText(string $refusal): string
     {
         // D-348: "Line N: choose the Thickness …" already names its line.
-        return preg_match('/^Line \d+(?: says "As per annexure"|: choose the )/u', $refusal) === 1 ? $refusal : 'Product line: ' . $refusal;
+        return preg_match('/^Line \d+(?: says "As per annexure"|: choose the |: enter the )/u', $refusal) === 1 ? $refusal : 'Product line: ' . $refusal;
     }
 
     /** D-270: "180 × 80 × 13 cm" from the piece size, or null when none was given. */
@@ -1220,6 +1267,45 @@ final class OrderController
             return $saved . ' Line ' . (int) $line['line_no'] . ' needs MD approval: ' . $check['cbm_reason'] . ' — it was sent to the MD for approval; the Quotation and Proforma Invoice wait for it.';
         }
         return $saved . ' Line ' . (int) $line['line_no'] . ' is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.';
+    }
+
+    /**
+     * Owner decision D-385 (18 Nov 2026): what ProductForms::checkLine needs from the line form
+     * (the panel's fields; hs_spec_id absent = a form without the field, the saved line keeps its own).
+     */
+    private static function soldAsInput(array $order, ?array $line, int $lineNo): array
+    {
+        $catalogId = array_key_exists('catalog_product_id', $_POST) ? self::catalogProductInput($_POST['catalog_product_id'])
+            : ($line !== null && !empty($line['catalog_product_id']) ? (int) $line['catalog_product_id'] : null);
+        $selection = array_key_exists('spec_json', $_POST) ? \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'])
+            : \App\Services\OrderLinePricing::selectionInput((string) ($line['spec_selection'] ?? ''));
+        return [
+            'line_no' => $lineNo,
+            'posted_spec' => array_key_exists('hs_spec_id', $_POST) && is_scalar($_POST['hs_spec_id']) ? (string) $_POST['hs_spec_id'] : null,
+            'catalog_product_id' => $catalogId,
+            'line_type' => (string) ($_POST['line_type'] ?? ($line['line_type'] ?? 'goods')),
+            'currency_code' => $order['currency_code'] ?? null,
+            'hs_code' => is_scalar($_POST['hs_code'] ?? null) ? (string) $_POST['hs_code'] : '',
+            'hs_override_reason' => is_scalar($_POST['hs_override_reason'] ?? null) ? (string) $_POST['hs_override_reason'] : '',
+            'unit' => is_scalar($_POST['unit'] ?? null) ? (string) $_POST['unit'] : (string) ($line['unit'] ?? ''),
+            'selection' => $selection,
+            'existing' => $line,
+            'can_override' => \App\Services\ProductForms::canOverride(),
+        ];
+    }
+
+    /** D-385: saves a line's Sold as (null result = none) and audits an HS code changed from its specification. */
+    private static function saveLineSoldAs(int $lineId, ?array $soldAs, int $userId, ?int $lineNo): void
+    {
+        $spec = $soldAs['spec'] ?? null;
+        \App\Services\ProductForms::setLineSoldAs($lineId, $spec !== null ? (int) $spec['id'] : null, $spec !== null ? ($soldAs['reason'] ?? null) : null);
+        if ($spec !== null && ($soldAs['overridden'] ?? null) !== null) {
+            [$from, $to] = $soldAs['overridden'];
+            $line = OrderProductRepository::find($lineId);
+            AuditLogRepository::log($userId, 'HS_CODE_OVERRIDDEN', 'order_products', $lineId, 'hs_code',
+                'Line ' . (int) ($line['line_no'] ?? $lineNo ?? 0) . ' (' . $spec['name'] . '): ' . $from,
+                'Line ' . (int) ($line['line_no'] ?? $lineNo ?? 0) . ' (' . $spec['name'] . '): ' . $to, (string) ($soldAs['reason'] ?? ''));
+        }
     }
 
     public function addProduct(array $params): void
@@ -1266,6 +1352,16 @@ final class OrderController
             Flash::set('error', 'Description is required.');
             header("Location: /orders/{$orderId}");
             return;
+        }
+        // Owner decision D-385 (18 Nov 2026): the line's Sold as sets its HS code (locked: only the MD / ED change it, with a reason).
+        $__soldAs = \App\Services\ProductForms::checkLine(self::soldAsInput($order, null, OrderProductRepository::nextLineNo($orderId)));
+        if ($__soldAs['refusal'] !== null) {
+            Flash::set('error', $__soldAs['refusal']);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+        if ($__soldAs['spec'] !== null) {
+            $_POST['hs_code'] = (string) $__soldAs['hs_code'];
         }
         // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
         if (($__unitError = \App\Repositories\ProductCategoryRepository::applyLineDefaults($_POST)) !== null) {
@@ -1317,7 +1413,10 @@ final class OrderController
             : [null, null];
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $_POST['catalog_product_id'] ?? null)
             // D-348: Thickness and Size / format chosen (a line from a price request keeps the request's options).
-            ?? ($__priceRequest !== null ? null : \App\Services\OrderLinePricing::requiredSpecsRefusal(OrderProductRepository::nextLineNo($orderId), self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $__specSel))
+            // D-385: with a Sold as, what is needed follows the unit instead (a line "As per annexure" has its size there).
+            ?? ($__priceRequest !== null ? null : ($__soldAs['spec'] !== null
+                ? ($__perAnnexure ? null : \App\Services\ProductForms::unitNeedsRefusal(OrderProductRepository::nextLineNo($orderId), trim((string) ($_POST['unit'] ?? '')) ?: null, $__size, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $__specSel))
+                : \App\Services\OrderLinePricing::requiredSpecsRefusal(OrderProductRepository::nextLineNo($orderId), self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, $__specSel)))
             ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, OrderLineValidator::priceInput($_POST['unit_price'] ?? null), self::seesPriceBuildup(),
                 $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest, $__size,
                 // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1367,6 +1466,8 @@ final class OrderController
         if (self::detailedLines($order)) {
             OrderProductRepository::setPieces($newLineId, $__pieces, $__sizeNote);
         }
+        // D-385: the line's Sold as; a changed HS code is audited with its reason.
+        self::saveLineSoldAs($newLineId, $lineType === 'goods' ? $__soldAs : null, (int) $user['id'], null);
         if ($__priceRequest !== null) {
             \App\Services\PriceRequestService::markOrdered((int) $__priceRequest['id'], $orderId);
         }
@@ -1395,6 +1496,16 @@ final class OrderController
             Flash::set('error', 'Description is required.');
             header("Location: /orders/{$orderId}");
             return;
+        }
+        // Owner decision D-385 (18 Nov 2026): the line's Sold as sets its HS code (a form without the field keeps the line's).
+        $__soldAs = \App\Services\ProductForms::checkLine(self::soldAsInput($order, $product, (int) $product['line_no']));
+        if ($__soldAs['refusal'] !== null) {
+            Flash::set('error', $__soldAs['refusal']);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+        if ($__soldAs['spec'] !== null) {
+            $_POST['hs_code'] = (string) $__soldAs['hs_code'];
         }
         // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
         if (($__unitError = \App\Repositories\ProductCategoryRepository::applyLineDefaults($_POST)) !== null) {
@@ -1462,8 +1573,13 @@ final class OrderController
             && strtoupper(trim((string) ($_POST['unit'] ?? ''))) === strtoupper(trim((string) ($product['unit'] ?? '')));
         $__refusal = $__sizeError ?? $__syncError ?? \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType, $_POST['catalog_product_id'] ?? null)
             // D-348: Thickness and Size / format chosen — a saved line whose product and options are unchanged keeps them.
-            ?? ($__specUnchanged && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0) ? null
-                : \App\Services\OrderLinePricing::requiredSpecsRefusal((int) $product['line_no'], $__catalogId, $lineType, $__specSel))
+            // D-385: with a Sold as, what is needed follows the unit instead (a line "As per annexure" has its size there).
+            ?? ($__soldAs['spec'] !== null
+                ? ($__perAnnexure || ($__specUnchanged && $__sizeUnchanged && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0)
+                        && (int) ($product['hs_spec_id'] ?? 0) === (int) $__soldAs['spec']['id'])
+                    ? null : \App\Services\ProductForms::unitNeedsRefusal((int) $product['line_no'], trim((string) ($_POST['unit'] ?? '')) ?: null, $__size, $__catalogId, $__specSel))
+                : ($__specUnchanged && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0) ? null
+                    : \App\Services\OrderLinePricing::requiredSpecsRefusal((int) $product['line_no'], $__catalogId, $lineType, $__specSel)))
             ?? ($__priceUnchanged && $__specUnchanged && $__sizeUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
                 $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null, $__size,
                 // D-338 (1c): a line "As per annexure" has no size — its own wording.
@@ -1518,6 +1634,8 @@ final class OrderController
         if ($__piecesForm) {
             OrderProductRepository::setPieces($productId, $__pieces, $__sizeNote);
         }
+        // D-385: the line's Sold as; a changed HS code is audited with its reason.
+        self::saveLineSoldAs($productId, $lineType === 'goods' ? $__soldAs : null, (int) $user['id'], null);
         $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
             OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);
@@ -1846,6 +1964,11 @@ final class OrderController
             'pickerBlocked' => \App\Repositories\ProductRepository::notQuotable(), // D-361
             'pickerPrices' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
             'pickerSpecs' => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
+            // Owner decision D-385 (18 Nov 2026): "Sold as" on the line panel and in the products table.
+            'soldAsSpecs' => \App\Services\ProductForms::pickerSpecifications(),
+            'pickerSoldAs' => \App\Services\ProductForms::pickerSoldAs(\App\Repositories\ProductRepository::forPicker()),
+            'canOverrideHs' => \App\Services\ProductForms::canOverride(),
+            'lineSoldAs' => \App\Services\ProductForms::soldAsForOrderLines($orderId),
             'linePricing' => \App\Services\OrderLinePricing::forOrder($orderId),
             'pickRequiredWhen' => \App\Services\OrderLinePricing::productPickRequired($order['currency_code'] ?? null) ? 'line_type=goods' : '',
             'canManagePricing' => PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_pricing'),
@@ -3263,6 +3386,8 @@ final class OrderController
             'supplier_type'         => $supplierType !== '' ? $supplierType : null,
             'material_stone_type'   => trim((string) ($_POST['material_stone_type'] ?? '')) ?: null,
             'grade'                 => trim((string) ($_POST['grade'] ?? '')) ?: 'Grade A',
+            // D-387: the Product Form row (prefilled from the order lines' Sold as; editable; empty = not printed).
+            ] + (array_key_exists('product_form', $_POST) ? ['product_form' => (string) $_POST['product_form']] : []) + [
             'surface_finish'        => trim((string) ($_POST['surface_finish'] ?? '')) ?: null,
             'dimensions'            => trim((string) ($_POST['dimensions'] ?? '')) ?: null,
             'dimensional_tolerance' => trim((string) ($_POST['dimensional_tolerance'] ?? '')) ?: null,

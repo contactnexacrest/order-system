@@ -55,6 +55,31 @@ final class OrderSupplierPoRepository
             ->execute(['o' => $offerId, 'q' => $quoted !== null ? number_format($quoted, 2, '.', '') : null, 'r' => $reason, 'id' => $id]);
     }
 
+    /** D-387: the Supplier PO "Product Form" as typed — trimmed, at most 80 characters, empty = null (row not printed). */
+    public static function productFormInput(mixed $raw): ?string
+    {
+        $v = trim((string) $raw);
+        return $v !== '' ? mb_substr($v, 0, 80) : null;
+    }
+
+    /**
+     * Owner decision D-387 (18 Nov 2026, confirmed twice): what the Supplier PO form's "Product Form"
+     * starts with — the form of the order's goods lines that have a "Sold as" (ProductForms), the
+     * different ones joined with ", "; null when no line has one.
+     */
+    public static function defaultProductForm(int $orderId): ?string
+    {
+        $forms = \App\Services\ProductForms::formNameForOrderLines($orderId);
+        $names = [];
+        foreach (OrderProductRepository::forOrder($orderId) as $line) { // active lines, in line order
+            $n = trim((string) ($forms[(int) $line['id']] ?? ''));
+            if ($n !== '' && ($line['line_type'] ?? 'goods') === 'goods' && !in_array($n, $names, true)) {
+                $names[] = $n;
+            }
+        }
+        return $names !== [] ? mb_substr(implode(', ', $names), 0, 80) : null;
+    }
+
     public static function create(int $orderId, int $supplierId, string $supplierPoReference, array $data, string $status = 'issued'): int
     {
         $pdo = Database::connection();
@@ -64,7 +89,7 @@ final class OrderSupplierPoRepository
                 (order_id, supplier_id, supplier_legal_name, supplier_address, supplier_city, supplier_state,
                  supplier_gstin, supplier_pan, supplier_contact_person, supplier_contact_person_phone,
                  supplier_contact_person_whatsapp, supplier_phone, supplier_email, supplier_whatsapp_number, supplier_type,
-                 supplier_po_reference, material_stone_type, grade, surface_finish,
+                 supplier_po_reference, material_stone_type, product_form, grade, surface_finish,
                  dimensions, dimensional_tolerance, quantity, unit, colour_reference, special_requirements,
                  unit_price_inr, basic_value_inr, gst_rate_pct, gst_amount_inr, total_payable_inr,
                  advance_pct, advance_amount_inr, balance_amount_inr,
@@ -73,7 +98,7 @@ final class OrderSupplierPoRepository
                 (:order_id, :supplier_id, :supplier_legal_name, :supplier_address, :supplier_city, :supplier_state,
                  :supplier_gstin, :supplier_pan, :supplier_contact_person, :supplier_contact_person_phone,
                  :supplier_contact_person_whatsapp, :supplier_phone, :supplier_email, :supplier_whatsapp_number, :supplier_type,
-                 :ref, :material, :grade, :finish,
+                 :ref, :material, :product_form, :grade, :finish,
                  :dimensions, :tolerance, :quantity, :unit, :colour, :special,
                  :unit_price, :basic_value, :gst_rate, :gst_amount, :total_payable,
                  :advance_pct, :advance_amount, :balance_amount,
@@ -86,6 +111,8 @@ final class OrderSupplierPoRepository
             'ref'         => $supplierPoReference,
             'status'      => $status,
             'material'    => $data['material_stone_type'] ?? null,
+            // D-387: Section 3 "Product Form" — as typed on the form (empty = not printed); without the field, the order lines' form.
+            'product_form' => array_key_exists('product_form', $data) ? self::productFormInput($data['product_form']) : self::defaultProductForm($orderId),
             'grade'       => $data['grade'] ?? 'Grade A',
             'finish'      => $data['surface_finish'] ?? null,
             'dimensions'  => $data['dimensions'] ?? null,

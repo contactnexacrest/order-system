@@ -85,4 +85,22 @@ trait PricingFixtures
         }
         return (string) json_encode($selection);
     }
+
+    /**
+     * D-385 (18 Nov 2026): a goods line picked from Products on a USD order has a "Sold as" — the
+     * seeded specification of that name and the HS code it sets, as the line form posts them.
+     * Put it first (self::soldAs() + [...]) so its HS code wins over a typed one.
+     *
+     * @return array{hs_spec_id: string, hs_code: string}
+     */
+    protected static function soldAs(string $name = 'Gangsaw slab'): array
+    {
+        $stmt = \App\Config\Database::connection()->prepare('SELECT id, hs_code FROM hs_specifications WHERE name = :n');
+        $stmt->execute(['n' => $name]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new \RuntimeException("No seeded specification \"{$name}\".");
+        }
+        return ['hs_spec_id' => (string) $row['id'], 'hs_code' => (string) $row['hs_code']];
+    }
 }

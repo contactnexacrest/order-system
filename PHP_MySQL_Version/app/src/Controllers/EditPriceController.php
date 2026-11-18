@@ -114,6 +114,10 @@ final class EditPriceController
             'undoToken' => $_SESSION['edit_price_undo'][$id]['token'] ?? null,
             // D-364: a price per SQM may be typed per SQFT (saved as the SQM price).
             'sqmUnit' => !$grid && SupplierOffers::sqmPriced($product, false, null, (string) ($row['price_basis'] ?? 'unit')) ? (string) $product['reference_unit'] : null,
+            // D-382: a block priced per CBM — "Priced per" CBM / Tonne (a price per tonne is saved as the per-CBM price).
+            'tonne' => SupplierOffers::tonnePriced($product, $grid, (string) ($row['price_basis'] ?? 'unit'))
+                ? ['cbm' => ($row['price_basis'] ?? '') === 'cbm' ? 'CBM' : (string) $product['reference_unit'], 't_per_cbm' => $rules['t_per_cbm']] : null,
+            'enteredText' => SupplierOffers::enteredText($row, $product),
             'unitLabel' => ($row['price_basis'] ?? '') === 'cbm' ? 'CBM' : (LineUnits::label((string) ($product['reference_unit'] ?? '')) ?: ((string) ($product['reference_unit'] ?? '') ?: 'unit')),
             'from' => self::from(), 'backUrl' => self::backUrl($row, self::from()),
             'canSeeSelling' => self::can('view_price_buildup'), 'old' => $old,
@@ -144,8 +148,15 @@ final class EditPriceController
         $grid = ($row['price_basis'] ?? '') === 'grid';
         $in = SupplierOffers::fromSqft(['price' => $price, 'unit' => (string) ($_GET['unit'] ?? ''), 'mm' => $mm ?? ($grid ? ThicknessPrices::baseOf($row, ThicknessPrices::rules($product)) : null)],
             $product, $grid, (string) ($row['price_basis'] ?? 'unit'));
-        $out = SupplierOffers::preview($product, $row, $mm, (float) $in['price'], $own);
-        $out['typed'] = $in['typed_sqft'] !== null ? SupplierOffers::typedText((float) $in['typed_sqft']) : null;
+        // D-382: a block price typed per tonne is previewed as the per-CBM price it is saved as.
+        $in = SupplierOffers::fromTonne($in, $product, $grid, (string) ($row['price_basis'] ?? 'unit'));
+        $out = SupplierOffers::preview($product, $row, $mm, $in['tonne_error'] === null ? (float) $in['price'] : 0.0, $own);
+        $out['typed'] = $in['typed_sqft'] !== null ? SupplierOffers::typedText((float) $in['typed_sqft'])
+            : ($in['entered_unit'] !== null ? SupplierOffers::tonneText((float) $in['entered_price'], (float) $in['t_per_cbm']) : null);
+        if ($in['tonne_error'] !== null) {
+            $out['ok'] = false;
+            $out['error'] = $in['tonne_error'];
+        }
         if (!self::can('view_price_buildup')) {
             $out['selling'] = null; // Procurement sees supplier prices only, never selling prices.
         }
@@ -165,7 +176,7 @@ final class EditPriceController
         $self = self::selfUrl($id, $from);
         $rules = ThicknessPrices::rules($product);
         $grid = ($row['price_basis'] ?? '') === 'grid';
-        [$in, $error] = self::read($rules, $row + ['_reference_unit' => $product['reference_unit'] ?? null], $grid);
+        [$in, $error] = self::read($rules, $row + ['_reference_unit' => $product['reference_unit'] ?? null, '_product' => $product], $grid);
         if ($error !== null) {
             Flash::set('error', $error);
             Flash::setOld($_POST);
@@ -239,6 +250,13 @@ final class EditPriceController
         if ($unit === SupplierOffers::SQFT_INPUT && !SupplierOffers::sqmPriced(['reference_unit' => $row['_reference_unit'] ?? null], $grid, $fromMm, (string) ($row['price_basis'] ?? 'unit'))) {
             return [[], 'Per: SQFT is only for a price per SQM — choose the unit the price is per.'];
         }
+        // D-382: Tonne only for a block priced per CBM, and only with a weight per CBM (SupplierOffers::fromTonne).
+        if (strtoupper($unit) === SupplierOffers::TONNE_INPUT && isset($row['_product'])) {
+            $check = SupplierOffers::fromTonne(['price' => $price, 'unit' => $unit], $row['_product'], $grid, (string) ($row['price_basis'] ?? 'unit'), $rules['t_per_cbm']);
+            if ($check['tonne_error'] !== null) {
+                return [[], $check['tonne_error']];
+            }
+        }
         $q = trim((string) ($_POST['quoted_on'] ?? ''));
         $d = \DateTime::createFromFormat('!Y-m-d', $q);
         if ($d === false || $d->format('Y-m-d') !== $q) {
@@ -259,7 +277,7 @@ final class EditPriceController
         }
         $chaRaw = trim(str_replace(',', '', (string) ($_POST['cha_transport_per_container'] ?? '')));
         if ($chaRaw !== '' && preg_match('/^\d{1,10}(\.\d{1,2})?$/', $chaRaw) !== 1) {
-            return [[], 'CHA + transport per container: enter ₹ (at most 2 decimals), or leave it empty for the product\'s default.'];
+            return [[], 'CHA + transport per container: enter ₹ (at most 2 decimals), or leave it empty for the supplier\'s figure (else the product\'s default).'];
         }
         $notes = trim((string) ($_POST['notes'] ?? ''));
         if (mb_strlen($notes) > 1000) {

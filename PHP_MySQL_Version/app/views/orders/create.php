@@ -169,6 +169,9 @@
         <?php foreach ($__oldDescriptions as $__i => $__desc): ?>
         <div class="product-row">
           <?php $__pickerName = 'product_catalog_id[]'; $__pickerSelected = (int) ($old['product_catalog_id'][$__i] ?? 0); $__pickerSpecSel = (string) ($old['product_spec_json'][$__i] ?? ''); $__pickerOrderId = null; include __DIR__ . '/_product_picker.php'; ?>
+          <?php // Owner decision D-385 (18 Nov 2026): "Sold as" — sets the row's HS code, units and finishes.
+          $__soldAsName = 'product_hs_spec_id[]'; $__soldAsSelected = (int) ($old['product_hs_spec_id'][$__i] ?? 0); $__soldAsLine = ['hs_code' => (string) ($old['product_hs_code'][$__i] ?? ''), 'hs_override_reason' => (string) ($old['product_hs_override_reason'][$__i] ?? '')];
+          $__soldAsReasonName = 'product_hs_override_reason[]'; $__soldAsReason = (string) ($old['product_hs_override_reason'][$__i] ?? ''); include __DIR__ . '/_sold_as.php'; ?>
           <label>Description *<input type="text" name="product_description[]" required value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <?php // Owner decision D-270 (point 25): the piece size the line's price is converted with; it fills the Dimensions text. ?>
           <label>Length (cm)<input type="text" inputmode="decimal" name="product_piece_length_cm[]" data-piece-size="length" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_length_cm'][$__i] ?? '')) ?>" placeholder="e.g. 180"></label>
@@ -197,14 +200,14 @@
           <label>Unit
             <select name="product_unit[]">
               <?php $__unitVal = (string) ($old['product_unit'][$__i] ?? ''); ?>
-              <?php foreach ($units as $o): ?>
-                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+              <?php foreach ($units as $o): // D-385: data-unit-kind — the units a Sold as allows ?>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" data-unit-kind="<?= htmlspecialchars((string) \App\Services\LineUnits::canonical((string) $o['option_value'])) ?>" <?= ($__unitVal === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
               <?php endforeach; ?>
             </select>
           </label>
           <label>Unit Price<input type="text" name="product_unit_price[]" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($old['product_unit_price'][$__i] ?? '')) ?>" placeholder="e.g. 45.00" data-floor-show></label>
           <p class="line-pieces-summary small" aria-live="polite" hidden></p>
-          <label>HS Code<input type="text" name="product_hs_code[]" value="<?= htmlspecialchars((string) ($old['product_hs_code'][$__i] ?? '')) ?>" list="hs_code_list" data-in-list="hs_code_list" data-in-list-message="Pick an HS code from the HS Code Master List." placeholder="Type to search…" autocomplete="off" required></label>
+          <label>HS Code <small class="muted">(with a Sold as, it comes from it)</small><input type="text" name="product_hs_code[]" class="line-hs-code" value="<?= htmlspecialchars((string) ($old['product_hs_code'][$__i] ?? '')) ?>" list="hs_code_list" data-in-list="hs_code_list" data-in-list-message="Pick an HS code from the HS Code Master List." placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>
             <button type="button" class="remove-row" onclick="this.closest('.product-row').remove()">&times;</button>
@@ -332,6 +335,11 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   clone.querySelectorAll('[data-confirm-tick]').forEach(function (el) { el.checked = false; });
   clone.querySelectorAll('[name="product_confirm_large_quantity[]"]').forEach(function (el) { el.value = '0'; });
   clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
+  // D-385: a new row starts without a Sold as (every specification offered, every unit, an HS code typed or picked).
+  clone.querySelectorAll('select.sold-as-select').forEach(function (el) { el.selectedIndex = 0; el.required = false; Array.prototype.forEach.call(el.options, function (o) { o.hidden = false; o.disabled = false; }); });
+  clone.querySelectorAll('[data-sold-as-hs], [data-hs-override-reason]').forEach(function (el) { el.hidden = true; });
+  clone.querySelectorAll('select[name="product_unit[]"] option').forEach(function (o) { o.hidden = false; o.disabled = false; });
+  clone.querySelectorAll('.line-hs-code').forEach(function (el) { el.readOnly = false; });
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   // D-271 (point 13): a new row starts without the first row's options.
   clone.querySelectorAll('.spec-options').forEach(function (el) { el.innerHTML = ''; });

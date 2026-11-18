@@ -13,7 +13,7 @@
       <form method="post" action="/admin/dropdown-options/<?= urlencode($listKey) ?>/update">
         <?= Csrf::field() ?>
         <table class="list">
-          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th><?php if ($__finish): ?><th>Price change (from Pricing › Specifications)</th><?php endif; ?></tr>
+          <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th><?php if ($__finish): ?><th>Price change (from Pricing › Specifications)</th><?php if (!empty($productForms)): ?><th>Offered for forms</th><?php endif; ?><?php endif; ?></tr>
           <?php foreach ($options as $o): ?>
             <tr>
               <td><input type="text" name="option_value[<?= (int) $o['id'] ?>]" required<?= $__finish ? ' maxlength="' . \App\Services\SurfaceFinishList::MAX_NAME . '"' : '' ?> value="<?= htmlspecialchars($o['option_value']) ?>" placeholder="<?= $__finish ? 'e.g., Natural Polish' : 'e.g., 20ft Standard' ?>" aria-label="Option value"><?php if ($__finish && isset($finishSaved['renamed'][(int) $o['id']])): ?> <small class="muted">was "<?= htmlspecialchars((string) $finishSaved['renamed'][(int) $o['id']]) ?>"</small><?php endif; ?></td>
@@ -22,10 +22,19 @@
               <td><input type="checkbox" name="is_active[<?= (int) $o['id'] ?>]" value="1" <?= $o['is_active'] ? 'checked' : '' ?> aria-label="Is active"></td>
               <?php if ($__finish): ?>
                 <td class="finish-price"><?php foreach ($finishPrices[(int) $o['id']] ?? [] as $__fp): ?><div><?= $__fp['category'] !== '' ? htmlspecialchars($__fp['category']) . ': ' : '' ?><?= htmlspecialchars($__fp['text']) ?><?php if ($__fp['unset']): ?> <a class="tag tag-gold" href="<?= htmlspecialchars($__fp['link']) ?>">set it in Pricing › Specifications</a><?php endif; ?></div><?php endforeach; ?><?php if (($finishPrices[(int) $o['id']] ?? []) === []): ?><span class="muted">—</span><?php endif; ?></td>
+                <?php // D-383 (18 Nov 2026): the forms of stone this finish is offered for (a form with no ticks at all offers every finish). ?>
+                <?php if (!empty($productForms)): ?>
+                <td class="finish-forms small" data-testid="finish-forms-<?= (int) $o['id'] ?>"><?php foreach ($productForms as $__pf): ?><label class="inline"><input type="checkbox" name="finish_forms[<?= (int) $o['id'] ?>][<?= (int) $__pf['id'] ?>]" value="1"<?= in_array((int) $__pf['id'], $finishFormMap[(int) $o['id']] ?? [], true) ? ' checked' : '' ?>> <?= htmlspecialchars((string) $__pf['name']) ?></label> <?php endforeach; ?></td>
+                <?php endif; ?>
               <?php endif; ?>
             </tr>
           <?php endforeach; ?>
         </table>
+        <?php if ($__finish && !empty($productForms)): ?>
+          <input type="hidden" name="finish_forms_present" value="1">
+          <p class="muted small">Offered for forms: an order line sold as a form offers only the finishes ticked for it (<a href="/pricing/forms">Forms of stone</a>); a form with no finish ticked offers every finish. Lines already saved keep their finish.</p>
+          <label>Reason <small class="muted">(needed when you change the forms a finish is offered for)</small><input type="text" name="reason" minlength="10" maxlength="500" placeholder="e.g. Flamed is not offered on raw blocks"></label>
+        <?php endif; ?>
         <button type="submit" class="btn-sm">Save <?= htmlspecialchars($listKey) ?> Changes</button>
       </form>
       <?php if ($__finish && !empty($finishSaved['messages'])): ?>

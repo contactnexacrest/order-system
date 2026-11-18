@@ -160,7 +160,8 @@ final class OrderLinePricingTest extends DbTestCase
         $md = $this->createTestUser('Managing Director');
         $this->actAs($sales);
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$sales]);
-        $post = ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods', 'hs_code' => '25161100',
+        // D-385: a picked goods line on a USD order has its Sold as (Gangsaw slab, sold per CBM too).
+        $post = self::soldAs() + ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods', 'hs_code' => '25161100',
             'spec_json' => self::baseSpecJson($productId)];
 
         $_POST = $post + ['unit_price' => '1240.00'];
@@ -303,7 +304,7 @@ final class OrderLinePricingTest extends DbTestCase
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
         $_POST = ['description' => 'Pallets', 'quantity' => '1', 'unit' => 'CBM', 'unit_price' => '25.00', 'line_type' => 'charge'];
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
-        $_POST = ['catalog_product_id' => (string) $productId, 'spec_json' => self::baseSpecJson($productId)] + $hand;
+        $_POST = self::soldAs() + ['catalog_product_id' => (string) $productId, 'spec_json' => self::baseSpecJson($productId)] + $hand;
         $this->render(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
         self::assertSame(['service', 'charge', 'goods'], array_column(OrderProductRepository::forOrder($orderId), 'line_type'));
 

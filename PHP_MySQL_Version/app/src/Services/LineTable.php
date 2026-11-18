@@ -269,7 +269,8 @@ final class LineTable
      *                                             (DocumentDataAssembler: description, quantity, unit, unit_price, amount …)
      * @param ?string $annexureLetter              D-336: the annexure "As per annexure" lines point to on this document (null: none)
      * @param array<string,int> $crateCounts       Packing List: crates per product description (lower case)
-     * @param array<int, array{material?: string, finish?: string}> $names  per line id: Material / Colour and Surface / Finish
+     * @param array<int, array{material?: string, finish?: string, form?: ?string}> $names  per line id: Material / Colour,
+     *                                             Surface / Finish, and (D-386, QT / PI / OC / CI only) the Product Form
      */
     public static function build(array $lines, array $formatted, string $currency, ?string $annexureLetter, bool $withPrices, array $crateCounts = [], array $names = []): array
     {
@@ -309,6 +310,7 @@ final class LineTable
         $pcsAny = false;
         $byUnit = [];
         $amount = 0.0;
+        $tbcNos = []; // D-388: the document line numbers whose quantity is still to be confirmed
         foreach ($stone as [$line, $f]) {
             $u = (string) self::docUnit($line['unit'] ?? null);
             $suffix = static fn (string $v): string => $mixed && $v !== self::DASH ? $v . ' ' . $u : $v;
@@ -334,6 +336,8 @@ final class LineTable
             }
             if ($qty !== null) {
                 $byUnit[$u] = ($byUnit[$u] ?? 0.0) + $qty;
+            } else {
+                $tbcNos[] = (int) $f['no'];
             }
             if ($line['fob_value'] !== null && $line['fob_value'] !== '') {
                 $amount += (float) $line['fob_value'];
@@ -358,7 +362,7 @@ final class LineTable
                 'price_piece' => $pricePiece !== null && !$perAnnexure && ($per !== null || $u === 'PCS') ? MoneyFormat::amount($pricePiece, $currency) : self::DASH,
                 'total' => (string) ($f['amount'] ?? ''),
                 'crates' => self::crates($crateCounts, (string) $line['description']),
-                'detail' => self::detail($line, $f, $perAnnexure ? $annexureLetter : null, $hasSize),
+                'detail' => self::detail($line, $f, $perAnnexure ? $annexureLetter : null, $hasSize, $names[(int) ($line['id'] ?? 0)]['form'] ?? null),
             ];
             if ($u === 'PCS') {
                 $row['per_piece'] = self::DASH;
@@ -377,7 +381,8 @@ final class LineTable
             'pcs' => $pcsAny ? number_format($pcsTotal) : '',
             // One unit: its total (a PCS-only full table counts the pieces instead). Mixed units are never added up.
             'measure' => !$mixed && isset($byUnit[$units[0]]) && ($units[0] !== 'PCS' || $out['variant'] === 'short') ? self::formatQuantity($byUnit[$units[0]], $units[0]) : '',
-            'amount' => MoneyFormat::amount($amount, $currency),
+            // D-388: "To Be Confirmed" when every line is TBC, else "<known> + line 2 To Be Confirmed".
+            'amount' => self::tbcTotal(MoneyFormat::amount($amount, $currency), $tbcNos, count($tbcNos) === count($stone)),
         ];
         $out['totals_by_unit'] = $mixed && $parts !== [] ? 'Totals by unit: ' . implode(' · ', $parts) : null;
         return $out;
@@ -436,12 +441,33 @@ final class LineTable
     }
 
     /**
+     * Owner decision D-388 (18 Nov 2026, confirmed twice): a total over lines some of which are
+     * "To Be Confirmed" — every line TBC: "To Be Confirmed"; some: "<known> + line 2 To Be Confirmed"
+     * (several: "<known> + lines 2, 4 To Be Confirmed"); none: the known total as today.
+     *
+     * @param list<int> $tbcNos the document line numbers still to be confirmed
+     */
+    public static function tbcTotal(string $known, array $tbcNos, bool $allTbc): string
+    {
+        if ($tbcNos === []) {
+            return $known;
+        }
+        if ($allTbc) {
+            return 'To Be Confirmed';
+        }
+        $nos = array_values(array_unique(array_map('intval', $tbcNos)));
+        sort($nos);
+        return $known . ' + ' . (count($nos) === 1 ? 'line ' : 'lines ') . implode(', ', $nos) . ' To Be Confirmed';
+    }
+
+    /**
      * The grey row under a line: "Qty as per Annexure A" · the size note · the Dimensions text of a
-     * line without a piece size · another category's attributes · HS Code · Country of Origin.
+     * line without a piece size · another category's attributes · Product Form (D-386: QT / PI / OC /
+     * CI, a line with a "Sold as") · HS Code · Country of Origin.
      *
      * @return list<array{label: ?string, text: string}>
      */
-    private static function detail(array $line, array $f, ?string $annexureLetter, bool $hasSize): array
+    private static function detail(array $line, array $f, ?string $annexureLetter, bool $hasSize, ?string $form = null): array
     {
         $out = [];
         if ($annexureLetter !== null) {
@@ -457,6 +483,9 @@ final class LineTable
         }
         foreach ($f['attributes'] ?? [] as $a) {
             $out[] = ['label' => $a['label'] . ':', 'text' => (string) $a['value']];
+        }
+        if ($form !== null && trim($form) !== '') {
+            $out[] = ['label' => 'Product Form:', 'text' => trim($form)]; // D-386
         }
         $out[] = ['label' => 'HS Code:', 'text' => (string) ($line['hs_code'] ?? '')];
         $out[] = ['label' => 'Country of Origin:', 'text' => 'India'];

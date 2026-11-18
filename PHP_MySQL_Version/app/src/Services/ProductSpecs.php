@@ -68,9 +68,16 @@ final class ProductSpecs
         return !empty($product['category_id']) ? (int) $product['category_id'] : SpecRepository::systemCategoryId();
     }
 
-    /** @return list<string> the product's forms; [] = all forms */
+    /**
+     * @return list<string> the product's forms; [] = all forms.
+     * D-384 (18 Nov 2026): the groups of the forms of its ticked "Sold as" specifications; none
+     * ticked → the old catalog_products.forms (kept, read-only) → all.
+     */
     public static function productForms(array $product): array
     {
+        if (!empty($product['id']) && ($groups = ProductForms::productSpecGroups((int) $product['id'])) !== null) {
+            return $groups;
+        }
         return self::splitForms($product['forms'] ?? null);
     }
 
@@ -160,6 +167,9 @@ final class ProductSpecs
                     'category_value' => $own ? null : ($o['value'] !== null ? (float) $o['value'] : null),
                     'thickness_mm' => $o['thickness_mm'] !== null ? (int) $o['thickness_mm'] : null,
                     'source' => $source, 'hidden' => $oHidden,
+                    // D-383: the Settings › Lists row of a Surface finish option (finishes offered per form).
+                    'dropdown_option_id' => !empty($o['dropdown_option_id']) ? (int) $o['dropdown_option_id'] : null,
+                    'sort_order' => (int) ($o['sort_order'] ?? 0), // D-389: shown and editable
                 ];
             }
             $out[] = [

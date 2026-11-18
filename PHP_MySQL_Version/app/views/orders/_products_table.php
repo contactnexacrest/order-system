@@ -27,7 +27,8 @@ $__money = static fn ($v): string => $v !== null ? number_format((float) $v, 2) 
 $__detailed = ($order['line_table_layout'] ?? 'classic') === 'detailed';
 
 // One table row (goods, or a charge / service line).
-$__row = static function (array $p) use ($products, $linePricing, $sees, $seesPriceBuildup, $canEditProducts, $order, $__copiedId, $__money, $__productReasonRequired, $pricesFixed): void {
+$__lineSoldAs = $lineSoldAs ?? [];
+$__row = static function (array $p) use ($products, $linePricing, $sees, $seesPriceBuildup, $canEditProducts, $order, $__copiedId, $__money, $__productReasonRequired, $pricesFixed, $__lineSoldAs): void {
     $__lc = $linePricing['lines'][(int) $p['id']] ?? null;
     $__copyOf = \App\Repositories\OrderProductRepository::copiedFromLineNo($p, $products);
     $__chips = OrderLinePricing::optionChips($p);
@@ -41,6 +42,11 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
           <div class="option-chips"><?php foreach ($__chips as $__chip): ?><span class="chip<?= $__chip['gone'] ? ' chip-gone' : '' ?>"><?= htmlspecialchars($__chip['name']) ?></span><?php endforeach; ?></div>
         <?php endif; ?>
         <?php if (!empty($p['finish']) && $__chips === []): ?><div class="muted small"><?= htmlspecialchars((string) $p['finish']) ?></div><?php endif; ?>
+        <?php // Owner decision D-385 (18 Nov 2026): the line's Sold as and where its HS code comes from. ?>
+        <?php if (isset($__lineSoldAs[(int) $p['id']])): $__sa = $__lineSoldAs[(int) $p['id']]; $__hsWhy = trim((string) ($p['hs_override_reason'] ?? '')); ?>
+          <div class="small sold-as-line" data-testid="line-sold-as-<?= (int) $p['id'] ?>">Sold as: <b><?= htmlspecialchars($__sa['spec']) ?></b><?php if ($__sa['form'] !== $__sa['spec']): ?> <span class="muted">(<?= htmlspecialchars($__sa['form']) ?>)</span><?php endif; ?> · HS <?= htmlspecialchars((string) $p['hs_code']) ?>
+            <?php if ($__hsWhy !== ''): ?><span class="tag tag-gold" title="<?= htmlspecialchars($__hsWhy) ?>">changed by MD/ED — <?= htmlspecialchars($__hsWhy) ?></span><?php else: ?><span class="tag">from specification</span><?php endif; ?></div>
+        <?php endif; ?>
       </td>
       <td><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?><?= !empty($p['pieces_count']) ? '<div class="muted small">' . number_format((int) $p['pieces_count']) . ' pcs</div>' : '' ?><?= !empty($p['size_note']) ? '<div class="muted small">' . htmlspecialchars((string) $p['size_note']) . '</div>' : '' ?></td>
       <td class="num"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) ($p['quantity'] ?? '')) ?></td>
@@ -157,6 +163,9 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
         </div>
         <section class="line-step"><h4><span class="step-no">1</span> Product</h4>
           <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($__p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); $__pickerSpecSel = (string) ($__p['spec_selection'] ?? ''); $__pickerOrderId = (int) $order['id']; $__pickerNoSpecBox = true; include __DIR__ . '/_product_picker.php'; $__pickerNoSpecBox = false; ?>
+          <?php // Owner decision D-385 (18 Nov 2026): "Sold as" and the HS code it sets.
+          $__soldAsName = 'hs_spec_id'; $__soldAsSelected = (int) ($__p['hs_spec_id'] ?? 0); $__soldAsLine = $__p; $__soldAsReasonName = 'hs_override_reason'; $__soldAsReason = (string) ($__p['hs_override_reason'] ?? '');
+          include __DIR__ . '/_sold_as.php'; ?>
           <?php if ($__isNew && !empty($sees['selling']) && !empty($linePricing['ctx']['associate'])): // Owner decision D-255: a line from the associate's price request ?>
             <label>From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
               <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
@@ -174,8 +183,8 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
             <label>Unit
               <select name="unit" data-allowed-from="category_id">
                 <?php $__unitVal = (string) ($__p['unit'] ?? ''); ?>
-                <?php foreach ($units as $o): ?>
-                  <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__isNew ? $o['is_default'] : $__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                <?php foreach ($units as $o): // D-385: data-unit-kind — the units a Sold as allows ?>
+                  <option value="<?= htmlspecialchars($o['option_value']) ?>" data-unit-kind="<?= htmlspecialchars((string) LineUnits::canonical((string) $o['option_value'])) ?>" <?= ($__isNew ? $o['is_default'] : $__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
                 <?php endforeach; ?>
               </select>
             </label>
@@ -227,7 +236,7 @@ $__head = static function (string $first) use ($sees, $canEditProducts, $order):
                 <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($__p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
+            <label>HS Code <small class="muted">(goods — with a Sold as, it comes from it)</small><input type="text" name="hs_code" class="line-hs-code" value="<?= htmlspecialchars((string) ($__p['hs_code'] ?? '')) ?>" list="hs_code_list_edit" data-in-list="hs_code_list_edit" data-in-list-message="Pick an HS code from the HS Code Master List." data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310" maxlength="20"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($__p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
             <label>Category

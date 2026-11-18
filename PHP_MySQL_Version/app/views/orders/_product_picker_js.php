@@ -74,7 +74,7 @@
     var scope = select.closest('.product-row') || select.closest('form');
     var hint = scope.querySelector('.product-picker-hint');
     var price = field(scope, 'unit_price');
-    if (!opt || !opt.value) { if (hint) { hint.textContent = ''; } renderSpecs(select, false); return; }
+    if (!opt || !opt.value) { if (hint) { hint.textContent = ''; } renderSpecs(select, false); filterSoldAs(scope, false); applySoldAs(scope, false); return; }
     var desc = field(scope, 'description'); if (desc) { desc.value = opt.dataset.name || desc.value; }
     var hs = field(scope, 'hs_code'); if (hs && opt.dataset.hs) { hs.value = opt.dataset.hs; }
     var unit = field(scope, 'unit');
@@ -110,6 +110,10 @@
     if (hint) { hint.textContent = text; }
     // Owner decision D-255: the product's specification options; the price follows them.
     renderSpecs(select, true);
+    // D-385: only the product's Sold as; the HS code, units and finishes follow the one chosen.
+    filterSoldAs(scope, true);
+    applySoldAs(scope, true);
+    if (soldAsOption(scope)) { refreshPrice(select, true); }
   });
 
   // ---- D-255: specification options on the order line ------------------------------------
@@ -151,11 +155,13 @@
       s.setAttribute('data-spec-id', spec.id);
       s.setAttribute('aria-label', spec.name);
       if (spec.thickness) { s.setAttribute('data-thickness', '1'); s.setAttribute('data-cbm-from', spec.cbm_from || 50); }
+      if (spec.finish) { s.setAttribute('data-finish-spec', '1'); } // D-385: the finishes follow the Sold as
       var required = REQUIRED_SPECS.indexOf(spec.name) !== -1;
       var empty = required && chosen[spec.id] === undefined && (refresh || hadSelection);
       if (required) {
         s.required = true;
         s.setAttribute('data-spec-required', '1');
+        s.setAttribute('data-d348', '1');
         s.setAttribute('data-required-message', 'Choose the ' + spec.name + ' — the price depends on it.');
         var none = document.createElement('option');
         none.value = '';
@@ -166,6 +172,7 @@
       spec.options.forEach(function (o) {
         var el = document.createElement('option');
         el.value = o.id;
+        el.setAttribute('data-name', o.name);
         el.textContent = o.name + (o.cbm ? ' (priced per CBM)' : '');
         if (o.cbm) { el.setAttribute('data-cbm', '1'); }
         if (o.mm !== null && o.mm !== undefined) { el.setAttribute('data-mm', o.mm); }
@@ -345,6 +352,153 @@
     if (picker) { refreshPrice(picker, true); }
   });
 
+  // ---- D-385 (18 Nov 2026): "Sold as" — the HS code, the units and the finishes follow it ------
+  // The product's ticked specifications only (all when none is ticked). With a Sold as, D-348's
+  // Thickness / Size / format are no longer required — what the line needs follows its unit
+  // (app.js: SQM / SQFT the thickness, PCS length, width and thickness). Only the MD or the ED
+  // (data-can-override) may type another HS code, with a reason. Server: ProductForms::checkLine.
+  function soldAsSelect(scope) { return scope ? scope.querySelector('select.sold-as-select') : null; }
+  function soldAsOption(scope) { var s = soldAsSelect(scope); return s && s.value ? s.options[s.selectedIndex] : null; }
+  function filterSoldAs(scope, autoPick) {
+    var s = soldAsSelect(scope);
+    if (!s) { return; }
+    var picker = scope.querySelector('select.product-picker');
+    var opt = picker && picker.options[picker.selectedIndex];
+    var allowed = null;
+    if (opt && opt.value && opt.dataset.soldAs) { try { allowed = JSON.parse(opt.dataset.soldAs).map(String); } catch (err) { allowed = null; } }
+    var visible = [];
+    Array.prototype.forEach.call(s.options, function (o) {
+      if (!o.value) { return; }
+      var ok = allowed === null || allowed.indexOf(o.value) !== -1 || o.value === (s.dataset.savedSpec || '');
+      o.hidden = !ok;
+      o.disabled = !ok;
+      if (ok) { visible.push(o); }
+    });
+    if (s.value !== '' && s.options[s.selectedIndex].disabled) { s.value = ''; }
+    if (autoPick && s.value === '' && visible.length === 1 && opt && opt.value) { s.value = visible[0].value; }
+    soldAsRequired(scope);
+  }
+  // Required for a goods line picked from Products where picking is required (a USD order); a saved
+  // line of the same product without a Sold as (before D-385) may stay without one.
+  function soldAsRequired(scope) {
+    var s = soldAsSelect(scope);
+    if (!s) { return; }
+    var picker = scope.querySelector('select.product-picker');
+    var lineType = scope.querySelector('[name="line_type"]');
+    var goods = !lineType || lineType.value === 'goods';
+    var need = !!(picker && picker.value && goods && picker.dataset.requiredWhen && orderCurrency(picker) === 'USD');
+    if (need && s.dataset.savedWithout && s.dataset.savedWithout === picker.value) { need = false; }
+    s.required = need;
+  }
+  function filterUnits(scope, kinds, preferred, chosenNow) {
+    var unit = field(scope, 'unit');
+    if (!unit) { return; }
+    var first = null, pick = null;
+    Array.prototype.forEach.call(unit.options, function (u) {
+      var ok = kinds === null || kinds.indexOf(u.getAttribute('data-unit-kind') || '') !== -1;
+      u.hidden = !ok;
+      u.disabled = !ok;
+      if (ok && first === null) { first = u; }
+      if (ok && preferred && u.value.toUpperCase() === preferred.toUpperCase()) { pick = u; }
+    });
+    var cur = unit.options[unit.selectedIndex];
+    var before = unit.value;
+    if (!chosenNow) { return; } // a saved line shows its unit as saved
+    if (pick && preferred) { unit.value = pick.value; }
+    else if (cur && cur.disabled && (pick || first)) { unit.value = (pick || first).value; }
+    if (unit.value !== before) { unit.dispatchEvent(new Event('change', { bubbles: true })); }
+  }
+  function filterFinishes(scope, names, preferred, chosenNow) {
+    var specSel = scope.querySelector('.spec-options select[data-finish-spec]');
+    var boxSel = scope.querySelector('[data-finish-box] select');
+    [specSel, boxSel].forEach(function (sel) {
+      if (!sel) { return; }
+      var firstOk = null, pick = null;
+      Array.prototype.forEach.call(sel.options, function (o) {
+        if (!o.value) { return; }
+        var name = sel === specSel ? (o.getAttribute('data-name') || o.textContent) : o.value;
+        var ok = names === null || names.indexOf(name) !== -1;
+        o.hidden = !ok;
+        o.disabled = !ok;
+        if (ok && firstOk === null) { firstOk = o; }
+        if (ok && preferred && name === preferred) { pick = o; }
+      });
+      var cur = sel.options[sel.selectedIndex];
+      if (chosenNow && cur && cur.value && cur.disabled && (pick || firstOk)) {
+        sel.value = (pick || firstOk).value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+  }
+  // D-348's required Thickness / Size / format: off while a Sold as is chosen, back on without one.
+  function d348Required(scope, on) {
+    scope.querySelectorAll('.spec-options select[data-d348]').forEach(function (x) {
+      x.required = on;
+      if (on) { x.setAttribute('data-spec-required', '1'); } else { x.removeAttribute('data-spec-required'); }
+    });
+  }
+  function hsReason(scope) {
+    var o = soldAsOption(scope);
+    var hs = field(scope, 'hs_code');
+    var box = scope.querySelector('[data-hs-override-reason]');
+    var input = box ? box.querySelector('input') : null;
+    var differs = !!(o && hs && hs.value.trim() !== '' && hs.value.trim() !== (o.dataset.hs || ''));
+    if (box) { box.hidden = !differs; }
+    if (input) { input.required = differs; if (differs) { input.setAttribute('minlength', '10'); } else { input.removeAttribute('minlength'); } }
+    var codeEl = scope.querySelector('[data-sold-as-hs-code]');
+    var tag = scope.querySelector('[data-sold-as-hs-tag]');
+    if (codeEl && hs) { codeEl.textContent = hs.value.trim() || (o ? o.dataset.hs || '' : ''); }
+    if (tag) { tag.textContent = differs ? 'changed by MD/ED' : 'from specification'; }
+  }
+  function applySoldAs(scope, chosenNow) {
+    var s = soldAsSelect(scope);
+    if (!s) { return; }
+    var o = soldAsOption(scope);
+    var hs = field(scope, 'hs_code');
+    var box = scope.querySelector('[data-sold-as-hs]');
+    if (box) { box.hidden = !o; }
+    if (!o) {
+      if (hs) { hs.readOnly = false; }
+      filterUnits(scope, null, null, false);
+      filterFinishes(scope, null, null, false);
+      d348Required(scope, true);
+      hsReason(scope);
+      return;
+    }
+    var canOverride = s.dataset.canOverride === '1';
+    if (hs) {
+      // A Sold as chosen now sets the code; a saved line shows its own (an MD / ED change stays).
+      if (chosenNow || hs.value.trim() === '') { hs.value = o.dataset.hs || hs.value; }
+      hs.readOnly = !canOverride;
+    }
+    var finishes = null;
+    if (o.dataset.finishes) { try { finishes = JSON.parse(o.dataset.finishes); } catch (err) { finishes = null; } }
+    // A new line starts on the form's unit; a saved line keeps its unit while the form offers it.
+    filterUnits(scope, o.dataset.units ? o.dataset.units.split(',') : null, chosenNow && s.dataset.newLine === '1' ? o.dataset.defaultUnit : null, chosenNow);
+    filterFinishes(scope, finishes, o.dataset.defaultFinish || '', chosenNow);
+    d348Required(scope, false);
+    hsReason(scope);
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) { return; }
+    var scope = t.closest('.product-row') || t.closest('form');
+    if (!scope) { return; }
+    if (t.matches('select.sold-as-select')) {
+      applySoldAs(scope, true);
+      var picker = scope.querySelector('select.product-picker');
+      if (picker && picker.value) { refreshPrice(picker, true); }
+    } else if (t.name === 'line_type') {
+      soldAsRequired(scope);
+    } else if (t.id === 'order-currency-select') {
+      document.querySelectorAll('select.sold-as-select').forEach(function (s) { soldAsRequired(s.closest('.product-row') || s.closest('form')); });
+    }
+  });
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('line-hs-code')) { hsReason(t.closest('.product-row') || t.closest('form')); }
+  });
+
   // ---- D-273 (point 17): the side panel for "Edit" and "+ Add product" --------------------
   function closePanels() { document.querySelectorAll('.line-panel').forEach(function (p) { p.hidden = true; }); document.body.classList.remove('line-panel-open'); }
   document.addEventListener('click', function (e) {
@@ -365,5 +519,12 @@
 
   // An edited line shows its saved options without changing its price.
   document.querySelectorAll('select.product-picker').forEach(function (select) { if (select.value) { renderSpecs(select, false); } });
+  // D-385: and its saved Sold as, units and finishes (its HS code as saved).
+  document.querySelectorAll('select.sold-as-select').forEach(function (s) {
+    var scope = s.closest('.product-row') || s.closest('form');
+    if (!scope) { return; }
+    filterSoldAs(scope, false);
+    applySoldAs(scope, false);
+  });
 })();
 </script>

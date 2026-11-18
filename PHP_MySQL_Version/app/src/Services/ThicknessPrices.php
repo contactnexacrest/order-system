@@ -276,7 +276,9 @@ final class ThicknessPrices
         if (!$done['ok']) {
             return null;
         }
-        $cha = self::chaPerCbm(self::chaPerContainer($row, $product), (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
+        $chaSrc = self::chaSource($row, $product);
+        $cha = self::chaPerCbm($chaSrc['value'], (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
+        $chaNote = $chaSrc['computed'] ? self::CHA_INSIDE_NOTE : null; // D-381
         $packing = empty($row['includes_packing_loading']) ? (float) ($product['default_packing_cost'] ?? 0) + (float) ($product['default_loading_cost'] ?? 0) : 0.0;
         // D-335: the row's BASE (the user's choice) is what the product-level price uses.
         $baseMm = self::rowBase($row);
@@ -290,7 +292,7 @@ final class ThicknessPrices
                 // D-338 (2b): a CALCULATED per-CBM price — from which thinner price it was worked out
                 // (the stored calc_from_mm, else the row's base) — needs the MD's approval on an order line.
                 return ['supplier' => $v['price'], 'cha' => $chaU, 'packing' => $packing, 'total' => $v['price'] + $chaU + $packing,
-                    'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => null,
+                    'unit' => 'CBM', 'mm' => $mm, 'how' => $v['how'], 'note' => $chaNote,
                     'calc_from_mm' => $v['how'] === 'calculated' ? (int) ($v['calc_from_mm'] ?? self::baseOf($row, $rules)) : null,
                     'cbm_from' => (int) $rules['cbm_from']];
             }
@@ -302,7 +304,7 @@ final class ThicknessPrices
             }
             $supplier = (float) $v['price'] * $per;
             return ['supplier' => $supplier, 'cha' => $chaU * $per, 'packing' => $packing, 'total' => $supplier + $chaU * $per + $packing,
-                'unit' => $unit, 'mm' => null, 'how' => $v['how'], 'note' => null, 'base' => self::CBM];
+                'unit' => $unit, 'mm' => null, 'how' => $v['how'], 'note' => $chaNote, 'base' => self::CBM];
         }
         $mm ??= (float) ($baseMm ?? $rules['base_mm']);
         $v = $done['values'][(int) round($mm)] ?? null;
@@ -323,7 +325,7 @@ final class ThicknessPrices
         $supplier = $perCbm * $cbmPerUnit;
         $chaU = ($cha['per_cbm'] ?? 0.0) * $cbmPerUnit;
         return ['supplier' => $supplier, 'cha' => $chaU, 'packing' => $packing, 'total' => $supplier + $chaU + $packing,
-            'unit' => $unit, 'mm' => $mm, 'how' => $v['how'], 'note' => null];
+            'unit' => $unit, 'mm' => $mm, 'how' => $v['how'], 'note' => $chaNote];
     }
 
     // ------------------------------------------------------------- D-335: typed wins, a base, a calculator
@@ -577,14 +579,119 @@ final class ThicknessPrices
         return null;
     }
 
-    /** The row's CHA + transport per container, else the product's default (₹). */
+    /**
+     * The CHA + transport per container (₹) a price row adds. Owner decision D-381 (18 Nov 2026):
+     * the row's own figure → its directory supplier's figure (catalog_product_suppliers.supplier_id
+     * → suppliers.cha_transport_per_container) → the product's default → none. A row with
+     * fob_source 'computed' (an older price with the CHA already inside) never gets it.
+     */
     public static function chaPerContainer(array $row, array $product): ?float
     {
-        $v = $row['cha_transport_per_container'] ?? null;
-        if ($v === null || $v === '') {
-            $v = $product['cha_transport_per_container'] ?? null;
+        return self::chaSource($row, $product)['value'];
+    }
+
+    /** D-381: the note shown where a 'computed' row adds no per-container CHA. */
+    public const CHA_INSIDE_NOTE = 'CHA already inside this older price';
+
+    /**
+     * D-381: the figure chaPerContainer() uses and WHERE it came from: 'row' | 'supplier' |
+     * 'product' | null (none), with the supplier's port when it is the supplier's figure.
+     * 'computed' is true for a row whose price already holds the CHA (value null then).
+     *
+     * @return array{value: ?float, source: ?string, port: ?string, computed: bool}
+     */
+    public static function chaSource(array $row, array $product): array
+    {
+        if (($row['fob_source'] ?? 'direct') === 'computed') {
+            return ['value' => null, 'source' => null, 'port' => null, 'computed' => true];
         }
-        return $v === null || $v === '' ? null : (float) $v;
+        $v = $row['cha_transport_per_container'] ?? null;
+        if ($v !== null && $v !== '') {
+            return ['value' => (float) $v, 'source' => 'row', 'port' => null, 'computed' => false];
+        }
+        return self::chaFallback($row, $product);
+    }
+
+    /**
+     * D-381: what a row WITHOUT its own figure falls back to — its supplier's figure, else the
+     * product's default (the Edit price placeholder names it).
+     *
+     * @return array{value: ?float, source: ?string, port: ?string, computed: bool}
+     */
+    public static function chaFallback(array $row, array $product): array
+    {
+        $sup = self::supplierCha($row);
+        if ($sup !== null) {
+            return ['value' => $sup['value'], 'source' => 'supplier', 'port' => $sup['port'], 'computed' => false];
+        }
+        $p = $product['cha_transport_per_container'] ?? null;
+        if ($p !== null && $p !== '') {
+            return ['value' => (float) $p, 'source' => 'product', 'port' => null, 'computed' => false];
+        }
+        return ['value' => null, 'source' => null, 'port' => null, 'computed' => false];
+    }
+
+    /**
+     * D-381: the row's directory supplier's CHA + transport per container, or null. Uses the
+     * joined columns (ProductSupplierRepository) when the row carries them, else reads suppliers.
+     *
+     * @return array{value: float, port: ?string}|null
+     */
+    private static function supplierCha(array $row): ?array
+    {
+        if (array_key_exists('supplier_cha_per_container', $row)) {
+            $v = $row['supplier_cha_per_container'];
+            $port = $row['supplier_cha_port'] ?? null;
+        } else {
+            $sid = (int) ($row['supplier_id'] ?? 0);
+            if ($sid <= 0) {
+                return null;
+            }
+            $st = Database::connection()->prepare('SELECT cha_transport_per_container, cha_port FROM suppliers WHERE id = :id');
+            $st->execute(['id' => $sid]);
+            $s = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($s === false) {
+                return null;
+            }
+            $v = $s['cha_transport_per_container'];
+            $port = $s['cha_port'];
+        }
+        if ($v === null || $v === '') {
+            return null;
+        }
+        $port = $port !== null && trim((string) $port) !== '' ? trim((string) $port) : null;
+        return ['value' => (float) $v, 'port' => $port];
+    }
+
+    /**
+     * D-381: the small source tag beside the CHA in the Price check / build-up: "this price",
+     * "supplier" (+ " · <port>"), "product default"; null when there is no CHA figure.
+     */
+    public static function chaSourceTag(array $src): ?string
+    {
+        return match ($src['source'] ?? null) {
+            'row' => 'this price',
+            'supplier' => 'supplier' . (!empty($src['port']) ? ' · ' . $src['port'] : ''),
+            'product' => 'product default',
+            default => null,
+        };
+    }
+
+    /**
+     * D-381: the Edit price CHA placeholder / help — what an empty field falls back to:
+     * "Empty = supplier's ₹45,000.00 (Mundra)", "Empty = product default ₹40,000.00",
+     * else "Empty = no CHA + transport".
+     */
+    public static function chaFallbackText(array $row, array $product): string
+    {
+        $f = self::chaFallback($row, $product);
+        if ($f['source'] === 'supplier') {
+            return 'Empty = supplier\'s ₹' . number_format((float) $f['value'], 2) . ($f['port'] !== null ? ' (' . $f['port'] . ')' : '');
+        }
+        if ($f['source'] === 'product') {
+            return 'Empty = product default ₹' . number_format((float) $f['value'], 2);
+        }
+        return 'Empty = no CHA + transport';
     }
 
     /** "35", "2.5", "−5". */

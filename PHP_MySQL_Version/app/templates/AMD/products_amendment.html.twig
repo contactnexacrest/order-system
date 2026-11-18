@@ -11,6 +11,8 @@
   table.products tr.removed td { color: #8A94A3; text-decoration: line-through; }
   table.products tr.total td { font-weight: bold; }
   .amd-text { font-size: 9.5pt; margin: 0 0 6pt; }
+  {# Owner decision D-387 (18 Nov 2026, confirmed twice): the line's form under the product name. #}
+  table.products td .amd-form { font-size: 8.5pt; color: #3B4560; }
 {% endblock %}
 
 {% block header_incoterm %}{% endblock %}
@@ -33,7 +35,7 @@
   {% for r in products_amendment.rows %}
   <tr{% if r.removed %} class="removed"{% endif %}>
     <td class="line-no">{{ r.no }}</td>
-    <td>{{ r.product }}</td>
+    <td>{{ r.product }}{% if r.product_form %}<br><span class="amd-form">Product Form: {{ r.product_form }}</span>{% endif %}</td>
     {% for c in [r.size, r.pieces, r.quantity, r.price, r.total] %}
     <td class="num">{% if r.removed %}{{ c.old }}{% else %}{{ c.new }}{% if c.old %}<span class="was">{{ c.old }}</span>{% endif %}{% endif %}</td>
     {% endfor %}

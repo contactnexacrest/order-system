@@ -2952,6 +2952,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
+        <?php if (!empty($supplierPo['product_form'])): ?><div><span class="k">Product Form</span><span class="v"><?= htmlspecialchars((string) $supplierPo['product_form']) ?></span></div><?php endif; ?>
         <?php if ($sees['purchase']): ?><div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div><?php endif; ?>
         <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
       </div>
@@ -3009,6 +3010,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
         </label>
         <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite" maxlength="150"></label>
+        <label>Product Form <small class="muted">(from the lines' Sold as — prints on the Supplier PO; empty = not printed)</small><input type="text" name="product_form" maxlength="80" placeholder="e.g., Raw block" value="<?= htmlspecialchars((string) (\App\Repositories\OrderSupplierPoRepository::defaultProductForm((int) $order['id']) ?? '')) ?>"></label>
         <label>Grade<input type="text" name="grade" value="Grade A" placeholder="e.g. Grade A" maxlength="50"></label>
         <label>Surface Finish
           <select name="surface_finish">
@@ -3190,6 +3192,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
+        <?php if (!empty($supplierPo['product_form'])): ?><div><span class="k">Product Form</span><span class="v"><?= htmlspecialchars((string) $supplierPo['product_form']) ?></span></div><?php endif; ?>
         <?php if ($sees['purchase']): ?><div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div><?php endif; ?>
         <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
       </div>

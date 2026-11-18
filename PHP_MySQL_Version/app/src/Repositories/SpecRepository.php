@@ -153,8 +153,8 @@ final class SpecRepository
     public static function updateOption(int $id, array $d, int $userId): void
     {
         Database::connection()->prepare(
-            'UPDATE spec_options SET name = :n, is_base = :b, change_type = :t, value = :v, thickness_mm = :mm, updated_by = :u WHERE id = :id'
-        )->execute(['n' => $d['name'], 'b' => $d['is_base'], 't' => $d['change_type'], 'v' => $d['value'], 'mm' => $d['thickness_mm'], 'u' => $userId, 'id' => $id]);
+            'UPDATE spec_options SET name = :n, is_base = :b, change_type = :t, value = :v, thickness_mm = :mm, sort_order = :o, updated_by = :u WHERE id = :id'
+        )->execute(['n' => $d['name'], 'b' => $d['is_base'], 't' => $d['change_type'], 'v' => $d['value'], 'mm' => $d['thickness_mm'], 'o' => (int) ($d['sort_order'] ?? 0), 'u' => $userId, 'id' => $id]);
     }
 
     /** Only one base option per specification (per product, for product-only options). */

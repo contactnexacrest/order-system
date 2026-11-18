@@ -18,9 +18,11 @@ final class ProductSupplierRepository
     /** @return array<int, array<string,mixed>> */
     public static function forProduct(int $productId): array
     {
-        // D-359: with the directory supplier's Active flag (NULL = not linked to the directory).
+        // D-359: with the directory supplier's Active flag (NULL = not linked to the directory);
+        // D-381: and its CHA + transport per container (+ port), the fallback for a row without its own.
         $stmt = Database::connection()->prepare(
-            'SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id
+            'SELECT cps.*, sd.is_active AS supplier_is_active, sd.cha_transport_per_container AS supplier_cha_per_container, sd.cha_port AS supplier_cha_port
+             FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id
              WHERE cps.product_id = :product_id ORDER BY cps.is_primary DESC, cps.supplier_name'
         );
         $stmt->execute(['product_id' => $productId]);
@@ -29,7 +31,7 @@ final class ProductSupplierRepository
 
     public static function find(int $id): ?array
     {
-        $stmt = Database::connection()->prepare('SELECT cps.*, sd.is_active AS supplier_is_active FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id WHERE cps.id = :id');
+        $stmt = Database::connection()->prepare('SELECT cps.*, sd.is_active AS supplier_is_active, sd.cha_transport_per_container AS supplier_cha_per_container, sd.cha_port AS supplier_cha_port FROM catalog_product_suppliers cps LEFT JOIN suppliers sd ON sd.id = cps.supplier_id WHERE cps.id = :id');
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }

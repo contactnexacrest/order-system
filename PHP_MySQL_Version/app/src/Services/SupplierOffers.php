@@ -349,7 +349,7 @@ final class SupplierOffers
         $st = Database::connection()->prepare('SELECT thickness_mm, price_inr, how, calc_from_mm, quoted_on, updated_by FROM catalog_supplier_thickness_prices WHERE product_supplier_id = :id ORDER BY thickness_mm');
         $st->execute(['id' => $offerId]);
         $product = ProductRepository::find((int) $row['product_id']);
-        $keep = ['fob_source', 'fob_value', 'auto_fill', 'base_thickness_mm', 'quoted_on', 'valid_until', 'includes_packing_loading', 'cha_transport_per_container', 'notes'];
+        $keep = ['fob_source', 'fob_value', 'auto_fill', 'base_thickness_mm', 'quoted_on', 'valid_until', 'includes_packing_loading', 'cha_transport_per_container', 'notes', 'entered_unit', 'entered_price'];
         return ['offer_id' => $offerId, 'product_id' => (int) $row['product_id'], 'row' => array_intersect_key($row, array_flip($keep)), 'thickness' => $st->fetchAll(\PDO::FETCH_ASSOC),
             'product' => $product !== null ? array_intersect_key($product, array_flip(['configured_base_price_inr', 'configured_base_thickness_mm', 'configured_base_unit', 'configured_at'])) : []];
     }
@@ -372,6 +372,12 @@ final class SupplierOffers
         // D-364: a price typed per SQFT is saved as the SQM price; the notes keep what was typed.
         $in = self::fromSqft($in + ['unit' => '', 'mm' => $in['from_mm'] ?? null], $product, $grid, (string) ($row['price_basis'] ?? 'unit'));
         $in['notes'] = self::notesWithTyped((string) ($in['notes'] ?? ''), $in['typed_sqft']) ?? '';
+        // D-382: a block price typed per tonne is saved as the per-CBM price; the typed one is kept.
+        $in = self::fromTonne($in, $product, $grid, (string) ($row['price_basis'] ?? 'unit'), $rules['t_per_cbm']);
+        if ($in['tonne_error'] !== null) {
+            return [null, $in['tonne_error']];
+        }
+        $tonneText = $in['entered_unit'] !== null ? self::tonneText((float) $in['entered_price'], (float) $in['t_per_cbm']) : null;
         // ThicknessPrices::addPrice() runs its own transaction for the thickness prices.
         if ($grid) {
             $from = (int) $in['from_mm'];
@@ -398,6 +404,10 @@ final class SupplierOffers
                 ThicknessPrices::history($id, 'Price per ' . (($row['price_basis'] ?? '') === 'cbm' ? 'CBM' : ((string) ($product['reference_unit'] ?? '') ?: 'unit')),
                     $old !== null ? number_format($old, 2, '.', '') : null, number_format((float) $in['price'], 2, '.', ''), $userId);
             }
+            self::setEntered($id, $in['entered_unit'], $in['entered_price'] !== null ? (float) $in['entered_price'] : null); // D-382
+            if ($tonneText !== null) {
+                ThicknessPrices::history($id, 'Price typed per tonne', null, $tonneText, $userId);
+            }
         }
         $fresh = ProductSupplierRepository::find($id) ?? $row;
         PricingRepository::setSupplierDates($id, (string) $in['quoted_on'], $in['valid_until'] !== '' ? $in['valid_until'] : null);
@@ -406,7 +416,7 @@ final class SupplierOffers
         $oldIncl = (int) ($row['includes_packing_loading'] ?? 1) === 1;
         ProductSupplierRepository::setPriceDetails($id, $fresh['supplier_id'] !== null ? (int) $fresh['supplier_id'] : null, (bool) $in['includes_packing_loading'], $in['cha']);
         if ($oldCha !== $newCha) {
-            ThicknessPrices::history($id, 'CHA + transport per container', $oldCha ?? 'product default', $newCha ?? 'product default', $userId);
+            ThicknessPrices::history($id, 'CHA + transport per container', $oldCha ?? 'default (supplier, else product)', $newCha ?? 'default (supplier, else product)', $userId); // D-381
         }
         if ($oldIncl !== (bool) $in['includes_packing_loading']) {
             ThicknessPrices::history($id, 'Price includes packing and loading', $oldIncl ? 'yes' : 'no', $in['includes_packing_loading'] ? 'yes' : 'no', $userId);
@@ -426,12 +436,13 @@ final class SupplierOffers
         $summary = $row['supplier_name'] . ' · ' . $product['name'] . ': '
             . ($before !== null ? '₹' . ThicknessPrices::amount($before['inr']) . ' → ' : '') . '₹' . ThicknessPrices::amount((float) $in['price']) . ' ' . $what
             . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '')
+            . ($tonneText !== null ? ' (' . $tonneText . ')' : '')
             . ', quoted ' . date('j M Y', (int) strtotime((string) $in['quoted_on'])) . '.'
             . ($grid && $after !== null && $before !== null && ((int) $in['from_mm'] !== ($after['mm'] ?? -1)) ? ' Base price now ₹' . ThicknessPrices::amount($after['inr']) . ' ' . $after['label'] . '.' : '')
             . ($grid ? ' Other thicknesses updated.' : '');
         AuditLogRepository::log($userId, 'MARKET_PRICE_CHANGED', 'product_suppliers', $id, null,
             $before !== null ? '₹' . number_format($before['inr'], 2) . ' ' . $before['label'] : null, '₹' . number_format((float) $in['price'], 2) . ' ' . $what
-            . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '') . ' quoted ' . $in['quoted_on'] . ' (Edit price)');
+            . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '') . ($tonneText !== null ? ' (' . $tonneText . ')' : '') . ' quoted ' . $in['quoted_on'] . ' (Edit price)');
         return [$summary, null];
     }
 
@@ -456,9 +467,10 @@ final class SupplierOffers
             }
             $r = $snap['row'];
             $pdo->prepare('UPDATE catalog_product_suppliers SET fob_source = :fs, fob_value = :fv, auto_fill = :af, base_thickness_mm = :b, quoted_on = :q, valid_until = :v,
-                includes_packing_loading = :i, cha_transport_per_container = :c, notes = :n, updated_by = :u WHERE id = :id')
+                includes_packing_loading = :i, cha_transport_per_container = :c, notes = :n, entered_unit = :eu, entered_price = :ep, updated_by = :u WHERE id = :id')
                 ->execute(['fs' => $r['fob_source'], 'fv' => $r['fob_value'], 'af' => $r['auto_fill'], 'b' => $r['base_thickness_mm'], 'q' => $r['quoted_on'], 'v' => $r['valid_until'],
-                    'i' => $r['includes_packing_loading'], 'c' => $r['cha_transport_per_container'], 'n' => $r['notes'], 'u' => $userId, 'id' => $id]);
+                    'i' => $r['includes_packing_loading'], 'c' => $r['cha_transport_per_container'], 'n' => $r['notes'],
+                    'eu' => $r['entered_unit'] ?? null, 'ep' => $r['entered_price'] ?? null, 'u' => $userId, 'id' => $id]);
             if (($snap['product'] ?? []) !== []) {
                 $p = $snap['product'];
                 $pdo->prepare('UPDATE catalog_products SET configured_base_price_inr = :p, configured_base_thickness_mm = :mm, configured_base_unit = :un, configured_at = :at WHERE id = :id')
@@ -587,6 +599,10 @@ final class SupplierOffers
             if (LineUnits::canonical($u) === 'M2') {
                 $units[] = ['value' => self::SQFT_INPUT, 'label' => 'SQFT', 'sqft' => true]; // D-364
             }
+            // D-382: a block priced per CBM may be priced per tonne (saved as the per-CBM price).
+            if (self::tonnePriced($product, false)) {
+                $units[] = ['value' => self::TONNE_INPUT, 'label' => 'Tonne', 'tonne' => true, 't_per_cbm' => $rules['t_per_cbm']];
+            }
         }
         if (!in_array('CBM', array_map(static fn (array $x): string => strtoupper($x['value']), $units), true)) {
             $units[] = ['value' => 'CBM', 'label' => 'CBM'];
@@ -633,6 +649,100 @@ final class SupplierOffers
         $in['price'] = self::sqftToSqm((float) $in['price']);
         $in['unit'] = $grid ? 'm2' : (string) $product['reference_unit'];
         return $in;
+    }
+
+    // ------------------------------------------------------------------ D-382: a block price typed per tonne
+
+    /** D-382: the "Priced per" value for a price per tonne; it is saved as the per-CBM price. */
+    public const TONNE_INPUT = 'TON';
+
+    /**
+     * D-382: whether a product is sold as a block — one of its ticked "Sold as" specifications
+     * is of a form in the 'block' group; with none ticked, its old forms include 'block'.
+     */
+    public static function isBlockProduct(array $product): bool
+    {
+        $id = (int) ($product['id'] ?? 0);
+        // The groups of its ticked specifications' forms (ProductForms, the same rule as the specifications' applies_to).
+        $groups = $id > 0 ? ProductForms::productSpecGroups($id) : null;
+        if ($groups !== null) {
+            return in_array('block', $groups, true);
+        }
+        return in_array('block', ProductSpecs::splitForms(isset($product['forms']) ? (string) $product['forms'] : null), true);
+    }
+
+    /** D-382: whether "Priced per" offers Tonne — a block product whose one price is per CBM (not a thickness grid). */
+    public static function tonnePriced(array $product, bool $grid, string $basis = 'unit'): bool
+    {
+        if ($grid || $basis === 'grid' || $basis === 'combo') {
+            return false;
+        }
+        $perCbm = $basis === 'cbm' || LineUnits::canonical((string) ($product['reference_unit'] ?? '')) === 'CBM';
+        return $perCbm && self::isBlockProduct($product);
+    }
+
+    /**
+     * D-382: a price typed per tonne becomes the per-CBM price (× the weight per CBM), stored in
+     * the usual fields; 'entered_unit' / 'entered_price' keep what was typed ('TON', the price),
+     * both null for a price typed per CBM. 'tonne_error' is set (and nothing converted) when the
+     * product has no weight per CBM, or when Tonne is not offered for this price.
+     *
+     * @param array<string,mixed> $in price, unit
+     * @return array<string,mixed>
+     */
+    public static function fromTonne(array $in, array $product, bool $grid, string $basis = 'unit', ?float $tPerCbm = null): array
+    {
+        $in['entered_unit'] = null;
+        $in['entered_price'] = null;
+        $in['tonne_error'] = null;
+        if (strtoupper(trim((string) ($in['unit'] ?? ''))) !== self::TONNE_INPUT) {
+            return $in;
+        }
+        if (!self::tonnePriced($product, $grid, $basis)) {
+            $in['tonne_error'] = 'Priced per: Tonne is only for a block priced per CBM — choose the unit the price is per.';
+            return $in;
+        }
+        $tPerCbm ??= ThicknessPrices::rules($product)['t_per_cbm'];
+        if ($tPerCbm === null || $tPerCbm <= 0) {
+            $in['tonne_error'] = LineUnits::missingMessage('weight', 'TON', 'CBM');
+            return $in;
+        }
+        $in['entered_unit'] = self::TONNE_INPUT;
+        $in['entered_price'] = PricingEngine::round2((float) $in['price']);
+        $in['t_per_cbm'] = (float) $tPerCbm;
+        $in['price'] = PricingEngine::round2((float) $in['price'] * (float) $tPerCbm);
+        $in['unit'] = $basis === 'cbm' ? 'CBM' : (string) ($product['reference_unit'] ?? 'CBM');
+        return $in;
+    }
+
+    /** D-382: "₹30,000.00 per tonne = ₹87,000.00 per CBM at 2.9 t/CBM". */
+    public static function tonneText(float $perTonne, float $tPerCbm): string
+    {
+        return '₹' . number_format($perTonne, 2) . ' per tonne = ₹' . number_format(PricingEngine::round2($perTonne * $tPerCbm), 2)
+            . ' per CBM at ' . ThicknessPrices::fmt($tPerCbm) . ' t/CBM';
+    }
+
+    /** D-382: the tonne text of a stored offer (entered per tonne), or null. */
+    public static function enteredText(array $row, array $product): ?string
+    {
+        if (strtoupper((string) ($row['entered_unit'] ?? '')) !== self::TONNE_INPUT || ($row['entered_price'] ?? null) === null) {
+            return null;
+        }
+        $fob = (new ProductService())->effectiveFobForSupplier($row, $product);
+        $perTonne = (float) $row['entered_price'];
+        if ($fob === null || $perTonne <= 0) {
+            return null;
+        }
+        // The weight it was converted at (the stored per-CBM price ÷ the typed per-tonne price).
+        $t = round($fob / $perTonne, 3);
+        return '₹' . number_format($perTonne, 2) . ' per tonne = ₹' . number_format($fob, 2) . ' per CBM at ' . ThicknessPrices::fmt($t) . ' t/CBM';
+    }
+
+    /** D-382: stores what was typed (per tonne) or clears it (typed per CBM). */
+    public static function setEntered(int $offerId, ?string $unit, ?float $price): void
+    {
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET entered_unit = :u, entered_price = :p WHERE id = :id')
+            ->execute(['u' => $unit, 'p' => $price !== null ? number_format($price, 2, '.', '') : null, 'id' => $offerId]);
     }
 
     /** D-364: "typed ₹185 / SQFT = ₹1,991.32 / SQM (× 10.7639)". */
@@ -718,6 +828,12 @@ final class SupplierOffers
         $rules = ThicknessPrices::rules($product);
         $grid = $in['mm'] !== null && $rules['grid'];
         $in = self::fromSqft($in, $product, $grid); // D-364: a price per SQFT is saved as the SQM price
+        // D-382: a block price typed per tonne is saved as the per-CBM price (× the weight per CBM).
+        $in = self::fromTonne($in, $product, $grid, 'unit', $rules['t_per_cbm']);
+        if ($in['tonne_error'] !== null) {
+            throw new \RuntimeException($in['tonne_error']);
+        }
+        $tonneText = $in['entered_unit'] !== null ? self::tonneText((float) $in['entered_price'], (float) $in['t_per_cbm']) : null;
         $unitIsCbm = strtoupper((string) $in['unit']) === 'CBM';
         $basis = $grid ? 'grid' : ($unitIsCbm && LineUnits::canonical((string) ($product['reference_unit'] ?? '')) !== 'CBM' ? 'cbm' : 'unit');
         $primary = $basis !== 'cbm' && self::markedForPricing($productId) === null;
@@ -732,6 +848,9 @@ final class SupplierOffers
         PricingRepository::setSupplierDates($id, (string) $in['quoted_on'], $in['valid_until'] !== '' ? (string) $in['valid_until'] : null);
         ProductSupplierRepository::setPriceDetails($id, (int) $supplier['id'], true, null);
         PricingRepository::setSupplierBasis($id, $basis);
+        if ($in['entered_unit'] !== null) {
+            self::setEntered($id, $in['entered_unit'], (float) $in['entered_price']); // D-382
+        }
         if ($grid) {
             $row = ProductSupplierRepository::find($id) ?? ['id' => $id];
             $others = array_values(array_filter(ThicknessPrices::thicknesses($rules), static fn (int $mm): bool => $mm !== (int) $in['mm']));
@@ -753,10 +872,14 @@ final class SupplierOffers
         if ($in['typed_sqft'] !== null) {
             ThicknessPrices::history($id, 'Price typed per SQFT', null, self::typedText((float) $in['typed_sqft']), $userId);
         }
+        if ($tonneText !== null) {
+            ThicknessPrices::history($id, 'Price typed per tonne', null, $tonneText, $userId);
+        }
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
             $supplier['supplier_legal_name'] . ': ' . $product['name'] . ' ₹' . number_format((float) $in['price'], 2) . ' '
             . ($grid ? ((int) $in['mm'] === ThicknessPrices::CBM ? 'per CBM' : 'per SQM') . ' (' . ThicknessPrices::label((int) $in['mm'], (int) $rules['cbm_from']) . ')' : 'per ' . $in['unit'])
             . ($in['typed_sqft'] !== null ? ' (' . self::typedText((float) $in['typed_sqft']) . ')' : '')
+            . ($tonneText !== null ? ' (' . $tonneText . ')' : '')
             . ' quoted ' . $in['quoted_on'] . ' (+ Add product)' . ($primary ? ' (used for pricing)' : ''));
         return $id;
     }

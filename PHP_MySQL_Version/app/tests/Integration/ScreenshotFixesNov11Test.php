@@ -112,7 +112,8 @@ final class ScreenshotFixesNov11Test extends DbTestCase
         // D-362: Global pricing settings and Exchange-rate history left the "Pricing" drop-down.
         self::assertSame([], self::activeLabels($pricing));
         $drop = array_values(array_filter($pricing['items'], static fn (array $i): bool => $i['label'] === 'Pricing'))[0];
-        self::assertSame(['Commission levels and ladder', 'Specifications'],
+        // D-382 (18 Nov 2026): Forms of stone joined the drop-down.
+        self::assertSame(['Commission levels and ladder', 'Specifications', 'Forms of stone'],
             array_values(array_map(static fn (array $c): string => $c['label'], $drop['children'])));
         // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
         self::assertStringContainsString('<details class="section-nav-details">', self::read('app/views/partials/section_nav.php'));

@@ -30,6 +30,9 @@ final class DropdownOptionController
         View::render('dropdown_options/index', [
             'grouped' => DropdownOptionRepository::allGrouped(true),
             'finishPrices' => SurfaceFinishList::priceColumn(),
+            // D-383 (18 Nov 2026): which forms of stone each finish is offered for.
+            'productForms' => \App\Services\ProductForms::forms(),
+            'finishFormMap' => \App\Services\ProductForms::finishFormMap(),
             'finishSaved' => is_array($finishSaved) ? $finishSaved : null,
         ], 'layout/base');
     }
@@ -106,6 +109,29 @@ final class DropdownOptionController
             }
         }
 
+        // D-383 (18 Nov 2026): surface_finish — "Offered for forms" ticks per finish; a change needs the page's reason.
+        $finishFormChanges = [];
+        if ($listKey === SurfaceFinishList::LIST_KEY && !empty($_POST['finish_forms_present'])) {
+            $formIds = array_map(static fn (array $f): int => (int) $f['id'], \App\Services\ProductForms::forms());
+            $map = \App\Services\ProductForms::finishFormMap();
+            $posted = (array) ($_POST['finish_forms'] ?? []);
+            foreach ($rows as $row) {
+                $id = (int) $row['id'];
+                $want = array_values(array_intersect($formIds, array_map('intval', array_keys((array) ($posted[$id] ?? [])))));
+                sort($want);
+                $have = $map[$id] ?? [];
+                sort($have);
+                if ($want !== $have) {
+                    $finishFormChanges[$id] = [$have, $want, (string) $row['option_value']];
+                }
+            }
+            if ($finishFormChanges !== [] && ($reasonError = \App\Helpers\ReasonValidator::check((string) ($_POST['reason'] ?? ''))) !== null) {
+                Flash::set('error', 'Offered for forms: ' . $reasonError);
+                header('Location: /admin/dropdown-options#list-' . $listKey);
+                return;
+            }
+        }
+
         $changedCount = 0;
         $renames = [];
         $activeChanged = [];
@@ -141,6 +167,22 @@ final class DropdownOptionController
             if ($currentDefault !== $defaultId) {
                 DropdownOptionRepository::setDefault($defaultId, $listKey);
                 AuditLogRepository::log((int) $user['id'], 'DROPDOWN_OPTION_DEFAULT_CHANGED', 'dropdown_options', $defaultId, 'is_default', (string) $currentDefault, (string) $defaultId);
+                $changedCount++;
+            }
+        }
+
+        if ($finishFormChanges !== []) {
+            $names = [];
+            foreach (\App\Services\ProductForms::forms() as $f) {
+                $names[(int) $f['id']] = (string) $f['name'];
+            }
+            $text = static function (array $ids) use ($names): string {
+                return $ids === [] ? 'no form' : implode(', ', array_map(static fn (int $i): string => $names[$i] ?? ('#' . $i), $ids));
+            };
+            foreach ($finishFormChanges as $id => [$have, $want, $finishName]) {
+                \App\Services\ProductForms::setFinishForms($id, $want);
+                AuditLogRepository::log((int) $user['id'], 'FINISH_FORMS_CHANGED', 'dropdown_options', $id, 'offered_for_forms',
+                    $finishName . ': ' . $text($have), $finishName . ': ' . $text($want), trim((string) ($_POST['reason'] ?? '')));
                 $changedCount++;
             }
         }

@@ -20,6 +20,8 @@ $__validUntil = (string) ($old['valid_until'] ?? ((string) ($row['valid_until'] 
 $__cha = (string) ($old['cha_transport_per_container'] ?? ($row['cha_transport_per_container'] !== null ? rtrim(rtrim(number_format((float) $row['cha_transport_per_container'], 2, '.', ''), '0'), '.') : ''));
 $__incl = array_key_exists('includes_packing_loading', $old) ? (string) $old['includes_packing_loading'] === '1' : (int) ($row['includes_packing_loading'] ?? 1) === 1;
 $__prodCha = $product['cha_transport_per_container'] ?? null;
+// D-381: an empty CHA field falls back to the supplier's figure, else the product default — named here.
+$__chaFallbackText = ThicknessPrices::chaFallbackText($row, $product);
 $__sell = $preview['selling'] ?? null;
 ?>
 <div class="card page-wide">
@@ -45,6 +47,7 @@ $__sell = $preview['selling'] ?? null;
     <a class="edit-price-close" href="<?= View::e($backUrl) ?>" aria-label="Close">✕ close</a>
     <h1>Edit price — <?= View::e((string) $row['supplier_name']) ?> · <?= View::e((string) $product['name']) ?></h1>
     <p class="muted">Today: <?= $base !== null ? View::e($__amt($base['inr']) . ' ' . $base['label']) : 'no price yet' ?><?= !empty($row['quoted_on']) ? ', quoted ' . View::e(date('j M Y', (int) strtotime((string) $row['quoted_on']))) : '' ?><?= !\App\Services\SupplierOffers::usable($row) ? ' <span class="badge badge-warning">offer or supplier inactive — not used</span>' : '' ?></p>
+    <?php if (!empty($enteredText)): ?><p class="small muted">Typed as <?= View::e((string) $enteredText) ?>.</p><?php endif; ?>
 
     <form method="post" action="/products/suppliers/<?= $__id ?>/edit-price" class="edit-price-form" data-edit-price
           data-preview-url="/products/suppliers/<?= $__id ?>/edit-price/preview" data-was="<?= $base !== null ? View::e((string) $base['inr']) : '' ?>">
@@ -54,7 +57,9 @@ $__sell = $preview['selling'] ?? null;
         <div>
           <div class="edit-price-main">
             <label>New price (₹) *<input type="text" inputmode="decimal" name="price" required class="edit-price-big" data-max-decimals="2" data-max-value="999999999999.99"
-                   placeholder="e.g. 185000" value="<?= View::e((string) ($old['price'] ?? ($base !== null ? rtrim(rtrim(number_format($base['inr'], 2, '.', ''), '0'), '.') : ''))) ?>" data-edit-price-input></label>
+                   placeholder="e.g. 185000" value="<?= View::e((string) ($old['price'] ?? (!empty($tonne) && strtoupper((string) ($row['entered_unit'] ?? '')) === 'TON' && ($row['entered_price'] ?? null) !== null
+                     ? rtrim(rtrim(number_format((float) $row['entered_price'], 2, '.', ''), '0'), '.')
+                     : ($base !== null ? rtrim(rtrim(number_format($base['inr'], 2, '.', ''), '0'), '.') : '')))) ?>" data-edit-price-input></label>
             <?php if ($grid): ?>
               <?php $__unit = (string) ($old['unit'] ?? ''); $__unit = $fromMm === ThicknessPrices::CBM || (isset($old['thickness_mm']) && (string) $old['thickness_mm'] === (string) ThicknessPrices::CBM) ? 'CBM' : (in_array($__unit, ['m2', 'SQFT'], true) ? $__unit : 'm2'); ?>
               <label>per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
@@ -74,6 +79,12 @@ $__sell = $preview['selling'] ?? null;
                   <option value="<?= View::e($sqmUnit) ?>"<?= $__unit !== 'SQFT' ? ' selected' : '' ?>>SQM</option>
                   <option value="SQFT" data-sqft="1"<?= $__unit === 'SQFT' ? ' selected' : '' ?>>SQFT</option>
                 </select></label>
+              <?php elseif (!empty($tonne)): $__unit = strtoupper((string) ($old['unit'] ?? (strtoupper((string) ($row['entered_unit'] ?? '')) === 'TON' ? 'TON' : $tonne['cbm']))) === 'TON' ? 'TON' : $tonne['cbm']; ?>
+                <?php // Owner decision D-382 (18 Nov 2026): a block is priced per CBM or per tonne; a price per tonne is saved as the per-CBM price (× the weight per CBM). ?>
+                <label>Priced per *<select name="unit" required data-edit-price-unit-select data-sqft-unit>
+                  <option value="<?= View::e($tonne['cbm']) ?>"<?= $__unit !== 'TON' ? ' selected' : '' ?>>CBM</option>
+                  <option value="TON" data-tonne="1"<?= $tonne['t_per_cbm'] !== null ? ' data-t-per-cbm="' . View::e(ThicknessPrices::fmt((float) $tonne['t_per_cbm'])) . '"' : '' ?><?= $__unit === 'TON' ? ' selected' : '' ?>>Tonne</option>
+                </select></label>
               <?php else: ?>
                 <span class="edit-price-per">per <strong><?= View::e($unitLabel) ?></strong></span>
               <?php endif; ?>
@@ -89,7 +100,8 @@ $__sell = $preview['selling'] ?? null;
             <summary><strong>More (optional)</strong> — CHA + transport, packing, notes</summary>
             <div class="field-grid">
               <label>CHA + transport per container (₹)<input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" value="<?= View::e($__cha) ?>"
-                     placeholder="<?= $__prodCha !== null ? 'product default ' . View::e(ThicknessPrices::amount((float) $__prodCha)) : 'e.g. 100000' ?>"></label>
+                     placeholder="<?= ThicknessPrices::chaFallback($row, $product)['source'] !== null ? View::e($__chaFallbackText) : 'e.g. 100000' ?>">
+                <small class="muted"><?= View::e($__chaFallbackText) ?></small></label>
               <label class="full checkbox-label"><input type="hidden" name="includes_packing_loading" value="0"><input type="checkbox" name="includes_packing_loading" value="1"<?= $__incl ? ' checked' : '' ?>> Price includes packing and loading</label>
               <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"><?= View::e((string) ($old['notes'] ?? ($row['notes'] ?? ''))) ?></textarea></label>
             </div>

@@ -278,9 +278,10 @@ final class SpecController
         if ($d['is_base'] === 1) {
             SpecRepository::clearBase((int) $spec['id'], $o['product_id'] !== null ? (int) $o['product_id'] : null, (int) $o['id']);
         }
+        // D-389 (18 Nov 2026): the option's order is editable too — logged with it.
         AuditLogRepository::log((int) self::user()['id'], 'SPEC_OPTION_CHANGED', 'spec_options', (int) $o['id'], null,
-            $o['name'] . ' ' . ProductSpecs::changeLabel((string) $o['change_type'], $o['value'] !== null ? (float) $o['value'] : null),
-            $d['name'] . ' ' . ProductSpecs::changeLabel($d['change_type'], $d['value'] !== null ? (float) $d['value'] : null));
+            $o['name'] . ' ' . ProductSpecs::changeLabel((string) $o['change_type'], $o['value'] !== null ? (float) $o['value'] : null) . ' · order ' . (int) $o['sort_order'],
+            $d['name'] . ' ' . ProductSpecs::changeLabel($d['change_type'], $d['value'] !== null ? (float) $d['value'] : null) . ' · order ' . (int) $d['sort_order']);
         Flash::set('success', 'Option saved. New quotes use it; prices already issued do not change.');
         self::back($to);
     }
@@ -354,8 +355,13 @@ final class SpecController
             return;
         }
         $tree = ProductSpecs::tree($product, true);
+        // D-384: the "Sold as" ticks — every active specification, and any switched-off one the product still ticks.
+        $__ticked = \App\Services\ProductForms::productSpecIds((int) $product['id']);
+        $__soldAs = array_values(array_filter(\App\Services\ProductForms::specifications(),
+            static fn (array $s): bool => ((int) $s['is_active'] === 1 && (int) $s['form_is_active'] === 1) || in_array((int) $s['id'], $__ticked, true)));
         View::render('products/specifications', [
             'product' => $product, 'tree' => $tree,
+            'soldAsSpecs' => $__soldAs, 'soldAsTicked' => $__ticked,
             'categories' => ProductCategoryRepository::all(true),
             'categoryId' => ProductSpecs::categoryIdFor($product),
             'canEdit' => self::can('manage_product_specifications'),
@@ -385,12 +391,9 @@ final class SpecController
         if ($categoryId <= 0 || ProductCategoryRepository::find($categoryId) === null) {
             $errors[] = 'Choose a category.';
         }
-        $forms = [];
-        foreach ((array) ($_POST['forms'] ?? []) as $f) {
-            if (isset(ProductSpecs::FORMS[(string) $f])) {
-                $forms[] = (string) $f;
-            }
-        }
+        // D-384 (18 Nov 2026): the old "Forms" ticks are replaced by "Sold as" (its own form, /products/{id}/sold-as);
+        // the product's old forms value is kept as it is (read-only) — it still applies while nothing is ticked.
+        $forms = ProductSpecs::splitForms($product['forms'] ?? null);
         $cbm = trim((string) ($_POST['cbm_from_mm'] ?? ''));
         $cbmVal = null;
         if ($cbm !== '') {

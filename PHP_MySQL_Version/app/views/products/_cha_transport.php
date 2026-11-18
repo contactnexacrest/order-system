@@ -14,7 +14,9 @@ use App\Services\ThicknessPrices;
 $__chaRow = $__row ?? [];
 $__chaVal = $__chaRow['cha_transport_per_container'] ?? null;
 $__chaDefault = $product['cha_transport_per_container'] ?? null;
-$__chaUse = $__chaVal !== null ? (float) $__chaVal : ($__chaDefault !== null ? (float) $__chaDefault : null);
+// D-381: empty = the supplier's figure (when the row has a directory supplier with one), else the product default.
+$__chaFallback = ThicknessPrices::chaFallback($__chaRow, $product);
+$__chaUse = $__chaVal !== null ? (float) $__chaVal : $__chaFallback['value'];
 $__fit = ThicknessPrices::chaPerCbm($__chaUse, (float) $rules['container_cbm'], $rules['container_max_t'], $rules['t_per_cbm']);
 $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['includes_packing_loading'] === 1;
 ?>
@@ -25,7 +27,7 @@ $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['incl
   <div class="field-grid">
     <label>CHA + transport per container (₹)
       <input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="<?= $__chaVal !== null ? View::e(number_format((float) $__chaVal, 2, '.', '')) : '' ?>"
-        placeholder="<?= $__chaDefault !== null ? 'product default ' . View::e(number_format((float) $__chaDefault, 2, '.', '')) : 'e.g. 60000.00' ?>"></label>
+        placeholder="<?= $__chaFallback['source'] !== null ? View::e(ThicknessPrices::chaFallbackText($__chaRow, $product)) : 'e.g. 60000.00' ?>"></label>
     <div><span class="muted small">Container holds</span><br><b><?= View::e(ThicknessPrices::fmt((float) $rules['container_cbm'])) ?> CBM · max <?= View::e(ThicknessPrices::fmt((float) $rules['container_max_t'])) ?> t</b>
       <br><small class="muted"><?= $rules['own'] !== [] && in_array('container', $rules['own'], true) ? 'this product\'s own figures' : 'from the category; a product can override' ?></small></div>
     <div><span class="muted small">Per unit</span><br><b data-cha-per-cbm><?= $__fit['per_cbm'] !== null ? '₹' . number_format($__fit['per_cbm'], 2) . ' / CBM' : '—' ?></b></div>
@@ -45,5 +47,5 @@ $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['incl
       <tr><td><?= (int) $rules['cbm_from'] ?> mm+</td><td colspan="3"><span data-cha-cbm-line><?= $__fit['per_cbm'] !== null ? '₹' . number_format($__fit['per_cbm'], 2) . ' per CBM' : '—' ?></span></td></tr>
     </table>
   <?php endif; ?>
-  <p class="small muted">Empty = the product's default<?= $__chaDefault !== null ? ' (₹' . number_format((float) $__chaDefault, 2) . ')' : ' (none set yet — set it on the product)' ?>. FOB cost = supplier price + CHA and transport per unit; the selling price is then worked out from it as usual.</p>
+  <p class="small muted"><?php if ($__chaFallback['source'] !== null): ?><?= View::e(ThicknessPrices::chaFallbackText($__chaRow, $product)) ?><?php else: ?>Empty = the supplier's figure (Edit Supplier), else the product's default (none set yet — set it on the supplier or the product)<?php endif; ?>. FOB cost = supplier price + CHA and transport per unit; the selling price is then worked out from it as usual.</p>
 </fieldset>

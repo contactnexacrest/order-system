@@ -38,6 +38,39 @@ FROM (
                   AND table_name IN ('role_report_access', 'user_report_extras'))
             + (SELECT COUNT(*) FROM permissions WHERE permission_key = 'manage_report_access')
               WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-18a',
+         'Forms of stone, Specifications (HS), Sold as: 4 new tables, finishes Roughly trimmed / Sawn, order_products.hs_spec_id / hs_override_reason and default HS 68029300, permission to change a line''s HS code (D-382 to D-385, D-389)',
+         CASE (SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('product_forms', 'hs_specifications', 'product_hs_specifications', 'surface_finish_forms'))
+            + (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'order_products'
+                  AND column_name IN ('hs_spec_id', 'hs_override_reason'))
+            + (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'order_products'
+                  AND column_name = 'hs_code' AND column_default LIKE '%68029300%')
+            + (SELECT COUNT(*) FROM permissions WHERE permission_key = 'override_line_hs_code')
+            + (SELECT COUNT(*) FROM dropdown_options WHERE list_key = 'surface_finish' AND option_value IN ('Roughly trimmed', 'Sawn'))
+              WHEN 10 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-18b',
+         'CHA + transport per supplier: suppliers.cha_transport_per_container / cha_port; a block price typed per tonne: catalog_product_suppliers.entered_unit / entered_price (D-381, D-382)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND ((table_name = 'suppliers' AND column_name IN ('cha_transport_per_container', 'cha_port'))
+                    OR (table_name = 'catalog_product_suppliers' AND column_name IN ('entered_unit', 'entered_price'))))
+              WHEN 4 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-18c',
+         'Bill of Lading wording: T&C clause 95 and the reference-library checklists (full set of originals, HS 68029300); Supplier PO order_supplier_po.product_form (D-380, D-387)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'order_supplier_po' AND column_name = 'product_form')
+            + (SELECT COUNT(*) FROM tc_clauses
+                WHERE clause_title = 'Bill of Lading Release' AND INSTR(clause_text, 'Original negotiable BL (3 originals)') = 0)
+            + IF((SELECT COUNT(*) FROM internal_reference_docs
+                   WHERE INSTR(content, '3 Originals ONLY') > 0 OR INSTR(content, 'all 3 originals') > 0 OR INSTR(content, '6802.93 for all') > 0) = 0, 1, 0)
+              WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

@@ -31,6 +31,8 @@ $__pickerSpecName = str_ends_with((string) $__pickerName, '[]') ? 'product_spec_
         data-unit="<?= htmlspecialchars((string) ($__pp['reference_unit'] ?? '')) ?>"
         <?php if ($__prices !== null): ?>data-prices="<?= htmlspecialchars((string) json_encode($__prices)) ?>"<?php endif; ?>
         <?php if (!empty($pickerSpecs[(int) $__pp['id']])): ?>data-spec-options="<?= htmlspecialchars((string) json_encode($pickerSpecs[(int) $__pp['id']])) ?>"<?php endif; ?>
+        <?php // D-385: the product's "Sold as" ticks (none = every specification). ?>
+        <?php if (!empty($pickerSoldAs[(int) $__pp['id']])): ?>data-sold-as="<?= htmlspecialchars((string) json_encode(array_values($pickerSoldAs[(int) $__pp['id']]))) ?>"<?php endif; ?>
         <?= $__pickerSelected === (int) $__pp['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__pp['name']) ?> (HS <?= htmlspecialchars((string) $__pp['hs_code']) ?>)</option>
     <?php endforeach; ?>
     <?php // D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. ?>

@@ -46,13 +46,20 @@ $__ro = $canManage ? '' : ' disabled';
           </form>
           <?php $__linked = \App\Services\SurfaceFinishList::isLinkedSpec($s); // D-357: the names come from Settings › Lists › surface_finish ?>
           <?php if ($__linked): ?><p class="notice notice-info small" data-testid="finish-linked-note">Price only here — the names, their order and on/off come from <a href="/admin/dropdown-options#list-surface_finish">Settings › Lists › surface_finish</a>. A finish added in Settings appears here automatically at no price change; a finish switched off in Settings disappears from Pick from Products.</p><?php endif; ?>
+          <p class="small muted">Order: the options are offered in this order on order lines and price requests (lowest first); change a number and Save that option.</p>
           <table class="list">
-            <tr><th><?= $__linked ? 'Option (name from Settings › Lists)' : 'Option' ?></th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
+            <tr><th><?= $__linked ? 'Order and option (from Settings › Lists)' : 'Order and option' ?></th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
             <?php foreach ($s['options'] as $o): ?>
               <tr>
                 <td colspan="5">
                   <form method="post" action="/pricing/spec-options/<?= (int) $o['id'] ?>" class="inline-form">
                     <?= Csrf::field() ?>
+                    <?php // D-389 (18 Nov 2026): the order is editable (it was a hidden field); a finish's order comes from Settings › Lists. ?>
+                    <?php if (!empty($o['dropdown_option_id'])): ?>
+                      <input type="hidden" name="sort_order" value="<?= (int) $o['sort_order'] ?>">
+                    <?php else: ?>
+                      <input type="number" name="sort_order" min="0" max="999" step="1" value="<?= (int) $o['sort_order'] ?>" aria-label="Order of <?= View::e($o['name']) ?>" placeholder="e.g. 1" class="input-order"<?= $__ro ?>>
+                    <?php endif; ?>
                     <?php if (!empty($o['dropdown_option_id'])): ?>
                       <input type="text" name="name" readonly class="input-readonly" maxlength="80" value="<?= View::e($o['name']) ?>" aria-label="Option name (from Settings › Lists)" placeholder="e.g. Natural Polish"> <a class="small" href="/admin/dropdown-options#list-surface_finish">Rename in Settings › Lists</a>
                     <?php else: ?>
@@ -62,7 +69,6 @@ $__ro = $canManage ? '' : ' disabled';
                     <input type="number" name="value" step="0.0001" value="<?= $o['value'] !== null ? View::e(rtrim(rtrim((string) $o['value'], '0'), '.')) : '' ?>" aria-label="Value" placeholder="e.g. 4.00 or -8"<?= $__ro ?>>
                     <input type="number" name="thickness_mm" min="1" max="2000" step="1" value="<?= $o['thickness_mm'] !== null ? (int) $o['thickness_mm'] : '' ?>" aria-label="Thickness in mm" placeholder="e.g. 30"<?= $__ro ?>>
                     <label class="inline"><input type="checkbox" name="is_base" value="1"<?= (int) $o['is_base'] === 1 ? ' checked' : '' ?><?= $__ro ?>> base</label>
-                    <input type="hidden" name="sort_order" value="<?= (int) $o['sort_order'] ?>">
                     <?php if ($canManage): ?><button type="submit" class="btn-sm">Save</button><?php endif; ?>
                   </form>
                 </td>

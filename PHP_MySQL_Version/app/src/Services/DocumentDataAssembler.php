@@ -59,6 +59,9 @@ final class DocumentDataAssembler
     /** D-215: documents that list service lines too (the rest are goods-only). */
     private const ALL_LINE_DOCUMENTS = ['QT', 'PI', 'OC', 'BUYERPO', 'AMD', 'ESI'];
 
+    /** Owner decision D-386 (18 Nov 2026, confirmed twice): the documents whose grey line prints "Product Form: <form>". */
+    public const PRODUCT_FORM_DOCUMENTS = ['QT', 'PI', 'OC', 'CI'];
+
     public static function assemble(int $orderId, ?string $documentTypeCode = null): array
     {
         $order = OrderRepository::find($orderId);
@@ -81,6 +84,11 @@ final class DocumentDataAssembler
         }
         $serviceValue = OrderProductRepository::totalServiceValue($orderId);
         $payment = OrderPaymentStatusRepository::find($orderId);
+        // D-386: the line's form ("Sold as" → its form) on the QT / PI / OC / CI only; lines without a Sold as print as before.
+        $formNames = in_array(strtoupper((string) $documentTypeCode), self::PRODUCT_FORM_DOCUMENTS, true)
+            ? \App\Services\ProductForms::formNameForOrderLines($orderId) : [];
+        // D-388: the document line numbers (as printed) of the goods / charge lines whose quantity is still to be confirmed.
+        [$tbcNos, $allTbc] = self::tbcLines($products);
 
         $company = self::companyBlock();
         $assets = self::assetsBlock();
@@ -289,7 +297,7 @@ final class DocumentDataAssembler
             'show_notify_party_section' => $showNotifyPartySection,
             // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
             'category_documents' => CategoryDocumentProfile::forOrder($orderId),
-            'products' => $formattedProducts = array_map(static function (array $p) use ($annexureLineLetter, $money): array {
+            'products' => $formattedProducts = array_map(static function (array $p) use ($annexureLineLetter, $money, $formNames): array {
                 // D-336: "Dimensions: As per Annexure X" and "8.801 (as per Annexure X)".
                 $perAnnexure = $annexureLineLetter !== null && !empty($p['as_per_annexure']);
                 $quantity = $p['quantity_is_tbc'] ? 'To Be Confirmed' : self::formatNumber($p['quantity']);
@@ -301,23 +309,27 @@ final class DocumentDataAssembler
                     'quantity'       => $perAnnexure && !$p['quantity_is_tbc'] ? AnnexureChoice::quantityText($quantity, $annexureLineLetter) : $quantity,
                     'unit'           => $p['unit'],
                     'unit_price'     => $p['unit_price'] !== null ? $money($p['unit_price']) : 'To Be Confirmed',
-                    'amount'         => $p['fob_value'] !== null ? $money($p['fob_value']) : 'To Be Confirmed',
+                    // D-388: a line whose quantity is to be confirmed never prints 0.00.
+                    'amount'         => $p['fob_value'] !== null && empty($p['quantity_is_tbc']) ? $money($p['fob_value']) : 'To Be Confirmed',
                     'line_type'      => $p['line_type'] ?? 'goods',
                     // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
                     'attributes'     => \App\Repositories\ProductCategoryRepository::documentAttributes($p),
                     'sac_code'       => $p['sac_code'] ?? null,
+                    // D-386: "Product Form: <form>" first in the grey line (QT / PI / OC / CI, a line with a Sold as); null = as before.
+                    'product_form'   => $formNames[(int) ($p['id'] ?? 0)] ?? null,
                 ];
             }, $products),
             // Owner decision D-339: the detailed product table on an order with the 'detailed' layout (new orders);
             // an order from before keeps 'classic' and prints exactly as before. Issued documents never change.
-            'line_table' => self::lineTableBlock($order, $products, $formattedProducts, $documentTypeCode, $annexureLineLetter, $orderId),
+            'line_table' => self::lineTableBlock($order, $products, $formattedProducts, $documentTypeCode, $annexureLineLetter, $orderId, $formNames),
             'financial' => [
-                'fob_value'        => $money($fobValue),
+                // D-388: "To Be Confirmed" / "<known> + line 2 To Be Confirmed" while a line's quantity is to be confirmed.
+                'fob_value'        => LineTable::tbcTotal($money($fobValue), $tbcNos, $allTbc),
                 'fob_value_raw'    => $fobValue,
                 // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
                 'has_services'        => $serviceValue > 0,
                 'service_value'       => $money($serviceValue),
-                'total_with_services' => $money($fobValue + $serviceValue),
+                'total_with_services' => LineTable::tbcTotal($money($fobValue + $serviceValue), $tbcNos, $allTbc && $serviceValue <= 0),
                 'advance_pct'      => rtrim(rtrim(number_format($advancePct, 2), '0'), '.'),
                 'advance_amount'   => $money($advanceAmount),
                 'advance_trigger_text' => $order['advance_trigger_text'],
@@ -348,17 +360,17 @@ final class DocumentDataAssembler
                 // "ADVANCE PAYABLE NOW: 0.00", without the advance sentences.
                 'has_advance'      => $advancePct > 0,
                 'payment_method'   => $order['payment_method'] ?? null,
-                'total_value'      => $money($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
+                'total_value'      => LineTable::tbcTotal($money($fobValue), $tbcNos, $allTbc), // D-388; freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
                 // 90-item backlog item #18 (BLOCKER) — see this
                 // function's own freightForTotal/totalCommercialInvoiceValue
                 // computation above for the full rationale. CI-only;
                 // every other document keeps using total_value above.
-                'total_commercial_invoice_value' => $money($totalCommercialInvoiceValue),
+                'total_commercial_invoice_value' => LineTable::tbcTotal($money($totalCommercialInvoiceValue), $tbcNos, $allTbc && abs($totalCommercialInvoiceValue - $fobValue) < 0.005),
                 // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
                 // "Total Invoice Value in Words" line prints the same figure as
                 // Total Commercial Invoice Value, in words — never a blank line.
-                'total_invoice_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $totalCommercialInvoiceValue, 2), $order['currency_code'] ?? null),
-                'fob_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $fobValue, 2), $order['currency_code'] ?? null),
+                'total_invoice_value_in_words' => LineTable::tbcTotal(\App\Helpers\AmountInWords::format(round((float) $totalCommercialInvoiceValue, 2), $order['currency_code'] ?? null), $tbcNos, $allTbc && abs($totalCommercialInvoiceValue - $fobValue) < 0.005),
+                'fob_value_in_words' => LineTable::tbcTotal(\App\Helpers\AmountInWords::format(round((float) $fobValue, 2), $order['currency_code'] ?? null), $tbcNos, $allTbc),
                 'freight_insurance_amount' => $freightForTotal !== null ? $money($freightForTotal) : null,
                 'preset_name'      => $order['preset_name'],
             ],
@@ -463,7 +475,7 @@ final class DocumentDataAssembler
      * of the QT / PI / OC / CI / Buyer PO (with prices) and Packing List (without), on an order
      * whose line_table_layout is 'detailed'. Null on a 'classic' order and on every other document.
      */
-    private static function lineTableBlock(array $order, array $products, array $formatted, ?string $documentTypeCode, ?string $annexureLetter, int $orderId): ?array
+    private static function lineTableBlock(array $order, array $products, array $formatted, ?string $documentTypeCode, ?string $annexureLetter, int $orderId, array $formNames = []): ?array
     {
         $code = strtoupper((string) $documentTypeCode);
         if (($order['line_table_layout'] ?? LineTable::LAYOUT_CLASSIC) !== LineTable::LAYOUT_DETAILED || !in_array($code, LineTable::DOCUMENTS, true)) {
@@ -480,9 +492,34 @@ final class DocumentDataAssembler
         }
         $names = [];
         foreach ($products as $p) {
-            $names[(int) $p['id']] = self::lineNames($p);
+            // D-386: the line's form for the grey line (set only on the QT / PI / OC / CI).
+            $names[(int) $p['id']] = self::lineNames($p) + ['form' => $formNames[(int) $p['id']] ?? null];
         }
         return LineTable::build(array_values($products), array_values($formatted), (string) ($order['currency_code'] ?? ''), $annexureLetter, $code !== 'PL', $crateCounts, $names);
+    }
+
+    /**
+     * Owner decision D-388 (18 Nov 2026, confirmed twice): the document line numbers (1-based, as
+     * printed) of the lines in the FOB value (not services) whose quantity is still to be confirmed,
+     * and whether every such line is.
+     *
+     * @param list<array<string,mixed>> $products the document's lines, in order
+     * @return array{0: list<int>, 1: bool}
+     */
+    public static function tbcLines(array $products): array
+    {
+        $nos = [];
+        $count = 0;
+        foreach (array_values($products) as $i => $p) {
+            if (($p['line_type'] ?? 'goods') === 'service') {
+                continue;
+            }
+            $count++;
+            if (!empty($p['quantity_is_tbc']) || ($p['quantity'] ?? null) === null || $p['quantity'] === '') {
+                $nos[] = $i + 1;
+            }
+        }
+        return [$nos, $count > 0 && count($nos) === $count];
     }
 
     /**
@@ -632,6 +669,8 @@ final class DocumentDataAssembler
             'supplier_phone'        => $row['supplier_phone'],
             'supplier_type'         => $row['supplier_type'],
             'material_stone_type'   => $row['material_stone_type'],
+            // D-387: Section 3 "Product Form", printed only when filled.
+            'product_form'          => ($row['product_form'] ?? null) !== null && trim((string) $row['product_form']) !== '' ? trim((string) $row['product_form']) : null,
             'grade'                 => $row['grade'],
             'surface_finish'        => $row['surface_finish'],
             'dimensions'            => $row['dimensions'],

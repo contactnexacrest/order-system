@@ -155,7 +155,8 @@ final class Hnt011ZeroPriceTest extends DbTestCase
 
         // A goods line from Products at 0 is below the product's lowest price: the existing D-245 rule
         // refuses it (before the fix PHP saved it as "no price" with no check at all).
-        $_POST = ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods',
+        // D-385: with its Sold as (Gangsaw slab, sold per CBM too).
+        $_POST = self::soldAs() + ['catalog_product_id' => (string) $productId, 'description' => 'Black Galaxy block', 'quantity' => '10', 'unit' => 'CBM', 'line_type' => 'goods',
             'hs_code' => '25161100', 'spec_json' => self::baseSpecJson($productId), 'unit_price' => '0'];
         $this->quietly(fn () => (new OrderController())->addProduct(['id' => (string) $orderId]));
         self::assertStringContainsString('below what NexaCrest can accept', $this->flash());
