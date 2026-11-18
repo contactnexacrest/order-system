@@ -34,7 +34,7 @@ module.exports = {
   group: 'Group B · Staff, by role',
   title: 'The Export Executive · Part 1',
   subtitle: 'Your screens, a new buyer, the order, the quotation and the buyer\'s PO.',
-  minutes: '10',
+  minutes: '8',
   restoreDb: true,
 
   async setup(d) { return B.setup(d); },

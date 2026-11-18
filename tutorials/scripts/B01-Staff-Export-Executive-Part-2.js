@@ -26,7 +26,7 @@ module.exports = {
   group: 'Group B · Staff, by role',
   title: 'The Export Executive · Part 2',
   subtitle: 'Proforma Invoice, the advance, the Order Confirmation and the hand-off.',
-  minutes: '10',
+  minutes: '8',
   restoreDb: true,
 
   async setup(d) {

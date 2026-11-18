@@ -22,7 +22,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Procurement',
   subtitle: 'Executive, Manager and Director: quotes, award, approval limits, the Supplier PO and receipt.',
-  minutes: '11',
+  minutes: '5',
   restoreDb: true,
 
   async setup(dm) {
@@ -51,7 +51,7 @@ module.exports = {
   },
 
   steps: ({ orderId = 0 } = {}) => { order = orderId || order; return [
-    { card: 'title', say: 'This video is for Procurement: the executive, the manager and the director. You buy the stone our buyers ordered, from the right supplier, at the right price, on time. In about eleven minutes we take one purchase from the request by Sales to the goods arriving and passing the quality check.' },
+    { card: 'title', say: 'This video is for Procurement: the executive, the manager and the director. You buy the stone our buyers ordered, from the right supplier, at the right price, on time. In this video we take one purchase from the request by Sales to the goods arriving and passing the quality check.' },
     { card: 'list', kicker: 'Your roles', title: 'Procurement · executive, manager, director', items: [
       'Executive: collects quotes, compares, awards, places the Supplier PO, records receipt and QC.',
       'Manager: the same on every order, and approves purchases up to ₹5,00,000.',

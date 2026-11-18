@@ -63,7 +63,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Export Compliance',
   subtitle: 'The compliance checklist, inspection and certificates, the COO prep sheet and export-benefit claims.',
-  minutes: '9',
+  minutes: '4',
   restoreDb: true,
 
   async setup(dm) {

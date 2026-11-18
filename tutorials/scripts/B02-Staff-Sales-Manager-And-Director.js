@@ -34,7 +34,7 @@ module.exports = {
   group: 'Group B · Staff, by role',
   title: 'The Sales Manager and the Sales Director',
   subtitle: 'Assigning orders, approving terms and documents, prices below the floor, e-mail approval and the cockpit.',
-  minutes: '13',
+  minutes: '9',
   restoreDb: true,
 
   async setup(d) {

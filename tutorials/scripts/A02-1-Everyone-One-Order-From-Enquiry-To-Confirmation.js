@@ -20,7 +20,7 @@ module.exports = {
   group: 'Group A · Everyone',
   title: 'One Order, End to End · Part 1',
   subtitle: 'From the first enquiry to an order the buyer has confirmed.',
-  minutes: '10',
+  minutes: '7',
   restoreDb: true,
 
   async setup(d) {

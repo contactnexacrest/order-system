@@ -61,6 +61,10 @@ const MOVES = {
     $paid = round((float) $p['balance_amount'] - 120, 2);
     Pay::recordBalanceReceived(${o}, $paid, date('Y-m-d'));
     Pay::setLegBankReference(${o}, 'balance', 'UTR SAMPLE0000789');
+    // Accounts records the rupees the bank credited for each leg (the profit review counts these).
+    $acc = $uid('accounts@email.com');
+    Pay::setBalanceInrActual(${o}, round($paid * 84.40, 2), $acc); Pay::setLegExchangeRate(${o}, 'balance', 84.40, $acc);
+    Pay::setFreightInrActual(${o}, round(1635 * 84.25, 2), $acc); Pay::setLegExchangeRate(${o}, 'freight', 84.25, $acc);
     $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, inr_credited, bank_rate, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([${o}, 'balance', $paid, date('Y-m-d'), 84.40, 'UTR SAMPLE0000789', round($paid * 84.40, 2), 84.40, $uid('accounts@email.com')]);
     echo 'ok';`,
@@ -138,7 +142,7 @@ module.exports = {
       await d.type(f.locator('input[name="amount_inr"]'), '3850');
       await d.type(f.locator('input[name="description"], textarea[name="description"]').first(), 'TEST Courier Services, invoice CR-2611-55: original documents to the buyer');
       await d.select(f.locator('select[name="paid_from"]'), { value: 'company_account' });
-      await d.type(f.locator('input[name="bank_reference"]'), 'UTR HDFC0000261120');
+      await d.type(f.locator('input[name="bank_reference"]'), 'HDFC0000261120');
       await d.clickNav(f.getByRole('button', { name: 'Record Cost' }));
     } },
     { caption: 'Costs are complete', say: 'The cost is listed, with the description the app builds for Zoho Books. When nothing else is missing, press Costs are complete.', do: async (d) => {

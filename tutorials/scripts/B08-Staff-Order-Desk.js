@@ -29,7 +29,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Order Desk',
   subtitle: 'Order Coordinator and Operations Manager: every order\'s status, owners, tasks and the cockpit.',
-  minutes: '8',
+  minutes: '4',
   restoreDb: true,
 
   async setup(dm) {
@@ -88,7 +88,6 @@ module.exports = {
     { card: 'chapter', title: 'Tasks and the cockpit', subtitle: 'What is waiting, what is late.', say: 'Chapter three. Chasing the work.' },
     { goto: '/my-tasks', caption: 'My tasks', say: 'My tasks lists what is waiting, with due dates. As the order desk you can switch between your own tasks and all tasks of your department. Overdue tasks turn red, and after a few days they are escalated to management.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('.kanban-board, table').first(), 1800); } },
     { goto: '/cockpit', caption: 'Management cockpit', say: 'The management cockpit shows, for each department, the open tasks, the overdue ones, the escalated ones, and the orders that still have no owner. Below: everything escalated, with who should act, and any supplier who is late. Counts only, no money. Start your day here, and chase from the top.', do: async (d) => { await d.point(d.page.getByRole('heading', { name: /Management cockpit/ }), 1000); await d.point(d.page.locator('table').filter({ hasText: 'Open tasks' }).first(), 2000); } },
-    { goto: '/reports/queues', caption: 'Reports › Operations queues', say: 'And Operations queues: how many orders wait in each queue right now, and the funnel for any period, from quotation to closure. Use it in your weekly meeting.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('table').first(), 1800); } },
 
     // ---------- 4. Operations Manager ----------
     { card: 'chapter', title: 'Assigning people', subtitle: 'Operations Manager · order assignees.', say: 'Chapter four. For the Operations Manager.' },

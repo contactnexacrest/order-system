@@ -21,7 +21,7 @@ module.exports = {
   group: 'Group A · Everyone',
   title: 'One Order, End to End · Part 2',
   subtitle: 'From the supplier\'s factory to a closed order.',
-  minutes: '10',
+  minutes: '6',
   restoreDb: true,
 
   async setup(d) {

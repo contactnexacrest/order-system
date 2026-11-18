@@ -53,7 +53,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Logistics · Part 1',
   subtitle: 'Freight terms and the freight bill, packing and crates, the packing list, shipping details, BL instruction.',
-  minutes: '9',
+  minutes: '4',
   restoreDb: true,
 
   async setup(dm) {

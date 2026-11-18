@@ -37,7 +37,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Logistics · Part 2',
   subtitle: 'The draft BL, the bill of lading, partner bills, and the original documents to the buyer.',
-  minutes: '9',
+  minutes: '4',
   restoreDb: true,
 
   async setup(dm) {

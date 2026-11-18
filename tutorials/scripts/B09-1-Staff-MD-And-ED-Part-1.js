@@ -23,7 +23,7 @@ module.exports = {
   group: 'Group B · Staff',
   title: 'Managing Director and Executive Director · Part 1',
   subtitle: 'The daily approvals: prices, payment terms and documents; the dashboard and the cockpit.',
-  minutes: '9',
+  minutes: '4',
   restoreDb: true,
 
   async setup(dm) {
