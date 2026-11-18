@@ -448,10 +448,15 @@
     if (codeEl && hs) { codeEl.textContent = hs.value.trim() || (o ? o.dataset.hs || '' : ''); }
     // Owner 18 Nov 2026: after a change, the specification's own code shows beside it.
     if (tag) { tag.textContent = differs ? 'changed by MD/ED (specification: ' + (o.dataset.hs || '') + ')' : 'from specification'; }
+    // Owner 18 Nov 2026: with a Sold as the HS Code box is hidden (the read-only line shows the code);
+    // it shows again after "Change HS code", while the code differs, or for a line without a Sold as.
+    var lab = hs ? hs.closest('label') : null;
+    if (lab) { lab.style.display = (!o || differs || scope.getAttribute('data-hs-open') === '1') ? '' : 'none'; }
   }
   function applySoldAs(scope, chosenNow) {
     var s = soldAsSelect(scope);
     if (!s) { return; }
+    if (chosenNow) { scope.removeAttribute('data-hs-open'); }
     var o = soldAsOption(scope);
     var hs = field(scope, 'hs_code');
     var box = scope.querySelector('[data-sold-as-hs]');
@@ -502,6 +507,9 @@
     var scope = b.closest('.product-row') || b.closest('form');
     var hs = scope ? field(scope, 'hs_code') : null;
     if (!hs) { return; }
+    scope.setAttribute('data-hs-open', '1');
+    var hsLabel = hs.closest('label');
+    if (hsLabel) { hsLabel.style.display = ''; }
     var more = hs.closest('details');
     if (more) { more.open = true; }
     hs.scrollIntoView({ block: 'center' });

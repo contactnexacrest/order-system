@@ -114,6 +114,8 @@ test.describe.serial('Forms of stone, Specifications (HS), Sold as — as a pers
     await expect(page.locator('[data-hs-override-reason]').first()).toBeHidden();
     // The MD clicks "Change HS code": the HS Code box (inside More on the order page) gets the cursor.
     const hs = page.locator('input[name="product_hs_code[]"]').first();
+    // With a Sold as the HS Code box is hidden — the read-only line shows the code (owner 18 Nov 2026).
+    await expect(hs).toBeHidden();
     await page.locator('[data-change-hs]').first().click();
     await expect(hs).toBeVisible();
     await expect(hs).toBeFocused();

@@ -837,7 +837,7 @@ What else the line needs then follows its **unit** (instead of "Thickness and Si
 A line without a Sold as (hand-typed lines, other currencies, saved older lines) works exactly as before.
 
 **Changing the HS code.** Only the **MD** and the **ED** (permission "Change a line's HS code from its specification,
-with a reason") may change it: click **Change HS code** beside the "HS code: … from specification" line (it opens
+with a reason") may change it (with a Sold as the HS Code box is hidden — the line "HS code: … from specification" shows the code): click **Change HS code** beside that line (it opens
 **More › HS Code** and puts the cursor in the box), type another code (the line then reads "changed by MD/ED
 (specification: <its code>)") from the HS Code Master and fill **Reason
 for changing the HS code** (e.g. "Buyer's customs classify these as worked monuments"). The products table then shows "changed by MD/ED —
