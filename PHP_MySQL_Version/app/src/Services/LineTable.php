@@ -43,10 +43,10 @@ final class LineTable
     private const DOC_UNITS = ['CBM' => 'CBM', 'M2' => 'SQM', 'SQFT' => 'SQFT', 'PCS' => 'PCS'];
 
     /** Decimals of the measure of all pieces (the line quantity) per document unit. */
-    private const ALL_DECIMALS = ['CBM' => 3, 'SQM' => 2, 'SQFT' => 2, 'PCS' => 0];
+    private const ALL_DECIMALS = ['CBM' => 3, 'SQM' => 2, 'SQFT' => 2, 'PCS' => 0, 'TON' => 3];
 
     /** Decimals shown for the measure of one piece. */
-    private const PIECE_DECIMALS = ['CBM' => 4, 'SQM' => 2, 'SQFT' => 2];
+    private const PIECE_DECIMALS = ['CBM' => 4, 'SQM' => 2, 'SQFT' => 2, 'TON' => 3];
 
     public const DASH = '—';
 
@@ -55,6 +55,30 @@ final class LineTable
     {
         $c = LineUnits::canonical($unit);
         return $c !== null && isset(self::DOC_UNITS[$c]) ? self::DOC_UNITS[$c] : null;
+    }
+
+    /**
+     * Owner decision D-392 (18 Nov 2026, confirmed twice): the unit a line prints in on the documents.
+     * CBM / SQM / SQFT as selected; TON as selected (tons per piece = tons ÷ pieces); a PCS line with a size in
+     * its product's pricing unit (catalog_products.reference_unit: CBM / SQM / SQFT, else CBM) — PCS only when
+     * that measure cannot be worked out from the size. Null for units not printed in the table (RMT, Set, Lot …).
+     *
+     * @param array<string,mixed> $line an order_products row
+     * @param array<int,array<string,mixed>> $names per line id: 'ref_unit' (the product's pricing unit)
+     */
+    public static function tableUnit(array $line, array $names = []): ?string
+    {
+        if (LineUnits::canonical($line['unit'] ?? null) === 'TON') {
+            return 'TON';
+        }
+        $u = self::docUnit($line['unit'] ?? null);
+        if ($u !== 'PCS') {
+            return $u;
+        }
+        $ref = self::docUnit($names[(int) ($line['id'] ?? 0)]['ref_unit'] ?? null);
+        $measure = in_array($ref, ['CBM', 'SQM', 'SQFT'], true) ? $ref : 'CBM';
+        $per = self::perPiece($measure, self::size($line['piece_length_cm'] ?? null), self::size($line['piece_width_cm'] ?? null), self::size($line['piece_thickness_cm'] ?? null));
+        return $per !== null && empty($line['as_per_annexure']) ? $measure : 'PCS';
     }
 
     /** A unit worked out from the piece size (CBM, SQM, SQFT). */
@@ -278,20 +302,20 @@ final class LineTable
         $simple = [];
         foreach ($lines as $i => $line) {
             $f = $formatted[$i] + ['no' => $i + 1];
-            if (($line['line_type'] ?? 'goods') === 'goods' && self::docUnit($line['unit'] ?? null) !== null) {
+            if (($line['line_type'] ?? 'goods') === 'goods' && self::tableUnit($line, $names) !== null) {
                 $stone[] = [$line, $f];
             } else {
                 $simple[] = $f;
             }
         }
         $out = [
-            'variant' => 'none', 'pcs_only' => false, 'mixed' => false, 'unit' => null, 'currency' => $currency, 'with_prices' => $withPrices,
+            'variant' => 'none', 'mixed' => false, 'unit' => null, 'currency' => $currency, 'with_prices' => $withPrices,
             'heads' => [], 'rows' => [], 'total' => null, 'totals_by_unit' => null, 'simple' => $simple, 'colspan' => 0,
         ];
         if ($stone === []) {
             return $out;
         }
-        $units = array_values(array_unique(array_map(static fn (array $s): string => (string) self::docUnit($s[0]['unit'] ?? null), $stone)));
+        $units = array_values(array_unique(array_map(static fn (array $s): string => (string) self::tableUnit($s[0], $names), $stone)));
         $mixed = count($units) > 1;
         $full = false;
         foreach ($stone as [$line]) {
@@ -303,10 +327,7 @@ final class LineTable
         $out['variant'] = $full ? 'full' : 'short';
         $out['mixed'] = $mixed;
         $out['unit'] = $mixed ? null : $units[0];
-        // Owner 18 Nov 2026 (Fix B, confirmed twice): a full table whose goods lines are all PCS leaves out
-        // "PCS per piece", "PCS all pcs" and "Price per PCS" (always "—", or a repeat of No. of pcs / per piece).
-        $out['pcs_only'] = $full && !$mixed && $units[0] === 'PCS';
-        $out['heads'] = self::heads($out['variant'], $mixed ? null : $units[0], $currency, $withPrices, $out['pcs_only']);
+        $out['heads'] = self::heads($out['variant'], $mixed ? null : $units[0], $currency, $withPrices);
         $out['colspan'] = count($out['heads']['bottom']) + 1;
 
         $pcsTotal = 0;
@@ -315,7 +336,9 @@ final class LineTable
         $amount = 0.0;
         $tbcNos = []; // D-388: the document line numbers whose quantity is still to be confirmed
         foreach ($stone as [$line, $f]) {
-            $u = (string) self::docUnit($line['unit'] ?? null);
+            $u = (string) self::tableUnit($line, $names);
+            // D-392: a PCS line printed in its product's pricing unit (CBM / SQM / SQFT) — worked out from the size.
+            $fromPcs = $u !== 'PCS' && self::docUnit($line['unit'] ?? null) === 'PCS';
             $suffix = static fn (string $v): string => $mixed && $v !== self::DASH ? $v . ' ' . $u : $v;
             $perAnnexure = $annexureLetter !== null && !empty($line['as_per_annexure']);
             $l = self::size($line['piece_length_cm'] ?? null);
@@ -326,26 +349,33 @@ final class LineTable
             $qty = $tbc ? null : (float) $line['quantity'];
             $price = $line['unit_price'] !== null && $line['unit_price'] !== '' ? (float) $line['unit_price'] : null;
             $hasSize = !$perAnnexure && $l !== null && $w !== null;
-            $per = $hasSize ? self::perPiece($line['unit'] ?? null, $l, $w, $h) : null;
-            if ($u === 'PCS' && $pieces === null && $qty !== null && !$perAnnexure) {
+            $per = $hasSize ? self::perPiece($fromPcs ? $u : ($line['unit'] ?? null), $l, $w, $h) : null;
+            if (($u === 'PCS' || $fromPcs) && $pieces === null && $qty !== null && !$perAnnexure) {
                 $pieces = (int) round($qty);
             }
-            if ($perAnnexure || !$hasSize && $u !== 'PCS') {
+            if ($perAnnexure || !$hasSize && $u !== 'PCS' && $u !== 'TON') {
                 $pieces = null;
             }
+            // D-392: a TON line — tons per piece = the line's tons ÷ No. of pcs (no stone weight is stored).
+            if ($u === 'TON') {
+                $per = $pieces !== null && $pieces > 0 && $qty !== null ? round($qty / $pieces, 3) : null;
+            }
+            // The quantity in the table's unit: a PCS line printed in CBM / SQM / SQFT counts its pieces' measure.
+            $measure = $fromPcs ? ($qty !== null && $per !== null && $pieces !== null ? round(round($per * $pieces, 6), self::ALL_DECIMALS[$u]) : null) : $qty;
             if ($pieces !== null) {
                 $pcsTotal += $pieces;
                 $pcsAny = true;
             }
-            if ($qty !== null) {
-                $byUnit[$u] = ($byUnit[$u] ?? 0.0) + $qty;
+            if ($measure !== null) {
+                $byUnit[$u] = ($byUnit[$u] ?? 0.0) + $measure;
             } else {
                 $tbcNos[] = (int) $f['no'];
             }
             if ($line['fob_value'] !== null && $line['fob_value'] !== '') {
                 $amount += (float) $line['fob_value'];
             }
-            $pricePiece = $u === 'PCS' ? $price : self::pricePerPiece($price, $per);
+            $priceUnit = $fromPcs ? ($price !== null && $per !== null && $per > 0 ? round($price / $per, 2) : null) : $price;
+            $pricePiece = $u === 'PCS' || $fromPcs ? $price : self::pricePerPiece($price, $per);
             $row = [
                 'no' => $f['no'],
                 'material' => $names[(int) ($line['id'] ?? 0)]['material'] ?? (string) $line['description'],
@@ -357,11 +387,11 @@ final class LineTable
                 'thickness' => !$perAnnexure && $h !== null ? LineUnits::num($h) : self::DASH,
                 'per_piece' => $per !== null ? $suffix(self::formatPerPiece($per, $u)) : self::DASH,
                 'pcs' => $pieces !== null ? number_format($pieces) : self::DASH,
-                'all_pcs' => $qty !== null ? $suffix(self::formatQuantity($qty, $u)) : 'To Be Confirmed',
+                'all_pcs' => $measure !== null ? $suffix(self::formatQuantity($measure, $u)) : 'To Be Confirmed',
                 // The short table's "Qty" (every unit, PCS included).
-                'qty' => $qty !== null ? $suffix(self::formatQuantity($qty, $u)) : 'To Be Confirmed',
+                'qty' => $measure !== null ? $suffix(self::formatQuantity($measure, $u)) : 'To Be Confirmed',
                 // D-343: money in Indian grouping on an INR order (1,75,000.00), as before in every other currency.
-                'price_unit' => $price !== null ? MoneyFormat::amount($price, $currency) . ($mixed ? ' /' . $u : '') : 'To Be Confirmed',
+                'price_unit' => $priceUnit !== null ? MoneyFormat::amount($priceUnit, $currency) . ($mixed ? ' /' . $u : '') : ($price !== null ? self::DASH : 'To Be Confirmed'),
                 'price_piece' => $pricePiece !== null && !$perAnnexure && ($per !== null || $u === 'PCS') ? MoneyFormat::amount($pricePiece, $currency) : self::DASH,
                 'total' => (string) ($f['amount'] ?? ''),
                 'crates' => self::crates($crateCounts, (string) $line['description']),
@@ -373,7 +403,7 @@ final class LineTable
             }
             $out['rows'][] = $row;
         }
-        $order = ['CBM', 'SQM', 'SQFT', 'PCS'];
+        $order = ['CBM', 'SQM', 'SQFT', 'TON', 'PCS'];
         $parts = [];
         foreach ($order as $u) {
             if (isset($byUnit[$u])) {
@@ -395,23 +425,12 @@ final class LineTable
      * The two header rows. 'top' and 'bottom' list the cells after "#"; a top cell
      * may span ('span') columns, and then the bottom row holds one cell per column.
      */
-    private static function heads(string $variant, ?string $unit, string $currency, bool $withPrices, bool $pcsOnly = false): array
+    private static function heads(string $variant, ?string $unit, string $currency, bool $withPrices): array
     {
         $measure = $unit ?? 'Measure';
         $per = $unit !== null ? 'per ' . $unit : 'per unit';
         $price = 'Price (' . $currency . ')';
-        if ($variant === 'full' && $pcsOnly) {
-            $top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], ['Qty', 1]];
-            $bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs'];
-            $widths = $withPrices ? [3, 24, 13, 7, 7, 7, 11, 13, 15] : [4, 30, 15, 9, 9, 9, 12, 12];
-            if ($withPrices) {
-                $top = array_merge($top, [[$price, 1], ['Total Price', 1]]);
-                $bottom = array_merge($bottom, ['per piece', '(' . $currency . ')']);
-            } else {
-                $top[] = ['Crates /', 1];
-                $bottom[] = 'Packages';
-            }
-        } elseif ($variant === 'full') {
+        if ($variant === 'full') {
             $top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], [$measure, 1], ['Qty', 1], [$measure, 1]];
             $bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs'];
             // Column widths (%) as the approved mockups; mixed units leave room for "0.1872 CBM".

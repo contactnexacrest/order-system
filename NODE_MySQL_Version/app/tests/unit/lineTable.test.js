@@ -28,7 +28,7 @@ function formatted(lines, currency = 'USD') {
     line_type: l.line_type, attributes: [], sac_code: null, dimensions: l.dimensions, finish: l.finish, hs_code: l.hs_code,
   }));
 }
-const build = (lines, currency = 'USD', letter = null, prices = true) => lineTable.build(lines, formatted(lines, currency), currency, letter, prices);
+const build = (lines, currency = 'USD', letter = null, prices = true, names = {}) => lineTable.build(lines, formatted(lines, currency), currency, letter, prices, {}, names);
 
 describe('D-339 detailed product table', () => {
   it('measures and rounding', () => {
@@ -80,27 +80,6 @@ describe('D-339 detailed product table', () => {
     expect(t.rows[0].price_piece).toBe('189.90');
   });
 
-  // Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS full table leaves out the three empty / repeated columns.
-  it('an all-PCS table leaves out the measure columns', () => {
-    const lines = [
-      line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', { finish: 'Natural Polish' }),
-      line(2, 'Absolute Black Granite', 'PCS', 120, 60, 13, 8, '8', '269.85', { finish: 'Natural Polish' }),
-    ];
-    const t = build(lines);
-    expect(t.pcs_only).toBe(true);
-    expect(t.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'per piece', '(USD)']);
-    expect(t.heads.top.map((x) => x.text)).toEqual(['Material', 'Surface', 'Dimensions (cm)', 'Qty', 'Price (USD)', 'Total Price']);
-    expect(t.heads.widths).toHaveLength(9);
-    expect(t.heads.widths.reduce((a, b) => a + b, 0)).toBe(100);
-    expect([t.rows[0].pcs, t.rows[0].price_piece]).toEqual(['25', '368.11']);
-    expect(t.total.pcs).toBe('33');
-    const pl = build(lines, 'USD', null, false);
-    expect(pl.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'Packages']);
-    expect(pl.heads.widths.reduce((a, b) => a + b, 0)).toBe(100);
-    expect(build([line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')]).pcs_only).toBe(false);
-    expect(build([lines[0], line(2, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')]).pcs_only).toBe(false);
-  });
-
   it('mixed units name their unit and total by unit', () => {
     const t = build([
       line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00'),
@@ -112,10 +91,39 @@ describe('D-339 detailed product table', () => {
     expect(t.heads.top[3].text).toBe('Measure');
     expect([t.rows[0].per_piece, t.rows[0].all_pcs, t.rows[0].price_unit, t.rows[0].price_piece]).toEqual(['0.1872 CBM', '4.680 CBM', '1,950.00 /CBM', '365.04']);
     expect([t.rows[1].per_piece, t.rows[1].all_pcs, t.rows[1].price_unit, t.rows[1].price_piece]).toEqual(['0.36 SQM', '180.00 SQM', '32.00 /SQM', '11.52']);
-    // PCS: no measure; the price per unit is the price per piece.
-    expect([t.rows[2].per_piece, t.rows[2].pcs, t.rows[2].all_pcs, t.rows[2].price_unit, t.rows[2].price_piece]).toEqual(['—', '20', '—', '85.00 /PCS', '85.00']);
+    // D-392: a PCS line with a size prints in its product's pricing unit (none given → CBM): 60×40×40 = 0.0960 CBM.
+    expect([t.rows[2].per_piece, t.rows[2].pcs, t.rows[2].all_pcs, t.rows[2].price_unit, t.rows[2].price_piece]).toEqual(['0.0960 CBM', '20', '1.920 CBM', '885.42 /CBM', '85.00']);
     expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['545', '', '16,586.00']);
-    expect(t.totals_by_unit).toBe('Totals by unit: 4.680 CBM · 180.00 SQM · 20 PCS');
+    expect(t.totals_by_unit).toBe('Totals by unit: 6.600 CBM · 180.00 SQM');
+  });
+
+  // Owner decision D-392 (18 Nov 2026, Mockups 5a–5e, confirmed twice).
+  it('D-392: the table follows the selected unit', () => {
+    const mon = line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', { finish: 'Natural Polish' });
+    let t = build([mon], 'USD', null, true, { 1: { ref_unit: 'CBM' } });
+    expect(t.mixed).toBe(false);
+    expect(t.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per CBM', 'per piece', '(USD)']);
+    expect([t.rows[0].per_piece, t.rows[0].pcs, t.rows[0].all_pcs, t.rows[0].price_unit, t.rows[0].price_piece, t.rows[0].total]).toEqual(['0.1274', '25', '3.185', '2,889.40', '368.11', '9,202.75']);
+    expect([t.total.pcs, t.total.measure, t.total.amount]).toEqual(['25', '3.185', '9,202.75']);
+    expect(build([mon]).rows[0].per_piece).toBe('0.1274');
+    const tile = line(1, 'Kashmir White Tile', 'PCS', 60, 60, 2, 500, '500', '11.61', { finish: 'Polished' });
+    t = build([tile], 'USD', null, true, { 1: { ref_unit: 'SQM' } });
+    expect([t.rows[0].per_piece, t.rows[0].pcs, t.rows[0].all_pcs, t.rows[0].price_unit, t.rows[0].price_piece, t.rows[0].total]).toEqual(['0.36', '500', '180.00', '32.25', '11.61', '5,805.00']);
+    expect(t.heads.bottom[8]).toBe('per SQM');
+    const block = line(1, 'CHM Black raw block', 'TON', 280, 170, 150, 3, '58.500', '230.00', { finish: 'Roughly trimmed' });
+    t = build([block]);
+    expect(t.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per TON', 'per piece', '(USD)']);
+    expect([t.rows[0].per_piece, t.rows[0].pcs, t.rows[0].all_pcs, t.rows[0].price_unit, t.rows[0].price_piece, t.rows[0].total]).toEqual(['19.500', '3', '58.500', '230.00', '4,485.00', '13,455.00']);
+    expect([t.total.pcs, t.total.measure]).toEqual(['3', '58.500']);
+    t = build([line(1, 'CHM Black raw block', 'TON', 280, 170, 150, null, '58.500', '230.00')]);
+    expect([t.rows[0].per_piece, t.rows[0].pcs, t.rows[0].all_pcs, t.rows[0].price_piece]).toEqual(['—', '—', '58.500', '—']);
+    const cbm = line(1, 'Absolute Black Granite', 'CBM', 180, 80, 13, 25, '4.680', '2882.97');
+    t = build([cbm, { ...mon, id: 2 }, { ...block, id: 3 }], 'USD', null, true, { 2: { ref_unit: 'CBM' } });
+    expect(t.mixed).toBe(true);
+    expect([t.rows[1].per_piece, t.rows[1].all_pcs, t.rows[1].price_unit]).toEqual(['0.1274 CBM', '3.185 CBM', '2,889.40 /CBM']);
+    expect([t.rows[2].per_piece, t.rows[2].all_pcs, t.rows[2].price_unit]).toEqual(['19.500 TON', '58.500 TON', '230.00 /TON']);
+    expect(t.totals_by_unit).toBe('Totals by unit: 7.865 CBM · 58.500 TON');
+    expect(build([line(1, 'Granite Headstone', 'PCS', null, null, null, null, '10', '100.00')]).variant).toBe('short');
   });
 
   it('no size gives the short table with the size note', () => {

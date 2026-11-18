@@ -262,16 +262,19 @@ describe('D-380 / D-386 / D-387 / D-388 documents (owner, 18 Nov 2026)', () => {
     }
   });
 
-  // Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS detailed table prints without the empty / repeated columns.
-  it('Fix B: an all-PCS table in PDF and Word', async () => {
+  // D-392 (owner 18 Nov 2026, Mockups 5a–5e, confirmed twice): a PCS line prints in CBM; a TON line in tons — PDF and Word.
+  it('D-392: the table follows the unit in PDF and Word', async () => {
     const orderId = await order('detailed');
-    const line = await orderProductRepository.add(orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
-    await db.query('UPDATE order_products SET piece_length_cm = 140, piece_width_cm = 70, piece_thickness_cm = 13, pieces_count = 25 WHERE id = ?', [Number(line.id || line)]);
-    expect((await documentDataAssembler.assemble(orderId, 'QT')).line_table.pcs_only).toBe(true);
+    const mon = await orderProductRepository.add(orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
+    const blk = await orderProductRepository.add(orderId, 2, 'CHM Black raw block', null, 'Roughly trimmed', '58.500', false, 'TON', '230.00', '25161100');
+    const up = 'UPDATE order_products SET piece_length_cm = ?, piece_width_cm = ?, piece_thickness_cm = ?, pieces_count = ? WHERE id = ?';
+    await db.query(up, [140, 70, 13, 25, Number(mon.id || mon)]);
+    await db.query(up, [280, 170, 150, 3, Number(blk.id || blk)]);
+    const lt = (await documentDataAssembler.assemble(orderId, 'QT')).line_table;
+    expect([lt.rows[0].per_piece, lt.rows[0].all_pcs, lt.rows[0].price_unit]).toEqual(['0.1274 CBM', '3.185 CBM', '2,889.40 /CBM']);
+    expect([lt.rows[1].per_piece, lt.rows[1].all_pcs, lt.rows[1].price_piece]).toEqual(['19.500 TON', '58.500 TON', '4,485.00']);
     for (const [format, text] of Object.entries(await generate(orderId, 'QT'))) {
-      has(`QT ${format}`, text, 'No. of pcs');
-      expect([`QT ${format}`, text.includes('per PCS'), text.includes('all pcs')]).toEqual([`QT ${format}`, false, false]);
-      has(`QT ${format}`, text, '9,202.75');
+      for (const want of ['0.1274 CBM', '2,889.40 /CBM', '19.500 TON', '58.500 TON', '3.185 CBM · 58.500 TON']) has(`QT ${format}: ${want}`, text, want);
     }
   });
 

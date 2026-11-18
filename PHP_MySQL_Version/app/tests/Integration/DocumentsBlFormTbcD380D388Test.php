@@ -272,19 +272,22 @@ final class DocumentsBlFormTbcD380D388Test extends DbTestCase
         }
     }
 
-    /** Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS detailed table prints without the empty / repeated columns. */
-    public function testFixBAllPcsTableInPdfAndWord(): void
+    /** D-392 (owner 18 Nov 2026, Mockups 5a–5e, confirmed twice): a PCS line prints in CBM; a TON line in tons — PDF and Word. */
+    public function testD392TableFollowsTheUnitInPdfAndWord(): void
     {
         $orderId = $this->order('detailed');
-        $line = OrderProductRepository::add($orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
-        Database::connection()->prepare('UPDATE order_products SET piece_length_cm = 140, piece_width_cm = 70, piece_thickness_cm = 13, pieces_count = 25 WHERE id = :id')
-            ->execute(['id' => $line]);
-        self::assertTrue(DocumentDataAssembler::assemble($orderId, 'QT')['line_table']['pcs_only']);
+        $mon = OrderProductRepository::add($orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
+        $blk = OrderProductRepository::add($orderId, 2, 'CHM Black raw block', null, 'Roughly trimmed', '58.500', false, 'TON', '230.00', '25161100');
+        $up = Database::connection()->prepare('UPDATE order_products SET piece_length_cm = :l, piece_width_cm = :w, piece_thickness_cm = :h, pieces_count = :p WHERE id = :id');
+        $up->execute(['l' => 140, 'w' => 70, 'h' => 13, 'p' => 25, 'id' => $mon]);
+        $up->execute(['l' => 280, 'w' => 170, 'h' => 150, 'p' => 3, 'id' => $blk]);
+        $lt = DocumentDataAssembler::assemble($orderId, 'QT')['line_table'];
+        self::assertSame(['0.1274 CBM', '3.185 CBM', '2,889.40 /CBM'], [$lt['rows'][0]['per_piece'], $lt['rows'][0]['all_pcs'], $lt['rows'][0]['price_unit']]);
+        self::assertSame(['19.500 TON', '58.500 TON', '4,485.00'], [$lt['rows'][1]['per_piece'], $lt['rows'][1]['all_pcs'], $lt['rows'][1]['price_piece']]);
         foreach ($this->generate($orderId, 'QT') as $format => $text) {
-            self::assertStringContainsString('No. of pcs', $text, "QT {$format}");
-            self::assertStringNotContainsString('per PCS', $text, "QT {$format}");
-            self::assertStringNotContainsString('all pcs', $text, "QT {$format}");
-            self::assertStringContainsString('9,202.75', $text, "QT {$format}");
+            foreach (['0.1274 CBM', '2,889.40 /CBM', '19.500 TON', '58.500 TON', '3.185 CBM · 58.500 TON'] as $want) {
+                self::assertStringContainsString($want, $text, "QT {$format}: {$want}");
+            }
         }
     }
 

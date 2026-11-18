@@ -41,9 +41,9 @@ final class LineTableTest extends TestCase
         ], $lines);
     }
 
-    private static function build(array $lines, string $currency = 'USD', ?string $letter = null, bool $prices = true): array
+    private static function build(array $lines, string $currency = 'USD', ?string $letter = null, bool $prices = true, array $names = []): array
     {
-        return LineTable::build($lines, self::formatted($lines, $currency), $currency, $letter, $prices);
+        return LineTable::build($lines, self::formatted($lines, $currency), $currency, $letter, $prices, [], $names);
     }
 
     public function testMeasuresAndRounding(): void
@@ -102,30 +102,6 @@ final class LineTableTest extends TestCase
         self::assertSame('189.90', $t['rows'][0]['price_piece']);
     }
 
-    /** Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS full table leaves out the three empty / repeated columns. */
-    public function testAnAllPcsTableLeavesOutTheMeasureColumns(): void
-    {
-        $lines = [
-            self::line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', ['finish' => 'Natural Polish']),
-            self::line(2, 'Absolute Black Granite', 'PCS', 120, 60, 13, 8, '8', '269.85', ['finish' => 'Natural Polish']),
-        ];
-        $t = self::build($lines);
-        self::assertTrue($t['pcs_only']);
-        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'per piece', '(USD)'], $t['heads']['bottom']);
-        self::assertSame(['Material', 'Surface', 'Dimensions (cm)', 'Qty', 'Price (USD)', 'Total Price'], array_column($t['heads']['top'], 'text'));
-        self::assertCount(9, $t['heads']['widths']);
-        self::assertSame(100, array_sum($t['heads']['widths']));
-        self::assertSame(['25', '368.11'], [$t['rows'][0]['pcs'], $t['rows'][0]['price_piece']]);
-        self::assertSame('33', $t['total']['pcs']);
-        // The Packing List (no prices): # · Material · Surface · L W H · No. of pcs · Crates / Packages.
-        $pl = self::build($lines, 'USD', null, false);
-        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'Packages'], $pl['heads']['bottom']);
-        self::assertSame(100, array_sum($pl['heads']['widths']));
-        // A CBM table and a mixed table are unchanged.
-        self::assertFalse(self::build([self::line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')])['pcs_only']);
-        self::assertFalse(self::build([$lines[0], self::line(2, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')])['pcs_only']);
-    }
-
     public function testMixedUnitsNameTheirUnitAndTotalByUnit(): void
     {
         $t = self::build([
@@ -138,10 +114,53 @@ final class LineTableTest extends TestCase
         self::assertSame('Measure', $t['heads']['top'][3]['text']);
         self::assertSame(['0.1872 CBM', '4.680 CBM', '1,950.00 /CBM', '365.04'], [$t['rows'][0]['per_piece'], $t['rows'][0]['all_pcs'], $t['rows'][0]['price_unit'], $t['rows'][0]['price_piece']]);
         self::assertSame(['0.36 SQM', '180.00 SQM', '32.00 /SQM', '11.52'], [$t['rows'][1]['per_piece'], $t['rows'][1]['all_pcs'], $t['rows'][1]['price_unit'], $t['rows'][1]['price_piece']]);
-        // PCS: no measure; the price per unit is the price per piece.
-        self::assertSame(['—', '20', '—', '85.00 /PCS', '85.00'], [$t['rows'][2]['per_piece'], $t['rows'][2]['pcs'], $t['rows'][2]['all_pcs'], $t['rows'][2]['price_unit'], $t['rows'][2]['price_piece']]);
+        // D-392: a PCS line with a size prints in its product's pricing unit (none given → CBM): 60×40×40 = 0.0960 CBM.
+        self::assertSame(['0.0960 CBM', '20', '1.920 CBM', '885.42 /CBM', '85.00'], [$t['rows'][2]['per_piece'], $t['rows'][2]['pcs'], $t['rows'][2]['all_pcs'], $t['rows'][2]['price_unit'], $t['rows'][2]['price_piece']]);
         self::assertSame(['545', '', '16,586.00'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
-        self::assertSame('Totals by unit: 4.680 CBM · 180.00 SQM · 20 PCS', $t['totals_by_unit']);
+        self::assertSame('Totals by unit: 6.600 CBM · 180.00 SQM', $t['totals_by_unit']);
+    }
+
+    /** Owner decision D-392 (18 Nov 2026, Mockups 5a–5e, confirmed twice). */
+    public function testD392TheTableFollowsTheSelectedUnit(): void
+    {
+        // 5b: PCS, product priced per CBM → the whole CBM table (the line total is the line's own amount).
+        $mon = self::line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', ['finish' => 'Natural Polish', 'catalog_product_id' => 7]);
+        $t = self::build([$mon], 'USD', null, true, [1 => ['ref_unit' => 'CBM']]);
+        self::assertFalse($t['mixed']);
+        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per CBM', 'per piece', '(USD)'], $t['heads']['bottom']);
+        self::assertSame(['0.1274', '25', '3.185', '2,889.40', '368.11', '9,202.75'],
+            [$t['rows'][0]['per_piece'], $t['rows'][0]['pcs'], $t['rows'][0]['all_pcs'], $t['rows'][0]['price_unit'], $t['rows'][0]['price_piece'], $t['rows'][0]['total']]);
+        self::assertSame(['25', '3.185', '9,202.75'], [$t['total']['pcs'], $t['total']['measure'], $t['total']['amount']]);
+        // No pricing unit on the product → CBM too.
+        self::assertSame('0.1274', self::build([$mon])['rows'][0]['per_piece']);
+        // 5c: PCS, product priced per SQM → the SQM table.
+        $tile = self::line(1, 'Kashmir White Tile', 'PCS', 60, 60, 2, 500, '500', '11.61', ['finish' => 'Polished']);
+        $t = self::build([$tile], 'USD', null, true, [1 => ['ref_unit' => 'SQM']]);
+        self::assertSame(['0.36', '500', '180.00', '32.25', '11.61', '5,805.00'],
+            [$t['rows'][0]['per_piece'], $t['rows'][0]['pcs'], $t['rows'][0]['all_pcs'], $t['rows'][0]['price_unit'], $t['rows'][0]['price_piece'], $t['rows'][0]['total']]);
+        self::assertSame('per SQM', $t['heads']['bottom'][8]);
+        // 5d: TON — tons per piece = tons ÷ pieces; no stone weight stored.
+        $block = self::line(1, 'CHM Black raw block', 'TON', 280, 170, 150, 3, '58.500', '230.00', ['finish' => 'Roughly trimmed']);
+        $t = self::build([$block]);
+        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs', 'per TON', 'per piece', '(USD)'], $t['heads']['bottom']);
+        self::assertSame(['19.500', '3', '58.500', '230.00', '4,485.00', '13,455.00'],
+            [$t['rows'][0]['per_piece'], $t['rows'][0]['pcs'], $t['rows'][0]['all_pcs'], $t['rows'][0]['price_unit'], $t['rows'][0]['price_piece'], $t['rows'][0]['total']]);
+        self::assertSame(['3', '58.500'], [$t['total']['pcs'], $t['total']['measure']]);
+        // A TON line without pieces: dashes per piece, the tons still print.
+        $t = self::build([self::line(1, 'CHM Black raw block', 'TON', 280, 170, 150, null, '58.500', '230.00')]);
+        self::assertSame(['—', '—', '58.500', '—'], [$t['rows'][0]['per_piece'], $t['rows'][0]['pcs'], $t['rows'][0]['all_pcs'], $t['rows'][0]['price_piece']]);
+        // 5e: mixed CBM + PCS monument (counts as CBM) + TON.
+        $cbm = self::line(1, 'Absolute Black Granite', 'CBM', 180, 80, 13, 25, '4.680', '2882.97');
+        $mon['id'] = 2;
+        $block['id'] = 3;
+        $t = self::build([$cbm, $mon, $block], 'USD', null, true, [2 => ['ref_unit' => 'CBM']]);
+        self::assertTrue($t['mixed']);
+        self::assertSame(['0.1274 CBM', '3.185 CBM', '2,889.40 /CBM'], [$t['rows'][1]['per_piece'], $t['rows'][1]['all_pcs'], $t['rows'][1]['price_unit']]);
+        self::assertSame(['19.500 TON', '58.500 TON', '230.00 /TON'], [$t['rows'][2]['per_piece'], $t['rows'][2]['all_pcs'], $t['rows'][2]['price_unit']]);
+        self::assertSame('Totals by unit: 7.865 CBM · 58.500 TON', $t['totals_by_unit']);
+        // A PCS line without a size stays PCS ("—" for the measure), as before.
+        $t = self::build([self::line(1, 'Granite Headstone', 'PCS', null, null, null, null, '10', '100.00')]);
+        self::assertSame('short', $t['variant']);
     }
 
     public function testNoSizeGivesTheShortTableWithTheSizeNote(): void

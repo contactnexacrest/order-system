@@ -39,9 +39,9 @@ const DOCUMENTS = ['QT', 'PI', 'OC', 'CI', 'BUYERPO', 'PL'];
 /** lineUnits kind => the unit code the documents print. */
 const DOC_UNITS = { CBM: 'CBM', M2: 'SQM', SQFT: 'SQFT', PCS: 'PCS' };
 /** Decimals of the measure of all pieces (the line quantity) per document unit. */
-const ALL_DECIMALS = { CBM: 3, SQM: 2, SQFT: 2, PCS: 0 };
+const ALL_DECIMALS = { CBM: 3, SQM: 2, SQFT: 2, PCS: 0, TON: 3 };
 /** Decimals shown for the measure of one piece. */
-const PIECE_DECIMALS = { CBM: 4, SQM: 2, SQFT: 2 };
+const PIECE_DECIMALS = { CBM: 4, SQM: 2, SQFT: 2, TON: 3 };
 
 const DASH = '—';
 
@@ -72,6 +72,23 @@ function docUnit(unit) {
 }
 
 /** A unit worked out from the piece size (CBM, SQM, SQFT). */
+/**
+ * Owner decision D-392 (18 Nov 2026, confirmed twice): the unit a line prints in on the documents.
+ * CBM / SQM / SQFT as selected; TON as selected (tons per piece = tons ÷ pieces); a PCS line with a size in
+ * its product's pricing unit (catalog_products.reference_unit: CBM / SQM / SQFT, else CBM) — PCS only when
+ * that measure cannot be worked out from the size. Null for units not printed in the table (RMT, Set, Lot …).
+ * PHP twin: LineTable::tableUnit().
+ */
+function tableUnit(line, names = {}) {
+  if (lineUnits.canonical(line.unit) === 'TON') return 'TON';
+  const u = docUnit(line.unit);
+  if (u !== 'PCS') return u;
+  const ref = docUnit((names[Number(line.id || 0)] || {}).ref_unit ?? null);
+  const measure = ['CBM', 'SQM', 'SQFT'].includes(ref) ? ref : 'CBM';
+  const per = perPiece(measure, size(line.piece_length_cm), size(line.piece_width_cm), size(line.piece_thickness_cm));
+  return per !== null && !Number(line.as_per_annexure || 0) ? measure : 'PCS';
+}
+
 function isMeasureUnit(unit) {
   const u = docUnit(unit);
   return u !== null && u !== 'PCS';
@@ -235,25 +252,14 @@ function totalCbm(lines) {
  * The two header rows. 'top' and 'bottom' list the cells after "#"; a top cell
  * may span ('span') columns, and then the bottom row holds one cell per column.
  */
-function heads(variant, unit, currency, withPrices, pcsOnly = false) {
+function heads(variant, unit, currency, withPrices) {
   const measure = unit ?? 'Measure';
   const per = unit !== null ? `per ${unit}` : 'per unit';
   const price = `Price (${currency})`;
   let top;
   let bottom;
   let widths;
-  if (variant === 'full' && pcsOnly) {
-    top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], ['Qty', 1]];
-    bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs'];
-    widths = withPrices ? [3, 24, 13, 7, 7, 7, 11, 13, 15] : [4, 30, 15, 9, 9, 9, 12, 12];
-    if (withPrices) {
-      top = top.concat([[price, 1], ['Total Price', 1]]);
-      bottom = bottom.concat(['per piece', `(${currency})`]);
-    } else {
-      top.push(['Crates /', 1]);
-      bottom.push('Packages');
-    }
-  } else if (variant === 'full') {
+  if (variant === 'full') {
     top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], [measure, 1], ['Qty', 1], [measure, 1]];
     bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs'];
     // Column widths (%) as the approved mockups; mixed units leave room for "0.1872 CBM".
@@ -347,15 +353,15 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
   const simple = [];
   lines.forEach((line, i) => {
     const f = { ...formatted[i], no: i + 1 };
-    if ((line.line_type || 'goods') === 'goods' && docUnit(line.unit) !== null) stone.push([line, f]);
+    if ((line.line_type || 'goods') === 'goods' && tableUnit(line, names) !== null) stone.push([line, f]);
     else simple.push(f);
   });
   const out = {
-    variant: 'none', pcs_only: false, mixed: false, unit: null, currency, with_prices: withPrices,
+    variant: 'none', mixed: false, unit: null, currency, with_prices: withPrices,
     heads: {}, rows: [], total: null, totals_by_unit: null, simple, colspan: 0,
   };
   if (stone.length === 0) return out;
-  const units = [...new Set(stone.map(([l]) => docUnit(l.unit)))];
+  const units = [...new Set(stone.map(([l]) => tableUnit(l, names)))];
   const mixed = units.length > 1;
   let full = false;
   for (const [line] of stone) {
@@ -365,10 +371,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
   out.variant = full ? 'full' : 'short';
   out.mixed = mixed;
   out.unit = mixed ? null : units[0];
-  // Owner 18 Nov 2026 (Fix B, confirmed twice): a full table whose goods lines are all PCS leaves out
-  // "PCS per piece", "PCS all pcs" and "Price per PCS" (always "—", or a repeat of No. of pcs / per piece).
-  out.pcs_only = full && !mixed && units[0] === 'PCS';
-  out.heads = heads(out.variant, mixed ? null : units[0], currency, withPrices, out.pcs_only);
+  out.heads = heads(out.variant, mixed ? null : units[0], currency, withPrices);
   out.colspan = out.heads.bottom.length + 1;
 
   let pcsTotal = 0;
@@ -377,7 +380,9 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
   let amount = 0;
   const tbcNos = []; // D-388: the document line numbers whose quantity is still to be confirmed
   for (const [line, f] of stone) {
-    const u = docUnit(line.unit);
+    const u = tableUnit(line, names);
+    // D-392: a PCS line printed in its product's pricing unit (CBM / SQM / SQFT) — worked out from the size.
+    const fromPcs = u !== 'PCS' && docUnit(line.unit) === 'PCS';
     const suffix = (v) => (mixed && v !== DASH ? `${v} ${u}` : v);
     const perAnnexure = annexureLetter !== null && Number(line.as_per_annexure || 0) === 1;
     const l = size(line.piece_length_cm);
@@ -388,17 +393,22 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
     const qty = tbc ? null : Number(line.quantity);
     const price = line.unit_price !== null && line.unit_price !== undefined && line.unit_price !== '' ? Number(line.unit_price) : null;
     const hasSize = !perAnnexure && l !== null && w !== null;
-    const per = hasSize ? perPiece(line.unit, l, w, h) : null;
-    if (u === 'PCS' && pieces === null && qty !== null && !perAnnexure) pieces = Math.round(qty);
-    if (perAnnexure || (!hasSize && u !== 'PCS')) pieces = null;
+    let per = hasSize ? perPiece(fromPcs ? u : line.unit, l, w, h) : null;
+    if ((u === 'PCS' || fromPcs) && pieces === null && qty !== null && !perAnnexure) pieces = Math.round(qty);
+    if (perAnnexure || (!hasSize && u !== 'PCS' && u !== 'TON')) pieces = null;
+    // D-392: a TON line — tons per piece = the line's tons ÷ No. of pcs (no stone weight is stored).
+    if (u === 'TON') per = pieces !== null && pieces > 0 && qty !== null ? roundTo(qty / pieces, 3) : null;
+    // The quantity in the table's unit: a PCS line printed in CBM / SQM / SQFT counts its pieces' measure.
+    const measure = fromPcs ? (qty !== null && per !== null && pieces !== null ? roundTo(roundTo(per * pieces, 6), ALL_DECIMALS[u]) : null) : qty;
     if (pieces !== null) {
       pcsTotal += pieces;
       pcsAny = true;
     }
-    if (qty !== null) byUnit[u] = (byUnit[u] || 0) + qty;
+    if (measure !== null) byUnit[u] = (byUnit[u] || 0) + measure;
     else tbcNos.push(Number(f.no));
     if (line.fob_value !== null && line.fob_value !== undefined && line.fob_value !== '') amount += Number(line.fob_value);
-    const pricePiece = u === 'PCS' ? price : pricePerPiece(price, per);
+    const priceUnit = fromPcs ? (price !== null && per !== null && per > 0 ? roundTo(price / per, 2) : null) : price;
+    const pricePiece = u === 'PCS' || fromPcs ? price : pricePerPiece(price, per);
     const nm = names[Number(line.id || 0)] || {};
     const row = {
       no: f.no,
@@ -411,11 +421,11 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
       thickness: !perAnnexure && h !== null ? lineUnits.num(h) : DASH,
       per_piece: per !== null ? suffix(formatPerPiece(per, u)) : DASH,
       pcs: pieces !== null ? fmt(pieces, 0) : DASH,
-      all_pcs: qty !== null ? suffix(formatQuantity(qty, u)) : 'To Be Confirmed',
+      all_pcs: measure !== null ? suffix(formatQuantity(measure, u)) : 'To Be Confirmed',
       // The short table's "Qty" (every unit, PCS included).
-      qty: qty !== null ? suffix(formatQuantity(qty, u)) : 'To Be Confirmed',
+      qty: measure !== null ? suffix(formatQuantity(measure, u)) : 'To Be Confirmed',
       // D-343: money in Indian grouping on an INR order (1,75,000.00), as before in every other currency.
-      price_unit: price !== null ? money(price, currency) + (mixed ? ` /${u}` : '') : 'To Be Confirmed',
+      price_unit: priceUnit !== null ? money(priceUnit, currency) + (mixed ? ` /${u}` : '') : (price !== null ? DASH : 'To Be Confirmed'),
       price_piece: pricePiece !== null && !perAnnexure && (per !== null || u === 'PCS') ? money(pricePiece, currency) : DASH,
       total: String(f.amount ?? ''),
       crates: crates(crateCounts, line.description),
@@ -428,7 +438,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
     out.rows.push(row);
   }
   const parts = [];
-  for (const u of ['CBM', 'SQM', 'SQFT', 'PCS']) {
+  for (const u of ['CBM', 'SQM', 'SQFT', 'TON', 'PCS']) {
     if (byUnit[u] !== undefined) parts.push(`${formatQuantity(byUnit[u], u)} ${u}`);
   }
   out.total = {
@@ -444,6 +454,6 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
 
 module.exports = {
   LAYOUT_CLASSIC, LAYOUT_DETAILED, DOCUMENTS, DASH,
-  roundTo, docUnit, isMeasureUnit, perPiece, quantityDecimals, needsPieces, quantityFromPieces, pricePerPiece,
+  roundTo, docUnit, tableUnit, isMeasureUnit, perPiece, quantityDecimals, needsPieces, quantityFromPieces, pricePerPiece,
   readPieces, readSizeNote, serverQuantity, formatPerPiece, formatQuantity, summary, build, totalCbm, tbcTotal,
 };

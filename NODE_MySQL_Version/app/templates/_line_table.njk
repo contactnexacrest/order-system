@@ -46,17 +46,11 @@
     <td{% if r.w == '—' %} class="na"{% endif %}>{{ r.w }}</td>
     <td{% if r.h == '—' %} class="na"{% endif %}>{{ r.h }}</td>
       {% endif %}
-      {% if not lt.pcs_only %}
     <td{% if r.per_piece == '—' %} class="na"{% endif %}>{{ r.per_piece }}</td>
-      {% endif %}
     <td{% if r.pcs == '—' %} class="na"{% endif %}>{{ r.pcs }}</td>
-      {% if not lt.pcs_only %}
     <td{% if r.all_pcs == '—' %} class="na"{% endif %}>{{ r.all_pcs }}</td>
-      {% endif %}
       {% if lt.with_prices %}
-      {% if not lt.pcs_only %}
     <td>{{ r.price_unit }}</td>
-      {% endif %}
     <td{% if r.price_piece == '—' %} class="na"{% endif %}>{{ r.price_piece }}</td>
     <td>{{ r.total }}</td>
       {% else %}
@@ -84,13 +78,7 @@
   </tr>
   {% endif %}
   {% endfor %}
-  {% if lt.variant == 'full' and lt.pcs_only %}
-  <tr class="tot">
-    <td colspan="6" style="text-align:left;">TOTAL</td>
-    <td>{{ lt.total.pcs }}</td>
-    {% if lt.with_prices %}<td></td><td>{{ lt.total.amount }}</td>{% else %}<td></td>{% endif %}
-  </tr>
-  {% elif lt.variant == 'full' %}
+  {% if lt.variant == 'full' %}
   <tr class="tot">
     <td colspan="7" style="text-align:left;">TOTAL</td>
     <td>{{ lt.total.pcs }}</td>

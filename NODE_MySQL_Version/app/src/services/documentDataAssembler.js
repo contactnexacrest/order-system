@@ -439,10 +439,17 @@ async function lineTableBlock(order, products, formatted, documentTypeCode, anne
       if (key !== '') crateCounts[key] = (crateCounts[key] || 0) + 1;
     }
   }
+  // D-392: each picked product's pricing unit — a PCS line prints in it (CBM / SQM / SQFT).
+  const refUnits = {};
+  const catIds = [...new Set(products.map((p) => Number(p.catalog_product_id || 0)).filter((n) => n > 0))];
+  if (catIds.length) {
+    const rows = await db.query(`SELECT id, reference_unit FROM catalog_products WHERE id IN (${catIds.map((n) => Number(n)).join(',')})`);
+    for (const r of rows) refUnits[Number(r.id)] = r.reference_unit;
+  }
   const names = {};
   for (const p of products) {
     // D-386: the line's form for the grey line (set only on the QT / PI / OC / CI).
-    names[Number(p.id)] = { ...(await lineNames(p)), form: formNames[Number(p.id)] ?? null };
+    names[Number(p.id)] = { ...(await lineNames(p)), form: formNames[Number(p.id)] ?? null, ref_unit: refUnits[Number(p.catalog_product_id || 0)] ?? null };
   }
   return lineTable.build(products, formatted, String(order.currency_code || ''), annexureLetter, code !== 'PL', crateCounts, names);
 }

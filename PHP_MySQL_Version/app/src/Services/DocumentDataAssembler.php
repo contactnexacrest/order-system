@@ -496,10 +496,19 @@ final class DocumentDataAssembler
                 }
             }
         }
+        // D-392: each picked product's pricing unit — a PCS line prints in it (CBM / SQM / SQFT).
+        $refUnits = [];
+        $catIds = array_values(array_unique(array_filter(array_map(static fn (array $p): int => (int) ($p['catalog_product_id'] ?? 0), $products))));
+        if ($catIds !== []) {
+            $st = \App\Config\Database::connection()->query('SELECT id, reference_unit FROM catalog_products WHERE id IN (' . implode(',', array_map('intval', $catIds)) . ')');
+            foreach ($st->fetchAll() as $r) {
+                $refUnits[(int) $r['id']] = $r['reference_unit'];
+            }
+        }
         $names = [];
         foreach ($products as $p) {
             // D-386: the line's form for the grey line (set only on the QT / PI / OC / CI).
-            $names[(int) $p['id']] = self::lineNames($p) + ['form' => $formNames[(int) $p['id']] ?? null];
+            $names[(int) $p['id']] = self::lineNames($p) + ['form' => $formNames[(int) $p['id']] ?? null, 'ref_unit' => $refUnits[(int) ($p['catalog_product_id'] ?? 0)] ?? null];
         }
         return LineTable::build(array_values($products), array_values($formatted), (string) ($order['currency_code'] ?? ''), $annexureLetter, $code !== 'PL', $crateCounts, $names);
     }
