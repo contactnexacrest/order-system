@@ -451,6 +451,13 @@ final class ProductFormsD382Test extends DbTestCase
         self::assertStringContainsString('class="sold-as-select"', $page);
         self::assertStringContainsString('data-sold-as="', $page);
         self::assertStringContainsString('data-unit-kind="TON"', $page);
+        // The MD gets "Change HS code" beside the HS line (it opens More and focuses the HS Code box) …
+        self::assertStringContainsString('<button type="button" class="btn-link" data-change-hs>Change HS code</button>', $page);
+        // … staff without the permission do not.
+        $this->actAs($sales);
+        $staffPage = $this->capture(fn () => (new OrderController())->show(['id' => (string) $orderId]));
+        self::assertStringContainsString('class="sold-as-select"', $staffPage);
+        self::assertStringNotContainsString('data-change-hs>Change HS code</button>', $staffPage);
     }
 
     public function testWithASoldAsWhatTheLineNeedsFollowsItsUnitAndD348StaysForLinesWithout(): void

@@ -32,7 +32,7 @@
   </select>
 </label>
 <p class="muted small sold-as-hs" data-sold-as-hs aria-live="polite"{% if saSelected <= 0 %} hidden{% endif %}>HS code: <b data-sold-as-hs-code>{{ saLine.hs_code or '' }}</b>
-  <span class="tag" data-sold-as-hs-tag>{{ 'changed by MD/ED' if ((saLine.hs_override_reason or '') | trim) else 'from specification' }}</span>{% if canOverrideHs %} <span class="muted">— you may type another code in More › HS Code, with a reason.</span>{% endif %}</p>
+  <span class="tag" data-sold-as-hs-tag>{{ 'changed by MD/ED' if ((saLine.hs_override_reason or '') | trim) else 'from specification' }}</span>{% if canOverrideHs %} <button type="button" class="btn-link" data-change-hs>Change HS code</button> <span class="muted">(with a reason)</span>{% endif %}</p>
 {% if canOverrideHs %}
 <label class="hs-override-reason" data-hs-override-reason{% if not ((soldAsReason or '') | trim) %} hidden{% endif %}>Reason for changing the HS code
   <input type="text" name="{{ soldAsReasonName }}" maxlength="500" value="{{ soldAsReason or '' }}" placeholder="e.g. Buyer's customs classify these as worked monuments" data-required-message="Give the reason for changing the HS code from its specification."></label>

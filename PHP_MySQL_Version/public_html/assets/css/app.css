@@ -1015,6 +1015,8 @@ ul.ready-list .ready-actions { display: inline-flex; flex-wrap: wrap; gap: .35re
 .spec-auto-note[hidden]{display:none}
 /* D-357: the hand-typed line's Finish box, hidden for a line picked from Products */
 [data-finish-box][hidden],[data-finish-note][hidden]{display:none}
+/* D-385: the HS-code reason box and HS line stay hidden until needed (label display would show them) */
+.hs-override-reason[hidden],.sold-as-hs[hidden]{display:none}
 .size-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .line-total-box{display:flex;flex-direction:column;justify-content:flex-end}
 .line-total-box output{font-weight:700;padding:6px 0}

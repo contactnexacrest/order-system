@@ -494,6 +494,21 @@
       document.querySelectorAll('select.sold-as-select').forEach(function (s) { soldAsRequired(s.closest('.product-row') || s.closest('form')); });
     }
   });
+  // "Change HS code" beside the Sold as HS line (MD / ED only): opens the line's More section and
+  // puts the cursor in its HS Code box, so the code can be typed (the reason box then appears).
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-change-hs]') : null;
+    if (!b) { return; }
+    e.preventDefault();
+    var scope = b.closest('.product-row') || b.closest('form');
+    var hs = scope ? field(scope, 'hs_code') : null;
+    if (!hs) { return; }
+    var more = hs.closest('details');
+    if (more) { more.open = true; }
+    hs.scrollIntoView({ block: 'center' });
+    hs.focus();
+    hs.select();
+  });
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t && t.classList && t.classList.contains('line-hs-code')) { hsReason(t.closest('.product-row') || t.closest('form')); }

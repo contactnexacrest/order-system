@@ -108,10 +108,13 @@ test.describe.serial('Forms of stone, Specifications (HS), Sold as — as a pers
     await page.locator('input[name="product_quantity[]"]').first().fill('50');
 
     // The MD types another HS code: the reason box appears and is required.
+    // Until the code changes, no reason box shows.
+    await expect(page.locator('[data-hs-override-reason]').first()).toBeHidden();
+    // The MD clicks "Change HS code": the HS Code box (inside More on the order page) gets the cursor.
     const hs = page.locator('input[name="product_hs_code[]"]').first();
-    if (!(await hs.isVisible())) {
-      await page.locator('details', { has: hs }).first().locator('summary').click();
-    }
+    await page.locator('[data-change-hs]').first().click();
+    await expect(hs).toBeVisible();
+    await expect(hs).toBeFocused();
     await hs.fill('68029300');
     await hs.dispatchEvent('change');
     const reason = page.locator('input[name="product_hs_override_reason[]"]').first();
