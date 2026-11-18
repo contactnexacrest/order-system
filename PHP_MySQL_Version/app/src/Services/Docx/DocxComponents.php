@@ -381,6 +381,7 @@ final class DocxComponents
                     ['alignment' => $dash || $align === 'center' ? Jc::CENTER : ($align === 'left' ? Jc::START : Jc::END), 'spaceAfter' => 0]);
             };
             $full = $lt['variant'] === 'full';
+            $pcsOnly = $full && !empty($lt['pcs_only']); // Fix B (owner 18 Nov 2026): no PCS per piece / all pcs / per PCS
             $prices = !empty($lt['with_prices']);
             $cols = count($widths);
             foreach ($lt['rows'] as $r) {
@@ -396,6 +397,15 @@ final class DocxComponents
                         $cell($table, $widths[4], (string) $r['w']);
                         $cell($table, $widths[5], (string) $r['h']);
                     }
+                    if ($pcsOnly) {
+                        $cell($table, $widths[6], (string) $r['pcs']);
+                        if ($prices) {
+                            $cell($table, $widths[7], (string) $r['price_piece']);
+                            $cell($table, $widths[8], (string) $r['total']);
+                        } else {
+                            $cell($table, $widths[7], (string) $r['crates']);
+                        }
+                    } else {
                     $cell($table, $widths[6], (string) $r['per_piece']);
                     $cell($table, $widths[7], (string) $r['pcs']);
                     $cell($table, $widths[8], (string) $r['all_pcs']);
@@ -405,6 +415,7 @@ final class DocxComponents
                         $cell($table, $widths[11], (string) $r['total']);
                     } else {
                         $cell($table, $widths[9], (string) $r['crates']);
+                    }
                     }
                 } else {
                     if ($r['annexure'] !== null) {
@@ -441,10 +452,16 @@ final class DocxComponents
                 $table->addCell($w, $tot + $extra)->addText($text, ['size' => 8, 'bold' => true, 'color' => self::WHITE], ['alignment' => Jc::END, 'spaceAfter' => 0]);
             };
             $table->addRow(null, ['cantSplit' => true]);
-            $lead = $full ? 7 : 4;
+            $lead = $pcsOnly ? 6 : ($full ? 7 : 4);
             $table->addCell(array_sum(array_slice($widths, 0, $lead)), $tot + ['gridSpan' => $lead])
                 ->addText('TOTAL', ['size' => 8, 'bold' => true, 'color' => self::WHITE], ['spaceAfter' => 0]);
-            if ($full) {
+            if ($pcsOnly) {
+                $totText($table, $widths[6], (string) $lt['total']['pcs']);
+                $totText($table, $widths[7], '');
+                if ($prices) {
+                    $totText($table, $widths[8], (string) $lt['total']['amount']);
+                }
+            } elseif ($full) {
                 $totText($table, $widths[7], (string) $lt['total']['pcs']);
                 $totText($table, $widths[8], (string) $lt['total']['measure']);
                 if ($prices) {

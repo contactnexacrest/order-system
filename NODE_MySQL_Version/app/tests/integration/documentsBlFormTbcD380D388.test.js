@@ -262,6 +262,19 @@ describe('D-380 / D-386 / D-387 / D-388 documents (owner, 18 Nov 2026)', () => {
     }
   });
 
+  // Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS detailed table prints without the empty / repeated columns.
+  it('Fix B: an all-PCS table in PDF and Word', async () => {
+    const orderId = await order('detailed');
+    const line = await orderProductRepository.add(orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
+    await db.query('UPDATE order_products SET piece_length_cm = 140, piece_width_cm = 70, piece_thickness_cm = 13, pieces_count = 25 WHERE id = ?', [Number(line.id || line)]);
+    expect((await documentDataAssembler.assemble(orderId, 'QT')).line_table.pcs_only).toBe(true);
+    for (const [format, text] of Object.entries(await generate(orderId, 'QT'))) {
+      has(`QT ${format}`, text, 'No. of pcs');
+      expect([`QT ${format}`, text.includes('per PCS'), text.includes('all pcs')]).toEqual([`QT ${format}`, false, false]);
+      has(`QT ${format}`, text, '9,202.75');
+    }
+  });
+
   // D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines.
   it('D-388: the advance and balance lines never show 0.00', async () => {
     let orderId = await order('classic');

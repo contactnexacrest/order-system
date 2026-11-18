@@ -80,6 +80,27 @@ describe('D-339 detailed product table', () => {
     expect(t.rows[0].price_piece).toBe('189.90');
   });
 
+  // Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS full table leaves out the three empty / repeated columns.
+  it('an all-PCS table leaves out the measure columns', () => {
+    const lines = [
+      line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', { finish: 'Natural Polish' }),
+      line(2, 'Absolute Black Granite', 'PCS', 120, 60, 13, 8, '8', '269.85', { finish: 'Natural Polish' }),
+    ];
+    const t = build(lines);
+    expect(t.pcs_only).toBe(true);
+    expect(t.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'per piece', '(USD)']);
+    expect(t.heads.top.map((x) => x.text)).toEqual(['Material', 'Surface', 'Dimensions (cm)', 'Qty', 'Price (USD)', 'Total Price']);
+    expect(t.heads.widths).toHaveLength(9);
+    expect(t.heads.widths.reduce((a, b) => a + b, 0)).toBe(100);
+    expect([t.rows[0].pcs, t.rows[0].price_piece]).toEqual(['25', '368.11']);
+    expect(t.total.pcs).toBe('33');
+    const pl = build(lines, 'USD', null, false);
+    expect(pl.heads.bottom).toEqual(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'Packages']);
+    expect(pl.heads.widths.reduce((a, b) => a + b, 0)).toBe(100);
+    expect(build([line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')]).pcs_only).toBe(false);
+    expect(build([lines[0], line(2, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')]).pcs_only).toBe(false);
+  });
+
   it('mixed units name their unit and total by unit', () => {
     const t = build([
       line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00'),

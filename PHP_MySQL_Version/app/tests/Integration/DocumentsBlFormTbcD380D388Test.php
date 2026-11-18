@@ -272,6 +272,22 @@ final class DocumentsBlFormTbcD380D388Test extends DbTestCase
         }
     }
 
+    /** Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS detailed table prints without the empty / repeated columns. */
+    public function testFixBAllPcsTableInPdfAndWord(): void
+    {
+        $orderId = $this->order('detailed');
+        $line = OrderProductRepository::add($orderId, 1, 'Absolute Black Granite', null, 'Natural Polish', '25', false, 'PCS', '368.11', '68029300');
+        Database::connection()->prepare('UPDATE order_products SET piece_length_cm = 140, piece_width_cm = 70, piece_thickness_cm = 13, pieces_count = 25 WHERE id = :id')
+            ->execute(['id' => $line]);
+        self::assertTrue(DocumentDataAssembler::assemble($orderId, 'QT')['line_table']['pcs_only']);
+        foreach ($this->generate($orderId, 'QT') as $format => $text) {
+            self::assertStringContainsString('No. of pcs', $text, "QT {$format}");
+            self::assertStringNotContainsString('per PCS', $text, "QT {$format}");
+            self::assertStringNotContainsString('all pcs', $text, "QT {$format}");
+            self::assertStringContainsString('9,202.75', $text, "QT {$format}");
+        }
+    }
+
     /** D-388 extended (owner, 18 Nov 2026, confirmed twice): the QT / PI / OC advance and balance lines. */
     public function testD388AdvanceAndBalanceLinesNeverShowZero(): void
     {

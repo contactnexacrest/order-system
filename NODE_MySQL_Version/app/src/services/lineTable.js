@@ -235,14 +235,25 @@ function totalCbm(lines) {
  * The two header rows. 'top' and 'bottom' list the cells after "#"; a top cell
  * may span ('span') columns, and then the bottom row holds one cell per column.
  */
-function heads(variant, unit, currency, withPrices) {
+function heads(variant, unit, currency, withPrices, pcsOnly = false) {
   const measure = unit ?? 'Measure';
   const per = unit !== null ? `per ${unit}` : 'per unit';
   const price = `Price (${currency})`;
   let top;
   let bottom;
   let widths;
-  if (variant === 'full') {
+  if (variant === 'full' && pcsOnly) {
+    top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], ['Qty', 1]];
+    bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs'];
+    widths = withPrices ? [3, 24, 13, 7, 7, 7, 11, 13, 15] : [4, 30, 15, 9, 9, 9, 12, 12];
+    if (withPrices) {
+      top = top.concat([[price, 1], ['Total Price', 1]]);
+      bottom = bottom.concat(['per piece', `(${currency})`]);
+    } else {
+      top.push(['Crates /', 1]);
+      bottom.push('Packages');
+    }
+  } else if (variant === 'full') {
     top = [['Material', 1], ['Surface', 1], ['Dimensions (cm)', 3], [measure, 1], ['Qty', 1], [measure, 1]];
     bottom = ['Colour', 'Finish', 'L', 'W', 'H', 'per piece', 'No. of pcs', 'all pcs'];
     // Column widths (%) as the approved mockups; mixed units leave room for "0.1872 CBM".
@@ -340,7 +351,7 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
     else simple.push(f);
   });
   const out = {
-    variant: 'none', mixed: false, unit: null, currency, with_prices: withPrices,
+    variant: 'none', pcs_only: false, mixed: false, unit: null, currency, with_prices: withPrices,
     heads: {}, rows: [], total: null, totals_by_unit: null, simple, colspan: 0,
   };
   if (stone.length === 0) return out;
@@ -354,7 +365,10 @@ function build(lines, formatted, currency, annexureLetter, withPrices, crateCoun
   out.variant = full ? 'full' : 'short';
   out.mixed = mixed;
   out.unit = mixed ? null : units[0];
-  out.heads = heads(out.variant, mixed ? null : units[0], currency, withPrices);
+  // Owner 18 Nov 2026 (Fix B, confirmed twice): a full table whose goods lines are all PCS leaves out
+  // "PCS per piece", "PCS all pcs" and "Price per PCS" (always "—", or a repeat of No. of pcs / per piece).
+  out.pcs_only = full && !mixed && units[0] === 'PCS';
+  out.heads = heads(out.variant, mixed ? null : units[0], currency, withPrices, out.pcs_only);
   out.colspan = out.heads.bottom.length + 1;
 
   let pcsTotal = 0;

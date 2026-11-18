@@ -102,6 +102,30 @@ final class LineTableTest extends TestCase
         self::assertSame('189.90', $t['rows'][0]['price_piece']);
     }
 
+    /** Fix B (owner 18 Nov 2026, confirmed twice): an all-PCS full table leaves out the three empty / repeated columns. */
+    public function testAnAllPcsTableLeavesOutTheMeasureColumns(): void
+    {
+        $lines = [
+            self::line(1, 'Absolute Black Granite', 'PCS', 140, 70, 13, 25, '25', '368.11', ['finish' => 'Natural Polish']),
+            self::line(2, 'Absolute Black Granite', 'PCS', 120, 60, 13, 8, '8', '269.85', ['finish' => 'Natural Polish']),
+        ];
+        $t = self::build($lines);
+        self::assertTrue($t['pcs_only']);
+        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'per piece', '(USD)'], $t['heads']['bottom']);
+        self::assertSame(['Material', 'Surface', 'Dimensions (cm)', 'Qty', 'Price (USD)', 'Total Price'], array_column($t['heads']['top'], 'text'));
+        self::assertCount(9, $t['heads']['widths']);
+        self::assertSame(100, array_sum($t['heads']['widths']));
+        self::assertSame(['25', '368.11'], [$t['rows'][0]['pcs'], $t['rows'][0]['price_piece']]);
+        self::assertSame('33', $t['total']['pcs']);
+        // The Packing List (no prices): # · Material · Surface · L W H · No. of pcs · Crates / Packages.
+        $pl = self::build($lines, 'USD', null, false);
+        self::assertSame(['Colour', 'Finish', 'L', 'W', 'H', 'No. of pcs', 'Packages'], $pl['heads']['bottom']);
+        self::assertSame(100, array_sum($pl['heads']['widths']));
+        // A CBM table and a mixed table are unchanged.
+        self::assertFalse(self::build([self::line(1, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')])['pcs_only']);
+        self::assertFalse(self::build([$lines[0], self::line(2, 'CHM Black slabs', 'CBM', 180, 80, 13, 25, '4.680', '1950.00')])['pcs_only']);
+    }
+
     public function testMixedUnitsNameTheirUnitAndTotalByUnit(): void
     {
         $t = self::build([

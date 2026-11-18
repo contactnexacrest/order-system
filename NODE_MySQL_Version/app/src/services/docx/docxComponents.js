@@ -578,15 +578,22 @@ function lineTable(lt, simpleHeaders = [], simpleWidths = [], simpleRows = []) {
         Object.assign({ width: pctWidth(w), borders: thinBorders(), verticalAlign: VerticalAlign.TOP }, extra));
     };
     const full = lt.variant === 'full';
+    const pcsOnly = full && !!lt.pcs_only; // Fix B (owner 18 Nov 2026): no PCS per piece / all pcs / per PCS
     const prices = !!lt.with_prices;
     lt.rows.forEach((r) => {
       const cells = [c(String(r.no), widths[0], 'center'), c(r.material, widths[1], 'left'), c(r.finish, widths[2], 'center')];
       if (full) {
         if (r.annexure !== null) cells.push(c(r.annexure, widths[3] + widths[4] + widths[5], 'center', { italics: true, color: '8A5A00' }, { columnSpan: 3 }));
         else cells.push(c(r.l, widths[3]), c(r.w, widths[4]), c(r.h, widths[5]));
-        cells.push(c(r.per_piece, widths[6]), c(r.pcs, widths[7]), c(r.all_pcs, widths[8]));
-        if (prices) cells.push(c(r.price_unit, widths[9]), c(r.price_piece, widths[10]), c(r.total, widths[11]));
-        else cells.push(c(r.crates, widths[9]));
+        if (pcsOnly) {
+          cells.push(c(r.pcs, widths[6]));
+          if (prices) cells.push(c(r.price_piece, widths[7]), c(r.total, widths[8]));
+          else cells.push(c(r.crates, widths[7]));
+        } else {
+          cells.push(c(r.per_piece, widths[6]), c(r.pcs, widths[7]), c(r.all_pcs, widths[8]));
+          if (prices) cells.push(c(r.price_unit, widths[9]), c(r.price_piece, widths[10]), c(r.total, widths[11]));
+          else cells.push(c(r.crates, widths[9]));
+        }
       } else {
         if (r.annexure !== null) cells.push(c(r.annexure, widths[3], 'center', { italics: true, color: '8A5A00' }));
         else cells.push(c(r.thickness, widths[3]));
@@ -613,10 +620,13 @@ function lineTable(lt, simpleHeaders = [], simpleWidths = [], simpleRows = []) {
     });
     const tot = (text, w, extra = {}) => cell(new Paragraph({ alignment: AlignmentType.RIGHT, children: [run(String(text), { size: 16, bold: true, color: WHITE })] }),
       Object.assign({ width: pctWidth(w), shading: shade(NAVY), borders: thinBorders(), verticalAlign: VerticalAlign.CENTER }, extra));
-    const lead = full ? 7 : 4;
+    const lead = pcsOnly ? 6 : (full ? 7 : 4);
     const totCells = [cell(new Paragraph({ children: [run('TOTAL', { size: 16, bold: true, color: WHITE })] }),
       { width: pctWidth(widths.slice(0, lead).reduce((a, b) => a + b, 0)), columnSpan: lead, shading: shade(NAVY), borders: thinBorders(), verticalAlign: VerticalAlign.CENTER })];
-    if (full) {
+    if (pcsOnly) {
+      totCells.push(tot(lt.total.pcs, widths[6]), tot('', widths[7]));
+      if (prices) totCells.push(tot(lt.total.amount, widths[8]));
+    } else if (full) {
       totCells.push(tot(lt.total.pcs, widths[7]), tot(lt.total.measure, widths[8]));
       if (prices) totCells.push(tot('', widths[9]), tot('', widths[10]), tot(lt.total.amount, widths[11]));
       else totCells.push(tot('', widths[9]));
