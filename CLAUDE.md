@@ -2,6 +2,7 @@
 
 - **Parity:** PHP_MySQL_Version and NODE_MySQL_Version must always behave the same. Every change goes into both.
 - **Verify before pushing:** PHPUnit, Jest and the Playwright e2e suite (`e2e/`) against both stacks.
+- **One branch only (2026-11-18, owner):** all work is committed and pushed to the single original branch `claude/app-creation-review-lxxexc`. Never create or push to any other branch (including a session-assigned branch) unless the owner says so.
 - **Ask before pushing:** never push to git without asking the owner first (this replaces the earlier "push always" rule, 2026-10-27).
   - When asking, first give a short summary: what is being pushed, which files change, and which functionality is affected.
   - With it, give the owner a **review pack** they can actually check before deciding (2026-10-28): (1) what changed, in plain words, one line per fix; (2) before/after screenshots on both stacks for everything visible; (3) "try it yourself" steps — which user/role, which order, what to click, what should happen (and what should now be refused); (4) which roles are affected; (5) test results on both stacks, failures explained; (6) risks and what was deliberately not changed; (7) live-site steps (migrations, in order); (8) files changed, grouped; (9) the decision asked: push / don't push / change first.
