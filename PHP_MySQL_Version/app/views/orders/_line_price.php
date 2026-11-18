@@ -20,13 +20,7 @@ $__converted = $__conv !== null && $__conv['factor'] !== null && abs((float) $__
 $__ref = $__lc['reference'] ?? null;
 ?>
 <span class="price-check-line small">
-  <?php if ($__f !== null): ?>
-    <?php // D-305 (point 19): on an associate's client order the figures are this order's, shown without the associate's name, level or %. ?>
-    <span class="price-range muted">Quote <?= number_format((float) $__f['quote'], 2) ?> · lowest <?= number_format((float) $__f['floor'], 2) ?><?= ($__f['sold_by'] ?? 'staff') !== 'staff' ? ' for this order' : '' ?><?= $seesPriceBuildup ? ' · minimum ' . number_format((float) $__f['minimum'], 2) : '' ?><?= $__converted ? ' per ' . htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['line_unit'])) : '' ?><?= $__lc['fixed'] ? ' <span title="Fixed when the Quotation was approved (D-342), or when the Proforma Invoice was issued">(fixed)</span>' : '' ?></span>
-    <?php if ($__converted && $__ref !== null): ?>
-      <span class="price-ref muted">Product reference per <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?>: quote <?= number_format((float) $__ref['quote'], 2) ?> · lowest <?= number_format((float) $__ref['floor'], 2) ?> · your price = USD <?= number_format((float) ($__conv['price_ref'] ?? 0), 2) ?> / <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?> (1 <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['line_unit'])) ?> = <?= rtrim(rtrim(number_format((float) $__conv['factor'], 4, '.', ''), '0'), '.') ?> <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?>)</span>
-    <?php endif; ?>
-  <?php endif; ?>
+  <?php // Owner-approved layout (mockup 2, 18 Nov 2026): the badge first, then the figures on one line. ?>
   <?php if ($__lc['status'] === \App\Services\OrderLinePricing::OK): ?>
     <span class="price-badge price-badge-ok">✓ OK</span>
   <?php elseif ($__lc['status'] === \App\Services\OrderLinePricing::BELOW): ?>
@@ -44,5 +38,12 @@ $__ref = $__lc['reference'] ?? null;
     <span class="price-badge price-badge-approved">Approved by the MD</span>
   <?php elseif ($__lc['note'] !== null): ?>
     <span class="price-badge price-badge-none"><?= htmlspecialchars((string) $__lc['note']) ?></span>
+  <?php endif; ?>
+  <?php if ($__f !== null): ?>
+    <?php // D-305 (point 19): on an associate's client order the figures are this order's, shown without the associate's name, level or %. ?>
+    <span class="price-range muted">Quote <?= number_format((float) $__f['quote'], 2) ?> · lowest <?= number_format((float) $__f['floor'], 2) ?><?= ($__f['sold_by'] ?? 'staff') !== 'staff' ? ' for this order' : '' ?><?= $seesPriceBuildup ? ' · minimum ' . number_format((float) $__f['minimum'], 2) : '' ?><?= $__converted ? ' per ' . htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['line_unit'])) : '' ?><?= $__lc['fixed'] ? ' <span title="Fixed when the Quotation was approved (D-342), or when the Proforma Invoice was issued">(fixed)</span>' : '' ?></span>
+    <?php if ($__converted && $__ref !== null): // Owner-approved layout (18 Nov 2026): the reference folds under "Per <unit> ▸". ?>
+      <details class="price-ref-more"><summary>Per <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?> ▸</summary><span class="price-ref muted">Product reference per <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?>: quote <?= number_format((float) $__ref['quote'], 2) ?> · lowest <?= number_format((float) $__ref['floor'], 2) ?> · your price = USD <?= number_format((float) ($__conv['price_ref'] ?? 0), 2) ?> / <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?> (1 <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['line_unit'])) ?> = <?= rtrim(rtrim(number_format((float) $__conv['factor'], 4, '.', ''), '0'), '.') ?> <?= htmlspecialchars(\App\Services\LineUnits::label((string) $__conv['ref_unit'])) ?>)</span></details>
+    <?php endif; ?>
   <?php endif; ?>
 </span>

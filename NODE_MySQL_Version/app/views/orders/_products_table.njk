@@ -33,7 +33,7 @@
 {% endif %}
 <div class="table-scroll">
 <table class="list products-table">
-  <thead><tr><th>#</th><th>Product and options</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th></th>{% endif %}</tr></thead>
+  <thead><tr><th>#</th><th>Product and options</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th class="line-actions-head"></th>{% endif %}</tr></thead>
   <tbody>
   {% for p in goodsLines %}{% include "orders/_product_row.njk" %}{% endfor %}
   {% if not goodsLines.length %}<tr><td colspan="9" class="muted">No product lines yet.</td></tr>{% endif %}
@@ -53,7 +53,7 @@
 <h3>Charges and services</h3>
 <div class="table-scroll">
 <table class="list products-table">
-  <thead><tr><th>#</th><th>Charge or service</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th></th>{% endif %}</tr></thead>
+  <thead><tr><th>#</th><th>Charge or service</th><th>Size</th><th class="num">Qty</th><th>Unit</th>{% if sees.selling %}<th class="num">Price {{ order.currency_code or '' }}</th><th class="num">Total</th><th>Price check</th>{% endif %}{% if canEditProducts %}<th class="line-actions-head"></th>{% endif %}</tr></thead>
   <tbody>{% for p in otherLines %}{% include "orders/_product_row.njk" %}{% endfor %}</tbody>
 </table>
 </div>

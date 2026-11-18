@@ -10,7 +10,7 @@
     <strong>{{ p.description }}</strong>{% if rowCopyOf %} <span class="muted">— copy of line {{ rowCopyOf }}</span>{% endif %}
     {% if (p.line_type or 'goods') != 'goods' %} <span class="muted small">({{ lineTypes[p.line_type] }})</span>{% endif %}
     {% if rowChips.length %}
-      <div class="option-chips">{% for chip in rowChips %}<span class="chip{{ ' chip-gone' if chip.gone else '' }}">{{ chip.name }}</span>{% endfor %}</div>
+      <div class="option-chips">{% for chip in rowChips %}<span class="chip{{ ' chip-gone' if chip.gone else '' }}">{{ chip.text or chip.name }}</span>{% endfor %}</div>
     {% endif %}
     {% if p.finish and not rowChips.length %}<div class="muted small">{{ p.finish }}</div>{% endif %}
     {# Owner decision D-385 (18 Nov 2026): the line's Sold as and where its HS code comes from. #}
@@ -19,11 +19,14 @@
         {% if hsWhy %}<span class="tag tag-gold" title="{{ hsWhy }}">changed by MD/ED — {{ hsWhy }}</span>{% else %}<span class="tag">from specification</span>{% endif %}</div>
     {% endif %}
   </td>
-  <td>{% if p.as_per_annexure and p.as_per_annexure != '0' %}<span class="muted">As per annexure</span>{% else %}{{ p.dimensions or '' }}{% endif %}{% if p.pieces_count %}<div class="muted small">{{ (p.pieces_count | int).toLocaleString('en-US') }} pcs</div>{% endif %}{% if p.size_note %}<div class="muted small">{{ p.size_note }}</div>{% endif %}</td>
-  <td class="num">{{ 'To Be Confirmed' if p.quantity_is_tbc else (p.quantity if p.quantity != null else '') }}</td>
+  {# Owner-approved layout (mockup 2, 18 Nov 2026): the size on one line; under it "25 pcs · 0.1274 CBM each". Display only. #}
+  {% set annex = p.as_per_annexure and p.as_per_annexure != '0' %}
+  {% set pcsLine = ((p.pieces_count | int).toLocaleString('en-US') + ' pcs') if p.pieces_count else '' %}{% set cbmLine = cbmEach[p.id] if (not annex and cbmEach and cbmEach[p.id]) else '' %}{% set pcsText = pcsLine + (' · ' if (pcsLine and cbmLine) else '') + cbmLine %}
+  <td class="line-size"><span class="line-dims">{% if annex %}<span class="muted">As per annexure</span>{% else %}{{ p.dimensions or '' }}{% endif %}</span>{% if pcsText %}<div class="muted small line-pcs">{{ pcsText }}</div>{% endif %}{% if p.size_note %}<div class="muted small">{{ p.size_note }}</div>{% endif %}</td>
+  <td class="num line-qty">{{ 'To Be Confirmed' if p.quantity_is_tbc else (lineQty[p.id] if (lineQty and lineQty[p.id] != null) else (p.quantity if p.quantity != null else '')) }}</td>
   <td>{{ p.unit or '' }}</td>
   {% if sees.selling %}
-    <td class="num">{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}{% if pricedAt and pricedAt[p.id] %}<div class="muted small priced-at">{{ pricedAt[p.id] }}</div>{% endif %}</td>
+    <td class="num">{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}{% if pricedAtShort and pricedAtShort[p.id] %}<div class="muted small priced-at" title="{{ pricedAt[p.id] }}">{{ pricedAtShort[p.id] }}</div>{% endif %}</td>{# D-374, one short line; the full wording is its title #}
     <td class="num">{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
     <td class="line-check">{% include "orders/_line_price.njk" %}
       {# Owner decision D-374: today's price differs from the line's — one click takes it (only while prices are not fixed). #}

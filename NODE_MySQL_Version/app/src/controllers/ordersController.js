@@ -1101,10 +1101,19 @@ async function linePricingViewData(req, orderId) {
   const lines = await orderProductRepository.forOrder(orderId);
   const lineChips = {};
   const copyOf = {};
-  const pricedAt = {}; // D-374: "Priced at ₹… per USD on …" under each price
+  const pricedAt = {}; // D-374: "Priced at ₹… per USD on …" (the full record line, the short line's title)
+  // Owner-approved table layout (mockup 2, 18 Nov 2026) — display only: "₹91.61 / USD · 18 Nov 2026",
+  // the Qty without decimals for pieces, "0.1274 CBM each", and "Edge work: None" chips.
+  const lineDisplay = require('../services/orderLineDisplay');
+  const pricedAtShort = {};
+  const lineQty = {};
+  const cbmEach = {};
   for (const l of lines) {
     pricedAt[Number(l.id)] = olp.pricedAtText(l);
-    lineChips[Number(l.id)] = await olp.optionChips(l);
+    pricedAtShort[Number(l.id)] = lineDisplay.pricedAtShort(l);
+    lineQty[Number(l.id)] = lineDisplay.quantityText(l.quantity, l.unit);
+    cbmEach[Number(l.id)] = lineDisplay.cbmEachText(l);
+    lineChips[Number(l.id)] = (await olp.optionChips(l)).map((c) => ({ ...c, text: lineDisplay.chipText(c) }));
     copyOf[Number(l.id)] = orderProductRepository.copiedFromLineNo(l, lines);
   }
   return {
@@ -1116,6 +1125,9 @@ async function linePricingViewData(req, orderId) {
     lineChips,
     copyOf,
     pricedAt,
+    pricedAtShort,
+    lineQty,
+    cbmEach,
     goodsLines: lines.filter((l) => (l.line_type || 'goods') === 'goods'),
     otherLines: lines.filter((l) => (l.line_type || 'goods') !== 'goods'),
     lineSummary: olp.summary(linePricing.lines),

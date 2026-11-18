@@ -816,12 +816,12 @@ details.vendor-bill-add{margin-top:10px;}
 /* Owner request (2026-10-27): the small ▸ "expand" toggles (native
    <details> other than the page's own step/section/nav cards) were easy
    to miss — show each one as a clear navy button with a ▸/▾ marker. */
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details) > summary::-webkit-details-marker{display:none;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details) > summary::before{content:"\25B8";font-size:1em;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details)[open] > summary::before{content:"\25BE";}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details) > summary:hover{background:#dce6f8;border-color:var(--navy);}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details) > summary *{color:inherit;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary::-webkit-details-marker{display:none;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary::before{content:"\25B8";font-size:1em;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more)[open] > summary::before{content:"\25BE";}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary:hover{background:#dce6f8;border-color:var(--navy);}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.report-details):not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary *{color:inherit;}
 
 /* Owner request (2026-10-27): "At a Glance" sits across the top of the
    order page instead of in a 280px side column, so the step sections and
@@ -978,6 +978,25 @@ ul.ready-list .ready-actions { display: inline-flex; flex-wrap: wrap; gap: .35re
 .option-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:12px;background:#efebe2;color:#3d3a33}
 .chip-gone{background:#fde8e8;color:#a32020;font-weight:600}
+/* Owner-approved layout of the order page's Products table (mockup 2, 18 Nov 2026) — display only.
+   The size on one line; option chips side by side; the price check with the badge first and the
+   figures on one line, the reference folded under "Per CBM ▸"; Edit / Duplicate / Delete stacked. */
+.products-table .line-desc{min-width:230px}
+.products-table .line-desc .option-chips{max-width:300px}
+.products-table .sold-as-line .tag{white-space:normal}
+.products-table .line-size .line-dims{white-space:nowrap}
+.products-table .line-size .line-pcs{white-space:nowrap}
+.products-table .priced-at{white-space:normal;display:block;max-width:122px;margin-left:auto}
+.products-table .line-check{min-width:165px;max-width:210px}
+.products-table .line-check .price-badge{margin:0 0 2px}
+.price-ref-more{margin-top:2px}
+.price-ref-more > summary{cursor:pointer;color:var(--navy);font-size:12px;font-weight:600;width:max-content;margin-top:2px}
+.price-ref-more .price-ref{white-space:normal;max-width:300px}
+.products-table td.line-actions{width:1%;padding-right:10px}
+@media (max-width:700px){.products-table .line-desc{min-width:200px}}
+.products-table .line-actions .btn-sm,.products-table .line-actions .inline-form{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin:0 0 6px}
+.products-table .line-actions .inline-form .btn-sm{margin:0;width:100%}
+.products-table .line-actions .btn-sm{width:100%;justify-content:center;text-align:center;padding:4px 8px;font-size:12.5px}
 .price-badge-size{background:#fff1d6;color:#7a5200}
 .price-ref{display:block;font-size:11.5px;margin-top:2px}
 .table-scroll{overflow-x:auto;max-width:100%}

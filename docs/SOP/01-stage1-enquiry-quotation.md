@@ -384,8 +384,9 @@ Products)." See [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 
 **Which exchange rate a line was priced at** (owner decision D-374, 14 Nov 2026).
 Under each line's price the order page shows the pricing rate and the day the
-price was set, e.g. *"Priced at ₹92.37 per USD on 14 Nov 2026"* (*"Rate not
-recorded"* for a line saved before 14 Nov 2026). The rate moves every day, so a
+price was set, on one short line, e.g. *"₹92.37 / USD · 14 Nov 2026"* (point at it
+to read "Priced at ₹92.37 per USD on 14 Nov 2026"; *"Rate not recorded"* for a line
+saved before 14 Nov 2026). The rate moves every day, so a
 line priced a few days ago can differ from today's **Quote** in the Price check
 column. Then a **Use today's price (2,865.84)** button appears under the check:
 one click puts today's quote on the line and records today's rate (it is in the
@@ -858,6 +859,16 @@ HS Code: 25161100 · …".
   size, qty, unit, price, total, a **price-check badge** and **Edit / Duplicate /
   Delete**. An option that has since been switched off shows in red "“…” is no
   longer offered — choose again": open **Edit** and choose a new one.
+- **How a row reads (owner-approved layout, 18 Nov 2026).** The options sit side by
+  side and wrap; an option that is just "None" shows its name ("Edge work: None",
+  "Treatment: None"). The size stays on one line ("140 × 70 × 13 cm") with the pieces
+  and the CBM of one piece under it ("25 pcs · 0.1274 CBM each"). The Qty of a line in
+  pieces (PCS, Set, Lot …) has no decimals ("25"); CBM keeps 3 decimals, SQM / SQFT 2.
+  The price check shows its badge first (**✓ OK** …), then "Quote · lowest · minimum per
+  piece"; the product's per-CBM reference figures are folded under **Per CBM ▸** (click
+  to open). **Edit / Duplicate / Delete** are stacked in their own column; on a laptop
+  screen the whole row fits without scrolling sideways. Nothing stored or
+  worked out changes — only how the row is shown.
 - The bar above the table sums up the price check, e.g. "2 lines OK · 1 line needs
   MD approval (line 3) — the Quotation waits for it." — **Show** jumps to Price check.
 - The **Total** row shows the goods value, about how many CBM and how many containers

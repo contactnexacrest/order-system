@@ -382,7 +382,10 @@ final class OrderLinePricing
                     $found = $o;
                 }
             }
-            $chips[] = $found !== null ? ['name' => (string) $found['name'], 'gone' => false] : self::goneChip($selection[$s['id']]);
+            // The spec's name rides along so the order page can show "Edge work: None" (owner, 18 Nov 2026).
+            $chip = $found !== null ? ['name' => (string) $found['name'], 'gone' => false, 'spec' => ''] : self::goneChip($selection[$s['id']]);
+            $chip['spec'] = (string) $s['name'];
+            $chips[] = $chip;
         }
         foreach ($selection as $specId => $optionId) {
             if (!isset($seen[$specId])) {
@@ -392,11 +395,11 @@ final class OrderLinePricing
         return $chips;
     }
 
-    /** @return array{name: string, gone: bool} */
+    /** @return array{name: string, gone: bool, spec: string} */
     private static function goneChip(int $optionId): array
     {
         $o = \App\Repositories\SpecRepository::findOption($optionId);
-        return ['name' => '"' . ($o !== null ? (string) $o['name'] : 'This option') . '" is no longer offered — choose again', 'gone' => true];
+        return ['name' => '"' . ($o !== null ? (string) $o['name'] : 'This option') . '" is no longer offered — choose again', 'gone' => true, 'spec' => ''];
     }
 
     /** D-255: a line's chosen options from the form (JSON {spec id: option id}); null when none. */

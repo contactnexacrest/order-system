@@ -272,7 +272,7 @@ function scaleFigures(figures, factor, lineUnit) {
 
 /**
  * D-270 (point 13): a line's chosen options as labels for the order page — every option, in the
- * product's order; one switched off since is shown as gone, never replaced. [{ name, gone }].
+ * product's order; one switched off since is shown as gone, never replaced. [{ name, gone, spec }].
  */
 async function optionChips(line, product = null) {
   const selection = lineSelection(line);
@@ -285,7 +285,8 @@ async function optionChips(line, product = null) {
     if (!(s.id in selection)) continue;
     seen[s.id] = true;
     const found = s.options.find((o) => Number(o.id) === Number(selection[s.id]));
-    chips.push(found ? { name: String(found.name), gone: false } : await goneChip(selection[s.id]));
+    // The spec's name rides along so the order page can show "Edge work: None" (owner, 18 Nov 2026).
+    chips.push({ ...(found ? { name: String(found.name), gone: false } : await goneChip(selection[s.id])), spec: String(s.name) });
   }
   for (const [specId, optionId] of Object.entries(selection)) {
     if (!seen[specId]) chips.push(await goneChip(optionId));
@@ -295,7 +296,7 @@ async function optionChips(line, product = null) {
 
 async function goneChip(optionId) {
   const o = await require('../repositories/specRepository').findOption(Number(optionId));
-  return { name: `"${o ? String(o.name) : 'This option'}" is no longer offered — choose again`, gone: true };
+  return { name: `"${o ? String(o.name) : 'This option'}" is no longer offered — choose again`, gone: true, spec: '' };
 }
 
 const intOk = (v) => /^\s*[+-]?(0|[1-9]\d*)\s*$/.test(String(v));

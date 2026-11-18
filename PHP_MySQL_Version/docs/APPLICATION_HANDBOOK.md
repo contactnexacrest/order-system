@@ -1922,11 +1922,22 @@ and returns the quote and lowest per the line's unit plus the reference figures.
 **Products section (D-273, owner point 17).** The order page's Products card is one
 compact table (`orders/_products_table.php` / `.njk`): # · product and its options as
 labels (D-271) · size (Dimensions text) · qty · unit · price · total · price-check badge ·
-Edit / Duplicate / Delete. Above it a summary bar
+Edit / Duplicate / Delete. **Row layout (owner-approved mockup, 18 Nov 2026; display only):** option chips flow
+side by side and wrap, a bare "None" chip shows its specification ("Edge work: None";
+`optionChips()` returns each chip's `spec`, `OrderLineDisplay::chipText()`); the size stays on
+one line with "25 pcs · 0.1274 CBM each" under it (`OrderLineDisplay::cbmEachText()`, which calls
+`LineTable::perPiece('CBM', …)`); the Qty of a piece-type unit (PCS kind, Set, Lot, Pair, Box …)
+has no decimals, CBM 3, SQM / SQFT 2, other units as stored (`OrderLineDisplay::quantityText()`);
+the price check (`_line_price`) shows its badge first, then "Quote · lowest · minimum per …", and
+the product's reference figures fold under `<details class="price-ref-more">` "Per <reference
+unit> ▸"; Edit / Duplicate / Delete are stacked in their own column; the column widths are set
+so the whole table fits a 1366 px laptop screen without sideways scrolling. Node twin: `src/services/orderLineDisplay.js`, maps
+`lineQty`, `cbmEach`, `pricedAtShort` from the order controller. Above it a summary bar
 (`OrderLinePricing::summary()`, e.g. "2 lines OK · 1 line needs MD approval (line 3) —
 the Quotation waits for it." with a **Show** link to Price check). **D-374 (14 Nov 2026):**
 under each price "Priced at ₹92.37 per USD on 14 Nov 2026" (`order_products.priced_fx_rate`,
-`priced_at`; "Rate not recorded" for older lines; `OrderLinePricing::pricedAtText()`), recorded by
+`priced_at`; "Rate not recorded" for older lines; `OrderLinePricing::pricedAtText()`; since 18 Nov 2026 the
+table shows it short, "₹92.37 / USD · 14 Nov 2026" (`OrderLineDisplay::pricedAtShort()`), with the full wording as its title), recorded by
 `OrderLinePricing::afterSave()` when a line gets a price or its price changes, while the prices are
 not fixed (`PriceLock::isFixed()`); a copy keeps its original's (`OrderProductRepository::duplicate()`).
 When today's quote differs, **Use today's price (x)** under the check (POST

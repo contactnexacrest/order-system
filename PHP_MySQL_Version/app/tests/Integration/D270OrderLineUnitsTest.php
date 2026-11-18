@@ -266,7 +266,7 @@ final class D270OrderLineUnitsTest extends DbTestCase
         $honed = $sel[array_search('Honed', array_map(static fn (int $o): string => (string) SpecRepository::findOption($o)['name'], $sel), true)];
         SpecRepository::setOptionOverride($this->product, $honed, true, null);
         $chips = OrderLinePricing::optionChips(OrderProductRepository::find($line));
-        self::assertSame(['name' => '"Honed" is no longer offered — choose again', 'gone' => true], $chips[2]);
+        self::assertSame(['name' => '"Honed" is no longer offered — choose again', 'gone' => true, 'spec' => 'Surface finish'], $chips[2]);
         self::assertSame(OrderLinePricing::NO_PRICE, OrderLinePricing::forOrder($orderId)['lines'][$line]['status'], 'never priced as another option');
     }
 

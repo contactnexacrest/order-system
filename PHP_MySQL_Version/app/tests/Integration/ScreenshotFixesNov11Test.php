@@ -118,7 +118,7 @@ final class ScreenshotFixesNov11Test extends DbTestCase
         // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
         self::assertStringContainsString('<details class="section-nav-details">', self::read('app/views/partials/section_nav.php'));
         $css = self::read('public_html/assets/css/app.css');
-        self::assertStringContainsString(':not(.dept-switch):not(.section-nav-details) > summary{', $css);
+        self::assertStringContainsString(':not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary{', $css); // the order page's "Per CBM ▸" fold (18 Nov 2026) is skipped too
         self::assertStringContainsString('.section-nav-drop.active > details > summary{font-weight:700;border-bottom-color:var(--gold);}', $css);
     }
 

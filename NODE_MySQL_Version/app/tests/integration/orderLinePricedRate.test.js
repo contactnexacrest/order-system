@@ -121,7 +121,10 @@ describe('D-374: the rate a line was priced at', () => {
     expect(String(row.priced_fx_rate)).toBe('92.0000');
     const log = await db.queryOne("SELECT old_value, new_value FROM audit_log WHERE action_type = 'ORDER_LINE_TODAYS_PRICE' AND entity_id = :id", { id: line });
     expect([log.old_value, log.new_value]).toEqual(['1500.00', String(row.unit_price)]);
-    expect((await agent.get(`/orders/${orderId}`)).text).toContain(`Priced at ₹92.00 per USD on ${today()}`);
+    const after = (await agent.get(`/orders/${orderId}`)).text;
+    // Owner-approved layout (18 Nov 2026): one short line; the full D-374 wording stays as its title.
+    expect(after).toContain(`>₹92.00 / USD · ${today()}</div>`);
+    expect(after).toContain(`title="Priced at ₹92.00 per USD on ${today()}"`);
 
     await db.execute('UPDATE orders SET prices_fixed_at = NOW(), pricing_fx_rate_at_qt = 92 WHERE id = :o', { o: orderId });
     await orderProductRepository.setUnitPrice(line, '1500.00');

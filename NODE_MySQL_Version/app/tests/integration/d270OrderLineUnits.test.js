@@ -227,7 +227,7 @@ describe('D-270 to D-273 order lines in any unit, full duplicate, products summa
     const honed = Number(Object.values(s)[names.indexOf('Honed')]);
     await specRepository.setOptionOverride(product, honed, true, null);
     const chips = await orderLinePricing.optionChips(await orderProductRepository.find(id));
-    expect(chips[2]).toEqual({ name: '"Honed" is no longer offered — choose again', gone: true });
+    expect(chips[2]).toEqual({ name: '"Honed" is no longer offered — choose again', gone: true, spec: 'Surface finish' });
     expect((await orderLinePricing.forOrder(orderId)).lines[id].status).toBe(orderLinePricing.NO_PRICE);
   });
 

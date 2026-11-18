@@ -14,6 +14,7 @@
  * variables are in scope). Node twin: views/orders/_products_table.njk.
  */
 use App\Services\LineUnits;
+use App\Services\OrderLineDisplay;
 use App\Services\OrderLinePricing;
 
 $__copiedId = (int) ($_GET['copied'] ?? 0);
@@ -39,7 +40,7 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
         <strong><?= htmlspecialchars((string) $p['description']) ?></strong><?php if ($__copyOf !== null): ?> <span class="muted">— copy of line <?= $__copyOf ?></span><?php endif; ?>
         <?php if (($p['line_type'] ?? 'goods') !== 'goods'): ?> <span class="muted small">(<?= htmlspecialchars(\App\Repositories\OrderProductRepository::LINE_TYPES[$p['line_type']] ?? '') ?>)</span><?php endif; ?>
         <?php if ($__chips !== []): ?>
-          <div class="option-chips"><?php foreach ($__chips as $__chip): ?><span class="chip<?= $__chip['gone'] ? ' chip-gone' : '' ?>"><?= htmlspecialchars($__chip['name']) ?></span><?php endforeach; ?></div>
+          <div class="option-chips"><?php foreach ($__chips as $__chip): ?><span class="chip<?= $__chip['gone'] ? ' chip-gone' : '' ?>"><?= htmlspecialchars(OrderLineDisplay::chipText($__chip)) ?></span><?php endforeach; ?></div>
         <?php endif; ?>
         <?php if (!empty($p['finish']) && $__chips === []): ?><div class="muted small"><?= htmlspecialchars((string) $p['finish']) ?></div><?php endif; ?>
         <?php // Owner decision D-385 (18 Nov 2026): the line's Sold as and where its HS code comes from. ?>
@@ -48,11 +49,13 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
             <?php if ($__hsWhy !== ''): ?><span class="tag tag-gold" title="<?= htmlspecialchars($__hsWhy) ?>">changed by MD/ED — <?= htmlspecialchars($__hsWhy) ?></span><?php else: ?><span class="tag">from specification</span><?php endif; ?></div>
         <?php endif; ?>
       </td>
-      <td><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?><?= !empty($p['pieces_count']) ? '<div class="muted small">' . number_format((int) $p['pieces_count']) . ' pcs</div>' : '' ?><?= !empty($p['size_note']) ? '<div class="muted small">' . htmlspecialchars((string) $p['size_note']) . '</div>' : '' ?></td>
-      <td class="num"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) ($p['quantity'] ?? '')) ?></td>
+      <?php // Owner-approved layout (mockup 2, 18 Nov 2026): the size on one line; under it "25 pcs · 0.1274 CBM each". Display only.
+      $__pcsLine = implode(' · ', array_filter([!empty($p['pieces_count']) ? number_format((int) $p['pieces_count']) . ' pcs' : '', empty($p['as_per_annexure']) ? OrderLineDisplay::cbmEachText($p) : ''])); ?>
+      <td class="line-size"><span class="line-dims"><?= !empty($p['as_per_annexure']) ? '<span class="muted">As per annexure</span>' : htmlspecialchars((string) ($p['dimensions'] ?? '')) ?></span><?= $__pcsLine !== '' ? '<div class="muted small line-pcs">' . htmlspecialchars($__pcsLine) . '</div>' : '' ?><?= !empty($p['size_note']) ? '<div class="muted small">' . htmlspecialchars((string) $p['size_note']) . '</div>' : '' ?></td>
+      <td class="num line-qty"><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars(OrderLineDisplay::quantityText($p['quantity'] ?? '', $p['unit'] ?? null)) ?></td>
       <td><?= htmlspecialchars((string) ($p['unit'] ?? '')) ?></td>
       <?php if ($sees['selling']): ?>
-        <td class="num"><?= $__money($p['unit_price']) ?><?php $__pricedAt = OrderLinePricing::pricedAtText($p); if ($__pricedAt !== ''): // D-374 ?><div class="muted small priced-at"><?= htmlspecialchars($__pricedAt) ?></div><?php endif; ?></td>
+        <td class="num"><?= $__money($p['unit_price']) ?><?php $__pricedAt = OrderLineDisplay::pricedAtShort($p); if ($__pricedAt !== ''): // D-374, one short line; the full wording is its title ?><div class="muted small priced-at" title="<?= htmlspecialchars(OrderLinePricing::pricedAtText($p)) ?>"><?= htmlspecialchars($__pricedAt) ?></div><?php endif; ?></td>
         <td class="num"><?= $__money($p['fob_value']) ?></td>
         <td class="line-check"><?php include __DIR__ . '/_line_price.php'; ?>
           <?php // Owner decision D-374: today's price differs from the line's — one click takes it (only while prices are not fixed). ?>
@@ -86,7 +89,7 @@ $__row = static function (array $p) use ($products, $linePricing, $sees, $seesPr
 };
 $__head = static function (string $first) use ($sees, $canEditProducts, $order): void {
     ?>
-    <thead><tr><th>#</th><th><?= $first ?></th><th>Size</th><th class="num">Qty</th><th>Unit</th><?php if ($sees['selling']): ?><th class="num">Price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></th><th class="num">Total</th><th>Price check</th><?php endif; ?><?php if ($canEditProducts): ?><th></th><?php endif; ?></tr></thead>
+    <thead><tr><th>#</th><th><?= $first ?></th><th>Size</th><th class="num">Qty</th><th>Unit</th><?php if ($sees['selling']): ?><th class="num">Price <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></th><th class="num">Total</th><th>Price check</th><?php endif; ?><?php if ($canEditProducts): ?><th class="line-actions-head"></th><?php endif; ?></tr></thead>
     <?php
 };
 ?>

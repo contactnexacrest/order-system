@@ -72,7 +72,7 @@ describe('11 Nov 2026 screenshot fixes', () => {
     // The drop-down's summary is drawn like the other bar items (the sitewide "▸ button" look skips it), so its gold underline shows.
     expect(read('views/partials/section_nav.njk')).toContain('<details class="section-nav-details">');
     const css = read('public/css/app.css');
-    expect(css).toContain(':not(.dept-switch):not(.section-nav-details) > summary{');
+    expect(css).toContain(':not(.dept-switch):not(.section-nav-details):not(.price-ref-more) > summary{'); // the order page's "Per CBM ▸" fold (18 Nov 2026) is skipped too
     expect(css).toContain('.section-nav-drop.active > details > summary{font-weight:700;border-bottom-color:var(--gold);}');
   });
 
