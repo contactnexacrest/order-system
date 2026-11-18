@@ -556,7 +556,9 @@ final class SalesTargetsTest extends DbTestCase
         $plain = $this->render(fn () => (new ReportController())->performance([]));
         $_GET = ['date_from' => '2033-03-01', 'date_to' => '2033-03-31', 'salesperson' => ''];
         $empty = $this->render(fn () => (new ReportController())->performance([]));
-        self::assertSame($plain, $empty, "salesperson '' renders exactly the default page");
+        // The session meta carries a live seconds-left counter that can tick between the two renders.
+        $still = static fn (string $h): string => (string) preg_replace('/data-absolute-left="\d+"/', 'data-absolute-left=""', $h, 1);
+        self::assertSame($still($plain), $still($empty), "salesperson '' renders exactly the default page");
         self::assertStringNotContainsString('id="performance-by-salesperson"', $plain);
 
         $seller = $this->createTestUser('Export Executive');

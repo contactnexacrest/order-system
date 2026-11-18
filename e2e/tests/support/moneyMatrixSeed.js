@@ -32,7 +32,9 @@ async function main() {
   fs.mkdirSync(storageDir, { recursive: true });
 
   // One login per role.
-  const roles = await db.query('SELECT id, name FROM roles ORDER BY id');
+  // Temporary roles of other e2e files (QA-ONLY …, TEST-…) are not real roles: a login on one
+  // would stop that file's cleanup from deleting it.
+  const roles = await db.query("SELECT id, name FROM roles WHERE name NOT LIKE 'QA-ONLY %' AND name NOT LIKE 'TEST-%' ORDER BY id");
   const users = [];
   for (const role of roles) {
     const email = `money-matrix-role-${role.id}@nexacrest.test`;

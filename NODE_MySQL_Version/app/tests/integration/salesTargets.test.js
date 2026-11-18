@@ -470,7 +470,9 @@ describe('D-378: sales targets', () => {
     const agent = await signIn(await createTestUser('Managing Director'));
     const plain = (await agent.get('/reports/performance?date_from=2033-03-01&date_to=2033-03-31')).text;
     const empty = (await agent.get('/reports/performance?date_from=2033-03-01&date_to=2033-03-31&salesperson=')).text;
-    expect(empty).toBe(plain); // salesperson '' renders exactly the default page
+    // The session meta carries a live seconds-left counter that can tick between the two requests.
+    const still = (html) => html.replace(/data-absolute-left="\d+"/, 'data-absolute-left=""');
+    expect(still(empty)).toBe(still(plain)); // salesperson '' renders exactly the default page
     expect(plain).not.toContain('id="performance-by-salesperson"');
 
     const seller = await createTestUser('Export Executive');
