@@ -37,7 +37,7 @@ foreach ($soldAsSpecs ?? [] as $__ss) {
   </select>
 </label>
 <p class="muted small sold-as-hs" data-sold-as-hs aria-live="polite"<?= $__soldAsSelected > 0 ? '' : ' hidden' ?>>HS code: <b data-sold-as-hs-code><?= htmlspecialchars((string) ($__soldAsLine['hs_code'] ?? '')) ?></b>
-  <span class="tag" data-sold-as-hs-tag><?= trim((string) ($__soldAsLine['hs_override_reason'] ?? '')) !== '' ? 'changed by MD/ED' : 'from specification' ?></span><?php if (!empty($canOverrideHs)): ?> <button type="button" class="btn-link" data-change-hs>Change HS code</button> <span class="muted">(with a reason)</span><?php endif; ?></p>
+  <span class="tag" data-sold-as-hs-tag><?php $__soldAsSpecHs = ''; foreach ($soldAsSpecs ?? [] as $__ss) { if ((int) $__ss['id'] === $__soldAsSelected) { $__soldAsSpecHs = (string) $__ss['hs_code']; } } ?><?= trim((string) ($__soldAsLine['hs_override_reason'] ?? '')) !== '' ? htmlspecialchars('changed by MD/ED' . ($__soldAsSpecHs !== '' ? ' (specification: ' . $__soldAsSpecHs . ')' : '')) : 'from specification' ?></span><?php if (!empty($canOverrideHs)): ?> <button type="button" class="btn-link" data-change-hs>Change HS code</button> <span class="muted">(with a reason)</span><?php endif; ?></p>
 <?php if (!empty($canOverrideHs)): ?>
 <label class="hs-override-reason" data-hs-override-reason<?= trim((string) ($__soldAsReason ?? '')) === '' ? ' hidden' : '' ?>>Reason for changing the HS code
   <input type="text" name="<?= htmlspecialchars((string) $__soldAsReasonName) ?>" maxlength="500" value="<?= htmlspecialchars((string) ($__soldAsReason ?? '')) ?>" placeholder="e.g. Buyer's customs classify these as worked monuments" data-required-message="Give the reason for changing the HS code from its specification."></label>

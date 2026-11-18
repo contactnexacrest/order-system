@@ -451,6 +451,8 @@ final class ProductFormsD382Test extends DbTestCase
         self::assertStringContainsString('class="sold-as-select"', $page);
         self::assertStringContainsString('data-sold-as="', $page);
         self::assertStringContainsString('data-unit-kind="TON"', $page);
+        // After a change the specification's own code shows beside it (owner 18 Nov 2026).
+        self::assertStringContainsString('changed by MD/ED (specification: 25161100)', $page);
         // The MD gets "Change HS code" beside the HS line (it opens More and focuses the HS Code box) …
         self::assertStringContainsString('<button type="button" class="btn-link" data-change-hs>Change HS code</button>', $page);
         // … staff without the permission do not.

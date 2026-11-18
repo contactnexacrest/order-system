@@ -375,6 +375,8 @@ describe('Forms of stone, Specifications (HS), Sold as and the option order (D-3
     expect(html).toContain('Sold as: <b>Raw block</b>');
     expect(html).toContain('changed by MD/ED — Customs want the sawn block code');
     expect(html).toContain('class="sold-as-select"');
+    // After a change the specification's own code shows beside it (owner 18 Nov 2026).
+    expect(html).toContain('changed by MD/ED (specification: 25161100)');
     // The MD gets "Change HS code" beside the HS line; staff without the permission do not.
     expect(html).toContain('<button type="button" class="btn-link" data-change-hs>Change HS code</button>');
     const staffHtml = unescape((await salesAgent.get(page)).text);

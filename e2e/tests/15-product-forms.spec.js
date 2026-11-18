@@ -119,6 +119,7 @@ test.describe.serial('Forms of stone, Specifications (HS), Sold as — as a pers
     await expect(hs).toBeFocused();
     await hs.fill('68029300');
     await hs.dispatchEvent('change');
+    await expect(page.locator('[data-sold-as-hs-tag]').first()).toHaveText('changed by MD/ED (specification: 68022310)');
     const reason = page.locator('input[name="product_hs_override_reason[]"]').first();
     await expect(reason).toBeVisible();
     await reason.fill('E2E: buyer customs classify these as worked stone');

@@ -449,7 +449,8 @@
     var codeEl = scope.querySelector('[data-sold-as-hs-code]');
     var tag = scope.querySelector('[data-sold-as-hs-tag]');
     if (codeEl && hs) { codeEl.textContent = hs.value.trim() || (o ? o.dataset.hs || '' : ''); }
-    if (tag) { tag.textContent = differs ? 'changed by MD/ED' : 'from specification'; }
+    // Owner 18 Nov 2026: after a change, the specification's own code shows beside it.
+    if (tag) { tag.textContent = differs ? 'changed by MD/ED (specification: ' + (o.dataset.hs || '') + ')' : 'from specification'; }
   }
   function applySoldAs(scope, chosenNow) {
     var s = soldAsSelect(scope);
