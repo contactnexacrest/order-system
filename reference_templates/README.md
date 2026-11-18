@@ -29,8 +29,10 @@ where the two disagree, the Developer Spec wins — it says so explicitly).
   is kept). Since owner decision D-380 (18 Nov 2026) the app's documents say
   "the full set of original Bills of Lading as issued by the shipping line",
   all couriered to the buyer once the balance clears, and HS 68029300 (not
-  6802.93); the Word files in this folder are the older reference samples and
-  were not changed.
+  6802.93). The Word files in this folder were brought into line on 18 Nov 2026
+  (owner, confirmed twice): only their wording changed (full set of originals,
+  Telex Release / surrendered BL only on the buyer's request with MD approval
+  after the balance clears, HS 68029300) — layout and formatting untouched.
   Never shown to a buyer.
 - Staff guidelines that are not document templates live outside this folder:
   the *Supplier & Logistics Payments Guide* (PDF + Word, 2 Nov 2026) is in
