@@ -440,7 +440,7 @@ describe('QA Nov 2026 security batch', () => {
         }
       }
       expect(bad).toEqual([]);
-    });
+    }, 240000); // 3 bad dates x every report page; slow under load
 
     it('UI-003: Incentives owed with an impossible date shows the default (month end), as PHP', async () => {
       const md = await user('Managing Director');

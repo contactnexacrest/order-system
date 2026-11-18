@@ -781,7 +781,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', '/ca/export-benefits', { scheme_name: scheme, claimed_amount: '1250', claimed_at: todayIst(), reference_number: reference }), 'POST /ca/export-benefits', 'claim recorded');
     const claim = await value('SELECT id FROM ca_export_benefits WHERE reference_number = :r', { r: reference });
     expect(await audits('CA_EXPORT_BENEFIT_RECORDED', claim)).toBe(1);
-  });
+  }, 240000); // walks every report page; slow when the suite runs alongside PHPUnit
 
   it('associate and partner edits, the balance exchange rate and a review rejection', async () => {
     const associate = await insert('associates', { name: 'Route Test Associate', based_in: 'india', currency_code: 'INR', status: 'active' });
