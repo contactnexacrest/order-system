@@ -77,13 +77,21 @@ module.exports = {
       await d.select('select[name="container_type"]', { label: '20ft Standard' }); // D-376: required since 14 Nov 2026
       await d.point('input[name="port_of_discharge_text"]', 900);
     } },
-    { caption: 'Pick from Products', say: 'Now the product line. On a US dollar order, a goods line is picked from Products. The list offers only products that are ready to quote: configured by the product manager, with an active supplier. Any other product is greyed at the bottom, under Not offered yet, with the reason. Pick Black Galaxy Granite Slab: the description, the H S code and the unit fill in by themselves, and the product\'s options appear.', do: async (d) => {
+    { caption: 'Pick from Products', say: 'Now the product line. On a US dollar order, a goods line is picked from Products. The list offers only products that are ready to quote: configured by the product manager, with an active supplier. Any other product is greyed at the bottom, under Not offered yet, with the reason. Pick Black Galaxy Granite Slab: the description fills in by itself, and the product\'s options appear.', do: async (d) => {
       const pick = d.page.locator('select.product-picker').first();
       await d.scrollTo(pick);
       await d.select(pick, { label: 'Black Galaxy Granite Slab (HS 68022390)' });
       await d.point('.product-picker-hint', 2000);
     } },
-    { caption: 'Thickness and Size / format', say: 'Two options start empty, on Choose: the Thickness, and the Size or format. The price depends on them, so the app shows no price until you have chosen both. Thickness: twenty millimetres. Size or format: gangsaw slab. Now the price fills in. The hint shows the quote price, and the lowest price you may agree. Below that, the Managing Director must approve the line. The finish comes from the Surface finish option, Natural Polish, so a picked line has no separate finish box.', do: async (d) => {
+    { caption: 'Sold as', say: 'Next, Sold as: what the stone is sold as, for example a gangsaw slab, a tile or a monument. It is required, and it sets the line\'s H S code, the units you may choose and the finishes. The H S code now shows below it, marked from specification. Only the Managing Director or the Executive Director may change it, with a reason.', do: async (d) => {
+      const sold = d.page.locator('.product-row').first().locator('select.sold-as-select');
+      await d.point(sold, 900);
+      const label = (await sold.locator('option').allInnerTexts()).find((t) => /^Gangsaw slab/.test(t.trim()));
+      await d.select(sold, { label });
+      await d.wait(800);
+      await d.point(d.page.locator('.product-row').first().locator('[data-sold-as-hs]'), 2200);
+    } },
+    { caption: 'Thickness', say: 'The options start empty, on Choose. The price depends on them: for a slab sold by the square metre, the thickness matters, so the app shows no price until you choose it. Thickness: twenty millimetres. Size or format: gangsaw slab. Now the price fills in. The hint shows the quote price, and the lowest price you may agree. Below that, the Managing Director must approve the line. The finish comes from the Surface finish option, Natural Polish, so a picked line has no separate finish box.', do: async (d) => {
       const opts = d.page.locator('.product-row').first().locator('.spec-options');
       await d.point(opts, 1200);
       await d.select(opts.locator('select[aria-label="Thickness"]'), { label: '20 mm' });

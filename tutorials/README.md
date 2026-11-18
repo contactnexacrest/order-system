@@ -1,10 +1,8 @@
 # Tutorial videos
 
-> **ON HOLD — owner, 13 Nov 2026: do not record or re-record anything until the owner lifts the hold.**
-> Do not run `tutorials/run.js` (not even `--plan`) while the hold stands. The scripts were brought up to
-> date with the app on 13 Nov 2026 (D-336 … D-365, plus the 11 Nov menu and wording changes) so they are
-> ready when recording restarts; `VIDEO_PROGRESS.md` lists, per video, what changed and whether a
-> re-recording is needed. Re-recording a video always needs the owner's go-ahead first (CLAUDE.md).
+> **Recording restarted — owner, 18 Nov 2026:** videos for every role plus one general video (A01, two parts), each
+> 10–15 minutes at most, same voice. Re-recording a video after a later app change still needs the owner's go-ahead
+> (CLAUDE.md). Recording now uses a separate clean tutorial database — see "Tutorial database" below.
 
 Narrated, subtitled 1080p tutorial videos of the application, recorded automatically
 with Playwright against the **PHP stack** on the dev database, with an offline voice (Piper).
@@ -59,6 +57,28 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
 * The first recording after a long pause should be checked step by step: the scripts were updated from the
   views and controllers only (no recording was allowed), so a selector may still need a small fix. A failing
   step names itself (`Step 7 (…): …`).
+
+## Tutorial database (since 18 Nov 2026)
+
+The dev database holds thousands of automated-test records (and must never show on camera), so recordings run against
+a clean database, `nexacrest_tutorial`, built from `docs/schema.sql` + `docs/seed.sql`, served by a copy of the PHP app:
+
+```bash
+mysql -uroot -e "CREATE DATABASE nexacrest_tutorial CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+```
+
+```bash
+mysql -uroot nexacrest_tutorial < PHP_MySQL_Version/docs/schema.sql && mysql -uroot nexacrest_tutorial < PHP_MySQL_Version/docs/seed.sql
+```
+
+* Give `md@email.com` and `ed@email.com` the e2e staff password (`TUT_STAFF_PASSWORD`), `force_password_change = 0`.
+* Copy `PHP_MySQL_Version/app` (without `vendor` and `tests`; link `vendor`) and `public_html` to a folder of its own; in
+  its `.env` set `DB_DATABASE=nexacrest_tutorial` and its own `STORAGE_BASE_PATH`.
+* Serve it on port 8081: `php -d upload_max_filesize=64M -d post_max_size=64M -S 127.0.0.1:8081 _dev_router.php`.
+* Record with `TUT_BASE_URL=http://127.0.0.1:8081 TUT_DB_NAME=nexacrest_tutorial TUT_PHP_APP=<copy>/app`.
+
+The snapshot taken before each recording leaves out the `documents` table (generated files); `restore()` deletes only the
+documents the recording added.
 
 ## How it works
 

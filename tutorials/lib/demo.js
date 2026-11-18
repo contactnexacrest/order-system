@@ -128,6 +128,11 @@ const STAFF = {
 // Created on demand with the tutorial staff password; removed by removeStaff() / cleanup().
 const DEMO_STAFF = {
   fm: { email: 'finance.manager@email.com', role: 'Finance Manager', name: 'Finance Manager' },
+  fd: { email: 'finance.director@email.com', role: 'Finance Director', name: 'Finance Director' },
+  procmgr: { email: 'procurement.manager@email.com', role: 'Procurement Manager', name: 'Procurement Manager' },
+  logmgr: { email: 'logistics.manager@email.com', role: 'Logistics Manager', name: 'Logistics Manager' },
+  coord: { email: 'order.coordinator@email.com', role: 'Order Coordinator', name: 'Order Coordinator' },
+  opsmgr: { email: 'operations.manager@email.com', role: 'Operations Manager', name: 'Operations Manager' },
   exec: { email: 'export.executive@email.com', role: 'Export Executive', name: 'Export Executive' },
   salesmgr: { email: 'sales.manager@email.com', role: 'Sales/Export Manager', name: 'Sales Manager' },
   salesdir: { email: 'sales.director@email.com', role: 'Sales Director', name: 'Sales Director' },
