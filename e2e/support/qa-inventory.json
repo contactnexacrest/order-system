@@ -36591,6 +36591,398 @@
    },
    "money_route": false,
    "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/{pid}/spec-options/{id}",
+   "controller": "SpecController",
+   "action": "updateOption",
+   "requires_all": [
+    "manage_product_specifications"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1306,
+   "node_line": 1598,
+   "node_handler": "specController.updateOption",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/pricing/forms",
+   "controller": "ProductFormController",
+   "action": "forms",
+   "requires_all": [],
+   "requires_any": [
+    [
+     "view_price_buildup",
+     "manage_pricing"
+    ]
+   ],
+   "guards": [
+    "session"
+   ],
+   "php_line": 1310,
+   "node_line": 1496,
+   "node_handler": "productFormController.forms",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/pricing/forms",
+   "controller": "ProductFormController",
+   "action": "saveForm",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1311,
+   "node_line": 1497,
+   "node_handler": "productFormController.saveForm",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/pricing/forms/{id}",
+   "controller": "ProductFormController",
+   "action": "saveForm",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1312,
+   "node_line": 1498,
+   "node_handler": "productFormController.saveForm",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/pricing/forms/{id}/delete",
+   "controller": "ProductFormController",
+   "action": "deleteForm",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1313,
+   "node_line": 1499,
+   "node_handler": "productFormController.deleteForm",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/products/hs-specifications",
+   "controller": "ProductFormController",
+   "action": "specifications",
+   "requires_all": [],
+   "requires_any": [
+    [
+     "view_price_buildup",
+     "manage_pricing"
+    ]
+   ],
+   "guards": [
+    "session"
+   ],
+   "php_line": 1223,
+   "node_line": 1500,
+   "node_handler": "productFormController.specifications",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/hs-specifications",
+   "controller": "ProductFormController",
+   "action": "saveSpecification",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1224,
+   "node_line": 1501,
+   "node_handler": "productFormController.saveSpecification",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/hs-specifications/{id}",
+   "controller": "ProductFormController",
+   "action": "saveSpecification",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1225,
+   "node_line": 1502,
+   "node_handler": "productFormController.saveSpecification",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/hs-specifications/{id}/delete",
+   "controller": "ProductFormController",
+   "action": "deleteSpecification",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1226,
+   "node_line": 1503,
+   "node_handler": "productFormController.deleteSpecification",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/{id}/sold-as",
+   "controller": "ProductFormController",
+   "action": "saveSoldAs",
+   "requires_all": [
+    "manage_product_specifications"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 1314,
+   "node_line": 1504,
+   "node_handler": "productFormController.saveSoldAs",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProductFormsD382Test.php"
+    ],
+    "node": [
+     "productFormsD382.test.js"
+    ],
+    "e2e": [
+     "15-product-forms.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
   }
  ],
  "payment_presets": [

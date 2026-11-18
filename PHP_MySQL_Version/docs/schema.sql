@@ -6837,7 +6837,7 @@ CREATE TABLE IF NOT EXISTS hs_specifications (
   name         VARCHAR(120) NOT NULL,
   form_id      BIGINT UNSIGNED NOT NULL,
   usual_finish VARCHAR(80) NULL,
-  hs_code      VARCHAR(8) NOT NULL,
+  hs_code      VARCHAR(20) NOT NULL,       -- 6 or 8 digits, no dots (checked in the app); same length as every other hs_code column
   when_to_use  VARCHAR(255) NULL,
   sort_order   INT NOT NULL DEFAULT 0,
   is_active    TINYINT(1) NOT NULL DEFAULT 1,

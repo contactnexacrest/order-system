@@ -10,7 +10,7 @@
 {% macro formFields(f, units, groups, finishNames, old, oldUnits) %}
   {% set isNew = not f %}
   {% set key = 'new' if isNew else (f.id | string) %}
-  {% set useOld = old and (old._form_key | string) == key %}
+  {% set useOld = old and ((old._form_key or "") | string) == key %}
   {% if useOld %}
     {% set vName = old.name or '' %}{% set vDefault = old.default_unit or '' %}{% set vGroup = old.spec_group or '' %}
     {% set vFinish = old.default_finish or '' %}{% set vOrder = old.sort_order if old.sort_order !== undefined else '' %}
@@ -28,15 +28,15 @@
   </fieldset>
   <label>Starts on *<select name="default_unit" required>
     <option value="">Choose…</option>
-    {% for u in units %}<option value="{{ u.code }}"{% if (vDefault | string) == u.code %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
+    {% for u in units %}<option value="{{ u.code }}"{% if ((vDefault or "") | string) == u.code %} selected{% endif %}>{{ u.label }}</option>{% endfor %}
   </select></label>
   <label>Group * <small class="muted">(which specifications it uses)</small><select name="spec_group" required>
     <option value="">Choose…</option>
-    {% for g, label in groups %}<option value="{{ g }}"{% if (vGroup | string) == g %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    {% for g, label in groups %}<option value="{{ g }}"{% if ((vGroup or "") | string) == g %} selected{% endif %}>{{ label }}</option>{% endfor %}
   </select></label>
   <label>Default finish<select name="default_finish">
     <option value="">Choose…</option>
-    {% for fn in finishNames %}<option value="{{ fn }}"{% if (vFinish | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
+    {% for fn in finishNames %}<option value="{{ fn }}"{% if ((vFinish or "") | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
   </select></label>
   <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="{{ vOrder }}" placeholder="e.g. 4"></label>
   <label class="inline"><input type="checkbox" name="is_active" value="1"{% if active %} checked{% endif %}> Active</label>

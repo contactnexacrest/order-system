@@ -1219,6 +1219,11 @@ $router->post('/products/{id}/configure/reset', [$productConfigure, 'reset'], [S
 $router->post('/products/{id}/configure/use-price', [$productConfigure, 'usePrice'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->get('/products/{id}/link-supplier', [$productConfigure, 'linkSupplierForm'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices')]);
 $router->post('/products/{id}/link-supplier', [$productConfigure, 'linkSupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+// D-383: the static /products/hs-specifications routes come before /products/{id}.
+$router->get('/products/hs-specifications', [$productForms, 'specifications'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/products/hs-specifications', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/hs-specifications/{id}', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/hs-specifications/{id}/delete', [$productForms, 'deleteSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 // Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).
@@ -1306,10 +1311,6 @@ $router->get('/pricing/forms', [$productForms, 'forms'], [SessionAuth::required(
 $router->post('/pricing/forms', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/forms/{id}', [$productForms, 'saveForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/pricing/forms/{id}/delete', [$productForms, 'deleteForm'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->get('/products/hs-specifications', [$productForms, 'specifications'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
-$router->post('/products/hs-specifications', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/products/hs-specifications/{id}', [$productForms, 'saveSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/products/hs-specifications/{id}/delete', [$productForms, 'deleteSpecification'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/products/{id}/sold-as', [$productForms, 'saveSoldAs'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
 // The order form's live quote for a product with chosen options (selling-price visibility is checked inside; never cost).
 $router->get('/pricing/line-quote', [$priceRequests, 'lineQuote'], [SessionAuth::required()]);

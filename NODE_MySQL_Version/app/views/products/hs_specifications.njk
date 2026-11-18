@@ -9,7 +9,7 @@
 {% macro specFields(s, forms, finishNames, old) %}
   {% set isNew = not s %}
   {% set key = 'new' if isNew else (s.id | string) %}
-  {% set useOld = old and (old._spec_key | string) == key %}
+  {% set useOld = old and ((old._spec_key or "") | string) == key %}
   {% if useOld %}
     {% set vName = old.name or '' %}{% set vForm = old.form_id | int %}{% set vFinish = old.usual_finish or '' %}
     {% set vHs = old.hs_code or '' %}{% set vWhen = old.when_to_use or '' %}{% set vOrder = old.sort_order if old.sort_order !== undefined else '' %}
@@ -29,7 +29,7 @@
   </select></label>
   <label>Usual finish<select name="usual_finish">
     <option value="">Choose…</option>
-    {% for fn in finishNames %}<option value="{{ fn }}"{% if (vFinish | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
+    {% for fn in finishNames %}<option value="{{ fn }}"{% if ((vFinish or "") | string) == fn %} selected{% endif %}>{{ fn }}</option>{% endfor %}
   </select></label>
   <label>HS code * <small class="muted">(from the HS Code Master, active only)</small><input type="text" name="hs_code" required maxlength="8" pattern="[0-9]{6}([0-9]{2})?" list="hs-spec-codes" data-in-list="hs-spec-codes" data-in-list-message="Pick an active code from the HS Code Master List." autocomplete="off" value="{{ vHs }}" placeholder="e.g. 68022310"></label>
   <label class="full">When to use<input type="text" name="when_to_use" maxlength="255" value="{{ vWhen }}" placeholder="e.g. As it comes from the quarry"></label>
