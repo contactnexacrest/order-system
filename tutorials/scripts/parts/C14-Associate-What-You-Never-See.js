@@ -1,6 +1,9 @@
 'use strict';
 // C14 — What associates never see, and why: costs, margins, suppliers, other associates' clients,
 // staff screens and finance reports. Shown by trying, so the associate sees the door is closed.
+// Updated 19 Nov 2026 (script only, not recorded): bank change = you confirm with an e-mailed code, then one
+// NexaCrest person who did not enter it checks it (D-293); commission levels and the ladder are never shown
+// to associates, only their own % (D-292).
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.privacy@email.com';
@@ -24,11 +27,11 @@ module.exports = {
     { card: 'title', say: 'Trust works both ways. NexaCrest protects your data, and it protects its own, and its buyers\' and suppliers\'. In this video we look at what an associate never sees, and why that is good for everyone, including you.' },
     { card: 'list', kicker: 'Never in your portal', title: 'Private by design', items: [
       'Supplier names, quarry locations, costs, margins and price formulas.',
-      'Other associates, their clients, their codes and their commission.',
+      'Other associates, their clients, their codes and their commission; commission levels and ladders.',
       'NexaCrest\'s internal finance reports and bank details.',
       'Staff screens: orders, documents in progress, approvals.',
       'Totals of orders or business value: you see your commission, never the business behind it.',
-    ], say: 'Here is the list. You never see supplier names, quarry locations, costs, margins or price formulas. You never see other associates, their clients, codes or commission, and they never see yours. You never see NexaCrest\'s internal finance reports or bank details. You never enter staff screens. And you never see totals of orders or of business value. You see your commission, not the business behind it. Let us prove a few of these.' },
+    ], say: 'Here is the list. You never see supplier names, quarry locations, costs, margins or price formulas. You never see other associates, their clients, codes or commission, and they never see yours. You see your own commission percentage, never levels or ladders. You never see NexaCrest\'s internal finance reports or bank details. You never enter staff screens. And you never see totals of orders or of business value. You see your commission, not the business behind it. Let us prove a few of these.' },
 
     { card: 'chapter', title: 'Commission, not business totals', say: 'First. Commission, not business totals.' },
     { as: 'associate', goto: '/associate', caption: 'Your commission, for the months set', say: 'Your home page shows your commission, in the order currency: earned and paid over the recent months that NexaCrest has set, and what is waiting to be paid. That is all the money you see. There is no total of orders, and no total value of the business your clients bring in, anywhere in your portal, not on the home page, not in your statement, not in any download.', do: async (d) => { await d.ring(d.page.locator('.stat-row').first()); await d.wait(2500); } },
@@ -45,9 +48,9 @@ module.exports = {
     { card: 'list', kicker: 'Your privacy', title: 'What NexaCrest protects for you', items: [
       'Your bank account is masked: only the last digits are shown, even to most staff.',
       'Aadhaar: only the last 4 digits are kept.',
-      'Every bank change is checked by two people.',
+      'Every bank change: you confirm it with an e-mailed code, then NexaCrest checks it.',
       'Your clients are linked to you; only the MD can change that, with a reason.',
-    ], say: 'And the same care protects you. Your bank account is masked, only the last digits are shown. For Aadhaar, only the last four digits are ever stored. Every bank change is checked by two people. And your clients are linked to you; only the Managing Director can change that, always with a reason you see.' },
+    ], say: 'And the same care protects you. Your bank account is masked, only the last digits are shown. For Aadhaar, only the last four digits are ever stored. Every bank change is confirmed by you, with a code we e-mail you, and then checked by someone at NexaCrest who did not enter it. And your clients are linked to you; only the Managing Director can change that, always with a reason you see.' },
     { card: 'list', kicker: 'Recap', title: 'Private by design', items: [
       'You see your clients, their orders, your prices and your commission.',
       'Never costs, suppliers, other associates, staff screens or business totals.',

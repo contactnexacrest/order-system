@@ -1,6 +1,9 @@
 'use strict';
 // C01 — Welcome to the Associate Portal (Group C, Associates).
 // One associate (Full level so every menu shows), freshly set up, logs in and tours the portal.
+// Updated 19 Nov 2026 (script only, not recorded): D-292 (the associate sees only the current %, a 4-step
+// "How it works", the new statuses, payout on the last day of the month), D-282 "Forgot password?" on the
+// login page, D-293 bank-confirmation bar, D-330 wording; video numbers follow the joined series (C01-C06).
 
 const EMAIL = 'associate.full@email.com';
 const nav = (d, name) => d.page.locator('nav.topbar-nav').getByRole('link', { name, exact: false }).first();
@@ -25,17 +28,18 @@ module.exports = {
   },
 
   steps: ({ a = { email: EMAIL, password: 'x', code: 'NXA-DEMO-XX' } } = {}) => [
-    { card: 'title', say: 'Hi, and welcome! This is the very first video for NexaCrest associates. In the next few minutes you will find out what an associate does, how to log in safely, and where everything lives in your portal. Grab a coffee, and let us dive in.' },
+    { card: 'title', say: 'Hi, and welcome! This is the very first video for NexaCrest associates. In this video you will find out what an associate does, how to log in safely, and where everything lives in your portal. Grab a coffee, and let us dive in.' },
 
     { card: 'chapter', title: 'What an associate does', subtitle: 'You bring the buyer. We do the export. You earn.', say: 'Part one. What does an associate actually do?' },
     { card: 'list', kicker: 'The idea in one picture', title: 'Three simple steps', items: [
       'You introduce an overseas buyer to NexaCrest, with your own link or personal code.',
       'NexaCrest quotes, makes the documents, ships the goods and collects the money.',
-      'When the buyer has paid in full, your commission is fixed and paid to your bank.',
-    ], say: 'It really is this simple. Step one: you introduce a buyer, using your own registration link or your personal code. Step two: NexaCrest does all the heavy lifting. We quote, prepare the export documents, ship the goods and collect the payment. Step three: once the buyer has paid in full, your commission is fixed automatically, at the exchange rate of the buyer\'s own payments, and it never changes after that. It is paid straight to your bank account, and NexaCrest pays the bank charges. Your portal lets you follow every one of those steps, live.' },
+      'When the buyer has paid in full, your commission is earned, and we pay it to your bank on our monthly payment day.',
+    ], say: 'It really is this simple. Step one: you introduce a buyer, using your own registration link or your personal code. Step two: NexaCrest does all the heavy lifting. We quote, prepare the export documents, ship the goods and collect the payment. Step three: once the buyer has paid in full, your commission is earned. It is set at the exchange rate of the buyer\'s own payments, and it never changes after that. We pay it straight to your bank account on our monthly payment day, normally the last day of the month, and NexaCrest pays the bank charges. Your portal lets you follow every one of those steps, live.' },
 
     { card: 'chapter', title: 'Logging in safely', subtitle: 'Password first, then a 6-digit code from your e-mail.', say: 'Part two. Logging in, the safe way.' },
     { as: 'associate', goto: '/associate/login', caption: 'Associate Login page', say: 'Your login page lives at your NexaCrest web address, slash associate, slash login. Bookmark it! Notice it says Associate Login. Staff and clients have their own doors, so you can never end up in the wrong place.', do: async (d) => { await d.point('h1', 1200); } },
+    { caption: 'Forgot password?', say: 'And just below the form: Forgot password? If you ever forget it, click here and type your e-mail. We e-mail you a link to set a new password. It works once, for seventy-two hours.', do: async (d) => { await d.point(d.page.getByRole('link', { name: 'Forgot password?' }), 1500); } },
     { caption: 'Step 1: e-mail and password', say: 'First, type the e-mail address NexaCrest registered for you, and your password.', do: async (d) => {
       await d.type(d.page.getByLabel('E-mail'), a.email);
       await d.type(d.page.getByLabel('Password'), a.password, { delay: 40 });
@@ -47,15 +51,15 @@ module.exports = {
       await d.type(d.page.getByLabel('Code'), code, { delay: 120 });
       await d.clickNav(d.page.getByRole('button', { name: 'Log in' }));
     } },
-    { caption: 'Too many wrong tries?', say: 'Quick tip. If the password is typed wrongly too many times, the account pauses for fifteen minutes, to keep it safe. And if you ever forget your password, just ask your NexaCrest relationship manager to send you a new link.' },
+    { caption: 'Too many wrong tries?', say: 'Quick tip. If the password is typed wrongly too many times, the account pauses for fifteen minutes, to keep it safe. And if you forget your password, you know where to go: Forgot password?, right on the login page.' },
 
     { card: 'chapter', title: 'Your home page', subtitle: 'Everything important on one screen.', say: 'Part three. Your home page.' },
     { goto: '/associate', caption: 'Home', say: 'And we are in! The home page greets you by name. Think of it as your dashboard: the money, your clients, your latest orders and your notices, all on one screen.', do: async (d) => { await d.point('h1', 1000); } },
-    { caption: 'First job: complete your profile', say: 'See this yellow note? On your first visit, NexaCrest asks you to complete your profile and upload your documents, like your PAN card and bank proof. Commission is only paid once those documents are accepted, so this is the very first thing to do. We cover it step by step in video C03.', do: async (d) => { await d.point(d.page.locator('.alert-warning').first(), 1500); } },
-    { caption: 'Your money at a glance', say: 'These three boxes are your money at a glance, in the order\'s currency, usually US dollars. Earned in the recent months. Waiting to be paid. And already paid. A brand-new account starts at zero, of course, but these fill up as your clients place orders.', do: async (d) => { await d.point('.stat-row', 1500); } },
+    { caption: 'First job: complete your profile', say: 'See this yellow note? On your first visit, NexaCrest asks you to complete your profile and documents, like your PAN card, your I D and address proof, and your bank proof. The note lists what is still needed or being checked. We pay commission once we have accepted your documents, so this is the very first thing to do. We cover it step by step in video C02.', do: async (d) => { await d.point(d.page.locator('.alert-warning').first(), 1500); } },
+    { caption: 'Your money at a glance', say: 'These three boxes are your money at a glance, in the order\'s currency, usually US dollars. Earned in the last months. Waiting to be paid. And paid in the last months. If a payment is on hold, a fourth box shows it. A brand-new account starts at zero, of course, but these fill up as your clients place orders.', do: async (d) => { await d.point('.stat-row', 1500); } },
     { caption: 'Clients and your personal code', say: 'Below that, you see how many clients you have, how many of your registration links are still open, and your personal code. That code is yours alone. Buyers who use it are linked to you, and to nobody else.', do: async (d) => { await d.point(d.page.locator('p').filter({ hasText: 'personal code' }).first(), 1500); } },
     { caption: 'Invite a client', say: 'And this button, Invite a client, is the quickest way to bring in a new buyer. Video C03 shows exactly how.', do: async (d) => { await d.point(d.page.getByRole('link', { name: 'Invite a client' }), 1200); } },
-    { caption: 'Latest orders and notices', say: 'Further down are your latest orders, with the stage each one has reached, and your notices. Whenever something happens, a new client registers, an order moves forward, or commission is paid, a notice appears here, and the Home tab shows how many are new.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.getByRole('heading', { name: 'Notices' })); } },
+    { caption: 'Latest orders and notices', say: 'Further down are your latest orders, with the stage each one has reached, and your commission on each. Then your notices. Whenever something happens, a new client registers, a client places a new order, or commission is earned or paid, a notice appears here, and the Home tab shows how many are new.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.getByRole('heading', { name: 'Notices' })); } },
 
     { card: 'chapter', title: 'The menu, tab by tab', subtitle: 'Six places to know.', say: 'Part four. A quick walk through the menu.' },
     { goto: '/associate', caption: 'The menu bar', say: 'The menu across the top takes you everywhere. Let us visit each tab, briefly. Each one has its own video later in this series.', do: async (d) => { await d.point('nav.topbar-nav', 1200); } },
@@ -64,10 +68,11 @@ module.exports = {
     { caption: 'Catalogue', say: 'Catalogue. The products NexaCrest has opened for you. Pick the options a buyer wants, and get a price in seconds.', do: async (d) => { await d.clickNav(nav(d, 'Catalogue')); await d.point('h1', 600); } },
     { caption: 'Commission', say: 'Commission. What you earned on each order, what is waiting, what was paid, and your tax certificates. You can download a statement here too.', do: async (d) => { await d.clickNav(nav(d, 'Commission')); await d.point('h1', 600); } },
     { caption: 'Messages', say: 'Messages. A direct line to the NexaCrest team. Ask a question, and the answer lands right here.', do: async (d) => { await d.clickNav(nav(d, 'Messages')); await d.point('h1', 600); } },
-    { caption: 'Profile', say: 'And Profile. Your contact and tax details, your bank account, your agreement and your documents.', do: async (d) => { await d.clickNav(nav(d, 'Profile')); await d.point('h1', 600); } },
+    { caption: 'Profile', say: 'And Profile. Your agreement, your commission, your contact and tax details, your bank account and your documents.', do: async (d) => { await d.clickNav(nav(d, 'Profile')); await d.point('h1', 600); } },
+    { caption: 'Your commission, in plain words', say: 'At the top, your commission: the percentage you earn, of the F O B value of each order from the clients you introduced. Below it, How it works, in four steps. Your percentage is fixed for an order when we send the buyer the proforma invoice. It is worked out on the F O B value on the commercial invoice. It becomes yours when the buyer has paid in full. And we pay it on our monthly payment day, to your checked bank account.', do: async (d) => { await d.ring(d.page.locator('[data-commission-headline]')); await d.wait(1500); await d.point('[data-how-it-works]', 2000); } },
     { caption: 'Contact, tax, bank and documents', say: 'As you scroll, you see the sections: contact and tax details, bank details, and my documents. We fill all of these in, together, in video C02.', do: async (d) => {
       await d.scrollTo(d.page.getByRole('heading', { name: 'Bank details' }));
-      await d.scrollTo(d.page.getByRole('heading', { name: 'My documents and KYC' }));
+      await d.scrollTo(d.page.getByRole('heading', { name: 'My documents (identity and bank checks)' }));
     } },
 
     { card: 'chapter', title: 'Say hello!', subtitle: 'Your first message, and what NexaCrest sees on the other side.', say: 'Part five. Let us say hello to NexaCrest, and peek at what happens on the other side.' },
@@ -101,7 +106,7 @@ module.exports = {
       'Starter: your clients, their orders, your commission, links and messages.',
       'Quoting: adds the catalogue, get a price, price requests and statements.',
       'Full: adds order documents and order amounts in notices.',
-    ], say: 'Not every associate sees the same menu, and that is on purpose. New associates usually start at the Starter level: clients, orders, commission, registration links and messages. Once a few of your orders are completed and paid, the Managing Director can move you up to Quoting, which adds the catalogue and pricing. The Full level adds order documents too. So if a tab from this video is missing in your portal, that is simply your current level. Video C08 explains the levels in detail.' },
+    ], say: 'Not every associate sees the same menu, and that is on purpose. New associates usually start at the Starter level: clients, orders, commission, registration links and messages. Once a few of your orders are completed and paid, the Managing Director can move you up to Quoting, which adds the catalogue and pricing. The Full level adds order documents too. So if a tab from this video is missing in your portal, that is simply your current level. Video C04 explains the levels in detail.' },
 
     { card: 'list', kicker: 'A good routine', title: 'Ten minutes a week', items: [
       'Check Home: new notices are in bold, and the Home tab counts them.',
@@ -114,7 +119,8 @@ module.exports = {
       'Your password and your login codes are yours alone. Never share them.',
       'Your personal code is meant to be shared, with buyers.',
       'Keep your profile, bank and documents up to date, or payouts wait.',
-    ], say: 'Before we finish, three golden rules. One: your password and your six-digit codes are yours alone. NexaCrest will never ask you for them. Two: your personal code is the opposite. Share it freely with buyers, that is how they get linked to you. Three: keep your profile, bank details and documents up to date, because commission can only be paid to a checked bank account.' },
+      'New bank details waiting for you? Confirm them, or press "This is not me".',
+    ], say: 'Before we finish, a few golden rules. One: your password and your six-digit codes are yours alone. NexaCrest will never ask you for them. Two: your personal code is the opposite. Share it freely with buyers, that is how they get linked to you. Three: keep your profile, bank details and documents up to date, because commission can only be paid to a checked bank account. And four: whenever new bank details are entered for you, a yellow bar appears on every page of your portal: new bank details are waiting for your confirmation. Press Review now, and confirm them with a code we e-mail you. If you did not ask for the change, press This is not me, and the change is cancelled.' },
 
     { goto: '/associate', caption: 'Log out', say: 'Finished for the day? Press Log out, top right. Always do this on a shared computer.', do: async (d) => { await d.clickNav(d.page.getByRole('button', { name: 'Log out' })); } },
     { caption: '', say: 'And you are safely back at the login page.', do: async (d) => { await d.point('h1', 600); } },

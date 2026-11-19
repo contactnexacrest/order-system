@@ -1,6 +1,10 @@
 'use strict';
 // C13 — When things change: a client moved to another associate (MD only, with a reason the
 // associate sees), a leaked code blocked and replaced, a suspended account, and an ended one.
+// Updated 19 Nov 2026 (script only, not recorded): new chapter "New bank details you did not ask for" (D-293:
+// the bar on every page, confirm with the e-mailed code or "This is not me — cancel it", cancelled after
+// 7 days) and the address-proof deadline (D-290, 60 days for associates accepted before the change), both as
+// cards (no new selectors); notice wording "… is no longer registered as your client" (D-330).
 const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.changes@email.com';
@@ -35,7 +39,7 @@ module.exports = {
       await d.type(row.locator('input[name="reason"]'), 'Buyer showed an earlier introduction by another associate', { delay: 20 });
       await d.clickNav(row.getByRole('button', { name: 'Change' }));
     } },
-    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail that include the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2000); } },
+    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail: the company is no longer registered as your client, decided by the Managing Director, with the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2000); } },
 
     { card: 'chapter', title: 'A code is blocked', subtitle: 'For example, after it leaked.', say: 'Part two. A blocked code.' },
     { as: 'md', goto: `/associates/${a.id}#portal`, caption: 'Staff: set a new code, block the old', say: 'Imagine your personal code was posted publicly, and strangers use it. NexaCrest can give you a new code, and block the old one, with a reason.', do: async (d) => {
@@ -47,7 +51,20 @@ module.exports = {
     } },
     { as: 'associate', goto: '/associate/clients#code', caption: 'Your new code, the old one blocked', say: 'In your portal, under My codes, the new code is current, and the old one says: blocked by NexaCrest. A blocked code no longer brings buyers to anyone. Normal old codes, from a change you made yourself, keep working.', do: async (d) => { await d.scrollTo('#code'); await d.ring(d.page.locator('#code table.list')); await d.wait(2200); } },
 
-    { card: 'chapter', title: 'Suspended', subtitle: 'You can look, but not act.', say: 'Part three. A suspended account.' },
+    { card: 'chapter', title: 'New bank details you did not ask for', subtitle: 'You confirm every change yourself.', say: 'Part three. New bank details.' },
+    { card: 'list', kicker: 'Bank details', title: 'A yellow bar on every page', items: [
+      '"New bank details are waiting for your confirmation." Press Review now.',
+      'Yours? Type the last 4 digits and the code we e-mail you, tick, and confirm.',
+      'Not yours? Press "This is not me — cancel it": the change is cancelled, NexaCrest is told.',
+      'No answer within 7 days: the change is cancelled; your current account stays.',
+    ], say: 'Whenever new bank details are entered for you, by you or by NexaCrest, you also get an e-mail, and a yellow bar appears on every page of your portal: new bank details are waiting for your confirmation. Press Review now. If the details are yours, type the last four digits of the new account and the code we e-mail you, tick the box, and confirm. If you did not ask for this, press This is not me, cancel it. The change is cancelled at once, and the Managing Director and the finance team are told. And if nobody answers within seven days, the change is cancelled by itself, and your current account stays in use.' },
+    { card: 'list', kicker: 'Documents', title: 'A new document is asked for', items: [
+      'ID proof and address proof are now two separate documents.',
+      'Already active? Home and Profile show the date your address proof is needed by.',
+      'After that date, commission payouts wait until it is accepted.',
+    ], say: 'Sometimes NexaCrest asks for a new document. For example, the I D proof and the address proof are now two separate documents. If you were already active when this changed, your home page and your profile show the date your address proof is needed by. Upload it before then, because after that date, commission payouts wait until it is accepted.' },
+
+    { card: 'chapter', title: 'Suspended', subtitle: 'You can look, but not act.', say: 'Part four. A suspended account.' },
     { as: 'md', goto: `/associates/${a.id}#profile`, caption: 'Staff: status Suspended', say: 'Sometimes an account is suspended for a while, for example while a question is cleared up. The Managing Director changes the status, with a reason.', do: async (d) => {
       await d.scrollTo('#profile form[action*="/status"]');
       await d.select(d.page.locator('#profile select[name="status"]'), 'suspended');
@@ -56,7 +73,7 @@ module.exports = {
     } },
     { as: 'associate', goto: '/associate', caption: 'The suspended banner', say: 'You can still log in and see your clients, orders and commission. But a banner explains: you cannot invite clients or change your details until the suspension ends. Commission already earned is not lost.', do: async (d) => { await d.point('[data-associate-suspended]', 2500); } },
 
-    { card: 'chapter', title: 'Ended', subtitle: 'When the partnership stops.', say: 'Part four. When the partnership ends.' },
+    { card: 'chapter', title: 'Ended', subtitle: 'When the partnership stops.', say: 'Part five. When the partnership ends.' },
     { as: 'md', goto: `/associates/${a.id}#profile`, caption: 'Staff: status Ended', say: 'If the agreement ends, the status becomes Ended.', do: async (d) => {
       await d.scrollTo('#profile form[action*="/status"]');
       await d.select(d.page.locator('#profile select[name="status"]'), 'ended');
@@ -73,8 +90,9 @@ module.exports = {
     { card: 'list', kicker: 'Recap', title: 'Changes, without surprises', items: [
       'Client moved: MD only, with a reason you see at once.',
       'Code blocked: you get a new one; the leaked one stops working.',
+      'New bank details: confirm them with the e-mailed code, or "This is not me".',
       'Suspended: you can look, not act; earned commission stays.',
       'Ended: no new logins; earned commission settled per the agreement.',
-    ], next: 'Part 3 · What you never see', say: 'To recap. A client can only be moved by the Managing Director, with a reason you see. A leaked code is blocked and replaced. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, in part three: what associates never see, and why.' },
+    ], next: 'Part 3 · What you never see', say: 'To recap. A client can only be moved by the Managing Director, with a reason you see. A leaked code is blocked and replaced. New bank details are only used after you confirm them, and This is not me cancels them. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, in part three: what associates never see, and why.' },
   ],
 };

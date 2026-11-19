@@ -3,6 +3,9 @@
 // setting your password and the first login. Also the second door: NexaCrest adds you directly.
 // Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-282 "Send set-password link"
 // (was "Send portal login link") and the login-page link with Copy on the associate page.
+// Updated 19 Nov 2026 (script only, not recorded): accept message shows the 72-hour link with Copy (D-280 / D-282);
+// Add associate: "Based in" now starts at "Choose…" (UI-013), so the script chooses India before saving;
+// "Forgot password?" on the login page (D-282).
 const { ACTORS, nav } = require('../_common');
 
 const NEW = 'associate.new@email.com';
@@ -83,7 +86,7 @@ module.exports = {
       { caption: 'Accept', say: 'The Managing Director can accept it, or reject it with a reason, which is e-mailed to you. Here, we accept. The browser asks, are you sure? And we confirm.', do: async (d) => {
         await d.clickNav(d.page.locator('tr', { hasText: NEW }).getByRole('button', { name: 'Accept' }));
       } },
-      { caption: 'You are now an associate (Invited)', say: 'And now you are an associate, with the status Invited. At the same moment, the system e-mails you a link to set your password.', do: async (d) => {
+      { caption: 'You are now an associate (Invited)', say: 'And now you are an associate, with the status Invited. At the same moment, the system e-mails you a link to set your password. The message also shows that link, with a Copy button, so NexaCrest can send it to you another way if the e-mail does not arrive. It is valid for seventy-two hours, and works once.', do: async (d) => {
         state.setPw = await d.devLink();
         await d.point('.alert-success', 1500);
       } },
@@ -95,7 +98,7 @@ module.exports = {
         await d.type(d.page.getByLabel('Re-enter the new password'), 'TutorialDemo#2026', { delay: 45 });
         await d.clickNav(d.page.getByRole('button', { name: 'Set password' }));
       } },
-      { goto: '/associate/login', caption: 'First login', say: 'Now the normal login: e-mail, password, Continue.', do: async (d) => {
+      { goto: '/associate/login', caption: 'First login', say: 'Now the normal login: e-mail, password, Continue. Below the form is Forgot password?, for the day you need a new one.', do: async (d) => {
         await d.type(d.page.getByLabel('E-mail'), NEW);
         await d.type(d.page.getByLabel('Password'), 'TutorialDemo#2026', { delay: 40 });
         await d.clickNav(d.page.getByRole('button', { name: 'Continue' }));
@@ -107,8 +110,9 @@ module.exports = {
       { caption: 'Status: Invited', say: 'Welcome to your portal! Notice the message: your account is invited. It becomes active once NexaCrest has checked your documents and bank details, which you add under Profile. Until then, you can look around, but you cannot invite clients yet.', do: async (d) => { await d.point(d.page.locator('.alert-warning').first(), 2000); } },
 
       { card: 'chapter', title: 'Door two: added by NexaCrest', subtitle: 'Same result, fewer steps for you.', say: 'Part five. The second door.' },
-      { as: 'md', goto: '/associates/new', caption: 'Staff: Associates → Add associate', say: 'Sometimes NexaCrest adds you directly, for example after meeting you at a trade fair. Staff fill in this form with your name, your e-mail for the portal login, and how your commission works.', do: async (d) => {
+      { as: 'md', goto: '/associates/new', caption: 'Staff: Associates → Add associate', say: 'Sometimes NexaCrest adds you directly, for example after meeting you at a trade fair. Staff fill in this form with your name, where you are based, your e-mail for the portal login, and how your commission is set.', do: async (d) => {
         await d.type(d.page.getByLabel('Name *'), 'Demo Direct Associate');
+        await d.select(d.page.locator('select[name="based_in"]'), 'india');
         await d.type(d.page.getByLabel('E-mail (portal login)'), DIRECT);
         await d.ring(d.page.locator('select[name="commission_mode"]')); await d.wait(800);
       } },

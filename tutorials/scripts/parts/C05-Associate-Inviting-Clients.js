@@ -7,6 +7,9 @@ const EMAIL = 'associate.inviter@email.com';
 const BUYER = 'TEST Demo Harbour Stone BV';
 // The buyer needs its own e-mail domain: the app treats buyers sharing a domain as one company,
 // and other demo buyers (e.g. in C04, recorded in the same video) use @email.com.
+// Updated 19 Nov 2026 (script only, not recorded): "Change my code" field is now "Your word for the code" and
+// the button "Show another ending" (selectors changed); staff list = Orders › Quotation requests, badge
+// "Associate: <name> — buyer's e-mail verified"; link status "Accepted — your client"; "Your client until" (D-330).
 
 module.exports = {
   code: 'C05',
@@ -49,10 +52,10 @@ module.exports = {
       { card: 'chapter', title: 'Your personal code', subtitle: 'For any buyer, any time.', say: 'Part two. Your personal code.' },
       { caption: 'Code and quotation link', say: 'On the right is your personal code, and your quotation link, which already contains the code. Hand them out freely: on your business card, in your e-mail signature, at a trade fair.', do: async (d) => { await d.scrollTo('#code'); await d.ring(d.page.locator('#code p').first()); await d.wait(1800); } },
       { caption: 'A built-in typo check', say: 'A clever detail: the last letter of the code is a check letter. If a buyer mistypes the code, the system notices, instead of linking the buyer to someone else.', do: async (d) => { await d.ring(d.page.locator('#code p.muted').first()); await d.wait(1500); } },
-      { caption: 'Change my code', say: 'You can choose a new code, a few times a year. Type a readable part, like your company name, and press New ending until you like it. Your clients stay yours, and old codes keep working, because clients are linked to you, not to the code.', do: async (d) => {
+      { caption: 'Change my code', say: 'You can choose a new code, a few times a year. Open Change my code, type your word for the code, like your company name, and press Show another ending until you like it. Then Use this code. Your clients stay yours, and links you already shared keep working, because clients are linked to you, not to the code.', do: async (d) => {
         await d.click(d.page.locator('#code summary'));
-        await d.type(d.page.getByLabel(/Readable part/), 'DEMOEXIM');
-        await d.clickNav(d.page.getByRole('button', { name: /New ending/ }));
+        await d.type(d.page.getByLabel(/Your word for the code/), 'DEMOEXIM');
+        await d.clickNav(d.page.getByRole('button', { name: /Show another ending/ }));
         await d.scrollTo('#code'); await d.ring(d.page.locator('#code details p').first()); await d.wait(1200);
       } },
 
@@ -80,14 +83,14 @@ module.exports = {
       { caption: 'Request received', say: 'Thank you! The buyer\'s request is with NexaCrest.', do: async (d) => { await d.point('h1', 1200); } },
 
       { card: 'chapter', title: 'NexaCrest accepts', subtitle: 'From that moment, the client is yours.', say: 'Part four. NexaCrest reviews the new buyer.' },
-      { as: 'md', goto: '/client-intake?view=list', caption: 'Staff: Quotation intake', say: 'On the staff side, the request appears in the quotation intake list. Notice the line: introduced by your associate name, buyer\'s e-mail verified. Staff can see at a glance that this buyer came through you.', do: async (d) => { await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(2000); } },
-      { caption: 'Accept', say: 'They accept it. And the message confirms: linked to the associate, protected until a date six months from now.', do: async (d) => {
+      { as: 'md', goto: '/client-intake?view=list', caption: 'Staff: Orders › Quotation requests', say: 'On the staff side, the request appears under Orders, Quotation requests. Notice the badge: Associate, your name, buyer\'s e-mail verified. Staff can see at a glance that this buyer came through you.', do: async (d) => { await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(2000); } },
+      { caption: 'Accept', say: 'They accept it. And the message confirms: linked to the associate, protected until a date six months from now. At the same moment you get a notice: the company is now registered as your client, and stays your client until that date.', do: async (d) => {
         await d.clickNav(d.page.locator('tr', { hasText: BUYER }).getByRole('button', { name: /Accept/ }).first());
         await d.point('.alert-success', 1800);
       } },
 
       { card: 'chapter', title: 'Your new client', say: 'Part five. Back to you.' },
-      { as: 'associate', goto: '/associate/clients', caption: 'Registered clients (1)', say: 'Your new client is in your list, with the date and the protected-until date. And in your links list, the status now says accepted, your client. You also get a notice on your home page.', do: async (d) => {
+      { as: 'associate', goto: '/associate/clients', caption: 'Registered clients (1)', say: 'Your new client is in your list, with the date it registered and the date it stays your client until. And in your links list, the status now says: Accepted, your client.', do: async (d) => {
         await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ }));
         await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(1800);
       } },
@@ -98,15 +101,15 @@ module.exports = {
       } },
       { card: 'list', kicker: 'Good to know', title: 'Rules that protect you', items: [
         'The first completed registration of a company counts.',
-        'Your client is protected for 6 months; with no order by then, it lapses.',
+        'The company stays your client for 6 months; with no order by then, the link lapses.',
         'Commission comes from the first orders: those within 10 days of the first purchase order.',
         'You can cancel an unused link at any time.',
-      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. Your client is protected for six months, and if they place no order in that time, the protection lapses. Commission comes from the client\'s first orders, those within ten days of their first purchase order. And you can cancel a link you no longer need.' },
+      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. The company stays your client for six months, and if they place no order in that time, the link lapses. Commission comes from the client\'s first orders, those within ten days of their first purchase order. And you can cancel a link you no longer need.' },
       { card: 'list', kicker: 'Recap', title: 'Inviting, step by step', items: [
         'My clients → Company + country → Create buyer registration link → send it.',
         'Or share your personal code / quotation link with any buyer.',
         'Buyer registers, verifies their e-mail, confirms you introduced them.',
-        'NexaCrest accepts: client protected, certificate ready.',
+        'NexaCrest accepts: the company is your client, certificate ready.',
       ], next: 'Video C04 · Prices, special requests and access levels', say: 'Great work! You created a link, met your personal code, and watched a buyer become your client. Next, in video C04, we get a price for that buyer, straight from the catalogue. See you there!' },
     ];
   },

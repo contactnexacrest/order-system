@@ -6,6 +6,9 @@
 // digits + e-mailed code + "These are my bank details"), then ONE staff member who did not enter them
 // verifies with at least two "how I checked" ticks (setting default "one person"); the Finance Manager's
 // second check is gone.
+// Updated 19 Nov 2026 (script only, not recorded): profile top shows "My commission" with the 4-step "How it
+// works" (D-292; a Starter sees "as set out in your agreement", no %); abroad checklist wording (D-290);
+// bank wait: a first account 0 days, a changed account 15 days by default (D-293).
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.invited@email.com';
@@ -43,7 +46,7 @@ module.exports = {
         await d.point(d.page.locator('.alert-warning').nth(1), 1200);
         await d.clickNav(d.page.locator('.alert-warning a').first());
       } },
-      { caption: 'My profile', say: 'At the top of your profile: your name, your login e-mail, your agreement dates, and a plain-words summary of how your commission works. To change your e-mail, just ask NexaCrest.', do: async (d) => { await d.scrollTo('h1'); await d.point('table.kv', 1800); } },
+      { caption: 'My profile', say: 'At the top of your profile: your name, your login e-mail, your agreement dates, and My commission, with How it works in four short steps: when your percentage is fixed, what it is worked out on, when it becomes yours, and when we pay it. To change your e-mail, just ask NexaCrest.', do: async (d) => { await d.scrollTo('h1'); await d.point('table.kv', 1800); } },
       { caption: 'Contact and tax details', say: 'Now the contact and tax details. Your phone number, and, because you are based in India, your PAN. The format is checked as you type: five letters, four digits, one letter.', do: async (d) => {
         await d.scrollTo(d.page.getByRole('heading', { name: 'Contact and tax details' }));
         await d.type(d.page.locator('input[name="pan"]'), 'ABCDE1234F', { delay: 70 });
@@ -55,7 +58,7 @@ module.exports = {
       } },
 
       { card: 'chapter', title: 'Your KYC documents', subtitle: 'Each one is checked by NexaCrest.', say: 'Part two. Your documents, also called KYC.' },
-      { caption: 'The checklist', say: 'This checklist shows exactly what is needed. For an associate in India: PAN card, an ID proof, which is the Aadhaar card or an ID document, a separate address proof, bank proof, and the signed agreement. If you have a GSTIN, the GST certificate too. Associates abroad see a different list: an ID document, an address proof, bank proof, the agreement, and the tax residency papers.', do: async (d) => { await d.scrollTo('#kyc'); await d.ring(d.page.locator('#kyc table.list').first()); await d.wait(1500); } },
+      { caption: 'The checklist', say: 'This checklist shows exactly what is needed. For an associate in India: PAN card, an ID proof, which is the Aadhaar card or an ID document, a separate address proof, bank proof, and the signed agreement. If you have a GSTIN, the GST certificate too. Associates abroad see a different list: an I D proof, an address proof, bank proof and the agreement, and the note below the form adds the tax residency papers.', do: async (d) => { await d.scrollTo('#kyc'); await d.ring(d.page.locator('#kyc table.list').first()); await d.wait(1500); } },
       { caption: 'Upload: PAN card', say: 'Uploading is three quick steps. Choose the document, type its number, and pick the file. The number is checked against the right format for that kind of document.', do: async (d) => { await uploadDoc(d, 'pan', 'ABCDE1234F', files.pan); } },
       { caption: 'Aadhaar: last 4 digits only', say: 'For the Aadhaar card, your I D proof, you type only the last four digits. NexaCrest never keeps the full number. Good for your privacy. With a passport or another I D document instead, you first choose its type, then type its number.', do: async (d) => { await d.scrollTo('#kyc form'); await uploadDoc(d, 'aadhaar', '1234', files.aadhaar); } },
       { caption: 'Address proof: a separate upload', say: 'The address proof is a separate item, checked on its own. If one document shows both, for example a passport with your current address, you upload it once as I D, and once as address proof.', do: async (d) => { await d.scrollTo('#kyc form'); await uploadDoc(d, 'address', '', files.address); } },
@@ -63,7 +66,7 @@ module.exports = {
       { caption: 'Signed agreement', say: 'And your signed agreement. Every upload appears in the list below, marked Being checked, and the checklist above follows along.', do: async (d) => { await d.scrollTo('#kyc form'); await uploadDoc(d, 'agreement', '', files.agreement); } },
 
       { card: 'chapter', title: 'Your bank account', subtitle: 'Where your commission goes.', say: 'Part three. Your bank account.' },
-      { caption: 'Add my bank details', say: 'Under Bank details, open Add my bank details. A small note explains the rule: you confirm every bank change yourself with a code we e-mail you, then someone at NexaCrest checks it, and a new account is only used a few days after it is verified. That protects you against fraud.', do: async (d) => {
+      { caption: 'Add my bank details', say: 'Under Bank details, open Add my bank details. A small note explains the rule: you confirm every bank change yourself with a code we e-mail you, then NexaCrest checks it. Until then, we keep paying into your current account, and a changed account is only used some days after it is checked. That protects you against fraud.', do: async (d) => {
         await d.scrollTo(d.page.getByRole('heading', { name: 'Bank details' }));
         await d.click(d.page.locator('summary', { hasText: 'bank details' }));
         await d.ring(d.page.locator('details p.muted').first()); await d.wait(1500);
@@ -118,7 +121,7 @@ module.exports = {
         await d.type(f.locator('input[name="verify_note"]'), 'Called the associate, last 4 digits confirmed', { delay: 25 });
         await d.clickNav(f.getByRole('button', { name: 'Verify' }));
       } },
-      { caption: 'Verified, usable after a short wait', say: 'Verified! One person alone never decides where your money goes: you confirmed it, and someone else checked it. The account becomes usable after a short waiting period. Until then, any payment would still go to a previously verified account.', do: async (d) => { await d.scrollTo('#bank'); await d.ring(d.page.locator('#bank table.list')); await d.wait(1500); } },
+      { caption: 'Verified, usable after a short wait', say: 'Verified! One person alone never decides where your money goes: you confirmed it, and someone else checked it. Your first account is used straight away. When you change to a new account later, it is used fifteen days after it is checked, and until then we keep paying into the old one.', do: async (d) => { await d.scrollTo('#bank'); await d.ring(d.page.locator('#bank table.list')); await d.wait(1500); } },
       { as: 'md', goto: `/associates/${a.id}#profile`, caption: 'Change status: Active', say: 'Finally, the Managing Director changes your status from Invited to Active, with a short reason for the record.', do: async (d) => {
         await d.scrollTo('#profile form[action*="/status"]');
         await d.select(d.page.locator('#profile select[name="status"]'), 'active');

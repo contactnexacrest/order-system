@@ -1,6 +1,9 @@
 'use strict';
 // C08 — Access levels: Starter, Quoting, Full and Custom; the level settings; how the MD moves
 // an associate up (with a reason), and what changes on the associate's screen.
+// Updated 19 Nov 2026 (script only, not recorded): access levels are about what the portal shows; the
+// associate never sees commission levels or the ladder, only the current % (D-292); locked page wording
+// "This page is not open for your account" (D-330); staff menu Associates › Access levels.
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.levels@email.com';
@@ -21,17 +24,17 @@ module.exports = {
     { card: 'title', say: 'Why does one associate see a Catalogue tab, and another does not? It is all about access levels. In this part we look at the four levels, who decides, and we watch an associate move up, live.' },
     { card: 'list', kicker: 'The levels', title: 'Four levels', items: [
       'Starter: clients, orders and stage, commission, links, messages, TDS certificates.',
-      'Quoting: + order value, commission %, catalogue, get price, "Other", statements.',
+      'Quoting: + order value, your commission %, catalogue, get price, "Other", statements.',
       'Full: + documents of your orders and order amounts in notices.',
       'Custom: the Managing Director ticks features one by one.',
-    ], say: 'There are four levels. Starter: your clients, their orders and stage, your commission, registration links, messages and TDS certificates. Quoting adds the order value, your commission percentage, the catalogue, get a price, Other requests, and statements. Full adds the documents of your orders, and order amounts in your notices. And Custom lets the Managing Director tick features one by one, for special cases.' },
+    ], say: 'There are four levels. Starter: your clients, their orders and stage, your commission, registration links, messages and TDS certificates. Quoting adds the order value, your commission percentage, the catalogue, get a price, Other requests, and statements. Your commission percentage means one number: the percent you earn on each order. Commission levels and their steps are never shown in your portal. Full adds the documents of your orders, and order amounts in your notices. And Custom lets the Managing Director tick features one by one, for special cases.' },
 
     { card: 'chapter', title: 'Starter today', say: 'Part one. Our demo associate today.' },
     { as: 'associate', goto: '/associate', caption: 'A Starter menu', say: 'Here is our demo associate at Starter. The menu: Home, My clients, Orders, Commission, Messages, Profile. No Catalogue.', do: async (d) => { await d.point('nav.topbar-nav', 1800); } },
     { goto: '/associate/orders', caption: 'No order value', say: 'And on Orders, there is no order value column. Remember these two things, so we can spot the change in a minute.', do: async (d) => { await d.ring(d.page.locator('table.list tr').first()); await d.wait(1500); } },
 
     { card: 'chapter', title: 'Who decides, and how', subtitle: 'Only the Managing Director changes a level.', say: 'Part two. On the NexaCrest side.' },
-    { as: 'md', goto: '/associates/access-levels', caption: 'Staff: Associate access levels', say: 'The Managing Director has a page called Associate access levels. It is a grid: every feature down the side, every level across the top. A tick means that level shows that feature.', do: async (d) => { await d.ring(d.page.locator('form[data-access-levels] table').first()); await d.wait(2200); } },
+    { as: 'md', goto: '/associates/access-levels', caption: 'Staff: Associate access levels', say: 'Under Associates, Access levels, the Managing Director has a page called Associate access levels. It is a grid: every feature down the side, every level across the top. A tick means that level shows that feature.', do: async (d) => { await d.ring(d.page.locator('form[data-access-levels] table').first()); await d.wait(2200); } },
     { caption: 'Changes need a reason', say: 'If the grid is changed, a reason is required, and every change is kept in the history below. There is even a button to put the recommended defaults back.', do: async (d) => { await d.scrollTo(d.page.getByRole('button', { name: 'Save level settings' })); await d.ring(d.page.locator('input[name="reason"]').first()); await d.wait(1500); } },
     { goto: `/associates/${a.id}#portal-access`, caption: 'One associate: Portal access', say: 'Now the record of one associate. The Portal access section shows the current level and the track record. When a Starter associate has a few completed and fully paid orders, a blue note appears here: ready for the Quoting level? Nothing upgrades by itself. The Managing Director decides, or presses Not yet.', do: async (d) => { await d.scrollTo('#portal-access'); await d.wait(1500); } },
     { caption: 'Move up to Quoting', say: 'Let us move our associate up. Choose Quoting, write the reason, and press Save portal access.', do: async (d) => {
@@ -55,7 +58,7 @@ module.exports = {
     { card: 'list', kicker: 'Good to know', title: 'Levels, in short', items: [
       'Your level only changes what you see, never what you earn.',
       'Only the Managing Director changes it, always with a reason.',
-      'Opening a locked page simply says "Not available at your access level".',
+      'Opening a locked page simply says "This page is not open for your account".',
       'Good results, completed and paid orders, are the way up.',
     ], next: 'Video C05 · Commission, statements, TDS and GST', say: 'In short: your level changes what you see, never what you earn. Only the Managing Director changes it, always with a reason. A locked page simply tells you so. And the way up is good results: completed, fully paid orders. Next, video C05: your commission, from start to finish. See you there!' },
   ],

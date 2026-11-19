@@ -1,5 +1,7 @@
 'use strict';
 // C10 — Statements: the CSV download and the printable statement (Quoting and Full levels).
+// Updated 19 Nov 2026 (script only, not recorded): D-330 plain labels on a paid line ("Before tax · Tax we
+// deducted (TDS) … · Paid to you"); the CSV columns as the app writes them for an associate in India.
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.statement@email.com';
@@ -34,13 +36,13 @@ module.exports = {
       if (dl) { const p = await dl.path(); d.csv = require('fs').readFileSync(p, 'utf8').split(/\r?\n/).filter(Boolean).slice(0, 5); }
     } },
     { card: 'list', kicker: 'Inside the file', title: 'One row per commission', items: [
-      'Month, order, client, amount (order currency and ₹), status.',
-      'For paid lines: the date paid, the amount paid, the TDS and the bank reference.',
+      'Month, order, client, commission in the order currency, the fixed rupee amount and rate, status.',
+      'For paid lines: the date paid, the rupees paid, the TDS and the bank reference.',
       'Same rows as the screen: the period NexaCrest set, plus anything still waiting.',
-    ], say: 'Inside, one row per commission, just like the screen: the month, the order, the client, the amounts, the status, and for paid lines the date paid, the amount paid, the TDS, and the bank reference. Exactly what an accountant needs.' },
+    ], say: 'Inside, one row per commission, just like the screen: the month, the order, the client, the commission in the order currency, and, for an associate in India, the rupee amount with the rate and date it was fixed at. Then the status, and for paid lines the date paid, the rupees paid, the T D S, and the bank reference. Exactly what an accountant needs.' },
     { card: 'chapter', title: 'The printable statement', subtitle: 'Clean, on paper or as a PDF.', say: 'Part two. The printable statement.' },
     { goto: '/associate/commission?print=1', caption: 'Printable statement', say: 'Printable statement opens a clean version of the page, without menus or buttons, and the print window opens by itself. Choose your printer, or Save as PDF.', do: async (d) => { await d.point('h1', 1500); await d.ring(d.page.locator('table.list').first()); await d.wait(2000); } },
-    { caption: 'Gross, TDS and net', say: 'Look at a paid line with tax deducted: gross, TDS with the section and rate, and the net amount that reached your bank. Part three of this video explains those numbers.', do: async (d) => { await d.ring(d.page.locator('[data-tds-breakdown]').first()); await d.wait(2000); } },
+    { caption: 'Before tax, tax deducted, paid to you', say: 'Look at a paid line with tax deducted: the amount before tax, the tax we deducted, called T D S, with the section of the Income Tax Act and the rate, and the amount paid to you, which reached your bank. Part three of this video explains those numbers.', do: async (d) => { await d.ring(d.page.locator('[data-tds-breakdown]').first()); await d.wait(2000); } },
     { card: 'list', kicker: 'Good to know', title: 'Statements, in short', items: [
       'Starter level: no statement buttons; ask NexaCrest if you need one.',
       'The statement shows your commission only, never other associates.',

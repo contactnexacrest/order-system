@@ -3,6 +3,10 @@
 // 206AA without a verified PAN), GST on top when registered, and associates abroad (section 195,
 // DTAA: no TDS once TRC, Form 10F and the no-PE declaration are accepted; Form 15CA/15CB per payout).
 // Figures follow the current Admin settings (Settings → Associate TDS); re-check before recording.
+// Updated 19 Nov 2026 (script only, not recorded): the certificates heading is now "Tax certificates (Form
+// 16A) and foreign payment forms (15CA / 15CB) from NexaCrest" (selector changed, 3 places); paid line labels
+// "Before tax · Tax we deducted (TDS) … · Paid to you" (D-330); abroad checklist: ID proof, address proof
+// (D-290), bank proof, agreement — the tax residency papers are named in the note below the upload form.
 const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const INDIA = 'associate.india@email.com';
@@ -47,8 +51,8 @@ module.exports = {
       'TDS 2% on ₹15,400 + ₹8,000 catch-up = ₹468.',
       'Paid to your bank: ₹15,400 − ₹468 = ₹14,932.',
     ], say: 'An example. Earlier this year you were paid eight thousand rupees, with no TDS, because you were still under twenty thousand. Now fifteen thousand four hundred rupees is due. Your year total becomes twenty-three thousand four hundred, over the limit. So TDS is two percent of fifteen thousand four hundred, plus the eight thousand catch-up: four hundred and sixty-eight rupees. Your bank receives fourteen thousand nine hundred and thirty-two rupees.' },
-    { as: 'associate', goto: '/associate/commission', caption: 'Gross · TDS · net paid', say: 'And here is exactly that payment in the portal. Gross fifteen thousand four hundred, TDS four hundred and sixty-eight under section 194H at two percent, and the net paid, with the bank reference.', do: async (d) => { await d.ring(d.page.locator('[data-tds-breakdown]').first()); await d.wait(2500); } },
-    { caption: 'Your Form 16A appears here', say: 'Below, under TDS certificates, NexaCrest places your Form 16A every quarter. You use it in your own income tax return, to claim the tax already deducted.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /TDS certificates/ })); await d.wait(1500); } },
+    { as: 'associate', goto: '/associate/commission', caption: 'Gross · TDS · net paid', say: 'And here is exactly that payment in the portal. Before tax, fifteen thousand four hundred. Tax we deducted, four hundred and sixty-eight, under Income Tax Act section 194H, at two percent. And paid to you, fourteen thousand nine hundred and thirty-two, with the bank reference.', do: async (d) => { await d.ring(d.page.locator('[data-tds-breakdown]').first()); await d.wait(2500); } },
+    { caption: 'Your Form 16A appears here', say: 'Below, under Tax certificates, NexaCrest places your Form 16A every three months. You use it in your own income tax return, to claim the tax already deducted.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /Tax certificates/ })); await d.wait(1500); } },
     { card: 'list', kicker: 'India · no PAN', title: 'Why your PAN matters', items: [
       'No PAN on file, or not yet verified: TDS is 20% (section 206AA).',
       'Same ₹15,400 payment: ₹3,080 deducted instead of ₹468.',
@@ -71,8 +75,8 @@ module.exports = {
       '…once your Tax Residency Certificate, Form 10F and No-PE declaration are accepted.',
       'Each payment also needs Form 15CA (and 15CB) before it is sent.',
     ], say: 'If you live outside India, payments to you fall under section 195. Under the tax treaty between India and your country, the DTAA, NexaCrest deducts no TDS, once three papers are on file and accepted: your Tax Residency Certificate, Form 10F, and a declaration that you have no permanent establishment in India. And for every payment, NexaCrest files Form 15CA, and where needed 15CB, before the money leaves India.' },
-    { as: 'abroad', goto: '/associate/profile#kyc', caption: 'Abroad: the papers on your checklist', say: 'Here is the profile of a demo associate abroad. The document checklist is different: passport or company registration, bank proof, the agreement, and the tax residency papers. Upload them once, and keep the residency certificate current every year.', do: async (d) => { await d.scrollTo('#kyc'); await d.ring(d.page.locator('#kyc table.list').first()); await d.wait(2200); await d.point(d.page.locator('#kyc p.muted.small').last(), 1500); } },
-    { goto: '/associate/commission', caption: 'Forms 15CA / 15CB appear here', say: 'And on the Commission page, the remittance forms 15CA and 15CB for your payments appear in the same list as the certificates.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /TDS certificates/ })); await d.wait(1500); } },
+    { as: 'abroad', goto: '/associate/profile#kyc', caption: 'Abroad: the papers on your checklist', say: 'Here is the profile of a demo associate abroad. The document checklist is different: an I D proof, such as a passport, a separate address proof, bank proof, and the agreement. The note below the upload form adds the tax residency papers: the tax residency certificate, Form 10F, and the no-PE declaration. Upload them once, and keep the residency certificate current every year.', do: async (d) => { await d.scrollTo('#kyc'); await d.ring(d.page.locator('#kyc table.list').first()); await d.wait(2200); await d.point(d.page.locator('#kyc p.muted.small', { hasText: 'Outside India' }).first(), 1500); } },
+    { goto: '/associate/commission', caption: 'Forms 15CA / 15CB appear here', say: 'And on the Commission page, the foreign payment forms 15CA and 15CB for your payments appear under the same heading as the certificates.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /Tax certificates/ })); await d.wait(1500); } },
     { card: 'list', kicker: 'Recap', title: 'Tax, in short', items: [
       'India: no TDS up to ₹20,000 a year, then 2% (194H) with a one-time catch-up.',
       'No verified PAN: 20% (206AA). Add your PAN early!',

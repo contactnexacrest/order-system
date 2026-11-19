@@ -4,6 +4,8 @@
 // Updated 13 Nov 2026 (docs audit C; not recorded, recording on hold): D-339 "Your prices in other units"
 // (per CBM / SQM / SQFT, D-364 unit names) shown after Get price; D-357 finish names ("Natural Polish" is the
 // standard finish; "Leather" unchanged).
+// Updated 19 Nov 2026 (script only, not recorded): the "Valid until" step now points at the line that says
+// "Valid until …" (it pointed at the "Price request no." line); catalogue narration D-305 (no prices).
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.quoting@email.com';
@@ -30,7 +32,7 @@ module.exports = {
     { caption: 'Daily limit and validity', say: 'They also set how many prices you can ask for per day, and how long a price stays valid. Empty means the company default: ten a day, valid seven days.', do: async (d) => { await d.ring(d.page.locator('.form-row').first()); await d.wait(1800); } },
 
     { card: 'chapter', title: 'The catalogue', subtitle: 'Products you may offer. No prices, no suppliers.', say: 'Part two. Your catalogue.' },
-    { as: 'associate', goto: '/associate/catalogue', caption: 'Catalogue', say: 'Back to you. The Catalogue tab lists the products you can offer, with their forms and finishes. Notice: no prices, no supplier names, no quarry locations. The descriptions can be shared with buyers.', do: async (d) => { await d.ring(d.page.locator('table.list').first()); await d.wait(2000); } },
+    { as: 'associate', goto: '/associate/catalogue', caption: 'Catalogue', say: 'Back to you. The Catalogue tab lists the products you can offer, with the forms they are available as, and their finishes. Notice: no prices here at all, no supplier names, no quarry locations. You get a price only with Get price. The descriptions can be shared with buyers.', do: async (d) => { await d.ring(d.page.locator('table.list').first()); await d.wait(2000); } },
     { caption: '10 of 10 left today', say: 'At the top: how many price requests you have left today. Use them wisely, NexaCrest keeps an eye on how many prices turn into orders.', do: async (d) => { await d.point(d.page.locator('p.muted').first(), 1500); } },
 
     { card: 'chapter', title: 'Get price', subtitle: 'Choose the options. Get the price.', say: 'Part three. Let us get a price.' },
@@ -50,7 +52,7 @@ module.exports = {
     { caption: 'Your prices in other units', say: 'Below them, the same two prices in other units: per C B M, per S Q M and per S Q F T, at the thickness you chose. They are only there to compare, for a buyer who thinks in another unit. The order itself is priced in the unit above.', do: async (d) => { const h = d.page.getByRole('heading', { name: /Your prices in other units/ }); if (await h.count()) { await d.scrollTo(h); await d.point(h, 1200); await d.point(d.page.locator('table.list').first(), 2200); } else { await d.wait(1500); } } },
     { caption: 'Your commission does not change', say: 'Here is the friendly part: your commission is the same anywhere between those two prices. So negotiate freely within that range, it does not cost you anything.', do: async (d) => { await d.point(d.page.locator('p.small.muted').last(), 1800); } },
     { caption: 'What changed the price', say: 'The lines show what changed the price compared to the standard specification, like a thicker slab or a special finish: the standard finish is Natural Polish, so leather adds a little. Never costs or margins, only what moved the price.', do: async (d) => { const t = d.page.locator('table.list'); if (await t.count()) { await d.ring(t.last()); } await d.wait(1800); } },
-    { caption: 'Valid until…', say: 'And the price is valid until the date shown. After that, simply ask again.', do: async (d) => { await d.point(d.page.locator('p.muted').nth(1), 1200); } },
+    { caption: 'Valid until…', say: 'And the price is valid until the date shown. After that, simply ask again.', do: async (d) => { await d.point(d.page.locator('p.muted', { hasText: 'Valid until' }).first(), 1200); } },
 
     { card: 'chapter', title: 'Your price requests', say: 'Part four. Keeping track.' },
     { goto: '/associate/catalogue', caption: 'Your price requests', say: 'Back on the catalogue, the request is listed under Your price requests, with its number, the specification, the two prices and the status. When the buyer orders, it says: became an order.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Your price requests' })); await d.ring(d.page.locator('table.list').last()); await d.wait(2000); } },
