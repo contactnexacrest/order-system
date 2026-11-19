@@ -18,7 +18,7 @@ module.exports = {
   group: 'Group A · Everyone',
   title: 'Everything NexaCrest Can Do',
   subtitle: 'Part 2 of 2 · A tour of every area of the app, from clients to backups.',
-  minutes: '12',
+  minutes: '10',
   restoreDb: true,
 
   async setup(demo) {

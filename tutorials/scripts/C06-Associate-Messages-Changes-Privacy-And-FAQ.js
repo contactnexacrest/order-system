@@ -7,5 +7,5 @@ module.exports = merge({
   group: 'Group C · Associates',
   title: 'Messages, changes, privacy and your questions',
   subtitle: 'Talk to NexaCrest, know what happens when things change, what stays private, and quick answers.',
-  minutes: '12',
+  minutes: '14',
 }, [require('./parts/C12-Associate-Messages-And-Notices'), require('./parts/C13-Associate-When-Things-Change'), require('./parts/C14-Associate-What-You-Never-See'), require('./parts/C15-Associate-FAQ')]);
