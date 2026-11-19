@@ -37,6 +37,27 @@
 > Open point for the owner (not narrated in any video): the associate's order statement still shows "Counts toward
 > your next commission rate: yes / no", although D-292 says associates never see counts or levels.
 
+> **Hindi versions recorded 19 Nov 2026 (owner, 19 Nov: "I need all above videos in Hindi … not more than 15 min,
+> split into parts if longer … give me all at once, A, then all A videos, then B …").** Same scripts, recorded with
+> `TUT_LANG=hi` and the Piper voice `hi_IN-priyamvada-medium`; every spoken and shown text comes from
+> `tutorials/i18n/hi/<video>.json` (guide: `tutorials/i18n/hi/README.md`; `node tutorials/i18n-check.js hi` must pass).
+> The app's screens and the e-mail cards stay in English (the app is English); the narration over them is Hindi.
+> Files end in `-Hindi.mp4` with Devanagari `.srt` subtitles. Checked like the English set (length, audio level
+> −17.2 to −17.6 dB, subtitle end, frame grid, flash scan; flashes repaired in B01-2, B11, C02 and C06 Part 1).
+> Hindi speech is a little longer, so C05 and C06 went over 15 minutes and were cut in two at a part title card
+> (C05 at 7:47.5, before "Part 2 of 3"; C06 at 7:45.9, before "Part 3 of 4"); the cards inside keep the merged
+> numbering ("Part 3 of 4" opens C06 Hindi Part 2).
+>
+> | Group | Hindi video | Length |
+> |---|---|---|
+> | A | A01-1 · A01-2 · A02-1 · A02-2 | 13.0 · 12.4 · 8.9 · 7.4 min |
+> | B | B01-1 / B01-2 · B02 · B03 · B04 · B05 · B06-1 / B06-2 · B07 · B08 · B09-1 / B09-2 · B10 · B11 | 12.9 / 10.5 · 11.8 · 8.6 · 7.2 · 6.0 · 5.3 / 4.5 · 4.9 · 4.3 · 5.2 / 6.3 · 6.1 · 3.7 min |
+> | C | C01 · C02 · C03 · C04 · C05 Part 1 / Part 2 · C06 Part 1 / Part 2 | 11.6 · 14.9 · 11.0 · 10.6 · 7.8 / 8.1 · 7.8 / 9.7 min |
+> | D | D01 · D02 · D03 · D04 · D05 | 9.5 · 8.9 · 9.2 · 8.9 · 10.0 min |
+>
+> A change that alters a recorded video now affects both the English and the Hindi version (ask the owner first,
+> as for the English videos); a changed English text needs its Hindi line in the JSON before re-recording.
+
 Owner plan (6 Nov 2026): one series of narrated videos per group, in the order
 **C → A → D → B → E**. Each video 8–12 minutes, never over 15 (split into parts instead).
 US English voice (Piper `en_US-lessac-medium`). Interesting, not boring. No PII: role names,

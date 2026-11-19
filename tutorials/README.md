@@ -37,6 +37,17 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
 | `TUT_DB_USER` / `TUT_DB_PASSWORD` / `TUT_DB_NAME` | dev values | dev database (never the live one) |
 | `TUT_STAFF_PASSWORD` | e2e staff password | password of the md@email.com / ed@email.com dev accounts |
 | `TUT_LENGTH_SCALE` | `1.1` | voice speed (higher = slower; 1.1 is a calm, clear pace) |
+| `TUT_LANG` | `en` | `hi` records the Hindi version: texts from `tutorials/i18n/hi/<video>.json`, file name ends `-Hindi.mp4` (use with `TUT_VOICE=…/hi_IN-priyamvada-medium.onnx`) |
+
+### Hindi versions (since 19 Nov 2026)
+
+`TUT_LANG=hi TUT_VOICE=<path>/hi_IN-priyamvada-medium.onnx node tutorials/run.js C01` (voice + `.onnx.json` from the
+Hugging Face `rhasspy/piper-voices` repository, like the English one) records the same
+script in Hindi. Every spoken and shown text is looked up in `tutorials/i18n/hi/<video file base>.json`; a missing
+text stops the recording (a video is never half English). After a script change run
+`node tutorials/i18n-extract.js hi <code>` (adds the new English texts, keeps the old translations), translate the
+empty values following `tutorials/i18n/hi/README.md`, and check with `node tutorials/i18n-check.js hi`. Hindi speech
+runs longer: use `--plan` for the estimate, and split a take over 15 minutes at a part title card.
 
 ### One-time set-up
 
