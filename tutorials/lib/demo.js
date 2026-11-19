@@ -227,6 +227,13 @@ function buyerWithOrders(spec) {
  */
 function pricedProduct(associateId, name = 'Black Galaxy Granite (demo)') {
   const md = Number(sql("SELECT id FROM users WHERE email = 'md@email.com'"));
+  // A video built from several parts calls this once per part: reuse the product, only open it to this associate.
+  const existing = Number(sql(`SELECT id FROM products WHERE name = ${q(name)} ORDER BY id LIMIT 1`) || 0);
+  if (existing) {
+    php(`use App\\Repositories\\SpecRepository; use App\\Services\\PriceRequestService;
+      PriceRequestService::saveAccess(${Number(associateId)}, [(int) SpecRepository::systemCategoryId() => ['slab', 'tile']]); echo 1;`);
+    return existing;
+  }
   return Number(php(`
     use App\\Repositories\\ProductRepository; use App\\Repositories\\PricingRepository; use App\\Repositories\\SpecRepository;
     use App\\Repositories\\ProductSupplierRepository; use App\\Services\\PriceRequestService;
