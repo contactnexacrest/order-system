@@ -17,7 +17,7 @@
 > The snapshot (`lib/demo.js`) now leaves out the `documents` table and deletes only the documents a recording added.
 
 > **Complete set recorded 19 Nov 2026 (owner, 19 Nov: "complete everything first … give me all videos under their
-> names … at the end give me all at once").** All 28 videos below were recorded fresh on the tutorial database,
+> names … at the end give me all at once").** All 29 videos below were recorded fresh on the tutorial database,
 > checked (length, audio level, subtitle end, frame grid, plus a scan for one-frame "tiny page" flashes, which were
 > repaired by replacing the flash frame with the clean frame after it) and sent together, grouped A / B / C / D.
 > Recorder fixes found on the way (all in `tutorials/lib` or the scripts): the dev login-code box is hidden in every
