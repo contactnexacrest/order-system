@@ -11,7 +11,7 @@ const cfg = require('./config');
 const q = (v) => (v == null ? 'NULL' : `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`);
 
 function sql(statement, what = 'sql') {
-  const r = spawnSync('mysql', ['-N', '-u', cfg.DB.user, `-p${cfg.DB.password}`, cfg.DB.database, '-e', statement]);
+  const r = spawnSync('mysql', ['-N', '--default-character-set=utf8mb4', '-u', cfg.DB.user, `-p${cfg.DB.password}`, cfg.DB.database, '-e', statement]);
   if (r.status !== 0) throw new Error(`${what} failed: ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }
