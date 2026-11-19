@@ -18,7 +18,7 @@ module.exports = {
   file: 'B10-Staff-Admin-And-System-Administrator.mp4',
   group: 'Group B · Staff',
   title: 'Admin and System Administrator',
-  subtitle: 'Users and rights, help access, templates and lists, settings, backups and test mode.',
+  subtitle: 'Users and rights, help access, templates and lists, settings and backups.',
   minutes: '5',
   restoreDb: true,
 
@@ -36,7 +36,7 @@ module.exports = {
   },
 
   steps: () => [
-    { card: 'title', say: 'This video is for the Admin and the System Administrator. You keep the application itself in order: the people who log in and what they may do, the help they see, the templates and lists behind every form, the company settings, and the safety nets: backups and test mode.' },
+    { card: 'title', say: 'This video is for the Admin and the System Administrator. You keep the application itself in order: the people who log in and what they may do, the help they see, the templates and lists behind every form, the company settings, and the safety net: backups.' },
     { card: 'list', kicker: 'Your roles', title: 'Admin · System Administrator', items: [
       'Admin: full system access, users, roles, settings, data export and the audit log.',
       'System Administrator: users, settings, templates and lists; no business money, no data export.',
@@ -71,11 +71,16 @@ module.exports = {
     { goto: '/holidays', caption: 'Settings › Holidays', say: 'The holiday calendar: the dated holidays skipped when the app counts working days, for example for the buyer\'s dispute response time, or a payout that would fall on a holiday. Add the year\'s state and festival holidays each January.', do: async (d) => { await d.point('h1', 1800); } },
 
     // ---------- 3. Settings and safety ----------
-    { card: 'chapter', title: 'Settings and safety', subtitle: 'Company · Backups · Data export · Test mode.', say: 'Chapter three. Keeping the system safe.' },
+    { card: 'chapter', title: 'Settings and safety', subtitle: 'Company · Backups · Data export.', say: 'Chapter three. Keeping the system safe.' },
     { goto: '/settings', caption: 'Settings › Company', say: 'Company settings hold every value our documents print. Protected fields, such as the bank account, show a lock: press Unlock on the row before you can change it, and give a reason. The mail copy list is for the Super Admin only.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.getByRole('button', { name: 'Expand all' }), 1200); } },
     { goto: '/admin/backups', caption: 'Settings › Backups', say: 'Backups shows what the nightly backup jobs report: the database and every order document, kept for ten years, encrypted and copied off-site. On this practice copy, backups are not set up, so the page says so. How to restore is in the SOP.', do: async (d) => { await d.point('h1', 1800); } },
     { goto: '/admin/data-export', caption: 'Settings › Data export', say: 'Data export, for the Admin only: the structure of the database, and a full data export, for moving to a new server. The file holds everything, so keep it safe.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.getByRole('heading', { name: /Full data export/ }), 1500); } },
-    { goto: '/test-mode', caption: 'Settings › Test mode', say: 'Test mode lets the team run the whole order process for practice, with documents and reports, while every business e-mail is redirected to a test address. Switch it off again before real work.', do: async (d) => { await d.point('h1', 2500); } },
+    { card: 'list', kicker: 'Good to know', title: 'Test mode is for the Super Admin', items: [
+      'Test mode runs the whole order process for practice, with documents and reports.',
+      'Every business e-mail is redirected to a test address while it is on.',
+      'Only a Super Admin opens it: by default the Managing Director and the Executive Director.',
+      'Switch it off again before real work.',
+    ], say: 'One more safety net, which is not yours to switch: test mode. It lets the team run the whole order process for practice, with documents and reports, while every business e-mail goes to a test address. Only a Super Admin can open it, by default the Managing Director and the Executive Director. If you try, the app refuses the page.' },
 
     // ---------- 4. System Administrator ----------
     { card: 'chapter', title: 'The System Administrator', subtitle: 'Same tools, no money.', say: 'Chapter four. The System Administrator.' },
@@ -86,7 +91,7 @@ module.exports = {
       'New colleague: Add user (one-time password), then the department.',
       'Roles and permissions, task due days and SOP access.',
       'E-mail templates, lists and holidays behind every form.',
-      'Protected settings, backups, data export (Admin only) and test mode.',
-    ], next: 'B11 · CA, Auditor and Investor', say: 'Let us recap. For a new colleague, add the user, hand over the one-time password, and add them to their department. Keep the roles and permissions, the task due days and the SOP access right. Look after the e-mail templates, the lists and the holidays behind every form. And protect the settings, watch the backups, and use test mode for practice; the data export is for the Admin only. Next: the chartered accountant, the auditor and the investor.' },
+      'Protected settings, backups and data export (Admin only); test mode is the MD and ED.',
+    ], next: 'B11 · CA, Auditor and Investor', say: 'Let us recap. For a new colleague, add the user, hand over the one-time password, and add them to their department. Keep the roles and permissions, the task due days and the SOP access right. Look after the e-mail templates, the lists and the holidays behind every form. And protect the settings and watch the backups; the data export is for the Admin only, and test mode for the Managing Director and the Executive Director. Next: the chartered accountant, the auditor and the investor.' },
   ],
 };
