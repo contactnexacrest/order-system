@@ -16,6 +16,27 @@
 > `TUT_BASE_URL=http://127.0.0.1:8081 TUT_DB_NAME=nexacrest_tutorial TUT_PHP_APP=/home/user/tutorial-stack/app`.
 > The snapshot (`lib/demo.js`) now leaves out the `documents` table and deletes only the documents a recording added.
 
+> **Complete set recorded 19 Nov 2026 (owner, 19 Nov: "complete everything first … give me all videos under their
+> names … at the end give me all at once").** All 28 videos below were recorded fresh on the tutorial database,
+> checked (length, audio level, subtitle end, frame grid, plus a scan for one-frame "tiny page" flashes, which were
+> repaired by replacing the flash frame with the clean frame after it) and sent together, grouped A / B / C / D.
+> Recorder fixes found on the way (all in `tutorials/lib` or the scripts): the dev login-code box is hidden in every
+> stylesheet; the page zoom is applied before the first paint (no tiny-page flash); the set-password link is read
+> from the Copy button (D-280/D-282); demo SQL runs in utf8mb4 (dashes were garbled); a video built from several
+> parts reuses one demo product; B01 Part 1 keeps Products open while it is narrated; C01 shows the password tip on
+> the login page; B10 says test mode is the Super Admin's (MD/ED) instead of opening a 403 page; stated lengths
+> ("About N minutes") set from the real takes.
+>
+> | Group | Video | Length |
+> |---|---|---|
+> | A | A01-1 NexaCrest in Ten Minutes · A01-2 Everything NexaCrest Can Do · A02-1 One Order, Enquiry to Confirmation · A02-2 One Order, Factory to Closure | 10.5 · 9.5 · 7.1 · 5.7 min |
+> | B | B01-1 / B01-2 Export Executive · B02 Sales Manager and Director · B03 Accounts Executive · B04 Finance Manager and Director · B05 Procurement · B06-1 / B06-2 Logistics · B07 Export Compliance · B08 Order Desk · B09-1 / B09-2 MD and ED · B10 Admin and System Administrator · B11 CA, Auditor and Investor | 10.4 / 8.2 · 9.2 · 6.8 · 5.8 · 4.8 · 4.3 / 3.7 · 3.9 · 3.4 · 4.0 / 4.8 · 4.8 · 3.0 min |
+> | C | C01 Welcome · C02 Becoming an Associate · C03 Starter Level and First Client · C04 Prices, Requests and Levels · C05 Commission, Statements and Tax · C06 Messages, Changes, Privacy and FAQ | 8.9 · 11.3 · 8.4 · 8.4 · 12.5 · 14.3 min |
+> | D | D01 From Enquiry to Proforma · D02 Paying and Your Login · D03 Inside Your Order · D04 Balance, Shipping and Closing · D05 When Something Goes Wrong | 7.5 · 6.9 · 7.1 · 7.0 · 7.6 min |
+>
+> Open point for the owner (not narrated in any video): the associate's order statement still shows "Counts toward
+> your next commission rate: yes / no", although D-292 says associates never see counts or levels.
+
 Owner plan (6 Nov 2026): one series of narrated videos per group, in the order
 **C → A → D → B → E**. Each video 8–12 minutes, never over 15 (split into parts instead).
 US English voice (Piper `en_US-lessac-medium`). Interesting, not boring. No PII: role names,
