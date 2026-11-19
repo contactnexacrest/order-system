@@ -24,7 +24,7 @@ module.exports = {
   group: 'Group D · Buyers',
   title: 'Balance, Shipping and Closing',
   subtitle: 'For buyers: your shipping documents, paying the balance, your feedback, and ordering again.',
-  minutes: '9',
+  minutes: '7',
   restoreDb: true,
 
   async setup(d) {

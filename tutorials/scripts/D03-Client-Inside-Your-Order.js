@@ -39,7 +39,7 @@ module.exports = {
   group: 'Group D · Buyers',
   title: 'Inside Your Order',
   subtitle: 'For buyers: My Orders, confirming your order, your documents, and messages with our team.',
-  minutes: '9',
+  minutes: '7',
   restoreDb: true,
 
   async setup(d) {
