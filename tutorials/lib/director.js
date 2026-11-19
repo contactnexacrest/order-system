@@ -260,7 +260,8 @@ class Director {
 
   // A dev-only link/code the app showed (hidden on camera by the overlay), as a same-site path.
   async devLink() {
-    const link = await this.page.evaluate(() => window.__tutDevLink || null);
+    // D-280/D-282: the app now shows the link itself, beside a Copy button ([data-copy]).
+    const link = await this.page.evaluate(() => window.__tutDevLink || document.querySelector('[data-copy]')?.getAttribute('data-copy') || null);
     if (!link) throw new Error('No development link on this page');
     const u = new URL(link, cfg.BASE_URL);
     return u.pathname + u.search;
