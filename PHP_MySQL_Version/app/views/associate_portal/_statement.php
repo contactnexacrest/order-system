@@ -32,8 +32,10 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <tr><th>GST</th><td><?= trim($c['gstin']) !== '' ? 'We add GST of ' . rtrim(rtrim(number_format((float) $c['gst_pct'], 2), '0'), '.') . '% when we have your tax invoice' : 'No GST (you are not registered for GST)' ?></td></tr>
     <tr><th>Full payment</th><td><?= $c['fully_paid_on'] ? $__d($c['fully_paid_on']) . ' ✓' : 'not yet' ?></td></tr>
     <tr><th>When we pay</th><td><?= $c['due_on'] ? 'due ' . $__d($c['due_on']) . ', paid on ' . $__d($c['payout_run_on']) : 'after the buyer has paid in full' ?><?= $c['claim_hold'] ? ' — <b>on hold while the buyer has an open claim</b>' : '' ?></td></tr>
-    <?php // D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. ?>
-    <tr><th><?= !empty($c['portal']) ? 'Counts toward your next commission rate' : 'Counts toward the ladder' ?></th><td><?= $c['state'] !== 'paid' ? 'we will know when the buyer has paid in full' : (!empty($c['portal']) ? ($c['counts'] ? 'yes' : 'no') : ($c['counts'] ? 'yes (counting order no. ' . (int) $c['counting_number'] . ')' : 'no — under ₹' . number_format((float) $c['threshold_inr'], 0) . ' within range')) ?></td></tr>
+    <?php // D-393 (owner 19 Nov 2026, following D-292): the associate never sees whether an order counts toward a level — staff only. ?>
+    <?php if (empty($c['portal'])): ?>
+    <tr><th>Counts toward the ladder</th><td><?= $c['state'] !== 'paid' ? 'we will know when the buyer has paid in full' : ($c['counts'] ? 'yes (counting order no. ' . (int) $c['counting_number'] . ')' : 'no — under ₹' . number_format((float) $c['threshold_inr'], 0) . ' within range') ?></td></tr>
+    <?php endif; ?>
   </table>
   <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
 </div>

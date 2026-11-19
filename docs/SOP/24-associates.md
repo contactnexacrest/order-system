@@ -279,13 +279,15 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   portal order page show the commission statement: each goods line, its
   basis, any reduction, the level, the rate realised, the amount, the state
   (estimated / earned / paid), due date and payout run. "Counts toward the
-  ladder" shows the counting-order number and the threshold to staff only;
-  the associate sees just "yes" or "no" (D-263).
+  ladder" (with the counting-order number and the threshold) is shown to
+  staff only; the associate's statement has no counts row at all (D-393,
+  19 Nov 2026, following D-292 — it replaced the D-263 "yes / no").
 - **Plain words for the associate (D-330, 11 Nov 2026).** The statement's columns and rows read
   **Invoice value of the goods · Price within range? (Yes / Sold below the lowest price (we agreed
   to it) — no commission on this line) · Your commission rate · Agreed discount or settled claim ·
-  Commission worked out on · When we pay ("due <date>, paid on <date>") · Counts toward your next
-  commission rate** (staff keep "Counts toward the ladder" and the rupee basis). Notices and
+  Commission worked out on · When we pay ("due <date>, paid on <date>")** (staff also see "Counts
+  toward the ladder" and the rupee basis; the associate's "Counts toward your next commission rate"
+  row was removed by D-393, 19 Nov 2026). Notices and
   e-mails say the same in short sentences: "We have sent the proforma invoice for order … Your
   commission rate on this order is now final: 5%.", "… stays your client until …", "We have paid
   your commission for order …: INR …, on …, bank reference …. Before tax it was INR …; we deducted

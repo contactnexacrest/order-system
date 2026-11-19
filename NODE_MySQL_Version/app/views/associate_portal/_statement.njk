@@ -25,7 +25,10 @@
     <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>
     <tr><th>When we pay</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }}, paid on {{ c.payout_run_on | shortDate }}{% else %}after the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>on hold while the buyer has an open claim</b>{% endif %}</td></tr>
     {# D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. #}
-    <tr><th>{{ 'Counts toward your next commission rate' if c.portal else 'Counts toward the ladder' }}</th><td>{% if c.state != 'paid' %}we will know when the buyer has paid in full{% elif c.portal %}{{ 'yes' if c.counts else 'no' }}{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+    {# D-393 (owner 19 Nov 2026, following D-292): the associate never sees whether an order counts toward a level — staff only. #}
+    {% if not c.portal %}
+    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}we will know when the buyer has paid in full{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+    {% endif %}
   </table>
   <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
 </div>

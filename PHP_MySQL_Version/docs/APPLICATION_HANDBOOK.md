@@ -1593,8 +1593,9 @@ record exists for someone else.
   number of orders) on any page, statement, notice or e-mail, and one must
   never be added. The number of clients they brought in is allowed.
 - **D-263 (6 Nov 2026):** the associate never sees the running number of
-  their counting orders or the ₹ threshold behind the ladder (the statement
-  says only "Counts toward the ladder: yes / no"), nor a level name or band —
+  their counting orders or the ₹ threshold behind the ladder, nor whether an
+  order counts at all (D-393, 19 Nov 2026: the statement's counts row is
+  staff-only; it had shown "yes / no"), nor a level name or band —
   only the rate ("5%"), and only with "Show commission %"
   (`AssociateAccess::rateOnly`, `AssociateCommission::rateLabel`). The FOB in
   a "commission earned" notice is removed unless `fob_value` is on
