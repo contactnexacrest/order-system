@@ -22,7 +22,7 @@ for (const f of fs.readdirSync(SCRIPTS).filter((x) => x.endsWith('.js') && !x.st
   let t;
   try { t = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { bad(base, `invalid JSON: ${e.message}`); continue; }
   const said = new Set();
-  for (const st of s.steps(s.planContext || {})) if (st.card !== 'email' && typeof st.say === 'string') said.add(st.say);
+  for (const st of s.steps(s.planContext || {})) if (typeof st.say === 'string') said.add(st.say);
   for (const [en, hi] of Object.entries(t.strings || {})) {
     if (typeof hi !== 'string' || !hi.trim()) { bad(base, `untranslated: "${en.slice(0, 70)}"`); continue; }
     if (said.has(en)) {

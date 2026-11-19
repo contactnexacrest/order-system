@@ -2,7 +2,7 @@
 // Other-language versions of the tutorial videos (owner, 19 Nov 2026: "I need all above videos in Hindi").
 // TUT_LANG=hi records the same scripts with every spoken and shown text taken from
 // tutorials/i18n/hi/<video file base>.json ({ "meta": {...}, "strings": { "<English>": "<Hindi>" } }).
-// The app's own screens stay in English; e-mail cards (the app's real e-mails) stay in English.
+// The app's own screens stay in English; e-mail cards show the app's real English e-mail (narration translated).
 // A missing translation stops the recording: a video is never half English.
 const fs = require('fs');
 const path = require('path');
@@ -51,8 +51,12 @@ function localise(script) {
     return t;
   };
   const step = (s) => {
-    if (s.card === 'email') return s;
     const c = { ...s };
+    // E-mail cards show the app's real English e-mail, but the narration over them is spoken in LANG.
+    if (s.card === 'email') {
+      for (const f of ['say', 'caption']) if (typeof c[f] === 'string' && c[f].trim()) c[f] = tr(c[f]);
+      return c;
+    }
     for (const f of FIELDS) if (typeof c[f] === 'string' && c[f].trim()) c[f] = tr(c[f]);
     if (Array.isArray(c.items)) c.items = c.items.map((it) => (typeof it === 'string' && it.trim() ? tr(it) : it));
     return c;
