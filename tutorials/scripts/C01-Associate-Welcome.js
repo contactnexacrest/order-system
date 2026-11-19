@@ -40,6 +40,7 @@ module.exports = {
     { card: 'chapter', title: 'Logging in safely', subtitle: 'Password first, then a 6-digit code from your e-mail.', say: 'Part two. Logging in, the safe way.' },
     { as: 'associate', goto: '/associate/login', caption: 'Associate Login page', say: 'Your login page lives at your NexaCrest web address, slash associate, slash login. Bookmark it! Notice it says Associate Login. Staff and clients have their own doors, so you can never end up in the wrong place.', do: async (d) => { await d.point('h1', 1200); } },
     { caption: 'Forgot password?', say: 'And just below the form: Forgot password? If you ever forget it, click here and type your e-mail. We e-mail you a link to set a new password. It works once, for seventy-two hours.', do: async (d) => { await d.point(d.page.getByRole('link', { name: 'Forgot password?' }), 1500); } },
+    { caption: 'Too many wrong tries?', say: 'Quick tip. If the password is typed wrongly too many times, the account pauses for fifteen minutes, to keep it safe.', do: async (d) => { await d.point('input[name="password"]', 1500); } },
     { caption: 'Step 1: e-mail and password', say: 'First, type the e-mail address NexaCrest registered for you, and your password.', do: async (d) => {
       await d.type(d.page.getByLabel('E-mail'), a.email);
       await d.type(d.page.getByLabel('Password'), a.password, { delay: 40 });
@@ -51,7 +52,6 @@ module.exports = {
       await d.type(d.page.getByLabel('Code'), code, { delay: 120 });
       await d.clickNav(d.page.getByRole('button', { name: 'Log in' }));
     } },
-    { caption: 'Too many wrong tries?', say: 'Quick tip. If the password is typed wrongly too many times, the account pauses for fifteen minutes, to keep it safe. And if you forget your password, you know where to go: Forgot password?, right on the login page.' },
 
     { card: 'chapter', title: 'Your home page', subtitle: 'Everything important on one screen.', say: 'Part three. Your home page.' },
     { goto: '/associate', caption: 'Home', say: 'And we are in! The home page greets you by name. Think of it as your dashboard: the money, your clients, your latest orders and your notices, all on one screen.', do: async (d) => { await d.point('h1', 1000); } },
