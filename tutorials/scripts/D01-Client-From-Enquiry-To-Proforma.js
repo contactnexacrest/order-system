@@ -19,7 +19,7 @@ module.exports = {
   group: 'Group D · Buyers',
   title: 'From Your Enquiry to the Proforma Invoice',
   subtitle: 'For buyers: asking for a quotation, accepting it, and confirming your details — no login needed.',
-  minutes: '10',
+  minutes: '7',
   restoreDb: true,
 
   async setup(d) { return B.setup(d); },

@@ -36,7 +36,7 @@ module.exports = {
   group: 'Group D · Buyers',
   title: 'Paying, and Your Own Login',
   subtitle: 'For buyers: telling us about your payment, your client portal login, and paying by Letter of Credit.',
-  minutes: '10',
+  minutes: '7',
   restoreDb: true,
 
   async setup(d) {

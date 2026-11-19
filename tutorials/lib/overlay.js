@@ -29,7 +29,7 @@ body{zoom:${zoom}}
 #tut-cursor{position:absolute;left:0;top:0;width:34px;height:34px;transform:translate(-3px,-2px);transition:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .tut-ripple{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:3px solid ${brand.gold};animation:tutRip .6s ease-out forwards}
 @keyframes tutRip{to{transform:scale(3.4);opacity:0}}
-.dev-server-banner{display:none!important}
+.dev-server-banner,.alert-dev{display:none!important}
 .tut-dev-hidden{display:none!important}`;
   }
 
