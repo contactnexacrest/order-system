@@ -12,6 +12,7 @@ const cfg = require('./lib/config');
 const tts = require('./lib/tts');
 const demo = require('./lib/demo');
 const { Director } = require('./lib/director');
+const i18n = require('./lib/i18n');
 
 const SCRIPTS = path.join(__dirname, 'scripts');
 
@@ -24,7 +25,7 @@ function find(ids) {
     if (!m.length) throw new Error(`No script for ${id}`);
     picked.push(...m);
   }
-  return [...new Set(picked)].map((f) => require(path.join(SCRIPTS, f)));
+  return [...new Set(picked)].map((f) => i18n.localise(require(path.join(SCRIPTS, f)))); // TUT_LANG=hi: Hindi texts
 }
 
 // Rough length without recording: narration + pauses + typical action time.
@@ -71,7 +72,7 @@ async function record(script) {
     // Rebuild the MP4 from the last raw recording (e.g. after a subtitle or audio change).
     const { buildVideo } = require('./lib/render');
     for (const s of scripts) {
-      const dir = path.join(cfg.WORK, 'raw', s.code);
+      const dir = path.join(cfg.WORK, 'raw', s.rawKey || s.code);
       const { webm, clips } = JSON.parse(fs.readFileSync(path.join(dir, 'clips.json'), 'utf8'));
       const out = path.join(cfg.OUT, s.file);
       const secs = await buildVideo({ webm, clips, out, workDir: dir });

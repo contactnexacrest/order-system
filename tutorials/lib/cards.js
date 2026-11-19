@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const cfg = require('./config');
+const { ui } = require('./i18n'); // other-language card words (TUT_LANG); English when unset
 
 let fontCss = null;
 function fonts() {
@@ -28,7 +29,7 @@ html{zoom:${cfg.VIEW.zoom || 1}}
 html,body{width:100%;height:100%;overflow:hidden}
 /* A card never takes the app overlay (its body zoom, badge, caption): it can be injected for a moment while the next card loads. */
 body{zoom:1!important}#tut-root{display:none!important}
-body{font-family:Poppins,system-ui,sans-serif;color:#fff;background:radial-gradient(ellipse at 20% 10%,#0b46c4 0%,${B.navy} 38%,${B.navyStrong} 100%);display:flex;align-items:center;justify-content:center}
+body{font-family:Poppins,'Noto Sans Devanagari',system-ui,sans-serif;color:#fff;background:radial-gradient(ellipse at 20% 10%,#0b46c4 0%,${B.navy} 38%,${B.navyStrong} 100%);display:flex;align-items:center;justify-content:center}
 .wrap{width:1080px;position:relative}
 .logo{width:74px;height:74px;border-radius:16px;background:#fff center/cover no-repeat;box-shadow:0 8px 30px rgba(0,0,0,.35)}
 .kicker{font-size:17px;letter-spacing:.18em;text-transform:uppercase;color:${B.gold};font-weight:600}
@@ -41,24 +42,24 @@ h1{font-size:58px;line-height:1.12;font-weight:700;margin:14px 0 18px}
 @keyframes in{to{opacity:1;transform:none}}
 .deco{position:fixed;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;border:60px solid rgba(201,150,43,.12)}
 .deco2{position:fixed;left:-120px;bottom:-200px;width:420px;height:420px;border-radius:50%;border:40px solid rgba(255,255,255,.05)}
-${extraCss}</style></head><body><div class="deco"></div><div class="deco2"></div>${body}
-<div class="foot">NexaCrest International · Tutorials · demo data only</div></body></html>`;
+${extraCss}${ui('video') ? '.kicker,.foot{letter-spacing:normal;text-transform:none}' : ''}</style></head><body><div class="deco"></div><div class="deco2"></div>${body}
+<div class="foot">${esc(ui('foot') || 'NexaCrest International · Tutorials · demo data only')}</div></body></html>`;
 }
 
 function titleCard({ code, group, title, subtitle, minutes }) {
   return shell(`<div class="wrap">
   <div class="in" style="display:flex;align-items:center;gap:18px"><div class="logo" style="background-image:url(${logo()})"></div>
-  <div class="kicker">${esc(group)} · Video ${esc(code)}</div></div>
+  <div class="kicker">${esc(group)} · ${esc(ui('video') || 'Video')} ${esc(code)}</div></div>
   <h1 class="in d1">${esc(title)}</h1>
   <div class="bar in d2"></div>
   <div class="sub in d3">${esc(subtitle)}</div>
-  ${minutes ? `<div class="sub in d4" style="margin-top:22px;font-size:17px;color:#b9c8f2">About ${esc(minutes)} minutes</div>` : ''}
+  ${minutes ? `<div class="sub in d4" style="margin-top:22px;font-size:17px;color:#b9c8f2">${esc(ui('about', minutes) || `About ${minutes} minutes`)}</div>` : ''}
 </div>`);
 }
 
 function chapterCard({ number, title, subtitle }) {
   return shell(`<div class="wrap">
-  <div class="kicker in">Part ${esc(number)}</div>
+  <div class="kicker in">${esc(ui('part') || 'Part')} ${esc(number)}</div>
   <h1 class="in d1" style="font-size:52px">${esc(title)}</h1>
   <div class="bar in d2"></div>
   ${subtitle ? `<div class="sub in d3">${esc(subtitle)}</div>` : ''}
@@ -68,10 +69,10 @@ function chapterCard({ number, title, subtitle }) {
 function listCard({ kicker, title, items = [], next }) {
   const lis = items.map((t, i) => `<li class="in d${Math.min(i + 2, 5)}"><span class="tick">✓</span>${esc(t)}</li>`).join('');
   return shell(`<div class="wrap">
-  <div class="kicker in">${esc(kicker || 'Recap')}</div>
+  <div class="kicker in">${esc(kicker || ui('recap') || 'Recap')}</div>
   <h1 class="in d1" style="font-size:46px">${esc(title)}</h1>
   <ul class="list">${lis}</ul>
-  ${next ? `<div class="next in d5">Up next → <b>${esc(next)}</b></div>` : ''}
+  ${next ? `<div class="next in d5">${esc(ui('next') || 'Up next →')} <b>${esc(next)}</b></div>` : ''}
 </div>`, `.list{list-style:none;padding:0;margin:26px 0 0}
 .list li{font-size:24px;margin:0 0 16px;display:flex;gap:16px;align-items:flex-start;line-height:1.4}
 .tick{flex:0 0 34px;height:34px;border-radius:50%;background:${cfg.BRAND.gold};color:${cfg.BRAND.navyStrong};display:grid;place-items:center;font-weight:700;font-size:18px}
@@ -84,7 +85,7 @@ function emailCard({ from = 'NexaCrest International <info@email.com>', to, subj
   const body = lines.map((t, i) => `<p class="in d${Math.min(i + 2, 5)}">${esc(t)}</p>`).join('');
   const att = attach.map((a) => `<span class="att">&#128206; ${esc(a)}</span>`).join('');
   return shell(`<div class="wrap">
-  <div class="kicker in">In the buyer's inbox</div>
+  <div class="kicker in">${esc(ui('inbox') || "In the buyer's inbox")}</div>
   <div class="mail in d1">
     <div class="hdr"><div><b>From</b> ${esc(from)}</div><div><b>To</b> ${esc(to)}</div><div class="subj">${esc(subject)}</div></div>
     <div class="body">${body}${link ? `<p class="lnk in d4">${esc(link)}</p>` : ''}${att ? `<div class="atts in d5">${att}</div>` : ''}</div>

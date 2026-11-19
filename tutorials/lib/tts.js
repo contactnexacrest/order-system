@@ -35,6 +35,7 @@ const SAY_AS = [
 
 function spoken(text) {
   let t = text;
+  if ((process.env.TUT_LANG || 'en') !== 'en') return t; // other languages are written as they are spoken
   for (const [re, rep] of SAY_AS) t = t.replace(re, rep);
   return t;
 }

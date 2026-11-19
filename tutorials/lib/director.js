@@ -30,7 +30,7 @@ class Director {
 
   // ---------- life cycle ----------
   async open() {
-    const raw = path.join(cfg.WORK, 'raw', this.script.code);
+    const raw = path.join(cfg.WORK, 'raw', this.script.rawKey || this.script.code);
     fs.rmSync(raw, { recursive: true, force: true });
     fs.mkdirSync(raw, { recursive: true });
     this.rawDir = raw;
@@ -70,7 +70,7 @@ class Director {
       try {
         await this.step(s);
       } catch (e) {
-        try { const f = require('path').join(cfg.WORK, 'raw', `${this.script.code}-fail.png`); await this.page.screenshot({ path: f }); console.error(`screenshot of the failed step: ${f}`); } catch (_) { /* page gone */ }
+        try { const f = require('path').join(cfg.WORK, 'raw', `${this.script.rawKey || this.script.code}-fail.png`); await this.page.screenshot({ path: f }); console.error(`screenshot of the failed step: ${f}`); } catch (_) { /* page gone */ }
         e.message = `Step ${i + 1} (${(s.say || s.card || s.as || '').toString().slice(0, 60)}): ${e.message}`;
         throw e;
       }
