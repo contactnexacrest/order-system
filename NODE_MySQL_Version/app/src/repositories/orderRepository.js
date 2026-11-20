@@ -59,6 +59,7 @@ async function allVisibleTo(userId, seesAll) {
             (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR ', ')
              FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
              WHERE oa2.order_id = o.id) AS assignee_names,
+            pc.is_prospect AS client_is_prospect, pc.prospect_expires_on AS client_prospect_expires_on,
             dom.stage AS dom_stage,
             COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
             (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
@@ -71,6 +72,7 @@ async function allVisibleTo(userId, seesAll) {
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      LEFT JOIN domestic_orders dom ON dom.order_id = o.id
+     LEFT JOIN clients pc ON pc.id = o.client_id -- D-394: the Prospects filter and badge
      WHERE o.is_archived = 0 ${scopeClause}${divisionService().sql('o.division_id')}
      ORDER BY o.created_at DESC, o.id DESC`,
     seesAll ? {} : { user_id: userId }

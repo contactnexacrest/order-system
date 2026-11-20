@@ -8,18 +8,21 @@
     <p class="muted">No deactivated clients.</p>
   <?php else: ?>
   <table class="list">
-    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th></th></tr>
+    <?php // Owner decision D-394 (mockup 8): an expired prospect shows its badge and why it was closed. ?>
+    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th>Why</th><th></th></tr>
     <?php foreach ($clients as $c): ?>
+    <?php $__isProspect = (int) ($c['is_prospect'] ?? 0) === 1; ?>
     <tr>
       <td><?= htmlspecialchars($c['client_unique_number']) ?></td>
-      <td><?= htmlspecialchars($c['company_legal_name']) ?></td>
+      <td><?= htmlspecialchars($c['company_legal_name']) ?><?php if ($__isProspect): ?> <span class="tag tag-gold" data-testid="prospect-badge">Prospect</span><?php endif; ?></td>
       <td><?= htmlspecialchars($c['contact_person'] ?? '—') ?></td>
       <td><?= htmlspecialchars($c['country_of_destination'] ?? '—') ?></td>
+      <td><?= htmlspecialchars((string) ($c['prospect_expired_reason'] ?? '') !== '' ? (string) $c['prospect_expired_reason'] : '—') ?></td>
       <td>
         <a href="/clients/<?= (int) $c['id'] ?>">View</a>
         <form method="post" action="/clients/<?= (int) $c['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('Reactivate <?= htmlspecialchars(addslashes($c['company_legal_name'])) ?>?');">
           <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm btn-success">Reactivate</button>
+          <button type="submit" class="btn-sm btn-success"><?= $__isProspect ? 'Reactivate (fresh ' . \App\Services\ProspectService::expiryDays() . ' days)' : 'Reactivate' ?></button>
         </form>
       </td>
     </tr>

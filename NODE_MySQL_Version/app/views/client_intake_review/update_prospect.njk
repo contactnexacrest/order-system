@@ -1,0 +1,40 @@
+{# Owner decision D-394 (mockup 10): "Update this prospect" — the request's details go onto the existing prospect (same id, Buyer Inquiry Ref and orders). Every change is shown old → new before anything is saved. #}
+<div class="card page-wide">
+  <p class="muted small"><a href="/client-intake">&larr; Back to Quotation requests</a></p>
+  <h1>Update this prospect</h1>
+  <p>
+    Request from <strong>{{ submission.company_legal_name }}</strong> ({{ submission.email }})
+    matches the prospect <a href="/clients/{{ client.id }}">{{ client.company_legal_name }}</a>
+    (Buyer Inquiry Ref {{ client.client_unique_number }}{{ '' if client.is_active == 1 else ', deactivated' }}).
+  </p>
+  <p class="muted">Saving fills in the prospect from the request. It keeps its Buyer Inquiry Ref and its orders, the Prospect badge goes (it then never expires on its own){{ '' if client.is_active == 1 else ', it is activated again' }}, and the request is marked accepted and linked to it. Nothing is deleted.</p>
+
+  {% if refusal %}
+    <div class="review-banner warn">&#9888; <span>{{ refusal }}</span></div>
+  {% endif %}
+
+  <table class="list" data-testid="prospect-changes">
+    <tr><th>Detail</th><th>Now</th><th></th><th>After saving</th></tr>
+    {% for c in changes %}
+      <tr>
+        <td>{{ c.label }}</td>
+        <td class="muted">{% if c.old !== '' %}{{ c.old }}{% else %}<em>empty</em>{% endif %}</td>
+        <td>&rarr;</td>
+        <td><strong>{% if c.new !== '' %}{{ c.new }}{% else %}<em>empty</em>{% endif %}</strong></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">No detail changes — the request holds the same details as the prospect.</td></tr>
+    {% endfor %}
+  </table>
+
+  <div class="btn-row">
+    {% if not refusal %}
+    <form method="post" action="/client-intake/{{ submission.id }}/update-prospect" style="display:inline" data-confirm="Update {{ client.company_legal_name }} with these details?">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="client_id" value="{{ client.id }}">
+      <button type="submit" class="btn-sm btn-success">Update this prospect</button>
+    </form>
+    {% endif %}
+    <a class="btn-sm btn-secondary" href="/client-intake">Cancel</a>
+  </div>
+</div>

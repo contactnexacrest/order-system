@@ -6880,3 +6880,19 @@ ALTER TABLE catalog_product_suppliers ADD COLUMN entered_price DECIMAL(14,2) NUL
 -- Owner decision D-387 (18 Nov 2026; migration 2026-11-18c): Supplier PO Section 3 "Product Form",
 -- prefilled from the order lines' form, printed only when filled.
 ALTER TABLE order_supplier_po ADD COLUMN product_form VARCHAR(80) NULL;
+
+-- Owner decision D-394 (20 Nov 2026; migration 2026-11-20a): quick-quote prospects. A client created
+-- with "Quick quote — the buyer has not sent their details yet" is a prospect: only the company name,
+-- e-mail and country of destination are required. is_prospect goes back to 0 once every normally
+-- required detail is filled in (it then never expires on its own). prospect_expires_on: the day its
+-- quotation order(s) move to "Did not go ahead" and the client to Deactivated unless an order goes
+-- ahead (Settings › Quick-quote prospects; nothing is ever deleted). prospect_reminded_on: the day the
+-- order's owner was reminded for the current expiry date (once; cleared when the date moves).
+-- prospect_expired_on / prospect_expired_reason: set when the daily job closed it automatically
+-- ("Quote expired 19 Jan 2027 — no reply in 60 days"); cleared when it is reactivated.
+ALTER TABLE clients
+  ADD COLUMN is_prospect TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN prospect_expires_on DATE NULL,
+  ADD COLUMN prospect_reminded_on DATE NULL,
+  ADD COLUMN prospect_expired_on DATE NULL,
+  ADD COLUMN prospect_expired_reason VARCHAR(255) NULL;

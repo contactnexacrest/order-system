@@ -27,10 +27,11 @@ $renderKanbanCard = static function (array $s): string {
           <?php if (!empty($s['coo_type'])): ?> · COO: <?= htmlspecialchars((string) $s['coo_type']) ?><?php endif; ?>
         </div>
         <div class="muted small">Submitted <?= htmlspecialchars((string) $s['submitted_at']) ?></div>
+        <?php require __DIR__ . '/_prospect_match.php'; // D-394 ?>
         <div class="kanban-card-actions">
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/accept">
             <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
+            <button type="submit" class="btn-sm <?= !empty($s['prospect_match']) ? 'btn-secondary' : 'btn-success' ?>"><?= !empty($s['prospect_match']) ? 'Accept as a new client' : 'Accept &amp; Create Client' ?></button>
           </form>
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/reject" onsubmit="return confirm('Reject this quotation request?');">
             <?= Csrf::field() ?>

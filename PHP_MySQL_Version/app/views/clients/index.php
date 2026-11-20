@@ -30,17 +30,31 @@ $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
     </div>
   </div>
 
+  <?php // Owner decision D-394 (mockup 2): Show: All · Clients · Prospects. ?>
+  <?php $__show = $show ?? 'all'; $__counts = $counts ?? ['all' => count($clients), 'clients' => count($clients), 'prospects' => 0]; ?>
+  <div class="filter-chip-row" data-testid="client-show-chips">
+    <span class="muted small">Show:</span>
+    <?php foreach (['all' => 'All', 'clients' => 'Clients', 'prospects' => 'Prospects'] as $__k => $__l): ?>
+      <a class="filter-chip<?= $__show === $__k ? ' active' : '' ?>" href="/clients?show=<?= $__k ?>"><?= $__l ?> (<?= (int) ($__counts[$__k] ?? 0) ?>)</a>
+    <?php endforeach; ?>
+  </div>
+
   <?php if (empty($clients)): ?>
-    <p class="muted">No clients yet.</p>
+    <p class="muted"><?= $__show === 'prospects' ? 'No prospects.' : 'No clients yet.' ?></p>
   <?php else: ?>
   <div class="card-grid">
     <?php foreach ($clients as $c): ?>
+    <?php $__isProspect = (int) ($c['is_prospect'] ?? 0) === 1; ?>
     <div class="entity-card entity-card-linked">
       <div class="entity-card-header">
         <a class="entity-card-stretched-link" href="/clients/<?= (int) $c['id'] ?>"><span class="entity-card-title"><?= htmlspecialchars($c['company_legal_name']) ?></span></a>
+        <?php if ($__isProspect): ?><span class="tag tag-gold" data-testid="prospect-badge">Prospect</span><?php endif; ?>
         <span class="tag tag-navy"><?= (int) $c['order_count'] ?> order<?= (int) $c['order_count'] === 1 ? '' : 's' ?></span>
       </div>
       <div class="entity-card-sub"><?= htmlspecialchars($c['client_unique_number']) ?></div>
+      <?php if ($__isProspect && !empty($c['prospect_expires_on'])): ?>
+        <div class="small prospect-expiry<?= \App\Services\ProspectService::isUrgent($c['prospect_expires_on']) ? ' prospect-expiry-urgent' : '' ?>"><?= htmlspecialchars(\App\Services\ProspectService::clientExpiryLine($c['prospect_expires_on'])) ?></div>
+      <?php endif; ?>
       <div class="entity-card-sub">
         <?= htmlspecialchars($c['contact_person'] ?? '—') ?>
         <?php if ($c['email']): ?>

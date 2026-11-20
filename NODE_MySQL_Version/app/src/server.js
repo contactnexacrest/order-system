@@ -1143,6 +1143,9 @@ app.post('/clients/:id/agreement/force-expire', requireAuth, requirePermission('
 app.post('/clients/:id/agreement/renew', requireAuth, requirePermission('manage_orders'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(clientsController.renewAgreement));
 app.get('/clients/:id/agreement/download', requireAuth, requirePermission('manage_orders'), asyncHandler(clientsController.downloadAgreement));
 app.post('/clients/:id/toggle-active', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.toggleActive));
+// Owner decision D-394: quick-quote prospects — keep longer, e-mail the Public Quotation Form.
+app.post('/clients/:id/prospect-keep', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.keepProspect));
+app.post('/clients/:id/send-quotation-form', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.sendQuotationForm));
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 app.post('/clients/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), verifyCsrf, asyncHandler(clientsController.uploadAdditionalDocument));
 app.post('/clients/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientsController.deleteAdditionalDocument));
@@ -1159,6 +1162,9 @@ app.post('/clients/:id/reset-password', requireAuth, requirePermission('manage_c
 // Staff review queue for public quotation-details submissions.
 app.get('/client-intake', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.index));
 app.post('/client-intake/:id/accept', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.accept));
+// Owner decision D-394: a request from a prospect's e-mail updates that prospect (see each change first).
+app.get('/client-intake/:id/update-prospect', requireAuth, requirePermission('manage_orders'), asyncHandler(clientIntakeReviewController.updateProspectForm));
+app.post('/client-intake/:id/update-prospect', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.updateProspect));
 app.post('/client-intake/:id/reject', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.reject));
 app.post('/client-intake/:id/resend-link', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(clientIntakeReviewController.resendLink));
 

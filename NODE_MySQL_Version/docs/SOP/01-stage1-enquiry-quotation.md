@@ -140,6 +140,67 @@ itself refuses a shared email too (QA Round 6, R6-N16), so two people
 saving the same email at the same moment can't both succeed — the second
 sees "Another client already uses this email".
 
+### Path C — a quick quote for a buyer who has not sent their details (owner decision D-394, 20 Nov 2026)
+
+A buyer asks for a price by e-mail or phone and does not fill in the Public
+Quotation Form. Quote at once **without** typing "To Be Confirmed" into every
+box, and without risking a second client when the buyer comes back:
+
+1. **Clients → + Add client.** Tick **"Quick quote — the buyer has not sent
+   their details yet (prospect)"** at the top. Now only **Company Legal
+   Name \***, **Email \*** and **Country of Destination \*** are needed; the
+   billing address boxes say "optional for a prospect". The form checks this
+   before it sends (the "*" moves with the tick box) and the server refuses a
+   prospect without its e-mail or country ("For a prospect, Company Legal
+   Name, Email and Country of Destination are required."). The usual rule —
+   one e-mail per client — still applies.
+2. Save. The client page shows a gold **Prospect** badge and a box:
+   "Prospect — details not confirmed yet. Quotation order … was created on …
+   If the buyer does not go ahead, the order moves to "Did not go ahead" and
+   this client to Deactivated on <date> (in 60 days). The order's owner is
+   reminded on <date>." Add the order (**+ New Order**) and quote as usual.
+   Details left empty print "To Be Confirmed" on the documents, exactly as
+   before.
+3. Buttons in the box:
+   - **Fill in the details** — the Edit form. While the Quick quote box stays
+     ticked you may save with only the three details. Once Billing Address
+     Line 1, City / Town and Billing Country are filled in, saving ends the
+     prospect: the badge goes and the client never expires on its own.
+   - **E-mail the Public Quotation Form** — sends the usual form link to the
+     client's e-mail so the buyer fills in their own details. While Testing
+     mode holds buyer e-mails the screen says "Not e-mailed: …" — send the
+     link yourself.
+   - **Keep for 60 more days** — moves the date (from the later of today and
+     the current date). Logged.
+4. **Where prospects show:** Clients list — "Show: All · Clients · Prospects",
+   the badge and "Quote expires <date> (in N days)", red in the last 7 days.
+   Orders list, Standard and Kanban — the **Prospects (n)** filter, the badge
+   and "No reply yet · expires <date>" / "expires in N days" (red in the last
+   7 days).
+5. **Reminder.** 7 days before the date the order's owner gets one
+   notification (with **Open the order** and **Keep for 60 more days**), a
+   line in **My tasks** ("Quotation expiring — no reply from the prospect")
+   and an e-mail. Nothing is deleted.
+6. **On the date** (Settings › Quick-quote prospects › Automatic closing =
+   On) the daily job moves the quotation order to **"Did not go ahead"**
+   (lost, reason "Quotation expired — no reply in 60 days"; the order page
+   says "Closed automatically on <date>") and the client to **Deactivated
+   Clients**, where it shows the badge, "Quote expired <date> — no reply in
+   60 days" and **Reactivate (fresh 60 days)**. It never closes an order
+   that Mark Lost would refuse (money received, an LC confirmed, a Bill of
+   Lading, a cancellation waiting) or one past the quotation stage — then
+   the client is left as it is. Nothing is ever deleted.
+7. **The buyer comes back.** Reactivate the client (fresh 60 days; the
+   message tells you to open the old order and use **Duplicate order** for a
+   fresh quotation). If the buyer fills in the Public Quotation Form with the
+   same e-mail, **Orders → Quotation requests** shows **"Matches prospect
+   <client>"** with **Update this prospect**: it shows every change (now →
+   after saving) and, when you confirm, fills in the prospect from the
+   request — the same client, Buyer Inquiry Ref and orders; the badge goes;
+   a deactivated client is active again; the request is marked accepted.
+   **Accept as a new client** is still refused for the same e-mail (one
+   e-mail per client), and **Reject** works as before.
+
 ### Duplicating a client
 
 A client's page has a **Duplicate** button (same permission as Add Client).

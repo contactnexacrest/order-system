@@ -1353,6 +1353,9 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
   <?php endif; ?>
   <?php if ($order['status'] === 'lost'): ?>
     <p class="muted small">Marked lost<?php if ($order['lost_at']): ?> on <?= htmlspecialchars($order['lost_at']) ?><?php endif; ?><?php if ($order['lost_reason']): ?> — reason: <?= htmlspecialchars($order['lost_reason']) ?><?php endif; ?></p>
+    <?php if (($order['lost_category'] ?? null) === \App\Services\ProspectService::LOST_CATEGORY): // Owner decision D-394 ?>
+    <p class="notice notice-info" data-testid="prospect-closed-note">Closed automatically on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $order['lost_at'])) ?>: the quick-quote prospect did not reply. Nothing was deleted. To quote again, use Duplicate order for a fresh quotation (and reactivate the client if it is deactivated).</p>
+    <?php endif; ?>
   <?php endif; ?>
   <?php if ((int) ($order['is_archived'] ?? 0) === 1): ?>
     <p class="muted small">Archived<?php if ($order['archived_at']): ?> on <?= htmlspecialchars($order['archived_at']) ?><?php endif; ?> — hidden from the main Orders list. Nothing was deleted.</p>

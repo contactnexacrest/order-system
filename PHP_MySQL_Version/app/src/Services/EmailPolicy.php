@@ -108,6 +108,7 @@ final class EmailPolicy
         'ecgc_policy_expiring' => 'staff_compliance', 'benefit_claim_deadline' => 'staff_compliance',
         'associate_tds_deposit' => 'staff_compliance', 'associate_tds_26q' => 'staff_compliance',
         'lc_expiry_soon' => 'staff_compliance', 'lc_last_shipment_soon' => 'staff_compliance', 'lc_presentation_soon' => 'staff_compliance',
+        'prospect_expiry_reminder' => 'staff_compliance', // D-394: a quick-quote prospect's quotation expires soon
         // Zoho, digest, assignment
         'zoho_sync_failed' => 'staff_zoho',
         'order_department_owner' => 'staff_assigned', 'order_assigned' => 'staff_assigned',

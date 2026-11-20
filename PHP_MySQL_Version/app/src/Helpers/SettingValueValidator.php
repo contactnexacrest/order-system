@@ -37,6 +37,9 @@ final class SettingValueValidator
         'quantity_warning_level_ton' => [1, 1000000, 'TON'],
         'quantity_warning_level_pcs' => [1, 1000000, 'PCS'],
         'quantity_warning_level_rmt' => [1, 1000000, 'RMT'],
+        // Owner decision D-394 (20 Nov 2026): quick-quote prospects.
+        'prospect_expiry_days' => [7, 365, 'days'],
+        'prospect_reminder_days' => [1, 30, 'days'],
     ];
 
     /** @return string|null an error message if invalid, null if the value passes */

@@ -850,6 +850,34 @@
       qty.required = on || qty.dataset.requiredWas === '1';
     }
   }
+  // Owner decision D-394 (20 Nov 2026): a field required only while a tick box of
+  // the same form is ticked (data-required-if-ticked="<name>") or only while it is
+  // NOT ticked (data-required-unless-ticked="<name>") — e.g. New client › "Quick
+  // quote": a prospect needs the e-mail and the country of destination, but not
+  // the billing address. The field's `required` follows the box, so the browser's
+  // own check, fieldError() and the "*" (markRequiredLabels) all follow it too.
+  function requiredWhenTickedApply(form) {
+    form.querySelectorAll('[data-required-if-ticked], [data-required-unless-ticked]').forEach(function (el) {
+      var name = el.getAttribute('data-required-if-ticked') || el.getAttribute('data-required-unless-ticked');
+      var box = form.elements.namedItem(name);
+      var ticked = !!(box && box.type === 'checkbox' && box.checked);
+      var need = el.hasAttribute('data-required-if-ticked') ? ticked : !ticked;
+      if (el.required !== need) el.required = need;
+      if (!need && el.classList.contains('field-invalid') && !fieldError(el)) clearFieldError(el);
+    });
+  }
+  function initRequiredWhenTicked() {
+    document.querySelectorAll('form').forEach(function (form) {
+      if (form.querySelector('[data-required-if-ticked], [data-required-unless-ticked]')) requiredWhenTickedApply(form);
+    });
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t && t.type === 'checkbox' && t.form && t.form.querySelector('[data-required-if-ticked="' + t.name + '"], [data-required-unless-ticked="' + t.name + '"]')) {
+        requiredWhenTickedApply(t.form);
+      }
+    });
+  }
+
   function initAnnexureLine() {
     document.querySelectorAll('input[type="checkbox"][data-annexure-line]').forEach(annexureApply);
     document.addEventListener('change', function (e) {
@@ -2868,6 +2896,7 @@
     initCopyButtons(); // D-280
     initIdleWarning(); // D-283
     initThicknessGrid();
+    initRequiredWhenTicked(); // D-394
     initAnnexureLine(); // D-336
     initLinePieces(); // D-339
     initThicknessCalc(); // D-335

@@ -225,6 +225,47 @@ final class KanbanParityTest extends DbTestCase
     }
 
     /**
+     * Owner decision D-394: the Orders "Prospects" filter, its badge and its expiry line, and the
+     * Quotation requests "Matches prospect" tag with "Update this prospect", are the same on the list
+     * and the board.
+     */
+    public function testProspectsAreTheSameOnTheListAndTheBoard(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        $pdo->exec('UPDATE clients SET is_prospect = 0 WHERE is_prospect = 1');
+        $email = 'parity-prospect-' . bin2hex(random_bytes(4)) . '@buyer.example';
+        $clientId = $this->createTestClient($email);
+        $pdo->prepare('UPDATE clients SET is_prospect = 1, prospect_expires_on = :d WHERE id = :id')->execute(['d' => date('Y-m-d', strtotime('+2 days')), 'id' => $clientId]);
+        $orderId = $this->createTestOrder($clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        $sid = ClientIntakeRepository::create([
+            'company_legal_name' => 'Parity Prospect GmbH', 'billing_address' => '1 Parity Street', 'billing_address_line1' => '1 Parity Street', 'billing_address_line2' => null,
+            'billing_city' => 'Hamburg', 'billing_postcode' => null, 'billing_country' => 'Germany', 'vat_eori_tax_no' => null, 'contact_person' => 'Chief Buyer',
+            'email' => strtoupper($email), 'phone' => null, 'country_of_destination' => 'Germany',
+            'port_of_discharge_text' => null, 'coo_type' => null, 'incoterm_preference' => null, 'container_type_text' => null, 'buyer_own_reference' => null, 'notes' => null,
+        ], '127.0.0.1');
+
+        $list = $this->render(new OrderController(), 'index', ['view' => 'list', 'status' => 'prospects']);
+        $board = $this->render(new OrderController(), 'index', ['status' => 'prospects']);
+        self::assertSame(self::parts($list)['filters'], self::parts($board)['filters']);
+        self::assertContains('Prospects ', self::parts($board)['filters']);
+        self::assertSame(["/orders/{$orderId}"], self::parts($list)['records']);
+        self::assertSame(["/orders/{$orderId}"], self::parts($board)['records']);
+        foreach ([$list, $board] as $html) {
+            self::assertStringContainsString('data-testid="prospect-badge">Prospect</span>', $html);
+            self::assertStringContainsString('No reply yet · expires in 2 days', $html);
+        }
+
+        $iList = $this->render(new ClientIntakeReviewController(), 'index', ['view' => 'list']);
+        $iBoard = $this->render(new ClientIntakeReviewController(), 'index', []);
+        foreach ([$iList, $iBoard] as $html) {
+            self::assertStringContainsString('Matches prospect', $html);
+            self::assertStringContainsString("/client-intake/{$sid}/update-prospect", $html);
+            self::assertStringContainsString("href=\"/clients/{$clientId}\"", $html);
+            self::assertStringContainsString('Accept as a new client', $html);
+        }
+    }
+
+    /**
      * QA Round 7, R7-N08: with no filter chosen, the list and the board open
      * on the same orders (Active) — the board used to add Docs Sent and
      * Complete orders.

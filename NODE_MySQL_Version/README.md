@@ -497,6 +497,16 @@ Seven jobs need to run outside the request/response cycle (plus the backup scrip
   history, but pricing uses the rate the MD typed (`pricing_fx_rate`).
   Needs outbound HTTPS to `api.frankfurter.app` and `open.er-api.com`. Safe
   to run twice a day (one row per date).
+- **`src/jobs/prospectExpiry.js`** — once a day at 06:40 IST (owner decision
+  D-394, 20 Nov 2026; in-process in `scheduler.js`, or `node
+  src/jobs/prospectExpiry.js` from cron): quick-quote prospects. N days before a
+  prospect's quotation expires (Settings › Quick-quote prospects, default 7) its
+  order's owner gets one reminder (notification, My tasks, e-mail); on the date,
+  when "Automatic closing" is On, its still-active quotation orders move to
+  "Did not go ahead" (the same rules as Mark Lost — an order with money, an LC,
+  a Bill of Lading, a cancellation request or past the quotation stage leaves the
+  client as it is) and the client is deactivated. Nothing is ever deleted. Safe
+  to run twice.
 - **`src/jobs/zohoSync.js`** — CA / Accounting module. **Must run hourly**
   (owner decision 2 Nov 2026, D-233): saving a receipt, bill, payment,
   expense or cost in the app never sends it to Zoho Books at that moment —
@@ -533,13 +543,14 @@ node src/jobs/zohoSync.js
 node src/jobs/dailyDigest.js
 node src/jobs/documentCopyCleanup.js
 node src/jobs/fetchFxRate.js
+node src/jobs/prospectExpiry.js
 ```
 
 **Pick exactly one of these two ways to run them — never both, or the
 same job double-fires:**
 
 **Option 1 — external cron (recommended: simplest, and independent of the
-web process's own uptime).** Add seven crontab entries, in IST:
+web process's own uptime).** Add eight crontab entries, in IST:
 ```
 CRON_TZ=Asia/Kolkata
 */10 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dispatchDeferredEmails.js >> /var/log/nexacrest/dispatch_deferred_emails.log 2>&1
@@ -549,10 +560,11 @@ CRON_TZ=Asia/Kolkata
 15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 15 2 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/documentCopyCleanup.js >> /var/log/nexacrest/document_copy_cleanup.log 2>&1
 5 7 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/fetchFxRate.js >> /var/log/nexacrest/fetch_fx_rate.log 2>&1
+40 6 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/prospectExpiry.js >> /var/log/nexacrest/prospect_expiry.log 2>&1
 ```
 
 Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
-(`CRON_TZ=Asia/Kolkata` makes 06:00, 08:15, 02:15 and 07:05 IST, the same as the PHP stack. If your cron does not support `CRON_TZ`, set the server time zone to IST or convert the times.)
+(`CRON_TZ=Asia/Kolkata` makes 06:00, 06:40, 08:15, 02:15 and 07:05 IST, the same as the PHP stack. If your cron does not support `CRON_TZ`, set the server time zone to IST or convert the times.)
 (`sudo mkdir -p /var/log/nexacrest` first.) Use the full path to `node`
 (`which node`) — cron's `$PATH` is much smaller than an interactive
 shell's.
@@ -562,9 +574,9 @@ in `.env` and restart the app (`pm2 restart nexacrest`). `src/server.js`
 then starts `src/jobs/scheduler.js`, which runs `checkAlerts` daily at
 06:00 IST (the same time as the PHP stack — QA batch 4, PAR-2), `dispatchDeferredEmails` every 10 minutes,
 `autoConfirmOcAcknowledgments` every 15 minutes, `zohoSync` hourly,
-`dailyDigest` at 08:15, `documentCopyCleanup` at 02:15 and `fetchFxRate` at 07:05 (all IST), all inside the same process — nothing else to configure, but job
+`dailyDigest` at 08:15, `documentCopyCleanup` at 02:15, `fetchFxRate` at 07:05 and `prospectExpiry` at 06:40 (all IST), all inside the same process — nothing else to configure, but job
 execution is then tied to the web process's uptime (a restart briefly
-pauses all seven jobs, and if you run multiple app instances behind a load
+pauses all eight jobs, and if you run multiple app instances behind a load
 balancer for scaling, each instance would independently fire the jobs —
 stick to a single instance, or use Option 1, if you ever scale out).
 

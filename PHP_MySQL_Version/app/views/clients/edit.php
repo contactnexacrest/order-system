@@ -25,35 +25,43 @@
     <?= Csrf::field() ?>
     <?= \App\Helpers\EditFingerprint::input($editFingerprint) ?>
     <?php $fieldsetDisabled = $locked && !$isSuperAdmin; ?>
+    <?php if ((int) ($client['is_prospect'] ?? 0) === 1): ?>
+    <?php // Owner decision D-394: a prospect may be saved with only the prospect's required details; with every detail filled in it is no longer a prospect. ?>
+    <fieldset class="prospect-fieldset" data-testid="quick-quote">
+      <legend>Quick quote</legend>
+      <label class="prospect-toggle"><input type="checkbox" name="is_prospect" value="1" checked> Quick quote — the buyer has not sent their details yet (prospect)</label>
+      <p class="muted small">While this is ticked, only Company Legal Name, Email and Country of Destination are needed. Once Billing Address Line 1, City / Town and Billing Country are filled in, saving ends the prospect: the Prospect badge goes and the client never expires on its own.</p>
+    </fieldset>
+    <?php endif; ?>
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Buyer Details</legend>
       <div class="field-grid">
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars($client['company_legal_name']) ?>" placeholder="e.g., Test Company Ltd" required maxlength="255">
         </label>
-        <label>Billing Address Line 1 *
-          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required maxlength="255">
+        <label>Billing Address Line 1 <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars($client['billing_address_line1'] ?? '') ?>" placeholder="Street number and street name" required data-required-unless-ticked="is_prospect" maxlength="255">
         </label>
         <label>Billing Address Line 2
           <input type="text" name="billing_address_line2" value="<?= htmlspecialchars($client['billing_address_line2'] ?? '') ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
-        <label>City / Town *
-          <input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>" placeholder="e.g., Birmingham" required maxlength="100">
+        <label>City / Town <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_city" value="<?= htmlspecialchars($client['billing_city'] ?? '') ?>" placeholder="e.g., Birmingham" required data-required-unless-ticked="is_prospect" maxlength="100">
         </label>
         <label>Postcode
           <input type="text" name="billing_postcode" value="<?= htmlspecialchars($client['billing_postcode'] ?? '') ?>" placeholder="e.g., B1 1AA" maxlength="30">
         </label>
-        <label>Billing Country *
-          <input type="text" name="billing_country" value="<?= htmlspecialchars($client['billing_country'] ?? '') ?>" placeholder="e.g., United Kingdom" required maxlength="100">
+        <label>Billing Country <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_country" value="<?= htmlspecialchars($client['billing_country'] ?? '') ?>" placeholder="e.g., United Kingdom" required data-required-unless-ticked="is_prospect" maxlength="100">
         </label>
-        <?php if (trim((string) ($client['billing_address'] ?? '')) !== '' && (trim((string) ($client['billing_address_line1'] ?? '')) === '' || trim((string) ($client['billing_city'] ?? '')) === '' || trim((string) ($client['billing_country'] ?? '')) === '')): ?>
+        <?php if ((int) ($client['is_prospect'] ?? 0) !== 1 && trim((string) ($client['billing_address'] ?? '')) !== '' && (trim((string) ($client['billing_address_line1'] ?? '')) === '' || trim((string) ($client['billing_city'] ?? '')) === '' || trim((string) ($client['billing_country'] ?? '')) === '')): ?>
           <p class="muted small legacy-billing-address" style="grid-column:1 / -1">Address on file (old single box): <?= htmlspecialchars((string) $client['billing_address']) ?> — copy it into the boxes above.</p>
         <?php endif; ?>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars($client['vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." maxlength="100">
         </label>
         <label>Country of Destination
-          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($client['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" maxlength="100">
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars($client['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" maxlength="100" data-required-if-ticked="is_prospect">
         </label>
         <label>Certificate of Origin Type
           <select name="coo_type">
@@ -146,7 +154,7 @@
           <input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>" placeholder="e.g., Purchasing Manager" maxlength="150">
         </label>
         <label>Email
-          <input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>" placeholder="e.g., name@example.com" maxlength="190" data-required-if-ticked="is_prospect">
         </label>
         <label>Phone
           <input type="text" name="phone" value="<?= htmlspecialchars($client['phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">

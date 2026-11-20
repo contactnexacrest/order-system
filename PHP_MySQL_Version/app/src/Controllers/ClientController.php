@@ -27,7 +27,20 @@ final class ClientController
 {
     public function index(array $params): void
     {
-        View::render('clients/index', ['clients' => ClientRepository::all()], 'layout/base');
+        // Owner decision D-394: "Show: All · Clients · Prospects" (counts from the whole list).
+        $all = ClientRepository::all();
+        $show = (string) ($_GET['show'] ?? 'all');
+        if (!in_array($show, ['all', 'clients', 'prospects'], true)) {
+            $show = 'all';
+        }
+        $prospects = array_values(array_filter($all, static fn (array $c): bool => (int) ($c['is_prospect'] ?? 0) === 1));
+        $counts = ['all' => count($all), 'clients' => count($all) - count($prospects), 'prospects' => count($prospects)];
+        $clients = match ($show) {
+            'prospects' => $prospects,
+            'clients' => array_values(array_filter($all, static fn (array $c): bool => (int) ($c['is_prospect'] ?? 0) !== 1)),
+            default => $all,
+        };
+        View::render('clients/index', ['clients' => $clients, 'show' => $show, 'counts' => $counts], 'layout/base');
     }
 
     public function inactiveIndex(array $params): void
@@ -51,6 +64,17 @@ final class ClientController
 
         $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
         $billingAddress = self::composedBillingAddress();
+        // Owner decision D-394: "Quick quote" — a prospect needs only the company name, e-mail and country of destination.
+        $isProspect = \App\Services\ProspectService::requested($_POST);
+        if ($isProspect) {
+            if ($error = \App\Services\ProspectService::createError($_POST)) {
+                Flash::set('error', $error);
+                Flash::setOld($_POST);
+                header('Location: /clients/create');
+                return;
+            }
+            $billingAddress ??= \App\Services\ProspectService::partialBillingAddress($_POST);
+        }
 
         if ($companyLegalName === '' || $billingAddress === null) {
             Flash::set('error', self::REQUIRED_MESSAGE);
@@ -79,6 +103,13 @@ final class ClientController
         }
         // External QA report L-23: client creation was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'CLIENT_CREATED', 'clients', $clientId, 'company_legal_name', null, $companyLegalName);
+        // D-394: a "prospect" whose details are all there anyway is an ordinary client.
+        if ($isProspect && !\App\Services\ProspectService::hasRequiredDetails($data)) {
+            $expires = \App\Services\ProspectService::markNew($clientId, (int) $user['id']);
+            Flash::set('success', "Prospect created — Buyer Inquiry Ref {$clientUniqueNumber}. Its quotation expires on " . \App\Helpers\Dates::short($expires) . ' unless an order goes ahead; fill in the details any time.');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
 
         Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}.");
         header("Location: /clients/{$clientId}");
@@ -248,6 +279,8 @@ final class ClientController
             'duplicateOfClient' => $client['duplicate_of_client_id'] ? ClientRepository::find((int) $client['duplicate_of_client_id']) : null,
             'duplicatedInto' => ClientRepository::findDuplicatesOf((int) $client['id']),
             'clientLogin' => ClientLoginRepository::findByClientId((int) $client['id']),
+            // Owner decision D-394: the prospect box names its quotation order.
+            'prospectOrder' => (int) ($client['is_prospect'] ?? 0) === 1 ? \App\Services\ProspectService::quotationOrder((int) $client['id']) : null,
         ], 'layout/base');
     }
 
@@ -286,6 +319,15 @@ final class ClientController
 
         $companyLegalName = trim((string) ($_POST['company_legal_name'] ?? ''));
         $billingAddress = self::composedBillingAddress();
+        // Owner decision D-394: a prospect may be saved with only the prospect's required details.
+        if ((int) ($client['is_prospect'] ?? 0) === 1 && \App\Services\ProspectService::requested($_POST)) {
+            if ($error = \App\Services\ProspectService::createError($_POST)) {
+                Flash::set('error', $error);
+                header("Location: /clients/{$clientId}/edit");
+                return;
+            }
+            $billingAddress ??= \App\Services\ProspectService::partialBillingAddress($_POST);
+        }
         if ($companyLegalName === '' || $billingAddress === null) {
             Flash::set('error', self::REQUIRED_MESSAGE);
             header("Location: /clients/{$clientId}/edit");
@@ -373,7 +415,14 @@ final class ClientController
         // changed again lapses.
         $refresh = \App\Services\BuyerDetailsRefreshService::afterClientSaved($clientId, (int) $user['id'], 'client edit');
 
-        Flash::set('success', "{$companyLegalName} updated." . \App\Services\BuyerDetailsRefreshService::flashText($refresh));
+        // Owner decision D-394: every normally required detail filled in — no longer a prospect.
+        $confirmed = '';
+        if ((int) ($client['is_prospect'] ?? 0) === 1 && \App\Services\ProspectService::hasRequiredDetails($data)) {
+            \App\Services\ProspectService::confirm($clientId, (int) $user['id'], 'Every required detail filled in on Edit client.');
+            $confirmed = ' Every required detail is filled in, so it is no longer a prospect and never expires on its own.';
+        }
+
+        Flash::set('success', "{$companyLegalName} updated." . $confirmed . \App\Services\BuyerDetailsRefreshService::flashText($refresh));
         header("Location: /clients/{$clientId}");
     }
 
@@ -654,10 +703,69 @@ final class ClientController
             $newState ? '1' : '0'
         );
 
+        // Owner decision D-394: a prospect comes back with a fresh expiry date.
+        if ($newState && (int) ($client['is_prospect'] ?? 0) === 1) {
+            $expires = \App\Services\ProspectService::onReactivated($clientId, (int) $user['id']);
+            Flash::set('success', \App\Services\ProspectService::reactivatedMessage((string) $client['company_legal_name'], $expires));
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+
         Flash::set('success', $newState
             ? "{$client['company_legal_name']} reactivated — visible in the main Clients list again."
             : "{$client['company_legal_name']} deactivated — hidden from the main Clients list. Nothing was deleted; their orders are untouched.");
         header('Location: /clients');
+    }
+
+    /** Owner decision D-394: "Keep for N more days" on a prospect (audit-logged). */
+    public function keepProspect(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        $new = \App\Services\ProspectService::extend($clientId, (int) AuthService::currentUser()['id']);
+        if ($new === null) {
+            Flash::set('error', 'Only an active prospect can be kept longer — reactivate a deactivated one instead.');
+        } else {
+            Flash::set('success', "{$client['company_legal_name']} is kept until " . \App\Helpers\Dates::short($new) . '. The order\'s owner is reminded again ' . \App\Services\ProspectService::reminderDays() . ' days before.');
+        }
+        header('Location: ' . (($_POST['back'] ?? '') === 'notifications' ? '/notifications' : "/clients/{$clientId}"));
+    }
+
+    /**
+     * Owner decision D-394: e-mails the existing Public Quotation Form link to the
+     * prospect's e-mail — a buyer link e-mail, so Testing mode and Admin › E-mail
+     * settings apply and the screen says plainly when it was held. Audit-logged.
+     */
+    public function sendQuotationForm(array $params): void
+    {
+        $clientId = (int) $params['id'];
+        $client = ClientRepository::find($clientId);
+        if (!$client) {
+            http_response_code(404);
+            echo 'Client not found.';
+            return;
+        }
+        $email = trim((string) ($client['email'] ?? ''));
+        if ($email === '') {
+            Flash::set('error', 'This client has no e-mail address — add one first.');
+            header("Location: /clients/{$clientId}");
+            return;
+        }
+        $link = rtrim((string) \App\Config\Env::get('APP_URL', ''), '/') . '/quotation-details';
+        $body = \App\Services\ProspectService::quotationFormEmailBody((string) $client['company_legal_name'], $email, $link);
+        $sent = \App\Services\EmailService::sendPlainText($email, \App\Services\ProspectService::QUOTATION_FORM_SUBJECT, $body, false, 'buyer_links', 'buyer');
+        $why = $sent ? null : \App\Services\EmailPolicy::notSentReason('buyer_links', 'buyer');
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], $sent ? 'CLIENT_QUOTATION_FORM_EMAILED' : 'CLIENT_QUOTATION_FORM_NOT_EMAILED', 'clients', $clientId, 'email', null, $email,
+            $sent ? 'Public Quotation Form link e-mailed (D-394).' : "Not e-mailed: {$why} (D-394).");
+        Flash::set($sent ? 'success' : 'error', $sent
+            ? "The Public Quotation Form link was e-mailed to {$email}."
+            : "Not e-mailed: {$why}. Send the link yourself: {$link}");
+        header("Location: /clients/{$clientId}");
     }
 
     /**

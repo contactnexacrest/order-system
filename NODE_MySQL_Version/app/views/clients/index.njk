@@ -18,17 +18,29 @@
     </div>
   </div>
 
+  {# Owner decision D-394 (mockup 2): Show: All · Clients · Prospects. #}
+  <div class="filter-chip-row" data-testid="client-show-chips">
+    <span class="muted small">Show:</span>
+    {% for key, label in [['all', 'All'], ['clients', 'Clients'], ['prospects', 'Prospects']] %}
+      <a class="filter-chip{{ ' active' if (show or 'all') == key else '' }}" href="/clients?show={{ key }}">{{ label }} ({{ counts[key] if counts else 0 }})</a>
+    {% endfor %}
+  </div>
+
   {% if not clients or clients.length == 0 %}
-    <p class="muted">No clients yet.</p>
+    <p class="muted">{{ 'No prospects.' if show == 'prospects' else 'No clients yet.' }}</p>
   {% else %}
   <div class="card-grid">
     {% for c in clients %}
     <div class="entity-card entity-card-linked">
       <div class="entity-card-header">
         <a class="entity-card-stretched-link" href="/clients/{{ c.id }}"><span class="entity-card-title">{{ c.company_legal_name }}</span></a>
+        {% if c.is_prospect == 1 %}<span class="tag tag-gold" data-testid="prospect-badge">Prospect</span>{% endif %}
         <span class="tag tag-navy">{{ c.order_count }} order{{ '' if c.order_count == 1 else 's' }}</span>
       </div>
       <div class="entity-card-sub">{{ c.client_unique_number }}</div>
+      {% if c.is_prospect == 1 and c.prospect_expires_on %}
+        <div class="small prospect-expiry{{ ' prospect-expiry-urgent' if c.prospect_urgent else '' }}">{{ c.prospect_line }}</div>
+      {% endif %}
       <div class="entity-card-sub">
         {{ c.contact_person or '—' }}
         {% if c.email %}

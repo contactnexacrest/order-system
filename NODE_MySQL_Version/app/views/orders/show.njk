@@ -711,6 +711,9 @@
   {% endif %}
   {% if order.status == 'lost' %}
     <p class="muted small">Marked lost{% if order.lost_at %} on {{ order.lost_at }}{% endif %}{% if order.lost_reason %} — reason: {{ order.lost_reason }}{% endif %}</p>
+    {% if order.lost_category == 'quotation_expired' %}{# Owner decision D-394 #}
+    <p class="notice notice-info" data-testid="prospect-closed-note">Closed automatically on {{ order.lost_at | shortDate }}: the quick-quote prospect did not reply. Nothing was deleted. To quote again, use Duplicate order for a fresh quotation (and reactivate the client if it is deactivated).</p>
+    {% endif %}
   {% endif %}
   {% if order.is_archived %}
     <p class="muted small">Archived{% if order.archived_at %} on {{ order.archived_at }}{% endif %} — hidden from the main Orders list. Nothing was deleted.</p>

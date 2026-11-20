@@ -22,7 +22,8 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
-  <h1><?= htmlspecialchars($client['company_legal_name']) ?></h1>
+  <?php $__isProspect = (int) ($client['is_prospect'] ?? 0) === 1; ?>
+  <h1><?= htmlspecialchars($client['company_legal_name']) ?><?php if ($__isProspect): ?> <span class="tag tag-gold" data-testid="prospect-badge">Prospect</span><?php endif; ?></h1>
   <p class="muted">
     Buyer Inquiry Ref: <strong><?= htmlspecialchars($client['client_unique_number']) ?></strong>
   </p>
@@ -49,9 +50,49 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <a class="btn-sm btn-secondary" href="/clients/<?= (int) $client['id'] ?>/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/toggle-active" style="display:inline" onsubmit="return confirm('<?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?> <?= htmlspecialchars(addslashes($client['company_legal_name'])) ?>?<?= (int) $client['is_active'] === 1 ? ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' : '' ?>');">
       <?= Csrf::field() ?>
-      <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : 'Reactivate' ?></button>
+      <button type="submit" class="btn-sm <?= (int) $client['is_active'] === 1 ? 'btn-danger' : 'btn-success' ?>"><?= (int) $client['is_active'] === 1 ? 'Deactivate' : ($__isProspect ? 'Reactivate (fresh ' . \App\Services\ProspectService::expiryDays() . ' days)' : 'Reactivate') ?></button>
     </form>
     <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if ($__isProspect): // Owner decision D-394 (mockup 3) ?>
+  <?php
+    $__exp = (string) ($client['prospect_expires_on'] ?? '');
+    $__auto = \App\Services\ProspectService::autoClose();
+    $__days = \App\Services\ProspectService::expiryDays();
+  ?>
+  <div class="prospect-box" data-testid="prospect-box">
+    <p><strong>Prospect — details not confirmed yet.</strong>
+    <?php if ($prospectOrder): ?>
+      Quotation order <a href="/orders/<?= (int) $prospectOrder['id'] ?>"><?= htmlspecialchars((string) $prospectOrder['order_reference']) ?></a> was created on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $prospectOrder['created_at'])) ?>.
+    <?php else: ?>
+      No quotation order yet — add one with + New Order.
+    <?php endif; ?>
+    </p>
+    <?php if ((int) $client['is_active'] !== 1): ?>
+      <p><?= htmlspecialchars((string) ($client['prospect_expired_reason'] ?? 'Deactivated.')) ?><?= !empty($client['prospect_expired_on']) ? ' — closed automatically on ' . htmlspecialchars(\App\Helpers\Dates::short((string) $client['prospect_expired_on'])) . '.' : '' ?> Reactivate it for a fresh <?= $__days ?> days.</p>
+    <?php elseif ($__exp !== ''): ?>
+      <?php if ($__auto): ?>
+      <p class="<?= \App\Services\ProspectService::isUrgent($__exp) ? 'prospect-expiry-urgent' : '' ?>">If the buyer does not go ahead, the order moves to "Did not go ahead" and this client to Deactivated on <?= htmlspecialchars(\App\Helpers\Dates::short($__exp)) ?> (<?= htmlspecialchars(\App\Services\ProspectService::relative($__exp)) ?>). The order's owner is reminded on <?= htmlspecialchars(\App\Helpers\Dates::short(\App\Services\ProspectService::reminderDate($__exp))) ?>.</p>
+      <?php else: ?>
+      <p class="<?= \App\Services\ProspectService::isUrgent($__exp) ? 'prospect-expiry-urgent' : '' ?>">Its quotation expires on <?= htmlspecialchars(\App\Helpers\Dates::short($__exp)) ?>. Automatic closing is off, so nothing closes on its own; the order's owner is reminded on <?= htmlspecialchars(\App\Helpers\Dates::short(\App\Services\ProspectService::reminderDate($__exp))) ?>.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?php if ($canManageOrders && (int) $client['is_active'] === 1): ?>
+    <div class="btn-row">
+      <a class="btn-sm" href="/clients/<?= (int) $client['id'] ?>/edit">Fill in the details</a>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/send-quotation-form" style="display:inline" onsubmit="return confirm('E-mail the Public Quotation Form link to the buyer?');">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm btn-secondary">E-mail the Public Quotation Form</button>
+      </form>
+      <form method="post" action="/clients/<?= (int) $client['id'] ?>/prospect-keep" style="display:inline">
+        <?= Csrf::field() ?>
+        <button type="submit" class="btn-sm btn-secondary">Keep for <?= $__days ?> more days</button>
+      </form>
+    </div>
+    <?php endif; ?>
+    <p class="muted small">When all the required details are filled in, the Prospect badge goes and the client never expires on its own.</p>
   </div>
   <?php endif; ?>
 

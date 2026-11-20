@@ -6,19 +6,21 @@
   {% if not clients or clients.length == 0 %}
     <p class="muted">No deactivated clients.</p>
   {% else %}
+  {# Owner decision D-394 (mockup 8): an expired prospect shows its badge and why it was closed. #}
   <table class="list">
-    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th></th></tr>
+    <tr><th>Buyer Inquiry Ref</th><th>Company</th><th>Contact</th><th>Country</th><th>Why</th><th></th></tr>
     {% for c in clients %}
     <tr>
       <td>{{ c.client_unique_number }}</td>
-      <td>{{ c.company_legal_name }}</td>
+      <td>{{ c.company_legal_name }}{% if c.is_prospect == 1 %} <span class="tag tag-gold" data-testid="prospect-badge">Prospect</span>{% endif %}</td>
       <td>{{ c.contact_person or '—' }}</td>
       <td>{{ c.country_of_destination or '—' }}</td>
+      <td>{{ c.prospect_expired_reason or '—' }}</td>
       <td>
         <a href="/clients/{{ c.id }}">View</a>
         <form method="post" action="/clients/{{ c.id }}/toggle-active" style="display:inline" data-confirm="Reactivate {{ c.company_legal_name }}?">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <button type="submit" class="btn-sm btn-success">Reactivate</button>
+          <button type="submit" class="btn-sm btn-success">{{ ('Reactivate (fresh ' + prospectExpiryDays + ' days)') if c.is_prospect == 1 else 'Reactivate' }}</button>
         </form>
       </td>
     </tr>
