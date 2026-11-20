@@ -80,6 +80,14 @@ FROM (
             + (SELECT COUNT(*) FROM company_settings WHERE setting_key IN ('prospect_expiry_days', 'prospect_reminder_days', 'prospect_auto_close'))
             + (SELECT COUNT(*) FROM department_task_types WHERE task_key = 'prospect_quote_expiring')
               WHEN 9 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-20b',
+         'The role "Merchant Trade Executive": Sales/Export Manager permissions + manage_purchasing, view_purchase_prices; report access and SOP chapters (D-399)',
+         CASE (SELECT COUNT(*) FROM roles WHERE name = 'Merchant Trade Executive')
+            + (SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+                WHERE r.name = 'Merchant Trade Executive' AND p.permission_key IN ('manage_purchasing', 'view_purchase_prices'))
+            + (SELECT COUNT(*) FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive' AND c.slug = '31-merchant-trade')
+              WHEN 4 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

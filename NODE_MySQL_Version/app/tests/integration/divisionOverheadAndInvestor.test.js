@@ -113,6 +113,60 @@ describe('D-257 Phase 5 — overhead sharing and the Investor role', () => {
     expect(page).toContain('₹30,000.00 in this period');
   });
 
+  // D-398 (20 Nov 2026, owner): a Merchant Trade deal counts in its division's row — received ₹ and margin.
+  it('counts Merchant Trade deals in their division\'s row', async () => {
+    await db.execute("UPDATE divisions SET status = 'active' WHERE id = 3");
+    const md = await createUser('Managing Director', null);
+    const exp = await createTestOrder(await createTestClient());
+    const tag = Math.random().toString(16).slice(2, 8).toUpperCase();
+    const deal = async (ref, stage, date) => (await db.execute(
+      `INSERT INTO merchant_deals (division_id, reference, po_no, stage, deal_date, supplier_name, supplier_country, purchase_currency, buyer_name, buyer_country, sale_currency, origin_country, advance_backing, switch_bl, created_by, updated_by)
+       VALUES (3, :r, :p, :st, :d, 'TEST Supplier', 'Vietnam', 'USD', 'TEST Buyer', 'UAE', 'USD', 'Vietnam', 'none', 0, :u1, :u2)`,
+      { r: `TEST-MTT/${ref}`, p: `TEST-PO/${ref}`, st: stage, d: date, u1: md.id, u2: md.id })).insertId;
+    const pay = (id, leg, fc, inr, ref, on) => db.execute(
+      `INSERT INTO merchant_payments (deal_id, leg, moved_on, amount_fc, fx_rate, amount_inr, bank_reference, description, recorded_by)
+       VALUES (:id, :leg, :on, :fc, '83.3333', :inr, :ref, 'TEST', :u)`, { id, leg, on, fc, inr, ref, u: md.id });
+    const ids = [];
+    try {
+      const d1 = await deal(tag, 'settled', '2032-02-10');
+      ids.push(d1);
+      await db.execute(`INSERT INTO merchant_deal_lines (deal_id, line_no, description, hsn_code, quantity, unit, buy_price_fc, sell_price_fc, is_active, created_by)
+        VALUES (:d, 1, 'TEST granite', '68022390', '10.000', 'CBM', '84.00', '120.00', 1, :u)`, { d: d1, u: md.id });
+      await pay(d1, 'sell', '1200.00', '100000.00', `UTR-S-${tag}`, '2032-02-20');
+      await pay(d1, 'buy', '840.00', '70000.00', `UTR-B-${tag}`, '2032-02-20');
+      const d2 = await deal(`${tag}-X`, 'contracted', '2031-12-31');
+      ids.push(d2);
+      await pay(d2, 'sell', '10.00', '830.00', `UTR-X-${tag}`, '2031-12-31');
+
+      const rows = [{ order_id: exp, revenue_inr: 300000, profit_before_commission_inr: 60000, profit_after_incentive_inr: 50000 }];
+      const by = Object.fromEntries((await as(md, () => divisionProfit.summary(rows, '2032-02-01', '2032-02-29', true))).rows.map((r) => [r.code, r]));
+      expect([by.MTT.revenue_inr, by.MTT.profit_inr, by.MTT.deals, by.MTT.orders]).toEqual(['100000.00', '30000.00', 1, 0]);
+      expect(by.MTT.revenue_share_pct).toBe('25.00');
+      expect([by.EXP.revenue_inr, by.EXP.deals]).toEqual(['300000.00', 0]);
+      const before = await as(md, () => divisionProfit.summary(rows, '2032-02-01', '2032-02-29', false));
+      expect(before.rows.find((r) => r.code === 'MTT').profit_inr).toBe('30000.00');
+      const page = (await (await loginAs(md)).get('/reports/order-profitability?date_from=2032-02-01&date_to=2032-02-29')).text;
+      expect(page).toContain('<th>Orders / deals</th>');
+      expect(page).toContain('0 + 1 deal</td>');
+    } finally {
+      for (const id of ids) {
+        await db.execute('DELETE FROM merchant_payments WHERE deal_id = :id', { id });
+        await db.execute('DELETE FROM merchant_deal_lines WHERE deal_id = :id', { id });
+        await db.execute('DELETE FROM merchant_deals WHERE id = :id', { id });
+      }
+    }
+  });
+
+  // D-399 (20 Nov 2026, owner): the ready-made role for a whole Merchant Trade deal.
+  it('gives the Merchant Trade Executive both sides of a deal', async () => {
+    const keys = (await db.query(`SELECT p.permission_key AS k FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+      WHERE r.name = 'Merchant Trade Executive' AND rp.is_enabled = 1`)).map((x) => x.k);
+    for (const k of ['view_selling_prices', 'view_buyer_payments', 'manage_purchasing', 'view_purchase_prices', 'manage_payments']) expect(keys).toContain(k);
+    expect(keys).not.toContain('see_all_divisions');
+    const chapters = (await db.query(`SELECT c.slug AS s FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive'`)).map((x) => x.s);
+    expect(chapters).toContain('31-merchant-trade');
+  });
+
   it('keeps the Investor (view only) role view-only, end to end', async () => {
     const investor = await createUser('Investor (view only)', null);
     const held = (await db.query(

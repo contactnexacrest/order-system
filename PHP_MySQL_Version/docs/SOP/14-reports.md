@@ -129,7 +129,7 @@ Everything starts from the **Reports** hub:
   Admin and roles granted **Manage order financials**; see [Order
   Financials](./ca-08-order-financials.md#the-order-profitability-report).
   With two or more active divisions, the "All divisions" view adds a
-  **Profit by division** section with company overhead shared by revenue
+  **Profit by division** section (Merchant Trade deals included, D-398) with company overhead shared by revenue
   (see [Divisions](./28-divisions.md)). Payment-milestone money counts as
   revenue (D-258, 6 Nov 2026).
 - **Associates report** (`/reports/associates`, owner decision D-217) —

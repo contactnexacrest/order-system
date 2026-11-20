@@ -7,7 +7,7 @@
 ## Before activating Merchant Trade (MD)
 
 1. **Settings › Divisions › Merchant Trade.**
-   - **Set it up:** *Create its departments* makes Merchant Trade Desk and Merchant Trade Documents (add their designations in Users & roles › Departments). *Move to Merchant Trade* places a staff member in the division.
+   - **Set it up:** *Create its departments* makes Merchant Trade Desk and Merchant Trade Documents (add their designations in Users & roles › Departments). *Move to Merchant Trade* places a staff member in the division. Give them the role **Merchant Trade Executive** (D-399, 20 Nov 2026): it covers a whole deal — the buyer side (selling prices, the buyer's payments, documents) and the supplier side (purchase prices, the purchase order, payments to the supplier), with this chapter in Help & SOP.
    - **Modules:** the **Merchant trade** module is on for Merchant Trade only, so nobody else reaches `/merchant`. Export shipping, LUT/IGST and export benefits stay off.
    - **Its own settings** (starting values, **to be confirmed with the AD bank and the CA**):
 

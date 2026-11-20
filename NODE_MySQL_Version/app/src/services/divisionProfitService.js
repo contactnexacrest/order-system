@@ -40,6 +40,24 @@ async function summary(rows, dateFrom, dateTo, profitAfterIncentives) {
     x.profit += paise(r[profitKey]);
     x.orders++;
   }
+  // D-398 (20 Nov 2026, owner): Merchant Trade deals are not orders, so they are added here — revenue
+  // = the rupees received from the buyer, profit = the deal's margin (received − paid to the supplier),
+  // the same figures as Merchant trade › Reports › Margin per deal; dated by the deal date. A deal has
+  // no commission or incentive, so the figure is the same with either profit choice.
+  const M = require('./merchantTradeService');
+  const mtt = await M.divisionId();
+  if (mtt !== null && divisions.has(Number(mtt))) {
+    const x = divisions.get(Number(mtt));
+    x.deals = 0;
+    for (const deal of await require('../repositories/merchantTradeRepository').list([mtt])) {
+      const date = String(deal.deal_date || '').slice(0, 10);
+      if ((dateFrom && date < dateFrom) || (dateTo && date > dateTo)) continue;
+      const f = await M.figures(deal);
+      x.revenue += paise(f.received_inr);
+      x.profit += paise(f.margin_inr);
+      x.deals++;
+    }
+  }
   const where = ['order_id IS NULL', "currency_code = 'INR'"];
   const params = {};
   if (dateFrom) {
@@ -67,6 +85,7 @@ async function summary(rows, dateFrom, dateTo, profitAfterIncentives) {
         code: d.code,
         name: d.name,
         orders: d.orders,
+        deals: d.deals || 0,
         revenue_inr: G.money(d.revenue),
         revenue_share_pct: totalRevenue > 0n ? G.money(G.roundDiv(weights[i] * 10000n, totalRevenue)) : '0.00',
         profit_inr: G.money(d.profit),

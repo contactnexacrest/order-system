@@ -42,6 +42,8 @@ The **Investor (view only)** role sees dashboards, the management cockpit and re
 
 Once two or more divisions are active, **Reports › Order Profitability** viewed as "All divisions" gets a **Profit by division** section: each division's revenue and profit, its own costs, and its share of company overhead (company costs not tied to an order or a division), shared out in proportion to revenue. With one division the report is exactly as before. CAFIN is not changed by this.
 
+**Merchant Trade deals count too (D-398, 20 Nov 2026).** A merchant deal is not an order, so its row adds each deal dated in the period: revenue = the rupees received from the buyer, profit = the deal's margin (received − paid to the supplier), the same figures as **Merchant trade › Reports › Margin per deal**. The column reads **Orders / deals** (for example "0 + 1 deal"), and the deals' revenue takes its share of company overhead like any other division's. A deal has no commission or incentive, so its profit is the same with either profit choice.
+
 ## Facts that depend on the CA or the bank
 
 Values such as GST rates by HSN, e-invoice and e-way bill thresholds, and merchanting limits start from **standard Indian rules**. Each is an editable division setting and is **to be confirmed by the CA / bank** before the division goes live.

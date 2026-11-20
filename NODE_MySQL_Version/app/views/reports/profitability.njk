@@ -42,9 +42,9 @@
     <h2>Profit by division</h2>
     <p class="muted">Company costs not linked to an order or a division (₹{{ divisionProfit.overhead_fmt }} in this period) are shared out by revenue{{ ' — not shared: no revenue in this period' if divisionProfit.overhead_unshared else '' }}. A division's own costs are charged to it alone.</p>
     <table class="list">
-      <tr><th>Division</th><th>Orders</th><th>Revenue (INR)</th><th>Share of revenue</th><th>{{ divisionProfit.profit_label }} (INR)</th><th>Division's own costs (INR)</th><th>Share of company overhead (INR)</th><th>Profit after overhead (INR)</th></tr>
+      <tr><th>Division</th><th>Orders / deals</th><th>Revenue (INR)</th><th>Share of revenue</th><th>{{ divisionProfit.profit_label }} (INR)</th><th>Division's own costs (INR)</th><th>Share of company overhead (INR)</th><th>Profit after overhead (INR)</th></tr>
       {% for d in divisionProfit.rows %}
-      <tr data-division="{{ d.code }}"><td>{{ d.name }}</td><td>{{ d.orders }}</td><td>{{ d.revenue_fmt }}</td><td>{{ d.revenue_share_pct }}%</td>
+      <tr data-division="{{ d.code }}"><td>{{ d.name }}</td><td>{{ d.orders }}{% if d.deals %} + {{ d.deals }} deal{% if d.deals != 1 %}s{% endif %}{% endif %}</td><td>{{ d.revenue_fmt }}</td><td>{{ d.revenue_share_pct }}%</td>
         <td>{{ d.profit_fmt }}</td><td>{{ d.own_fmt }}</td><td>{{ d.overhead_fmt }}</td><td>{{ d.after_fmt }}</td></tr>
       {% endfor %}
     </table>

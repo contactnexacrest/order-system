@@ -113,6 +113,65 @@ final class DivisionOverheadAndInvestorTest extends DbTestCase
         self::assertNull(DivisionProfitService::summary($data['rows'], null, null, true));
     }
 
+    /** D-398 (20 Nov 2026, owner): a Merchant Trade deal counts in its division's row — received ₹ and margin. */
+    public function testMerchantTradeDealsCountInTheirDivisionsRow(): void
+    {
+        $pdo = Database::connection();
+        $pdo->exec("UPDATE divisions SET status = 'active' WHERE id = 3");
+        $md = $this->createTestUser('Managing Director');
+        $pdo->prepare('UPDATE users SET division_id = NULL WHERE id = :id')->execute(['id' => $md]);
+        $exp = $this->createTestOrder($this->createTestClient());
+        $tag = strtoupper(bin2hex(random_bytes(3)));
+        $pdo->prepare("INSERT INTO merchant_deals (division_id, reference, po_no, stage, deal_date, supplier_name, supplier_country, purchase_currency, buyer_name, buyer_country, sale_currency, origin_country, advance_backing, switch_bl, created_by, updated_by)
+            VALUES (3, :r, :p, 'settled', '2032-02-10', 'TEST Supplier', 'Vietnam', 'USD', 'TEST Buyer', 'UAE', 'USD', 'Vietnam', 'none', 0, :u1, :u2)")
+            ->execute(['r' => "TEST-MTT/{$tag}", 'p' => "TEST-PO/{$tag}", 'u1' => $md, 'u2' => $md]);
+        $deal = (int) $pdo->lastInsertId();
+        $outside = null;
+        try {
+            $pdo->prepare("INSERT INTO merchant_deal_lines (deal_id, line_no, description, hsn_code, quantity, unit, buy_price_fc, sell_price_fc, is_active, created_by) VALUES (?, 1, 'TEST granite', '68022390', '10.000', 'CBM', '84.00', '120.00', 1, ?)")->execute([$deal, $md]);
+            $pay = $pdo->prepare("INSERT INTO merchant_payments (deal_id, leg, moved_on, amount_fc, fx_rate, amount_inr, bank_reference, description, recorded_by) VALUES (?, ?, '2032-02-20', ?, '83.3333', ?, ?, 'TEST', ?)");
+            $pay->execute([$deal, 'sell', '1200.00', '100000.00', "UTR-S-{$tag}", $md]);
+            $pay->execute([$deal, 'buy', '840.00', '70000.00', "UTR-B-{$tag}", $md]);
+            // A deal dated outside the period does not count.
+            $pdo->prepare("INSERT INTO merchant_deals (division_id, reference, po_no, stage, deal_date, supplier_name, supplier_country, purchase_currency, buyer_name, buyer_country, sale_currency, origin_country, advance_backing, switch_bl, created_by, updated_by)
+                VALUES (3, :r, :p, 'contracted', '2031-12-31', 'TEST Supplier', 'Vietnam', 'USD', 'TEST Buyer', 'UAE', 'USD', 'Vietnam', 'none', 0, :u1, :u2)")
+                ->execute(['r' => "TEST-MTT/{$tag}-X", 'p' => "TEST-PO/{$tag}-X", 'u1' => $md, 'u2' => $md]);
+            $outside = (int) $pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO merchant_payments (deal_id, leg, moved_on, amount_fc, fx_rate, amount_inr, bank_reference, description, recorded_by) VALUES (?, 'sell', '2031-12-31', '10.00', '83.0000', '830.00', ?, 'TEST', ?)")->execute([$outside, "UTR-X-{$tag}", $md]);
+
+            $this->signIn($md);
+            $rows = [['order_id' => $exp, 'revenue_inr' => 300000.0, 'profit_before_commission_inr' => 60000.0, 'profit_after_incentive_inr' => 50000.0]];
+            $by = array_column(DivisionProfitService::summary($rows, '2032-02-01', '2032-02-29', true)['rows'], null, 'code');
+            self::assertSame(['100000.00', '30000.00', 1, 0], [$by['MTT']['revenue_inr'], $by['MTT']['profit_inr'], $by['MTT']['deals'], $by['MTT']['orders']]);
+            self::assertSame('25.00', $by['MTT']['revenue_share_pct'], 'the deal takes its share of revenue, so of the overhead');
+            self::assertSame(['300000.00', 0], [$by['EXP']['revenue_inr'], $by['EXP']['deals']]);
+            self::assertSame('30000.00', array_column(DivisionProfitService::summary($rows, '2032-02-01', '2032-02-29', false)['rows'], null, 'code')['MTT']['profit_inr'], 'no commission or incentive on a deal');
+            $_GET = ['date_from' => '2032-02-01', 'date_to' => '2032-02-29'];
+            $page = $this->render(fn () => (new ReportController())->profitability([]));
+            self::assertStringContainsString('<th>Orders / deals</th>', $page);
+            self::assertStringContainsString('0 + 1 deal</td>', $page);
+        } finally {
+            foreach (array_filter([$deal, $outside]) as $id) {
+                $pdo->prepare('DELETE FROM merchant_payments WHERE deal_id = ?')->execute([$id]);
+                $pdo->prepare('DELETE FROM merchant_deal_lines WHERE deal_id = ?')->execute([$id]);
+                $pdo->prepare('DELETE FROM merchant_deals WHERE id = ?')->execute([$id]);
+            }
+        }
+    }
+
+    /** D-399 (20 Nov 2026, owner): the ready-made role for a whole Merchant Trade deal. */
+    public function testTheMerchantTradeExecutiveRoleCoversBothSidesOfADeal(): void
+    {
+        $keys = Database::connection()->query("SELECT p.permission_key FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+            WHERE r.name = 'Merchant Trade Executive' AND rp.is_enabled = 1")->fetchAll(\PDO::FETCH_COLUMN);
+        foreach (['view_selling_prices', 'view_buyer_payments', 'manage_purchasing', 'view_purchase_prices', 'manage_payments'] as $k) {
+            self::assertContains($k, $keys, $k);
+        }
+        self::assertNotContains('see_all_divisions', $keys, 'a division role, not company level');
+        $chapters = Database::connection()->query("SELECT c.slug FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive'")->fetchAll(\PDO::FETCH_COLUMN);
+        self::assertContains('31-merchant-trade', $chapters);
+    }
+
     public function testOverheadIsSharedByRevenueWithTwoDivisions(): void
     {
         $pdo = Database::connection();

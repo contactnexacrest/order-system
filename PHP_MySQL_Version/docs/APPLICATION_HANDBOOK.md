@@ -1045,6 +1045,7 @@ role (D-214).
 | 22 | Export Compliance Manager | Export Compliance · manager | 13 | Executive on every order + approve documents, compliance task types. |
 | 23 | Export Compliance Director | Export Compliance · director | 14 | Manager + cockpit. |
 | 24 | Investor (view only) | none | 3 | `see_all_divisions`, `view_cockpit`, `view_reports` only (D-257). |
+| 25 | Merchant Trade Executive | Merchant Trade (staff placed in the division) | 31 | A whole Merchant Trade deal (D-399, 20 Nov 2026): the permissions, report access and SOP chapters of Sales/Export Manager plus `manage_purchasing` and `view_purchase_prices`, and SOP chapter 31. Migration 2026-11-20b. |
 
 Abbreviations used in the next table: ExpEx = Export Executive, AccEx =
 Accounts Executive, LogEx = Logistics Executive, Viewer = Viewer / Auditor,
@@ -1689,6 +1690,7 @@ Owner decision D-266 (7 Nov 2026). The SOP / Operations Guide (`/sop`) shows eac
 | Viewer / Auditor | 01–09, 14 |
 | CA / Chartered Accountant | 08, 14, every `ca-` chapter |
 | Investor (view only) | 14, 28 Divisions |
+| Merchant Trade Executive | as Sales/Export Manager, plus 31 Merchant Trade |
 
 Every chapter shipped at install is configured and on. Tests: `SopAccessD266Test` / `sopAccessD266.test.js`.
 
@@ -3384,7 +3386,7 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
 | Sales Performance / Product Sales | `/reports/performance`, `/products` | `view_reports` |
 | Freight Cost | `/reports/freight-cost` | `view_logistics_costs` |
 | Supplier Performance | `/reports/suppliers` | `view_purchase_prices` |
-| Order Profitability (Profit by division when ≥ 2 active) | `/reports/order-profitability` | `manage_order_financials` |
+| Order Profitability (Profit by division when ≥ 2 active; Merchant Trade deals count in their row — received ₹ and margin, D-398) | `/reports/order-profitability` | `manage_order_financials` |
 | Staff Productivity (active users only; the dates apply to documents and audit actions alike, D-269) | `/reports/staff` | `view_staff_reports` |
 | Incentive & Commission Register, To pay, Owed, Statement | `/reports/incentives…` | incentive gate |
 | Associates | `/reports/associates` | `manage_associates` |

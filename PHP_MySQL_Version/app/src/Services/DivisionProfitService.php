@@ -17,7 +17,8 @@ use App\Config\Database;
  * Costs come from ca_expenses that are not linked to an order (an order's
  * own expenses are already in that order's cost): division_id empty = a
  * company-wide cost, shared by revenue; a division's own = charged to it
- * alone. Only ₹ expenses count. Port: divisionProfitService.js.
+ * alone. Only ₹ expenses count. D-398: Merchant Trade deals count in their
+ * division's row (received ₹ and margin). Port: divisionProfitService.js.
  */
 final class DivisionProfitService
 {
@@ -58,6 +59,24 @@ final class DivisionProfitService
             $divisions[$div]['profit'] += self::paise($r[$profitKey]);
             $divisions[$div]['orders']++;
         }
+        // D-398 (20 Nov 2026, owner): Merchant Trade deals are not orders, so they are added here — revenue
+        // = the rupees received from the buyer, profit = the deal's margin (received − paid to the supplier),
+        // the same figures as Merchant trade › Reports › Margin per deal; dated by the deal date. A deal has
+        // no commission or incentive, so the figure is the same with either profit choice.
+        $mtt = MerchantTradeService::divisionId();
+        if ($mtt !== null && isset($divisions[$mtt])) {
+            $divisions[$mtt]['deals'] = 0;
+            foreach (\App\Repositories\MerchantTradeRepository::list([$mtt]) as $deal) {
+                $date = substr((string) $deal['deal_date'], 0, 10);
+                if (($dateFrom && $date < $dateFrom) || ($dateTo && $date > $dateTo)) {
+                    continue;
+                }
+                $f = MerchantTradeService::figures($deal);
+                $divisions[$mtt]['revenue'] += self::paise($f['received_inr']);
+                $divisions[$mtt]['profit'] += self::paise($f['margin_inr']);
+                $divisions[$mtt]['deals']++;
+            }
+        }
         $where = ["order_id IS NULL", "currency_code = 'INR'"];
         $params = [];
         if ($dateFrom) {
@@ -90,6 +109,7 @@ final class DivisionProfitService
                 'code' => $d['code'],
                 'name' => $d['name'],
                 'orders' => $d['orders'],
+                'deals' => $d['deals'] ?? 0,
                 'revenue_inr' => GstCalculator::money($d['revenue']),
                 'revenue_share_pct' => $totalRevenue > 0 ? GstCalculator::money(GstCalculator::roundDiv($weights[$i] * 10000, $totalRevenue)) : '0.00',
                 'profit_inr' => GstCalculator::money($d['profit']),
