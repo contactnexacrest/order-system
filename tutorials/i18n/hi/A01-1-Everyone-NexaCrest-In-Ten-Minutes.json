@@ -91,7 +91,7 @@
   "Part five. Pick the view that suits you.": "भाग पाँच। अपनी पसंद का व्यू चुनिए।",
   "Standard or Kanban": "Standard या Kanban",
   "Two ways to see the same work. Your choice.": "एक ही काम देखने के दो तरीके। आपकी मर्ज़ी।",
-  "This is the Standard view: a card for every order, with filters across the top: active, overdue, documents sent, complete, lost and cancelled.": "यह स्टैंडर्ड व्यू है: हर ऑर्डर का एक कार्ड, और ऊपर फ़िल्टर: एक्टिव, ओवरड्यू, डॉक्यूमेंट्स सेंट, कम्प्लीट, लॉस्ट और कैंसल्ड।",
+  "This is the Standard view: a card for every order, with filters across the top: active, overdue, prospects, documents sent, complete, lost and cancelled. Prospects are buyers we quoted before they sent their full details.": "यह स्टैंडर्ड व्यू है: हर ऑर्डर का एक कार्ड, और ऊपर फ़िल्टर: एक्टिव, ओवरड्यू, प्रॉस्पेक्ट्स, डॉक्यूमेंट्स सेंट, कम्प्लीट, लॉस्ट और कैंसल्ड। प्रॉस्पेक्ट्स वे बायर हैं जिन्हें हमने उनकी पूरी डिटेल्स आने से पहले कोटेशन भेजा।",
   "Standard: cards and filters": "Standard: कार्ड और फ़िल्टर",
   "Prefer a board? Open My Account, and scroll to UI Template.": "बोर्ड पसंद है? माई अकाउंट खोलिए, और यू आई टेम्पलेट तक स्क्रॉल कीजिए।",
   "My Account › UI Template": "My Account › UI Template",

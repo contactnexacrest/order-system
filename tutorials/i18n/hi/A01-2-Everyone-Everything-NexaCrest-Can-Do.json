@@ -15,7 +15,7 @@
   "Stop two. Clients and agreements.": "दूसरा पड़ाव। क्लाइंट और एग्रीमेंट।",
   "Clients and agreements": "क्लाइंट और एग्रीमेंट",
   "Every buyer, every signed agreement.": "हर बायर, हर साइन किया हुआ एग्रीमेंट।",
-  "Clients lists every buyer. Each one carries one Buyer Inquiry Reference for the whole relationship, and every order and document for that buyer reuses it.": "क्लाइंट्स में हर बायर की लिस्ट है। हर बायर का पूरे रिश्ते के लिए एक बायर इन्क्वायरी रेफ़रेंस होता है, और उस बायर का हर ऑर्डर और डॉक्यूमेंट उसी को इस्तेमाल करता है।",
+  "Clients lists every buyer. Each one carries one Buyer Inquiry Reference for the whole relationship, and every order and document for that buyer reuses it. The row above the cards shows all, only clients, or only prospects.": "क्लाइंट्स में हर बायर की लिस्ट है। हर बायर का पूरे रिश्ते के लिए एक बायर इन्क्वायरी रेफ़रेंस होता है, और उस बायर का हर ऑर्डर और डॉक्यूमेंट उसी को इस्तेमाल करता है। कार्ड्स के ऊपर की लाइन में सब, सिर्फ़ क्लाइंट्स, या सिर्फ़ प्रॉस्पेक्ट्स देख सकते हैं।",
   "Clients": "Clients",
   "Up here is the link to the public quotation form. Send it to a new lead, and they type in their own details. Their request then waits for you under Orders, Quotation requests, where one click turns it into a client.": "यहाँ ऊपर पब्लिक कोटेशन फ़ॉर्म का लिंक है। इसे नए लीड को भेजिए, और वे अपनी डिटेल्स ख़ुद भरते हैं। फिर उनकी रिक्वेस्ट ऑर्डर्स, कोटेशन रिक्वेस्ट्स में आपका इंतज़ार करती है, जहाँ एक क्लिक से वह क्लाइंट बन जाती है।",
   "The public quotation form": "पब्लिक कोटेशन फ़ॉर्म",

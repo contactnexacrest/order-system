@@ -52,7 +52,7 @@ module.exports = {
 
     // ---------- 2. Clients and agreements ----------
     { card: 'chapter', title: 'Clients and agreements', subtitle: 'Every buyer, every signed agreement.', say: 'Stop two. Clients and agreements.' },
-    { goto: '/clients', caption: 'Clients', say: 'Clients lists every buyer. Each one carries one Buyer Inquiry Reference for the whole relationship, and every order and document for that buyer reuses it.', do: async (d) => { await d.point('h1', 900); await d.point(text(d, '[SAMPLE] Regal Memorials'), 1400); } },
+    { goto: '/clients', caption: 'Clients', say: 'Clients lists every buyer. Each one carries one Buyer Inquiry Reference for the whole relationship, and every order and document for that buyer reuses it. The row above the cards shows all, only clients, or only prospects.', do: async (d) => { await d.point('h1', 900); await d.point(text(d, '[SAMPLE] Regal Memorials'), 1400); } },
     { caption: 'The public quotation form', say: 'Up here is the link to the public quotation form. Send it to a new lead, and they type in their own details. Their request then waits for you under Orders, Quotation requests, where one click turns it into a client.', do: async (d) => { await d.point(text(d, 'Public Quotation Form'), 1800); } },
     { goto: '/agreements', caption: 'Clients › Agreements', say: 'Agreements keeps every signed agreement in one register: with clients, suppliers, logistics partners, associates and staff, with the signed copy and its dates. The app sends a reminder thirty days and seven days before an agreement expires, and on the day itself.', do: async (d) => { await d.point('h1', 900); await d.point(text(d, 'Expiring within'), 1500); } },
 

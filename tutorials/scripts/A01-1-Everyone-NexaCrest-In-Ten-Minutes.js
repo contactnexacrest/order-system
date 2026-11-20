@@ -108,7 +108,7 @@ module.exports = {
 
     // ---------- 5. Standard vs Kanban ----------
     { card: 'chapter', title: 'Standard or Kanban', subtitle: 'Two ways to see the same work. Your choice.', say: 'Part five. Pick the view that suits you.' },
-    { goto: '/orders', caption: 'Standard: cards and filters', say: 'This is the Standard view: a card for every order, with filters across the top: active, overdue, documents sent, complete, lost and cancelled.', do: async (d) => { await d.point(d.page.getByRole('link', { name: /^Active/ }).first(), 1500); } },
+    { goto: '/orders', caption: 'Standard: cards and filters', say: 'This is the Standard view: a card for every order, with filters across the top: active, overdue, prospects, documents sent, complete, lost and cancelled. Prospects are buyers we quoted before they sent their full details.', do: async (d) => { await d.point(d.page.getByRole('link', { name: /^Active/ }).first(), 1500); } },
     { goto: '/account', caption: 'My Account › UI Template', say: 'Prefer a board? Open My Account, and scroll to UI Template.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'UI Template' })); await d.ring(d.page.getByRole('heading', { name: 'UI Template' })); await d.wait(800); } },
     { caption: 'Choose Kanban Board', say: 'Choose Kanban Board, and save.', do: async (d) => {
       await d.select(d.page.getByLabel('Template'), { label: 'Kanban Board' });
