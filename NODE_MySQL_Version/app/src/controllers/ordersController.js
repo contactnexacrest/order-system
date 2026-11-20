@@ -164,7 +164,8 @@ async function index(req, res) {
 
   // Precomputed here (not in the template) since Nunjucks has no min/max
   // filter — how many of the 9 mini-stage-track segments render filled.
-  const orders = pageSlice.map(withFilledSegments);
+  const remindDays = await require('../services/prospectService').reminderDays(); // D-394
+  const orders = pageSlice.map((o) => withProspectLine(withFilledSegments(o), remindDays));
 
   res.renderView('orders/index', {
     orders,
@@ -180,10 +181,28 @@ async function index(req, res) {
 }
 
 /** The count per status filter (Standard list and Kanban board alike). */
+/** Owner decision D-394: an order of a prospect client that is still active (the "Prospects" chip, badge and expiry line). */
+function isProspectOrder(o) {
+  return Number(o.client_is_prospect || 0) === 1 && o.status === 'active';
+}
+
+/** D-394: the card's "Prospect" badge and "No reply yet · expires …" line (red within the reminder days), same on the list and the board. */
+function withProspectLine(o, remindDays) {
+  if (!isProspectOrder(o)) return o;
+  const prospectService = require('../services/prospectService');
+  return {
+    ...o,
+    is_prospect_order: true,
+    prospect_line: prospectService.orderExpiryLine(o.client_prospect_expires_on, remindDays),
+    prospect_urgent: prospectService.isUrgent(o.client_prospect_expires_on, remindDays),
+  };
+}
+
 function statusCounts(all) {
-  const counts = { all: all.length, active: 0, overdue: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
+  const counts = { all: all.length, active: 0, overdue: 0, prospects: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
   for (const o of all) {
     if (o.is_overdue) counts.overdue++;
+    if (isProspectOrder(o)) counts.prospects++;
     if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
   }
   return counts;
@@ -193,6 +212,7 @@ function statusCounts(all) {
 function filterByStatus(all, statusFilter) {
   if (statusFilter === 'all') return all;
   if (statusFilter === 'overdue') return all.filter((o) => !!o.is_overdue);
+  if (statusFilter === 'prospects') return all.filter(isProspectOrder);
   if (['active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(statusFilter)) return all.filter((o) => o.status === statusFilter);
   return all.filter((o) => o.status === 'active');
 }
@@ -242,6 +262,7 @@ async function indexKanban(req, res, seesAllOrders) {
   // QA Round 7, R7-N08: no filter = Active, exactly as the Standard list opens; Lost and Cancelled get columns when chosen.
   const statusFilter = String(req.query.status || '').trim() || 'active';
   const visible = filterByStatus(all, statusFilter);
+  const remindDays = await require('../services/prospectService').reminderDays(); // D-394
 
   const columns = [];
   for (const st of await lookupRepository.stagesMaster()) {
@@ -263,7 +284,7 @@ async function indexKanban(req, res, seesAllOrders) {
     let key = o.status === 'active' ? `stage${(o.current_stage_number || 1) || 1}` : String(o.status);
     if (o.dom_stage !== null && o.dom_stage !== undefined && o.status === 'active') key = `dom_${o.dom_stage}`;
     const col = columns.find((c) => c.key === key);
-    if (col) col.orders.push(withFilledSegments(o));
+    if (col) col.orders.push(withProspectLine(withFilledSegments(o), remindDays));
   }
   // Owner decision 1 Nov 2026 (A-5, Q-R7-2): each column pages like the list — the latest 25 cards,
   // then "Show more" adds 25 at a time (?more_<column>=50, 75, …). The count shows the whole column.
@@ -5545,34 +5566,12 @@ async function markLost(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  if (order.status !== 'active') {
-    flash.set(req, 'error', `Only an active order can be marked lost (this one is already "${order.status}").`);
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  // 90-item backlog Phase 6 Item 3 — once a real Bill of Lading exists,
-  // the goods have actually shipped, so "lost" (buyer walked away,
-  // nothing ever shipped) no longer describes this order's reality.
-  // Closes a side door around Close Order's own BLI/COOPREP requirement:
-  // without this, staff could mark an already-shipped order "lost" and
-  // skip that paperwork entirely.
-  const shipping = await orderShippingRepository.find(orderId);
-  if (shipping && shipping.bl_number) {
-    flash.set(req, 'error', 'This order already has a Bill of Lading on file — the goods have shipped, so it can no longer be marked "lost". Use Close Order instead.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  // QA batch 2 (ORD-04): "lost" is the walk-away before any money. Once the buyer has paid (or an LC is
-  // confirmed usable), or while a cancellation awaits its decision, the order goes through the
-  // cancellation workflow instead (second approver, refund recorded with its bank reference).
-  if (await orderCancellationRepository.findPendingForOrder(orderId)) {
-    flash.set(req, 'error', 'This order has a cancellation request awaiting a decision — approve or reject it instead of marking the order lost.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
-  const lc = await orderLcDetailRepository.find(orderId);
-  if ((await partPaymentService.orderReceivedTotal(orderId)) > 0 || (lc && lc.lc_confirmed_at)) {
-    flash.set(req, 'error', 'The buyer has already paid on this order, so it cannot be marked lost. Use Request Cancellation: a second person approves it and the refund is recorded.');
+  // Owner decision D-394: the refusal rules and the write live in orderLostService, shared with the
+  // daily quick-quote prospect expiry (never closes an order this would refuse).
+  const orderLostService = require('../services/orderLostService');
+  const refusal = await orderLostService.refusal(order);
+  if (refusal) {
+    flash.set(req, 'error', refusal);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -5584,14 +5583,10 @@ async function markLost(req, res) {
     return;
   }
 
-  await orderRepository.markLost(orderId, reason, user.id);
-  await auditLogRepository.log(user.id, 'ORDER_MARKED_LOST', 'orders', orderId, 'status', order.status, 'lost', reason);
   // Owner decision D-378: the optional lost category, saved only when it is one of the listed values.
   const category = String((req.body && req.body.lost_category) ?? '');
-  if (Object.prototype.hasOwnProperty.call(require('../services/salesTargetService').LOST_CATEGORIES, category)) {
-    await orderRepository.setLostCategory(orderId, category);
-    await auditLogRepository.log(user.id, 'ORDER_LOST_CATEGORY_SET', 'orders', orderId, 'lost_category', null, category, reason);
-  }
+  const known = Object.prototype.hasOwnProperty.call(require('../services/salesTargetService').LOST_CATEGORIES, category);
+  await orderLostService.markLost(orderId, reason, user.id, known ? category : null);
   flash.set(req, 'success', 'Order marked as lost.');
   res.redirect(`/orders/${orderId}`);
 }

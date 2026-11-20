@@ -13,10 +13,11 @@
     <div class="muted small">Consignee: {{ 'Same as Buyer' if (s.consignee_same_as_buyer == null or s.consignee_same_as_buyer == 1) else (s.consignee_name or '—') }}</div>
     <div class="muted small">Destination: {{ s.country_of_destination }}{% if s.port_of_discharge_text %} · Port: {{ s.port_of_discharge_text }}{% endif %}{% if s.incoterm_preference %} · Incoterm: {{ s.incoterm_preference }}{% endif %}{% if s.coo_type %} · COO: {{ s.coo_type }}{% endif %}</div>
     <div class="muted small">Submitted {{ s.submitted_at }}</div>
+    {% include "client_intake_review/_prospect_match.njk" %}{# D-394 #}
     <div class="kanban-card-actions">
       <form method="post" action="/client-intake/{{ s.id }}/accept">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
+        <button type="submit" class="btn-sm {{ 'btn-secondary' if s.prospect_match else 'btn-success' }}">{{ 'Accept as a new client' if s.prospect_match else 'Accept &amp; Create Client' | safe }}</button>
       </form>
       <form method="post" action="/client-intake/{{ s.id }}/reject" onsubmit="return confirm('Reject this quotation request?');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">

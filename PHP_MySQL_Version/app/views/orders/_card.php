@@ -29,8 +29,11 @@ $amount = $domStage !== null
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
         <?php if ($domStage === null && !empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
         <?php if (!empty($seesAllOrders) && !empty($o['assignee_names'])): ?><span class="tag tag-navy"><?= htmlspecialchars($o['assignee_names']) ?></span><?php endif; ?>
+        <?php $__prospect = \App\Controllers\OrderController::isProspectOrder($o); // D-394 (mockups 4/5) ?>
+        <?php if ($__prospect): ?><span class="tag tag-gold" data-testid="prospect-badge">Prospect</span><?php endif; ?>
       </div>
       <?php if (!isset($sees['client']) || $sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div><?php endif; ?>
+      <?php if ($__prospect): ?><div class="small prospect-expiry<?= \App\Services\ProspectService::isUrgent($o['client_prospect_expires_on'] ?? null) ? ' prospect-expiry-urgent' : '' ?>"><?= htmlspecialchars(\App\Services\ProspectService::orderExpiryLine($o['client_prospect_expires_on'] ?? null)) ?></div><?php endif; ?>
       <div>
         <div class="mini-stage-track">
           <?php for ($i = 1; $i <= $stageTotal; $i++): ?>

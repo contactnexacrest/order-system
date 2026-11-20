@@ -52,7 +52,7 @@ final class ClientIntakeReviewController
         }
 
         View::render('client_intake_review/index', [
-            'pending' => ClientIntakeRepository::pending(),
+            'pending' => self::withProspectMatches(ClientIntakeRepository::pending()),
             'resolved' => ClientIntakeRepository::recentResolved(),
             // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
             'kanbanUser' => UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
@@ -62,7 +62,7 @@ final class ClientIntakeReviewController
     /** The Kanban UI template's Client Intake Review board: Pending / Converted / Rejected columns. */
     private function indexKanban(): void
     {
-        $pending = ClientIntakeRepository::pending();
+        $pending = self::withProspectMatches(ClientIntakeRepository::pending());
         $resolved = ClientIntakeRepository::recentResolved();
         $converted = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'converted'));
         $rejected = array_values(array_filter($resolved, static fn(array $s): bool => $s['status'] === 'rejected'));
@@ -72,6 +72,75 @@ final class ClientIntakeReviewController
             'converted' => $converted,
             'rejected'  => $rejected,
         ], 'layout/base');
+    }
+
+    /**
+     * Owner decision D-394: a pending request whose e-mail is a prospect's (active or
+     * deactivated, case-insensitive) carries that prospect as 'prospect_match' — the
+     * list and the board then offer "Update this prospect".
+     *
+     * @param list<array<string,mixed>> $pending
+     * @return list<array<string,mixed>>
+     */
+    private static function withProspectMatches(array $pending): array
+    {
+        foreach ($pending as $i => $s) {
+            $pending[$i]['prospect_match'] = \App\Services\ProspectService::matchingProspect($s['email'] ?? null);
+        }
+        return $pending;
+    }
+
+    /** D-394: "Update this prospect" — each change, old → new, before anything is saved. */
+    public function updateProspectForm(array $params): void
+    {
+        if (!self::exportScope()) {
+            return;
+        }
+        $submission = ClientIntakeRepository::find((int) ($params['id'] ?? 0));
+        if (!$submission || $submission['status'] !== 'pending') {
+            Flash::set('error', 'Submission not found, or already resolved.');
+            header('Location: /client-intake');
+            return;
+        }
+        $client = \App\Services\ProspectService::matchingProspect($submission['email'] ?? null);
+        if ($client === null) {
+            Flash::set('error', 'This request no longer matches a prospect.');
+            header('Location: /client-intake');
+            return;
+        }
+        View::render('client_intake_review/update_prospect', [
+            'submission' => $submission,
+            'client' => $client,
+            'changes' => \App\Services\ProspectService::intakeChanges($submission, $client),
+            'refusal' => \App\Services\ProspectService::intakeUpdateRefusal($submission, $client),
+        ], 'layout/base');
+    }
+
+    /** D-394: saves "Update this prospect" (same id, Buyer Inquiry Ref and orders; badge cleared; reactivated). */
+    public function updateProspect(array $params): void
+    {
+        if (!self::exportScope()) {
+            return;
+        }
+        $user = AuthService::currentUser();
+        $id = (int) ($params['id'] ?? 0);
+        $submission = ClientIntakeRepository::find($id);
+        if (!$submission || $submission['status'] !== 'pending') {
+            Flash::set('error', 'Submission not found, or already resolved.');
+            header('Location: /client-intake');
+            return;
+        }
+        $client = ClientRepository::find((int) ($_POST['client_id'] ?? 0));
+        if ($refusal = \App\Services\ProspectService::intakeUpdateRefusal($submission, $client)) {
+            Flash::set('error', $refusal);
+            header('Location: /client-intake');
+            return;
+        }
+        $result = \App\Services\ProspectService::applyIntake($submission, $client, (int) $user['id']);
+        Flash::set('success', "{$submission['company_legal_name']} updated from the request — the same Buyer Inquiry Ref {$client['client_unique_number']} and orders; no longer a prospect"
+            . ($result['reactivated'] ? ', and active again' : '') . '. To quote again on an order that did not go ahead, open it and use Duplicate order.'
+            . ($result['associate'] !== null ? ' ' . $result['associate'] : '') . \App\Services\BuyerDetailsRefreshService::flashText($result['refresh']));
+        header("Location: /clients/{$client['id']}");
     }
 
     public function accept(array $params): void

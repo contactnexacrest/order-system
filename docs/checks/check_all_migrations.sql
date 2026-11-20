@@ -71,6 +71,15 @@ FROM (
             + IF((SELECT COUNT(*) FROM internal_reference_docs
                    WHERE INSTR(content, '3 Originals ONLY') > 0 OR INSTR(content, 'all 3 originals') > 0 OR INSTR(content, '6802.93 for all') > 0) = 0, 1, 0)
               WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-20a',
+         'Quick-quote prospects: 5 new client columns (is_prospect, prospect_expires_on ...), 3 settings in Settings > Quick-quote prospects, the Sales task "Quotation expiring" (D-394)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'clients'
+                  AND column_name IN ('is_prospect', 'prospect_expires_on', 'prospect_reminded_on', 'prospect_expired_on', 'prospect_expired_reason'))
+            + (SELECT COUNT(*) FROM company_settings WHERE setting_key IN ('prospect_expiry_days', 'prospect_reminder_days', 'prospect_auto_close'))
+            + (SELECT COUNT(*) FROM department_task_types WHERE task_key = 'prospect_quote_expiring')
+              WHEN 9 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

@@ -138,10 +138,13 @@ final class OrderController
     /** @param list<array<string,mixed>> $all @return array<string,int> the count per status filter (Standard list and Kanban board alike) */
     private static function statusCounts(array $all): array
     {
-        $counts = ['all' => count($all), 'active' => 0, 'overdue' => 0, 'shipped_docs_sent' => 0, 'complete' => 0, 'lost' => 0, 'cancelled' => 0];
+        $counts = ['all' => count($all), 'active' => 0, 'overdue' => 0, 'prospects' => 0, 'shipped_docs_sent' => 0, 'complete' => 0, 'lost' => 0, 'cancelled' => 0];
         foreach ($all as $o) {
             if (!empty($o['is_overdue'])) {
                 $counts['overdue']++;
+            }
+            if (self::isProspectOrder($o)) {
+                $counts['prospects']++;
             }
             if (isset($counts[$o['status']])) {
                 $counts[$o['status']]++;
@@ -150,12 +153,19 @@ final class OrderController
         return $counts;
     }
 
+    /** Owner decision D-394: an order of a prospect client that is still active (the "Prospects" chip, badge and expiry line). */
+    public static function isProspectOrder(array $o): bool
+    {
+        return (int) ($o['client_is_prospect'] ?? 0) === 1 && ($o['status'] ?? '') === 'active';
+    }
+
     /** @param list<array<string,mixed>> $all @return list<array<string,mixed>> the orders a status filter keeps */
     private static function filterByStatus(array $all, string $statusFilter): array
     {
         return match ($statusFilter) {
             'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
+            'prospects' => array_values(array_filter($all, static fn($o) => self::isProspectOrder($o))),
             'active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
             default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
@@ -5311,34 +5321,10 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
-        if ($order['status'] !== 'active') {
-            Flash::set('error', "Only an active order can be marked lost (this one is already \"{$order['status']}\").");
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        // 90-item backlog Phase 6 Item 3 — once a real Bill of Lading
-        // exists, the goods have actually shipped, so "lost" (buyer
-        // walked away, nothing ever shipped) no longer describes this
-        // order's reality. Closes a side door around Close Order's own
-        // BLI/COOPREP requirement: without this, staff could mark an
-        // already-shipped order "lost" and skip that paperwork entirely.
-        $shipping = OrderShippingRepository::find($orderId);
-        if ($shipping && !empty($shipping['bl_number'])) {
-            Flash::set('error', 'This order already has a Bill of Lading on file — the goods have shipped, so it can no longer be marked "lost". Use Close Order instead.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        // QA batch 2 (ORD-04): "lost" is the walk-away before any money. Once the buyer has paid (or an LC is
-        // confirmed usable), or while a cancellation awaits its decision, the order goes through the
-        // cancellation workflow instead (second approver, refund recorded with its bank reference).
-        if (OrderCancellationRepository::findPendingForOrder($orderId)) {
-            Flash::set('error', 'This order has a cancellation request awaiting a decision — approve or reject it instead of marking the order lost.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-        $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
-        if (\App\Services\PartPaymentService::orderReceivedTotal($orderId) > 0 || ($lc !== null && !empty($lc['lc_confirmed_at']))) {
-            Flash::set('error', 'The buyer has already paid on this order, so it cannot be marked lost. Use Request Cancellation: a second person approves it and the refund is recorded.');
+        // Owner decision D-394: the refusal rules and the write live in OrderLostService, shared with the
+        // daily quick-quote prospect expiry (never closes an order this would refuse).
+        if ($refusal = \App\Services\OrderLostService::refusal($order)) {
+            Flash::set('error', $refusal);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -5349,14 +5335,9 @@ final class OrderController
             return;
         }
 
-        OrderRepository::markLost($orderId, $reason, (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'ORDER_MARKED_LOST', 'orders', $orderId, 'status', $order['status'], 'lost', $reason);
         // Owner decision D-378: the optional lost category, saved only when it is one of the listed values.
         $category = (string) ($_POST['lost_category'] ?? '');
-        if (isset(\App\Services\SalesTargetService::LOST_CATEGORIES[$category])) {
-            OrderRepository::setLostCategory($orderId, $category);
-            AuditLogRepository::log((int) $user['id'], 'ORDER_LOST_CATEGORY_SET', 'orders', $orderId, 'lost_category', null, $category, $reason);
-        }
+        \App\Services\OrderLostService::markLost($orderId, $reason, (int) $user['id'], isset(\App\Services\SalesTargetService::LOST_CATEGORIES[$category]) ? $category : null);
         Flash::set('success', 'Order marked as lost.');
         header("Location: /orders/{$orderId}");
     }

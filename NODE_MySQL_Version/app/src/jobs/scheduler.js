@@ -8,6 +8,7 @@ const zohoSync = require('./zohoSync');
 const dailyDigest = require('./dailyDigest');
 const documentCopyCleanup = require('./documentCopyCleanup');
 const fetchFxRate = require('./fetchFxRate');
+const prospectExpiry = require('./prospectExpiry');
 const logger = require('../helpers/logger');
 
 /**
@@ -105,7 +106,16 @@ function start() {
     }, { timezone: 'Asia/Kolkata' })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 06:00 IST, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15, fetchFxRate daily @ 07:05).');
+  // Daily at 06:40 IST — owner decision D-394 (20 Nov 2026): quick-quote prospects — one reminder
+  // before a prospect's quotation expires; on the date (Automatic closing On) its quotation order
+  // moves to "Did not go ahead" and the client to Deactivated. The same time as the PHP crontab entry.
+  tasks.push(
+    cron.schedule('40 6 * * *', () => {
+      prospectExpiry.run().catch((e) => logger.error('scheduler:prospectExpiry', e));
+    }, { timezone: 'Asia/Kolkata' })
+  );
+
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 06:00 IST, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15, fetchFxRate daily @ 07:05, prospectExpiry daily @ 06:40).');
   return tasks;
 }
 

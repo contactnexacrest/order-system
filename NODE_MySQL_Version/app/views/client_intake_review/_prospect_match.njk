@@ -1,0 +1,9 @@
+{# Owner decision D-394: the request's e-mail is a prospect's — the tag and the "Update this prospect" link. Shared by the list (index.njk) and the board (index_kanban.njk), so both offer the same (owner hard rule 2026-11-01). Expects s (a pending submission with prospect_match). #}
+{% if s.prospect_match %}
+  <div class="prospect-match" data-testid="prospect-match">
+    <span class="tag tag-gold">Matches prospect</span>
+    <a href="/clients/{{ s.prospect_match.id }}">{{ s.prospect_match.company_legal_name }}</a>
+    <span class="muted small">(same e-mail {{ s.prospect_match.email }}{{ '' if s.prospect_match.is_active == 1 else ' · deactivated' }})</span>
+    <a class="btn-sm btn-secondary" href="/client-intake/{{ s.id }}/update-prospect">Update this prospect</a>
+  </div>
+{% endif %}

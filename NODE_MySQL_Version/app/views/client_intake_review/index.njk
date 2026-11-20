@@ -20,9 +20,10 @@
         </td>
         <td>{{ s.submitted_at }}</td>
         <td>
+          {% include "client_intake_review/_prospect_match.njk" %}{# D-394 #}
           <form method="post" action="/client-intake/{{ s.id }}/accept" style="display:inline">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
+            <button type="submit" class="btn-sm {{ 'btn-secondary' if s.prospect_match else 'btn-success' }}">{{ 'Accept as a new client' if s.prospect_match else 'Accept &amp; Create Client' | safe }}</button>
           </form>
           <form method="post" action="/client-intake/{{ s.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this quotation request?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">

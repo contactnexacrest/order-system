@@ -119,8 +119,11 @@ describe('Client billing address from its parts (D-346)', () => {
   it('the New Client form has no single Billing Address box', async () => {
     const html = (await admin.get('/clients/create')).text;
     expect(html).not.toContain('name="billing_address"');
-    expect(html).toContain('Billing Address Line 1 *');
-    expect(html).toContain('City / Town *');
-    expect(html).toContain('Billing Country *');
+    // D-394: still required, but not for a "Quick quote" prospect — so the "*" is drawn by app.js
+    // (markRequiredLabels) while the field is required, instead of being written in the label.
+    for (const [name, label] of [['billing_address_line1', 'Billing Address Line 1'], ['billing_city', 'City / Town'], ['billing_country', 'Billing Country']]) {
+      expect(html).toContain(`<label>${label} <small class="muted prospect-optional"`);
+      expect(html).toMatch(new RegExp(`name="${name}"[^>]*required data-required-unless-ticked="is_prospect"`));
+    }
   });
 });

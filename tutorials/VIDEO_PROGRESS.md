@@ -399,6 +399,22 @@ script in `tutorials/scripts/` (and `scripts/parts/`).
 | Not in any recorded video | Product › Specifications (old **Forms** ticks → **Sold as**), Products list "Sold as: …", Products › Pricing › **Forms of stone**, Products › **Specifications (HS)**, Settings › Lists › surface_finish (**Offered for forms**, new finishes Roughly trimmed / Sawn), Edit Supplier (**CHA + transport per container**), Edit price (CHA fallback text, **Priced per** Tonne), the option **Order** boxes (D-389). To be covered by the B05 (Procurement) and B09 (MD / ED) scripts, not started yet. | — |
 | C04 (associate Price access / Catalogue, "which forms, like slabs or tiles") | Not affected: the associate portal and price access did not change in this build. | No change needed |
 
+## Also out of date after the 20 Nov 2026 build — D-394 quick-quote prospects (noted only; owner to decide)
+
+No video or script was changed and nothing was recorded (CLAUDE.md video rule: ask the owner first). Checked
+against every script in `tutorials/scripts/` (and `scripts/parts/`). No recorded video opens + Add client, a
+client page of a prospect, Deactivated Clients, a notification of a prospect, or Mark Lost, so those screens
+are new, not changed, on camera.
+
+| Video | What now differs on screen | Decision |
+|---|---|---|
+| A01 Part 1 (Orders, Standard and Kanban scenes) | The status filter row has a new chip **Prospects (n)** between Overdue and Docs Sent (0 on the demo data, so no Prospect badge or "No reply yet" line on any card). | Owner to decide when videos restart |
+| B01 Part 1, B01 Part 2, B02, B08 (the Orders page) | The same new **Prospects (n)** chip in the filter row. | Owner to decide |
+| A01 Part 2 (Clients) | The Clients list has a new row **Show: All (n) · Clients (n) · Prospects (n)** above the cards (no badge on the demo buyers). | Owner to decide |
+| A01 Part 2, B10 (Settings › Company) | A new section **Quick-quote prospects (3)** in the list of setting sections (alphabetical, between "Orders" and "Quotation defaults"); the videos do not open it. | Owner to decide |
+| B01 Part 1, D01, C03 / C05 (Orders › Quotation requests) | Not affected: a request shows "Matches prospect" and "Update this prospect" only when its e-mail is a prospect's; the demo requests are not, so the screen is unchanged. | No change needed |
+| Documents (all videos) | Not affected: no document (PDF / Word) change. | No change needed |
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

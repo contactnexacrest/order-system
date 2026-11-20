@@ -7,7 +7,17 @@
         <td>{{ n.created_at }}</td>
         <td>{{ n.type }}</td>
         <td>{{ n.message }}</td>
-        <td>{% if n.type == 'email_send_pending_approval' %}<a href="/email-approvals">Review &amp; approve</a>{% elif n.related_order_id %}<a href="/orders/{{ n.related_order_id }}">Order #{{ n.related_order_id }}</a>{% endif %}</td>
+        <td>{% if n.type == 'email_send_pending_approval' %}<a href="/email-approvals">Review &amp; approve</a>
+          {% elif n.type == 'prospect_expiry_reminder' and n.related_order_id %}{# D-394 #}
+            <a href="/orders/{{ n.related_order_id }}">Open the order</a>
+            {% if n.prospect_client %}
+            <form method="post" action="/clients/{{ n.prospect_client.id }}/prospect-keep" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="hidden" name="back" value="notifications">
+              <button type="submit" class="btn-sm btn-secondary">Keep for {{ prospectExpiryDays }} more days</button>
+            </form>
+            {% endif %}
+          {% elif n.related_order_id %}<a href="/orders/{{ n.related_order_id }}">Order #{{ n.related_order_id }}</a>{% endif %}</td>
       </tr>
     {% endfor %}
     {% if not notifications or notifications.length == 0 %}

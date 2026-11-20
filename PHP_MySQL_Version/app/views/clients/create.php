@@ -14,32 +14,40 @@
   </div>
   <form method="post" action="<?= $duplicateOf ? '/clients/' . (int) $duplicateOf['id'] . '/duplicate' : '/clients' ?>">
     <?= Csrf::field() ?>
+    <?php if (!$duplicateOf): ?>
+    <?php // Owner decision D-394 (mockup 1): Quick quote — a prospect needs only the company name, e-mail and country of destination. ?>
+    <fieldset class="prospect-fieldset" data-testid="quick-quote">
+      <legend>Quick quote</legend>
+      <label class="prospect-toggle"><input type="checkbox" name="is_prospect" value="1"<?= !empty($old['is_prospect']) ? ' checked' : '' ?>> Quick quote — the buyer has not sent their details yet (prospect)</label>
+      <p class="muted small">Tick this to quote before the buyer has filled in the Public Quotation Form: only Company Legal Name, Email and Country of Destination are needed; details left empty print "To Be Confirmed" on documents. If no order goes ahead, after <?= \App\Services\ProspectService::expiryDays() ?> days the quotation order moves to "Did not go ahead" and the client to Deactivated (Settings › Quick-quote prospects). Nothing is deleted.</p>
+    </fieldset>
+    <?php endif; ?>
     <fieldset>
       <legend>Buyer Details</legend>
       <div class="field-grid">
         <label class="full">Company Legal Name *
           <input type="text" name="company_legal_name" value="<?= htmlspecialchars((string) ($old['company_legal_name'] ?? '')) ?>" placeholder="e.g., Test Company Ltd" required maxlength="255">
         </label>
-        <label>Billing Address Line 1 *
-          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars((string) ($old['billing_address_line1'] ?? '')) ?>" placeholder="Street number and street name" required maxlength="255">
+        <label>Billing Address Line 1 <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_address_line1" value="<?= htmlspecialchars((string) ($old['billing_address_line1'] ?? '')) ?>" placeholder="Street number and street name" required data-required-unless-ticked="is_prospect" maxlength="255">
         </label>
         <label>Billing Address Line 2
           <input type="text" name="billing_address_line2" value="<?= htmlspecialchars((string) ($old['billing_address_line2'] ?? '')) ?>" placeholder="Area / district — if applicable" maxlength="255">
         </label>
-        <label>City / Town *
-          <input type="text" name="billing_city" value="<?= htmlspecialchars((string) ($old['billing_city'] ?? '')) ?>" placeholder="e.g., Birmingham" required maxlength="100">
+        <label>City / Town <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_city" value="<?= htmlspecialchars((string) ($old['billing_city'] ?? '')) ?>" placeholder="e.g., Birmingham" required data-required-unless-ticked="is_prospect" maxlength="100">
         </label>
         <label>Postcode
           <input type="text" name="billing_postcode" value="<?= htmlspecialchars((string) ($old['billing_postcode'] ?? '')) ?>" placeholder="e.g., B1 1AA" maxlength="30">
         </label>
-        <label>Billing Country *
-          <input type="text" name="billing_country" value="<?= htmlspecialchars((string) ($old['billing_country'] ?? '')) ?>" placeholder="e.g., United Kingdom" required maxlength="100">
+        <label>Billing Country <small class="muted prospect-optional" data-show-when="is_prospect=1" hidden>optional for a prospect</small>
+          <input type="text" name="billing_country" value="<?= htmlspecialchars((string) ($old['billing_country'] ?? '')) ?>" placeholder="e.g., United Kingdom" required data-required-unless-ticked="is_prospect" maxlength="100">
         </label>
         <label>VAT / EORI / Tax Reg. No.
           <input type="text" name="vat_eori_tax_no" value="<?= htmlspecialchars((string) ($old['vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No." maxlength="100">
         </label>
         <label>Country of Destination
-          <input type="text" name="country_of_destination" value="<?= htmlspecialchars((string) ($old['country_of_destination'] ?? '')) ?>" placeholder="e.g., Hungary / UK / France" maxlength="100">
+          <input type="text" name="country_of_destination" value="<?= htmlspecialchars((string) ($old['country_of_destination'] ?? '')) ?>" placeholder="e.g., Hungary / UK / France" maxlength="100" data-required-if-ticked="is_prospect">
         </label>
         <label>Certificate of Origin Type
           <select name="coo_type">
@@ -130,7 +138,7 @@
           <input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>" placeholder="e.g., Purchasing Manager" maxlength="150">
         </label>
         <label>Email
-          <input type="email" name="email" value="<?= htmlspecialchars((string) ($old['email'] ?? '')) ?>" placeholder="e.g., name@example.com">
+          <input type="email" name="email" value="<?= htmlspecialchars((string) ($old['email'] ?? '')) ?>" placeholder="e.g., name@example.com" maxlength="190" data-required-if-ticked="is_prospect">
         </label>
         <label>Phone
           <input type="text" name="phone" value="<?= htmlspecialchars((string) ($old['phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567">

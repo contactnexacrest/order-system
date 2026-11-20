@@ -33,6 +33,7 @@ final class SettingLabels
         'mail_redirect' => 'E-mail copies and redirect',
         'order_defaults' => 'New order defaults',
         'orders' => 'Orders',
+        'prospects' => 'Quick-quote prospects', // D-394
         'rbi' => 'RBI purpose codes',
         'security' => 'Security and logging in',
         'shipping' => 'Bill of Lading instructions',
@@ -96,6 +97,10 @@ final class SettingLabels
         'generated_document_disclaimer_text' => ['"System-generated document" note: wording', 'The wording printed under the signature block when the "system-generated document" note is switched on.'],
         'pi_validity_days' => ['Proforma Invoice valid for … days', 'Days a Proforma Invoice stays valid from its issue date.'],
         'quotation_validity_days' => ['Quotation valid for … days', 'Days a Quotation stays valid from its issue date.'],
+        // Owner decision D-394 (20 Nov 2026): quick-quote prospects — their own expiry, separate from the Quotation's validity above.
+        'prospect_expiry_days' => ['Close a prospect\'s quotation after (days)', 'Days after a prospect is added (or kept, or reactivated) before its quotation order moves to "Did not go ahead" and the client to Deactivated, unless an order goes ahead. 7 to 365; default 60. Nothing is deleted, and a client can be activated again. Separate from "Quotation valid for … days", which prints on the Quotation.'],
+        'prospect_reminder_days' => ['Remind the order\'s owner before (days)', 'Days before that date the order\'s owner gets one reminder: a notification, a line in My tasks and an e-mail. 1 to 30; default 7.'],
+        'prospect_auto_close' => ['Automatic closing', 'On = on that date the daily job moves the order to "Did not go ahead" and the client to Deactivated. Off = only remind; nothing closes on its own.'],
         'revision_start_number' => ['First revision number', null],
         'show_generated_document_disclaimer' => ['Print the "system-generated document" note', 'On = documents that carry a signature or seal image show the "system-generated document" note under the signature block. Off by default.'],
         'master_tracking_ref_format' => ['Buyer inquiry reference format', null],
@@ -177,6 +182,8 @@ final class SettingLabels
      * (placeholder()). Same list in settingLabels.js.
      */
     public const PLACEHOLDERS = [
+        'prospect_expiry_days' => 'e.g. 60', // D-394
+        'prospect_reminder_days' => 'e.g. 7',
         'quantity_warning_level_sqm' => 'e.g. 30000',
         'quantity_warning_level_sqft' => 'e.g. 300000',
         'quantity_warning_level_cbm' => 'e.g. 500',

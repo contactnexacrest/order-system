@@ -1,6 +1,6 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/clients">&larr; Back to Clients</a></p>
-  <h1>{{ client.company_legal_name }}</h1>
+  <h1>{{ client.company_legal_name }}{% if client.is_prospect == 1 %} <span class="tag tag-gold" data-testid="prospect-badge">Prospect</span>{% endif %}</h1>
   <p class="muted">
     Buyer Inquiry Ref: <strong>{{ client.client_unique_number }}</strong>
   </p>
@@ -25,9 +25,44 @@
     <a class="btn-sm btn-secondary" href="/clients/{{ client.id }}/duplicate" title="Re-onboard a near-identical but distinct entity (e.g. a sister company) under a brand-new Buyer Inquiry Ref">Duplicate</a>
     <form method="post" action="/clients/{{ client.id }}/toggle-active" style="display:inline" data-confirm="{{ 'Deactivate' if client.is_active else 'Reactivate' }} {{ client.company_legal_name }}?{{ ' It will no longer appear in the main Clients list, but nothing is deleted and it can be reactivated any time.' if client.is_active else '' }}">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else 'Reactivate' }}</button>
+      <button type="submit" class="btn-sm {{ 'btn-danger' if client.is_active else 'btn-success' }}">{{ 'Deactivate' if client.is_active else ('Reactivate (fresh ' + prospectBox.expiryDays + ' days)' if prospectBox else 'Reactivate') }}</button>
     </form>
     {% endif %}
+  </div>
+  {% endif %}
+
+  {% if prospectBox %}{# Owner decision D-394 (mockup 3) #}
+  <div class="prospect-box" data-testid="prospect-box">
+    <p><strong>Prospect — details not confirmed yet.</strong>
+    {% if prospectBox.order %}
+      Quotation order <a href="/orders/{{ prospectBox.order.id }}">{{ prospectBox.order.order_reference }}</a> was created on {{ prospectBox.orderCreated }}.
+    {% else %}
+      No quotation order yet — add one with + New Order.
+    {% endif %}
+    </p>
+    {% if client.is_active != 1 %}
+      <p>{{ client.prospect_expired_reason or 'Deactivated.' }}{{ (' — closed automatically on ' + prospectBox.expiredOn + '.') if prospectBox.expiredOn else '' }} Reactivate it for a fresh {{ prospectBox.expiryDays }} days.</p>
+    {% elif prospectBox.expires %}
+      {% if prospectBox.autoClose %}
+      <p class="{{ 'prospect-expiry-urgent' if prospectBox.urgent else '' }}">If the buyer does not go ahead, the order moves to "Did not go ahead" and this client to Deactivated on {{ prospectBox.expires }} ({{ prospectBox.relative }}). The order's owner is reminded on {{ prospectBox.remindOn }}.</p>
+      {% else %}
+      <p class="{{ 'prospect-expiry-urgent' if prospectBox.urgent else '' }}">Its quotation expires on {{ prospectBox.expires }}. Automatic closing is off, so nothing closes on its own; the order's owner is reminded on {{ prospectBox.remindOn }}.</p>
+      {% endif %}
+    {% endif %}
+    {% if permissions.manage_orders and client.is_active == 1 %}
+    <div class="btn-row">
+      <a class="btn-sm" href="/clients/{{ client.id }}/edit">Fill in the details</a>
+      <form method="post" action="/clients/{{ client.id }}/send-quotation-form" style="display:inline" data-confirm="E-mail the Public Quotation Form link to the buyer?">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-secondary">E-mail the Public Quotation Form</button>
+      </form>
+      <form method="post" action="/clients/{{ client.id }}/prospect-keep" style="display:inline">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-secondary">Keep for {{ prospectBox.expiryDays }} more days</button>
+      </form>
+    </div>
+    {% endif %}
+    <p class="muted small">When all the required details are filled in, the Prospect badge goes and the client never expires on its own.</p>
   </div>
   {% endif %}
 

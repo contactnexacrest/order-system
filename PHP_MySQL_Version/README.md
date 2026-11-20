@@ -77,7 +77,7 @@ correctly once the password is changed.
   clauses, 9 email templates for the deferred-send pipeline, and the new
   `cross_verify_documents`/`approve_email_send` permissions.
 - `scripts/` — the backup scripts and their self-test (owner decisions D-260; see "Backups" below).
-- `app/cron/` — the five scheduled jobs (see "Bluehost cron setup" below):
+- `app/cron/` — the scheduled jobs (see "Bluehost cron setup" below), among them
   `dispatch_deferred_emails.php`, `auto_confirm_oc_acknowledgments.php`,
   `check_alerts.php` and `zoho_sync.php`; plus two scripts run by hand,
   never from cron: `zoho_cleanup_test_records.php` and
@@ -555,9 +555,19 @@ CRON_TZ=Asia/Kolkata
 15 8 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/daily_digest.php >> /home/yourcpaneluser/logs/daily_digest.log 2>&1
 15 2 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/document_copy_cleanup.php >> /home/yourcpaneluser/logs/document_copy_cleanup.log 2>&1
 5 7 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/fetch_fx_rate.php >> /home/yourcpaneluser/logs/fetch_fx_rate.log 2>&1
+40 6 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/prospect_expiry.php >> /home/yourcpaneluser/logs/prospect_expiry.log 2>&1
 ```
 
 Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
+
+- `prospect_expiry.php` — once a day at 06:40 IST (owner decision D-394, 20 Nov
+  2026): quick-quote prospects. N days before a prospect's quotation expires
+  (Settings › Quick-quote prospects, default 7) its order's owner gets one
+  reminder (notification, My tasks, e-mail); on the date, when "Automatic
+  closing" is On, its still-active quotation orders move to "Did not go ahead"
+  (the same rules as Mark Lost — an order with money, an LC, a Bill of Lading,
+  a cancellation request or past the quotation stage leaves the client as it
+  is) and the client is deactivated. Nothing is ever deleted. Safe to run twice.
 
 - `fetch_fx_rate.php` — once a day at 07:05 IST (owner decision D-301, 11 Nov
   2026): fetches the USD → INR market rate from Frankfurter (European Central

@@ -647,6 +647,9 @@ $router->post('/clients/{id}/agreement/force-expire', [$clients, 'forceExpireAgr
 $router->post('/clients/{id}/agreement/renew', [$clients, 'renewAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->get('/clients/{id}/agreement/download', [$clients, 'downloadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/clients/{id}/toggle-active', [$clients, 'toggleActive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Owner decision D-394: quick-quote prospects — keep longer, e-mail the Public Quotation Form.
+$router->post('/clients/{id}/prospect-keep', [$clients, 'keepProspect'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/send-quotation-form', [$clients, 'sendQuotationForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 // Batch 3 #13b — free-form extra documents attached to this client (schema.sql Section AZ).
 $router->post('/clients/{id}/additional-documents', [$clients, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/additional-documents/{fileId}/delete', [$clients, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
@@ -663,6 +666,9 @@ $router->post('/clients/{id}/reset-password', [$clients, 'resetPortalPassword'],
 // Staff review queue for public quotation-details submissions.
 $router->get('/client-intake', [$clientIntakeReview, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/client-intake/{id}/accept', [$clientIntakeReview, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+// Owner decision D-394: a request from a prospect's e-mail updates that prospect (see each change first).
+$router->get('/client-intake/{id}/update-prospect', [$clientIntakeReview, 'updateProspectForm'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/client-intake/{id}/update-prospect', [$clientIntakeReview, 'updateProspect'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/client-intake/{id}/reject', [$clientIntakeReview, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/client-intake/{id}/resend-link', [$clientIntakeReview, 'resendLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 

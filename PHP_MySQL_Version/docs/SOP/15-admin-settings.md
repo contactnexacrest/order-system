@@ -52,6 +52,16 @@ ask for support. The sections have plain titles too ("Security and logging
 in", "RBI purpose codes", "Screen layout", "Zoho Books" …) and are in A–Z
 order.
 
+### Quick-quote prospects (owner decision D-394, 20 Nov 2026)
+
+**Settings › Company › Quick-quote prospects** (MD / Admin): **Close a
+prospect's quotation after (days) \*** (60; 7 to 365), **Remind the order's
+owner before (days) \*** (7; 1 to 30) and **Automatic closing** (On; Off =
+only remind, nothing closes on its own). The browser and the server refuse a
+value outside the range; every change needs the usual reason and is logged.
+This is separate from "Quotation valid for … days" (30), which prints on the
+Quotation and is not touched. How prospects work: [SOP 01](./01-stage1-enquiry-quotation.md), Path C.
+
 ### Changing the Managing Director's name or title (D-349, 12 Nov 2026)
 
 When you change **Managing Director name** or **Managing Director title** on
@@ -304,6 +314,7 @@ associate's GSTIN it was locked with.
 | Alerts | daily 06:00 IST | LUT / RCMC expiry, freight and balance payments overdue, the LC's last shipment date, document deadline and expiry (7 days before), quotation / PI validity expired, dispute replies overdue |
 | Zoho Books sync | hourly | Sends and checks the records that go to Zoho Books ([CA-03](./ca-03-zoho-sync.md)) |
 | Daily digest | 08:15 IST | One e-mail per person with their open tasks and documents to review; also the associates' reminders (protection and agreement ending in 30 and 7 days) |
+| Quick-quote prospects (D-394) | daily 06:40 IST | One reminder 7 days before a prospect's quotation expires; on the date (Automatic closing On) its quotation order moves to "Did not go ahead" and the client to Deactivated — nothing deleted ([SOP 01](./01-stage1-enquiry-quotation.md), Path C) |
 | Document copies clean-up | daily 02:15 | Removes the document copies switched on under **Document copies clean-up** (below); nothing while every rule is off |
 | Database backup | daily 02:00 IST | Encrypted copy of the database, kept 10 years ([SOP 32](./32-backups-restore.md)) |
 | Documents backup | daily 02:30 IST | Copy of every order document, each file stored once ([SOP 32](./32-backups-restore.md)) |

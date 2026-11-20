@@ -136,8 +136,11 @@ final class ClientBillingAddressPartsTest extends DbTestCase
         $html = (string) ob_get_clean();
 
         self::assertStringNotContainsString('name="billing_address"', $html);
-        self::assertStringContainsString('Billing Address Line 1 *', $html);
-        self::assertStringContainsString('City / Town *', $html);
-        self::assertStringContainsString('Billing Country *', $html);
+        // D-394: still required, but not for a "Quick quote" prospect — so the "*" is drawn by app.js
+        // (markRequiredLabels) while the field is required, instead of being written in the label.
+        foreach (['billing_address_line1' => 'Billing Address Line 1', 'billing_city' => 'City / Town', 'billing_country' => 'Billing Country'] as $name => $label) {
+            self::assertStringContainsString("<label>{$label} <small class=\"muted prospect-optional\"", $html);
+            self::assertMatchesRegularExpression('/name="' . $name . '"[^>]*required data-required-unless-ticked="is_prospect"/', $html);
+        }
     }
 }

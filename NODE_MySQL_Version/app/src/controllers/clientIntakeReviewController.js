@@ -10,6 +10,7 @@ const clientRepository = require('../repositories/clientRepository');
 const referenceNumberService = require('../services/referenceNumberService');
 const uiTemplateService = require('../services/uiTemplateService');
 const clientIntakeController = require('./clientIntakeController');
+const prospectService = require('../services/prospectService');
 
 /**
  * Port of App\Controllers\ClientIntakeReviewController. Staff review queue
@@ -27,8 +28,56 @@ async function withAssociateInfo(rows) {
   for (const s of rows) {
     const info = await associateIntakeService.reviewInfo(s);
     s.associateInfo = { associate: info.associate, verified: info.verified, confirmed: info.confirmed, flags: info.flags };
+    // Owner decision D-394: the request's e-mail is a prospect's (active or deactivated, case-insensitive).
+    s.prospect_match = await prospectService.matchingProspect(s.email);
   }
   return rows;
+}
+
+/** D-394: "Update this prospect" — each change, old → new, before anything is saved. */
+async function updateProspectForm(req, res) {
+  if (!exportScope(res)) return;
+  const submission = await clientIntakeRepository.find(parseInt(req.params.id, 10) || 0);
+  if (!submission || submission.status !== 'pending') {
+    flash.set(req, 'error', 'Submission not found, or already resolved.');
+    res.redirect('/client-intake');
+    return;
+  }
+  const client = await prospectService.matchingProspect(submission.email);
+  if (!client) {
+    flash.set(req, 'error', 'This request no longer matches a prospect.');
+    res.redirect('/client-intake');
+    return;
+  }
+  res.renderView('client_intake_review/update_prospect', {
+    submission,
+    client,
+    changes: prospectService.intakeChanges(submission, client),
+    refusal: await prospectService.intakeUpdateRefusal(submission, client),
+  }, 'layout/base');
+}
+
+/** D-394: saves "Update this prospect" (same id, Buyer Inquiry Ref and orders; badge cleared; reactivated). */
+async function updateProspect(req, res) {
+  if (!exportScope(res)) return;
+  const submission = await clientIntakeRepository.find(parseInt(req.params.id, 10) || 0);
+  if (!submission || submission.status !== 'pending') {
+    flash.set(req, 'error', 'Submission not found, or already resolved.');
+    res.redirect('/client-intake');
+    return;
+  }
+  const client = await clientRepository.find(parseInt((req.body && req.body.client_id) || 0, 10) || 0);
+  const refusal = await prospectService.intakeUpdateRefusal(submission, client);
+  if (refusal) {
+    flash.set(req, 'error', refusal);
+    res.redirect('/client-intake');
+    return;
+  }
+  const result = await prospectService.applyIntake(submission, client, Number(req.user.id));
+  flash.set(req, 'success', `${submission.company_legal_name} updated from the request — the same Buyer Inquiry Ref ${client.client_unique_number} and orders; no longer a prospect`
+    + (result.reactivated ? ', and active again' : '') + '. To quote again on an order that did not go ahead, open it and use Duplicate order.'
+    + (result.associate !== null && result.associate !== undefined ? ` ${result.associate}` : '') + require('../services/buyerDetailsRefreshService').flashText(result.refresh));
+  res.redirect(`/clients/${client.id}`);
 }
 
 /**
@@ -200,4 +249,4 @@ async function reject(req, res) {
   res.redirect('/client-intake');
 }
 
-module.exports = { index, accept, reject, resendLink };
+module.exports = { index, accept, reject, resendLink, updateProspectForm, updateProspect };

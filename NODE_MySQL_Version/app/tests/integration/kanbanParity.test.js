@@ -183,6 +183,39 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     expect(boardHtml).toContain('class="filter-chip active" href="/orders?status=active">Active');
   });
 
+  // Owner decision D-394: the Orders "Prospects" filter, its badge and its expiry line, and the Quotation
+  // requests "Matches prospect" tag with "Update this prospect", are the same on the list and the board.
+  it('shows prospects the same on the list and the board', async () => {
+    await db.execute('UPDATE clients SET is_prospect = 0 WHERE is_prospect = 1');
+    const email = `parity-prospect-${crypto.randomBytes(4).toString('hex')}@buyer.example`;
+    const clientId = await createTestClient(email);
+    await db.execute('UPDATE clients SET is_prospect = 1, prospect_expires_on = DATE_ADD(CURDATE(), INTERVAL 2 DAY) WHERE id = :id', { id: clientId });
+    const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+    const sid = await clientIntakeRepository.create({
+      company_legal_name: 'Parity Prospect GmbH', billing_address: '1 Parity Street', billing_address_line1: '1 Parity Street', billing_address_line2: null,
+      billing_city: 'Hamburg', billing_postcode: null, billing_country: 'Germany', vat_eori_tax_no: null, contact_person: 'Chief Buyer',
+      email: email.toUpperCase(), phone: null, country_of_destination: 'Germany',
+      port_of_discharge_text: null, coo_type: null, incoterm_preference: null, container_type_text: null, buyer_own_reference: null, notes: null,
+    }, '127.0.0.1');
+
+    const list = (await agent.get('/orders?view=list&status=prospects')).text;
+    const board = (await agent.get('/orders?status=prospects')).text;
+    expect(parts(list).filters).toEqual(parts(board).filters);
+    expect(parts(board).filters).toContain('Prospects');
+    expect(parts(list).records).toEqual([`/orders/${orderId}`]);
+    expect(parts(board).records).toEqual([`/orders/${orderId}`]);
+    for (const html of [list, board]) {
+      expect(html).toContain('data-testid="prospect-badge">Prospect</span>');
+      expect(html).toContain('No reply yet · expires in 2 days');
+    }
+    for (const html of [(await agent.get('/client-intake?view=list')).text, (await agent.get('/client-intake')).text]) {
+      expect(html).toContain('Matches prospect');
+      expect(html).toContain(`/client-intake/${sid}/update-prospect`);
+      expect(html).toContain(`href="/clients/${clientId}"`);
+      expect(html).toContain('Accept as a new client');
+    }
+  });
+
   // D-257: a Domestic Trade order (or local sale) shows its own stage (of 8) and its rupee amount on the
   // list and the board alike; the board adds Domestic columns only when there are such orders. Export cards unchanged.
   it('shows a Domestic Trade order with its own stage and rupee amount on the list and the board', async () => {

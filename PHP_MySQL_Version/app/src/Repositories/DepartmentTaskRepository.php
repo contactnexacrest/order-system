@@ -18,6 +18,13 @@ final class DepartmentTaskRepository
 {
     /** Every open task: task_key, order, subject, the date it became due to start ("since") and the page to do it on. */
     private const OPEN_WORK = "
+        -- Owner decision D-394 - a quick-quote prospect quotation about to expire (from the day its owner was reminded).
+        SELECT o.id AS order_id, 'prospect_quote_expiring' AS task_key,
+               CONCAT(c.company_legal_name, ' — quotation expires on ', DATE_FORMAT(c.prospect_expires_on, '%d %b %Y'), ', no reply yet') AS subject,
+               c.prospect_reminded_on AS since, CONCAT('/orders/', o.id) AS link
+          FROM orders o JOIN clients c ON c.id = o.client_id
+         WHERE o.status = 'active' AND c.is_prospect = 1 AND c.is_active = 1 AND c.prospect_reminded_on IS NOT NULL
+        UNION ALL
         SELECT o.id AS order_id, 'raise_purchase_requirement' AS task_key, 'Advance cleared — no purchase requirement yet' AS subject,
                DATE(ps.advance_cleared_at) AS since, CONCAT('/orders/', o.id, '#purchase-requirements') AS link
           FROM orders o JOIN order_payment_status ps ON ps.order_id = o.id

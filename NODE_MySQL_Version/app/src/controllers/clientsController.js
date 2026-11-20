@@ -25,31 +25,54 @@ const fileUploadService = require('../services/fileUploadService');
 const orderAccessService = require('../services/orderAccessService');
 const env = require('../config/env');
 const { todayIst } = require('../helpers/dbDateTime');
+const prospectService = require('../services/prospectService');
+const { short } = require('../helpers/dates');
 
 // Port of App\Controllers\ClientController.
 
 async function index(req, res) {
-  const clients = await clientRepository.all();
+  // Owner decision D-394: "Show: All · Clients · Prospects" (counts from the whole list), the badge and the expiry line.
+  const remindDays = await prospectService.reminderDays();
+  const all = (await clientRepository.all()).map((c) => (Number(c.is_prospect || 0) === 1
+    ? { ...c, prospect_line: prospectService.clientExpiryLine(c.prospect_expires_on), prospect_urgent: prospectService.isUrgent(c.prospect_expires_on, remindDays) }
+    : c));
+  let show = String(req.query.show || 'all');
+  if (!['all', 'clients', 'prospects'].includes(show)) show = 'all';
+  const prospects = all.filter((c) => Number(c.is_prospect || 0) === 1);
+  const counts = { all: all.length, clients: all.length - prospects.length, prospects: prospects.length };
+  const clients = show === 'prospects' ? prospects : (show === 'clients' ? all.filter((c) => Number(c.is_prospect || 0) !== 1) : all);
   const quotationFormLink = `${env.get('APP_URL', '').replace(/\/+$/, '')}/quotation-details`;
-  res.renderView('clients/index', { clients, quotationFormLink }, 'layout/base');
+  res.renderView('clients/index', { clients, show, counts, quotationFormLink }, 'layout/base');
 }
 
 async function inactiveIndex(req, res) {
   const clients = await clientRepository.allInactive();
-  res.renderView('clients/inactive', { clients }, 'layout/base');
+  res.renderView('clients/inactive', { clients, prospectExpiryDays: await prospectService.expiryDays() }, 'layout/base');
 }
 
 async function create(req, res) {
   // Batch 3 #4 — if this page is being shown again after a validation failure on submit,
   // re-populate the form from what was typed rather than making the user retype everything.
-  res.renderView('clients/create', { old: flash.pullOld(req), cooTypes: await lookupRepository.dropdownOptions('coo_type') }, 'layout/base');
+  res.renderView('clients/create', { old: flash.pullOld(req), cooTypes: await lookupRepository.dropdownOptions('coo_type'), prospectExpiryDays: await prospectService.expiryDays() }, 'layout/base');
 }
 
 async function store(req, res) {
   const user = req.user;
 
   const companyLegalName = String(req.body.company_legal_name || '').trim();
-  const billingAddress = composedBillingAddress(req);
+  let billingAddress = composedBillingAddress(req);
+  // Owner decision D-394: "Quick quote" — a prospect needs only the company name, e-mail and country of destination.
+  const isProspect = prospectService.requested(req.body);
+  if (isProspect) {
+    const prospectError = prospectService.createError(req.body);
+    if (prospectError) {
+      flash.set(req, 'error', prospectError);
+      flash.setOld(req, req.body);
+      res.redirect('/clients/create');
+      return;
+    }
+    if (billingAddress === null) billingAddress = prospectService.partialBillingAddress(req.body);
+  }
 
   if (companyLegalName === '' || billingAddress === null) {
     flash.set(req, 'error', REQUIRED_MESSAGE);
@@ -80,6 +103,13 @@ async function store(req, res) {
   }
   // External QA report L-23: client creation was never audit-logged.
   await auditLogRepository.log(user.id, 'CLIENT_CREATED', 'clients', clientId, 'company_legal_name', null, companyLegalName);
+  // D-394: a "prospect" whose details are all there anyway is an ordinary client.
+  if (isProspect && !prospectService.hasRequiredDetails(data)) {
+    const expires = await prospectService.markNew(clientId, user.id);
+    flash.set(req, 'success', `Prospect created — Buyer Inquiry Ref ${clientUniqueNumber}. Its quotation expires on ${short(expires)} unless an order goes ahead; fill in the details any time.`);
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
 
   flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}.`);
   res.redirect(`/clients/${clientId}`);
@@ -277,7 +307,26 @@ async function show(req, res) {
     duplicatedInto: await clientRepository.findDuplicatesOf(client.id),
     clientLogin: await clientLoginRepository.findByClientId(client.id),
     clientLoginUrl: require('../services/clientPortalService').loginUrl(), // D-282
+    // Owner decision D-394: the prospect box (its quotation order, the dates).
+    prospectBox: Number(client.is_prospect || 0) === 1 ? await prospectBox(client) : null,
   }, 'layout/base');
+}
+
+/** D-394: what the client page's prospect box says (mockup 3). */
+async function prospectBox(client) {
+  const s = await prospectService.viewSettings();
+  const exp = client.prospect_expires_on ? String(client.prospect_expires_on).slice(0, 10) : '';
+  const order = await prospectService.quotationOrder(client.id);
+  return {
+    ...s,
+    order,
+    orderCreated: order ? short(String(order.created_at)) : '',
+    expires: exp ? short(exp) : '',
+    remindOn: exp ? short(prospectService.reminderDate(exp, s.reminderDays)) : '',
+    relative: exp ? prospectService.relative(exp) : '',
+    urgent: exp ? prospectService.isUrgent(exp, s.reminderDays) : false,
+    expiredOn: client.prospect_expired_on ? short(String(client.prospect_expired_on)) : '',
+  };
 }
 
 async function editForm(req, res) {
@@ -304,7 +353,17 @@ async function update(req, res) {
   }
 
   const companyLegalName = String(req.body.company_legal_name || '').trim();
-  const billingAddress = composedBillingAddress(req);
+  let billingAddress = composedBillingAddress(req);
+  // Owner decision D-394: a prospect may be saved with only the prospect's required details.
+  if (Number(client.is_prospect || 0) === 1 && prospectService.requested(req.body)) {
+    const prospectError = prospectService.createError(req.body);
+    if (prospectError) {
+      flash.set(req, 'error', prospectError);
+      res.redirect(`/clients/${clientId}/edit`);
+      return;
+    }
+    if (billingAddress === null) billingAddress = prospectService.partialBillingAddress(req.body);
+  }
   if (companyLegalName === '' || billingAddress === null) {
     flash.set(req, 'error', REQUIRED_MESSAGE);
     res.redirect(`/clients/${clientId}/edit`);
@@ -381,7 +440,14 @@ async function update(req, res) {
   const buyerDetails = require('../services/buyerDetailsRefreshService');
   const refresh = await buyerDetails.afterClientSaved(clientId, Number(user.id), 'client edit');
 
-  flash.set(req, 'success', `${companyLegalName} updated.${buyerDetails.flashText(refresh)}`);
+  // Owner decision D-394: every normally required detail filled in — no longer a prospect.
+  let confirmed = '';
+  if (Number(client.is_prospect || 0) === 1 && prospectService.hasRequiredDetails(data)) {
+    await prospectService.confirm(clientId, Number(user.id), 'Every required detail filled in on Edit client.');
+    confirmed = ' Every required detail is filled in, so it is no longer a prospect and never expires on its own.';
+  }
+
+  flash.set(req, 'success', `${companyLegalName} updated.${confirmed}${buyerDetails.flashText(refresh)}`);
   res.redirect(`/clients/${clientId}`);
 }
 
@@ -639,10 +705,65 @@ async function toggleActive(req, res) {
     newState ? '1' : '0'
   );
 
+  // Owner decision D-394: a prospect comes back with a fresh expiry date.
+  if (newState && Number(client.is_prospect || 0) === 1) {
+    const expires = await prospectService.onReactivated(clientId, user.id);
+    flash.set(req, 'success', prospectService.reactivatedMessage(client.company_legal_name, expires));
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+
   flash.set(req, 'success', newState
     ? `${client.company_legal_name} reactivated — visible in the main Clients list again.`
     : `${client.company_legal_name} deactivated — hidden from the main Clients list. Nothing was deleted; their orders are untouched.`);
   res.redirect('/clients');
+}
+
+/** Owner decision D-394: "Keep for N more days" on a prospect (audit-logged). */
+async function keepProspect(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+  const next = await prospectService.extend(clientId, req.user.id);
+  if (next === null) {
+    flash.set(req, 'error', 'Only an active prospect can be kept longer — reactivate a deactivated one instead.');
+  } else {
+    flash.set(req, 'success', `${client.company_legal_name} is kept until ${short(next)}. The order's owner is reminded again ${await prospectService.reminderDays()} days before.`);
+  }
+  res.redirect((req.body && req.body.back) === 'notifications' ? '/notifications' : `/clients/${clientId}`);
+}
+
+/**
+ * Owner decision D-394: e-mails the existing Public Quotation Form link to the
+ * prospect's e-mail — a buyer link e-mail, so Testing mode and Admin › E-mail
+ * settings apply and the screen says plainly when it was held. Audit-logged.
+ */
+async function sendQuotationForm(req, res) {
+  const clientId = parseInt(req.params.id, 10);
+  const client = await clientRepository.find(clientId);
+  if (!client) {
+    res.status(404).send('Client not found.');
+    return;
+  }
+  const email = String(client.email || '').trim();
+  if (email === '') {
+    flash.set(req, 'error', 'This client has no e-mail address — add one first.');
+    res.redirect(`/clients/${clientId}`);
+    return;
+  }
+  const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/quotation-details`;
+  const body = prospectService.quotationFormEmailBody(client.company_legal_name, email, link, await companySettingsRepository.get('legal_name'));
+  const sent = await require('../services/emailService').sendPlainText(email, prospectService.QUOTATION_FORM_SUBJECT, body, { kind: 'buyer_links', audience: 'buyer' });
+  const why = sent ? null : await require('../services/emailPolicy').notSentReason('buyer_links', 'buyer');
+  await auditLogRepository.log(req.user.id, sent ? 'CLIENT_QUOTATION_FORM_EMAILED' : 'CLIENT_QUOTATION_FORM_NOT_EMAILED', 'clients', clientId, 'email', null, email,
+    sent ? 'Public Quotation Form link e-mailed (D-394).' : `Not e-mailed: ${why} (D-394).`);
+  flash.set(req, sent ? 'success' : 'error', sent
+    ? `The Public Quotation Form link was e-mailed to ${email}.`
+    : `Not e-mailed: ${why}. Send the link yourself: ${link}`);
+  res.redirect(`/clients/${clientId}`);
 }
 
 /**
@@ -966,7 +1087,7 @@ async function showRemovedAdditionalDocuments(req, res) {
 }
 
 module.exports = {
-  index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, overrideUniqueNumber,
+  index, inactiveIndex, create, store, show, editForm, update, updateAgreementFooter, toggleActive, keepProspect, sendQuotationForm, overrideUniqueNumber,
   setImpersonationAllowed, setOrderHistoryVisibilityOverride, setDocumentDownloadsVisibilityOverride, impersonate, resetPortalPassword, sendPortalLink, uploadAdditionalDocument, deleteAdditionalDocument, showRemovedAdditionalDocuments,
   uploadAgreement, forceExpireAgreement, renewAgreement, downloadAgreement,
   duplicateForm, duplicateStore,

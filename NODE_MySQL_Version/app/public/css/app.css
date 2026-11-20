@@ -1341,3 +1341,11 @@ details.report-details[open] > summary .report-name::before{transform:rotate(90d
 .refused-pill{display:inline-block;font-size:0.78rem;font-weight:600;padding:0.2rem 0.75rem;border-radius:999px;background:var(--danger-soft);color:var(--danger);margin-bottom:0.6rem;}
 .refused-page h1{margin:0 0 0.75rem;}
 .refused-text{color:var(--ink-soft);font-size:0.95rem;margin-bottom:1.25rem;}
+
+/* Owner decision D-394: quick-quote prospects — the expiry line (red within the reminder days) and the prospect box. */
+.prospect-expiry{color:var(--ink-soft);margin-top:2px;}
+.prospect-expiry-urgent{color:var(--danger);font-weight:600;}
+.prospect-box{border:1px solid var(--gold);background:var(--gold-soft);border-radius:var(--radius);padding:12px 14px;margin:12px 0;}
+.prospect-box p{margin:4px 0;}
+.prospect-fieldset{border-color:var(--gold);}
+.prospect-match{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}

@@ -122,6 +122,7 @@ The complete description of the NexaCrest export order system: what it is for, h
   - [6.0 Menus: the left menu and the section menu bars (D-320–D-322, 11 Nov 2026)](#60-menus-the-left-menu-and-the-section-menu-bars-d-320d-322-11-nov-2026)
   - [6.1 Clients and intake](#61-clients-and-intake)
   - [6.1b Buyer details on orders follow the client (D-337)](#61b-buyer-details-on-orders-follow-the-client-d-337-12-nov-2026)
+  - [6.1c Quick-quote prospects (D-394)](#61c-quick-quote-prospects-d-394-20-nov-2026)
   - [6.2 Products, categories and specifications](#62-products-categories-and-specifications)
   - [6.3 Pricing engine and price requests](#63-pricing-engine-and-price-requests)
   - [6.4 Associates and commission / TDS](#64-associates-and-commission--tds)
@@ -799,6 +800,7 @@ There is no permanent worker on shared hosting, so background work runs as sched
 | Zoho sync | `zoho_sync.php` | `zohoSync.js` | hourly | Pushes pending records to Zoho Books; one run at a time (`ZohoSyncLock`) |
 | Daily digest | `daily_digest.php` | `dailyDigest.js` | daily 08:15 | Per-person e-mail of waiting work, associate reminders, backup warnings |
 | Document copy clean-up | `document_copy_cleanup.php` | `documentCopyCleanup.js` | daily 02:15 | Removes old draft/superseded copies per Admin rules; does nothing while every rule is off (default) |
+| Quick-quote prospects (D-394) | `prospect_expiry.php` | `prospectExpiry.js` | daily 06:40 | One reminder N days before a prospect's quotation expires (notification, My tasks, e-mail to the order's owner); on the date, with Automatic closing On, moves its still-active quotation orders to "Did not go ahead" and deactivates the client (§6.1c). Nothing is deleted; safe to run twice |
 | Exchange rate (D-301) | `fetch_fx_rate.php` | `fetchFxRate.js` | daily 07:05 | Fetches USD→INR (Frankfurter, backup open.er-api.com) into `fx_rates`; failure keeps the last rate; a move over 2 % waits for the MD. Needs HTTPS to api.frankfurter.app and open.er-api.com |
 | Zoho TEST clean-up | `zoho_cleanup_test_records.php` | `zohoCleanupTestRecords.js` | **by hand** | Removes `TEST-` records from Books (dry run unless `--apply`; `--log` writes change-log rows) |
 | Reorganise order files | `reorganize_order_files.php` | `reorganizeOrderFiles.js` | **by hand** | Moves files into the per-step folders (dry run unless `--apply`) |
@@ -815,6 +817,7 @@ CRON_TZ=Asia/Kolkata
 15 8 * * *    php …/app/cron/daily_digest.php
 15 2 * * *    php …/app/cron/document_copy_cleanup.php
 5 7 * * *     php …/app/cron/fetch_fx_rate.php
+40 6 * * *    php …/app/cron/prospect_expiry.php
 ```
 
 **Live site on Bluehost (13 Nov 2026).** cPanel's Cron Jobs form has no `CRON_TZ`, and the server clock is MST (India = MST + 12 h 30 min; + 11 h 30 min while the server is on MDT, March–November). The ten jobs are therefore typed in server hours, at the owner's chosen frequencies: e-mails hourly `0 * * * *`, OC auto-confirm daily `30 20 * * *` (09:00 IST), Zoho sync daily `30 10 * * *` (23:00 IST; staff use **Sync now** / **Sync this order** when urgent), alerts `30 17 * * *` (06:00), exchange rate `35 18 * * *` (07:05), digest `45 19 * * *` (08:15), document clean-up `45 13 * * *` (02:15), database backup `30 13 * * *` (02:00), documents backup `0 14 * * *` (02:30), test-restore `30 15 1 * *` (04:00 IST on the 2nd). Logs go to `<home>/logs/`. Every step of the server installation, the backup set-up and updates (cPanel Git + `docs/checks/check_all_migrations.sql`) is in `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md`.
@@ -1815,8 +1818,23 @@ skipped). A legacy client with only the old single box shows "Address on
 file (old single box): … — copy it into the boxes above." under the address
 fields on Edit; saving needs the parts.
 
+**Path C — a quick quote for a prospect (D-394, 20 Nov 2026).** A buyer asks
+for a price without filling in the public form. On **Clients › + Add client**
+tick **"Quick quote — the buyer has not sent their details yet (prospect)"**:
+only Company Legal Name, Email and Country of Destination are required (in the
+browser and on the server: "For a prospect, Company Legal Name, Email and
+Country of Destination are required."); the billing address becomes "optional
+for a prospect". Empty details behave on documents exactly as before ("To Be
+Confirmed"; an empty Line 1 stores `billing_address` = "To Be Confirmed").
+The client is a **prospect** (`clients.is_prospect = 1`) with its own expiry
+date — see §6.1c for the badge, the dates, the reminder, the automatic
+closing, "Keep for N more days", reactivation, and how a later Quotation
+request from the same e-mail updates the prospect instead of creating a
+second client.
+
 Code: `ClientIntakeController`, `ClientIntakeReviewController`,
-`ClientController` (Node `clientsController.js`), `AssociateIntakeService`.
+`ClientController` (Node `clientsController.js`), `AssociateIntakeService`,
+`ProspectService` (D-394).
 
 ### 5.3 Creating the order
 
@@ -2352,7 +2370,14 @@ Tables `disputes`, `dispute_documents`, `dispute_replies`.
 the order is not `active`; a BL number exists (goods shipped — use Close
 Order); a cancellation is pending; any payment was received or the LC was
 confirmed (use Request Cancellation, D-258). Result: status `lost`, locked,
-reported as lost.
+reported as lost. Since D-394 the refusal rules and the write live in one
+service, `OrderLostService::refusal()` / `::markLost()` (Node
+`orderLostService.js`), used by the button and by the daily quick-quote
+prospect expiry (§6.1c), which closes an order with reason "Quotation expired
+— no reply in N days", `lost_category` `quotation_expired`, `lost_by` NULL (the
+system) — and only an order the button would accept that is still at the
+quotation stage (Stage 1 gate not passed). The order page then adds "Closed
+automatically on <date> … use Duplicate order for a fresh quotation".
 
 ### 5.10 Editing, duplicating, archiving
 
@@ -2551,15 +2576,17 @@ the same filters, counts, fields, actions and money rules on both templates
     address and lines, VAT/EORI, contact, e-mail, phone, country of
     destination, consignee and notify party — the columns
     `OrderRepository::applyClientSnapshot` writes). See 6.1b.
+  - **Quick-quote prospects (D-394, 20 Nov 2026).** See 6.1c.
 - **Tables.** `clients`, `client_divisions`, `client_intake_submissions`,
   `pi_intake_submissions`, `client_logins`, `client_password_reset_tokens`,
   `associate_registrations`.
 - **Code.** `ClientController`, `ClientIntakeController`,
   `ClientIntakeReviewController`, `PiIntakeController`,
   `PiIntakeReviewController`, `ClientRepository`, `ClientIntakeRepository`,
-  `PiIntakeRepository`, `AssociateIntakeService`, `AssociateMatchService`.
+  `PiIntakeRepository`, `AssociateIntakeService`, `AssociateMatchService`,
+  `ProspectService` (D-394).
 - **SOP / decisions.** SOP 01, 03 (PI form), 12; D-122, D-129, D-130,
-  D-147, D-217, D-246, D-253, D-337.
+  D-147, D-217, D-246, D-253, D-337, D-394.
 
 ### 6.1b Buyer details on orders follow the client (D-337, 12 Nov 2026)
 
@@ -2623,6 +2650,73 @@ the same filters, counts, fields, actions and money rules on both templates
   `POST /orders/{id}/buyer-details/{requestId}/approve|refuse`
   (approve_buyer_details_change). Migration `2026-11-12d`. Tests
   `BuyerDetailsRefreshTest` / `buyerDetailsRefresh.test.js`.
+
+### 6.1c Quick-quote prospects (D-394, 20 Nov 2026)
+
+**Why.** Buyers ask for a quotation without filling in the Public Quotation
+Form. Staff used to add a client with "To Be Confirmed" details, an order and
+a draft quotation; dead enquiries piled up and a returning buyer got a second
+client. Owner decision D-394: A (build it) yes, B (automatic deletion) **no —
+nothing is ever deleted**, C a 60-day setting of its own; an expired prospect
+can be made active again. Mockups 1–11 approved.
+
+**Data.** `clients.is_prospect` (TINYINT, 0 for every older client),
+`prospect_expires_on` (DATE), `prospect_reminded_on` (DATE: the owner was
+reminded for the current date; cleared when the date moves),
+`prospect_expired_on` / `prospect_expired_reason` ("Quote expired 19 Jan 2027 —
+no reply in 60 days", set by the daily job, cleared on reactivation).
+Migration `2026-11-20a`.
+
+**Settings › Quick-quote prospects** (`company_settings` category
+`prospects`, `manage_company_settings`): `prospect_expiry_days` "Close a
+prospect's quotation after (days)" 60 (7–365), `prospect_reminder_days`
+"Remind the order's owner before (days)" 7 (1–30), `prospect_auto_close`
+"Automatic closing" On (Off = only remind). Ranges in
+`SettingValueValidator::RANGES` (browser `min` / `max` / `required` and the
+server). Separate from `quotation_validity_days` (30, printed on the
+Quotation — unchanged).
+
+**Screens (both stacks, both templates).**
+
+| Where | What |
+|---|---|
+| Clients › + Add client | "Quick quote" fieldset with the tick box. `app.js` `initRequiredWhenTicked()` (sitewide, data attributes `data-required-if-ticked="is_prospect"` on Email and Country of Destination, `data-required-unless-ticked="is_prospect"` on Line 1, City, Billing Country) switches `required` with the box, so the browser check, the inline message and the "*" follow it. Server: `ProspectService::createError()`. A ticked form with every normally required detail is saved as an ordinary client. The expiry is today + 60. Audit `CLIENT_PROSPECT_CREATED`. |
+| Edit client (a prospect) | The same fieldset, ticked: may be saved with only the prospect's details. When Line 1, City / Town and Billing Country are all filled in, saving ends the prospect (`is_prospect` 0, no expiry; audit `CLIENT_PROSPECT_CONFIRMED`) — it never expires on its own. |
+| Clients list (one layout for both templates) | "Show: All (n) · Clients (n) · Prospects (n)" (`?show=`), a gold "Prospect" badge, "Quote expires 19 Jan 2027 (in 60 days)", red within the reminder days. |
+| Client page | "Prospect" badge; box "Prospect — details not confirmed yet. Quotation order <ref> was created on <date>. If the buyer does not go ahead, the order moves to "Did not go ahead" and this client to Deactivated on <date> (in N days). The order's owner is reminded on <date>." Buttons (`manage_orders`): **Fill in the details** (Edit), **E-mail the Public Quotation Form** (`POST /clients/{id}/send-quotation-form`: the existing `/quotation-details` link to the client's e-mail, kind `buyer_links` / buyer — held in Testing mode, the screen says "Not e-mailed: …"; audit `CLIENT_QUOTATION_FORM_EMAILED` / `_NOT_EMAILED`), **Keep for 60 more days** (`POST /clients/{id}/prospect-keep`: the later of today and the date + the setting; audit `CLIENT_PROSPECT_EXTENDED`). |
+| Orders list — Standard and Kanban (shared `_filters` / `_card`) | Filter chip "Prospects (n)" = active orders of prospect clients (`OrderController::isProspectOrder`); the card's gold "Prospect" badge and "No reply yet · expires 19 Jan 2027" / "… · expires in 5 days" (red within the reminder days). `KanbanParityTest` / `kanbanParity.test.js` check both. |
+| Notifications, My tasks | The reminder (type `prospect_expiry_reminder`, e-mail kind `staff_compliance`) with **Open the order** and **Keep for 60 more days**; My tasks (Sales) "Quotation expiring — no reply from the prospect" (`department_task_types.prospect_quote_expiring`, from the day of the reminder). |
+| Order page | After the automatic closing, under "Marked lost …": "Closed automatically on <date>: the quick-quote prospect did not reply. Nothing was deleted. To quote again, use Duplicate order …". |
+| Clients › Deactivated Clients | Prospect badge, a "Why" column (`prospect_expired_reason`), the button "Reactivate (fresh 60 days)". |
+| Reactivate (a prospect) | Fresh date (today + the setting), reminder and expired note cleared, message "… is active again. It stays a prospect until its details are filled in; it now expires on <date> unless an order goes ahead. To quote again, open the old order (Did not go ahead) and use Duplicate order." |
+| Orders › Quotation requests (list and board, shared `_prospect_match`) | A pending request whose e-mail is a prospect's (active or deactivated, case- and space-insensitive) shows "Matches prospect <client> (same e-mail …)" and **Update this prospect** (`GET /client-intake/{id}/update-prospect`: every change old → new; `POST` saves). It copies the request's details onto the prospect (same id, Buyer Inquiry Ref and orders; `CLIENT_UPDATED` per field), ends the prospect, reactivates a deactivated one, marks the request accepted and linked (`converted_client_id`), applies the associate link and e-mail-verification rules of Accept (`AssociateIntakeService::acceptBlocker` / `onAccepted`) and refreshes running orders' buyer details (D-337). **Accept as a new client** keeps today's refusal for a duplicate e-mail (D-129). Reject unchanged. |
+
+**Daily job** `cron/prospect_expiry.php` / `jobs/prospectExpiry.js`, 06:40 IST
+(§3.9):
+
+1. **Reminder** — every active prospect whose date is within
+   `prospect_reminder_days` and not yet reminded: one notification + e-mail per
+   owner of each still-active order (its assignees, else whoever created the
+   order, else whoever created the client): "Reminder: quotation for <client>
+   expires on <date> (order <ref>). … Nothing is deleted, and the client can
+   be activated again." Then `prospect_reminded_on` = today (once per date).
+   Skipped when the date has come and Automatic closing is On (the closing
+   comes instead).
+2. **Automatic closing** (only when On) — every active prospect whose date
+   is today or past. Each order: lost / cancelled ignored; any other status
+   than `active` (it went ahead) or any order `ProspectService::closeRefusal()`
+   refuses (Mark Lost's own refusals — payment, LC, BL, pending cancellation —
+   and Stage 1 gate passed) leaves **the whole client as it is** (listed as
+   "Left as it is"). Otherwise each active order is marked lost through
+   `OrderLostService` (reason "Quotation expired — no reply in N days",
+   category `quotation_expired`, system user = NULL, locked, audit), then the
+   client is deactivated (audit `CLIENT_DEACTIVATED` with the reason) and
+   `prospect_expired_on` / `_reason` set. Safe to run twice.
+
+**Not changed.** No document (PDF / DOCX) code; Zoho; money records; the
+Quotation's printed validity. Tests: `ProspectD394Test` /
+`prospectD394.test.js`, `KanbanParityTest` / `kanbanParity.test.js`, e2e
+`16-quick-quote-prospects.spec.js`.
 
 ### 6.2 Products, categories and specifications
 
@@ -5156,6 +5250,7 @@ Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are *
 | Disputes | `dispute_response_days_n` 10 (working days), `weekly_off_days` sunday |
 | Workflow / orders | `wet_signature_required_buyer_po` 1, `wet_signature_required_supplier_po` 1, `oc_ack_override_restricted` 0, `oc_ack_auto_confirm_hours` 48, `lead_time_display_unit` days; large-quantity levels (item 10a, Settings › Orders, 1 to 1,000,000) `quantity_warning_level_sqm` 30000, `_sqft` 300000, `_cbm` 500, `_ton` 600, `_pcs` 600000, `_rmt` 60000 |
 | Clients | `client_impersonation_enabled` 0, `client_portal_show_order_history` 1, `client_portal_show_document_downloads` 1 |
+| Quick-quote prospects (D-394) | `prospect_expiry_days` 60 (7–365), `prospect_reminder_days` 7 (1–30), `prospect_auto_close` 1 (0 = only remind) — §6.1c |
 | Compliance | `ecgc_policy_no` (empty), `ecgc_policy_cover_pct` 90, `ecgc_policy_valid_to` (empty), `ecgc_declaration_day` 10, `benefit_deadline_days_rodtep` 365, `_rosctl` 365, `_duty_drawback` 0, `_other` 0 |
 | System | `storage_base_path` — documentation only; the app reads `.env` |
 

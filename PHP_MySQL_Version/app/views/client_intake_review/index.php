@@ -21,9 +21,10 @@
         </td>
         <td><?= htmlspecialchars((string) $s['submitted_at']) ?></td>
         <td>
+          <?php require __DIR__ . '/_prospect_match.php'; // D-394 ?>
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/accept" style="display:inline">
             <?= Csrf::field() ?>
-            <button type="submit" class="btn-sm btn-success">Accept &amp; Create Client</button>
+            <button type="submit" class="btn-sm <?= !empty($s['prospect_match']) ? 'btn-secondary' : 'btn-success' ?>"><?= !empty($s['prospect_match']) ? 'Accept as a new client' : 'Accept &amp; Create Client' ?></button>
           </form>
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this quotation request?');">
             <?= Csrf::field() ?>
