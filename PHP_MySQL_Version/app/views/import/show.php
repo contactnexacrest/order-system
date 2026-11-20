@@ -14,7 +14,7 @@ $num = static fn (string $v): string => str_contains($v, '.') ? rtrim(rtrim($v, 
   <h1><?= $h($s['reference']) ?> <span class="badge"><?= $h(I::STAGES[$stage]) ?></span></h1>
   <p class="muted"><?= $h($s['supplier_name']) ?> · <?= $h($s['supplier_country']) ?> · in <?= $h($cur) ?><?= $s['incoterm'] ? ' · ' . $h($s['incoterm']) : '' ?></p>
 
-  <ol class="stage-strip" data-testid="imp-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
+  <ol class="stage-strip" data-testid="imp-stages" style="display:flex;flex-wrap:wrap;gap:6px 36px;padding-left:22px;">
     <?php foreach (I::STAGES as $k => $label): $i = (int) array_search($k, $keys, true); ?>
       <li<?= $k === $stage ? ' style="font-weight:700"' : ($i < $pos ? ' style="color:#2D7D56"' : ' style="color:#8A94A6"') ?>><?= $h($label) ?></li>
     <?php endforeach; ?>

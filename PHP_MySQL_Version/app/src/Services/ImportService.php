@@ -301,7 +301,7 @@ final class ImportService
     {
         $divisionId = self::divisionId();
         if ($divisionId === null || !self::isActive()) {
-            return [null, 'Import & Distribution is not active yet. The MD activates it in Admin › Divisions.'];
+            return [null, 'Import & Distribution is not active yet. The MD activates it in Settings › Divisions.'];
         }
         [$fields, $error] = self::headerFields($in);
         if ($error !== null) {

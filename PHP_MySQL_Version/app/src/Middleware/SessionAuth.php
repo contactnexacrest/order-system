@@ -144,7 +144,7 @@ final class SessionAuth
                 $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
                 if ($ownDivision !== null && $ownDivision['status'] !== 'active' && !in_array($postPath, ['/logout', '/preview/exit', '/account/password', '/keep-alive'], true)) {
                     http_response_code(403);
-                    echo 'Your division (' . htmlspecialchars((string) $ownDivision['name'], ENT_QUOTES, 'UTF-8') . ') is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.';
+                    echo 'Your division (' . htmlspecialchars((string) $ownDivision['name'], ENT_QUOTES, 'UTF-8') . ') is not active yet: nothing can be saved until the MD activates it in Settings › Divisions.';
                     return false;
                 }
             }

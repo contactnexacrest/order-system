@@ -20,7 +20,7 @@
      | `pricing_fx_rate` (pricing) | 1 | Prices are worked out in rupees |
      | `program_enabled` (incentive) | 0 | Domestic Trade's own team-incentive programme starts off |
 
-     Add `order_ref_format` (for example `NC/DOM/{YY}/{DDMM}{NNN}`); without it the numbers start with `DOM/` and Export's format.
+     Add `order_ref_format` (for example `NC/{DIV}/{YY}/{DDMM}{NNN}`, which gives `NC/DOM/26/2011001`; put `{DIV}` where the division code goes — a format without it gets `DOM/` added in front, so `NC/DOM/…` would come out as `DOM/NC/DOM/…`); without it the numbers start with `DOM/` and Export's format.
 2. **Settings › Lists › GST rates** (link on the division page): one rate per HSN (the longest matching start of a line's HSN wins) or per product category. Starts with HSN 6802 at 18 %.
 3. Check **NexaCrest's GSTIN** in Settings: its first two digits are the GST state (29 = Karnataka) used to choose CGST + SGST or IGST.
 4. Work through **Before activating**, tick the box and **Activate**. From then on company-level people see the division switcher, "All divisions" and the Division filters (SOP 28).

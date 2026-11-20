@@ -451,7 +451,7 @@ final class MerchantTradeService
     {
         $divisionId = self::divisionId();
         if ($divisionId === null || !self::isActive()) {
-            return [null, 'Merchant Trade is not active yet. The MD activates it in Admin › Divisions.'];
+            return [null, 'Merchant Trade is not active yet. The MD activates it in Settings › Divisions.'];
         }
         [$fields, $error] = self::headerFields($in);
         if ($error !== null) {

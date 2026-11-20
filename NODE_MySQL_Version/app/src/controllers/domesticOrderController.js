@@ -112,7 +112,7 @@ async function pageData(order, permissions) {
     afterOc: D.atOrAfter(stage, 'order_confirmation'),
     afterDispatch: D.atOrAfter(stage, 'dispatch'),
     afterInvoice: D.atOrAfter(stage, 'tax_invoice'),
-    docButtons: Object.entries(D.DOCUMENTS).filter(([code]) => D.documentAllowed(dom, code)).map(([code, label]) => ({ code, label: label.charAt(0).toLowerCase() + label.slice(1) })),
+    docButtons: Object.entries(D.DOCUMENTS).filter(([code]) => D.documentAllowed(dom, code)).map(([code, label]) => ({ code, label: /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label })),
     seesPrices: moneyVisibility.can(permissions, moneyVisibility.SELLING),
     seesPayments: moneyVisibility.can(permissions, moneyVisibility.BUYER_PAYMENTS),
     canEdit: !!permissions.manage_orders && Number(order.is_locked || 0) !== 1,

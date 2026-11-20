@@ -143,6 +143,11 @@ describe('D-257 Phase 2 — Domestic Trade', () => {
     const page = (await agent.get('/domestic/orders/create')).text;
     expect(page).toContain('dom-not-active');
     expect(page).not.toContain('dom-create-form');
+    // Group E fixes (20 Nov 2026): the menu is Settings › Divisions, and the suggested number format puts {DIV} itself.
+    expect(page).toContain('The MD activates it in Settings › Divisions');
+    expect(page).not.toContain('Admin › Divisions');
+    const help = ((await divisionRepository.preflight(DOM)).find((i) => i.label === 'Order number format set') || {}).help || '';
+    expect(help).toContain('NC/{DIV}/{YY}/{DDMM}{NNN}');
     expect((await agent.get(`/clients/${client}`)).text).not.toContain('client-gst');
     expect((await agent.get('/orders/create')).text).not.toMatch(/<option[^>]*>\s*INR\b/);
     const inr = await db.queryOne("SELECT id FROM currencies WHERE code = 'INR'");
@@ -235,6 +240,9 @@ describe('D-257 Phase 2 — Domestic Trade', () => {
     const page = (await (await loginAs(domStaff)).get(`/orders/${orderId}`)).text;
     expect(page).toContain('data-testid="dom-order"');
     expect(page).toContain('Domestic sale receipt of ₹1,00,000.00');
+    // Group E fixes (20 Nov 2026): the stage names have room for their numbers; "GST" keeps its capitals.
+    expect(page).toContain('data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 36px;');
+    expect(page).not.toContain('gST');
   }, 120000);
 
   it('another state is IGST, and an unregistered buyer waits for its GSTIN', async () => {

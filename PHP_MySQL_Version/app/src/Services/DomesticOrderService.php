@@ -194,7 +194,7 @@ final class DomesticOrderService
         $code = in_array($code, self::LOCAL_CODES, true) ? $code : self::CODE;
         $divisionId = self::divisionId($code);
         if ($divisionId === null || !self::isActive($code)) {
-            return [null, ($code === 'IMP' ? 'Import & Distribution' : 'Domestic Trade') . ' is not active yet. The MD activates it in Admin › Divisions.'];
+            return [null, ($code === 'IMP' ? 'Import & Distribution' : 'Domestic Trade') . ' is not active yet. The MD activates it in Settings › Divisions.'];
         }
         $client = DomesticOrderRepository::client((int) ($in['client_id'] ?? 0));
         if ($client === null || (int) $client['is_active'] !== 1 || !DivisionService::allowsClient((int) $client['id']) && !DivisionService::seesAll()) {

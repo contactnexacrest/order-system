@@ -184,7 +184,7 @@ async function partyFields(input) {
 async function create(input, userId, code = CODE) {
   const divCode = LOCAL_CODES.includes(code) ? code : CODE;
   const domId = await divisionId(divCode);
-  if (domId === null || !(await isActive(divCode))) return [null, `${divCode === 'IMP' ? 'Import & Distribution' : 'Domestic Trade'} is not active yet. The MD activates it in Admin › Divisions.`];
+  if (domId === null || !(await isActive(divCode))) return [null, `${divCode === 'IMP' ? 'Import & Distribution' : 'Domestic Trade'} is not active yet. The MD activates it in Settings › Divisions.`];
   const client = await repo.client(parseInt(input.client_id || 0, 10));
   if (!client || Number(client.is_active) !== 1 || (!(await divisionService().allowsClient(client.id)) && !divisionService().seesAll())) {
     return [null, 'Please select a valid client.'];

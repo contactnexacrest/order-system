@@ -15,7 +15,7 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
   <h1><?= $h($order['order_reference']) ?> <span class="badge"><?= $h(D::STAGES[$stage]) ?></span></h1>
   <p class="muted"><?= $h($order['company_legal_name']) ?> · <?= !empty($isImp) ? 'Local sale of imported stock in ₹' : 'Domestic sale in ₹' ?> · <?= $totals['intra_state'] ? 'Same state: CGST + SGST' : 'Another state: IGST' ?></p>
 
-  <ol class="stage-strip" data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
+  <ol class="stage-strip" data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 36px;padding-left:22px;">
     <?php foreach (D::STAGES as $k => $label): ?>
       <li class="<?= $k === $stage ? 'current' : (D::atOrAfter($stage, $k) ? 'done' : '') ?>"<?= $k === $stage ? ' style="font-weight:700"' : (D::atOrAfter($stage, $k) ? ' style="color:#2D7D56"' : ' style="color:#8A94A6"') ?>><?= $h($label) ?></li>
     <?php endforeach; ?>
@@ -189,7 +189,7 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
     </table>
     <?php if ($canDocs): ?>
       <?php foreach (D::DOCUMENTS as $code => $label): if (!D::documentAllowed($dom, $code)) { continue; } ?>
-      <form method="post" action="/domestic/orders/<?= $id ?>/documents" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="doc_code" value="<?= $h($code) ?>"><button type="submit" class="btn-secondary">Generate <?= $h(lcfirst($label)) ?></button></form>
+      <form method="post" action="/domestic/orders/<?= $id ?>/documents" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="doc_code" value="<?= $h($code) ?>"><button type="submit" class="btn-secondary">Generate <?= $h(preg_match('/^[A-Z][a-z]/', $label) ? lcfirst($label) : $label) /* "GST tax invoice" keeps its capitals */ ?></button></form>
       <?php endforeach; ?>
     <?php endif; ?>
     <?php else: ?><p class="muted">The documents show prices.</p><?php endif; ?>

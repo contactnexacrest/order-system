@@ -145,7 +145,7 @@ function required() {
       if (ownDivision && ownDivision.status !== 'active' && !['/logout', '/preview/exit', '/account/password', '/keep-alive'].includes(postPath)
         && !(await superAdminService.isEffective(user.id))) {
         const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        res.status(403).send(`Your division (${escapeHtml(ownDivision.name)}) is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.`);
+        res.status(403).send(`Your division (${escapeHtml(ownDivision.name)}) is not active yet: nothing can be saved until the MD activates it in Settings › Divisions.`);
         return;
       }
     }

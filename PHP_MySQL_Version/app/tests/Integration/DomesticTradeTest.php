@@ -161,6 +161,11 @@ final class DomesticTradeTest extends DbTestCase
         $page = $this->render(fn () => (new DomesticOrderController())->create([]));
         self::assertStringContainsString('dom-not-active', $page);
         self::assertStringNotContainsString('dom-create-form', $page);
+        // Group E fixes (20 Nov 2026): the menu is Settings › Divisions, and the suggested number format puts {DIV} itself.
+        self::assertStringContainsString('The MD activates it in Settings › Divisions', $page);
+        self::assertStringNotContainsString('Admin › Divisions', $page);
+        $help = array_column(DivisionRepository::preflight(self::DOM), 'help', 'label')['Order number format set'] ?? '';
+        self::assertStringContainsString('NC/{DIV}/{YY}/{DDMM}{NNN}', (string) $help);
         $clientPage = $this->render(fn () => (new \App\Controllers\ClientController())->show(['id' => (string) $this->client]));
         self::assertStringNotContainsString('client-gst', $clientPage, 'no GST section on the client page while DOM is planned');
         // INR is never offered on an Export order, and refused if posted.
@@ -265,6 +270,9 @@ final class DomesticTradeTest extends DbTestCase
         $page = $this->render(fn () => (new OrderController())->show(['id' => (string) $orderId]));
         self::assertStringContainsString('data-testid="dom-order"', $page);
         self::assertStringContainsString('Domestic sale receipt of ₹1,00,000.00', $page);
+        // Group E fixes (20 Nov 2026): the stage names have room for their numbers; "GST" keeps its capitals.
+        self::assertStringContainsString('data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 36px;', $page);
+        self::assertStringNotContainsString('gST', $page);
     }
 
     public function testOtherStateIsIgstAndAnUnregisteredBuyerWaitsForItsGstin(): void

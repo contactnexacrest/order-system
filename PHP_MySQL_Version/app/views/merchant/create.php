@@ -5,7 +5,7 @@ $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')
   <p><a href="/merchant">&larr; Merchant trade deals</a></p>
   <h1>New merchant trade deal</h1>
   <?php if (!$active): ?>
-    <p class="muted" data-testid="mtt-not-active">Merchant Trade is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="mtt-not-active">Merchant Trade is not active yet. The MD activates it in Settings › Divisions when it is ready.</p>
   <?php else: ?>
   <p class="muted">Buy from a supplier abroad and sell to a buyer abroad; the goods go straight from one to the other. The deal and PO numbers are given when you save.</p>
   <form method="post" action="/merchant" class="field-grid" data-testid="mtt-create-form">

@@ -3,7 +3,7 @@
   {% set imp = (code == 'IMP') %}
   <h1>{{ 'New local sale (from stock)' if imp else 'New domestic order' }}</h1>
   {% if not active %}
-    <p class="muted" data-testid="dom-not-active">{{ 'Import & Distribution' if imp else 'Domestic Trade' }} is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="dom-not-active">{{ 'Import & Distribution' if imp else 'Domestic Trade' }} is not active yet. The MD activates it in Settings › Divisions when it is ready.</p>
   {% else %}
   <p class="muted">{{ 'A sale of imported stock to a reseller in India' if imp else 'A sale to a reseller in India' }}, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
   <form method="post" action="/domestic/orders" class="field-grid" data-testid="dom-create-form">

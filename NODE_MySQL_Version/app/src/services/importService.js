@@ -285,7 +285,7 @@ function headerFields(input) {
 /** Creates an import (its PO number is taken now). @returns {Promise<[number|null, string|null]>} */
 async function create(input, userId) {
   const divId = await divisionId();
-  if (divId === null || !(await isActive())) return [null, 'Import & Distribution is not active yet. The MD activates it in Admin › Divisions.'];
+  if (divId === null || !(await isActive())) return [null, 'Import & Distribution is not active yet. The MD activates it in Settings › Divisions.'];
   const [fields, error] = headerFields(input);
   if (error !== null) return [null, error];
   fields.division_id = divId;

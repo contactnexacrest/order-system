@@ -19,7 +19,7 @@ $levelStyle = ['ok' => 'color:#2D7D56', 'info' => 'color:#5B6573', 'warn' => 'co
   <h1><?= $h($d['reference']) ?> <span class="badge"><?= $h(M::STAGES[$stage]) ?></span></h1>
   <p class="muted"><?= $h($d['supplier_name']) ?> (<?= $h($d['supplier_country']) ?>, in <?= $h($d['purchase_currency']) ?>) → <?= $buyerName ?> (<?= $h($d['buyer_country']) ?>, in <?= $h($d['sale_currency']) ?>) · goods from <?= $h($d['origin_country']) ?> · PO <?= $h($d['po_no']) ?><?= $d['sale_invoice_no'] ? ' · invoice ' . $h($d['sale_invoice_no']) : '' ?></p>
 
-  <ol class="stage-strip" data-testid="mtt-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
+  <ol class="stage-strip" data-testid="mtt-stages" style="display:flex;flex-wrap:wrap;gap:6px 36px;padding-left:22px;">
     <?php foreach (M::STAGES as $k => $label): $i = (int) array_search($k, $keys, true); ?>
       <li<?= $k === $stage ? ' style="font-weight:700"' : ($i < $pos ? ' style="color:#2D7D56"' : ' style="color:#8A94A6"') ?>><?= $h($label) ?></li>
     <?php endforeach; ?>

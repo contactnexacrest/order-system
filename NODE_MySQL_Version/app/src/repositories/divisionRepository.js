@@ -61,7 +61,7 @@ async function preflight(divisionId) {
   const items = [
     { label: 'At least one department works in this division', ok: c.departments > 0, help: 'Admin › Departments: set the Division of its departments.' },
     { label: 'At least one active staff member works in this division', ok: c.staff > 0, help: 'Admin › Users: set the Division of its staff.' },
-    { label: 'Order number format set', ok: own.has('company:order_ref_format'), help: 'Add the division setting "order_ref_format" below (e.g. NC/DOM/{YY}/{DDMM}{NNN}).' },
+    { label: 'Order number format set', ok: own.has('company:order_ref_format'), help: 'Add the division setting "order_ref_format" below (e.g. NC/{DIV}/{YY}/{DDMM}{NNN} — {DIV} is the division code).' },
     { label: 'Modules chosen', ok: modulesOn.length > 0, help: 'Tick the modules this division uses.' },
     { label: 'Settings reviewed (company, pricing, incentive)', ok: own.size >= 2, help: "Add the division's own values where they differ from the company (at least the number format and one more)." },
   ];

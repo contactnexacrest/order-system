@@ -5,7 +5,7 @@ $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')
   <?php $imp = ($code ?? 'DOM') === 'IMP'; ?>
   <h1><?= $imp ? 'New local sale (from stock)' : 'New domestic order' ?></h1>
   <?php if (!$active): ?>
-    <p class="muted" data-testid="dom-not-active"><?= $imp ? 'Import & Distribution' : 'Domestic Trade' ?> is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="dom-not-active"><?= $imp ? 'Import & Distribution' : 'Domestic Trade' ?> is not active yet. The MD activates it in Settings › Divisions when it is ready.</p>
   <?php else: ?>
   <p class="muted"><?= $imp ? 'A sale of imported stock to a reseller in India' : 'A sale to a reseller in India' ?>, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
   <form method="post" action="/domestic/orders" class="field-grid" data-testid="dom-create-form">

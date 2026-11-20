@@ -1071,7 +1071,7 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `manage_approval_limits` | Change a designation's purchase approval limit or make it a 'director' (no limit). | MD, ED |
 | `manage_assets` | Upload/replace logo, signature, seal, watermark. | Admin, MD, ED, SysAdmin |
 | `manage_company_settings` | Edit company_settings key-value configuration. | Admin, MD, ED, SysAdmin |
-| `manage_divisions` | Admin > Divisions: modules, number formats, division settings and activating a planned division. | Admin, MD |
+| `manage_divisions` | Settings › Divisions: modules, number formats, division settings and activating a planned division. | Admin, MD |
 | `manage_email_templates` | Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless). | Admin, MD, ED, SysAdmin |
 | `manage_field_protection` | Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). | Admin, MD, ED, SysAdmin |
 | `manage_permissions` | Edit role/user permission matrix. | Admin, MD, ED, SysAdmin |

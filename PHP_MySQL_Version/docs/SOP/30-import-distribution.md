@@ -22,7 +22,7 @@
      | `pricing_fx_rate` (pricing) | 1 | Local-sale prices are worked out in rupees |
      | `program_enabled` (incentive) | 0 | Import & Distribution's own team-incentive programme starts off |
 
-     Add `order_ref_format` (for example `NC/IMP/{YY}/{DDMM}{NNN}`) for the local-sale order numbers.
+     Add `order_ref_format` (for example `NC/{DIV}/{YY}/{DDMM}{NNN}`, which gives `NC/IMP/26/2011001`; put `{DIV}` where the division code goes — a format without it gets `IMP/` added in front, so `NC/IMP/…` would come out as `IMP/NC/IMP/…`) for the local-sale order numbers.
 2. **Settings › Lists › Import duty** (link on the division page): basic duty, SWS and IGST per HSN (the longest matching start of a line's HSN wins). Starts with HSN 6802 at 20 % / 10 % / 18 %.
 3. Check **NexaCrest's IEC** and **GSTIN** in Settings (the importer of record; IGST credit and local sales).
 4. The local sale uses the **GST rates**, e-way bill threshold and e-invoicing rule of Domestic Trade (Settings › Lists › GST rates and the Domestic Trade settings): the GST law is the same.

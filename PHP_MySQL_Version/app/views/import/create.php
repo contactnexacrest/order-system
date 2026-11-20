@@ -5,7 +5,7 @@ $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')
   <p><a href="/import">&larr; Imports</a></p>
   <h1>New import</h1>
   <?php if (!$active): ?>
-    <p class="muted" data-testid="imp-not-active">Import &amp; Distribution is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="imp-not-active">Import &amp; Distribution is not active yet. The MD activates it in Settings › Divisions when it is ready.</p>
   <?php else: ?>
   <p class="muted">A purchase from a supplier abroad, in the supplier's currency. The PO number is given when you save.</p>
   <form method="post" action="/import" class="field-grid" data-testid="imp-create-form">
