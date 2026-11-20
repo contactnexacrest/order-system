@@ -163,8 +163,9 @@ box, and without risking a second client when the buyer comes back:
    before.
 3. Buttons in the box:
    - **Fill in the details** — the Edit form. While the Quick quote box stays
-     ticked you may save with only the three details. Once Billing Address
-     Line 1, City / Town and Billing Country are filled in, saving ends the
+     ticked you may save with only the three details. Once Company Legal
+     Name, Billing Address Line 1, City / Town and Billing Country are all
+     filled in with real details, saving ends the
      prospect: the badge goes and the client never expires on its own.
      A box that reads only "To be confirmed" still counts as empty, so an old
      client saved with "To be confirmed" stays a prospect until real details
