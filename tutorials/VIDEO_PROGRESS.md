@@ -399,7 +399,13 @@ script in `tutorials/scripts/` (and `scripts/parts/`).
 | Not in any recorded video | Product › Specifications (old **Forms** ticks → **Sold as**), Products list "Sold as: …", Products › Pricing › **Forms of stone**, Products › **Specifications (HS)**, Settings › Lists › surface_finish (**Offered for forms**, new finishes Roughly trimmed / Sawn), Edit Supplier (**CHA + transport per container**), Edit price (CHA fallback text, **Priced per** Tonne), the option **Order** boxes (D-389). To be covered by the B05 (Procurement) and B09 (MD / ED) scripts, not started yet. | — |
 | C04 (associate Price access / Catalogue, "which forms, like slabs or tiles") | Not affected: the associate portal and price access did not change in this build. | No change needed |
 
-## Also out of date after the 20 Nov 2026 build — D-394 quick-quote prospects (noted only; owner to decide)
+## Also out of date after the 20 Nov 2026 build — D-394 quick-quote prospects — RE-RECORDED 20 Nov 2026
+
+**Done (owner 20 Nov: "start on videos … give me all the videos"):** A01 Part 1, A01 Part 2, B01 Part 1, B01 Part 2,
+B02, B08 and B10 re-recorded in English and Hindi on the tutorial stack with the D-394 screens (Prospects chip,
+Clients Show row, Settings section), each checked (length = subtitles, volume English ≈ −20 dB / Hindi ≈ −17 dB,
+frames, flicker scan) and sent to the owner as replacements on 20 Nov 2026. A01 Part 2 was recorded once more
+for D-395 below (that recording is the current one). The table below is the note as first written.
 
 No video or script was changed and nothing was recorded (CLAUDE.md video rule: ask the owner first). Checked
 against every script in `tutorials/scripts/` (and `scripts/parts/`). No recorded video opens + Add client, a
@@ -415,7 +421,15 @@ are new, not changed, on camera.
 | B01 Part 1, D01, C03 / C05 (Orders › Quotation requests) | Not affected: a request shows "Matches prospect" and "Update this prospect" only when its e-mail is a prospect's; the demo requests are not, so the screen is unchanged. | No change needed |
 | Documents (all videos) | Not affected: no document (PDF / Word) change. | No change needed |
 
-## Also out of date after the 20 Nov 2026 build — D-395 CA / Accounting home (noted only; owner to decide)
+## Also out of date after the 20 Nov 2026 build — D-395 CA / Accounting home — RE-RECORDED 20 Nov 2026
+
+**Done (owner 20 Nov: "yes record them all and do not wait for me"):** the `/ca` scenes of A01 Part 2, B03, B04 and
+B11 were rewritten for the new page (Needs attention boxes, the four cards with their new headings, the register
+summary and quick filters; B11 does not name the boxes, since a CA without CA Manage sees fewer) with the Hindi
+translations, then re-recorded in English and Hindi, checked (A01-2 10.07 / 13.13 min, B03 7.09 / 8.96, B04
+6.06 / 7.56, B11 3.23 / 4.08 min English / Hindi; length = subtitles; volume ≈ −20 / −17 dB; frames show the new
+page per role; flicker-scan hits are ordinary page changes) and sent to the owner as replacements on 20 Nov 2026.
+The table below is the note as first written.
 
 No video or script was changed and nothing was recorded (CLAUDE.md video rule: ask the owner first). Four videos
 open `/ca`; each still plays and its narration is still true, but the picture shows the old page (a list of links)
@@ -427,6 +441,14 @@ instead of the new one (Needs attention boxes, four cards, register summary and 
 | B03 Accounts Executive | The INR Settlement Register (now under the boxes and cards, with a summary row and filters). | Owner to decide |
 | B04 Finance Manager and Director | The page while expenses, bank, benefits, Zoho sync and year lock are named (now cards and boxes). | Owner to decide |
 | B11 CA, Auditor and Investor | The CA's view of the page, naming its sections (now cards; the CA sees no Zoho box or card, as before). | Owner to decide |
+
+## After the 20 Nov 2026 builds D-396 / D-397 (noted)
+
+D-396 (Dimensions follow the sizes): only the New Order form's Dimensions hint is longer ("prints on the documents
+— follows the three sizes; your own wording is kept"); B01 Part 1 shows it, says nothing about it, and still plays
+correctly (it types the Dimensions text, which stays as typed). Recommended: no re-record; owner not yet answered.
+D-397 (price note below the minimum): no video shows the note below the minimum; A01 Part 2, B02, B09 Parts 1–2
+describe the minimum-price rule, which is unchanged. No video affected.
 
 ## Resume notes (for a new session)
 
