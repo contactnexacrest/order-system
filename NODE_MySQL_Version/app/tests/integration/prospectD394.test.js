@@ -141,6 +141,28 @@ describe('Quick-quote prospects (D-394)', () => {
     expect([Number(after.is_prospect), after.prospect_expires_on, after.billing_address]).toEqual([0, null, '1 Quarry Road, Berlin, Germany']);
   });
 
+  it('"To be confirmed" counts as empty, so the prospect stays', async () => {
+    // Owner, 20 Nov 2026 (option A): the placeholder staff typed before D-394 is not a real detail.
+    for (const v of ['', '  ', 'To be confirmed', 'TO BE CONFIRMED', 'to be  confirmed.', ' To Be Confirmed ', null, undefined]) {
+      expect(prospectService.isPlaceholder(v)).toBe(true);
+    }
+    for (const v of ['1 Quarry Road', 'To be confirmed by phone', 'Confirmed']) {
+      expect(prospectService.isPlaceholder(v)).toBe(false);
+    }
+    const id = await addProspect();
+    const c = await clientRepository.find(id);
+    const page = (await agent.get(`/clients/${id}/edit`)).text;
+    const fingerprint = page.match(/name="edit_fingerprint" value="([^"]*)"/)[1];
+    const res = await post(`/clients/${id}/update`, {
+      company_legal_name: c.company_legal_name, email: c.email, country_of_destination: 'Germany', consignee_same_as_buyer: '1', notify_party_same_as_consignee: '1',
+      is_prospect: '1', billing_address_line1: 'To be confirmed', billing_city: 'To Be Confirmed', billing_country: 'To be confirmed', edit_fingerprint: fingerprint,
+    }, `/clients/${id}/edit`);
+    expect((await flashAfter(res)).message || '').not.toContain('no longer a prospect');
+    const after = await clientRepository.find(id);
+    expect(Number(after.is_prospect)).toBe(1);
+    expect(after.prospect_expires_on).not.toBeNull();
+  });
+
   // ---------------------------------------------------------------- 2. Clients list
 
   it('the Clients list filters prospects and shows their badge and date', async () => {

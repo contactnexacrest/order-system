@@ -166,6 +166,9 @@ box, and without risking a second client when the buyer comes back:
      ticked you may save with only the three details. Once Billing Address
      Line 1, City / Town and Billing Country are filled in, saving ends the
      prospect: the badge goes and the client never expires on its own.
+     A box that reads only "To be confirmed" still counts as empty, so an old
+     client saved with "To be confirmed" stays a prospect until real details
+     are typed in.
    - **E-mail the Public Quotation Form** — sends the usual form link to the
      client's e-mail so the buyer fills in their own details. While Testing
      mode holds buyer e-mails the screen says "Not e-mailed: …" — send the

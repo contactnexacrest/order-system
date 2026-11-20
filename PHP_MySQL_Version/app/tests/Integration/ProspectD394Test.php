@@ -172,6 +172,30 @@ final class ProspectD394Test extends DbTestCase
         self::assertSame('1 Quarry Road, Berlin, Germany', $c['billing_address']);
     }
 
+    public function testToBeConfirmedCountsAsEmptySoTheProspectStays(): void
+    {
+        // Owner, 20 Nov 2026 (option A): the "To be confirmed" placeholder staff typed
+        // before D-394 is not a real detail.
+        foreach (['', '  ', 'To be confirmed', 'TO BE CONFIRMED', 'to be  confirmed.', ' To Be Confirmed '] as $v) {
+            self::assertTrue(\App\Services\ProspectService::isPlaceholder($v), "'{$v}' is a placeholder");
+        }
+        foreach (['1 Quarry Road', 'To be confirmed by phone', 'Confirmed'] as $v) {
+            self::assertFalse(\App\Services\ProspectService::isPlaceholder($v), "'{$v}' is a real detail");
+        }
+
+        $id = $this->addProspect();
+        $c = ClientRepository::find($id);
+        $_POST = ['company_legal_name' => $c['company_legal_name'], 'email' => $c['email'], 'country_of_destination' => 'Germany',
+            'consignee_same_as_buyer' => '1', 'notify_party_same_as_consignee' => '1', 'is_prospect' => '1',
+            'billing_address_line1' => 'To be confirmed', 'billing_city' => 'To Be Confirmed', 'billing_country' => 'To be confirmed',
+            'edit_fingerprint' => \App\Helpers\EditFingerprint::of($c, ClientController::editFields())];
+        $this->call(fn () => (new ClientController())->update(['id' => (string) $id]));
+        self::assertStringNotContainsString('no longer a prospect', (string) self::flash());
+        $c = ClientRepository::find($id);
+        self::assertSame(1, (int) $c['is_prospect']);
+        self::assertNotNull($c['prospect_expires_on']);
+    }
+
     // ---------------------------------------------------------------- 2. Clients list
 
     public function testTheClientsListFiltersProspectsAndShowsTheirBadgeAndDate(): void

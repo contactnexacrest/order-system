@@ -129,15 +129,29 @@ final class ProspectService
         return 'No reply yet · expires ' . Dates::short($date);
     }
 
-    /** @param array<string,mixed> $client */
+    /**
+     * True when every normally required detail is really filled in. A field that
+     * reads only "To be confirmed" (any capitals, a trailing full stop allowed) is
+     * the placeholder staff typed before D-394 and counts as still empty (owner,
+     * 20 Nov 2026, option A), so saving such a prospect keeps it a prospect.
+     *
+     * @param array<string,mixed> $client
+     */
     public static function hasRequiredDetails(array $client): bool
     {
         foreach (self::REQUIRED_DETAILS as $field) {
-            if (trim((string) ($client[$field] ?? '')) === '') {
+            if (self::isPlaceholder((string) ($client[$field] ?? ''))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /** Empty, or only the words "To be confirmed" (any capitals, optional full stop). */
+    public static function isPlaceholder(string $value): bool
+    {
+        $v = strtolower(trim($value));
+        return $v === '' || preg_match('/^to\s+be\s+confirmed\.?$/', $v) === 1;
     }
 
     /** The prospect form's own server check (company name, a valid e-mail, country of destination); null = fine. */

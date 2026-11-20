@@ -30,7 +30,7 @@
     <fieldset class="prospect-fieldset" data-testid="quick-quote">
       <legend>Quick quote</legend>
       <label class="prospect-toggle"><input type="checkbox" name="is_prospect" value="1" checked> Quick quote — the buyer has not sent their details yet (prospect)</label>
-      <p class="muted small">While this is ticked, only Company Legal Name, Email and Country of Destination are needed. Once Billing Address Line 1, City / Town and Billing Country are filled in, saving ends the prospect: the Prospect badge goes and the client never expires on its own.</p>
+      <p class="muted small">While this is ticked, only Company Legal Name, Email and Country of Destination are needed. Once Billing Address Line 1, City / Town and Billing Country are filled in with real details, saving ends the prospect: the Prospect badge goes and the client never expires on its own. A field that reads only "To be confirmed" still counts as empty.</p>
     </fieldset>
     <?php endif; ?>
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>

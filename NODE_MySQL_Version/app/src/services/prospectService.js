@@ -105,8 +105,19 @@ function orderExpiryLine(date, remindDays) {
   return `No reply yet · expires ${short(date)}`;
 }
 
+/** Empty, or only the words "To be confirmed" (any capitals, optional full stop). */
+function isPlaceholder(value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  return v === '' || /^to\s+be\s+confirmed\.?$/.test(v);
+}
+
+/**
+ * True when every normally required detail is really filled in. A field that reads
+ * only "To be confirmed" is the placeholder staff typed before D-394 and counts as
+ * still empty (owner, 20 Nov 2026, option A), so saving such a prospect keeps it a prospect.
+ */
 function hasRequiredDetails(client) {
-  return REQUIRED_DETAILS.every((f) => String((client && client[f]) ?? '').trim() !== '');
+  return REQUIRED_DETAILS.every((f) => !isPlaceholder(client && client[f]));
 }
 
 /** The prospect form's own server check (company name, e-mail, country of destination); null = fine. */
@@ -421,7 +432,7 @@ async function viewSettings() {
 module.exports = {
   LOST_CATEGORY, NOTIFICATION_TYPE, DEFAULT_EXPIRY_DAYS, DEFAULT_REMINDER_DAYS, REQUIRED_DETAILS, REQUIRED_MESSAGE, QUOTATION_FORM_SUBJECT, INTAKE_FIELDS,
   expiryDays, reminderDays, autoClose, today, addDays, daysLeft, freshExpiry, reminderDate, isUrgent, relative, clientExpiryLine, orderExpiryLine,
-  hasRequiredDetails, createError, requested, partialBillingAddress, markNew, confirm, quotationFormEmailBody, extend, onReactivated, reactivatedMessage,
+  hasRequiredDetails, isPlaceholder, createError, requested, partialBillingAddress, markNew, confirm, quotationFormEmailBody, extend, onReactivated, reactivatedMessage,
   closeRefusal, orders, quotationOrder, reminderMessage, sendReminders, expiredReason, expireDue, matchingProspect, valuesFromIntake, intakeChanges,
   intakeUpdateRefusal, applyIntake, viewSettings,
 };
