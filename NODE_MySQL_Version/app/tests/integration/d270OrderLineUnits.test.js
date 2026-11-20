@@ -121,6 +121,31 @@ describe('D-270 to D-273 order lines in any unit, full duplicate, products summa
     expect(refusal).not.toContain('set the unit to CBM');
   });
 
+  // D-397 (20 Nov 2026): the price check tells "below the minimum price" (refused, the MD cannot approve
+  // it) apart from "below your lowest". The figure only for build-up viewers; the yes/no for everyone.
+  it('the line quote says whether the price is below the minimum', async () => {
+    const o = await order();
+    const s = await thick13();
+    const prod = await p();
+    const ctx = await orderLinePricing.context(o);
+    const sz = size('180.00', '80.00', '13.00');
+    const f = await orderLinePricing.liveFigures(prod, ctx, s, 130);
+    const perPieceMin = Number(f.minimum) * 0.1872;
+
+    const md = await orderLinePricing.lineQuote(prod, ctx, s, 'PCS', sz, (perPieceMin - 1).toFixed(2), true);
+    expect(md.ok).toBe(true);
+    expect(md.below_minimum).toBe(true);
+    expect(Math.abs(md.minimum - Math.round(perPieceMin * 100) / 100)).toBeLessThan(0.011);
+
+    const staff = await orderLinePricing.lineQuote(prod, ctx, s, 'PCS', sz, (perPieceMin - 1).toFixed(2), false);
+    expect(staff.below_minimum).toBe(true);
+    expect(staff.minimum).toBeUndefined();
+
+    const between = await orderLinePricing.lineQuote(prod, ctx, s, 'PCS', sz, (perPieceMin + 1).toFixed(2), false);
+    expect(between.below_minimum).toBe(false);
+    expect((await orderLinePricing.lineQuote(prod, ctx, s, 'PCS', sz)).below_minimum).toBeUndefined();
+  });
+
   it('a missing size is asked for, never too low', async () => {
     expect(await orderLinePricing.saveRefusal(await order(), product, 'goods', '1.00', true, await thick13(), 'PCS', null, size(null, '80.00', '13.00')))
       .toBe("Enter the length (cm) — needed to compare a price per piece with the product's price per CBM.");

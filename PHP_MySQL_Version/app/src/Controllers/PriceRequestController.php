@@ -177,6 +177,10 @@ final class PriceRequestController
             return;
         }
         $unit = trim((string) ($_GET['unit'] ?? ''));
-        echo json_encode(OrderLinePricing::lineQuote($product, $ctx, OrderLinePricing::selectionInput((string) ($_GET['spec'] ?? '')) ?? [], $unit !== '' ? mb_substr($unit, 0, 20) : null, $size));
+        $price = trim((string) ($_GET['unit_price'] ?? ''));
+        $u = \App\Services\AuthService::currentUser();
+        $seesBuildup = $u !== null && \App\Services\PermissionService::can((int) $u['id'], $u['role_id'] !== null ? (int) $u['role_id'] : null, 'view_price_buildup');
+        echo json_encode(OrderLinePricing::lineQuote($product, $ctx, OrderLinePricing::selectionInput((string) ($_GET['spec'] ?? '')) ?? [], $unit !== '' ? mb_substr($unit, 0, 20) : null, $size,
+            $price !== '' ? mb_substr($price, 0, 20) : null, $seesBuildup));
     }
 }

@@ -346,7 +346,7 @@ async function priceRequestFigures(line) {
 }
 
 /** D-255: the quote and floor for a product with chosen options, for the order form (never cost). */
-async function lineQuote(product, ctx, selection, unit = null, size = {}) {
+async function lineQuote(product, ctx, selection, unit = null, size = {}, unitPrice = null, seesBuildup = false) {
   // D-270 (point 25): a typed thickness chooses the Thickness option, as on save.
   const [synced, syncError] = await syncThickness(Number(product.id), selection, size.piece_thickness_cm ?? null);
   if (syncError !== null) return { ok: false, reason: syncError, field: 'piece_thickness_cm' };
@@ -366,6 +366,14 @@ async function lineQuote(product, ctx, selection, unit = null, size = {}) {
     out.quote = round2(f.quote * conv.factor);
     out.floor = round2(f.floor * conv.factor);
     out.unit = Math.abs(conv.factor - 1) > 1e-9 ? unit : f.unit;
+  }
+  // D-397 (20 Nov 2026): whether the typed price is below the minimum price (refused on save,
+  // the MD cannot approve it), so the note beside the price says so. The figure itself only
+  // for people who see the price build-up, as in the save refusal.
+  const minimum = Number(f.minimum) * Number(out.factor);
+  if (seesBuildup) out.minimum = round2(minimum);
+  if (unitPrice !== null && unitPrice !== '' && !Number.isNaN(Number(unitPrice))) {
+    out.below_minimum = Number(unitPrice) < minimum - 0.0001;
   }
   return out;
 }

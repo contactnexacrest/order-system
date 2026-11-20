@@ -827,7 +827,9 @@ see selling prices — fills the **quote price of whoever sells the order** (sta
 or the client's associate at their commission level). The price stays editable;
 below the seller's lowest price a red note appears beside it and the saved line
 goes to the MD for approval; below the product's minimum price the line is
-refused. **Every document (QT, PI, OC, CI …) prints the line's own price.** The
+refused and the note says so ("Below what NexaCrest can accept — raise it; the MD
+cannot approve this"; the MD and ED also see the minimum figure). To go below the
+minimum, the product's margin must be changed first (Products → pricing). **Every document (QT, PI, OC, CI …) prints the line's own price.** The
 whole flow — who sees what, the MD's approval, the PI waiting, the figures fixed
 at the first approved Quotation (D-342) — is in [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 

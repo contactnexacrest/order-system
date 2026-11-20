@@ -333,6 +333,11 @@
     if (base === 'unit_price') { el.dataset.auto = '0'; }
     if (base === 'piece_length_cm' || base === 'piece_width_cm' || base === 'piece_thickness_cm') { fillDimensions(scope); }
     if (base === 'quantity' || base === 'unit_price') { updateTotal(scope); }
+    // D-397: a typed price is checked against the minimum price as well (a short pause after typing).
+    if (base === 'unit_price') {
+      var pk = scope.querySelector('select.product-picker');
+      if (pk && pk.value) { clearTimeout(scope.minimumTimer); scope.minimumTimer = setTimeout(function () { refreshPrice(pk, false); }, 400); }
+    }
   });
   document.addEventListener('change', function (e) {
     var el = e.target;
@@ -359,6 +364,9 @@
     var q = 'product_id=' + encodeURIComponent(opt.value) + '&spec=' + encodeURIComponent(JSON.stringify(selection));
     if (unit && unit.value) { q += '&unit=' + encodeURIComponent(unit.value); }
     ['piece_length_cm', 'piece_width_cm', 'piece_thickness_cm'].forEach(function (n) { var f = field(scope, n); if (f && f.value.trim() !== '') { q += '&' + n + '=' + encodeURIComponent(f.value.trim()); } });
+    // D-397: the typed price too, so the answer says whether it is below the minimum price.
+    var sentPrice = price.value.trim();
+    if (sentPrice !== '') { q += '&unit_price=' + encodeURIComponent(sentPrice); }
     if (select.dataset.orderId) { q += '&order_id=' + encodeURIComponent(select.dataset.orderId); }
     else { var client = document.querySelector('select[name="client_id"]'); if (client && client.value) { q += '&client_id=' + encodeURIComponent(client.value); } }
     // D-364: only the newest answer counts — an older one arriving late (e.g. "Enter the width"
@@ -376,16 +384,25 @@
             price.dataset.auto = '1';
           }
           price.setAttribute('data-floor', Number(d.floor).toFixed(2));
+          // D-397: the minimum price (people who see the price build-up) and whether the sent price is below it.
+          if (d.minimum !== undefined) { price.setAttribute('data-minimum', Number(d.minimum).toFixed(2)); } else { price.removeAttribute('data-minimum'); }
+          if (d.below_minimum !== undefined) { price.setAttribute('data-below-minimum', d.below_minimum ? '1' : '0'); price.setAttribute('data-below-minimum-at', sentPrice); }
+          else { price.removeAttribute('data-below-minimum'); price.removeAttribute('data-below-minimum-at'); }
           var text = 'Quote USD ' + money(d.quote) + ' · your lowest ' + money(d.floor) + per + (d.spec_text ? ' (' + d.spec_text + ')' : '');
           if (d.factor && Math.abs(d.factor - 1) > 1e-9) {
             text += ' — product reference per ' + d.ref_unit + ': quote ' + money(d.ref_quote) + ' · lowest ' + money(d.ref_floor) + '; 1 ' + d.unit + ' = ' + (Math.round(d.factor * 10000) / 10000) + ' ' + d.ref_unit + '.';
           } else { text += '.'; }
           var pv = Number(price.value);
-          var badge = price.value.trim() === '' ? '' : (pv >= Number(d.floor) - 0.004 ? ' ✓ OK — above your lowest' : ' ✗ Below your lowest price');
+          var underMin = d.below_minimum === true && sentPrice === price.value.trim();
+          var badge = price.value.trim() === '' ? '' : (pv >= Number(d.floor) - 0.004 ? ' ✓ OK — above your lowest'
+            : (underMin ? ' ✗ Below what NexaCrest can accept — the MD cannot approve it' : ' ✗ Below your lowest price'));
           if (hint) { hint.textContent = text; }
           if (refBox) { refBox.textContent = text + badge; }
         } else {
           price.removeAttribute('data-floor');
+          price.removeAttribute('data-minimum');
+          price.removeAttribute('data-below-minimum');
+          price.removeAttribute('data-below-minimum-at');
           var msg = d.reason + (d.field ? '' : ' The line will need the MD\'s approval.');
           if (hint) { hint.textContent = msg; }
           if (refBox) { refBox.textContent = msg; }

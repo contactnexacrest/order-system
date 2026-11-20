@@ -2180,7 +2180,20 @@
       note.setAttribute('aria-live', 'polite');
       el.insertAdjacentElement('afterend', note);
     }
-    note.textContent = (el.dataset.floorMessage || 'Below your lowest price') + ' (' + floor.toFixed(2) + ') — saving sends this line to the MD for approval; the Proforma Invoice waits for it.';
+    // D-397 (20 Nov 2026): below the minimum price the line is refused on save and the MD cannot
+    // approve it (D-245) — say so instead of promising an approval. The figure only where the page
+    // was given it (people who see the price build-up); otherwise the server's answer for this price.
+    var minimum = parseFloat(el.dataset.minimum);
+    var hasMinimum = el.dataset.minimum !== undefined && el.dataset.minimum !== '' && !isNaN(minimum);
+    var underMinimum = hasMinimum ? value < minimum - 0.0001
+      : (el.dataset.belowMinimum === '1' && el.dataset.belowMinimumAt === el.value.trim());
+    if (underMinimum) {
+      note.textContent = hasMinimum
+        ? 'Below the minimum price NexaCrest can accept (' + groupNum(minimum, 2) + ') — the MD cannot approve this. Raise it, or change the product\'s margin.'
+        : 'Below what NexaCrest can accept — raise it; the MD cannot approve this.';
+    } else {
+      note.textContent = (el.dataset.floorMessage || 'Below your lowest price') + ' (' + floor.toFixed(2) + ') — saving sends this line to the MD for approval; the Proforma Invoice waits for it.';
+    }
     el.classList.add('below-floor');
   }
 

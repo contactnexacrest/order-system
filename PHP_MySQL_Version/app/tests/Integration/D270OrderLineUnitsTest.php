@@ -149,6 +149,35 @@ final class D270OrderLineUnitsTest extends DbTestCase
         self::assertStringNotContainsString('set the unit to CBM', $refusal);
     }
 
+    /**
+     * D-397 (20 Nov 2026): the order form's price check tells "below the minimum price" (refused, the MD
+     * cannot approve it) apart from "below your lowest" (goes to the MD). The figure only for people
+     * who see the price build-up; the yes/no answer for everyone, for the price the browser sent.
+     */
+    public function testTheLineQuoteSaysWhetherThePriceIsBelowTheMinimum(): void
+    {
+        $order = $this->order();
+        $sel = $this->thick13();
+        $product = ProductRepository::find($this->product);
+        $ctx = OrderLinePricing::context($order);
+        $size = $this->lineSize('180.00', '80.00', '13.00');
+        $f = OrderLinePricing::liveFigures($product, $ctx, $sel, 130.0);
+        $perPieceMin = (float) $f['minimum'] * 0.1872;
+
+        $md = OrderLinePricing::lineQuote($product, $ctx, $sel, 'PCS', $size, number_format($perPieceMin - 1, 2, '.', ''), true);
+        self::assertTrue($md['ok']);
+        self::assertTrue($md['below_minimum']);
+        self::assertEqualsWithDelta(round($perPieceMin, 2), $md['minimum'], 0.011, 'the minimum per piece for the build-up viewer');
+
+        $staff = OrderLinePricing::lineQuote($product, $ctx, $sel, 'PCS', $size, number_format($perPieceMin - 1, 2, '.', ''), false);
+        self::assertTrue($staff['below_minimum']);
+        self::assertArrayNotHasKey('minimum', $staff, 'no minimum figure without the price build-up');
+
+        $between = OrderLinePricing::lineQuote($product, $ctx, $sel, 'PCS', $size, number_format($perPieceMin + 1, 2, '.', ''), false);
+        self::assertFalse($between['below_minimum'], 'above the minimum: the MD may approve it');
+        self::assertArrayNotHasKey('below_minimum', OrderLinePricing::lineQuote($product, $ctx, $sel, 'PCS', $size), 'no price sent, no answer');
+    }
+
     public function testAMissingSizeIsAskedForNeverTooLow(): void
     {
         $refusal = (string) OrderLinePricing::saveRefusal($this->order(), $this->product, 'goods', '1.00', true, $this->thick13(), 'PCS', null, $this->lineSize(null, '80.00', '13.00'));

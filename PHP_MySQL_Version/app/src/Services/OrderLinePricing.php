@@ -465,7 +465,8 @@ final class OrderLinePricing
      *
      * @return array<string,mixed>
      */
-    public static function lineQuote(array $product, array $ctx, ?array $selection, ?string $unit = null, array $size = []): array
+    public static function lineQuote(array $product, array $ctx, ?array $selection, ?string $unit = null, array $size = [],
+        ?string $unitPrice = null, bool $seesBuildup = false): array
     {
         // D-270 (point 25): a typed thickness chooses the Thickness option, as on save.
         [$synced, $syncError] = self::syncThickness((int) $product['id'], $selection, $size['piece_thickness_cm'] ?? null);
@@ -490,6 +491,16 @@ final class OrderLinePricing
             $out['quote'] = round($f['quote'] * $conv['factor'], 2);
             $out['floor'] = round($f['floor'] * $conv['factor'], 2);
             $out['unit'] = abs($conv['factor'] - 1.0) > 1e-9 ? $unit : $f['unit'];
+        }
+        // D-397 (20 Nov 2026): whether the typed price is below the minimum price (refused on save,
+        // the MD cannot approve it), so the note beside the price says so. The figure itself only
+        // for people who see the price build-up, as in the save refusal.
+        $minimum = (float) $f['minimum'] * (float) $out['factor'];
+        if ($seesBuildup) {
+            $out['minimum'] = round($minimum, 2);
+        }
+        if ($unitPrice !== null && is_numeric($unitPrice)) {
+            $out['below_minimum'] = (float) $unitPrice < $minimum - 0.0001;
         }
         return $out;
     }

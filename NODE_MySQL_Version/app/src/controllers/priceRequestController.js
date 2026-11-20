@@ -134,7 +134,10 @@ async function lineQuote(req, res) {
     return;
   }
   const unit = String(req.query.unit || '').trim().slice(0, 20);
-  res.json(await orderLinePricing.lineQuote(product, ctx, orderLinePricing.selectionInput(String(req.query.spec || '')) || {}, unit !== '' ? unit : null, size));
+  const price = String(req.query.unit_price || '').trim().slice(0, 20);
+  const seesBuildup = !!(req.permissions && req.permissions.view_price_buildup);
+  res.json(await orderLinePricing.lineQuote(product, ctx, orderLinePricing.selectionInput(String(req.query.spec || '')) || {}, unit !== '' ? unit : null, size,
+    price !== '' ? price : null, seesBuildup));
 }
 
 module.exports = { index, price, access, saveAccess, lineQuote };
