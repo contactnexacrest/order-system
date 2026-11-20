@@ -96,6 +96,13 @@ rendered pages, not a direct controller/HTTP call.
   fix batches (D-258): a payment with a different amount can be saved again
   (UI-1), bank-reference patterns work, the switch BL number appears once its
   box is ticked, India is refused as an import country.
+- `16-quick-quote-prospects.spec.js` — quick-quote prospects (D-394): + New Client
+  with "Quick quote" ticked (the browser stops requiring the billing address and
+  starts requiring the e-mail and country), the prospect page, Clients › Prospects,
+  Keep for 60 more days, Deactivated Clients › Reactivate (fresh 60 days), a
+  Quotation request from the same e-mail › Update this prospect, and the
+  settings' browser range check. The daily job is covered by
+  `ProspectD394Test` / `prospectD394.test.js`.
 - `qa-order-cost-forms.spec.js` — the order page's "+ Add a cost" shows only
   the chosen form, and the Travel form is checked in the browser.
 - `qa-roles-permissions-matrix.spec.js` — every role and every single
