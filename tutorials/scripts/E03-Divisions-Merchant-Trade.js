@@ -63,22 +63,19 @@ module.exports = {
     demo.demoStaff('accounts');
     mtt = Number(demo.sql("SELECT id FROM divisions WHERE code = 'MTT'"));
     const pw = demo.STAFF.md.password;
-    // The Merchant Trade Executive: works in Merchant Trade, sees and manages both sides of a deal
-    // (selling side from the role, purchasing added for this person), records payments.
+    // The Merchant Trade Executive (role D-399): works in Merchant Trade, sees and manages both sides of a
+    // deal, records payments.
     demo.php(`
       $pdo = App\\Config\\Database::connection();
-      $role = (int) $pdo->query("SELECT id FROM roles WHERE name = 'Sales/Export Manager'")->fetchColumn();
+      $role = (int) $pdo->query("SELECT id FROM roles WHERE name = 'Merchant Trade Executive'")->fetchColumn();
       $pdo->prepare("DELETE FROM users WHERE email = ?")->execute([${JSON.stringify(DESK_EMAIL)}]);
       $pdo->prepare('INSERT INTO users (name, email, password_hash, role_id, is_active, force_password_change, two_fa_enabled, is_super_admin, division_id) VALUES (?, ?, ?, ?, 1, 0, 0, 0, ?)')
         ->execute(['Merchant Trade Executive', ${JSON.stringify(DESK_EMAIL)}, password_hash(${JSON.stringify(pw)}, PASSWORD_BCRYPT), $role, ${mtt}]);
       $uid = (int) $pdo->lastInsertId();
       $md = (int) $pdo->query("SELECT id FROM users WHERE email = 'md@email.com'")->fetchColumn();
-      foreach (['manage_purchasing', 'view_purchase_prices'] as $k)
-        $pdo->prepare('INSERT INTO user_permissions (user_id, permission_id, is_enabled, granted_by, reason) SELECT ?, id, 1, ?, ? FROM permissions WHERE permission_key = ?')
-          ->execute([$uid, $md, 'Merchant Trade desk (tutorial demo)', $k]);
       // Settings › Divisions › Merchant Trade: its departments, the number format and the AD bank's approval (the RBI limits are seeded).
       App\\Repositories\\DivisionRepository::createStarterDepartments(${mtt});
-      App\\Repositories\\DivisionRepository::setSetting(${mtt}, 'company', 'order_ref_format', 'NC/MTT/{YY}/{DDMM}{NNN}', $md);
+      App\\Repositories\\DivisionRepository::setSetting(${mtt}, 'company', 'order_ref_format', 'NC/{DIV}/{YY}/{DDMM}{NNN}', $md);
       App\\Repositories\\DivisionRepository::setSetting(${mtt}, 'company', 'mtt_ad_bank_approval', 'TEST AD Bank - merchanting trade approval letter TEST/MT/2026/001', $md);
       $missing = array_filter(App\\Repositories\\DivisionRepository::preflight(${mtt}), static fn ($i) => !$i['ok']);
       echo $missing ? 'missing: ' . implode('; ', array_column($missing, 'label')) : 'ok';`);
