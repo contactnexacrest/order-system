@@ -180,7 +180,7 @@ final class QuantityLimitsItem10aTest extends DbTestCase
         }
         // Settings page: the levels' inputs carry min 1 / max 1,000,000.
         $settings = $this->render(fn () => (new \App\Controllers\SettingsController())->index([]));
-        self::assertMatchesRegularExpression('/min="1" max="1000000" step="1"\s+name="settings\[quantity_warning_level_sqm\]"/', $settings);
+        self::assertMatchesRegularExpression('/min="1" max="1000000" step="1" required\s+name="settings\[quantity_warning_level_sqm\]"/', $settings);
         self::assertStringContainsString('<input type="hidden" name="product_confirm_large_quantity[]" value="0">', $create);
         self::assertStringContainsString('<input type="checkbox" data-confirm-tick="product_confirm_large_quantity[]" >', $create);
         // app.js (both stacks): one generic rule in fieldError(), the same file on PHP and Node.

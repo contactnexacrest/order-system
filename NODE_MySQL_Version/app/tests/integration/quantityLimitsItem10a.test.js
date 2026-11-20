@@ -105,7 +105,7 @@ describe('Order line quantity limits (owner decision item 10a)', () => {
     }
     // Settings page: the levels' inputs carry min 1 / max 1,000,000.
     const page = (await agent.get('/settings')).text;
-    expect(page).toMatch(/min="1" max="1000000" step="1"\s+name="settings\[quantity_warning_level_sqm\]"/);
+    expect(page).toMatch(/min="1" max="1000000" step="1" required\s+name="settings\[quantity_warning_level_sqm\]"/);
   });
 
   it('item 10a: add and edit line need the tick and are audited', async () => {

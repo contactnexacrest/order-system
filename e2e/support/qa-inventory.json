@@ -17402,6 +17402,160 @@
   },
   {
    "method": "POST",
+   "path": "/clients/{id}/prospect-keep",
+   "controller": "ClientController",
+   "action": "keepProspect",
+   "requires_all": [
+    "manage_orders"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 651,
+   "node_line": 1147,
+   "node_handler": "clientsController.keepProspect",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProspectD394Test.php"
+    ],
+    "node": [
+     "prospectD394.test.js"
+    ],
+    "e2e": [
+     "16-quick-quote-prospects.spec.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/clients/{id}/send-quotation-form",
+   "controller": "ClientController",
+   "action": "sendQuotationForm",
+   "requires_all": [
+    "manage_orders"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 652,
+   "node_line": 1148,
+   "node_handler": "clientsController.sendQuotationForm",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProspectD394Test.php"
+    ],
+    "node": [
+     "prospectD394.test.js"
+    ],
+    "e2e": [
+     "16-quick-quote-prospects.spec.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/client-intake/{id}/update-prospect",
+   "controller": "ClientIntakeReviewController",
+   "action": "updateProspectForm",
+   "requires_all": [
+    "manage_orders"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session"
+   ],
+   "php_line": 670,
+   "node_line": 1166,
+   "node_handler": "clientIntakeReviewController.updateProspectForm",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProspectD394Test.php"
+    ],
+    "node": [
+     "prospectD394.test.js"
+    ],
+    "e2e": [
+     "16-quick-quote-prospects.spec.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/client-intake/{id}/update-prospect",
+   "controller": "ClientIntakeReviewController",
+   "action": "updateProspect",
+   "requires_all": [
+    "manage_orders"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 671,
+   "node_line": 1167,
+   "node_handler": "clientIntakeReviewController.updateProspect",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "ProspectD394Test.php"
+    ],
+    "node": [
+     "prospectD394.test.js"
+    ],
+    "e2e": [
+     "16-quick-quote-prospects.spec.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
    "path": "/clients/{id}/additional-documents",
    "controller": "ClientController",
    "action": "uploadAdditionalDocument",
