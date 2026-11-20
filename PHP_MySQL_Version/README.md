@@ -111,7 +111,7 @@ correctly once the password is changed.
 > **Installing on Bluehost (cPanel)?** Follow `docs/guides/DEPLOYMENT_GUIDE_BLUEHOST.md` from top to bottom. It is the click-by-click
 > version of everything below, written from the live installation of 13–14 Nov 2026: folder layout, cPanel Git, subdomain and SSL,
 > databases (including the restore-test database), phpMyAdmin import, `app/.env` line by line, the web lock and its tests, the server
-> clock and the ten cron jobs, the backup folders, key and first test run, the final check, the routine checks, updating a live site
+> clock and the eleven cron jobs, the backup folders, key and first test run, the final check, the routine checks, updating a live site
 > (Git pull + `docs/checks/check_all_migrations.sql`) and troubleshooting.
 >
 > **Go-live day:** work through `docs/guides/GO_LIVE_CHECKLIST.md`. It is the business view of these steps, with the settings, people, prices and dry run, in order.
@@ -665,11 +665,12 @@ Plus the three backup lines (database 02:00, documents 02:30, monthly test-resto
   when the server is on MDT — every job then runs one hour earlier in India time).
 - Create `<home>/logs` (outside `public_html`) before adding the jobs, and set the **Cron Email** at the top of
   the page so failures reach an admin.
-- The ten jobs, typed in **server (MST)** hours — Minute / Hour / Day / Month / Weekday (India time):
+- The eleven jobs, typed in **server (MST)** hours — Minute / Hour / Day / Month / Weekday (India time):
   e-mails `0 * * * *` (every hour); OC auto-confirm `30 20 * * *` (09:00); Zoho sync `30 10 * * *` (23:00);
   alerts `30 17 * * *` (06:00); exchange rate `35 18 * * *` (07:05); digest `45 19 * * *` (08:15);
   document clean-up `45 13 * * *` (02:15); database backup `30 13 * * *` (02:00); documents backup
-  `0 14 * * *` (02:30); test-restore `30 15 1 * *` (04:00 on the 2nd — **Day must be 1**, not `*`).
+  `0 14 * * *` (02:30); test-restore `30 15 1 * *` (04:00 on the 2nd — **Day must be 1**, not `*`);
+  quick-quote prospects `10 18 * * *` (06:40).
 - Those frequencies are the owner's choice for the live site: e-mails hourly, OC auto-confirm and Zoho once a
   day (staff press **Sync now** / **Sync this order** when something is urgent). The lines above, with
   e-mails every 10 minutes, auto-confirm every 15 minutes and Zoho hourly, are the general recommendation;

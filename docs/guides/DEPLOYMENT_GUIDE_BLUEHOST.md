@@ -292,7 +292,7 @@ form has no place for it, so on Bluehost type the server's own hours as below.
 
 ---
 
-## 10. The ten cron jobs
+## 10. The eleven cron jobs
 
 cPanel › **Advanced › Cron Jobs** › **Add New Cron Job**, once per row. Type the five boxes
 exactly; paste the command into **Command** with your real `<app>` and `<home>`.
@@ -309,6 +309,7 @@ exactly; paste the command into **Command** with your real `<app>` and `<home>`.
 | 8 | Database backup | `30` | `13` | `*` | `*` | `*` | 02:00 daily |
 | 9 | Documents backup | `0` | `14` | `*` | `*` | `*` | 02:30 daily |
 | 10 | Backup test-restore | `30` | `15` | `1` | `*` | `*` | 04:00 on the 2nd of each month |
+| 11 | Quick-quote prospects (D-394) | `10` | `18` | `*` | `*` | `*` | 06:40 daily |
 
 Row 10's **Day must be `1`** (not `*`), or the test-restore runs every day.
 
@@ -328,6 +329,7 @@ row 10: Minute `0`, Hour `4`, Day `2`).
 8  <app>/scripts/backup_db.sh >> <home>/logs/backup_db.log 2>&1
 9  <app>/scripts/backup_storage.sh >> <home>/logs/backup_storage.log 2>&1
 10 <app>/scripts/backup_test_restore.sh >> <home>/logs/backup_test_restore.log 2>&1
+11 php <app>/app/cron/prospect_expiry.php >> <home>/logs/prospect_expiry.log 2>&1
 ```
 
 (Do not type the row number at the front of the command.)
@@ -336,7 +338,7 @@ Notes:
 
 - Add rows **8–10 only after section 11** (the backup set-up). Until then they fail.
 - If a log or the cron e-mail says `php: command not found` (or shows an old PHP version), replace
-  `php` with `/usr/local/bin/php` in rows 1–7.
+  `php` with `/usr/local/bin/php` in rows 1–7 and 11.
 - **How often** — the owner's choice for the live site (13 Nov 2026): e-mails **hourly** (an
   approved e-mail may wait up to an hour; login codes are sent at once, not by this job),
   OC auto-confirm **daily** (a buyer's 48-hour deadline is acted on at the next 09:00 run),
@@ -470,7 +472,7 @@ and every backup made with it, and run 11.5 again.
 - [ ] `<site>/login` shows the sign-in page over **https**; the MD logged in with the e-mailed code.
 - [ ] Every address in sections 7.5 and 11.6 gives the expected answer.
 - [ ] `check_all_migrations.sql` shows every row **already done** (or "nothing to run").
-- [ ] Ten cron jobs are listed, with row 10 Day = `1`; the one-time jobs (server time, key, test
+- [ ] Eleven cron jobs are listed, with row 10 Day = `1`; the one-time jobs (server time, key, test
       runs) are deleted; the Cron Email is set.
 - [ ] `<backupfolder>/db/` holds an encrypted backup with its `.sha256`; Settings › Backups shows
       database, documents and test-restore **OK**.

@@ -47,8 +47,8 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
   - [ ] `ZOHO_EINVOICE_ENABLED=false`.
 - [ ] **PHP only:** the folder `storage/sessions/` exists and the web server can write to it (D-283). Without it staff are signed out after about 24 minutes.
 - [ ] Point the web root at `public_html/` (PHP), or start the Node service.
-- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"), in Indian time: deferred e-mails, OC auto-confirm, alerts at 06:00, Zoho sync, digest at 08:15, document clean-up at 02:15, **exchange rate at 07:05** (`app/cron/fetch_fx_rate.php` / `src/jobs/fetchFxRate.js`, D-301), backups.
-  - [ ] **Bluehost:** cPanel has no `CRON_TZ`: first find the server's clock with a one-time `date > <home>/servertime.txt` job (usually **MST**, India = MST + 12 h 30 min), then type the server hours from the deployment guide, section 10 (ten jobs; the test-restore row has **Day = 1**). Delete the one-time job;
+- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"), in Indian time: deferred e-mails, OC auto-confirm, alerts at 06:00, Zoho sync, digest at 08:15, document clean-up at 02:15, **exchange rate at 07:05** (`app/cron/fetch_fx_rate.php` / `src/jobs/fetchFxRate.js`, D-301), **quick-quote prospects at 06:40** (`app/cron/prospect_expiry.php` / `src/jobs/prospectExpiry.js`, D-394), backups.
+  - [ ] **Bluehost:** cPanel has no `CRON_TZ`: first find the server's clock with a one-time `date > <home>/servertime.txt` job (usually **MST**, India = MST + 12 h 30 min), then type the server hours from the deployment guide, section 10 (eleven jobs; the test-restore row has **Day = 1**). Delete the one-time job;
   - [ ] create `<home>/logs` before adding the jobs; set the **Cron Email** to an admin address;
   - [ ] if a log says `php: command not found`, use `/usr/local/bin/php`.
 - [ ] Set up the **backups** (README, "Backups"; SOP 32; owner decisions D-260):
