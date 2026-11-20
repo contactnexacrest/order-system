@@ -415,6 +415,19 @@ are new, not changed, on camera.
 | B01 Part 1, D01, C03 / C05 (Orders › Quotation requests) | Not affected: a request shows "Matches prospect" and "Update this prospect" only when its e-mail is a prospect's; the demo requests are not, so the screen is unchanged. | No change needed |
 | Documents (all videos) | Not affected: no document (PDF / Word) change. | No change needed |
 
+## Also out of date after the 20 Nov 2026 build — D-395 CA / Accounting home (noted only; owner to decide)
+
+No video or script was changed and nothing was recorded (CLAUDE.md video rule: ask the owner first). Four videos
+open `/ca`; each still plays and its narration is still true, but the picture shows the old page (a list of links)
+instead of the new one (Needs attention boxes, four cards, register summary and filters). English and Hindi alike.
+
+| Video | What it shows of `/ca` | Decision |
+|---|---|---|
+| A01 Part 2 (MD tour, "CA / Accounting") | The page heading only, for one sentence; the old link list is visible. | Owner to decide |
+| B03 Accounts Executive | The INR Settlement Register (now under the boxes and cards, with a summary row and filters). | Owner to decide |
+| B04 Finance Manager and Director | The page while expenses, bank, benefits, Zoho sync and year lock are named (now cards and boxes). | Owner to decide |
+| B11 CA, Auditor and Investor | The CA's view of the page, naming its sections (now cards; the CA sees no Zoho box or card, as before). | Owner to decide |
+
 ## Resume notes (for a new session)
 
 1. Read `tutorials/README.md`.

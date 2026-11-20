@@ -3294,6 +3294,19 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
   from the order pipeline: INR actuals, forex, FIRC/eBRC, Zoho sync,
   expenses, bank reconciliation, FY lock, export benefits, GST refunds, and
   the internal CA Financial Annexure (CAFIN) per order.
+- **CA / Accounting home (`/ca`, D-395, 20 Nov 2026, mockup Option B).** Top:
+  **Needs attention** boxes (`CaOverviewService::attention` /
+  `caOverviewService.attention`) — FIRC / eBRC pending (register rows with
+  `firc_pending`), bank lines not matched (`ca_bank_statement_lines` with no
+  matched order or expense; CA reports level All), not yet in Zoho (rows with
+  INR actual and no `zoho_synced_at`; `ca_module_manage`), TDS on this
+  month's expenses with its deposit date (7th of the next month, 30 April for
+  March; level All), benefit claims waiting (no `received_amount`, scoped as
+  on Export Benefits). Each box only for someone who may open its page; a
+  box with 0 is green. Then four cards (Revenue & benefits, Expenses & TDS,
+  Bank & reconciliation, Zoho Books & year lock for `ca_module_manage`), then
+  the register with a summary row (`registerSummary`) and filters
+  `?show=all|firc|zoho|estimated` (`filterRegister`). Read only.
 - **Screens.** CA / Accounting (`/ca`): INR Settlement Register, revenue
   reports (FY / calendar year), expenses, bank statement import and
   matching, FY lock, export benefits, GST refunds; CA › Zoho Books Sync

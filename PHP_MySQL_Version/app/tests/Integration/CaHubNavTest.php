@@ -30,9 +30,9 @@ final class CaHubNavTest extends DbTestCase
         $controller->index([]);
         $html = ob_get_clean();
 
-        self::assertStringContainsString('Revenue &amp; Benefits', $html);
+        self::assertStringContainsString('Revenue &amp; benefits', $html);
         self::assertStringContainsString('Expenses &amp; TDS', $html);
-        self::assertStringContainsString('Bank &amp; Reconciliation', $html);
+        self::assertStringContainsString('Bank &amp; reconciliation', $html);
         self::assertStringContainsString('href="/ca/reports"', $html);
         self::assertStringContainsString('href="/ca/export-benefits"', $html);
         self::assertStringContainsString('href="/ca/expenses"', $html);
@@ -52,7 +52,7 @@ final class CaHubNavTest extends DbTestCase
         $controller->index([]);
         $html = ob_get_clean();
 
-        self::assertStringContainsString('Zoho Books &amp; Financial Year Lock', $html);
+        self::assertStringContainsString('Zoho Books &amp; year lock', $html);
         self::assertStringContainsString('href="/ca/zoho-sync"', $html);
         self::assertStringContainsString('href="/ca/fy-locks"', $html);
     }
@@ -69,11 +69,11 @@ final class CaHubNavTest extends DbTestCase
         $controller->index([]);
         $html = ob_get_clean();
 
-        self::assertStringNotContainsString('Zoho Books &amp; Financial Year Lock', $html);
+        self::assertStringNotContainsString('Zoho Books &amp; year lock', $html);
         self::assertStringNotContainsString('href="/ca/zoho-sync"', $html);
         self::assertStringNotContainsString('href="/ca/fy-locks"', $html);
         // The rest of the hub must still render normally for this user.
-        self::assertStringContainsString('Revenue &amp; Benefits', $html);
+        self::assertStringContainsString('Revenue &amp; benefits', $html);
     }
 
     protected function tearDown(): void

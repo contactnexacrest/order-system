@@ -230,11 +230,33 @@ audit log.
 ## The CA / Accounting hub page
 
 **Finance & accounts › CA / Accounting** in the left menu (visible only with `ca_module_view`)
-opens `/ca` — a hub of card sections, each with a one-line description and
-a button to the screen it leads to, grouped by what they're for:
-**Revenue & Benefits** (FY/calendar-year reports, Government Export
-Benefits), **Expenses & TDS**, **Bank & Reconciliation**, and — only for
-someone holding `ca_module_manage` — **Zoho Books & Financial Year Lock**.
+opens `/ca`. Since 20 Nov 2026 (owner decision D-395) the page reads top to
+bottom as "what needs doing", "where to go", "the register":
+
+1. **Needs attention** — a row of coloured boxes, each with a number and a
+   button to the page where you deal with it. Red or amber means something
+   is waiting; green means nothing is.
+   - **FIRC / eBRC pending** — cleared legs whose proof is overdue
+     (**Show** filters the register below to them).
+   - **Bank lines not matched** — bank statement lines matched to neither a
+     receipt nor an expense (**Reconcile**).
+   - **Not yet in Zoho** — legs whose rupees are recorded but not yet in Zoho
+     Books (**Sync**).
+   - **TDS on this month's expenses — deposit by …** — the TDS on this
+     month's TDS-applicable expenses and the date it must be deposited (the
+     7th of the next month; 30 April for March) (**Summary**).
+   - **Benefit claims waiting for money** — export-benefit claims not yet
+     received (**Claims**).
+
+   A box appears only for someone who may open the page its button leads
+   to: the bank and TDS boxes need the CA reports level **All**, the Zoho box
+   needs `ca_module_manage`. The figures only count; nothing on this page
+   changes a record.
+2. **Four cards** — **Revenue & benefits** (revenue reports, export benefits,
+   GST refunds (LUT), and the CAFIN export for management), **Expenses &
+   TDS**, **Bank & reconciliation**, and — only for someone holding
+   `ca_module_manage` — **Zoho Books & year lock**. The main action of each
+   card is the filled button.
 A view-only CA-role user (who holds `ca_module_view` but not
 `ca_module_manage`) never sees that last card at all, so they're never
 offered a link to a screen they don't have access to. This follows the
@@ -245,7 +267,12 @@ one undifferentiated block of text.
 
 ## The INR Settlement Register
 
-Below those cards, on the same hub page, sits a single table listing every
+Below those cards, on the same hub page, sits a summary row — legs cleared,
+INR credited, net forex gain or loss, FIRC / eBRC pending, not yet in Zoho
+— and four quick filters: **All**, **FIRC pending**, **Not in Zoho** and
+**Estimated only** (legs with no rupees credited yet, shown at the recorded
+rate). The summary and the filters cover the legs your CA reports level
+shows. Then comes a single table listing every
 advance/balance/freight leg that has been marked cleared anywhere in the
 order pipeline, one row per leg, with:
 

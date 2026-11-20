@@ -137,16 +137,31 @@ async function cafinExport(req, res) {
 }
 
 async function index(req, res) {
+  const caOverviewService = require('../services/caOverviewService');
+  const reportAccess = require('../services/reportAccess');
+  // D-379: the settlement register limited to the orders the person's CA reports level shows.
+  const settlements = await caRepository.settlementRegister('ca_reports');
+  // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
+  // stricter ca_module_manage, not the plain ca_module_view every other
+  // link here needs — hiding their cards for a view-only CA user avoids
+  // offering a link that 403s.
+  const canManageCa = !!(req.permissions && req.permissions.ca_module_manage);
+  // D-395 (20 Nov 2026): "Needs attention" boxes, register summary and quick filters.
+  const summary = caOverviewService.registerSummary(settlements);
+  const show = caOverviewService.normaliseFilter(typeof (req.query || {}).show === 'string' ? req.query.show : null);
   res.renderView('ca/index', {
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
-    // D-379: the settlement register limited to the orders the person's CA reports level shows.
-    settlements: await caRepository.settlementRegister('ca_reports'),
+    settlements: caOverviewService.filterRegister(settlements, show),
+    summary,
+    show,
+    attention: await caOverviewService.attention(
+      summary,
+      canManageCa,
+      await reportAccess.can('ca_reports', reportAccess.ALL),
+      require('../helpers/dbDateTime').todayIst()
+    ),
     usersById: await usersById(),
-    // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
-    // stricter ca_module_manage, not the plain ca_module_view every other
-    // link here needs — hiding their cards for a view-only CA user avoids
-    // offering a link that 403s.
-    canManageCa: !!(req.permissions && req.permissions.ca_module_manage),
+    canManageCa,
   }, 'layout/base');
 }
 

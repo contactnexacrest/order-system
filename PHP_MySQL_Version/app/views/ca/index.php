@@ -15,55 +15,83 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
 ?>
 <div class="card page-wide">
   <h1>CA / Accounting</h1>
-  <p class="muted">Independent of the order-pipeline system — nothing here affects order stages, and nothing in the order reports feeds this.</p>
+  <p class="muted">The accounting side of the business — separate from order stages. Nothing here moves an order forward, and nothing in the order reports feeds this.</p>
 
-  <div class="section">
-    <h2>Revenue &amp; Benefits</h2>
-    <p class="muted">FY/calendar-year revenue, and the government export-benefit claims (RODTEP etc.) linked to individual orders.</p>
-    <div class="btn-row">
-      <a class="btn-sm" href="/ca/reports">Open Revenue Reports</a>
-      <a class="btn-sm" href="/ca/export-benefits">Open Export Benefits</a>
-      <a class="btn-sm" href="/ca/gst-refunds">Open GST refunds (LUT)</a>
-      <?php $__cu = \App\Services\AuthService::currentUser(); if ($__cu && \App\Services\PermissionService::can((int) $__cu['id'], $__cu['role_id'] !== null ? (int) $__cu['role_id'] : null, 'view_cafin')): ?>
-        <a class="btn-sm" href="/ca/cafin-export">CAFIN export (CSV, all orders)</a>
-      <?php endif; ?>
+  <?php // D-395 (20 Nov 2026, Option B): what needs doing first. Each box shows only to a person who may open the page it leads to. ?>
+  <div class="ca-attention" data-ca-attention>
+    <h2>Needs attention</h2>
+    <div class="ca-attention-grid">
+      <?php foreach ($attention as $box): ?>
+      <div class="ca-att tone-<?= htmlspecialchars($box['tone']) ?>" data-ca-box="<?= htmlspecialchars($box['key']) ?>">
+        <span class="ca-att-value"><?= htmlspecialchars($box['value']) ?></span>
+        <span class="ca-att-label"><?= htmlspecialchars($box['label']) ?></span>
+        <a class="btn-sm btn-secondary" href="<?= htmlspecialchars($box['href']) ?>"><?= htmlspecialchars($box['button']) ?> &rsaquo;</a>
+      </div>
+      <?php endforeach; ?>
     </div>
   </div>
 
-  <div class="section">
-    <h2>Expenses &amp; TDS</h2>
-    <p class="muted">Every recorded expense (ECGC, inspection, CHA, transport, ...), its TDS treatment, and a payable summary across all of them.</p>
-    <div class="btn-row">
-      <a class="btn-sm" href="/ca/expenses">Open Expenses</a>
-      <a class="btn-sm" href="/ca/tds-summary">Open TDS Payable Summary</a>
+  <div class="ca-cards">
+    <div class="ca-card">
+      <div class="ca-card-head"><span class="ca-ico" aria-hidden="true">&#8599;</span><h2>Revenue &amp; benefits</h2></div>
+      <p class="muted small">Revenue by financial or calendar year, and the export-benefit claims (RoDTEP etc.) per order.</p>
+      <div class="btn-row">
+        <a class="btn btn-sm" href="/ca/reports">Revenue reports</a>
+        <a class="btn-sm btn-secondary" href="/ca/export-benefits">Export benefits</a>
+        <a class="btn-sm btn-secondary" href="/ca/gst-refunds">GST refunds (LUT)</a>
+        <?php $__cu = \App\Services\AuthService::currentUser(); if ($__cu && \App\Services\PermissionService::can((int) $__cu['id'], $__cu['role_id'] !== null ? (int) $__cu['role_id'] : null, 'view_cafin')): ?>
+          <a class="btn-sm btn-secondary" href="/ca/cafin-export">CAFIN export (CSV, all orders) <span class="badge badge-internal">management</span></a>
+        <?php endif; ?>
+      </div>
     </div>
+
+    <div class="ca-card">
+      <div class="ca-card-head"><span class="ca-ico" aria-hidden="true">%</span><h2>Expenses &amp; TDS</h2></div>
+      <p class="muted small">Every recorded expense (ECGC, inspection, CHA, transport …) with its TDS, and the TDS payable by month.</p>
+      <div class="btn-row">
+        <a class="btn btn-sm" href="/ca/expenses">Expenses</a>
+        <a class="btn-sm btn-secondary" href="/ca/tds-summary">TDS payable summary</a>
+      </div>
+    </div>
+
+    <div class="ca-card">
+      <div class="ca-card-head"><span class="ca-ico" aria-hidden="true">&#8644;</span><h2>Bank &amp; reconciliation</h2></div>
+      <p class="muted small">Upload a bank statement and match its lines to receipts and expenses.</p>
+      <div class="btn-row">
+        <a class="btn btn-sm" href="/ca/bank-statement">Bank statement</a>
+        <a class="btn-sm btn-secondary" href="/ca/reconciliation">Reconciliation</a>
+      </div>
+    </div>
+
+    <?php if ($canManageCa): ?>
+    <div class="ca-card">
+      <div class="ca-card-head"><span class="ca-ico" aria-hidden="true">&#10227;</span><h2>Zoho Books &amp; year lock</h2></div>
+      <p class="muted small">Send settlements and expenses to Zoho Books; lock a financial year once it is reconciled. Needs the CA Manage permission.</p>
+      <div class="btn-row">
+        <a class="btn btn-sm" href="/ca/zoho-sync">Zoho Books sync</a>
+        <a class="btn-sm btn-secondary" href="/ca/fy-locks">Financial year lock</a>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
-  <div class="section">
-    <h2>Bank &amp; Reconciliation</h2>
-    <p class="muted">Upload a bank statement and match its lines against revenue settlements and expenses.</p>
-    <div class="btn-row">
-      <a class="btn-sm" href="/ca/bank-statement">Open Bank Statement</a>
-      <a class="btn-sm" href="/ca/reconciliation">Open Reconciliation</a>
-    </div>
-  </div>
-
-  <?php if ($canManageCa): ?>
-  <div class="section">
-    <h2>Zoho Books &amp; Financial Year Lock</h2>
-    <p class="muted">Sync settlements/expenses to Zoho Books, and lock a financial year once it's fully reconciled. Both need the CA Manage permission — that's why they're only shown here, not above.</p>
-    <div class="btn-row">
-      <a class="btn-sm" href="/ca/zoho-sync">Open Zoho Books Sync</a>
-      <a class="btn-sm" href="/ca/fy-locks">Open Financial Year Lock</a>
-    </div>
-  </div>
-  <?php endif; ?>
-
-  <div class="section">
+  <div class="section" id="register">
     <h2>INR Settlement Register</h2>
     <p class="muted small">Every advance/balance/freight leg that has been marked cleared in the order pipeline: the actual INR amount credited, the forex gain/(loss) against the order's assumed exchange rate, and its FIRC/eBRC realization proof. Recorded from the order's own Payment Status section by whoever holds the "Add/edit INR actual" permission.</p>
+    <div class="ca-summary" data-ca-summary>
+      <div><strong><?= (int) $summary['legs'] ?></strong>legs cleared</div>
+      <div><strong>&#8377;<?= number_format($summary['inr_credited'], 2) ?></strong>INR credited</div>
+      <div><strong class="<?= $summary['forex_net'] < 0 ? 'loss' : 'gain' ?>"><?= $summary['forex_known'] ? '&#8377;' . number_format(abs($summary['forex_net']), 2) . ($summary['forex_net'] < 0 ? ' loss' : ' gain') : '—' ?></strong>forex, net</div>
+      <div><strong class="<?= $summary['firc_pending'] > 0 ? 'bad' : '' ?>"><?= (int) $summary['firc_pending'] ?></strong>FIRC / eBRC pending</div>
+      <div><strong><?= (int) $summary['not_in_zoho'] ?></strong>not yet in Zoho</div>
+    </div>
+    <div class="btn-row ca-filters">
+      <?php foreach (['all' => 'All', 'firc' => 'FIRC pending (' . $summary['firc_pending'] . ')', 'zoho' => 'Not in Zoho (' . $summary['not_in_zoho'] . ')', 'estimated' => 'Estimated only (' . $summary['estimated'] . ')'] as $__k => $__label): ?>
+        <a class="btn-sm btn-secondary<?= $show === $__k ? ' is-active' : '' ?>" href="<?= $__k === 'all' ? '/ca' : '/ca?show=' . $__k ?>#register"<?= $show === $__k ? ' aria-current="true"' : '' ?>><?= htmlspecialchars($__label) ?></a>
+      <?php endforeach; ?>
+    </div>
     <?php if (empty($settlements)): ?>
-      <p class="muted">No settlement legs have been cleared yet.</p>
+      <p class="muted"><?= $show === 'all' ? 'No settlement legs have been cleared yet.' : 'No leg matches this filter.' ?></p>
     <?php else: ?>
       <table class="list">
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Exchange Rate</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>

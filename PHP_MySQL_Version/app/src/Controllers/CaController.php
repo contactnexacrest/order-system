@@ -153,15 +153,29 @@ final class CaController
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 
+        // D-379: the settlement register limited to the orders the person's CA reports level shows.
+        $settlements = CaRepository::settlementRegister('ca_reports');
+        // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
+        // stricter ca_module_manage, not the plain ca_module_view every
+        // other link here needs — hiding their cards for a
+        // view-only CA user avoids offering a link that 403s.
+        $canManageCa = PermissionService::can((int) $user['id'], $roleId, 'ca_module_manage');
+        // D-395 (20 Nov 2026): "Needs attention" boxes, register summary and quick filters.
+        $summary = \App\Services\CaOverviewService::registerSummary($settlements);
+        $show = \App\Services\CaOverviewService::normaliseFilter(isset($_GET['show']) ? (string) $_GET['show'] : null);
+
         View::render('ca/index', [
-            // D-379: the settlement register limited to the orders the person's CA reports level shows.
-            'settlements' => CaRepository::settlementRegister('ca_reports'),
+            'settlements' => \App\Services\CaOverviewService::filterRegister($settlements, $show),
+            'summary' => $summary,
+            'show' => $show,
+            'attention' => \App\Services\CaOverviewService::attention(
+                $summary,
+                $canManageCa,
+                \App\Services\ReportAccess::can('ca_reports', \App\Services\ReportAccess::ALL),
+                date('Y-m-d')
+            ),
             'usersById' => $this->usersById(),
-            // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
-            // stricter ca_module_manage, not the plain ca_module_view every
-            // other link here needs — hiding their cards for a
-            // view-only CA user avoids offering a link that 403s.
-            'canManageCa' => PermissionService::can((int) $user['id'], $roleId, 'ca_module_manage'),
+            'canManageCa' => $canManageCa,
         ], 'layout/base');
     }
 

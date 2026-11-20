@@ -1370,3 +1370,29 @@ details.report-details[open] > summary .report-name::before{transform:rotate(90d
 .prospect-box p{margin:4px 0;}
 .prospect-fieldset{border-color:var(--gold);}
 .prospect-match{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+/* D-395 (20 Nov 2026): CA / Accounting home — "Needs attention" boxes, section cards, register summary. */
+.ca-attention{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:14px 16px;margin:14px 0 16px;}
+.ca-attention h2{font-size:1rem;margin:0 0 10px;}
+.ca-attention-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;}
+.ca-att{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;}
+.ca-att-value{font-size:1.5rem;font-weight:700;line-height:1.2;overflow-wrap:anywhere;}
+.ca-att-label{font-size:0.88rem;}
+.ca-att .btn-sm{align-self:flex-start;margin-top:6px;}
+.ca-att.tone-bad{background:var(--danger-soft);border-color:#E8C9C0;}
+.ca-att.tone-bad .ca-att-value{color:var(--danger);}
+.ca-att.tone-warn{background:var(--gold-soft);}
+.ca-att.tone-warn .ca-att-value{color:var(--amber);}
+.ca-att.tone-ok{background:var(--success-soft);}
+.ca-att.tone-ok .ca-att-value{color:var(--success);}
+.ca-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px;}
+.ca-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:14px 16px;}
+.ca-card-head{display:flex;gap:10px;align-items:center;margin-bottom:4px;}
+.ca-card-head h2{font-size:1.05rem;margin:0;}
+.ca-ico{width:34px;height:34px;border-radius:10px;background:var(--navy-soft);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;}
+.ca-card .btn-row{flex-direction:column;align-items:flex-start;gap:0.45rem;}
+.ca-summary{display:flex;flex-wrap:wrap;gap:8px 26px;margin:10px 0;}
+.ca-summary div{font-size:0.8rem;color:var(--ink-soft);}
+.ca-summary strong{display:block;font-size:1.1rem;color:var(--ink);}
+.ca-summary .gain{color:var(--success);}
+.ca-summary .loss,.ca-summary .bad{color:var(--danger);}
+.ca-filters a.is-active{background:var(--navy);color:#fff;}
