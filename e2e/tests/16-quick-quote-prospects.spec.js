@@ -26,6 +26,9 @@ test.describe.serial('Quick-quote prospects — as a person would', () => {
   let clientId;
 
   const sql = (s) => s.replace(/'/g, "''");
+  // The app counts prospect days in India time (Asia/Kolkata); the database server's CURDATE()
+  // is UTC, which is a day behind between 00:00 and 05:30 IST. Use India's date in every query.
+  const TODAY_IST = "DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+05:30'))";
 
   test.afterAll(() => {
     // Nothing is deleted in the app; the test's own rows are only parked out of the way.
@@ -75,25 +78,25 @@ test.describe.serial('Quick-quote prospects — as a person would', () => {
     await expect(card).toContainText('Quote expires');
     await expect(page.locator('.filter-chip.active')).toContainText('Prospects');
 
-    runSql(`UPDATE clients SET prospect_expires_on = DATE_ADD(CURDATE(), INTERVAL 3 DAY) WHERE id = ${Number(clientId)}`, 'expiry in 3 days');
+    runSql(`UPDATE clients SET prospect_expires_on = DATE_ADD(${TODAY_IST}, INTERVAL 3 DAY) WHERE id = ${Number(clientId)}`, 'expiry in 3 days');
     await page.goto('/clients?show=prospects');
     await expect(page.locator('.entity-card', { hasText: NAME }).locator('.prospect-expiry-urgent')).toContainText('(in 3 days)');
     await page.goto(`/clients/${clientId}`);
     await page.locator('[data-testid="prospect-box"] button', { hasText: 'Keep for 60 more days' }).click();
     await expect(page.locator('body')).toContainText('is kept until');
-    expect(runSql(`SELECT DATEDIFF(prospect_expires_on, CURDATE()) FROM clients WHERE id = ${Number(clientId)}`, 'read expiry')).toBe('63');
+    expect(runSql(`SELECT DATEDIFF(prospect_expires_on, ${TODAY_IST}) FROM clients WHERE id = ${Number(clientId)}`, 'read expiry')).toBe('63');
   });
 
   test('4: closed → Deactivated Clients → Reactivate (fresh 60 days)', async ({ page }) => {
     // The state the daily job leaves (its order part is covered by the unit / integration tests).
-    runSql(`SET NAMES utf8mb4; UPDATE clients SET is_active = 0, prospect_expired_on = CURDATE(), prospect_expired_reason = '${sql('Quote expired today — no reply in 60 days')}' WHERE id = ${Number(clientId)}`, 'expire');
+    runSql(`SET NAMES utf8mb4; UPDATE clients SET is_active = 0, prospect_expired_on = ${TODAY_IST}, prospect_expired_reason = '${sql('Quote expired today — no reply in 60 days')}' WHERE id = ${Number(clientId)}`, 'expire');
     await page.goto('/clients/inactive');
     const row = page.locator('tr', { hasText: NAME });
     await expect(row.locator('[data-testid="prospect-badge"]')).toHaveText('Prospect');
     await expect(row).toContainText('Quote expired today — no reply in 60 days');
     await row.locator('button', { hasText: 'Reactivate (fresh 60 days)' }).click();
     await expect(page.locator('body')).toContainText('is active again. It stays a prospect until its details are filled in');
-    expect(runSql(`SELECT CONCAT(is_active, '/', DATEDIFF(prospect_expires_on, CURDATE())) FROM clients WHERE id = ${Number(clientId)}`, 'read state')).toBe('1/60');
+    expect(runSql(`SELECT CONCAT(is_active, '/', DATEDIFF(prospect_expires_on, ${TODAY_IST})) FROM clients WHERE id = ${Number(clientId)}`, 'read state')).toBe('1/60');
   });
 
   test('5: a Quotation request from the same e-mail updates the prospect', async ({ page }) => {
