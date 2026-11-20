@@ -1935,7 +1935,17 @@ lowest … · your price = USD 2,644.23 / CBM (1 piece = 0.1872 CBM)"). The MD's
 also holds only for the size it was given for (the size joins
 `price_approved_selection`). The Dimensions text is filled "180 × 80 × 13 cm" from the
 sizes (browser; on save when left empty) and stays editable; it prints on the documents
-as before — no document change. `/pricing/line-quote` takes `unit` and the three sizes
+as before — no document change. **D-396 (20 Nov 2026, owner: "one way"):** Dimensions follows the
+three sizes on a new, a saved and a duplicated line (order page side panel and the New
+Order form, including its Duplicate row): a Dimensions text made only of sizes
+("120 × 60 × 12 cm", "120 x 60 x 12") is kept equal to Length × Width × Thickness when
+it said the sizes as they were, or gives as many sizes as the boxes hold (so a typed
+"300 x 180 x 2 cm" is not cut to "2 cm" while only Thickness is entered); a saved line
+whose sizes-only text no longer matches its sizes is brought in line when the form opens,
+with the note "Filled from the sizes (was …)". Typing in Dimensions never changes the
+sizes, so the Qty can still be typed. Own wording ("Random sizes, as available") is never
+changed — the note "Your own wording is kept. The sizes are … cm." offers **Use the
+sizes**. Browser only (`_product_picker_js`); the server still saves what the boxes hold. `/pricing/line-quote` takes `unit` and the three sizes
 and returns the quote and lowest per the line's unit plus the reference figures.
 
 **Products section (D-273, owner point 17).** The order page's Products card is one

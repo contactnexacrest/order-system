@@ -177,7 +177,7 @@
           <label>Length (cm)<input type="text" inputmode="decimal" name="product_piece_length_cm[]" data-piece-size="length" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_length_cm'][$__i] ?? '')) ?>" placeholder="e.g. 180"></label>
           <label>Width (cm)<input type="text" inputmode="decimal" name="product_piece_width_cm[]" data-piece-size="width" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_width_cm'][$__i] ?? '')) ?>" placeholder="e.g. 80"></label>
           <label>Thickness (cm)<input type="text" inputmode="decimal" name="product_piece_thickness_cm[]" data-piece-size="thickness" data-max-decimals="2" data-max-value="10000" value="<?= htmlspecialchars((string) ($old['product_piece_thickness_cm'][$__i] ?? '')) ?>" placeholder="e.g. 13"></label>
-          <label>Dimensions <small class="muted">(prints on the documents)</small><input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
+          <label>Dimensions <small class="muted">(prints on the documents — follows the three sizes; your own wording is kept)</small><input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 180 × 80 × 13 cm"></label>
           <?php // D-357: a line picked from Products takes its finish from the Surface finish option above — this box is for lines typed by hand. ?>
           <p class="muted small finish-from-option" data-finish-note hidden>Finish: the one chosen in the options above (Surface finish).</p>
           <label data-finish-box>Finish
@@ -343,7 +343,6 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   // D-271 (point 13): a new row starts without the first row's options.
   clone.querySelectorAll('.spec-options').forEach(function (el) { el.innerHTML = ''; });
-  clone.querySelectorAll('[data-dims-auto]').forEach(function (el) { el.removeAttribute('data-dims-auto'); });
   // D-339: a new row starts with a typed Qty and no pieces summary.
   clone.querySelectorAll('.qty-auto').forEach(function (el) { el.readOnly = false; el.classList.remove('qty-auto'); });
   clone.querySelectorAll('.qty-worked-out, .line-pieces-summary, .floor-note').forEach(function (el) { el.textContent = ''; });

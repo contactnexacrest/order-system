@@ -864,7 +864,7 @@ app converts your price before checking it — you never have to switch to CBM.
    is chosen (no manual price needed) — a small green note says "set from Thickness (cm)
    13". A Thickness option you chose yourself is never changed by the typed thickness.
    Below 5 cm with no matching option, choose the Thickness yourself.
-4. The **Dimensions** text fills itself ("180 × 80 × 13 cm"); you may still change it.
+4. The **Dimensions** text fills itself ("180 × 80 × 13 cm") and keeps following the sizes — also on a saved or duplicated line. Typing in Dimensions does not change the sizes. Your own wording ("Random sizes, as available") is kept; a note beside it offers **Use the sizes**.
    It prints on the documents as before.
 5. Enter the price per your unit. The box under the price shows the quote and your
    lowest **per your unit** and the product's figures **per CBM** (e.g. "1 piece =

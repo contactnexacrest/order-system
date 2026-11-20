@@ -256,11 +256,68 @@
     s.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   }
-  function fillDimensions(scope) {
+  // D-396 (20 Nov 2026, owner: one way): Dimensions follows Length / Width / Thickness on a new,
+  // a saved and a duplicated line alike. A Dimensions text made only of sizes ("120 × 60 × 12 cm",
+  // "120 x 60 x 12") is kept equal to the three sizes; typing in Dimensions never changes the sizes
+  // (the Qty can still be typed). Own wording ("Random sizes, as available") is never changed — a
+  // note offers the sizes.
+  var SIZE_NAMES = ['piece_length_cm', 'piece_width_cm', 'piece_thickness_cm'];
+  var DIMS_RE = /^\s*(\d+(?:\.\d+)?)(?:\s*[×xX*]\s*(\d+(?:\.\d+)?))?(?:\s*[×xX*]\s*(\d+(?:\.\d+)?))?\s*(?:cm)?\s*$/;
+  function sizesLocked(scope) {
+    return SIZE_NAMES.some(function (n) { var f = field(scope, n); return f && (f.disabled || f.readOnly); });
+  }
+  function sizesText(scope) {
+    var parts = SIZE_NAMES.map(function (n) { return sizeVal(scope, n); }).filter(function (v) { return v !== null; });
+    return parts.length ? parts.map(num).join(' × ') + ' cm' : '';
+  }
+  function dimsNumbers(text) {
+    var m = String(text).match(DIMS_RE);
+    return m ? [m[1], m[2], m[3]].filter(function (v) { return v !== undefined; }).map(function (v) { return num(v); }).join('|') : null;
+  }
+  function dimsNote(scope, was) {
     var dims = field(scope, 'dimensions');
-    if (!dims || (dims.dataset.dimsAuto === '0' && dims.value.trim() !== '')) { return; }
-    var parts = ['piece_length_cm', 'piece_width_cm', 'piece_thickness_cm'].map(function (n) { return sizeVal(scope, n); }).filter(function (v) { return v !== null; });
-    if (parts.length) { dims.value = parts.map(num).join(' × ') + ' cm'; dims.dataset.dimsAuto = '1'; }
+    if (!dims) { return; }
+    var host = dims.closest('label') || dims;
+    var note = host.parentNode.querySelector('.dims-note');
+    var want = sizesLocked(scope) ? '' : sizesText(scope);
+    var own = dims.value.trim() !== '' && dimsNumbers(dims.value) === null;
+    var text = '';
+    if (want !== '' && own) { text = 'Your own wording is kept. The sizes are ' + want + '.'; }
+    else if (was) { text = 'Filled from the sizes (was ' + was + ').'; }
+    if (text === '') { if (note) { note.hidden = true; } return; }
+    if (!note) {
+      note = document.createElement('small');
+      note.className = 'muted dims-note';
+      host.parentNode.insertBefore(note, host.nextSibling);
+    }
+    note.hidden = false;
+    note.textContent = text + ' ';
+    if (own) {
+      var use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'btn-link';
+      use.textContent = 'Use the sizes';
+      use.addEventListener('click', function () { dims.value = sizesText(scope); dimsNote(scope); });
+      note.appendChild(use);
+    }
+  }
+  function fillDimensions(scope, quiet) {
+    var dims = field(scope, 'dimensions');
+    if (!dims || dims.disabled || dims.readOnly || sizesLocked(scope)) { return; }
+    var want = sizesText(scope);
+    var wantN = want === '' ? '' : dimsNumbers(want);
+    var cur = dims.value.trim() === '' ? '' : dimsNumbers(dims.value);
+    var prev = dims.dataset.dimsPrev || '';
+    var was = '';
+    // Follows when empty, when it said the sizes as they were, or when it gives as many sizes as
+    // the boxes now hold (so "300 x 180 x 2 cm" is not cut to "2 cm" while only Thickness is typed).
+    var follows = cur === '' || (cur !== null && (cur === prev || cur.split('|').length === wantN.split('|').length));
+    if (want !== '' && follows && cur !== wantN) {
+      was = dims.value.trim();
+      dims.value = want;
+    }
+    dims.dataset.dimsPrev = wantN;
+    dimsNote(scope, quiet ? was : '');
   }
   function updateTotal(scope) {
     var out = scope.querySelector('output.line-total');
@@ -275,7 +332,7 @@
     var scope = el.closest('.product-row') || el.closest('form');
     if (!scope) { return; }
     var base = el.name.replace(/^product_/, '').replace(/\[\]$/, '');
-    if (base === 'dimensions') { el.dataset.dimsAuto = el.value.trim() === '' ? '1' : '0'; }
+    if (base === 'dimensions') { dimsNote(scope); }
     if (base === 'unit_price') { el.dataset.auto = '0'; }
     if (base === 'piece_length_cm' || base === 'piece_width_cm' || base === 'piece_thickness_cm') { fillDimensions(scope); }
     if (base === 'quantity' || base === 'unit_price') { updateTotal(scope); }
@@ -550,6 +607,12 @@
     if (!scope) { return; }
     filterSoldAs(scope, false);
     applySoldAs(scope, false);
+  });
+  // D-396: a saved or duplicated line whose Dimensions (sizes only) no longer match its sizes is
+  // brought in line when the page opens, with a note of what it said; own wording stays.
+  document.querySelectorAll('[name="dimensions"], [name="product_dimensions[]"]').forEach(function (dims) {
+    var scope = dims.closest('.product-row') || dims.closest('form');
+    if (scope) { fillDimensions(scope, true); }
   });
 })();
 </script>
