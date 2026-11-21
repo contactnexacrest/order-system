@@ -433,6 +433,28 @@ Insurance belongs to CIF only (owner decision D-049): on a CFR or FOB order
 any indicative insurance amount is cleared when the order is saved — the
 documents already print NIL / "buyer arranges insurance" for those.
 
+**The insurance on a CIF order is worked out for you (D-402, 21 Nov 2026).**
+Once the products and the indicative freight are entered, the Insurance box
+fills itself from the CIF value: rate × 110 % × (FOB + freight + insurance).
+The rate is the one of the order's product category (Natural Stone 0.30 %,
+ICC (A) incl. breakage); a note under the box shows how it was worked out,
+for example *Calculated: 0.3% (Natural Stone — ICC (A) incl. breakage) ×
+110% of CIF value (FOB 4,500.00 + freight 950.00 + insurance) = EUR 19.00
+(rounded up)*. You can type your own figure (for example the insurer's
+quote): it is kept, and the note offers **Use calculated** to go back. If
+you save a CIF order with the box empty, the app fills in the calculated
+figure. The buyer still pays the actual premium by Debit Note at Stage 6.
+
+**What the buyer sees on a CFR / CIF Quotation and Proforma Invoice
+(D-403, D-404).** Under *Total quoted value* / *Total PI value* (which stay
+the FOB value — advance and balance are on FOB) a line *Estimated total CIF
+value* (or *CFR value*) shows FOB + freight (+ insurance) and tells the
+buyer that the Commercial Invoice will show FOB + the actual freight and
+insurance, and to open any Letter of Credit for that value. On a CIF order
+the *Insurance* row names the cover, e.g. "ICC (A) incl. breakage, 110% of
+CIF value — arranged by seller; actual premium billed by Debit Note." FOB
+documents do not change.
+
 On the order page, open **Step 1 · Prepare Quotation** (section **A ·
 Order Booking**) and click **Generate Quotation** (badge **1a**). A PDF is
 always made; tick **DOCX** as well if you want an editable Word copy for

@@ -5,6 +5,7 @@ const pricingRepository = require('../repositories/pricingRepository');
 const productSupplierRepository = require('../repositories/productSupplierRepository');
 const productService = require('./productService');
 const pricingEngine = require('./pricingEngine');
+const marineInsurance = require('./marineInsurance');
 
 /**
  * Port of App\Services\PricingService — owner decision D-245 (4 Nov 2026), P1:
@@ -37,6 +38,7 @@ const DEFAULTS = {
   container_max_t: '27.00',
   container_cbm: '8.00',
   thick_k_factor: '40',
+  ...marineInsurance.DEFAULTS, // D-402 (21 Nov 2026): marine insurance on CIF orders
 };
 
 const LABELS = {
@@ -58,6 +60,7 @@ const LABELS = {
   container_max_t: 'Container max tonnes',
   container_cbm: 'Container CBM',
   thick_k_factor: 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
+  ...marineInsurance.LABELS, // D-402
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -175,6 +178,22 @@ function readSettingsForm(post) {
       // Stored as before: 2.70 / 27.00 / 8.00 / 40 (more decimals only when typed).
       const typed = v.includes('.') ? v.slice(v.indexOf('.') + 1).replace(/0+$/, '').length : 0;
       values[key] = Number(v).toFixed(Math.max(key === 'thick_k_factor' ? 0 : 2, typed));
+    }
+  }
+  // D-402 (21 Nov 2026): marine insurance on CIF orders (only when the form carries the fields).
+  if (Object.prototype.hasOwnProperty.call(post, 'insurance_rate_pct')) {
+    values.insurance_cover_pct = num('insurance_cover_pct', 100, 200, false, false, 2);
+    values.insurance_rate_pct = num('insurance_rate_pct', 0, 5, true, false, 4);
+    const min = String(post.insurance_min_premium ?? '').trim();
+    values.insurance_min_premium = min === '' ? '' : num('insurance_min_premium', 0, 1000000, false, false, 2);
+    values.insurance_rounding = String(post.insurance_rounding ?? 'up') === '2dp' ? '2dp' : 'up';
+    values.insurance_add_gst = String(post.insurance_add_gst ?? '0') === '1' ? '1' : '0';
+    const wording = String(post.insurance_cover_wording ?? '').trim();
+    if (wording === '' || [...wording].length > 80) {
+      errors.push(`${LABELS.insurance_cover_wording}: enter the cover as it should read on documents (up to 80 characters), e.g. ICC (A) all risks.`);
+      values.insurance_cover_wording = '';
+    } else {
+      values.insurance_cover_wording = wording;
     }
   }
   // D-301: the exchange-rate mode and cushion (only when the form carries them).

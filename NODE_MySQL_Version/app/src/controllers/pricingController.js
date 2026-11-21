@@ -41,6 +41,8 @@ async function settings(req, res) {
     fx: await fxRateService.status(),
     fxHistory: await fxRateService.history(30),
     fxJumpPct: fxRateService.JUMP_PCT,
+    // D-402 (21 Nov 2026): the category rates listed under Marine Insurance.
+    insuranceCategories: await require('../services/marineInsurance').categories(),
   }, 'layout/base');
 }
 

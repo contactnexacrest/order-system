@@ -133,6 +133,30 @@ $__ro = $canManage ? '' : ' disabled';
         </select></label>
     </fieldset>
 
+    <?php // Owner decision D-402 (21 Nov 2026): the calculated insurance on CIF orders. ?>
+    <fieldset id="marine-insurance"><legend>Marine Insurance (CIF orders)</legend>
+      <p class="muted small">Fills the Insurance amount on a CIF order: rate × cover % × CIF value (FOB + freight + insurance). Staff can change it on the order; the buyer is billed the actual premium by Debit Note. CFR and FOB orders have no insurance.</p>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_cover_pct']) ?> *<small class="muted">Incoterms 2020 minimum; LC banks expect 110 %.</small><span class="help-line">Example: 110 → a CIF value of EUR 5,468 is insured for EUR 6,015.</span></span>
+        <input type="number" name="insurance_cover_pct" min="100" max="200" step="0.01" required value="<?= View::e((string) $settings['insurance_cover_pct']) ?>" placeholder="e.g. 110"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_rate_pct']) ?> *<small class="muted">ICC (A) all risks — used for categories without their own rate (Products › Categories).</small><span class="help-line">Example: 0.20 → EUR 12 on a CIF value of EUR 5,468 (rounded up).</span></span>
+        <input type="number" name="insurance_rate_pct" min="0.0001" max="5" step="0.0001" required value="<?= View::e((string) $settings['insurance_rate_pct']) ?>" placeholder="e.g. 0.20"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_cover_wording']) ?> *<small class="muted">Printed on the Quotation and Proforma Invoice when the order's categories have no wording of their own.</small><span class="help-line">Example: ICC (A) all risks</span></span>
+        <input type="text" name="insurance_cover_wording" maxlength="80" required value="<?= View::e((string) $settings['insurance_cover_wording']) ?>" placeholder="e.g. ICC (A) all risks"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_min_premium']) ?> <small class="muted">In the order's currency. Only if you buy a separate policy per shipment; leave empty for none.</small><span class="help-line">Example: 10 → a premium worked out at 6.40 becomes 10.</span></span>
+        <input type="number" name="insurance_min_premium" min="0" max="1000000" step="0.01" value="<?= View::e((string) $settings['insurance_min_premium']) ?>" placeholder="e.g. 10 — leave empty for none"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_rounding']) ?> <small class="muted">How the worked-out premium is rounded.</small><span class="help-line">Example: 18.04 → 19.00 (up) or 18.04 (2 decimals).</span></span>
+        <select name="insurance_rounding"<?= $__ro ?>>
+          <option value="up"<?= (string) $settings['insurance_rounding'] !== '2dp' ? ' selected' : '' ?>>Round up to the next whole unit</option>
+          <option value="2dp"<?= (string) $settings['insurance_rounding'] === '2dp' ? ' selected' : '' ?>>Round to 2 decimals</option>
+        </select></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['insurance_add_gst']) ?> <small class="muted">The insurer charges 18 % GST to NexaCrest; exports under LUT can claim it back as input tax credit.</small><span class="help-line">Example: not added → 19.00; added → 22.00.</span></span>
+        <select name="insurance_add_gst"<?= $__ro ?>>
+          <option value="0"<?= (string) $settings['insurance_add_gst'] !== '1' ? ' selected' : '' ?>>Not added — NexaCrest's own cost (input tax credit)</option>
+          <option value="1"<?= (string) $settings['insurance_add_gst'] === '1' ? ' selected' : '' ?>>Add 18 % to the buyer's figure</option>
+        </select></label>
+      <p class="muted small">Category rates (incl. breakage): <?php $__cr = []; foreach (\App\Services\MarineInsurance::categories() as $__c) { $__cr[] = View::e((string) $__c['name']) . ' ' . ($__c['insurance_rate_pct'] !== null ? View::e(rtrim(rtrim((string) $__c['insurance_rate_pct'], '0'), '.')) . ' %' : '— uses the default'); } echo implode(' · ', $__cr); ?>. <a href="/products/categories">Set per category</a></p>
+    </fieldset>
+
     <fieldset><legend>Specifications and Associate Prices (D-255)</legend>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['cbm_from_mm']) ?> *<small class="muted">From this thickness the price is per CBM, from the product's per-CBM supplier price (Market prices). A product can set its own.</small><span class="help-line">Example: 50 → 20, 30 and 40 mm are priced per SQM; 50, 60, 80 mm per CBM (12.5 SQM in one CBM at 80 mm).</span></span>
         <input type="number" name="cbm_from_mm" min="1" max="2000" step="1" required value="<?= View::e($settings['cbm_from_mm']) ?>" placeholder="e.g. 50"<?= $__ro ?>></label>

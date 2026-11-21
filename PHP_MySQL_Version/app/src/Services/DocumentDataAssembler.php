@@ -224,6 +224,8 @@ final class DocumentDataAssembler
                 'container_type'       => $order['container_type'] ?? 'To Be Confirmed',
                 // D-401: what the indicative freight on the QT / PI is quoted per (PDF and Word read this one value).
                 'freight_per_text'     => self::freightPerText($order['container_type'] ?? null),
+                // D-403 (21 Nov 2026, owner confirmed twice): the QT / PI "Insurance" row of a CIF order names the cover.
+                'insurance_cover_text' => $isCif ? self::insuranceCoverText($orderId) : null,
                 'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'To Be Confirmed',
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
@@ -380,6 +382,9 @@ final class DocumentDataAssembler
                 'total_invoice_value_in_words' => LineTable::tbcTotal(\App\Helpers\AmountInWords::format(round((float) $totalCommercialInvoiceValue, 2), $order['currency_code'] ?? null), $tbcNos, $allTbc && abs($totalCommercialInvoiceValue - $fobValue) < 0.005),
                 'fob_value_in_words' => LineTable::tbcTotal(\App\Helpers\AmountInWords::format(round((float) $fobValue, 2), $order['currency_code'] ?? null), $tbcNos, $allTbc),
                 'freight_insurance_amount' => $freightForTotal !== null ? $money($freightForTotal) : null,
+                // D-404 (21 Nov 2026, owner confirmed twice): the QT / PI line "Estimated total CIF / CFR value" under the
+                // FOB total — FOB + indicative freight (+ insurance on CIF). Null on FOB orders (nothing changes there).
+                'estimated_value' => self::estimatedValue($isFob, $isCif, $fobValue, $order['indicative_freight_amount'] ?? null, $order['indicative_insurance_amount'] ?? null, $money, $moneyCurrency, $tbcNos, $allTbc),
                 'preset_name'      => $order['preset_name'],
             ],
             'payment_status' => $payment ? [
@@ -467,6 +472,61 @@ final class DocumentDataAssembler
         }
         $cbm = LineTable::totalCbm($products);
         return $cbm === null ? null : number_format($cbm, 3);
+    }
+
+    /**
+     * D-403: the QT / PI "Insurance" row of a CIF order — "<cover>, <cover %>% of CIF value — arranged by seller;
+     * actual premium billed by Debit Note." The cover is the wording of the order's category with the highest
+     * insurance rate (Natural Stone: ICC (A) incl. breakage), else the default in Global pricing settings (D-402).
+     */
+    public static function insuranceCoverText(int $orderId): string
+    {
+        $s = MarineInsurance::settings();
+        $rate = MarineInsurance::rateFor(MarineInsurance::orderCategoryIds($orderId), $s);
+        $cover = rtrim(rtrim(number_format($s['cover_pct'], 2, '.', ''), '0'), '.');
+        return $rate['wording'] . ', ' . $cover . '% of CIF value — arranged by seller; actual premium billed by Debit Note.';
+    }
+
+    /**
+     * D-404: "Estimated total CIF / CFR value" on the QT / PI — FOB + indicative freight (+ indicative insurance on CIF).
+     * The FOB total, advance and balance are unchanged. A figure not entered yet reads "To Be Confirmed" in the sum.
+     *
+     * @param list<int> $tbcNos
+     * @return ?array{term: string, total: string, breakdown: string, note: string}
+     */
+    public static function estimatedValue(bool $isFob, bool $isCif, float $fobValue, mixed $freight, mixed $insurance, \Closure $money, string $currency, array $tbcNos, bool $allTbc): ?array
+    {
+        if ($isFob) {
+            return null;
+        }
+        $term = $isCif ? 'CIF' : 'CFR';
+        $known = $fobValue;
+        $missing = [];
+        $parts = ['FOB ' . LineTable::tbcTotal($money($fobValue), $tbcNos, $allTbc)];
+        if (is_numeric($freight)) {
+            $known += (float) $freight;
+            $parts[] = ($isCif ? 'freight ' : 'indicative freight ') . $money((float) $freight);
+        } else {
+            $missing[] = 'freight';
+            $parts[] = ($isCif ? 'freight' : 'indicative freight') . ' To Be Confirmed';
+        }
+        if ($isCif) {
+            if (is_numeric($insurance)) {
+                $known += (float) $insurance;
+                $parts[] = 'insurance ' . $money((float) $insurance);
+            } else {
+                $missing[] = 'insurance';
+                $parts[] = 'insurance To Be Confirmed';
+            }
+        }
+        $total = $allTbc ? 'To Be Confirmed' : LineTable::tbcTotal($money(round($known, 2)), $tbcNos, false);
+        if (!$allTbc && $missing !== []) {
+            $total .= ' + ' . implode(' and ', $missing) . ' To Be Confirmed';
+        }
+        $note = $isCif
+            ? 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value.'
+            : 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR value.';
+        return ['term' => $term, 'total' => $total, 'breakdown' => '= ' . implode(' + ', $parts), 'note' => $note];
     }
 
     /** D-343: an indicative freight / insurance figure — Indian grouping on an INR order, otherwise exactly as stored. */

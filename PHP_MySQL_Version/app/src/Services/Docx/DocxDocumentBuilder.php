@@ -486,12 +486,12 @@ final class DocxDocumentBuilder
             ? 'NIL'
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'freight_per_text') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
         $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Debit Note when cargo is ready.');
-        DocxComponents::addTotalsTable($section, [
+        DocxComponents::addTotalsTable($section, array_merge([
             ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
             ['label' => "Insurance ({$currency})", 'value' => $insuranceText],
             ['label' => "TOTAL QUOTED VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
-        ]);
+        ], self::estimatedValueRows($financial, $currency)));
 
         self::weightTable($section, $order, $context);
 
@@ -502,7 +502,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Lead Time', 'value' => self::g($order, 'est_lead_time_text')],
-            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
+            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : self::g($order, 'insurance_cover_text')], // D-403
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
@@ -597,12 +597,12 @@ final class DocxDocumentBuilder
             ? 'NIL'
             : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'freight_per_text') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
         $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Debit Note when cargo is ready.');
-        DocxComponents::addTotalsTable($section, [
+        DocxComponents::addTotalsTable($section, array_merge([
             ['label' => "FOB Value ({$currency})", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
             ['label' => "Insurance ({$currency})", 'value' => $insuranceText],
             ['label' => "TOTAL PI VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
-        ]);
+        ], self::estimatedValueRows($financial, $currency)));
         // Owner decision (2026-10-28): what to pay now, by when, and who
         // bears the bank charges — same box as the PDF PI.
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order, $financial, $currency) {
@@ -634,7 +634,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Discharge', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Shipment Date', 'value' => self::g($order, 'est_shipment_date_text')],
-            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
+            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : self::g($order, 'insurance_cover_text')], // D-403
         ]);
 
         DocxComponents::addSectionTitle($section, self::sn($context, 'payment', 5) . '. PAYMENT TERMS');
@@ -1879,4 +1879,29 @@ final class DocxDocumentBuilder
             $run->addText('RCMC must be renewed annually. If RCMC expires, CAPEXIL cannot issue a COO — your shipment documents will be incomplete and customs clearance will fail. Set a reminder 60 days before expiry.', ['color' => DocxComponents::AMBER_TEXT2]);
         }, 4);
     }
+
+    /**
+     * D-404 (21 Nov 2026, owner confirmed twice): the QT / PI row "Estimated total CIF / CFR value" under the FOB
+     * total, as the PDF — none on FOB orders.
+     *
+     * @param array<string,mixed> $financial
+     * @return list<array<string,mixed>>
+     */
+    private static function estimatedValueRows(array $financial, string $currency): array
+    {
+        $e = $financial['estimated_value'] ?? null;
+        if (!is_array($e)) {
+            return [];
+        }
+        return [[
+            'label' => 'Estimated total ' . $e['term'] . " value ({$currency})",
+            'amber' => true,
+            'value' => static function (AbstractContainer $cell) use ($e): void {
+                $cell->addText((string) $e['total'], ['bold' => true, 'size' => 10]);
+                $cell->addText((string) $e['breakdown'], ['size' => 9.5]);
+                $cell->addText((string) $e['note'], ['size' => 8.5, 'color' => '5B6573']);
+            },
+        ]];
+    }
+
 }

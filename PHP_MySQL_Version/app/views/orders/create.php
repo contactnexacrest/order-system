@@ -148,7 +148,7 @@
       </div>
     </fieldset>
 
-    <fieldset id="freight-insurance-fieldset">
+    <fieldset id="freight-insurance-fieldset"<?= \App\Services\MarineInsurance::formAttributeHtml() ?>>
       <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF — not needed for FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($old['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g. 950"></label>
@@ -376,3 +376,5 @@ document.getElementById('product-rows').addEventListener('click', function (e) {
   });
 });
 </script>
+<?php // D-402: the calculated insurance on CIF orders. ?>
+<?php include __DIR__ . '/_insurance_calc_js.php'; ?>

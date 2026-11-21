@@ -3218,3 +3218,14 @@ INSERT INTO sop_role_chapters (role_id, slug)
 SELECT n.id, '31-merchant-trade' FROM roles n
  WHERE n.name = 'Merchant Trade Executive'
    AND NOT EXISTS (SELECT 1 FROM sop_role_chapters x WHERE x.role_id = n.id AND x.slug = '31-merchant-trade');
+
+-- D-402 (21 Nov 2026): marine insurance on CIF orders — Natural Stone (the system category) insures at 0.30 % with the breakage clause (same as docs/migrations/2026-11-21a-marine-insurance.sql).
+UPDATE product_categories SET insurance_rate_pct = 0.3000, insurance_cover_wording = 'ICC (A) incl. breakage' WHERE is_system = 1 AND insurance_rate_pct IS NULL;
+-- D-402: the Marine Insurance settings (Admin › Global pricing settings), same as the migration.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('insurance_cover_pct', '110.00'),
+  ('insurance_rate_pct', '0.2000'),
+  ('insurance_cover_wording', 'ICC (A) all risks'),
+  ('insurance_min_premium', ''),
+  ('insurance_rounding', 'up'),
+  ('insurance_add_gst', '0');

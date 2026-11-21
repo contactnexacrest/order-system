@@ -804,6 +804,8 @@ final class OrderController
         \App\Services\DivisionService::leaveOrderDivision();
 
         // External QA report L-23: order creation was never audit-logged.
+        // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
+        \App\Services\MarineInsurance::fillIfEmpty($orderId);
         AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);
 
         // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
@@ -973,6 +975,8 @@ final class OrderController
             'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
         ]);
 
+        // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
+        \App\Services\MarineInsurance::fillIfEmpty($orderId);
         AuditLogRepository::log((int) $user['id'], 'ORDER_DETAILS_UPDATED', 'orders', $orderId);
         Flash::set('success', 'Order details updated.');
         header("Location: /orders/{$orderId}");

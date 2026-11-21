@@ -131,7 +131,7 @@
       </div>
     </fieldset>
 
-    <fieldset id="freight-insurance-fieldset">
+    <fieldset id="freight-insurance-fieldset"<?= \App\Services\MarineInsurance::formAttributeHtml((int) $order['id']) ?>>
       <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($order['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g., 950"></label>
@@ -248,3 +248,5 @@ function lookupSailingLeadTime() {
     .catch(function () { /* best-effort suggestion only — a failed lookup never blocks the form */ });
 }
 </script>
+<?php // D-402: the calculated insurance on CIF orders. ?>
+<?php include __DIR__ . '/_insurance_calc_js.php'; ?>

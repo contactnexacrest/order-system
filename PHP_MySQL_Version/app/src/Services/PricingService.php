@@ -41,7 +41,7 @@ final class PricingService
         'container_max_t' => '27.00',
         'container_cbm' => '8.00',
         'thick_k_factor' => '40',
-    ];
+    ] + MarineInsurance::DEFAULTS; // D-402 (21 Nov 2026): marine insurance on CIF orders
 
     /** Labels for the settings page and the audit log. */
     public const LABELS = [
@@ -63,7 +63,7 @@ final class PricingService
         'container_max_t' => 'Container max tonnes',
         'container_cbm' => 'Container CBM',
         'thick_k_factor' => 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
-    ];
+    ] + MarineInsurance::LABELS; // D-402
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
     public static function settings(): array
@@ -168,6 +168,27 @@ final class PricingService
                 // Stored as before: 2.70 / 27.00 / 8.00 / 40 (more decimals only when typed).
                 $typed = str_contains($v, '.') ? strlen(rtrim(substr($v, strpos($v, '.') + 1), '0')) : 0;
                 $values[$key] = number_format((float) $v, max($key === 'thick_k_factor' ? 0 : 2, $typed), '.', '');
+            }
+        }
+        // D-402 (21 Nov 2026): marine insurance on CIF orders (only when the form carries the fields).
+        if (array_key_exists('insurance_rate_pct', $post)) {
+            $values['insurance_cover_pct'] = $num('insurance_cover_pct', 100, 200, false, false, 2);
+            $values['insurance_rate_pct'] = $num('insurance_rate_pct', 0, 5, true, false, 4);
+            $min = trim((string) ($post['insurance_min_premium'] ?? ''));
+            if ($min === '') {
+                $values['insurance_min_premium'] = '';
+            } else {
+                $values['insurance_min_premium'] = $num('insurance_min_premium', 0, 1000000, false, false, 2);
+            }
+            $round = (string) ($post['insurance_rounding'] ?? 'up');
+            $values['insurance_rounding'] = $round === '2dp' ? '2dp' : 'up';
+            $values['insurance_add_gst'] = (string) ($post['insurance_add_gst'] ?? '0') === '1' ? '1' : '0';
+            $wording = trim((string) ($post['insurance_cover_wording'] ?? ''));
+            if ($wording === '' || mb_strlen($wording) > 80) {
+                $errors[] = self::LABELS['insurance_cover_wording'] . ': enter the cover as it should read on documents (up to 80 characters), e.g. ICC (A) all risks.';
+                $values['insurance_cover_wording'] = '';
+            } else {
+                $values['insurance_cover_wording'] = $wording;
             }
         }
         // D-301: the exchange-rate mode and cushion (only when the form carries them).

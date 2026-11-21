@@ -149,7 +149,18 @@ async function parseSettings(body, knownUnits, packageTypes) {
   // D-270 (point 25): tonnes per CBM, for lines priced per Ton (stone 2.7).
   const [weight, weightError] = weightInput(body.weight_t_per_cbm);
   if (weightError !== null) return [{}, weightError];
+  // D-402 (21 Nov 2026): the category's marine insurance rate (incl. breakage) and cover wording; empty = the defaults.
+  const insRate = String(body.insurance_rate_pct ?? '').trim();
+  if (insRate !== '' && (!/^\d{1,2}(\.\d{1,4})?$/.test(insRate) || Number(insRate) <= 0 || Number(insRate) > 5)) {
+    return [{}, 'Insurance rate: a % above 0 and up to 5, up to 4 decimals (e.g. 0.30), or leave it empty for the default rate.'];
+  }
+  const insWording = String(body.insurance_cover_wording ?? '').trim();
+  if ([...insWording].length > 80) {
+    return [{}, 'Cover wording: up to 80 characters (e.g. ICC (A) incl. breakage).'];
+  }
   return [{
+    insurance_rate_pct: insRate !== '' ? Number(insRate).toFixed(4) : null,
+    insurance_cover_wording: insWording !== '' ? insWording : null,
     weight_t_per_cbm: weight,
     default_unit: def !== '' ? def : null,
     allowed_units: allowed.length > 0 ? allowed.join(',') : null,
@@ -162,8 +173,11 @@ async function parseSettings(body, knownUnits, packageTypes) {
 
 async function updateSettings(id, s) {
   await db.execute(
-    'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt WHERE id = :id',
-    { du: s.default_unit, au: s.allowed_units, hs: s.default_hs_code, pt: s.packing_type, qd: s.quality_documents, tc: s.tc_clause_set, wt: s.weight_t_per_cbm ?? null, id },
+    'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt, insurance_rate_pct = :ir, insurance_cover_wording = :iw WHERE id = :id',
+    {
+      du: s.default_unit, au: s.allowed_units, hs: s.default_hs_code, pt: s.packing_type, qd: s.quality_documents, tc: s.tc_clause_set, wt: s.weight_t_per_cbm ?? null,
+      ir: s.insurance_rate_pct ?? null, iw: s.insurance_cover_wording ?? null, id,
+    },
   );
 }
 
@@ -174,7 +188,9 @@ function settingsSummary(c) {
     + `; HS ${c.default_hs_code || '-'}; packing ${c.packing_type || '-'}`
     + `; quality documents: ${docs.length > 0 ? docs.join(', ') : 'none'}`
     + `; T&C ${c.tc_clause_set || '-'}`
-    + `; weight per CBM ${c.weight_t_per_cbm !== null && c.weight_t_per_cbm !== undefined ? `${String(Number(c.weight_t_per_cbm))} t` : '-'}`;
+    + `; weight per CBM ${c.weight_t_per_cbm !== null && c.weight_t_per_cbm !== undefined ? `${String(Number(c.weight_t_per_cbm))} t` : '-'}`
+    + `; insurance ${c.insurance_rate_pct !== null && c.insurance_rate_pct !== undefined ? `${String(c.insurance_rate_pct).replace(/0+$/, '').replace(/\.$/, '')} %` : 'default rate'}`
+    + (c.insurance_cover_wording ? ` (${c.insurance_cover_wording})` : '');
 }
 
 /** D-270 (point 25): a weight per CBM in tonnes (0.1 to 20, up to 3 decimals), or null when left empty. Returns [value, error]. */

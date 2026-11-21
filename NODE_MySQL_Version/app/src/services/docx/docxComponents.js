@@ -648,15 +648,16 @@ function totalsTable(rows, labelWidthPct = 55) {
   const valueWidthPct = 100 - labelWidthPct;
   const trRows = rows.map((row) => {
     const highlight = !!row.highlight;
-    const labelCell = cell(plain(String(row.label ?? ''), { bold: true, size: highlight ? 21 : 19, color: highlight ? WHITE : NAVY }), {
+    const amber = !!row.amber; // D-404: the "Estimated total CIF / CFR value" row
+    const labelCell = cell(plain(String(row.label ?? ''), { bold: true, size: highlight ? 21 : 19, color: highlight ? WHITE : (amber ? '8A5A00' : NAVY) }), {
       width: pctWidth(labelWidthPct),
-      shading: shade(highlight ? NAVY : WHITE),
+      shading: shade(highlight ? NAVY : (amber ? 'FFF4DC' : WHITE)),
       borders: thinBorders(),
       verticalAlign: VerticalAlign.TOP,
     });
     const valueCell = cell(renderValue(row.value), {
       width: pctWidth(valueWidthPct),
-      shading: shade(highlight ? NAVY_MID : WHITE),
+      shading: shade(highlight ? NAVY_MID : (amber ? 'FFF4DC' : WHITE)),
       borders: thinBorders(),
       verticalAlign: VerticalAlign.TOP,
     });

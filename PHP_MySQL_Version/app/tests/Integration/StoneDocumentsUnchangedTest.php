@@ -39,6 +39,9 @@ use App\Tests\Support\DbTestCase;
  * and T&C clause 95 on the OC ("The full set of original negotiable Bills of Lading, as issued by the shipping line, will
  * be released to the buyer only after"); nothing else changed. (D-386 / D-388 do not touch these orders: no line has a
  * Sold as and no quantity is to be confirmed.)
+ * Owner decisions D-403 / D-404 (21 Nov 2026, each confirmed twice): CIF_QT and CIF_PI (PDF and Word) were captured again
+ * once — the Insurance row names the cover ("ICC (A) incl. breakage, 110% of CIF value — arranged by seller; actual premium
+ * billed by Debit Note.") and the new line "Estimated total CIF value" follows the total; every FOB fixture is unchanged.
  */
 final class StoneDocumentsUnchangedTest extends DbTestCase
 {

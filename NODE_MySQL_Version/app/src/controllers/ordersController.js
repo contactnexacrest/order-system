@@ -465,6 +465,8 @@ async function create(req, res) {
       // Owner, 14 Nov 2026 (D-375): opened from a client's page, the drop-down offers only that client.
       onlyClient: preselectedClientId ? (allClients.find((c) => Number(c.id) === Number(preselectedClientId)) || null) : null,
       old,
+      // D-402 (21 Nov 2026): the data-ins-* attributes the insurance calculator reads (values already HTML-escaped).
+      insuranceAttrs: await require('../services/marineInsurance').formAttributeHtml(),
     },
     'layout/base'
   );
@@ -834,6 +836,8 @@ async function store(req, res) {
   }));
 
   // External QA report L-23: order creation was never audit-logged.
+  // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
+  await require('../services/marineInsurance').fillIfEmpty(orderId);
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   for (let k = 0; k < createdLineIds.length; k++) {
@@ -912,6 +916,8 @@ async function editDetails(req, res) {
       canOverride: orderEditGuard.canOverride(req),
       isLocked: !!order.is_locked,
       canOverrideLock: orderEditGuard.canOverrideLock(req),
+      // D-402 (21 Nov 2026): the data-ins-* attributes the insurance calculator reads (values already HTML-escaped).
+      insuranceAttrs: await require('../services/marineInsurance').formAttributeHtml(orderId),
     },
     'layout/base'
   );
@@ -1011,6 +1017,8 @@ async function updateDetails(req, res) {
     indicative_insurance_amount: str(body.indicative_insurance_amount),
   });
 
+  // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
+  await require('../services/marineInsurance').fillIfEmpty(orderId);
   await auditLogRepository.log(req.user ? req.user.id : null, 'ORDER_DETAILS_UPDATED', 'orders', orderId);
   flash.set(req, 'success', 'Order details updated.');
   res.redirect(`/orders/${orderId}`);

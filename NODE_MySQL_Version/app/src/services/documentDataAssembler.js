@@ -221,6 +221,8 @@ async function assemble(orderId, documentTypeCode = null) {
       container_type: order.container_type ?? 'To Be Confirmed',
       // D-401: what the indicative freight on the QT / PI is quoted per (PDF and Word read this one value).
       freight_per_text: freightPerText(order.container_type),
+      // D-403 (21 Nov 2026, owner confirmed twice): the QT / PI "Insurance" row of a CIF order names the cover.
+      insurance_cover_text: isCif ? await insuranceCoverText(orderId) : null,
       est_lead_time_text: order.est_lead_time_text ?? 'To Be Confirmed',
       est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
@@ -375,6 +377,9 @@ async function assemble(orderId, documentTypeCode = null) {
       total_invoice_value_in_words: tbcTotal(amountInWords.format(round2(Number(totalCommercialInvoiceValue)), order.currency_code || null), tbcNos, allTbc && Math.abs(totalCommercialInvoiceValue - fobValue) < 0.005),
       fob_value_in_words: tbcTotal(amountInWords.format(round2(Number(fobValue)), order.currency_code || null), tbcNos, allTbc),
       freight_insurance_amount: freightForTotal !== null ? money(freightForTotal) : null,
+      // D-404 (21 Nov 2026, owner confirmed twice): the QT / PI line "Estimated total CIF / CFR value" under the
+      // FOB total — FOB + indicative freight (+ insurance on CIF). Null on FOB orders (nothing changes there).
+      estimated_value: estimatedValue(isFob, isCif, fobValue, order.indicative_freight_amount ?? null, order.indicative_insurance_amount ?? null, money, moneyCurrency, tbcNos, allTbc),
       preset_name: order.preset_name,
     },
     payment_status: payment
@@ -1018,6 +1023,60 @@ function lineTableTotalCbm(order, products, documentTypeCode) {
   return cbm === null ? null : cbm.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
+/**
+ * D-403: the QT / PI "Insurance" row of a CIF order — "<cover>, <cover %>% of CIF value — arranged by seller;
+ * actual premium billed by Debit Note." The cover is the wording of the order's category with the highest
+ * insurance rate (Natural Stone: ICC (A) incl. breakage), else the default in Global pricing settings (D-402).
+ */
+async function insuranceCoverText(orderId) {
+  const marineInsurance = require('./marineInsurance');
+  const s = await marineInsurance.settings();
+  const rate = await marineInsurance.rateFor(await marineInsurance.orderCategoryIds(orderId), s);
+  const cover = round2(s.cover_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return `${rate.wording}, ${cover}% of CIF value — arranged by seller; actual premium billed by Debit Note.`;
+}
+
+/**
+ * D-404: "Estimated total CIF / CFR value" on the QT / PI — FOB + indicative freight (+ indicative insurance on CIF).
+ * The FOB total, advance and balance are unchanged. A figure not entered yet reads "To Be Confirmed" in the sum.
+ * @returns {?{term: string, total: string, breakdown: string, note: string}}
+ */
+function estimatedValue(isFob, isCif, fobValue, freight, insurance, money, currency, tbcNos, allTbc) {
+  if (isFob) {
+    return null;
+  }
+  const { tbcTotal } = require('./lineTable');
+  const isNumeric = (v) => v !== null && v !== undefined && typeof v !== 'boolean' && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(String(v));
+  const term = isCif ? 'CIF' : 'CFR';
+  let known = Number(fobValue);
+  const missing = [];
+  const parts = [`FOB ${tbcTotal(money(fobValue), tbcNos, allTbc)}`];
+  if (isNumeric(freight)) {
+    known += parseFloat(freight);
+    parts.push(`${isCif ? 'freight ' : 'indicative freight '}${money(parseFloat(freight))}`);
+  } else {
+    missing.push('freight');
+    parts.push(`${isCif ? 'freight' : 'indicative freight'} To Be Confirmed`);
+  }
+  if (isCif) {
+    if (isNumeric(insurance)) {
+      known += parseFloat(insurance);
+      parts.push(`insurance ${money(parseFloat(insurance))}`);
+    } else {
+      missing.push('insurance');
+      parts.push('insurance To Be Confirmed');
+    }
+  }
+  let total = allTbc ? 'To Be Confirmed' : tbcTotal(money(round2(known)), tbcNos, false);
+  if (!allTbc && missing.length > 0) {
+    total += ` + ${missing.join(' and ')} To Be Confirmed`;
+  }
+  const note = isCif
+    ? 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value.'
+    : 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR value.';
+  return { term, total, breakdown: `= ${parts.join(' + ')}`, note };
+}
+
 /** D-343: an indicative freight / insurance figure — Indian grouping on an INR order, otherwise exactly as stored. */
 function indicativeMoney(value, currency) {
   if (!moneyFormat.usesIndianGrouping(currency) || value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) {
@@ -1308,6 +1367,8 @@ module.exports = {
   formatDate,
   cooLine,
   freightPerText,
+  insuranceCoverText,
+  estimatedValue,
   balanceTriggerSentence,
   resolveAgreementFooter,
   resolveConsignee,

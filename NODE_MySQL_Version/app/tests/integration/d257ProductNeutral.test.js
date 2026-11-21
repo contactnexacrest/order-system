@@ -41,7 +41,8 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
   let agent;
 
   /** Natural Stone's seeded settings, put back after each test (two tests here save other values). */
-  const STONE_SETTINGS = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set', 'weight_t_per_cbm'];
+  const STONE_SETTINGS = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set', 'weight_t_per_cbm',
+    'insurance_rate_pct', 'insurance_cover_wording']; // D-402: the stone category's insurance rate and wording are restored too
   let stoneSeeded = null;
 
   beforeAll(async () => {
@@ -137,7 +138,7 @@ describe('Product-neutral groundwork (D-257 Phase 0B)', () => {
     expect([cat.default_unit, cat.allowed_units, cat.default_hs_code, cat.packing_type, cat.quality_documents, cat.tc_clause_set])
       .toEqual(['PCS', 'PCS,NOS,SET', '730791', 'Wooden Crates', 'Mill test certificate 3.1\nDrawing approval', 'engineering']);
     const audit = await db.queryOne("SELECT new_value FROM audit_log WHERE action_type = 'PRODUCT_CATEGORY_SETTINGS_UPDATED' AND entity_id = :id ORDER BY id DESC LIMIT 1", { id });
-    expect(audit.new_value).toBe('unit PCS (allowed: PCS,NOS,SET); HS 730791; packing Wooden Crates; quality documents: Mill test certificate 3.1, Drawing approval; T&C engineering; weight per CBM -'); // D-270 (point 25): the category's weight per CBM (left empty here)
+    expect(audit.new_value).toBe('unit PCS (allowed: PCS,NOS,SET); HS 730791; packing Wooden Crates; quality documents: Mill test certificate 3.1, Drawing approval; T&C engineering; weight per CBM -; insurance default rate'); // D-270 (point 25): the category's weight per CBM (left empty here); D-402: no insurance rate of its own
     expect(productCategoryRepository.lineOptionAttributes(cat)).toBe(' data-fills="{&quot;hs_code&quot;:&quot;730791&quot;,&quot;unit&quot;:&quot;PCS&quot;}" data-allowed-units="PCS,NOS,SET"');
     expect((await agent.get(`/orders/${orderId}`)).text).toContain(`data-fills="{&quot;hs_code&quot;:&quot;730791&quot;,&quot;unit&quot;:&quot;PCS&quot;}" data-allowed-units="PCS,NOS,SET">${n}</option>`);
 

@@ -251,6 +251,8 @@ njkEnv.addGlobal('pricingFmt', {
   trim3: (v) => (v === null || v === undefined || v === '' ? '' : require('./services/thicknessPrices').fmt(v)),
   thicknessLabel: (mm, cbmFrom) => require('./services/thicknessPrices').label(mm, cbmFrom),
   signed: (v) => require('./services/fxRateService').signed(Number(v)),
+  // D-402: a stored insurance rate without trailing zeros ("0.3000" → "0.3") — PHP rtrim(rtrim($v, '0'), '.').
+  trimRate: (v) => require('./services/marineInsurance').trimRate(v),
 });
 // Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
 // are recorded and displayed to 4 decimal places (e.g. "88.5000"), not

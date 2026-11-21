@@ -2278,13 +2278,37 @@ here at all.
 | Who pays freight | Buyer, own forwarder | NexaCrest, recovered by Debit Note | NexaCrest, recovered by Debit Note |
 | Insurance | Buyer | **Buyer** (prints "NIL — buyer arranges insurance (CFR)") (D-049) | NexaCrest; insurance box shown only here |
 | Stage 6 / Step 9 | Auto-skipped; greyed "Not applicable — FOB" | Normal | Normal |
-| Indicative freight/insurance on the order | Hidden | Freight only | Freight + insurance |
+| Indicative freight/insurance on the order | Hidden | Freight only | Freight + insurance (insurance calculated from the CIF value, D-402) |
 | Documents | Freight and insurance print "NIL" (D-048) | "Freight is paid separately by Debit Note"; Buyer PO row "Freight: invoiced separately … (insurance arranged by the buyer)" | "Freight & Insurance: invoiced separately by Debit Note before shipment" |
 | CI | Raised before shipment; no BL-copy reminder | Raised against the BL; reminder until scanned BL attached | same as CFR |
 | Profit | — | Freight leg in revenue; insurance excluded | Freight + insurance in revenue (converted to INR, D-225) |
 | Logistics bills | Allowed on every incoterm | A **Final** logistics bill waits for 9d freight cleared (D-090) | same |
 
 **Freight line wording (D-401, 21 Nov 2026, owner confirm 1 + confirm 2).** On the Quotation and the Proforma Invoice (PDF and Word, CFR / CIF orders) the indicative freight reads "Indicative approx. USD 5500.00 per **20ft Standard container**, Chennai to …": the container type with "container" after it (left as it is when it already says "container"), "**LCL shipment** (Less than Container Load)" for LCL, and "**container (type to be confirmed)**" while no type is chosen. One value, `freight_per_text` (`DocumentDataAssembler::freightPerText` / `documentDataAssembler.freightPerText`), feeds the PDF templates and the Word builder. The rest of the sentence, the insurance line and every other document are unchanged; documents already generated keep their text.
+
+**Calculated insurance on CIF orders (D-402, 21 Nov 2026, owner "approve A").** The indicative insurance of a CIF order is
+worked out from the CIF value: premium = rate × cover × (FOB + freight) ÷ (1 − rate × cover), so the sum insured is a true
+110 % of FOB + freight + insurance (Incoterms 2020; what LC banks check). The rate is the highest *Insurance rate incl. breakage*
+among the order's goods-line categories (`product_categories.insurance_rate_pct`; Natural Stone 0.30 % "ICC (A) incl. breakage"),
+else the default in Admin › Global pricing settings › **Marine Insurance (CIF orders)** (cover 110 %, rate 0.20 %, wording
+"ICC (A) all risks", optional minimum premium per shipment, rounding up to the next whole unit or to 2 decimals, GST not added
+— NexaCrest's own cost — or added at 18 %). On New Order and Edit order the Insurance box fills itself
+(`views/orders/_insurance_calc_js`, data from `MarineInsurance::formAttributes` / `marineInsurance.formAttributes`) with a note
+showing how; a figure typed by staff is kept and the note offers **Use calculated**; a CIF order saved with the box empty gets the
+figure on the server (`MarineInsurance::fillIfEmpty`). Example: FOB 4,500 + freight 950 at 0.30 % → 18.04 → **19.00**. CFR and FOB
+orders have no insurance (D-049). The buyer is billed the actual premium by Debit Note as before; existing orders keep their figures.
+
+**Insurance cover and "Estimated total CIF / CFR value" on the Quotation and PI (D-403, D-404, 21 Nov 2026, each confirmed
+twice).** PDF and Word, both stacks. CIF: the Shipping / Commercial terms row Insurance reads "<cover wording>, 110% of CIF
+value — arranged by seller; actual premium billed by Debit Note." (`insurance_cover_text`; was "Seller arranges — cost included in
+invoice."). CFR and CIF: an amber row after TOTAL QUOTED VALUE / TOTAL PI VALUE — "Estimated total CIF value (EUR) 5,570.00 /
+= FOB 4,500.00 + freight 950.00 + insurance 120.00 / Advance and balance are on the FOB value. The Commercial Invoice will show
+FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value." (CFR: "Estimated total
+CFR value … = FOB … + indicative freight … — Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR
+value."); a figure not entered yet reads "To Be Confirmed" in the sum (`financial.estimated_value`,
+`DocumentDataAssembler::estimatedValue`). Why: the QT / PI total the FOB value while the Commercial Invoice totals FOB + freight +
+insurance — an LC opened for the PI value alone would be short of the CI. FOB totals, advance, balance, payment terms, the CI,
+the Debit Note, the Order Confirmation and every FOB document are unchanged.
 
 Word copies say **Debit Note** like the PDF (QA item 11, owner decision 13 Nov 2026, confirm 1 + confirm 2): the Word Quotation and Proforma Invoice CIF insurance row reads "Confirmed by Debit Note when cargo is ready." and the Word Order Confirmation CFR/CIF freight row "A Debit Note will be raised when cargo is packed and ready …" (was "Freight Debit Note"); no buyer-facing Word text prints "Freight Debit Note" or the internal code "FDN". PDFs unchanged. Tests: `DocxDebitNoteWordingItem11Test` / `docxDebitNoteWordingItem11.test.js`; Natural Stone Word fixtures CIF_QT_docx, CIF_PI_docx, CIF_OC_docx captured again once.
 
@@ -4284,6 +4308,7 @@ with no supplier record are linked by name by the migration, the rest on "Link t
   (`supplier_id` NULL): product, supplier as typed, price, dates, and a Supplier * drop-down (exact name pre-selected) with
   **Link** (`SupplierOffers::linkPrice()`: `supplier_id` and the legal name, history "Linked to supplier", audit
   `SUPPLIER_PRICE_LINKED`); "+ Add a new supplier (quick)" returns here.
+- **Global pricing settings** — block **Marine Insurance (CIF orders)** (D-402): cover %, default rate, default cover wording, minimum premium, rounding, GST; per category on Products › Categories.
 - **Global pricing settings** — block **Default physical values for every category and product**: weight t / CBM (0.1–20), container
   max t (1–100), container CBM (0.5–100), thickness factor (1–1000), stored as 2.70 / 27.00 / 8.00 / 40.
 - **Category price rules** (per category, MD, with a reason) — new **Margin, other costs and buffer** fields (empty = global; the
@@ -5313,6 +5338,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 | `price_request_daily_limit` | 10 | Associate automatic price requests per day |
 | `price_request_valid_days` | 7 | Associate price validity |
 | `weight_t_per_cbm` / `container_max_t` / `container_cbm` / `thick_k_factor` | 2.70 / 27.00 / 8.00 / 40 | D-359 / D-361: default physical values, used when neither the category (Category price rules) nor the product (Configure) has one |
+| `insurance_cover_pct` / `insurance_rate_pct` / `insurance_cover_wording` / `insurance_min_premium` / `insurance_rounding` / `insurance_add_gst` | 110.00 / 0.2000 / ICC (A) all risks / (none) / up / 0 | D-402: marine insurance on CIF orders (Global pricing settings › Marine Insurance); a category may set its own rate and wording (`product_categories.insurance_rate_pct`, `insurance_cover_wording`; Natural Stone 0.30 % "ICC (A) incl. breakage") |
 
 Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED). Self-approval rule `bank_details` (MD, ED): verify bank details one entered oneself, with a reason (D-293).
 

@@ -400,6 +400,7 @@ function renderQt(context) {
       { label: `Freight (${currency})`, value: freightText },
       { label: `Insurance (${currency})`, value: insuranceText },
       { label: `TOTAL QUOTED VALUE (${currency})`, value: g(financial, 'total_value'), highlight: true },
+      ...estimatedValueRows(financial, currency),
     ])
   );
 
@@ -413,7 +414,7 @@ function renderQt(context) {
       { label: 'Port of Discharge', value: g(order, 'port_of_discharge') },
       { label: 'Container Type', value: g(order, 'container_type') },
       { label: 'Est. Lead Time', value: g(order, 'est_lead_time_text') },
-      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
+      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : g(order, 'insurance_cover_text') }, // D-403
     ])
   );
 
@@ -522,6 +523,7 @@ function renderPi(context) {
       { label: `Freight (${currency})`, value: freightText },
       { label: `Insurance (${currency})`, value: insuranceText },
       { label: `TOTAL PI VALUE (${currency})`, value: g(financial, 'total_value'), highlight: true },
+      ...estimatedValueRows(financial, currency),
     ])
   );
   // Owner decision (2026-10-28): what to pay now, by when, and who bears
@@ -569,7 +571,7 @@ function renderPi(context) {
       { label: 'Port of Discharge', value: g(order, 'port_of_discharge') },
       { label: 'Container Type', value: g(order, 'container_type') },
       { label: 'Est. Shipment Date', value: g(order, 'est_shipment_date_text') },
-      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
+      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : g(order, 'insurance_cover_text') }, // D-403
     ])
   );
 
@@ -2010,6 +2012,26 @@ async function render(documentTypeCode, context) {
   });
 
   return require('docx').Packer.toBuffer(doc);
+}
+
+/**
+ * D-404 (21 Nov 2026, owner confirmed twice): the QT / PI row "Estimated total CIF / CFR value" under the FOB
+ * total, as the PDF — none on FOB orders.
+ */
+function estimatedValueRows(financial, currency) {
+  const e = financial ? financial.estimated_value : null;
+  if (!e || typeof e !== 'object') {
+    return [];
+  }
+  return [{
+    label: `Estimated total ${e.term} value (${currency})`,
+    amber: true,
+    value: (add) => {
+      add(C.plain(String(e.total), { bold: true, size: 20 }));
+      add(C.plain(String(e.breakdown), { size: 19 }));
+      add(C.plain(String(e.note), { size: 17, color: '5B6573' }));
+    },
+  }];
 }
 
 module.exports = { render, buildProductRows, freightTermsSentence };

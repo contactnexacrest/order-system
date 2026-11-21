@@ -130,7 +130,7 @@
       </div>
     </fieldset>
 
-    <fieldset id="freight-insurance-fieldset">
+    <fieldset id="freight-insurance-fieldset"{{ insuranceAttrs | safe }}>
       <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">{{ order.currency_code or '' }}</span></span>)<input type="text" name="indicative_freight_amount" value="{{ order.indicative_freight_amount or '' }}" placeholder="e.g., 950"></label>
@@ -239,3 +239,5 @@ function lookupSailingLeadTime() {
     .catch(function () { /* best-effort suggestion only — a failed lookup never blocks the form */ });
 }
 </script>
+{# D-402: the calculated insurance on CIF orders. #}
+{% include "orders/_insurance_calc_js.njk" %}

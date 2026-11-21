@@ -77,6 +77,11 @@ $__return = "/products/categories/{$__id}?tab=general";
           <?php foreach ($tcClauseSets as $k => $label): ?><option value="<?= View::e($k) ?>" <?= $k === (string) ($__c['tc_clause_set'] ?? '') ? 'selected' : '' ?>><?= View::e($label) ?></option><?php endforeach; ?>
         </select>
       </label>
+      <?php // Owner decision D-402 (21 Nov 2026): the category's marine insurance rate (incl. breakage) and cover wording. ?>
+      <div class="field-grid" id="category-insurance">
+        <label>Insurance rate incl. breakage (%) <small class="muted">(CIF orders; empty = the default rate in Global pricing settings › Marine Insurance. An order with products from more than one category uses the highest rate.)</small><input type="number" name="insurance_rate_pct" min="0.0001" max="5" step="0.0001" value="<?= ($__c['insurance_rate_pct'] ?? null) !== null ? View::e(rtrim(rtrim((string) $__c['insurance_rate_pct'], '0'), '.')) : '' ?>" placeholder="e.g. 0.30 — empty = the default rate"<?= $__ro ?>></label>
+        <label>Cover wording on documents <small class="muted">(printed on the Quotation and Proforma Invoice of a CIF order; empty = the default wording)</small><input type="text" name="insurance_cover_wording" maxlength="80" value="<?= View::e((string) ($__c['insurance_cover_wording'] ?? '')) ?>" placeholder="e.g. ICC (A) incl. breakage"<?= $__ro ?>></label>
+      </div>
       <?php if ($canManageCatalog): ?><div class="btn-row"><button type="submit" class="btn-sm btn-success">Save settings</button></div><?php endif; ?>
     </form>
     <datalist id="category_hs_codes"><?php foreach ($hsCodes as $h): ?><option value="<?= View::e((string) $h['code']) ?>"><?= View::e((string) ($h['description'] ?? '')) ?></option><?php endforeach; ?></datalist>

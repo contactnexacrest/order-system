@@ -207,7 +207,18 @@ final class ProductCategoryRepository
         if ($weightError !== null) {
             return [[], $weightError];
         }
+        // D-402 (21 Nov 2026): the category's marine insurance rate (incl. breakage) and cover wording; empty = the defaults.
+        $insRate = trim((string) ($post['insurance_rate_pct'] ?? ''));
+        if ($insRate !== '' && (!preg_match('/^\d{1,2}(\.\d{1,4})?$/', $insRate) || (float) $insRate <= 0 || (float) $insRate > 5)) {
+            return [[], 'Insurance rate: a % above 0 and up to 5, up to 4 decimals (e.g. 0.30), or leave it empty for the default rate.'];
+        }
+        $insWording = trim((string) ($post['insurance_cover_wording'] ?? ''));
+        if (mb_strlen($insWording) > 80) {
+            return [[], 'Cover wording: up to 80 characters (e.g. ICC (A) incl. breakage).'];
+        }
         return [[
+            'insurance_rate_pct' => $insRate !== '' ? number_format((float) $insRate, 4, '.', '') : null,
+            'insurance_cover_wording' => $insWording !== '' ? $insWording : null,
             'weight_t_per_cbm' => $weight,
             'default_unit' => $default !== '' ? $default : null,
             'allowed_units' => $allowed !== [] ? implode(',', $allowed) : null,
@@ -222,9 +233,10 @@ final class ProductCategoryRepository
     public static function updateSettings(int $id, array $settings): void
     {
         Database::connection()->prepare(
-            'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt WHERE id = :id'
+            'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc, weight_t_per_cbm = :wt, insurance_rate_pct = :ir, insurance_cover_wording = :iw WHERE id = :id'
         )->execute([
             'wt' => $settings['weight_t_per_cbm'] ?? null,
+            'ir' => $settings['insurance_rate_pct'] ?? null, 'iw' => $settings['insurance_cover_wording'] ?? null,
             'du' => $settings['default_unit'], 'au' => $settings['allowed_units'], 'hs' => $settings['default_hs_code'],
             'pt' => $settings['packing_type'], 'qd' => $settings['quality_documents'], 'tc' => $settings['tc_clause_set'], 'id' => $id,
         ]);
@@ -237,7 +249,9 @@ final class ProductCategoryRepository
             . '; HS ' . (($c['default_hs_code'] ?? null) ?: '-') . '; packing ' . (($c['packing_type'] ?? null) ?: '-')
             . '; quality documents: ' . (self::qualityDocuments($c) !== [] ? implode(', ', self::qualityDocuments($c)) : 'none')
             . '; T&C ' . (($c['tc_clause_set'] ?? null) ?: '-')
-            . '; weight per CBM ' . (($c['weight_t_per_cbm'] ?? null) !== null ? rtrim(rtrim((string) $c['weight_t_per_cbm'], '0'), '.') . ' t' : '-');
+            . '; weight per CBM ' . (($c['weight_t_per_cbm'] ?? null) !== null ? rtrim(rtrim((string) $c['weight_t_per_cbm'], '0'), '.') . ' t' : '-')
+            . '; insurance ' . (($c['insurance_rate_pct'] ?? null) !== null ? rtrim(rtrim((string) $c['insurance_rate_pct'], '0'), '.') . ' %' : 'default rate')
+            . (($c['insurance_cover_wording'] ?? null) ? ' (' . $c['insurance_cover_wording'] . ')' : '');
     }
 
     /**

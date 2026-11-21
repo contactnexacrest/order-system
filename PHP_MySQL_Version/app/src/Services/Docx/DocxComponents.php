@@ -488,8 +488,9 @@ final class DocxComponents
         foreach ($rows as $row) {
             $table->addRow();
             $highlight = !empty($row['highlight']);
+            $amber = !empty($row['amber']); // D-404: the "Estimated total CIF / CFR value" row
             $labelCell = $table->addCell($labelWidth, [
-                'bgColor' => $highlight ? self::NAVY : self::WHITE,
+                'bgColor' => $highlight ? self::NAVY : ($amber ? 'FFF4DC' : self::WHITE),
                 'borderSize' => 4,
                 'borderColor' => self::BORDER_GRAY,
                 'valign' => 'top',
@@ -497,10 +498,10 @@ final class DocxComponents
             $labelCell->addText((string) $row['label'], [
                 'bold' => true,
                 'size' => $highlight ? 10.5 : 9.5,
-                'color' => $highlight ? self::WHITE : self::NAVY,
+                'color' => $highlight ? self::WHITE : ($amber ? '8A5A00' : self::NAVY),
             ]);
             $valueCell = $table->addCell($valueWidth, [
-                'bgColor' => $highlight ? self::NAVY_MID : self::WHITE,
+                'bgColor' => $highlight ? self::NAVY_MID : ($amber ? 'FFF4DC' : self::WHITE),
                 'borderSize' => 4,
                 'borderColor' => self::BORDER_GRAY,
                 'valign' => 'top',

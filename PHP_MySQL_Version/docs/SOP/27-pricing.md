@@ -774,6 +774,31 @@ Since 13 Nov 2026 (D-362) a tab with no products opens **Active** instead (or **
 you reactivate the last product on the **Inactive** tab, the list opens **Active** with the green message and the
 product in it; the same the other way round after a deactivation from the list.
 
+## Marine insurance on CIF orders (D-402, 21 Nov 2026)
+
+**Admin › Global pricing settings › Marine Insurance (CIF orders)** (MD):
+
+| Setting | Default | What it does |
+|---|---|---|
+| Cover (% of CIF value) | 110 | Incoterms 2020 minimum; LC banks expect 110 %. |
+| Default premium rate (%) | 0.20 | ICC (A) all risks — for categories without their own rate. |
+| Default cover wording | ICC (A) all risks | Printed on the Quotation / PI when the category has none. |
+| Minimum premium per shipment | empty (none) | Only if you buy a separate policy per shipment. |
+| Rounding | up to the next whole unit | Or 2 decimals. |
+| GST on the premium | not added | NexaCrest's own cost (input tax credit); or add 18 %. |
+
+**Products › Categories › <category>** — *Insurance rate incl. breakage (%)*
+and *Cover wording on documents*. Natural Stone: **0.30 %**, "ICC (A) incl.
+breakage". Empty = the default. An order with products from more than one
+category uses the **highest** rate (insurers rate a container by its most
+fragile cargo).
+
+The calculation: premium = rate × cover × (FOB + freight) ÷ (1 − rate ×
+cover), so the sum insured is a true 110 % of FOB + freight + insurance.
+Example: FOB 4,500 + freight 950 at 0.30 % = 18.04 → **19.00**. Use your
+insurer's real rate here once they confirm it; the actual premium is always
+billed to the buyer by Debit Note.
+
 ## Global pricing settings and Category price rules (D-362, 13 Nov 2026)
 
 - **Global pricing settings** (`/pricing/settings`) — *applies to every product unless a category or product changes it.*

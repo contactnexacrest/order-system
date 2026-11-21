@@ -88,6 +88,14 @@ FROM (
                 WHERE r.name = 'Merchant Trade Executive' AND p.permission_key IN ('manage_purchasing', 'view_purchase_prices'))
             + (SELECT COUNT(*) FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive' AND c.slug = '31-merchant-trade')
               WHEN 4 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-21a',
+         'Marine insurance on CIF orders: product_categories.insurance_rate_pct and insurance_cover_wording; Natural Stone 0.30 % ICC (A) incl. breakage; 6 settings in Global pricing settings > Marine Insurance (D-402)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'product_categories'
+                  AND column_name IN ('insurance_rate_pct', 'insurance_cover_wording'))
+            + (SELECT COUNT(*) FROM pricing_settings WHERE setting_key IN ('insurance_cover_pct', 'insurance_rate_pct', 'insurance_cover_wording', 'insurance_min_premium', 'insurance_rounding', 'insurance_add_gst'))
+              WHEN 8 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns
