@@ -219,6 +219,8 @@ async function assemble(orderId, documentTypeCode = null) {
       port_of_loading: portOfLoading,
       port_of_discharge: portOfDischarge,
       container_type: order.container_type ?? 'To Be Confirmed',
+      // D-401: what the indicative freight on the QT / PI is quoted per (PDF and Word read this one value).
+      freight_per_text: freightPerText(order.container_type),
       est_lead_time_text: order.est_lead_time_text ?? 'To Be Confirmed',
       est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
@@ -1221,6 +1223,18 @@ function formatNumber(value) {
  * "Certificate of Origin — <type> — Issued by CAPEXIL". The PDF templates and
  * the Word builder both print this value, so the two never differ.
  */
+/**
+ * D-401 (21 Nov 2026, owner confirm 1 + confirm 2): the words after "per" in the indicative freight
+ * line of the Quotation / Proforma Invoice — "20ft Standard container", "LCL shipment (Less than
+ * Container Load)", "container (type to be confirmed)" while no type is chosen.
+ */
+function freightPerText(containerType) {
+  const type = String(containerType ?? '').trim();
+  if (type === '' || ['tbc', 'to be confirmed'].includes(type.toLowerCase())) return 'container (type to be confirmed)';
+  if (/^LCL\b/i.test(type)) return type.replace(/^LCL\b/i, 'LCL shipment');
+  return /container/i.test(type) ? type : `${type} container`;
+}
+
 function cooLine(cooType) {
   const type = String(cooType ?? '').trim();
   if (type === '' || ['tbc', 'to be confirmed'].includes(type.toLowerCase())) {
@@ -1293,6 +1307,7 @@ module.exports = {
   formatNumber,
   formatDate,
   cooLine,
+  freightPerText,
   balanceTriggerSentence,
   resolveAgreementFooter,
   resolveConsignee,

@@ -222,6 +222,8 @@ final class DocumentDataAssembler
                 'port_of_loading'      => $portOfLoading,
                 'port_of_discharge'    => $portOfDischarge,
                 'container_type'       => $order['container_type'] ?? 'To Be Confirmed',
+                // D-401: what the indicative freight on the QT / PI is quoted per (PDF and Word read this one value).
+                'freight_per_text'     => self::freightPerText($order['container_type'] ?? null),
                 'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'To Be Confirmed',
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
@@ -422,6 +424,23 @@ final class DocumentDataAssembler
      * "Certificate of Origin — <type> — Issued by CAPEXIL". The PDF templates and
      * the Word builder both print this value, so the two never differ.
      */
+    /**
+     * D-401 (21 Nov 2026, owner confirm 1 + confirm 2): the words after "per" in the indicative freight
+     * line of the Quotation / Proforma Invoice — "20ft Standard container", "LCL shipment (Less than
+     * Container Load)", "container (type to be confirmed)" while no type is chosen.
+     */
+    public static function freightPerText(?string $containerType): string
+    {
+        $type = trim((string) $containerType);
+        if ($type === '' || in_array(strtolower($type), ['tbc', 'to be confirmed'], true)) {
+            return 'container (type to be confirmed)';
+        }
+        if (preg_match('/^LCL\b/i', $type) === 1) {
+            return preg_replace('/^LCL\b/i', 'LCL shipment', $type, 1);
+        }
+        return stripos($type, 'container') !== false ? $type : $type . ' container';
+    }
+
     public static function cooLine(?string $cooType): string
     {
         $type = trim((string) $cooType);

@@ -2284,6 +2284,8 @@ here at all.
 | Profit | — | Freight leg in revenue; insurance excluded | Freight + insurance in revenue (converted to INR, D-225) |
 | Logistics bills | Allowed on every incoterm | A **Final** logistics bill waits for 9d freight cleared (D-090) | same |
 
+**Freight line wording (D-401, 21 Nov 2026, owner confirm 1 + confirm 2).** On the Quotation and the Proforma Invoice (PDF and Word, CFR / CIF orders) the indicative freight reads "Indicative approx. USD 5500.00 per **20ft Standard container**, Chennai to …": the container type with "container" after it (left as it is when it already says "container"), "**LCL shipment** (Less than Container Load)" for LCL, and "**container (type to be confirmed)**" while no type is chosen. One value, `freight_per_text` (`DocumentDataAssembler::freightPerText` / `documentDataAssembler.freightPerText`), feeds the PDF templates and the Word builder. The rest of the sentence, the insurance line and every other document are unchanged; documents already generated keep their text.
+
 Word copies say **Debit Note** like the PDF (QA item 11, owner decision 13 Nov 2026, confirm 1 + confirm 2): the Word Quotation and Proforma Invoice CIF insurance row reads "Confirmed by Debit Note when cargo is ready." and the Word Order Confirmation CFR/CIF freight row "A Debit Note will be raised when cargo is packed and ready …" (was "Freight Debit Note"); no buyer-facing Word text prints "Freight Debit Note" or the internal code "FDN". PDFs unchanged. Tests: `DocxDebitNoteWordingItem11Test` / `docxDebitNoteWordingItem11.test.js`; Natural Stone Word fixtures CIF_QT_docx, CIF_PI_docx, CIF_OC_docx captured again once.
 
 ### 5.7 Payment presets
