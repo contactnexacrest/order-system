@@ -163,6 +163,8 @@ describe('D-257 Phase 5 — overhead sharing and the Investor role', () => {
       WHERE r.name = 'Merchant Trade Executive' AND rp.is_enabled = 1`)).map((x) => x.k);
     for (const k of ['view_selling_prices', 'view_buyer_payments', 'manage_purchasing', 'view_purchase_prices', 'manage_payments']) expect(keys).toContain(k);
     expect(keys).not.toContain('see_all_divisions');
+    expect(keys).not.toContain('approve_payment_terms');
+    expect(keys).not.toContain('approve_documents');
     const chapters = (await db.query(`SELECT c.slug AS s FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive'`)).map((x) => x.s);
     expect(chapters).toContain('31-merchant-trade');
   });

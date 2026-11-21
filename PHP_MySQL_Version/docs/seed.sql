@@ -3194,6 +3194,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT n.id, rp.permission_id, 1 FROM roles n
   JOIN roles s ON s.name = 'Sales/Export Manager'
   JOIN role_permissions rp ON rp.role_id = s.id AND rp.is_enabled = 1
+  JOIN permissions sp ON sp.id = rp.permission_id AND sp.permission_key NOT IN ('approve_payment_terms', 'approve_documents')
  WHERE n.name = 'Merchant Trade Executive'
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = n.id AND x.permission_id = rp.permission_id);
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)

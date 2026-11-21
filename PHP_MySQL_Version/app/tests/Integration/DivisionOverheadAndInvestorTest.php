@@ -168,6 +168,8 @@ final class DivisionOverheadAndInvestorTest extends DbTestCase
             self::assertContains($k, $keys, $k);
         }
         self::assertNotContains('see_all_divisions', $keys, 'a division role, not company level');
+        self::assertNotContains('approve_payment_terms', $keys, 'no export approvals: merchant deals use none');
+        self::assertNotContains('approve_documents', $keys);
         $chapters = Database::connection()->query("SELECT c.slug FROM sop_role_chapters c JOIN roles r ON r.id = c.role_id WHERE r.name = 'Merchant Trade Executive'")->fetchAll(\PDO::FETCH_COLUMN);
         self::assertContains('31-merchant-trade', $chapters);
     }

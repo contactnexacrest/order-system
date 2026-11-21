@@ -1045,7 +1045,7 @@ role (D-214).
 | 22 | Export Compliance Manager | Export Compliance · manager | 13 | Executive on every order + approve documents, compliance task types. |
 | 23 | Export Compliance Director | Export Compliance · director | 14 | Manager + cockpit. |
 | 24 | Investor (view only) | none | 3 | `see_all_divisions`, `view_cockpit`, `view_reports` only (D-257). |
-| 25 | Merchant Trade Executive | Merchant Trade (staff placed in the division) | 31 | A whole Merchant Trade deal (D-399, 20 Nov 2026): the permissions, report access and SOP chapters of Sales/Export Manager plus `manage_purchasing` and `view_purchase_prices`, and SOP chapter 31. Migration 2026-11-20b. |
+| 25 | Merchant Trade Executive | Merchant Trade (staff placed in the division) | 31 | A whole Merchant Trade deal (D-399, 20 Nov 2026): the permissions, report access and SOP chapters of Sales/Export Manager except its two approvals (`approve_payment_terms`, `approve_documents`) plus `manage_purchasing` and `view_purchase_prices`, and SOP chapter 31. Migration 2026-11-20b. |
 
 Abbreviations used in the next table: ExpEx = Export Executive, AccEx =
 Accounts Executive, LogEx = Logistics Executive, Viewer = Viewer / Auditor,

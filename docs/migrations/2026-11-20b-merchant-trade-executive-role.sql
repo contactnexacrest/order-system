@@ -1,6 +1,7 @@
 -- 2026-11-20b — Owner decision D-399 (20 Nov 2026): a ready-made role for a whole Merchant Trade deal.
 -- "Merchant Trade Executive": the permissions of Sales/Export Manager (selling side, buyer payments, documents)
--- plus manage_purchasing and view_purchase_prices (the supplier side), its report access and SOP chapters, and
+-- except its two approvals (approve_payment_terms, approve_documents: merchant deals use neither) plus
+-- manage_purchasing and view_purchase_prices (the supplier side), its report access and SOP chapters, and
 -- SOP chapter 31 (Merchant Trade). No other role changes; no user is moved; nothing is deleted.
 -- Every INSERT is guarded with WHERE NOT EXISTS (no PREPARE, owner D-371): a second run changes nothing.
 -- Run docs/checks/check_all_migrations.sql first: this file's row says NEEDED until it has run.
@@ -12,6 +13,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT n.id, rp.permission_id, 1 FROM roles n
   JOIN roles s ON s.name = 'Sales/Export Manager'
   JOIN role_permissions rp ON rp.role_id = s.id AND rp.is_enabled = 1
+  JOIN permissions sp ON sp.id = rp.permission_id AND sp.permission_key NOT IN ('approve_payment_terms', 'approve_documents')
  WHERE n.name = 'Merchant Trade Executive'
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = n.id AND x.permission_id = rp.permission_id);
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)

@@ -158,10 +158,14 @@ describe('Agreements register (owner point 4, 2 Nov 2026)', () => {
     expect(assoc[0].agreement_type).toBe('Associate Agreement');
     expect(assoc[0].status).toBe('active');
 
+    // While the agreement is in force — moved a year past today so the check never depends on the day the test runs.
+    await db.execute('UPDATE clients SET agreement_expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR) WHERE id = :id', { id: clientId });
     const orderId = await createTestOrder(clientId);
     const data = await documentDataAssembler.assemble(orderId, 'QT');
     expect(JSON.stringify(data)).toContain('Subject to the Sales & Supply Agreement dated 5 Jan 2026');
 
+    // Back to its 20 Nov 2026 expiry: 7 days after 13 Nov.
+    await db.execute("UPDATE clients SET agreement_expiry_date = '2026-11-20' WHERE id = :id", { id: clientId });
     await agreementAlertService.run('2026-11-13');
     expect(await countNotes('Footer Client Ltd')).toBeGreaterThan(0);
   });

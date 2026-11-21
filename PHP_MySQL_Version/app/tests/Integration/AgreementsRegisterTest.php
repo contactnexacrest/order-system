@@ -199,12 +199,15 @@ final class AgreementsRegisterTest extends DbTestCase
         self::assertSame('Associate Agreement', $assoc[0]['agreement_type']);
         self::assertSame('active', $assoc[0]['status']);
 
-        // The client footer on documents still comes from the client record, as before.
+        // The client footer on documents still comes from the client record, as before (while the agreement
+        // is in force — moved a year past today so the check never depends on the day the test runs).
+        Database::connection()->prepare('UPDATE clients SET agreement_expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR) WHERE id = :id')->execute(['id' => $clientId]);
         $orderId = $this->createTestOrder($clientId);
         $data = DocumentDataAssembler::assemble($orderId, 'QT');
         self::assertStringContainsString('Subject to the Sales & Supply Agreement dated 5 Jan 2026', (string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        // The client agreement now gets reminders too.
+        // The client agreement now gets reminders too (back to its 20 Nov 2026 expiry: 7 days after 13 Nov).
+        Database::connection()->prepare("UPDATE clients SET agreement_expiry_date = '2026-11-20' WHERE id = :id")->execute(['id' => $clientId]);
         AgreementAlertService::run('2026-11-13'); // 7 days
         self::assertGreaterThan(0, (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE type = 'agreement_expiry' AND message LIKE '%Footer Client Ltd%'")->fetchColumn());
     }
