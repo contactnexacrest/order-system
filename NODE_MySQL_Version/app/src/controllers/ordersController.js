@@ -466,7 +466,8 @@ async function create(req, res) {
       onlyClient: preselectedClientId ? (allClients.find((c) => Number(c.id) === Number(preselectedClientId)) || null) : null,
       old,
       // D-402 (21 Nov 2026): the data-ins-* attributes the insurance calculator reads (values already HTML-escaped).
-      insuranceAttrs: await require('../services/marineInsurance').formAttributeHtml(),
+      // Only for users who may see selling prices (the calculator shows the FOB value); others get it filled on save.
+      insuranceAttrs: moneyVisibility.can(req.permissions, 'selling') ? await require('../services/marineInsurance').formAttributeHtml() : '',
     },
     'layout/base'
   );
@@ -917,7 +918,8 @@ async function editDetails(req, res) {
       isLocked: !!order.is_locked,
       canOverrideLock: orderEditGuard.canOverrideLock(req),
       // D-402 (21 Nov 2026): the data-ins-* attributes the insurance calculator reads (values already HTML-escaped).
-      insuranceAttrs: await require('../services/marineInsurance').formAttributeHtml(orderId),
+      // Only for users who may see selling prices (the calculator shows the FOB value); others get it filled on save.
+      insuranceAttrs: moneyVisibility.can(req.permissions, 'selling') ? await require('../services/marineInsurance').formAttributeHtml(orderId) : '',
     },
     'layout/base'
   );

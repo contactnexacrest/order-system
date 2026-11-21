@@ -230,6 +230,11 @@ final class MarineInsurance
     /** The attributes as an HTML attribute string. */
     public static function formAttributeHtml(?int $orderId = null): string
     {
+        // The calculator shows the order's FOB value: only for users who may see selling prices (money matrix).
+        // For anyone else the form has no calculator and the server fills an empty figure on save (fillIfEmpty).
+        if (!MoneyVisibility::can(MoneyVisibility::SELLING)) {
+            return '';
+        }
         $out = '';
         foreach (self::formAttributes($orderId) as $k => $v) {
             $out .= ' ' . $k . '="' . htmlspecialchars($v, ENT_QUOTES) . '"';
