@@ -126,9 +126,9 @@ About 24 roles, one part per role or close pair, 8–12 minutes each; listed in 
 
 | No. | File name | Covers | Status |
 |---|---|---|---|
-| E01 | `E01-Divisions-Domestic-Trade.mp4` | DOM: sale to Indian resellers in INR, GST tax invoices (planned division, shown in a test switch-on) | not started |
-| E02 | `E02-Divisions-Import-And-Distribution.mp4` | IMP: import, customs duty, landed cost, stock, local sale | not started |
-| E03 | `E03-Divisions-Merchant-Trade.mp4` | MTT: buy abroad, sell abroad, both legs in foreign currency; plus Admin › Divisions activation checklist | not started |
+| E01 | `E01-Divisions-Domestic-Trade.mp4` | DOM: sale to Indian resellers in INR, GST tax invoices (planned division, shown in a test switch-on) | **Recorded + checked + sent 21 Nov 2026 (English and Hindi):** 8.58 min, −20.1 dB; Hindi 10.60 min, −17.3 dB. Domestic Sales Executive: quotation, order confirmation, purchase, dispatch with e-way bill, GST tax invoice, payment. Re-recorded after the Group E fixes (D-400: spaced stage strip, "GST" wording, Settings › Divisions) and the new role (D-399). |
+| E02 | `E02-Divisions-Import-And-Distribution.mp4` | IMP: import, customs duty, landed cost, stock, local sale | **Recorded + checked + sent 21 Nov 2026 (English and Hindi):** 8.45 min, −19.9 dB; Hindi 10.57 min, −17.4 dB. Distribution Sales Executive: import, landed cost, stock check, local sale with GST tax invoice. Re-recorded after the Group E fixes (D-400: spaced stage strip, "GST" wording, Settings › Divisions) and the new role (D-399). |
+| E03 | `E03-Divisions-Merchant-Trade.mp4` | MTT: buy abroad, sell abroad, both legs in foreign currency; plus Admin › Divisions activation checklist | **Recorded + checked + sent 21 Nov 2026 (English and Hindi):** 8.56 min, −20.1 dB; Hindi 10.48 min, −17.2 dB. MD switches Merchant Trade on in Settings › Divisions; the Merchant Trade Executive (D-399) records both legs, RBI checks, AD bank checklist. Re-recorded after the Group E fixes (D-400: spaced stage strip, "GST" wording, Settings › Divisions) and the new role (D-399). |
 
 ## Out of date after the 11 Nov 2026 build — waiting for the owner's decision
 
@@ -359,7 +359,7 @@ D-280, D-282, D-290, D-293, D-310, D-320, D-330) where a script showed or said t
 | D03 Inside your order | yes (7 Nov) | My Orders: "Open order", "Did not go ahead", plain stage names (the active order reads "In production"); "Please confirm your order" box and its button; "Your purchase order" section and its closed-upload text; "Tell us what we could do better"; OC e-mail card as the template; recap. | **needed** |
 | D04 Balance, shipping and closing | yes (7 Nov) | E-mail cards: freight bill subject "Freight bill (debit note) … — please pay before we ship", BL copy, CI and balance-received texts as the templates; My Orders says "Shipping"; Report a Payment: bank reference number wording, "Payments you have told us about", "Received — we are checking it"; Reorder This narration: "Quantity not decided yet" and the new **"As per annexure"** tick (D-338); the Finish list has no "Polished" any more (demo lines "Natural Polish", D-357). | **needed** |
 | D05 When something goes wrong | yes (8 Nov) | "Tell us what we could do better", "Ask to cancel this order" (portal heading, button and the staff tick wording), "Did not go ahead", "Open order", "Your purchase order" with its new text; "Log in as this client" now in the Client portal login block (D-282); amendment card adds the **Products & prices** amendment (D-342: after QT approval, quantities / sizes / lines only by a signed amendment, a price only goes down). | **needed** |
-| B03 – B11, E01 – E03 | not started | — Write against the 13 Nov app: **B05** Procurement (Suppliers list offers, Offer active switch, "+ Add product" with SQFT input, Edit price, Supplier PO supplier-offer table and price-override reason, "Supplier performance" button, "Pricing ready?" supplier lines); **B09** MD / ED (Products list short view and "Show all columns", Configure / Edit, Link a supplier, Link these prices, Global pricing settings, Category price rules, Configure › Thickness rules, Duplicate, price-lock and Products & prices amendments). | not recorded |
+| B03 – B11 (E01 – E03 done 21 Nov 2026) | not started | — Write against the 13 Nov app: **B05** Procurement (Suppliers list offers, Offer active switch, "+ Add product" with SQFT input, Edit price, Supplier PO supplier-offer table and price-override reason, "Supplier performance" button, "Pricing ready?" supplier lines); **B09** MD / ED (Products list short view and "Show all columns", Configure / Edit, Link a supplier, Link these prices, Global pricing settings, Category price rules, Configure › Thickness rules, Duplicate, price-lock and Products & prices amendments). | not recorded |
 
 **Still to do before the associate videos are recorded again (not done in this pass):** the associate
 narration of C01, C03, C04 (parts C07, C08), C05 and C06 on commission statuses, payout day, levels and the
@@ -500,3 +500,10 @@ C05 9.7 · C06 10.4 minutes (Group C about 53 minutes).
 - Part 2 is 7.98 min (1 s under the 8-minute aim); accepted.
 - Seen in the app while recording (not changed, reported to the owner): (1) Order Communication labels a staff post "not emailed (no client email on file)" even when the client has an e-mail and only e-mail sending is off; (2) the Dashboard's Recent Activity for an Export Executive lists the latest audit entries of the whole app (other people's logins, stage passes on orders they are not assigned to); (3) on New Order, a picked product's specification options (grade, thickness, finish …) render as a tall column that pushes "Pick from Products" below them; (4) a staff login with a role but no department membership sees every department's tasks in My Tasks.
 
+
+## Group E re-recorded 21 Nov 2026 (D-400 wording/layout, D-399 role, D-401 freight line)
+
+**Done (owner 20 Nov: "Re-record all 6"):** E01, E02 and E03 in English and Hindi, recorded on the 21 Nov app (stage
+strip spaced out, "Generate the GST tax invoice", "Settings › Divisions" in messages, `{DIV}` number format, E03 signed
+in as the Merchant Trade Executive). Checked (length against subtitles, loudness, frames, flicker scan — hits are
+ordinary page changes) and sent to the owner on 21 Nov 2026, English and Hindi under one heading each.
