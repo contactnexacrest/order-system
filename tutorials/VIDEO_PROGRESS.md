@@ -507,3 +507,6 @@ C05 9.7 · C06 10.4 minutes (Group C about 53 minutes).
 strip spaced out, "Generate the GST tax invoice", "Settings › Divisions" in messages, `{DIV}` number format, E03 signed
 in as the Merchant Trade Executive). Checked (length against subtitles, loudness, frames, flicker scan — hits are
 ordinary page changes) and sent to the owner on 21 Nov 2026, English and Hindi under one heading each.
+
+## After the 21 Nov 2026 builds D-402 / D-403 / D-404 (noted, no re-record)
+Calculated marine insurance on CIF orders (Edit / New order freight & insurance box), the insurance cover wording and the "Estimated total CIF / CFR value" line on the QT / PI. Checked against every recorded video: none shows the CIF freight & insurance box being filled or the inside of a CIF QT / PI (D01 shows only the e-mail cards with the attachment name). No video is affected, so nothing is re-recorded.
