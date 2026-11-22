@@ -510,3 +510,10 @@ ordinary page changes) and sent to the owner on 21 Nov 2026, English and Hindi u
 
 ## After the 21 Nov 2026 builds D-402 / D-403 / D-404 (noted, no re-record)
 Calculated marine insurance on CIF orders (Edit / New order freight & insurance box), the insurance cover wording and the "Estimated total CIF / CFR value" line on the QT / PI. Checked against every recorded video: none shows the CIF freight & insurance box being filled or the inside of a CIF QT / PI (D01 shows only the e-mail cards with the attachment name). No video is affected, so nothing is re-recorded.
+
+## B01 Part 2 re-recorded 22 Nov 2026 (QA Round 10, R9-N01) — owner: "yes rerecord B01 part 2"
+After the R9-N01 fix the Export Executive no longer sees the rupees the bank credited or the rate (receipts table and the
+"Received …" line in Step 5d/5e and the Payment Overview). B01 Part 2 re-recorded on the 22 Nov app (tutorial stack synced,
+clean tutorial database with migrations 2026-11-21a and 2026-11-22a): English 8.24 min, Hindi 10.54 min; checked and sent
+to the owner as replacements. D-402…D-407 (CIF insurance, Debit Note wording, QT/PI "To Be Confirmed") affect no recorded
+video — none shows the CIF freight/insurance box or the inside of a Debit Note / CIF Quotation / PI.
