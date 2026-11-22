@@ -1025,7 +1025,7 @@ async function updateDetails(req, res) {
   // D-405 (22 Nov 2026): the freight (or the products since the last save) changed and staff did not change the
   // insurance in this save — the premium is recalculated. A figure changed in this save is kept.
   const ins = require('../services/marineInsurance');
-  const money = (v) => (String(v ?? '').trim() === '' ? null : (Math.round(parseFloat(String(v).replace(/,/g, '')) * 100) / 100).toFixed(2));
+  const money = (v) => (String(v ?? '').trim() === '' ? null : require('../helpers/money').phpRound(parseFloat(String(v).replace(/,/g, '')), 2).toFixed(2));
   const insChanged = money(body.indicative_insurance_amount) !== money(order.indicative_insurance_amount);
   const freightChanged = money(body.indicative_freight_amount) !== money(order.indicative_freight_amount);
   let recalc = null;

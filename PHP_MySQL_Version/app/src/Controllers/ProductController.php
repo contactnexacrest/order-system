@@ -917,10 +917,10 @@ final class ProductController
             return 'Supplier name is required.';
         }
         // R10-N06 (QA Round 10): the same checks on the server as in the browser — nothing wrong is stored.
-        if ($data['contact_phone'] !== null && !preg_match(self::PHONE_PATTERN, $data['contact_phone'])) {
+        if (($data['contact_phone'] ?? null) !== null && $data['contact_phone'] !== '' && !preg_match(self::PHONE_PATTERN, $data['contact_phone'])) {
             return self::PHONE_MESSAGE;
         }
-        if ($data['contact_email'] !== null && !filter_var($data['contact_email'], FILTER_VALIDATE_EMAIL)) {
+        if (($data['contact_email'] ?? null) !== null && $data['contact_email'] !== '' && !filter_var($data['contact_email'], FILTER_VALIDATE_EMAIL)) {
             return 'Contact email: enter a valid email address, e.g. name@company.com, or leave it blank.';
         }
         foreach (['fob_value' => 'FOB value', 'factory_cost' => 'Factory cost', 'transportation_cost' => 'Transportation cost',

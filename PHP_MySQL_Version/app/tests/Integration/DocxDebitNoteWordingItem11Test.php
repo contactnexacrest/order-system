@@ -72,8 +72,8 @@ final class DocxDebitNoteWordingItem11Test extends DbTestCase
                 self::assertStringContainsString(self::OC_FREIGHT, $word, "Item 11: Word OC freight row ({$incoterm})");
                 self::assertStringContainsString('A Debit Note will be raised when cargo is packed and ready', $pdf, "Item 11: the PDF OC says the same ({$incoterm})");
             } elseif ($incoterm === 'CIF') {
-                self::assertStringContainsString('Confirmed by Debit Note when cargo is ready.', $word, "Item 11: Word {$code} CIF insurance row");
-                self::assertStringContainsString('Confirmed by Debit Note when cargo is ready.', $pdf, "Item 11: the PDF {$code} says the same");
+                self::assertStringContainsString('To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.', $word, "Item 11: Word {$code} CIF insurance row (D-407: insurance not entered yet)");
+                self::assertStringContainsString('To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.', $pdf, "Item 11: the PDF {$code} says the same");
             } else {
                 self::assertStringContainsString('NIL — buyer arranges insurance (CFR).', $word, "Item 11: Word {$code} CFR insurance row unchanged");
             }

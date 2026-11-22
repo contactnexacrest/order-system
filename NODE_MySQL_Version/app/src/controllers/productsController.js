@@ -918,10 +918,10 @@ function validateSupplier(data, existing, body = {}) {
     return 'Supplier name is required.';
   }
   // R10-N06 (QA Round 10): the same checks on the server as in the browser — nothing wrong is stored.
-  if (data.contact_phone !== null && !PHONE_PATTERN.test(data.contact_phone)) {
+  if (data.contact_phone != null && data.contact_phone !== '' && !PHONE_PATTERN.test(data.contact_phone)) {
     return PHONE_MESSAGE;
   }
-  if (data.contact_email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_email)) {
+  if (data.contact_email != null && data.contact_email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_email)) {
     return 'Contact email: enter a valid email address, e.g. name@company.com, or leave it blank.';
   }
   const parts = { fob_value: 'FOB value', factory_cost: 'Factory cost', transportation_cost: 'Transportation cost',

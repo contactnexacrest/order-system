@@ -70,8 +70,8 @@ describe('Item 11: Word Quotation, PI and OC say "Debit Note" like the PDF', () 
         expect([incoterm, code, word.includes(OC_FREIGHT)]).toEqual([incoterm, code, true]);
         expect([incoterm, code, 'pdf', pdf.includes('A Debit Note will be raised when cargo is packed and ready')]).toEqual([incoterm, code, 'pdf', true]);
       } else if (incoterm === 'CIF') {
-        expect([code, word.includes('Confirmed by Debit Note when cargo is ready.')]).toEqual([code, true]);
-        expect([code, 'pdf', pdf.includes('Confirmed by Debit Note when cargo is ready.')]).toEqual([code, 'pdf', true]);
+        expect([code, word.includes('To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.')]).toEqual([code, true]);
+        expect([code, 'pdf', pdf.includes('To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.')]).toEqual([code, 'pdf', true]);
       } else {
         expect(word).toContain('NIL — buyer arranges insurance (CFR).');
       }
