@@ -2309,6 +2309,17 @@ figure as soon as the freight or a product changes, and says so. Recalculation s
 Freight Debit Note step (`order_freight.insurance_amount`). Orders saved before D-405 keep their figure until their products or
 freight next change. A typed 0 is kept as 0 on both stacks (R10-N02).
 
+**Debit Note wording and "To Be Confirmed" on the QT / PI (D-406 / D-407, 22 Nov 2026, owner confirmed twice).** The Freight
+Debit Note (PDF and Word, both stacks): Order Reference label **Freight Forwarder** (was "Shipping Line"; the value is the forwarder
+picked on the order); the Insurance row's remark is `order.dn_insurance_remark` (`DocumentDataAssembler::dnInsuranceRemark` /
+`dnInsuranceRemark`): CIF "<cover wording>, <cover %>% of CIF value — actual premium", CFR "Buyer arranges insurance (CFR)", FOB
+"NIL — FOB order"; under TOTAL AMOUNT DUE a blue box **How this Debit Note fits your order** (`order.dn_fit_note` / `dnFitNote`):
+"Freight [and insurance] under Proforma Invoice No. … The Commercial Invoice will show this Debit Note as paid; the balance on the
+Commercial Invoice is for the goods (FOB value) only." (+ "Insurance is arranged by the buyer (CFR)." on CFR; none on FOB). On the
+Quotation / PI an indicative freight not entered yet prints "Indicative approx. <cur> To Be Confirmed — per …" and an insurance
+not entered yet "To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready." (was "XXX" /
+"XX"). The Commercial Invoice and every other document are unchanged (it already names the Debit Note's number and date).
+
 **QA Round 10 fixes (22 Nov 2026, both stacks).** Order form limits (browser and server, same words): production and sailing
 lead times 0–365 days, Total CBM 0–10,000 (3 decimals), weights 0–1,000,000 kg, indicative freight / insurance 0–10,000,000 (2
 decimals); the inspection fee 0–10,000,000 (2 decimals). A field with `data-max-value` / `data-max-decimals` refuses text such as

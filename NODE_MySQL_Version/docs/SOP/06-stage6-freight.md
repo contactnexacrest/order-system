@@ -84,6 +84,16 @@ buyer for these charges. Take it through [Document Review &
 Approval](./13-document-review-approval.md): 9d is refused until the Debit
 Note is approved (buyer e-mails held) or sent (buyer e-mails sent).
 
+**What the Debit Note says (D-406, 22 Nov 2026).** Order Reference shows
+the **Freight Forwarder** you picked. The Insurance row's remark names the
+cover on a CIF order (e.g. *ICC (A) incl. breakage, 110% of CIF value —
+actual premium*), or *Buyer arranges insurance (CFR)*. Under the total, a
+box **How this Debit Note fits your order** tells the buyer it is for
+freight (and insurance on CIF) under the PI, and that the Commercial
+Invoice will show it as paid — the invoice balance is for the goods (FOB
+value) only. The Commercial Invoice names this Debit Note's number and
+date by itself.
+
 The Debit Note itself states payment is due within **3 Calendar Days**
 of its own date (previously "3 working days" — every buyer payment
 obligation across the system now counts in Calendar Days, not Working

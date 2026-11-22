@@ -36,7 +36,8 @@
   <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}. Freight recovery applies as agreed under the referenced Proforma Invoice.</td></tr>
   <tr><td class="k">Port of Loading</td><td class="v">{{ order.port_of_loading }}</td></tr>
   <tr><td class="k">Port of Discharge</td><td class="v">{{ order.port_of_discharge }}</td></tr>
-  <tr><td class="k">Shipping Line</td><td class="v">{{ freight.freight_forwarder_name or 'To Be Confirmed' }}</td></tr>
+  {# D-406 (owner confirmed twice): the forwarder picked on the order, so it is labelled as one. #}
+  <tr><td class="k">Freight Forwarder</td><td class="v">{{ freight.freight_forwarder_name or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Cargo Status</td><td class="v">{{ ('Packed and ready for shipment as of ' ~ packing.packing_date) if packing.packing_date else 'To Be Confirmed' }}</td></tr>
 </table>
 
@@ -59,7 +60,7 @@
     <td>Insurance</td>
     <td></td>
     <td class="num">{% if order.incoterm_code == 'CIF' %}{{ freight.insurance_amount or 'To Be Confirmed' }}{% else %}NIL{% endif %}</td>
-    <td class="placeholder-italic" style="font-size:8.5pt;">CIF only — if FOB/CFR enter NIL</td>
+    <td class="placeholder-italic" style="font-size:8.5pt;">{{ order.dn_insurance_remark }}</td>
   </tr>
   <tr style="background:#F1F5F9;">
     <td>GST / IGST (if applicable)</td>
@@ -72,6 +73,8 @@
   <tr class="highlight"><td class="k">TOTAL AMOUNT DUE ({{ order.currency_code }}) &nbsp;<span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(incl. GST if applicable)</span></td><td class="v" style="font-style:italic;">{{ freight.total_freight_and_insurance or 'To Be Confirmed' }}</td></tr>
 </table>
 
+{# D-406 (owner confirmed twice): how this Debit Note fits the order (none on an FOB order). #}
+{% if order.dn_fit_note %}<div class="banner" style="background:#E8F1FB; color:#1F2937; text-align:left; border:1px solid #185FA5; margin-top:6pt;"><strong style="color:#185FA5;">How this Debit Note fits your order</strong><br>{{ order.dn_fit_note }}</div>{% endif %}
 <div class="section-title">5. PAYMENT INSTRUCTIONS</div>
 <div class="banner banner-red" style="text-align:left; font-size:9.5pt; font-weight:normal;">
   <p style="margin:0 0 4pt;"><strong>Payment Due:</strong> <span style="color:#5A1414;">Within 3 Calendar Days of this Debit Note date — by <em>{{ freight.payment_due_date or 'To Be Confirmed' }}</em></span></p>

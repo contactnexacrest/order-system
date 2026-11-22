@@ -226,6 +226,10 @@ final class DocumentDataAssembler
                 'freight_per_text'     => self::freightPerText($order['container_type'] ?? null),
                 // D-403 (21 Nov 2026, owner confirmed twice): the QT / PI "Insurance" row of a CIF order names the cover.
                 'insurance_cover_text' => $isCif ? self::insuranceCoverText($orderId) : null,
+                // D-406 (22 Nov 2026, owner confirmed twice): the Debit Note's insurance remark and its
+                // "How this Debit Note fits your order" box (PDF and Word read these two values).
+                'dn_insurance_remark'  => self::dnInsuranceRemark($isFob, $isCif, $orderId),
+                'dn_fit_note'          => self::dnFitNote($isFob, $isCif, $piDoc['document_reference'] ?? null),
                 'est_lead_time_text'   => $order['est_lead_time_text'] ?? 'To Be Confirmed',
                 'est_shipment_date_text' => $order['est_shipment_date_text'] ?? 'To Be Confirmed',
                 'production_status_text' => $order['production_status_text'] ?? 'Not yet commenced',
@@ -485,6 +489,33 @@ final class DocumentDataAssembler
         $rate = MarineInsurance::rateFor(MarineInsurance::orderCategoryIds($orderId), $s);
         $cover = rtrim(rtrim(number_format($s['cover_pct'], 2, '.', ''), '0'), '.');
         return $rate['wording'] . ', ' . $cover . '% of CIF value — arranged by seller; actual premium billed by Debit Note.';
+    }
+
+    /** D-406: the Insurance row's remark on the Freight Debit Note. */
+    public static function dnInsuranceRemark(bool $isFob, bool $isCif, int $orderId): string
+    {
+        if ($isFob) {
+            return 'NIL — FOB order';
+        }
+        if (!$isCif) {
+            return 'Buyer arranges insurance (CFR)';
+        }
+        $s = MarineInsurance::settings();
+        $rate = MarineInsurance::rateFor(MarineInsurance::orderCategoryIds($orderId), $s);
+        $cover = rtrim(rtrim(number_format($s['cover_pct'], 2, '.', ''), '0'), '.');
+        return $rate['wording'] . ', ' . $cover . '% of CIF value — actual premium';
+    }
+
+    /** D-406: the "How this Debit Note fits your order" box on the Freight Debit Note (none on an FOB order). */
+    public static function dnFitNote(bool $isFob, bool $isCif, ?string $piRef): ?string
+    {
+        if ($isFob) {
+            return null;
+        }
+        $pi = $piRef !== null && $piRef !== '' ? $piRef : 'To Be Confirmed';
+        return ($isCif ? 'Freight and insurance' : 'Freight') . ' under Proforma Invoice No. ' . $pi
+            . '. The Commercial Invoice will show this Debit Note as paid; the balance on the Commercial Invoice is for the goods (FOB value) only.'
+            . ($isCif ? '' : ' Insurance is arranged by the buyer (CFR).');
     }
 
     /**

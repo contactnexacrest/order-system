@@ -223,6 +223,10 @@ async function assemble(orderId, documentTypeCode = null) {
       freight_per_text: freightPerText(order.container_type),
       // D-403 (21 Nov 2026, owner confirmed twice): the QT / PI "Insurance" row of a CIF order names the cover.
       insurance_cover_text: isCif ? await insuranceCoverText(orderId) : null,
+      // D-406 (22 Nov 2026, owner confirmed twice): the Debit Note's insurance remark and its
+      // "How this Debit Note fits your order" box (PDF and Word read these two values).
+      dn_insurance_remark: await dnInsuranceRemark(isFob, isCif, orderId),
+      dn_fit_note: dnFitNote(isFob, isCif, piDoc ? piDoc.document_reference : null),
       est_lead_time_text: order.est_lead_time_text ?? 'To Be Confirmed',
       est_shipment_date_text: order.est_shipment_date_text ?? 'To Be Confirmed',
       production_status_text: order.production_status_text ?? 'Not yet commenced',
@@ -1036,6 +1040,24 @@ async function insuranceCoverText(orderId) {
   return `${rate.wording}, ${cover}% of CIF value — arranged by seller; actual premium billed by Debit Note.`;
 }
 
+/** D-406: the Insurance row's remark on the Freight Debit Note. PHP twin: DocumentDataAssembler::dnInsuranceRemark. */
+async function dnInsuranceRemark(isFob, isCif, orderId) {
+  if (isFob) return 'NIL — FOB order';
+  if (!isCif) return 'Buyer arranges insurance (CFR)';
+  const marineInsurance = require('./marineInsurance');
+  const s = await marineInsurance.settings();
+  const rate = await marineInsurance.rateFor(await marineInsurance.orderCategoryIds(orderId), s);
+  const cover = round2(s.cover_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return `${rate.wording}, ${cover}% of CIF value — actual premium`;
+}
+
+/** D-406: the "How this Debit Note fits your order" box on the Freight Debit Note (none on an FOB order). */
+function dnFitNote(isFob, isCif, piRef) {
+  if (isFob) return null;
+  const pi = piRef !== null && piRef !== undefined && piRef !== '' ? piRef : 'To Be Confirmed';
+  return `${isCif ? 'Freight and insurance' : 'Freight'} under Proforma Invoice No. ${pi}. The Commercial Invoice will show this Debit Note as paid; the balance on the Commercial Invoice is for the goods (FOB value) only.${isCif ? '' : ' Insurance is arranged by the buyer (CFR).'}`;
+}
+
 /**
  * D-404: "Estimated total CIF / CFR value" on the QT / PI — FOB + indicative freight (+ indicative insurance on CIF).
  * The FOB total, advance and balance are unchanged. A figure not entered yet reads "To Be Confirmed" in the sum.
@@ -1368,6 +1390,8 @@ module.exports = {
   cooLine,
   freightPerText,
   insuranceCoverText,
+  dnInsuranceRemark,
+  dnFitNote,
   estimatedValue,
   balanceTriggerSentence,
   resolveAgreementFooter,

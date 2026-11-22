@@ -445,6 +445,10 @@ quote): it is kept, and the note offers **Use calculated** to go back. If
 you save a CIF order with the box empty, the app fills in the calculated
 figure. The buyer still pays the actual premium by Debit Note at Stage 6.
 
+**Freight or insurance not entered yet (D-407, 22 Nov 2026):** the
+Quotation and PI print *To Be Confirmed* in those rows (never "XXX" /
+"XX"), the same as the amber estimated-value line.
+
 **When the products or the freight change, the insurance is worked out again
 (D-405, 22 Nov 2026).** This happens even if you typed your own figure (or
 0) — the order page then says *Insurance recalculated from … to … because

@@ -392,8 +392,8 @@ function renderQt(context) {
 
   const freightText = order.is_fob
     ? 'NIL'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'freight_per_text')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Debit Note when cargo is ready.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'To Be Confirmed —')} per ${g(order, 'freight_per_text')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : (g(order, 'indicative_insurance_amount', '') !== '' ? `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount')}. Confirmed by Debit Note when cargo is ready.` : 'To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.');
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency})`, value: g(financial, 'fob_value') },
@@ -515,8 +515,8 @@ function renderPi(context) {
 
   const freightText = order.is_fob
     ? 'NIL'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'freight_per_text')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Debit Note when cargo is ready.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'To Be Confirmed —')} per ${g(order, 'freight_per_text')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : (g(order, 'indicative_insurance_amount', '') !== '' ? `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount')}. Confirmed by Debit Note when cargo is ready.` : 'To Be Confirmed — worked out once the freight is known; billed by Debit Note when cargo is ready.');
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency})`, value: g(financial, 'fob_value') },
@@ -1263,7 +1263,7 @@ function renderFdn(context) {
       { label: 'Incoterm', value: `${g(order, 'incoterm_label')}. Freight recovery applies as agreed under the referenced Proforma Invoice.` },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
       { label: 'Port of Discharge', value: g(order, 'port_of_discharge') },
-      { label: 'Shipping Line', value: g(freight, 'freight_forwarder_name', 'To Be Confirmed') },
+      { label: 'Freight Forwarder', value: g(freight, 'freight_forwarder_name', 'To Be Confirmed') }, // D-406
       { label: 'Cargo Status', value: g(context, 'packing.packing_date') !== '—' ? `Packed and ready for shipment as of ${g(context, 'packing.packing_date')}` : 'To Be Confirmed' },
     ])
   );
@@ -1273,11 +1273,15 @@ function renderFdn(context) {
     ...C.productsTable(['Description', 'Container Type', `Amount (${currency})`, 'Remarks'], [22, 18, 20, 40], [
       { cells: ['Ocean Freight', g(order, 'container_type'), g(freight, 'confirmed_freight_rate', 'To Be Confirmed'), `Confirmed rate — ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}`], align: [null, null, 'right', null] },
       { cells: ['Origin Charges (if any)', '', 'NIL', `THC, documentation charges at ${g(order, 'port_of_loading')} — if applicable`], align: [null, null, 'right', null] },
-      { cells: ['Insurance', '', g(order, 'incoterm_code') === 'CIF' ? g(freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', 'CIF only — if FOB/CFR enter NIL'], align: [null, null, 'right', null] },
+      { cells: ['Insurance', '', g(order, 'incoterm_code') === 'CIF' ? g(freight, 'insurance_amount', 'To Be Confirmed') : 'NIL', g(order, 'dn_insurance_remark')], align: [null, null, 'right', null] },
       { cells: ['GST / IGST (if applicable)', '', 'NIL', 'Freight recovery is a pure cost reimbursement, not a taxable service supply'], align: [null, null, 'right', null] },
     ])
   );
   children.push(...C.totalsTable([{ label: `TOTAL AMOUNT DUE (${currency})  (incl. GST if applicable)`, value: g(freight, 'total_freight_and_insurance', 'To Be Confirmed'), highlight: true }]));
+  // D-406 (owner confirmed twice): how this Debit Note fits the order (none on an FOB order).
+  if (order.dn_fit_note) {
+    children.push(...C.colorBox(C.BLUE_BG, C.BLUE_BORDER, [C.rich([['How this Debit Note fits your order', { bold: true, color: C.BLUE_BORDER }]]), C.plain(String(order.dn_fit_note))]));
+  }
 
   children.push(...C.sectionTitle('5. PAYMENT INSTRUCTIONS'));
   children.push(
