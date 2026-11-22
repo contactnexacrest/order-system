@@ -117,16 +117,16 @@
           <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars((string) ($old['est_lead_time_text'] ?? '')) ?>" placeholder="e.g. 45-60 days from advance receipt" maxlength="255">
         </label>
         <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" max="365" value="<?= htmlspecialchars((string) ($old['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
+          <input max="365" type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" value="<?= htmlspecialchars((string) ($old['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
         </label>
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" name="lead_time_max_days" max="365" value="<?= htmlspecialchars((string) ($old['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
+          <input max="365" type="number" min="0" name="lead_time_max_days" value="<?= htmlspecialchars((string) ($old['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
         </label>
         <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <?= \App\Helpers\PermittedLinks::currentUserMayOpen('/port-routes') ? '<a href="/port-routes" target="_blank">Port Routes</a>' : 'Port Routes' ?> once both ports are picked, still editable)</small>
-          <input type="number" min="0" data-not-more-than="[name=sailing_lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="sailing_lead_time_min_days" max="365" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
+          <input max="365" type="number" min="0" data-not-more-than="[name=sailing_lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" name="sailing_lead_time_max_days" max="365" id="sailing-lead-time-max" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 24">
+          <input max="365" type="number" min="0" name="sailing_lead_time_max_days" id="sailing-lead-time-max" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 24">
         </label>
       </div>
     </fieldset>
@@ -134,10 +134,10 @@
     <fieldset>
       <legend>Estimated Weight &amp; Volume <small class="muted">(shown on QT/PI — actuals confirmed later at Packing List)</small></legend>
       <div class="field-grid">
-        <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" data-max-value="10000" data-max-decimals="3" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g. 28.5"></label>
+        <label>Total CBM (m&sup3;)<input data-max-value="10000" data-max-decimals="3" type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($old['estimated_total_cbm'] ?? '')) ?>" placeholder="e.g. 28.5"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($old['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates" maxlength="50"></label>
-        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" data-max-value="1000000" data-max-decimals="2" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 24000"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" data-max-value="1000000" data-max-decimals="2" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 23500"></label>
+        <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input data-max-value="1000000" data-max-decimals="2" type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 24000"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input data-max-value="1000000" data-max-decimals="2" type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($old['estimated_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 23500"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             <?php foreach ($packageTypes as $o): ?>
@@ -151,8 +151,8 @@
     <fieldset id="freight-insurance-fieldset"<?= \App\Services\MarineInsurance::formAttributeHtml() ?>>
       <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF — not needed for FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
-        <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" data-max-value="10000000" data-max-decimals="2" value="<?= htmlspecialchars((string) ($old['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g. 950"></label>
-        <label id="insurance-field">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" data-max-value="10000000" data-max-decimals="2" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
+        <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input data-max-value="10000000" data-max-decimals="2" type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($old['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g. 950"></label>
+        <label id="insurance-field">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input data-max-value="10000000" data-max-decimals="2" type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($old['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g. 120"></label>
       </div>
       <p class="muted small">Ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This is the current indicative rate only — the real rate is confirmed by Debit Note once cargo is packed and ready (Stage 6). Ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against the Debit Note, before the vessel is booked.</p>
     </fieldset>

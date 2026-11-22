@@ -176,7 +176,8 @@ final class QuantityLimitsItem10aTest extends DbTestCase
             self::assertMatchesRegularExpression('/name="' . $name . '"[^>]*data-max-value="1000000"[^>]*data-confirm-above="\{[^"]*&quot;SQM&quot;:30000[^"]*&quot;CBM&quot;:500[^"]*\}" data-confirm-unit="' . preg_quote($unit, '/') . '"/', $html, $form);
             self::assertStringContainsString('data-confirm-message="This is unusually large for one line (more than about 20 containers of {unit}).', $html, $form);
             self::assertStringContainsString('I confirm this quantity</label>', $html, $form);
-            self::assertStringNotContainsString('data-max-value="10000000"', $html, $form);
+            // The quantity no longer allows 10,000,000 (R10-N03 gave the freight / insurance boxes that limit — not checked here).
+            self::assertDoesNotMatchRegularExpression('/name="' . $name . '"[^>]*data-max-value="10000000"/', $html, $form);
         }
         // Settings page: the levels' inputs carry min 1 / max 1,000,000.
         $settings = $this->render(fn () => (new \App\Controllers\SettingsController())->index([]));

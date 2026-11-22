@@ -183,7 +183,8 @@ describe('Order line quantity limits (owner decision item 10a)', () => {
       expect(html).toMatch(new RegExp(`name="${esc(name)}"[^>]*data-max-value="1000000"[^>]*data-confirm-above="\\{[^"]*&quot;SQM&quot;:30000[^"]*&quot;CBM&quot;:500[^"]*\\}" data-confirm-unit="${esc(unit)}"`));
       expect(html).toContain('data-confirm-message="This is unusually large for one line (more than about 20 containers of {unit}).');
       expect(html).toContain('I confirm this quantity</label>');
-      expect(html).not.toContain('data-max-value="10000000"');
+      // The quantity no longer allows 10,000,000 (R10-N03 gave the freight / insurance boxes that limit — not checked here).
+      expect(html).not.toMatch(new RegExp(`name="${esc(name)}"[^>]*data-max-value="10000000"`));
     }
     expect(create).toContain('<input type="hidden" name="product_confirm_large_quantity[]" value="0">');
     expect(create).toContain('<input type="checkbox" data-confirm-tick="product_confirm_large_quantity[]" >');

@@ -106,8 +106,8 @@ final class Round5ValidationTest extends DbTestCase
     /** R5-29: the same numbers on New Order. */
     public function testNewOrderRefusesTextInTheCbm(): void
     {
-        self::assertSame('Total CBM must be a number of 0 or more (digits and a decimal point only).', FieldValidator::orderNumbers(['estimated_total_cbm' => '12,5 kg']));
-        self::assertSame('Sailing time (max days) must be a whole number of 0 or more.', FieldValidator::orderNumbers(['sailing_lead_time_max_days' => '-1']));
+        self::assertSame('Total CBM must be a number from 0 to 10000.', FieldValidator::orderNumbers(['estimated_total_cbm' => '12,5 kg'])); // R10-N03: with its upper limit
+        self::assertSame('Sailing time (max days) must be a whole number from 0 to 365.', FieldValidator::orderNumbers(['sailing_lead_time_max_days' => '-1'])); // R10-N03: with its upper limit
         self::assertNull(FieldValidator::orderNumbers(['lead_time_min_days' => '45', 'estimated_total_cbm' => '28.5']));
     }
 
