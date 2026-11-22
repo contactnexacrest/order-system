@@ -212,8 +212,12 @@ final class ImportController
             return;
         }
         $pdf = ImportDocumentService::pdf((int) $s['id']);
-        ImportService::markPoGenerated((int) $s['id'], (int) self::user()['id']);
-        AuditLogRepository::log((int) self::user()['id'], 'IMPORT_PO_GENERATED', 'import_shipments', (int) $s['id'], 'reference', null, (string) $s['reference']);
+        // R9-N05 (QA Round 9/10): only an editor marks the PO generated (and freezes the company details on it);
+        // a viewer with view_purchase_prices only downloads a copy — as on the Merchant Trade PO (ACC-4).
+        if (self::can('manage_purchasing')) {
+            ImportService::markPoGenerated((int) $s['id'], (int) self::user()['id']);
+            AuditLogRepository::log((int) self::user()['id'], 'IMPORT_PO_GENERATED', 'import_shipments', (int) $s['id'], 'reference', null, (string) $s['reference']);
+        }
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="IPO ' . str_replace('/', '-', (string) $s['reference']) . '.pdf"');
         echo $pdf;

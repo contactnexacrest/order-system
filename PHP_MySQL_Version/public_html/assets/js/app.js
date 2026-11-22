@@ -1518,12 +1518,19 @@
     // hold as entered (QA Round 6, R6-N14/N15/N21/N23) — 0.0001 for a
     // 2-decimal price was silently saved as 0.00, and a too-large value was
     // a server error.
-    if (value !== '' && el.dataset.maxDecimals !== undefined && /^\d*\.?\d+$/.test(value)) {
-      var decimalsPart = value.indexOf('.') === -1 ? '' : value.slice(value.indexOf('.') + 1).replace(/0+$/, '');
+    // R10-N07 (QA Round 10): such a field holds a number only — text like "12,5 kg" is refused here, beside the
+    // field, instead of after a round-trip to the server. Thousands commas ("1,250.50") are allowed.
+    if (value !== '' && (el.dataset.maxDecimals !== undefined || el.dataset.maxValue !== undefined)
+        && !/^-?\d*\.?\d+$/.test(value.replace(/,(?=\d{3}(\D|$))/g, ''))) {
+      return 'Enter a number, e.g. 12.50.';
+    }
+    var numText = value.replace(/,(?=\d{3}(\D|$))/g, '');
+    if (value !== '' && el.dataset.maxDecimals !== undefined && /^\d*\.?\d+$/.test(numText)) {
+      var decimalsPart = numText.indexOf('.') === -1 ? '' : numText.slice(numText.indexOf('.') + 1).replace(/0+$/, '');
       var maxDecimals = parseInt(el.dataset.maxDecimals, 10);
       if (decimalsPart.length > maxDecimals) return maxDecimals === 0 ? 'Enter a whole number.' : 'Use at most ' + maxDecimals + ' decimal' + (maxDecimals === 1 ? '' : 's') + '.';
     }
-    if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
+    if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(numText) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
     }
     // data-confirm-above (owner decision item 10a): above about 20 containers of its unit, a

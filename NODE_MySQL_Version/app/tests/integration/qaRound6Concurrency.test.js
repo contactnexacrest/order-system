@@ -122,16 +122,16 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     const holder = await db.pool.getConnection();
     const count = async () => Number((await db.queryOne('SELECT COUNT(*) AS n FROM documents WHERE order_id = :o', { o: orderId })).n);
     try {
-      await holder.query('SELECT GET_LOCK(?, 0)', [`nx_docgen_${orderId}_QT`]);
+      await holder.query("SELECT GET_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), ?), 0)", [`_${orderId}_QT`]); // R10-N08: per database
       const before = await count();
       const res = await post(`/orders/${orderId}/documents/generate`, { document_type: 'QT' }, `/orders/${orderId}`);
       expect((await flashAfter(res)).message).toBe('This document is being generated right now — wait a moment, then refresh the page.');
       expect(await count()).toBe(before);
     } finally {
-      await holder.query('SELECT RELEASE_LOCK(?)', [`nx_docgen_${orderId}_QT`]);
+      await holder.query("SELECT RELEASE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), ?))", [`_${orderId}_QT`]);
       holder.release();
     }
-    expect(Number((await db.queryOne('SELECT IS_FREE_LOCK(:n) AS free', { n: `nx_docgen_${orderId}_QT` })).free)).toBe(1);
+    expect(Number((await db.queryOne("SELECT IS_FREE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), :n)) AS free", { n: `_${orderId}_QT` })).free)).toBe(1);
   });
 
   const fingerprintFrom = (html) => {

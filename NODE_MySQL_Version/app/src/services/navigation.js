@@ -211,6 +211,8 @@ function forRequest(req) {
     mod_team_incentive: modules.team_incentive !== false,
     div_gst: activeCodes.includes('DOM') || activeCodes.includes('IMP'), // QA UI-12
     div_import_duty: activeCodes.includes('IMP'),
+    // R10-N05 (QA Round 10): the quotation enquiry queue is Export's — shown only to people working in Export.
+    div_export: require('./divisionService').allows(require('./divisionService').EXPORT_ID),
     ...(req.reportNavFlags || {}), // D-379: report:<key>, report:<key>:<level>, report:any (sessionAuth, reportAccess.navFlagsFor)
   };
   const tabs = req.approvalTabCounts || {};

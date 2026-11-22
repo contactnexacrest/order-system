@@ -726,8 +726,10 @@ final class OrderFinancialsController
             return;
         }
         $rawAmount = trim((string) ($_POST['fee_amount'] ?? ''));
-        if ($rawAmount !== '' && (!is_numeric($rawAmount) || (float) $rawAmount < 0)) {
-            Flash::set('error', 'Enter a valid fee amount (or leave it blank).');
+        // R10-N03: an upper limit and at most 2 decimals (a huge amount was a server error).
+        if ($rawAmount !== '' && (!is_numeric($rawAmount) || (float) $rawAmount < 0 || (float) $rawAmount > 10000000
+            || (preg_match('/\.(\d+)$/', $rawAmount, $__m) === 1 && strlen(rtrim($__m[1], '0')) > 2))) {
+            Flash::set('error', 'Enter a valid fee amount from 0 to 10000000, with at most 2 decimals (or leave it blank).');
             header("Location: /orders/{$orderId}#order-financials");
             return;
         }

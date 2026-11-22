@@ -301,7 +301,9 @@ function required() {
       // (A request without a path, e.g. a bare internal call, is treated as the empty path.)
       const reqPath = req.path || String(req.originalUrl || '').split('?')[0] || '';
       if (req.divisionUi && req.divisionUi.isDisabledPath(reqPath)) {
-        res.status(403).send('This part of the system is not in use here.');
+        // R9-N04: the real reason — switched off everywhere, or in use in a division this person is not in.
+        const refusal = (await divisionService.refusalForPath(reqPath)) || divisionService.MODULE_OFF;
+        res.status(403).send(refusal.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
         return;
       }
       // D-257: a client or an associate outside the request's division(s) is not available.
@@ -331,8 +333,9 @@ function required() {
           ctxStore.forcedDivision = Number(orderForPath.division_id);
           // QA ACC-11: a module switched off in the ORDER's division refuses that order's addresses
           // (a company-level user on "All divisions" included).
-          if (await divisionService.disabledModuleForPath(reqPath)) {
-            res.status(403).send('This part of the system is not in use here.');
+          const orderRefusal = await divisionService.refusalForPath(reqPath);
+          if (orderRefusal) {
+            res.status(403).send(orderRefusal.replace(/&/g, '&amp;').replace(/</g, '&lt;')); // R9-N04
             return;
           }
         }

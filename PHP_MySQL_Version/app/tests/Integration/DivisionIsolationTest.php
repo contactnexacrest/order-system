@@ -289,7 +289,8 @@ final class DivisionIsolationTest extends DbTestCase
             $allowed = (\App\Middleware\SessionAuth::required())([]);
         });
         self::assertFalse($allowed);
-        self::assertStringContainsString('not in use here', $out);
+        // R9-N04: the module is in use in Export, where this person does not work — the refusal says so.
+        self::assertStringContainsString('You do not work in the Export division — ask an administrator to add you (Admin › Divisions).', $out);
 
         $pdo->prepare('UPDATE users SET division_id = 1 WHERE id = :id')->execute(['id' => $proc]);
         $this->actAs($proc);

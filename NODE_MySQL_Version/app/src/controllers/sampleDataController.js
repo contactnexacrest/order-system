@@ -33,7 +33,12 @@ async function load(req, res) {
     result = await require('../services/emailService').withoutSending('sample data is being loaded', () => sampleDataService.load(user.id));
   } catch (e) {
     logger.error('SAMPLE DATA LOAD FAILED', e);
-    flash.setErrorFromException(req, e, 'Could not load sample data — check the server error log.');
+    try {
+      await sampleDataService.clear(); // R10-N10: never leave a half-loaded sample set (same as PHP)
+    } catch (ignored) {
+      logger.error('SAMPLE DATA CLEAR AFTER FAILED LOAD FAILED', ignored);
+    }
+    flash.setErrorFromException(req, e, 'Could not load sample data — nothing was kept; check the server error log.');
     res.redirect('/sample-data');
     return;
   }

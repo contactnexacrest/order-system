@@ -24,7 +24,9 @@ $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUs
 $canClearPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'clear_payments');
 // Gap list G-5 (owner, 1 Nov 2026): part payments — each receipt, what is still owed, and a manager's reason to clear short.
 $canApproveShort = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_short_payment');
-$renderReceipts = static function (string $leg, ?array $milestone = null) use ($order, $sees): void {
+$renderReceipts = static function (string $leg, ?array $milestone = null) use ($order, $sees, $canViewInrActual): void {
+    // R9-N01 (QA Round 9/10): the rupees the bank credited and the rate are shown only with inr_actual_view.
+    $__inr = !empty($canViewInrActual);
     // Owner decision D-214, phase 2: a department that may not see buyer payments sees no amounts here.
     if (empty($sees['buyer_payments'])) {
         return;
@@ -34,11 +36,11 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
         return;
     }
     $__cur = (string) ($order['currency_code'] ?? '');
-    echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>INR credited</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>';
+    echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th>' . ($__inr ? '<th>INR credited</th><th>Rate</th>' : '') . '<th>Bank reference</th><th>Recorded by</th></tr>';
     foreach ($__s['receipts'] as $__r) {
         // Owner 2 Nov 2026: the reason a receipt differed, and any bank charges the banks deducted.
         $__why = match ($__r['difference_reason'] ?? null) {
-            'bank_charges' => ' <small class="muted">+ ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['bank_charges'])) . ' bank charges (&#8377;' . number_format((float) $__r['bank_charges_inr'], 2) . ', order cost)</small>',
+            'bank_charges' => ' <small class="muted">+ ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['bank_charges'])) . ' bank charges (' . ($__inr ? '&#8377;' . number_format((float) $__r['bank_charges_inr'], 2) . ', ' : '') . 'order cost)</small>',
             'short' => ' <small class="muted">· buyer paid less</small>',
             'excess' => ' <small class="muted">· buyer paid more</small>',
             default => '',
@@ -48,18 +50,21 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
             $__why .= ' <small class="muted">— ' . htmlspecialchars((string) $__r['difference_reason_text']) . (!empty($__r['difference_reason_custom']) ? ' (typed in)' : '') . '</small>';
         }
         // Owner (2 Nov 2026): our own bank's fee on this credit, booked as an order cost with the receipt.
-        if (!empty($__r['own_bank_charges_inr'])) {
+        if ($__inr && !empty($__r['own_bank_charges_inr'])) {
             $__why .= ' <small class="muted">· our bank\'s charges &#8377;' . number_format((float) $__r['own_bank_charges_inr'], 2) . ' (order cost)</small>';
         }
         // D-244 (4 Nov 2026): the rupees the bank credited, and why they differ from the bank's rate when they do.
-        if (($__r['rate_gap_choice'] ?? null) === 'bank_charges') {
+        if (!$__inr) {
+            // R9-N01: no rupees or rates without inr_actual_view.
+        } elseif (($__r['rate_gap_choice'] ?? null) === 'bank_charges') {
             $__why .= ' <small class="muted">· the bank kept &#8377;' . number_format((float) $__r['rate_gap_inr'], 2) . ' at its rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' (order cost "Bank Charges")</small>';
         } elseif (($__r['rate_gap_choice'] ?? null) === 'other') {
             $__why .= ' <small class="muted">· &#8377;' . number_format(abs((float) $__r['rate_gap_inr']), 2) . ' apart from the bank\'s rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' — ' . htmlspecialchars((string) $__r['rate_gap_reason']) . '</small>';
         }
         $__inrCell = ($__r['inr_credited'] ?? null) !== null ? '&#8377;' . number_format((float) $__r['inr_credited'], 2) : '<span class="muted">not known yet</span>';
-        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td><td>' . $__inrCell . '</td><td>'
-            . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td><td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
+        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td>'
+            . ($__inr ? '<td>' . $__inrCell . '</td><td>' . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td>' : '')
+            . '<td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
             . htmlspecialchars((string) ($__r['recorded_by_name'] ?? '—')) . '</td></tr>';
     }
     echo '</table><p>';
@@ -232,7 +237,7 @@ foreach ($activeUsers as $u) {
 // Owner request (2026-10-26): a remittance is recorded together with the
 // day's exchange rate, and once recorded the card reads it back as one
 // statement — "we received X at today's exchange rate of Y".
-$remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment, $order, $sees): string {
+$remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment, $order, $sees, $canViewInrActual): string {
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     $after = $clearedAt ? 'Cleared on ' . date('d M Y', strtotime((string) $clearedAt)) . '.' : $nextStep;
     // Owner decision D-214, phase 2: a department that may not see buyer payments sees only that it came in.
@@ -248,11 +253,12 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
         . ($receivedAt ? ' on ' . htmlspecialchars(date('d M Y', strtotime((string) $receivedAt))) : '');
     $inrActual = $payment[$leg . '_inr_actual'] ?? null;
     // D-244 (4 Nov 2026): the rupees the bank credited, when known, with the rate worked out from them.
-    $text .= $inrActual !== null && $rate !== null
+    // R9-N01: the rupees and the rate only for inr_actual_view holders; others read just what was received.
+    $text .= empty($canViewInrActual) ? '.' : ($inrActual !== null && $rate !== null
         ? ' — &#8377;' . number_format((float) $inrActual, 2) . ' credited by the bank (exchange rate &#8377;' . number_format((float) $rate, 4) . ').'
         : ($rate !== null
         ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
-        : ' — exchange rate not recorded yet (record it below).');
+        : ' — exchange rate not recorded yet (record it below).'));
     // Owner rule D-212: the bank reference it was recorded with.
     if (!empty($payment[$leg . '_bank_reference'])) {
         $text .= ' Bank ref ' . htmlspecialchars((string) $payment[$leg . '_bank_reference']) . '.';
@@ -4288,7 +4294,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <option value="client" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'client' ? 'selected' : '' ?>>Client</option>
               </select>
             </label>
-            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>" placeholder="e.g. 12000.00"></label>
+            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" data-max-value="10000000" data-max-decimals="2" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>" placeholder="e.g. 12000.00"></label>
             <?php // Owner decision 2026-10-29: the fee goes to Zoho Books as an expense, paid from here. ?>
             <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
             <label data-show-when="fee_payer=nexacrest">Paid from *

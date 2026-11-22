@@ -445,6 +445,13 @@ quote): it is kept, and the note offers **Use calculated** to go back. If
 you save a CIF order with the box empty, the app fills in the calculated
 figure. The buyer still pays the actual premium by Debit Note at Stage 6.
 
+**When the products or the freight change, the insurance is worked out again
+(D-405, 22 Nov 2026).** This happens even if you typed your own figure (or
+0) — the order page then says *Insurance recalculated from … to … because
+the products / freight changed*. If you still want your own figure, type it
+again on Edit order. Once the actual premium is entered at the Freight Debit
+Note step, the figure is no longer changed.
+
 **What the buyer sees on a CFR / CIF Quotation and Proforma Invoice
 (D-403, D-404).** Under *Total quoted value* / *Total PI value* (which stay
 the FOB value — advance and balance are on FOB) a line *Estimated total CIF

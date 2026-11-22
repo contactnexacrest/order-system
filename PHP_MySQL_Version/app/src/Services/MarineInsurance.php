@@ -167,6 +167,82 @@ final class MarineInsurance
     }
 
     /**
+     * Owner decision D-405 (22 Nov 2026): what the insurance figure was worked out from — the FOB value, the
+     * freight and the product categories. When it changes, the premium is recalculated (see sync()).
+     */
+    public static function basis(int $orderId): string
+    {
+        $stmt = Database::connection()->prepare('SELECT indicative_freight_amount FROM orders WHERE id = :id');
+        $stmt->execute(['id' => $orderId]);
+        $freight = $stmt->fetchColumn();
+        $fob = self::orderFob($orderId);
+        $cats = array_map(static fn ($c) => $c === null ? 'n' : (string) $c, self::orderCategoryIds($orderId));
+        sort($cats);
+        return ($fob === null ? '-' : number_format($fob, 2, '.', '')) . '|'
+            . (is_numeric($freight) ? number_format((float) $freight, 2, '.', '') : '-') . '|' . implode(',', $cats);
+    }
+
+    /** Remember the current basis (after staff set the figure themselves, or after it was calculated). */
+    public static function rememberBasis(int $orderId): void
+    {
+        Database::connection()->prepare('UPDATE orders SET insurance_basis = :b WHERE id = :id')
+            ->execute(['b' => self::basis($orderId), 'id' => $orderId]);
+    }
+
+    /**
+     * D-405: on a CIF order whose actual premium is not billed yet (Freight Debit Note step), a change of the
+     * products or the freight since the figure was set recalculates the premium — even a figure staff typed
+     * (they can change it again). Returns ['from' => ?string, 'to' => string] when the figure changed, else null.
+     * An order saved before D-405 (no basis yet) only records its basis: its figure is kept until the next change.
+     *
+     * @param bool $changed true when the caller knows the products / freight just changed (edit order details)
+     * @return array{from: ?string, to: string}|null
+     */
+    public static function sync(int $orderId, ?int $userId, bool $changed = false): ?array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
+            'SELECT o.incoterm_code, o.indicative_insurance_amount, o.insurance_basis, f.insurance_amount AS actual
+               FROM orders o LEFT JOIN order_freight f ON f.order_id = o.id WHERE o.id = :id'
+        );
+        $stmt->execute(['id' => $orderId]);
+        $o = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($o === false || strtoupper((string) $o['incoterm_code']) !== 'CIF' || $o['actual'] !== null) {
+            return null;
+        }
+        $now = self::basis($orderId);
+        if (!$changed && ($o['insurance_basis'] === null || $o['insurance_basis'] === $now)) {
+            if ($o['insurance_basis'] === null) {
+                self::rememberBasis($orderId);
+            }
+            return null;
+        }
+        $freight = $pdo->query('SELECT indicative_freight_amount FROM orders WHERE id = ' . $orderId)->fetchColumn();
+        $p = self::forOrder($orderId, $freight);
+        self::rememberBasis($orderId);
+        if ($p === null) {
+            return null;
+        }
+        $to = number_format($p, 2, '.', '');
+        $from = $o['indicative_insurance_amount'] !== null ? number_format((float) $o['indicative_insurance_amount'], 2, '.', '') : null;
+        if ($from === $to) {
+            return null;
+        }
+        $pdo->prepare('UPDATE orders SET indicative_insurance_amount = :p WHERE id = :id')->execute(['p' => $to, 'id' => $orderId]);
+        \App\Repositories\AuditLogRepository::log($userId, 'ORDER_INSURANCE_RECALCULATED', 'orders', $orderId, 'indicative_insurance_amount', $from, $to,
+            'D-405: the products or the freight changed since the insurance was set');
+        return ['from' => $from, 'to' => $to];
+    }
+
+    /** The message staff see after a recalculation (D-405). */
+    public static function recalcMessage(array $r, string $currency): string
+    {
+        $from = $r['from'] === null ? 'nothing' : $currency . ' ' . number_format((float) $r['from'], 2);
+        return 'Insurance recalculated from ' . $from . ' to ' . $currency . ' ' . number_format((float) $r['to'], 2)
+            . ' because the products / freight changed. Change it again on Edit order if needed.';
+    }
+
+    /**
      * The same for the New Order form's lines (before the order exists).
      *
      * @param list<array{quantity: mixed, unit_price: mixed, category_id: ?int}> $lines

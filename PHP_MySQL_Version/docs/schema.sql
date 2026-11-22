@@ -6305,6 +6305,8 @@ ALTER TABLE product_categories ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
 ALTER TABLE catalog_products ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
 -- D-402 (21 Nov 2026): marine insurance on CIF orders — the category's premium rate (incl. breakage) and cover wording.
 ALTER TABLE product_categories ADD COLUMN insurance_rate_pct DECIMAL(7,4) NULL, ADD COLUMN insurance_cover_wording VARCHAR(80) NULL;
+-- D-405 (22 Nov 2026): what a CIF order's insurance was worked out from (FOB | freight | categories).
+ALTER TABLE orders ADD COLUMN insurance_basis VARCHAR(255) NULL;
 -- Owner decisions 11 Nov 2026, points 6 and 7 (D-290): KYC. The ID document's
 -- type (Passport / National ID card / Residence permit / Driving licence) is
 -- kept with the document; ID proof and Address proof are separate required

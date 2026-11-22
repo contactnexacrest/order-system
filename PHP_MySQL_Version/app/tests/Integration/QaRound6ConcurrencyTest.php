@@ -137,7 +137,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
             Env::get('DB_USERNAME'),
             Env::get('DB_PASSWORD', '')
         );
-        $other->query("SELECT GET_LOCK('nx_docgen_{$orderId}_QT', 0)");
+        $other->query("SELECT GET_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), '_{$orderId}_QT'), 0)"); // R10-N08: per database
         $count = static fn (): int => (int) Database::connection()->query("SELECT COUNT(*) FROM documents WHERE order_id = {$orderId}")->fetchColumn();
         try {
             $before = $count();
@@ -146,9 +146,9 @@ final class QaRound6ConcurrencyTest extends DbTestCase
             self::assertSame('This document is being generated right now — wait a moment, then refresh the page.', $this->flash()['message']);
             self::assertSame($before, $count(), 'no revision made');
         } finally {
-            $other->query("SELECT RELEASE_LOCK('nx_docgen_{$orderId}_QT')");
+            $other->query("SELECT RELEASE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), '_{$orderId}_QT'))");
         }
-        self::assertSame(1, (int) Database::connection()->query("SELECT IS_FREE_LOCK('nx_docgen_{$orderId}_QT')")->fetchColumn());
+        self::assertSame(1, (int) Database::connection()->query("SELECT IS_FREE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), '_{$orderId}_QT'))")->fetchColumn());
     }
 
     private function fingerprintFrom(string $html): string

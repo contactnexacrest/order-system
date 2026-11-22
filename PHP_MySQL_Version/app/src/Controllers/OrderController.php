@@ -806,6 +806,7 @@ final class OrderController
         // External QA report L-23: order creation was never audit-logged.
         // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
         \App\Services\MarineInsurance::fillIfEmpty($orderId);
+        \App\Services\MarineInsurance::rememberBasis($orderId); // D-405
         AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);
 
         // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
@@ -977,8 +978,20 @@ final class OrderController
 
         // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
         \App\Services\MarineInsurance::fillIfEmpty($orderId);
+        // D-405 (22 Nov 2026): the freight (or the products since the last save) changed and staff did not change
+        // the insurance in this save — the premium is recalculated. A figure changed in this save is kept.
+        $__money = static fn ($v): ?string => trim((string) $v) === '' ? null : number_format((float) str_replace(',', '', (string) $v), 2, '.', '');
+        $__insChanged = $__money($_POST['indicative_insurance_amount'] ?? '') !== $__money($order['indicative_insurance_amount'] ?? '');
+        $__freightChanged = $__money($_POST['indicative_freight_amount'] ?? '') !== $__money($order['indicative_freight_amount'] ?? '');
+        $__recalc = null;
+        if ($__insChanged) {
+            \App\Services\MarineInsurance::rememberBasis($orderId);
+        } else {
+            $__recalc = \App\Services\MarineInsurance::sync($orderId, (int) $user['id'], $__freightChanged);
+        }
         AuditLogRepository::log((int) $user['id'], 'ORDER_DETAILS_UPDATED', 'orders', $orderId);
-        Flash::set('success', 'Order details updated.');
+        Flash::set('success', 'Order details updated.'
+            . ($__recalc !== null ? ' ' . \App\Services\MarineInsurance::recalcMessage($__recalc, (string) (OrderRepository::find($orderId)['currency_code'] ?? '')) : ''));
         header("Location: /orders/{$orderId}");
     }
 
@@ -1800,6 +1813,13 @@ final class OrderController
             \App\Services\DivisionService::enterOrderDivision((int) $order['division_id']);
             DomesticOrderController::show($order);
             return;
+        }
+        // D-405 (22 Nov 2026): products or freight changed since the insurance was set — recalculate it now.
+        if (($__recalc = \App\Services\MarineInsurance::sync($orderId, (int) $actor['id'])) !== null) {
+            $order = OrderRepository::find($orderId);
+            if (\App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::SELLING)) {
+                Flash::set('warning', \App\Services\MarineInsurance::recalcMessage($__recalc, (string) ($order['currency_code'] ?? '')));
+            }
         }
         $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');
         $canAssignOwner = PermissionService::can((int) $actor['id'], $actorRoleId, 'assign_order_owner');

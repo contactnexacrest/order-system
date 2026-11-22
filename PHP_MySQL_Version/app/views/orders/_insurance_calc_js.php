@@ -17,6 +17,8 @@
   note.hidden = true;
   (ins.closest('label') || ins).insertAdjacentElement('afterend', note);
 
+  // R10-N01: the same rounding as the server (PHP round(): half away from zero, decimal-exact).
+  function r2(x) { var a = Number(Math.abs(x).toPrecision(15)); return (x < 0 ? -1 : 1) * Number(Math.round(Number(a + 'e2')) + 'e-2'); }
   function num(v) { v = String(v == null ? '' : v).replace(/,/g, '').trim(); return v !== '' && isFinite(v) ? parseFloat(v) : null; }
   function money(n) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function pct(n) { return String(Math.round(n * 10000) / 10000); }
@@ -54,9 +56,9 @@
     document.querySelectorAll('.product-row').forEach(function (row) {
       var q = num((row.querySelector('input[name="product_quantity[]"]') || {}).value);
       var p = num((row.querySelector('input[name="product_unit_price[]"]') || {}).value);
-      if (q !== null && p !== null) { t += q * p; any = true; }
+      if (q !== null && p !== null) { t += r2(q * p); any = true; }
     });
-    return any && t > 0 ? Math.round(t * 100) / 100 : null;
+    return any && t > 0 ? r2(t) : null;
   }
   function premium(f, freight, r) {
     var k = (r / 100) * (parseFloat(fs.getAttribute('data-ins-cover')) / 100);
@@ -66,9 +68,10 @@
     var m = num(fs.getAttribute('data-ins-min'));
     if (m !== null && m > 0 && p < m) { p = m; }
     p = Math.round(p * 1e6) / 1e6;
-    return fs.getAttribute('data-ins-round') === '2dp' ? Math.round(p * 100) / 100 : Math.ceil(p - 1e-9);
+    return fs.getAttribute('data-ins-round') === '2dp' ? r2(p) : Math.ceil(p - 1e-9);
   }
-  function update() {
+  // D-405 (22 Nov 2026): a change of the freight or the products recalculates the premium, even a typed figure.
+  function update(changed) {
     if (incoterm() !== 'CIF' || ins.disabled) { note.hidden = true; return; }
     var f = fob(), freight = num(fr.value);
     note.hidden = false;
@@ -84,6 +87,13 @@
     var how = pct(rt.r) + '% (' + (rt.n ? rt.n + ' — ' : '') + rt.w + ') × ' + pct(parseFloat(fs.getAttribute('data-ins-cover'))) + '% of CIF value (FOB ' + money(f) + ' + freight ' + money(freight) + ' + insurance)';
     var typed = ins.value.trim();
     note.className = 'ins-note small';
+    if (changed === true && typed !== '' && num(typed) !== p) {
+      ins.value = pv;
+      ins.setAttribute('data-ins-prev', pv);
+      note.innerHTML = '<strong>Recalculated</strong> because the products / freight changed (was ' + esc(typed) + '): ' + esc(how) + ' = <strong>'
+        + esc((unit + ' ' + money(p)).trim()) + '</strong>' + (fs.getAttribute('data-ins-round') === '2dp' ? '' : ' (rounded up)') + '. You can change it again.';
+      return;
+    }
     if (typed === '' || typed === ins.getAttribute('data-ins-prev') || num(typed) === p) {
       ins.value = pv;
       ins.setAttribute('data-ins-prev', pv);
@@ -95,26 +105,27 @@
       note.querySelector('.ins-use').addEventListener('click', function () {
         ins.value = pv;
         ins.setAttribute('data-ins-prev', pv);
-        update();
+        update(false);
       });
     }
   }
-  fr.addEventListener('input', update);
-  ins.addEventListener('input', update);
-  if (inc) { inc.addEventListener('change', function () { setTimeout(update, 0); }); }
+  function changedNow() { update(true); }
+  fr.addEventListener('input', changedNow);
+  ins.addEventListener('input', function () { update(false); });
+  if (inc) { inc.addEventListener('change', function () { setTimeout(function () { update(false); }, 0); }); }
   document.addEventListener('input', function (e) {
     var n = e.target && e.target.name;
-    if (n === 'product_quantity[]' || n === 'product_unit_price[]') { update(); }
+    if (n === 'product_quantity[]' || n === 'product_unit_price[]') { changedNow(); }
   });
   document.addEventListener('change', function (e) {
     var n = e.target && e.target.name;
-    if (n === 'product_catalog_id[]' || n === 'product_quantity[]' || n === 'product_unit_price[]') { setTimeout(update, 0); }
+    if (n === 'product_catalog_id[]' || n === 'product_quantity[]' || n === 'product_unit_price[]') { setTimeout(changedNow, 0); }
   });
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.closest && e.target.closest('.duplicate-row, .remove-row, .add-row, #add-product-row')) { setTimeout(update, 0); }
+    if (e.target && e.target.closest && e.target.closest('.duplicate-row, .remove-row, .add-row, #add-product-row')) { setTimeout(changedNow, 0); }
   });
   // The product picker fills prices after a look-up: check again when someone reaches the freight box.
-  fs.addEventListener('focusin', function (e) { if (!note.contains(e.target)) { update(); } });
-  update();
+  fs.addEventListener('focusin', function (e) { if (!note.contains(e.target)) { update(false); } });
+  update(false);
 })();
 </script>

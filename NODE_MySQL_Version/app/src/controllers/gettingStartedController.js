@@ -38,6 +38,10 @@ async function show(req, res) {
   const userId = (req.user && req.user.id) || 0; // parity with PHP ($user['id'] ?? 0)
   const visible = await sopAccess.visibleSlugs(userId, roleId, req.permissions);
   html = sopAccess.filterChapterLinks(html, visible);
+  // R10-N04 (QA Round 10): with the SOP library switched off for this person, the manual link is plain text.
+  if (!(await sopAccess.libraryVisibleTo(userId, req.permissions))) {
+    html = html.split('<a href="/sop">SOP / Operations Guide</a>').join('SOP / Operations Guide (switched off)');
+  }
   html = await sopAccess.filterScreenshots(html, userId, req.permissions, visible);
   send(html);
 }

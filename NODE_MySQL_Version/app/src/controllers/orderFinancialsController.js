@@ -590,8 +590,11 @@ async function saveInspectionFee(req, res) {
     return;
   }
   const rawAmount = String(req.body.fee_amount || '').trim();
-  if (rawAmount !== '' && (Number.isNaN(Number(rawAmount)) || Number(rawAmount) < 0)) {
-    flash.set(req, 'error', 'Enter a valid fee amount (or leave it blank).');
+  // R10-N03: an upper limit and at most 2 decimals (a huge amount was a server error).
+  const feeDecimals = /\.(\d+)$/.exec(rawAmount);
+  if (rawAmount !== '' && (Number.isNaN(Number(rawAmount)) || Number(rawAmount) < 0 || Number(rawAmount) > 10000000
+    || (feeDecimals && feeDecimals[1].replace(/0+$/, '').length > 2))) {
+    flash.set(req, 'error', 'Enter a valid fee amount from 0 to 10000000, with at most 2 decimals (or leave it blank).');
     res.redirect(`/orders/${orderId}#order-financials`);
     return;
   }

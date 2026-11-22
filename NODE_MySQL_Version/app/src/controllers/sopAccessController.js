@@ -110,8 +110,15 @@ async function addUserExtra(req, res) {
 
 async function removeUserExtra(req, res) {
   const userId = Number(req.params.id);
-  await sopAccess.removeUserExtra(userId, String((req.body || {}).slug || ''), req.user.id);
-  flash.set(req, 'success', 'Extra SOP chapter removed.');
+  // R9-N02 (QA Round 9/10): say what really happened — no chapter chosen, already removed, or removed.
+  const slug = String((req.body || {}).slug || '').trim();
+  if (slug === '') {
+    flash.set(req, 'error', 'Choose the extra SOP chapter to remove.');
+  } else if (await sopAccess.removeUserExtra(userId, slug, req.user.id)) {
+    flash.set(req, 'success', 'Extra SOP chapter removed.');
+  } else {
+    flash.set(req, 'error', 'That extra SOP chapter was already removed.');
+  }
   res.redirect(`/users/${userId}/edit#sop-extras`);
 }
 

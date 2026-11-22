@@ -30,12 +30,22 @@ final class SampleDataController
     public function load(array $params): void
     {
         $user = AuthService::currentUser();
+        // R10-N10 (QA Round 10): loading builds every sample document (PDFs) and takes longer than a shared host's
+        // usual 30-second limit — this one admin action may run to the end, and a failed load is cleared again,
+        // so the sample set is never left half-loaded.
+        @set_time_limit(0);
+        ignore_user_abort(true);
         try {
             // QA MTX-008: loading demo records never e-mails anyone (the sample buyer's portal access, review notices, ...).
             $result = \App\Services\EmailService::withoutSending('sample data is being loaded', static fn (): array => SampleDataService::load((int) $user['id']));
         } catch (\Throwable $e) {
             error_log('[SAMPLE DATA LOAD FAILED] ' . $e->getMessage());
-            Flash::setErrorFromException($e, 'Could not load sample data — check the server error log.');
+            try {
+                SampleDataService::clear(); // R10-N10: never leave a half-loaded sample set
+            } catch (\Throwable $ignored) {
+                error_log('[SAMPLE DATA CLEAR AFTER FAILED LOAD FAILED] ' . $ignored->getMessage());
+            }
+            Flash::setErrorFromException($e, 'Could not load sample data — nothing was kept; check the server error log.');
             header('Location: /sample-data');
             return;
         }

@@ -916,12 +916,30 @@ final class ProductController
         if ($data['supplier_name'] === '') {
             return 'Supplier name is required.';
         }
+        // R10-N06 (QA Round 10): the same checks on the server as in the browser — nothing wrong is stored.
+        if ($data['contact_phone'] !== null && !preg_match(self::PHONE_PATTERN, $data['contact_phone'])) {
+            return self::PHONE_MESSAGE;
+        }
+        if ($data['contact_email'] !== null && !filter_var($data['contact_email'], FILTER_VALIDATE_EMAIL)) {
+            return 'Contact email: enter a valid email address, e.g. name@company.com, or leave it blank.';
+        }
+        foreach (['fob_value' => 'FOB value', 'factory_cost' => 'Factory cost', 'transportation_cost' => 'Transportation cost',
+            'packing_cost' => 'Packing cost', 'loading_cost' => 'Loading cost', 'cha_cost' => 'CHA cost'] as $k => $label) {
+            $raw = trim(str_replace(',', '', (string) ($_POST[$k] ?? '')));
+            if ($raw !== '' && (!is_numeric($raw) || (float) $raw < 0 || (float) $raw > 9999999999.99)) {
+                return $label . ': a number of 0 or more, e.g. 4500.00.';
+            }
+        }
         // D-338 (2a): only a price already saved as "add up the cost parts" may stay so.
         if ($data['fob_source'] === 'computed' && ($existing === null || ($existing['fob_source'] ?? 'direct') !== 'computed')) {
             return self::COST_PARTS_REFUSAL;
         }
         return null;
     }
+
+    /** R10-N06: the phone rule of the main supplier form (digits, spaces or dashes, with the country code). */
+    public const PHONE_PATTERN = '/^\+?[0-9][0-9 \-]{6,18}$/';
+    public const PHONE_MESSAGE = 'Contact phone: digits, spaces or dashes, with the country code, e.g. +91-0000000000.';
 
     /** D-338 (2a): the refusal for a new "add up the cost parts" price (the same wording on both stacks). */
     public const COST_PARTS_REFUSAL = 'Adding up the cost parts is no longer offered for a new price — type the supplier\'s price in FOB Value (₹). Prices saved that way earlier keep working.';

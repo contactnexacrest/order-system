@@ -618,7 +618,22 @@ async function lockAllReady(userId) {
   let locked = 0;
   const skipped = [];
   for (const orderId of await readyToLock()) {
-    const error = await lockIfReady(orderId, userId, 'Locked with "Lock all ready".');
+    // R9-N03 (QA Round 9/10): two "Lock all" at the same moment (double click, two people) can meet in a MySQL
+    // deadlock — the losing request tries that order once more (it then finds it locked or still ready) instead
+    // of showing the error page, as PHP already behaves.
+    let error;
+    try {
+      error = await lockIfReady(orderId, userId, 'Locked with "Lock all ready".');
+    } catch (err) {
+      if (!err || (err.code !== 'ER_LOCK_DEADLOCK' && err.errno !== 1213)) throw err;
+      await new Promise((r) => setTimeout(r, 50 + Math.floor(Math.random() * 100)));
+      try {
+        error = await lockIfReady(orderId, userId, 'Locked with "Lock all ready".');
+      } catch (err2) {
+        if (!err2 || (err2.code !== 'ER_LOCK_DEADLOCK' && err2.errno !== 1213)) throw err2;
+        continue; // someone else is locking it right now — nothing left to do here
+      }
+    }
     if (error === null) {
       locked++;
     } else {

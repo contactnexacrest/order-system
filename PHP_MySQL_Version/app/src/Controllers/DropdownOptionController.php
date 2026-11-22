@@ -34,6 +34,13 @@ final class DropdownOptionController
             'productForms' => \App\Services\ProductForms::forms(),
             'finishFormMap' => \App\Services\ProductForms::finishFormMap(),
             'finishSaved' => is_array($finishSaved) ? $finishSaved : null,
+            // R10-N09 (QA Round 10): the "Forms of stone" link only for people who can open that page.
+            'canOpenForms' => (static function (): bool {
+                $u = \App\Services\AuthService::currentUser();
+                $r = $u && $u['role_id'] !== null ? (int) $u['role_id'] : null;
+                return $u !== null && (\App\Services\PermissionService::can((int) $u['id'], $r, 'view_price_buildup')
+                    || \App\Services\PermissionService::can((int) $u['id'], $r, 'manage_pricing')); // the route's own gate
+            })(),
         ], 'layout/base');
     }
 

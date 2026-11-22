@@ -159,8 +159,15 @@ final class SopAccessController
     public function removeUserExtra(array $params): void
     {
         $userId = (int) ($params['id'] ?? 0);
-        SopAccessService::removeUserExtra($userId, (string) ($_POST['slug'] ?? ''), $this->userId());
-        Flash::set('success', 'Extra SOP chapter removed.');
+        // R9-N02 (QA Round 9/10): say what really happened — no chapter chosen, already removed, or removed.
+        $slug = trim((string) ($_POST['slug'] ?? ''));
+        if ($slug === '') {
+            Flash::set('error', 'Choose the extra SOP chapter to remove.');
+        } elseif (SopAccessService::removeUserExtra($userId, $slug, $this->userId())) {
+            Flash::set('success', 'Extra SOP chapter removed.');
+        } else {
+            Flash::set('error', 'That extra SOP chapter was already removed.');
+        }
         header('Location: /users/' . $userId . '/edit#sop-extras');
     }
 

@@ -286,12 +286,15 @@ final class SopAccessService
         }
     }
 
-    public static function removeUserExtra(int $userId, string $slug, int $byUserId): void
+    /** @return bool whether a chapter was removed (R9-N02: the page says so truthfully) */
+    public static function removeUserExtra(int $userId, string $slug, int $byUserId): bool
     {
         $stmt = Database::connection()->prepare('DELETE FROM sop_user_chapters WHERE user_id = :u AND slug = :s');
         $stmt->execute(['u' => $userId, 's' => $slug]);
         if ($stmt->rowCount() > 0) {
             AuditLogRepository::log($byUserId, 'SOP_USER_CHAPTER_REMOVED', 'users', $userId, 'sop_chapters', $slug, null);
+            return true;
         }
+        return false;
     }
 }

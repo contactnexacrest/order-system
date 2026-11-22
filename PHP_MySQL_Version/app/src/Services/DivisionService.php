@@ -437,6 +437,32 @@ final class DivisionService
         return self::$modulesCache[$divisionId][$module] ?? true;
     }
 
+    public const MODULE_OFF = 'This part of the system is not in use here.';
+
+    /**
+     * R9-N04 (QA Round 9/10): the refusal for a URL whose module is off for the current scope, or null when it opens.
+     * When the module IS in use in an active division the person does not work in, it says so (and how to get in),
+     * instead of "not in use here".
+     */
+    public static function refusalForPath(string $path): ?string
+    {
+        foreach (self::MODULES as $key => [$label, $patterns]) {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $path) && !self::moduleEnabled($key)) {
+                    $using = [];
+                    foreach (self::active() as $d) {
+                        if (self::moduleEnabledFor((int) $d['id'], $key)) {
+                            $using[] = (string) $d['name'];
+                        }
+                    }
+                    return $using === [] ? self::MODULE_OFF
+                        : 'You do not work in the ' . implode(' / ', $using) . ' division — ask an administrator to add you (Admin › Divisions).';
+                }
+            }
+        }
+        return null;
+    }
+
     /** The module a URL belongs to, when that module is switched off for the current scope; else null. */
     public static function disabledModuleForPath(string $path): ?string
     {

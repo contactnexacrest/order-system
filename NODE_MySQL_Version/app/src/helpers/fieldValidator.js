@@ -17,16 +17,22 @@ function plain(number) {
   return String(require('./money').round2(number)); // HNT-L01: PHP number_format rounds with round()
 }
 
-function wholeNumber(value, label, min = 0) {
+function wholeNumber(value, label, min = 0, max = null) {
   if (value === '') return null;
-  if (!/^-?\d+$/.test(value) || parseInt(value, 10) < min) {
-    return `${label} must be a whole number of ${min} or more.`;
+  if (!/^-?\d+$/.test(value) || parseInt(value, 10) < min
+    || (max !== null && (value.replace(/^-?0*/, '').length > 9 || parseInt(value, 10) > max))) {
+    return max === null ? `${label} must be a whole number of ${min} or more.` : `${label} must be a whole number from ${min} to ${max}.`;
   }
   return null;
 }
 
-function decimal(value, label, min = 0, max = null) {
+function decimal(value, label, min = 0, max = null, maxDecimals = null) {
   if (value === '') return null;
+  // R10-N03: more decimals than the column keeps would be rounded away silently.
+  const m = /^-?\d*\.(\d+)$/.exec(value);
+  if (maxDecimals !== null && m && m[1].replace(/0+$/, '').length > maxDecimals) {
+    return `${label}: use at most ${maxDecimals} decimal${maxDecimals === 1 ? '' : 's'}.`;
+  }
   if (!/^-?\d*\.?\d+$/.test(value) || parseFloat(value) < min || (max !== null && parseFloat(value) > max)) {
     return max === null
       ? `${label} must be a number of ${plain(min)} or more (digits and a decimal point only).`
@@ -43,6 +49,12 @@ function email(value, label) {
   return null;
 }
 
+/** R10-N03: upper limits of the order form's numbers (generous business limits, well inside the columns). */
+const MAX_LEAD_DAYS = 365;
+const MAX_CBM = 10000;
+const MAX_WEIGHT_KG = 1000000;
+const MAX_ORDER_CHARGE = 10000000;
+
 /** The number fields on the New Order and Edit Order forms — the first problem found, or null. */
 function orderNumbers(body) {
   const value = (name) => scalarString(body[name]);
@@ -52,19 +64,21 @@ function orderNumbers(body) {
     ['sailing_lead_time_min_days', 'Sailing time (min days)'],
     ['sailing_lead_time_max_days', 'Sailing time (max days)'],
   ];
+  // QA Round 10, R10-N03: each number has an upper limit (a huge value was a server error); the same limits
+  // are on the form fields and in FieldValidator.php.
   for (const [name, label] of whole) {
-    const error = wholeNumber(value(name), label);
+    const error = wholeNumber(value(name), label, 0, MAX_LEAD_DAYS);
     if (error) return error;
   }
   const decimals = [
-    ['estimated_total_cbm', 'Total CBM'],
-    ['estimated_gross_weight_kg', 'Gross weight (kg)'],
-    ['estimated_net_weight_kg', 'Net weight (kg)'],
-    ['indicative_freight_amount', 'Indicative freight'],
-    ['indicative_insurance_amount', 'Indicative insurance'],
+    ['estimated_total_cbm', 'Total CBM', MAX_CBM, 3],
+    ['estimated_gross_weight_kg', 'Gross weight (kg)', MAX_WEIGHT_KG, 2],
+    ['estimated_net_weight_kg', 'Net weight (kg)', MAX_WEIGHT_KG, 2],
+    ['indicative_freight_amount', 'Indicative freight', MAX_ORDER_CHARGE, 2],
+    ['indicative_insurance_amount', 'Indicative insurance', MAX_ORDER_CHARGE, 2],
   ];
-  for (const [name, label] of decimals) {
-    const error = decimal(value(name), label);
+  for (const [name, label, max, places] of decimals) {
+    const error = decimal(value(name), label, 0, max, places);
     if (error) return error;
   }
   // QA Round 6, R6-N28: a range's minimum is not above its maximum, and the
@@ -143,4 +157,4 @@ function reportedPayment(amount, date) {
   return null;
 }
 
-module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment, bankReference, EARLIEST_PAYMENT_DATE };
+module.exports = { MAX_LEAD_DAYS, MAX_CBM, MAX_WEIGHT_KG, MAX_ORDER_CHARGE, MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment, bankReference, EARLIEST_PAYMENT_DATE };

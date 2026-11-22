@@ -62,6 +62,10 @@ final class DocumentController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision D-405: an out-of-date CIF insurance figure is recalculated before a document uses it.
+        if (in_array($type, ['QT', 'PI', 'OC', 'CI', 'FDN'], true)) {
+            \App\Services\MarineInsurance::sync($orderId, (int) $user['id']);
+        }
         // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation or PI.
         if (in_array($type, ['QT', 'PI'], true) && ($priceBlock = \App\Services\OrderLinePricing::documentBlockReason($orderId, $type)) !== null) {
             Flash::set('error', $priceBlock);
@@ -358,13 +362,18 @@ final class DocumentController
      */
     private static function claimGeneration(int $orderId, string $type): ?string
     {
-        $lock = \App\Config\Database::connection()->prepare('SELECT GET_LOCK(:name, 0)');
-        $lock->execute(['name' => "nx_docgen_{$orderId}_{$type}"]);
+        // R10-N08 (QA Round 10): the lock name carries this database (a short hash keeps it within MySQL 5.7's
+        // 64 characters), so a staging copy or the twin stack on the same MySQL server never blocks this one.
+        $lock = \App\Config\Database::connection()->prepare(self::LOCK_SQL_GET);
+        $lock->execute(['name' => "_{$orderId}_{$type}"]);
         return (int) $lock->fetchColumn() === 1 ? null : 'This document is being generated right now — wait a moment, then refresh the page.';
     }
 
     private static function releaseGeneration(int $orderId, string $type): void
     {
-        \App\Config\Database::connection()->prepare('SELECT RELEASE_LOCK(:name)')->execute(['name' => "nx_docgen_{$orderId}_{$type}"]);
+        \App\Config\Database::connection()->prepare(self::LOCK_SQL_RELEASE)->execute(['name' => "_{$orderId}_{$type}"]);
     }
+
+    private const LOCK_SQL_GET = "SELECT GET_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), :name), 0)";
+    private const LOCK_SQL_RELEASE = "SELECT RELEASE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), :name))";
 }

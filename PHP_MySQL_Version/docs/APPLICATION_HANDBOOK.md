@@ -2298,6 +2298,31 @@ showing how; a figure typed by staff is kept and the note offers **Use calculate
 figure on the server (`MarineInsurance::fillIfEmpty`). Example: FOB 4,500 + freight 950 at 0.30 % → 18.04 → **19.00**. CFR and FOB
 orders have no insurance (D-049). The buyer is billed the actual premium by Debit Note as before; existing orders keep their figures.
 
+**The insurance follows the products and the freight (D-405, 22 Nov 2026, owner).** Whenever the products (quantity, price, a
+line added or removed, its category) or the freight of a CIF order change, the insurance is recalculated — even a figure staff
+typed (0 included); they can change it again. `orders.insurance_basis` records what the figure was worked out from (FOB |
+freight | categories); `MarineInsurance::sync` / `marineInsurance.sync` compare it when the order page opens and before the
+QT / PI / OC / CI / FDN is generated, recalculate, write an audit row `ORDER_INSURANCE_RECALCULATED` (old → new) and show
+"Insurance recalculated from … to … because the products / freight changed." to staff who may see selling prices. On Edit order a
+freight change recalculates unless the insurance box was changed in the same save; in the browser the calculator replaces a typed
+figure as soon as the freight or a product changes, and says so. Recalculation stops once the actual premium is entered at the
+Freight Debit Note step (`order_freight.insurance_amount`). Orders saved before D-405 keep their figure until their products or
+freight next change. A typed 0 is kept as 0 on both stacks (R10-N02).
+
+**QA Round 10 fixes (22 Nov 2026, both stacks).** Order form limits (browser and server, same words): production and sailing
+lead times 0–365 days, Total CBM 0–10,000 (3 decimals), weights 0–1,000,000 kg, indicative freight / insurance 0–10,000,000 (2
+decimals); the inspection fee 0–10,000,000 (2 decimals). A field with `data-max-value` / `data-max-decimals` refuses text such as
+"12,5 kg" in the browser (app.js). The product supplier form checks the contact phone (as the main supplier form), the e-mail
+and that prices are 0 or more on the server. *Load Sample Data* runs to the end (PHP lifts the time limit for it) and a failed
+load is cleared again. The document-generation lock is per database (`nx_docgen_<db hash>_<order>_<type>`). "Quotation requests"
+shows only to people working in Export (navigation fact `div_export`); the client page's "Full report" also needs per-client
+report access (D-379); "Forms of stone" links only for `view_price_buildup` / `manage_pricing`; Getting Started shows the SOP
+link as plain text while the library is off for the person. Round 9 items: the receipts table and the "Received …" sentence show
+the INR credited and the rate only with `inr_actual_view`; removing an extra SOP chapter says "already removed" / "choose a
+chapter" when nothing was removed; a double "Lock all" no longer gives an error page on Node; a person outside an active division
+is told "You do not work in the … division — ask an administrator to add you (Admin › Divisions)" (only a module switched off
+everywhere says "not in use here"); downloading the Import PO marks it generated only for `manage_purchasing` holders.
+
 **Insurance cover and "Estimated total CIF / CFR value" on the Quotation and PI (D-403, D-404, 21 Nov 2026, each confirmed
 twice).** PDF and Word, both stacks. CIF: the Shipping / Commercial terms row Insurance reads "<cover wording>, 110% of CIF
 value — arranged by seller; actual premium billed by Debit Note." (`insurance_cover_text`; was "Seller arranges — cost included in

@@ -28,6 +28,8 @@ async function index(req, res) {
     finishSaved: finishSaved && typeof finishSaved === 'object' ? finishSaved : null,
     finishListKey: surfaceFinishList.LIST_KEY,
     finishMaxName: surfaceFinishList.MAX_NAME,
+    // R10-N09 (QA Round 10): the "Forms of stone" link only for people who can open that page.
+    canOpenForms: !!(req.permissions && (req.permissions.view_price_buildup || req.permissions.manage_pricing)),
   }, 'layout/base');
 }
 

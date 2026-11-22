@@ -192,8 +192,12 @@ async function poDocument(req, res) {
     return;
   }
   const pdf = await importDocumentService.pdf(Number(s.id));
-  await I.markPoGenerated(Number(s.id), req.user.id);
-  await auditLogRepository.log(req.user.id, 'IMPORT_PO_GENERATED', 'import_shipments', Number(s.id), 'reference', null, String(s.reference));
+  // R9-N05 (QA Round 9/10): only an editor marks the PO generated (and freezes the company details on it);
+  // a viewer with view_purchase_prices only downloads a copy — as on the Merchant Trade PO (ACC-4).
+  if (req.permissions && req.permissions.manage_purchasing) {
+    await I.markPoGenerated(Number(s.id), req.user.id);
+    await auditLogRepository.log(req.user.id, 'IMPORT_PO_GENERATED', 'import_shipments', Number(s.id), 'reference', null, String(s.reference));
+  }
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="IPO ${String(s.reference).replace(/\//g, '-')}.pdf"`);
   res.send(pdf);

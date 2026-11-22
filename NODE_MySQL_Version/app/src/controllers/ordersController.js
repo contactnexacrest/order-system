@@ -839,6 +839,7 @@ async function store(req, res) {
   // External QA report L-23: order creation was never audit-logged.
   // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
   await require('../services/marineInsurance').fillIfEmpty(orderId);
+  await require('../services/marineInsurance').rememberBasis(orderId); // D-405
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   for (let k = 0; k < createdLineIds.length; k++) {
@@ -1021,8 +1022,21 @@ async function updateDetails(req, res) {
 
   // D-402 (21 Nov 2026): a CIF order saved without an insurance figure gets the calculated one.
   await require('../services/marineInsurance').fillIfEmpty(orderId);
+  // D-405 (22 Nov 2026): the freight (or the products since the last save) changed and staff did not change the
+  // insurance in this save — the premium is recalculated. A figure changed in this save is kept.
+  const ins = require('../services/marineInsurance');
+  const money = (v) => (String(v ?? '').trim() === '' ? null : (Math.round(parseFloat(String(v).replace(/,/g, '')) * 100) / 100).toFixed(2));
+  const insChanged = money(body.indicative_insurance_amount) !== money(order.indicative_insurance_amount);
+  const freightChanged = money(body.indicative_freight_amount) !== money(order.indicative_freight_amount);
+  let recalc = null;
+  if (insChanged) {
+    await ins.rememberBasis(orderId);
+  } else {
+    recalc = await ins.sync(orderId, req.user ? req.user.id : null, freightChanged);
+  }
   await auditLogRepository.log(req.user ? req.user.id : null, 'ORDER_DETAILS_UPDATED', 'orders', orderId);
-  flash.set(req, 'success', 'Order details updated.');
+  flash.set(req, 'success', 'Order details updated.'
+    + (recalc ? ' ' + ins.recalcMessage(recalc, String(((await orderRepository.find(orderId)) || {}).currency_code || '')) : ''));
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -1815,7 +1829,7 @@ async function departmentOwnersFor(req, orderId) {
 
 async function show(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  const order = await orderRepository.find(orderId);
+  let order = await orderRepository.find(orderId);
   if (!order) {
     res.status(404).send('Order not found.');
     return;
@@ -1834,6 +1848,14 @@ async function show(req, res) {
   if ((await require('../services/domesticOrderService').isDomesticOrder(order)) && (await require('../repositories/domesticOrderRepository').find(order.id))) {
     await require('./domesticOrderController').show(req, res, order);
     return;
+  }
+  // D-405 (22 Nov 2026): products or freight changed since the insurance was set — recalculate it now.
+  const insRecalc = await require('../services/marineInsurance').sync(orderId, req.user ? req.user.id : null);
+  if (insRecalc) {
+    order = await orderRepository.find(orderId);
+    if (moneyVisibility.can(req.permissions, 'selling')) {
+      flash.set(req, 'warning', require('../services/marineInsurance').recalcMessage(insRecalc, String(order.currency_code || '')));
+    }
   }
   const seesAllOrders = !!req.permissions.view_all_orders;
   const canAssignOwner = !!req.permissions.assign_order_owner;

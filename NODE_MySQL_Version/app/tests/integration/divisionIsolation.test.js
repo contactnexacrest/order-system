@@ -242,7 +242,8 @@ describe('D-257 divisions — isolation', () => {
     const agent = await loginAs(proc);
     const refused = await agent.get('/procurement');
     expect(refused.status).toBe(403);
-    expect(refused.text).toContain('not in use here');
+    // R9-N04: the module is in use in Export, where this person does not work — the refusal says so.
+    expect(refused.text).toContain('You do not work in the Export division — ask an administrator to add you (Admin › Divisions).');
     expect((await agent.get('/')).text).not.toContain('href="/procurement"');
     await db.execute('UPDATE users SET division_id = 1 WHERE id = :id', { id: proc.id });
     const expAgent = await loginAs(proc);

@@ -40,6 +40,10 @@ final class GettingStartedController
         $roleId = isset($user['role_id']) && $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $visible = SopAccessService::visibleSlugs($userId, $roleId, PermissionService::can($userId, $roleId, 'ca_module_view'));
         $html = SopAccessService::filterChapterLinks($html, $visible);
+        // R10-N04 (QA Round 10): with the SOP library switched off for this person, the manual link is plain text.
+        if (!SopAccessService::libraryVisibleTo($userId, $roleId)) {
+            $html = str_replace('<a href="/sop">SOP / Operations Guide</a>', 'SOP / Operations Guide (switched off)', $html);
+        }
         echo SopAccessService::filterScreenshots($html, $userId, $roleId, $visible);
     }
 }

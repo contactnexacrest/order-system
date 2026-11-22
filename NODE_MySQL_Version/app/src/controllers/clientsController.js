@@ -289,7 +289,9 @@ async function show(req, res) {
   res.renderView('clients/show', {
     // D-379: the per-client report also needs the person's report access (and the money it shows) — the same answer as its route.
     canClientReport: !!(req.permissions && req.permissions.view_reports)
-      && require('../helpers/permittedLinks').mayOpen(`/reports/client/${Number(client.id)}`, req.permissions, null, null, req.reportLevels || null),
+      && require('../helpers/permittedLinks').mayOpen(`/reports/client/${Number(client.id)}`, req.permissions, null, null, req.reportLevels || null)
+      // R10-N09 (QA Round 10): and the person's per-client report access, exactly as reportAccessCheck on the route.
+      && await require('../services/reportAccess').can('per_client', require('../services/reportAccess').pageMin('per_client')),
     domesticActive,
     gstStates: domesticActive ? await require('../repositories/domesticOrderRepository').states() : [],
     agreementCard: await require('./agreementController').partyCard(req, 'client', client.id),

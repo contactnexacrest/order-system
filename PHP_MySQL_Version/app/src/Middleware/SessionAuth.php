@@ -165,9 +165,9 @@ final class SessionAuth
 
             // D-257: a module switched off for the request's division(s) refuses its addresses.
             $requestPath = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-            if (\App\Services\DivisionService::disabledModuleForPath($requestPath) !== null) {
+            if (($moduleRefusal = \App\Services\DivisionService::refusalForPath($requestPath)) !== null) {
                 http_response_code(403);
-                echo 'This part of the system is not in use here.';
+                echo htmlspecialchars($moduleRefusal, ENT_QUOTES, 'UTF-8'); // R9-N04: the real reason
                 return false;
             }
             // D-257: a client outside the request's division(s) is not available.

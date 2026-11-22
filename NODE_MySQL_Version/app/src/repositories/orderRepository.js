@@ -1,5 +1,10 @@
 'use strict';
 
+// R10-N02: an empty box is "not entered" (NULL); a typed 0 is kept as 0 — the same on both stacks.
+function blankToNull(v) {
+  return v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v;
+}
+
 const crypto = require('crypto');
 const db = require('../config/db');
 const orderAssigneeRepository = require('./orderAssigneeRepository');
@@ -485,9 +490,9 @@ async function insertOrderRow(executor, data, createdBy) {
       lead_time_max_days: data.lead_time_max_days ?? null,
       sailing_lead_time_min_days: data.sailing_lead_time_min_days ?? null,
       sailing_lead_time_max_days: data.sailing_lead_time_max_days ?? null,
-      indicative_freight_amount: data.indicative_freight_amount || null,
+      indicative_freight_amount: blankToNull(data.indicative_freight_amount),
       // Owner decision D-049 (QA Round 6, Q-R5-2): only a CIF order carries an insurance amount.
-      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? (data.indicative_insurance_amount || null) : null,
+      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? blankToNull(data.indicative_insurance_amount) : null,
       buyers_po_ref: data.buyers_po_ref ?? 'NIL',
       quotation_date: data.quotation_date,
       quotation_valid_until: data.quotation_valid_until,
@@ -651,9 +656,9 @@ async function updateDetails(orderId, data) {
       estimated_net_weight_kg: data.estimated_net_weight_kg || null,
       estimated_package_count: data.estimated_package_count || null,
       estimated_package_type: data.estimated_package_type || null,
-      indicative_freight_amount: data.indicative_freight_amount || null,
+      indicative_freight_amount: blankToNull(data.indicative_freight_amount),
       // Owner decision D-049 (QA Round 6, Q-R5-2): only a CIF order carries an insurance amount.
-      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? (data.indicative_insurance_amount || null) : null,
+      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? blankToNull(data.indicative_insurance_amount) : null,
       incoterm_code: snapshot.incoterm_code,
       currency_code: snapshot.currency_code,
       port_of_loading_name: snapshot.port_of_loading_name,

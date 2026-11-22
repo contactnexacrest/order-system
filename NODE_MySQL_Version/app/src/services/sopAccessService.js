@@ -192,7 +192,11 @@ async function addUserExtra(userId, slug, byUserId) {
 
 async function removeUserExtra(userId, slug, byUserId) {
   const result = await db.execute('DELETE FROM sop_user_chapters WHERE user_id = :u AND slug = :s', { u: userId, s: slug });
-  if (result.affectedRows > 0) await auditLogRepository.log(byUserId, 'SOP_USER_CHAPTER_REMOVED', 'users', userId, 'sop_chapters', slug, null);
+  if (result.affectedRows > 0) {
+    await auditLogRepository.log(byUserId, 'SOP_USER_CHAPTER_REMOVED', 'users', userId, 'sop_chapters', slug, null);
+    return true;
+  }
+  return false; // R9-N02: the page says so truthfully
 }
 
 module.exports = {

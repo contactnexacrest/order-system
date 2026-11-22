@@ -799,6 +799,11 @@ Example: FOB 4,500 + freight 950 at 0.30 % = 18.04 → **19.00**. Use your
 insurer's real rate here once they confirm it; the actual premium is always
 billed to the buyer by Debit Note.
 
+**D-405 (22 Nov 2026):** when an order's products or freight change, its
+insurance is recalculated — even a figure staff typed — until the actual
+premium is entered at the Freight Debit Note step. Every recalculation is in
+the audit log (old and new figure).
+
 ## Global pricing settings and Category price rules (D-362, 13 Nov 2026)
 
 - **Global pricing settings** (`/pricing/settings`) — *applies to every product unless a category or product changes it.*

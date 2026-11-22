@@ -51,10 +51,12 @@ async function pickedDocumentDate(date, orderId) {
  * @returns {Promise<{release: function(): Promise<void>}|null>} null when another request holds it
  */
 async function claimGeneration(orderId, type) {
-  const name = `nx_docgen_${orderId}_${type}`;
+  // R10-N08 (QA Round 10): the lock name carries this database (a short hash keeps it within MySQL 5.7's
+  // 64 characters), so a staging copy or the twin stack on the same MySQL server never blocks this one.
+  const name = `_${orderId}_${type}`;
   const conn = await db.pool.getConnection();
   try {
-    const [[row]] = await conn.query('SELECT GET_LOCK(?, 0) AS got', [name]);
+    const [[row]] = await conn.query("SELECT GET_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), ?), 0) AS got", [name]);
     if (Number(row.got) !== 1) {
       conn.release();
       return null;
@@ -66,7 +68,7 @@ async function claimGeneration(orderId, type) {
   return {
     async release() {
       try {
-        await conn.query('SELECT RELEASE_LOCK(?)', [name]);
+        await conn.query("SELECT RELEASE_LOCK(CONCAT('nx_docgen_', LEFT(MD5(DATABASE()), 12), ?))", [name]);
       } finally {
         conn.release();
       }
@@ -91,6 +93,10 @@ async function generate(req, res) {
     return;
   }
   // Owner decision D-226: without the general permission, Export Compliance generates only its own documents.
+  // Owner decision D-405: an out-of-date CIF insurance figure is recalculated before a document uses it.
+  if (['QT', 'PI', 'OC', 'CI', 'FDN'].includes(type)) {
+    await require('../services/marineInsurance').sync(orderId, req.user ? req.user.id : null);
+  }
   // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation or PI.
   if (type === 'QT' || type === 'PI') {
     const priceBlock = await require('../services/orderLinePricing').documentBlockReason(orderId, type);
@@ -380,4 +386,4 @@ async function deleteDraft(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
-module.exports = { generate, download, deleteDraft };
+module.exports = { generate, download, deleteDraft, claimGeneration }; // claimGeneration: for the R10-N08 test

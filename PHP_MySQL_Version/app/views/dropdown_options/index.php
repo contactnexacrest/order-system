@@ -32,7 +32,7 @@
         </table>
         <?php if ($__finish && !empty($productForms)): ?>
           <input type="hidden" name="finish_forms_present" value="1">
-          <p class="muted small">Offered for forms: an order line sold as a form offers only the finishes ticked for it (<a href="/pricing/forms">Forms of stone</a>); a form with no finish ticked offers every finish. Lines already saved keep their finish.</p>
+          <p class="muted small">Offered for forms: an order line sold as a form offers only the finishes ticked for it (<?php if (!empty($canOpenForms)): ?><a href="/pricing/forms">Forms of stone</a><?php else: ?>Pricing › Forms of stone<?php endif; ?>); a form with no finish ticked offers every finish. Lines already saved keep their finish.</p>
           <label>Reason <small class="muted">(needed when you change the forms a finish is offered for)</small><input type="text" name="reason" minlength="10" maxlength="500" placeholder="e.g. Flamed is not offered on raw blocks"></label>
         <?php endif; ?>
         <button type="submit" class="btn-sm">Save <?= htmlspecialchars($listKey) ?> Changes</button>

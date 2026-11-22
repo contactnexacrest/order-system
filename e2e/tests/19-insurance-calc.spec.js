@@ -7,7 +7,8 @@ const { runSql } = require('./support/db');
 /**
  * Owner decision D-402 (21 Nov 2026, "approve A"): on a CIF order the Insurance box fills itself from the CIF value
  * (rate × 110 % × (FOB + freight) ÷ (1 − rate × 110 %), Natural Stone 0.30 % incl. breakage, rounded up), with a note
- * showing how; a figure typed by staff is kept and the note offers "Use calculated". Nothing is saved by this test.
+ * showing how; a figure typed by staff is kept and the note offers "Use calculated" — until the freight or the products
+ * change (D-405, 22 Nov 2026), which recalculates it. Nothing is saved by this test.
  */
 test.describe('Calculated insurance on a CIF order (D-402)', () => {
   test('the Edit order page works out the insurance and keeps a typed figure', async ({ page }) => {
@@ -39,5 +40,12 @@ test.describe('Calculated insurance on a CIF order (D-402)', () => {
     await expect(insurance).toHaveValue('250');
     await box.getByRole('button', { name: 'Use calculated' }).click();
     await expect(insurance).toHaveValue(expected);
+
+    // D-405 (22 Nov 2026): a change of the freight replaces even a typed figure, and says so.
+    await insurance.fill('250');
+    await box.locator('input[name="indicative_freight_amount"]').fill('1950');
+    const k2 = Math.ceil(Math.round((k * (fob + 1950) / (1 - k)) * 1e6) / 1e6 - 1e-9).toFixed(2);
+    await expect(insurance).toHaveValue(k2);
+    await expect(box.locator('.ins-note')).toContainText('Recalculated because the products / freight changed (was 250)');
   });
 });

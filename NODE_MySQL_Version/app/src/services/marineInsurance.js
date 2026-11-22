@@ -154,6 +154,67 @@ async function fillIfEmpty(orderId) {
   }
 }
 
+/**
+ * Owner decision D-405 (22 Nov 2026): what the insurance figure was worked out from — the FOB value, the
+ * freight and the product categories. When it changes, the premium is recalculated (see sync()). PHP twin: MarineInsurance::basis.
+ */
+async function basis(orderId) {
+  const o = await db.queryOne('SELECT indicative_freight_amount FROM orders WHERE id = :id', { id: orderId });
+  const freight = o ? o.indicative_freight_amount : null;
+  const fob = await orderFob(orderId);
+  const cats = (await orderCategoryIds(orderId)).map((c) => (c === null ? 'n' : String(c))).sort();
+  return (fob === null ? '-' : phpRound(fob, 2).toFixed(2)) + '|'
+    + (isNumeric(freight) ? phpRound(parseFloat(freight), 2).toFixed(2) : '-') + '|' + cats.join(',');
+}
+
+/** Remember the current basis (after staff set the figure themselves, or after it was calculated). */
+async function rememberBasis(orderId) {
+  await db.execute('UPDATE orders SET insurance_basis = :b WHERE id = :id', { b: await basis(orderId), id: orderId });
+}
+
+/**
+ * D-405: on a CIF order whose actual premium is not billed yet (Freight Debit Note step), a change of the products
+ * or the freight since the figure was set recalculates the premium — even a figure staff typed (they can change it
+ * again). Returns { from, to } when the figure changed, else null. An order saved before D-405 (no basis yet) only
+ * records its basis: its figure is kept until the next change. `changed` = the caller knows the freight just changed.
+ */
+async function sync(orderId, userId, changed = false) {
+  const o = await db.queryOne(
+    `SELECT o.incoterm_code, o.indicative_insurance_amount, o.indicative_freight_amount, o.insurance_basis, f.insurance_amount AS actual
+       FROM orders o LEFT JOIN order_freight f ON f.order_id = o.id WHERE o.id = :id`, { id: orderId });
+  if (!o || String(o.incoterm_code ?? '').toUpperCase() !== 'CIF' || o.actual !== null) {
+    return null;
+  }
+  const now = await basis(orderId);
+  if (!changed && (o.insurance_basis === null || o.insurance_basis === now)) {
+    if (o.insurance_basis === null) {
+      await rememberBasis(orderId);
+    }
+    return null;
+  }
+  const p = await forOrder(orderId, o.indicative_freight_amount);
+  await rememberBasis(orderId);
+  if (p === null) {
+    return null;
+  }
+  const to = phpRound(p, 2).toFixed(2);
+  const from = o.indicative_insurance_amount !== null ? phpRound(parseFloat(o.indicative_insurance_amount), 2).toFixed(2) : null;
+  if (from === to) {
+    return null;
+  }
+  await db.execute('UPDATE orders SET indicative_insurance_amount = :p WHERE id = :id', { p: to, id: orderId });
+  await require('../repositories/auditLogRepository').log(userId, 'ORDER_INSURANCE_RECALCULATED', 'orders', orderId,
+    'indicative_insurance_amount', from, to, 'D-405: the products or the freight changed since the insurance was set');
+  return { from, to };
+}
+
+/** The message staff see after a recalculation (D-405). */
+function recalcMessage(r, currency) {
+  const fmt = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const from = r.from === null ? 'nothing' : `${currency} ${fmt(r.from)}`;
+  return `Insurance recalculated from ${from} to ${currency} ${fmt(r.to)} because the products / freight changed. Change it again on Edit order if needed.`;
+}
+
 /** The same for the New Order form's lines (before the order exists). */
 async function forLines(lines, freight) {
   let fob = 0;
@@ -238,5 +299,5 @@ async function formAttributeHtml(orderId = null) {
 
 module.exports = {
   DEFAULTS, LABELS, GST_PCT, settings, premium, rateFor, categories, orderCategoryIds, orderFob, forOrder, fillIfEmpty, forLines,
-  formAttributes, formAttributeHtml, trimRate,
+  formAttributes, formAttributeHtml, trimRate, basis, rememberBasis, sync, recalcMessage,
 };

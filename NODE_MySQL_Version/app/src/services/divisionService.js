@@ -258,6 +258,29 @@ async function moduleEnabled(moduleKey) {
   return false;
 }
 
+const MODULE_OFF = 'This part of the system is not in use here.';
+
+/**
+ * R9-N04 (QA Round 9/10): the refusal for a URL whose module is off for the current scope, or null when it opens.
+ * When the module IS in use in an active division the person does not work in, it says so (and how to get in),
+ * instead of "not in use here". PHP twin: DivisionService::refusalForPath.
+ */
+async function refusalForPath(path) {
+  for (const [key, [, patterns]] of Object.entries(MODULES)) {
+    for (const pattern of patterns) {
+      if (pattern.test(path) && !(await moduleEnabled(key))) {
+        const using = [];
+        for (const d of await active()) {
+          if (await moduleEnabledFor(Number(d.id), key)) using.push(String(d.name));
+        }
+        return using.length === 0 ? MODULE_OFF
+          : `You do not work in the ${using.join(' / ')} division — ask an administrator to add you (Admin › Divisions).`;
+      }
+    }
+  }
+  return null;
+}
+
 /** The module a URL belongs to, when that module is switched off for the current scope; else null. */
 async function disabledModuleForPath(path) {
   for (const [key, [label, patterns]] of Object.entries(MODULES)) {
@@ -272,5 +295,5 @@ module.exports = {
   EXPORT_ID, SESSION_CHOICE, MODULES,
   all, active, find, isMulti, userDivisionId, resolveScope, currentIds, currentId, condition, sql, orderIdSql, clientSql,
   allows, allowsClient, allowsOrderId, orderIdChecker, linkClient, seesAll, forNewRecord, needsChoiceOnCreate, withDivision, choose,
-  settingOverrides, overlay, overrideFor, moduleEnabledFor, moduleEnabled, disabledModuleForPath,
+  settingOverrides, overlay, overrideFor, moduleEnabledFor, moduleEnabled, disabledModuleForPath, refusalForPath, MODULE_OFF,
 };

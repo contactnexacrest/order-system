@@ -100,21 +100,25 @@ final class FieldValidator
         return null;
     }
 
-    public static function wholeNumber(string $value, string $label, int $min = 0): ?string
+    public static function wholeNumber(string $value, string $label, int $min = 0, ?int $max = null): ?string
     {
         if ($value === '') {
             return null;
         }
-        if (!preg_match('/^-?\d+$/', $value) || (int) $value < $min) {
-            return "{$label} must be a whole number of {$min} or more.";
+        if (!preg_match('/^-?\d+$/', $value) || (int) $value < $min || ($max !== null && (strlen(ltrim($value, '-0')) > 9 || (int) $value > $max))) {
+            return $max === null ? "{$label} must be a whole number of {$min} or more." : "{$label} must be a whole number from {$min} to {$max}.";
         }
         return null;
     }
 
-    public static function decimal(string $value, string $label, float $min = 0.0, ?float $max = null): ?string
+    public static function decimal(string $value, string $label, float $min = 0.0, ?float $max = null, ?int $maxDecimals = null): ?string
     {
         if ($value === '') {
             return null;
+        }
+        // R10-N03: more decimals than the column keeps would be rounded away silently.
+        if ($maxDecimals !== null && preg_match('/^-?\d*\.(\d+)$/', $value, $m) && strlen(rtrim($m[1], '0')) > $maxDecimals) {
+            return "{$label}: use at most {$maxDecimals} decimal" . ($maxDecimals === 1 ? '' : 's') . '.';
         }
         if (!preg_match('/^-?\d*\.?\d+$/', $value) || (float) $value < $min || ($max !== null && (float) $value > $max)) {
             return $max === null
@@ -136,27 +140,35 @@ final class FieldValidator
     }
 
     /** The number fields on the New Order and Edit Order forms — the first problem found, or null. */
+    /** R10-N03: upper limits of the order form's numbers (generous business limits, well inside the columns). */
+    public const MAX_LEAD_DAYS = 365;
+    public const MAX_CBM = 10000.0;
+    public const MAX_WEIGHT_KG = 1000000.0;
+    public const MAX_ORDER_CHARGE = 10000000.0;
+
     public static function orderNumbers(array $post): ?string
     {
         $value = static fn (string $name): string => Input::scalarString($post[$name] ?? '');
+        // QA Round 10, R10-N03: each number has an upper limit (a huge value was a server error); the same limits
+        // are on the form fields (max / data-max-value / data-max-decimals) and in the Node twin.
         foreach ([
             'lead_time_min_days' => 'Production lead time (min days)',
             'lead_time_max_days' => 'Production lead time (max days)',
             'sailing_lead_time_min_days' => 'Sailing time (min days)',
             'sailing_lead_time_max_days' => 'Sailing time (max days)',
         ] as $name => $label) {
-            if ($error = self::wholeNumber($value($name), $label)) {
+            if ($error = self::wholeNumber($value($name), $label, 0, self::MAX_LEAD_DAYS)) {
                 return $error;
             }
         }
         foreach ([
-            'estimated_total_cbm' => 'Total CBM',
-            'estimated_gross_weight_kg' => 'Gross weight (kg)',
-            'estimated_net_weight_kg' => 'Net weight (kg)',
-            'indicative_freight_amount' => 'Indicative freight',
-            'indicative_insurance_amount' => 'Indicative insurance',
-        ] as $name => $label) {
-            if ($error = self::decimal($value($name), $label)) {
+            'estimated_total_cbm' => ['Total CBM', self::MAX_CBM, 3],
+            'estimated_gross_weight_kg' => ['Gross weight (kg)', self::MAX_WEIGHT_KG, 2],
+            'estimated_net_weight_kg' => ['Net weight (kg)', self::MAX_WEIGHT_KG, 2],
+            'indicative_freight_amount' => ['Indicative freight', self::MAX_ORDER_CHARGE, 2],
+            'indicative_insurance_amount' => ['Indicative insurance', self::MAX_ORDER_CHARGE, 2],
+        ] as $name => [$label, $max, $decimals]) {
+            if ($error = self::decimal($value($name), $label, 0.0, $max, $decimals)) {
                 return $error;
             }
         }

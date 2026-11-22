@@ -41,7 +41,9 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   <?php endif; ?>
   <?php // D-379: the per-client report also needs the person's report access (and the money it shows) — the same answer as its route.
   $__canClientReport = PermissionService::can((int) $__u['id'], $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_reports')
-      && \App\Helpers\PermittedLinks::currentUserMayOpen('/reports/client/' . (int) $client['id']); ?>
+      && \App\Helpers\PermittedLinks::currentUserMayOpen('/reports/client/' . (int) $client['id'])
+      // R10-N09 (QA Round 10): and the person's per-client report access, exactly as ReportAccessCheck on the route.
+      && \App\Services\ReportAccess::can('per_client', \App\Services\ReportAccess::pageMin('per_client')); ?>
   <?php if ($canManageOrders || $__canClientReport): // D-320 (point 26): the main buttons stay at the top while scrolling ?>
   <div class="btn-row sticky-actions" data-testid="client-actions">
     <?php if ($__canClientReport): ?><a class="btn-sm btn-secondary" href="/reports/client/<?= (int) $client['id'] ?>">Full report</a><?php endif; ?>
