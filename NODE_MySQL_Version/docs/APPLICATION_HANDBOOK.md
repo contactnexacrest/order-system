@@ -2294,7 +2294,7 @@ else the default in Admin › Global pricing settings › **Marine Insurance (CI
 "ICC (A) all risks", optional minimum premium per shipment, rounding up to the next whole unit or to 2 decimals, GST not added
 — NexaCrest's own cost — or added at 18 %). On New Order and Edit order the Insurance box fills itself
 (`views/orders/_insurance_calc_js`, data from `MarineInsurance::formAttributes` / `marineInsurance.formAttributes`) with a note
-showing how; a figure typed by staff is kept and the note offers **Use calculated**; a CIF order saved with the box empty gets the
+showing how; a figure typed by staff is kept (until the products or the freight change — then D-405 below recalculates it) and the note offers **Use calculated**; a CIF order saved with the box empty gets the
 figure on the server (`MarineInsurance::fillIfEmpty`). Example: FOB 4,500 + freight 950 at 0.30 % → 18.04 → **19.00**. CFR and FOB
 orders have no insurance (D-049). The buyer is billed the actual premium by Debit Note as before; existing orders keep their figures.
 
