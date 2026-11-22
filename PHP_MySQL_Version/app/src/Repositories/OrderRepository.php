@@ -43,7 +43,8 @@ final class OrderRepository
                         SELECT 1 FROM order_payment_status ops
                         WHERE ops.order_id = o.id AND ops.balance_due_date IS NOT NULL
                           AND ops.balance_cleared_at IS NULL AND ops.balance_due_date < CURDATE()
-                    ) AS is_overdue
+                    ) AS is_overdue,
+                    EXISTS (SELECT 1 FROM order_cancellations ocx WHERE ocx.order_id = o.id AND ocx.status = 'pending') AS cancellation_pending -- D-408
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              LEFT JOIN domestic_orders dom ON dom.order_id = o.id
@@ -79,7 +80,8 @@ final class OrderRepository
                         SELECT 1 FROM order_payment_status ops
                         WHERE ops.order_id = o.id AND ops.balance_due_date IS NOT NULL
                           AND ops.balance_cleared_at IS NULL AND ops.balance_due_date < CURDATE()
-                    ) AS is_overdue
+                    ) AS is_overdue,
+                    EXISTS (SELECT 1 FROM order_cancellations ocx WHERE ocx.order_id = o.id AND ocx.status = 'pending') AS cancellation_pending -- D-408
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              LEFT JOIN domestic_orders dom ON dom.order_id = o.id

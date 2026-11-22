@@ -54,6 +54,7 @@ $amount = $domStage !== null
           <?php endif; ?>
         </div>
       </div>
+      <?php if (!empty($o['cancellation_pending']) && !$isCancelled): // D-408 ?><div class="cancellation-pending-line"><span class="badge badge-cancel-pending" data-testid="cancellation-pending-badge">⏳ Cancellation requested — waiting for approval</span></div><?php endif; ?>
       <div class="entity-card-footer">
         <?php if (!empty($o['is_overdue'])): ?>
           <span class="badge badge-lost">Overdue</span>

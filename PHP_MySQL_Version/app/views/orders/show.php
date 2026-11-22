@@ -1271,8 +1271,9 @@ $__apWaiting = \App\Services\ApprovalsInbox::waitingOnOthers($__apUser, $__apRol
 // Owner decision D-320 (point 26): a bar of real buttons at the top of the
 // order page that stays visible while scrolling — each shown only to those
 // allowed to use it (the same checks as before). "More" holds the rare ones.
+$__barPendingCancellation = OrderCancellationRepository::findPendingForOrder((int) $order['id']);
 $__barRequestCancel = $canCloseOrders && !in_array($order['status'], ['complete', 'lost', 'cancelled'], true)
-    && OrderCancellationRepository::findPendingForOrder((int) $order['id']) === null;
+    && $__barPendingCancellation === null;
 $__barLoginAsClient = false;
 if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'impersonate_client')) {
     $__barClient = \App\Repositories\ClientRepository::find((int) $order['client_id']);
@@ -1281,7 +1282,7 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
 }
 ?>
 <div class="order-action-bar" id="order-action-bar" data-testid="order-action-bar">
-  <div class="order-action-bar-title"><strong><?= htmlspecialchars($order['order_reference']) ?></strong><?php if ($sees['client']): ?> &middot; <?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></div>
+  <div class="order-action-bar-title"><strong><?= htmlspecialchars($order['order_reference']) ?></strong><?php if ($__barPendingCancellation !== null && $order['status'] !== 'cancelled'): // D-408 ?> <a class="badge badge-cancel-pending" href="#cancellation-request" data-testid="cancellation-pending-badge">Cancellation requested</a><?php endif; ?><?php if ($sees['client']): ?> &middot; <?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></div>
   <div class="order-action-bar-buttons">
     <?php if ($canManageOrders): ?><a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/edit">Edit order</a><?php endif; ?>
     <a class="btn-sm btn-secondary" href="#document-review-approval">Documents</a>
@@ -1431,8 +1432,14 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
       <?php endif; ?>
     </p>
   <?php elseif ($__pendingCancellation): ?>
-    <div class="review-banner" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
-      <span>Cancellation requested by <?= htmlspecialchars($__pendingCancellation['requested_by_name'] ?? 'unknown') ?> on <?= htmlspecialchars($__pendingCancellation['requested_at']) ?> — awaiting approval.<br>Reason: <?= htmlspecialchars($__pendingCancellation['reason']) ?></span>
+    <div class="review-banner cancel-request-box" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
+      <?php // D-408 (owner 22 Nov 2026): say plainly that the request waits for approval and what happens next. ?>
+      <div class="cancel-request-text" data-testid="cancellation-request-text">
+        <div class="cancel-request-title">⏳ Cancellation requested — waiting for approval</div>
+        <div>The request has been sent for approval. It is on the <a href="/approvals">Approvals</a> page of the people who can approve cancellations.</div>
+        <div>Requested by <strong><?= htmlspecialchars($__pendingCancellation['requested_by_name'] ?? 'a deleted user') ?></strong> on <?= htmlspecialchars(date('j M Y, H:i', strtotime((string) $__pendingCancellation['requested_at']))) ?> · Reason: <?= htmlspecialchars($__pendingCancellation['reason']) ?></div>
+        <div>The order stays <strong>Active</strong> until someone approves; it then becomes <strong>Cancelled</strong>. If the request is rejected, the order simply carries on.</div>
+      </div>
       <?php if ($canEditLockedData): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
           <?= Csrf::field() ?>

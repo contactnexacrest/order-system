@@ -319,8 +319,12 @@ requirement.
 
 When an order is cancelled rather than lost (for example, the buyer has
 already paid an advance), use **Request Cancellation** on the order page
-and write the reason. Requesting needs the permission **Close or mark an order lost**. The order then
-shows "Cancellation requested by … — awaiting approval." A person with
+and write the reason. Requesting needs the permission **Close or mark an order lost**. The order page
+then opens on a yellow box: "⏳ Cancellation requested — waiting for approval",
+with who asked, when and why. The order stays **Active** until someone approves.
+A "Cancellation requested" badge shows next to the order number, and on the
+order's card in the Orders list and on the Kanban board; the filter
+**Cancellation requested** lists every order waiting for a decision (D-408). A person with
 **Override locked data** then presses **Approve Cancellation**, choosing the
 refund: **No refund applicable**, **Refund pending** or **Refund already
 completed**. Or they press **Reject Cancellation** and give the reason.

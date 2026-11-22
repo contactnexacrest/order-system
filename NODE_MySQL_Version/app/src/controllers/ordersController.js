@@ -198,10 +198,19 @@ function withProspectLine(o, remindDays) {
   };
 }
 
+/** D-408: '2026-11-22 17:40:02' → '22 Nov 2026, 17:40' (PHP date('j M Y, H:i')). */
+function dayMonthYearTime(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!m) return String(value || '');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}, ${m[4]}:${m[5]}`;
+}
+
 function statusCounts(all) {
-  const counts = { all: all.length, active: 0, overdue: 0, prospects: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
+  const counts = { all: all.length, active: 0, overdue: 0, prospects: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancellation_requested: 0, cancelled: 0 };
   for (const o of all) {
     if (o.is_overdue) counts.overdue++;
+    if (Number(o.cancellation_pending)) counts.cancellation_requested++; // D-408: a cancellation waits for approval (the order is still active)
     if (isProspectOrder(o)) counts.prospects++;
     if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
   }
@@ -213,6 +222,7 @@ function filterByStatus(all, statusFilter) {
   if (statusFilter === 'all') return all;
   if (statusFilter === 'overdue') return all.filter((o) => !!o.is_overdue);
   if (statusFilter === 'prospects') return all.filter(isProspectOrder);
+  if (statusFilter === 'cancellation_requested') return all.filter((o) => !!Number(o.cancellation_pending));
   if (['active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(statusFilter)) return all.filter((o) => o.status === statusFilter);
   return all.filter((o) => o.status === 'active');
 }
@@ -1921,6 +1931,7 @@ async function show(req, res) {
   // still 'active' with no BL on file). A request here never changes the
   // order's own status; only an approval does.
   const pendingCancellation = await orderCancellationRepository.findPendingForOrder(orderId);
+  if (pendingCancellation) pendingCancellation.requested_at_label = dayMonthYearTime(pendingCancellation.requested_at); // D-408
   const cancellationHistory = await orderCancellationRepository.forOrder(orderId);
   const approvedCancellation = cancellationHistory.find((c) => c.status === 'approved') || cancellationHistory[0] || null;
   // Owner decision D-320 (point 26): "Log in as client" in the order page's More menu —
@@ -5668,8 +5679,9 @@ async function requestCancellation(req, res) {
     await notificationRepository.create(approverUserId, null, 'order_cancellation_requested', orderId, `Cancellation requested for order ${order.order_reference} — awaiting approval.`);
   }
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', cancellationId, null, null, reason);
-  flash.set(req, 'success', 'Cancellation requested — awaiting approval.');
-  res.redirect(`/orders/${orderId}`);
+  // D-408 (owner 22 Nov 2026): land on the request box, which says plainly that it waits for approval.
+  flash.set(req, 'success', 'Your cancellation request has been sent for approval. The order stays active until it is approved.');
+  res.redirect(`/orders/${orderId}#cancellation-request`);
 }
 
 async function approveCancellation(req, res) {

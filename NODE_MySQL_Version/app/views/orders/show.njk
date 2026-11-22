@@ -635,7 +635,7 @@
    allowed to use it (the same checks as before). "More" holds the rare ones. #}
 {% set barRequestCancel = permissions.close_orders and order.status not in ['complete', 'lost', 'cancelled'] and not pendingCancellation %}
 <div class="order-action-bar" id="order-action-bar" data-testid="order-action-bar">
-  <div class="order-action-bar-title"><strong>{{ order.order_reference }}</strong>{% if sees.client %} &middot; {{ order.company_legal_name }}{% endif %}</div>
+  <div class="order-action-bar-title"><strong>{{ order.order_reference }}</strong>{% if pendingCancellation and order.status != 'cancelled' %} <a class="badge badge-cancel-pending" href="#cancellation-request" data-testid="cancellation-pending-badge">Cancellation requested</a>{% endif %}{# D-408 #}{% if sees.client %} &middot; {{ order.company_legal_name }}{% endif %}</div>
   <div class="order-action-bar-buttons">
     {% if permissions.manage_orders %}<a class="btn-sm" href="/orders/{{ order.id }}/edit">Edit order</a>{% endif %}
     <a class="btn-sm btn-secondary" href="#document-review-approval">Documents</a>
@@ -779,8 +779,14 @@
       {% endif %}
     </p>
   {% elif pendingCancellation %}
-    <div class="review-banner" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
-      <span>Cancellation requested by {{ pendingCancellation.requested_by_name or 'unknown' }} on {{ pendingCancellation.requested_at }} — awaiting approval.<br>Reason: {{ pendingCancellation.reason }}</span>
+    <div class="review-banner cancel-request-box" id="cancellation-request" style="flex-direction:column;align-items:stretch;gap:6px">
+      {# D-408 (owner 22 Nov 2026): say plainly that the request waits for approval and what happens next. #}
+      <div class="cancel-request-text" data-testid="cancellation-request-text">
+        <div class="cancel-request-title">⏳ Cancellation requested — waiting for approval</div>
+        <div>The request has been sent for approval. It is on the <a href="/approvals">Approvals</a> page of the people who can approve cancellations.</div>
+        <div>Requested by <strong>{{ pendingCancellation.requested_by_name or 'a deleted user' }}</strong> on {{ pendingCancellation.requested_at_label }} · Reason: {{ pendingCancellation.reason }}</div>
+        <div>The order stays <strong>Active</strong> until someone approves; it then becomes <strong>Cancelled</strong>. If the request is rejected, the order simply carries on.</div>
+      </div>
       {% if permissions.edit_locked_data %}
         <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">

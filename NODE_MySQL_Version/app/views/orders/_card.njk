@@ -35,6 +35,7 @@
           {% endif %}
         </div>
       </div>
+      {% if o.cancellation_pending and o.cancellation_pending != '0' and not isCancelled %}<div class="cancellation-pending-line"><span class="badge badge-cancel-pending" data-testid="cancellation-pending-badge">⏳ Cancellation requested — waiting for approval</span></div>{% endif %}{# D-408 #}
       <div class="entity-card-footer">
         {% if o.is_overdue %}
           <span class="badge badge-lost">Overdue</span>

@@ -290,7 +290,7 @@ final class OrderCancellationWorkflowTest extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('awaiting approval', $html);
+        self::assertStringContainsString('waiting for approval', $html);
         self::assertStringContainsString('Approve Cancellation', $html);
         self::assertStringContainsString('Reject Cancellation', $html);
     }

@@ -35,7 +35,9 @@ final class OrderCancellationRepository
     public static function findPendingForOrder(int $orderId): ?array
     {
         $stmt = Database::connection()->prepare(
-            "SELECT * FROM order_cancellations WHERE order_id = :order_id AND status = 'pending' ORDER BY id DESC LIMIT 1"
+            // D-408: with the requester's name (the box said "requested by unknown").
+            "SELECT oc.*, ru.name AS requested_by_name FROM order_cancellations oc LEFT JOIN users ru ON ru.id = oc.requested_by
+             WHERE oc.order_id = :order_id AND oc.status = 'pending' ORDER BY oc.id DESC LIMIT 1"
         );
         $stmt->execute(['order_id' => $orderId]);
         return $stmt->fetch() ?: null;

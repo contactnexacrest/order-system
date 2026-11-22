@@ -138,10 +138,13 @@ final class OrderController
     /** @param list<array<string,mixed>> $all @return array<string,int> the count per status filter (Standard list and Kanban board alike) */
     private static function statusCounts(array $all): array
     {
-        $counts = ['all' => count($all), 'active' => 0, 'overdue' => 0, 'prospects' => 0, 'shipped_docs_sent' => 0, 'complete' => 0, 'lost' => 0, 'cancelled' => 0];
+        $counts = ['all' => count($all), 'active' => 0, 'overdue' => 0, 'prospects' => 0, 'shipped_docs_sent' => 0, 'complete' => 0, 'lost' => 0, 'cancellation_requested' => 0, 'cancelled' => 0];
         foreach ($all as $o) {
             if (!empty($o['is_overdue'])) {
                 $counts['overdue']++;
+            }
+            if (!empty($o['cancellation_pending'])) {
+                $counts['cancellation_requested']++; // D-408: a cancellation waits for approval (the order is still active)
             }
             if (self::isProspectOrder($o)) {
                 $counts['prospects']++;
@@ -166,6 +169,7 @@ final class OrderController
             'all' => $all,
             'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
             'prospects' => array_values(array_filter($all, static fn($o) => self::isProspectOrder($o))),
+            'cancellation_requested' => array_values(array_filter($all, static fn($o) => !empty($o['cancellation_pending']))),
             'active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
             default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
         };
@@ -5413,8 +5417,9 @@ final class OrderController
             \App\Repositories\NotificationRepository::create($approverUserId, null, 'order_cancellation_requested', $orderId, "Cancellation requested for order {$order['order_reference']} — awaiting approval.");
         }
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REQUESTED', 'order_cancellations', $cancellationId, null, null, $reason);
-        Flash::set('success', 'Cancellation requested — awaiting approval.');
-        header("Location: /orders/{$orderId}");
+        // D-408 (owner 22 Nov 2026): land on the request box, which says plainly that it waits for approval.
+        Flash::set('success', 'Your cancellation request has been sent for approval. The order stays active until it is approved.');
+        header("Location: /orders/{$orderId}#cancellation-request");
     }
 
     public function approveCancellation(array $params): void

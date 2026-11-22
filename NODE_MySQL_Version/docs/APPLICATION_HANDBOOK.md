@@ -2431,7 +2431,12 @@ Tables `disputes`, `dispute_documents`, `dispute_replies`.
 
 **Cancellation** (D-082, D-258), `order_cancellations`:
 
-1. **Request Cancellation** with a reason (`close_orders`).
+1. **Request Cancellation** with a reason (`close_orders`). The order page
+   then opens on a yellow box "⏳ Cancellation requested — waiting for
+   approval" (who asked, when, why; the order stays Active until approved),
+   the order number carries a "Cancellation requested" badge, and the
+   Standard list and the Kanban board show the same badge on the card and a
+   **Cancellation requested (n)** filter (D-408).
 2. A holder of `edit_locked_data` approves (choosing *No refund*, *Refund
    pending* or *Refund already completed*) or rejects. Not the requester,
    unless the `cancellation` self-approval rule allows.

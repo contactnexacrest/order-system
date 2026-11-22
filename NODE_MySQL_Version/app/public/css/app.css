@@ -326,6 +326,13 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge-lost{background:var(--danger-soft);color:var(--danger);}
 .badge-complete{background:var(--navy-soft);color:var(--navy);}
 .badge-disputed{background:var(--gold-soft);color:var(--gold-strong);}
+/* D-408: an order whose cancellation waits for approval (list card, Kanban card, order page). */
+.badge-cancel-pending{background:var(--gold-soft);color:var(--gold-strong);border:1px solid var(--gold);white-space:normal;text-decoration:none;}
+.cancellation-pending-line{margin:0.5rem 0 0;}
+.cancellation-pending-line .badge-cancel-pending{margin-left:0;}
+.cancel-request-box{background:var(--gold-soft);border:1px solid var(--gold);border-left:6px solid var(--gold);scroll-margin-top:120px;}
+.cancel-request-text{display:flex;flex-direction:column;gap:4px;}
+.cancel-request-title{font-weight:700;font-size:1rem;}
 
 /* Annexure A "Additional Terms" WYSIWYG editor (Section AT) — a small
    hand-rolled contenteditable toolbar, consistent with the rest of this
