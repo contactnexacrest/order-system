@@ -682,6 +682,7 @@ a.entity-card:hover{text-decoration:none;}
 .entity-card-stretched-link::after{content:'';position:absolute;inset:0;z-index:0;}
 .entity-card-stretched-link:hover{text-decoration:underline;}
 .entity-card-action{position:relative;z-index:1;font-size:0.8rem;font-weight:700;color:var(--navy);}
+.entity-card-actions{display:inline-flex;gap:14px;align-items:center;} /* D-409 */
 
 /* --- Task #18: responsive / mobile pass ---
    The sidebar collapses to a top strip with a hamburger toggle below

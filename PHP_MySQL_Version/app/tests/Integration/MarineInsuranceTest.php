@@ -114,18 +114,22 @@ final class MarineInsuranceTest extends DbTestCase
     public function testTheEstimatedValueLineAndTheCoverWording(): void
     {
         $money = static fn ($v): string => number_format((float) $v, 2);
-        $cif = DocumentDataAssembler::estimatedValue(false, true, 4500.0, '950.00', '19.00', $money, 'EUR', [], false);
+        $cif = DocumentDataAssembler::estimatedValue(false, true, 4500.0, '950.00', '19.00', $money, 'EUR', [], false, true);
         self::assertSame('CIF', $cif['term']);
         self::assertSame('4,519.00', $money(4519)); // sanity of the helper
         self::assertSame('5,469.00', $cif['total']);
         self::assertSame('= FOB 4,500.00 + freight 950.00 + insurance 19.00', $cif['breakdown']);
         self::assertSame('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value.', $cif['note']);
 
-        $cfr = DocumentDataAssembler::estimatedValue(false, false, 4500.0, '950.00', null, $money, 'EUR', [], false);
+        $cfr = DocumentDataAssembler::estimatedValue(false, false, 4500.0, '950.00', null, $money, 'EUR', [], false, true);
         self::assertSame('CFR', $cfr['term']);
         self::assertSame('5,450.00', $cfr['total']);
         self::assertSame('= FOB 4,500.00 + indicative freight 950.00', $cfr['breakdown']);
         self::assertStringContainsString('Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR value.', $cfr['note']);
+
+        // D-409: without LC payment terms the Letter of Credit sentence is left out.
+        self::assertSame('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note).', DocumentDataAssembler::estimatedValue(false, true, 4500.0, '950.00', '19.00', $money, 'EUR', [], false, false)['note']);
+        self::assertSame('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR).', DocumentDataAssembler::estimatedValue(false, false, 4500.0, '950.00', null, $money, 'EUR', [], false)['note']);
 
         // Freight not entered yet: the known part and "To Be Confirmed".
         $open = DocumentDataAssembler::estimatedValue(false, true, 8040.0, null, null, $money, 'USD', [], false);

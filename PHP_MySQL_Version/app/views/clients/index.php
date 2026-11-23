@@ -68,7 +68,10 @@ $quotationFormLink = rtrim(Env::get('APP_URL', ''), '/') . '/quotation-details';
       </div>
       <div class="entity-card-footer">
         <span class="muted small"><?= htmlspecialchars($c['country_of_destination'] ?? 'Country not set') ?></span>
-        <?php if ($canManageOrders): ?><a class="entity-card-action" href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a><?php endif; ?>
+        <?php if ($canManageOrders): ?>
+          <?php // D-409: quick link to a new order for this client (same link as on the client page). ?>
+          <span class="entity-card-actions"><a class="entity-card-action" href="/orders/create?client_id=<?= (int) $c['id'] ?>" data-testid="client-card-new-order">+ New Order</a><a class="entity-card-action" href="/clients/<?= (int) $c['id'] ?>/edit">Edit</a></span>
+        <?php endif; ?>
       </div>
     </div>
     <?php endforeach; ?>

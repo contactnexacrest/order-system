@@ -517,3 +517,13 @@ After the R9-N01 fix the Export Executive no longer sees the rupees the bank cre
 clean tutorial database with migrations 2026-11-21a and 2026-11-22a): English 8.24 min, Hindi 10.54 min; checked and sent
 to the owner as replacements. D-402…D-407 (CIF insurance, Debit Note wording, QT/PI "To Be Confirmed") affect no recorded
 video — none shows the CIF freight/insurance box or the inside of a Debit Note / CIF Quotation / PI.
+
+## Out of date after the 23 Nov 2026 build — D-409 — OWNER TO DECIDE
+
+Checked against every script in `tutorials/scripts/` (and `scripts/parts/`). Nothing re-recorded (ask the owner first).
+
+| Video | What now differs on screen | Decision |
+|---|---|---|
+| A01 Part 2 (Clients scene), English and Hindi | Each client card's footer shows **+ New Order** next to Edit. | Owner to decide |
+| All videos (Quotation / Proforma Invoice) | Not affected: no video shows the inside of a CIF / CFR QT or PI, where the LC sentence is now printed only on LC orders. | No change needed |
+| C05, C13 (associate My clients) | Not affected: the associate portal's client list is a different page. | No change needed |

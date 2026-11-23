@@ -388,7 +388,7 @@ final class DocumentDataAssembler
                 'freight_insurance_amount' => $freightForTotal !== null ? $money($freightForTotal) : null,
                 // D-404 (21 Nov 2026, owner confirmed twice): the QT / PI line "Estimated total CIF / CFR value" under the
                 // FOB total — FOB + indicative freight (+ insurance on CIF). Null on FOB orders (nothing changes there).
-                'estimated_value' => self::estimatedValue($isFob, $isCif, $fobValue, $order['indicative_freight_amount'] ?? null, $order['indicative_insurance_amount'] ?? null, $money, $moneyCurrency, $tbcNos, $allTbc),
+                'estimated_value' => self::estimatedValue($isFob, $isCif, $fobValue, $order['indicative_freight_amount'] ?? null, $order['indicative_insurance_amount'] ?? null, $money, $moneyCurrency, $tbcNos, $allTbc, ($order['payment_method'] ?? null) === 'LC'),
                 'preset_name'      => $order['preset_name'],
             ],
             'payment_status' => $payment ? [
@@ -521,11 +521,12 @@ final class DocumentDataAssembler
     /**
      * D-404: "Estimated total CIF / CFR value" on the QT / PI — FOB + indicative freight (+ indicative insurance on CIF).
      * The FOB total, advance and balance are unchanged. A figure not entered yet reads "To Be Confirmed" in the sum.
+     * D-409: the "Open any Letter of Credit for this CIF / CFR value." sentence only when the payment method is LC.
      *
      * @param list<int> $tbcNos
      * @return ?array{term: string, total: string, breakdown: string, note: string}
      */
-    public static function estimatedValue(bool $isFob, bool $isCif, float $fobValue, mixed $freight, mixed $insurance, \Closure $money, string $currency, array $tbcNos, bool $allTbc): ?array
+    public static function estimatedValue(bool $isFob, bool $isCif, float $fobValue, mixed $freight, mixed $insurance, \Closure $money, string $currency, array $tbcNos, bool $allTbc, bool $isLc = false): ?array
     {
         if ($isFob) {
             return null;
@@ -555,8 +556,11 @@ final class DocumentDataAssembler
             $total .= ' + ' . implode(' and ', $missing) . ' To Be Confirmed';
         }
         $note = $isCif
-            ? 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value.'
-            : 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR value.';
+            ? 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note).'
+            : 'Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR).';
+        if ($isLc) {
+            $note .= ' Open any Letter of Credit for this ' . $term . ' value.';
+        }
         return ['term' => $term, 'total' => $total, 'breakdown' => '= ' . implode(' + ', $parts), 'note' => $note];
     }
 

@@ -110,18 +110,22 @@ describe('Marine insurance on CIF orders (D-402 / D-403 / D-404)', () => {
 
   it('the estimated value line and the cover wording', async () => {
     const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const cif = documentDataAssembler.estimatedValue(false, true, 4500.0, '950.00', '19.00', money, 'EUR', [], false);
+    const cif = documentDataAssembler.estimatedValue(false, true, 4500.0, '950.00', '19.00', money, 'EUR', [], false, true);
     expect(cif.term).toBe('CIF');
     expect(money(4519)).toBe('4,519.00'); // sanity of the helper
     expect(cif.total).toBe('5,469.00');
     expect(cif.breakdown).toBe('= FOB 4,500.00 + freight 950.00 + insurance 19.00');
     expect(cif.note).toBe('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note). Open any Letter of Credit for this CIF value.');
 
-    const cfr = documentDataAssembler.estimatedValue(false, false, 4500.0, '950.00', null, money, 'EUR', [], false);
+    const cfr = documentDataAssembler.estimatedValue(false, false, 4500.0, '950.00', null, money, 'EUR', [], false, true);
     expect(cfr.term).toBe('CFR');
     expect(cfr.total).toBe('5,450.00');
     expect(cfr.breakdown).toBe('= FOB 4,500.00 + indicative freight 950.00');
     expect(cfr.note).toContain('Insurance is arranged by the buyer (CFR). Open any Letter of Credit for this CFR value.');
+
+    // D-409: without LC payment terms the Letter of Credit sentence is left out.
+    expect(documentDataAssembler.estimatedValue(false, true, 4500.0, '950.00', '19.00', money, 'EUR', [], false, false).note).toBe('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight & insurance (billed by Debit Note).');
+    expect(documentDataAssembler.estimatedValue(false, false, 4500.0, '950.00', null, money, 'EUR', [], false).note).toBe('Advance and balance are on the FOB value. The Commercial Invoice will show FOB + the actual freight (billed by Debit Note). Insurance is arranged by the buyer (CFR).');
 
     // Freight not entered yet: the known part and "To Be Confirmed".
     const open = documentDataAssembler.estimatedValue(false, true, 8040.0, null, null, money, 'USD', [], false);

@@ -54,7 +54,10 @@
       </div>
       <div class="entity-card-footer">
         <span class="muted small">{{ c.country_of_destination or 'Country not set' }}</span>
-        {% if permissions.manage_orders %}<a class="entity-card-action" href="/clients/{{ c.id }}/edit">Edit</a>{% endif %}
+        {% if permissions.manage_orders %}
+          {# D-409: quick link to a new order for this client (same link as on the client page). #}
+          <span class="entity-card-actions"><a class="entity-card-action" href="/orders/create?client_id={{ c.id }}" data-testid="client-card-new-order">+ New Order</a><a class="entity-card-action" href="/clients/{{ c.id }}/edit">Edit</a></span>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
