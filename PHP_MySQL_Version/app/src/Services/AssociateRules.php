@@ -28,6 +28,25 @@ use App\Repositories\PricingRepository;
  */
 final class AssociateRules
 {
+    /**
+     * Owner decision D-411 (24 Nov 2026): who may change the associate commission rules — commission levels and the
+     * ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice
+     * corrections, a client's associate and the portal access levels. The permission "Manage associate rules": the MD
+     * and the ED to start; Admin › Roles can give it to any role or person. (Until D-411: the MD only.)
+     */
+    public const MANAGE_PERMISSION = 'manage_associate_rules';
+
+    /** The wording shown where the rules are read only. */
+    public const WHO_CHANGES = 'Only the MD, the ED and people with "Manage associate rules" can change this.';
+
+    public static function canManage(?array $user): bool
+    {
+        if ($user === null || empty($user['id'])) {
+            return false;
+        }
+        return PermissionService::can((int) $user['id'], isset($user['role_id']) && $user['role_id'] !== null ? (int) $user['role_id'] : null, self::MANAGE_PERMISSION);
+    }
+
     public const PRICE_RULES = ['starting' => 'Starting rate', 'fixed' => 'A fixed %', 'ladder' => 'Ladder rate'];
     public const PRICE_RULE_TEXT = [
         'starting' => "The client's price always includes the first ladder step. The price never rises. When the associate is above it, we pay the rest from our margin.",

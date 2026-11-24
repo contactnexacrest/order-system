@@ -210,7 +210,7 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     expect(page).toContain('data-commission-rule');
     expect(page).toContain('Ladder steps so far');
     page = (await (await staff(await user('Export Executive'))).get(`/associates/${a.id}`)).text;
-    expect(page).toContain('Set by the MD.');
+    expect(page).toContain('Set by the MD / ED.');
     expect(page).not.toContain('Ladder steps so far');
 
     const [level] = await associateCommission.levelForAssociate(a, null);

@@ -1,6 +1,7 @@
 {# Owner decision D-245 (4 Nov 2026), P1: associate commission levels (CRUD) and the ladder. Port of views/pricing/commission_levels.php. #}
 <div class="card page-wide">
   <h1>Associate Commission Levels</h1>
+  {% if not canManage %}<p class="alert alert-info" data-rules-read-only>Only the MD, the ED and people with &quot;Manage associate rules&quot; can change this.</p>{% endif %}{# D-411 #}
   <p class="muted">Commission is built into the associate's price: a higher level raises the buyer's price, never lowers NexaCrest's margin. A level used by an associate or the ladder can only be deactivated, not deleted. A change applies to new quotes only — orders with an issued Proforma Invoice keep their commission. Every change is in the audit log. (Commission is paid on these levels from phase P3.)</p>
   {% if sample %}
     <p class="muted small">Floors shown for <strong>{{ sample.product.name }}</strong> (staff floor USD {{ sample.pricing.build.staff_floor | money }}).</p>

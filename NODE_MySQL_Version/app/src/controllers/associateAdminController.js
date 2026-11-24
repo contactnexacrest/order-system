@@ -120,14 +120,14 @@ async function form(req, res, a) {
     users: await userRepository.listActive(),
     // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
     commissionLevels: (await pricingRepository.levels()).map((l) => ({ ...l, label: pricingService.levelLabel(l) })),
-    canPricing: can(req, 'manage_pricing'),
+    canPricing: can(req, 'manage_associate_rules'), // D-411
   }, 'layout/base');
 }
 
-/** Owner decision D-245: the associate's commission mode and level, read only for people with manage_pricing. */
+/** Owner decision D-245: the associate's commission mode and level, read only for people with manage_associate_rules (D-411). */
 async function readCommissionLevel(req, existing) {
   // D-291 (11 Nov 2026): an existing associate's rule is changed on their page (Commission rule), with a reason.
-  if (!can(req, 'manage_pricing') || existing) return [null, null];
+  if (!can(req, 'manage_associate_rules') || existing) return [null, null];
   const body = req.body || {};
   const mode = String(body.commission_mode ?? '');
   if (!['fixed', 'ladder'].includes(mode)) return [null, 'Choose whether this associate has a fixed commission level or follows the ladder.'];
@@ -317,7 +317,7 @@ async function show(req, res) {
     companyPriceRule: (await require('../services/associateRules').companyPriceRule()).rule,
     groupDays: await require('../services/associateRules').groupDays(),
     minOrderInr: await require('../services/associateRules').minOrderInr(),
-    canPricing: can(req, 'manage_pricing'),
+    canPricing: can(req, 'manage_associate_rules'), // D-411
     canChangeLink: await associateService.canChangeLink(req),
     clients: await associatePortalRepository.clients(id),
     me: req.user,
@@ -391,7 +391,7 @@ async function show(req, res) {
         const track = await access.trackRecord(id);
         const feats = await access.features(a);
         return {
-          track, history: await access.history(id, 20), isMd: await incentiveService.isMd(req.user), upgradeAfter: await access.upgradeAfter(),
+          track, history: await access.history(id, 20), isMd: await require('../services/associateRules').canManage(req.user) /* D-411: may change the level */, upgradeAfter: await access.upgradeAfter(),
           suggest: await access.suggestUpgrade(a, track.completed_paid), level: access.level(a), describe: await access.describe(a),
           levels: access.ALL_LEVELS, features: Object.entries(access.FEATURES).filter(([k]) => k !== 'profile').map(([k, [label, help]]) => ({ key: k, label, help, on: !!feats[k] })),
           valueText: Object.entries(track.value).map(([c, v]) => `${c} ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' · '),
@@ -555,7 +555,7 @@ async function unlinkClient(req, res) {
   const moveTo = parseInt((req.body || {}).move_to || 0, 10) || 0;
   if (await recordCheck.missing(req, res, 'clients', clientId, `/associates/${a.id}`, 'client link', { associate_id: Number(a.id) })) return;
   if (!(await associateService.canChangeLink(req))) {
-    flash.set(req, 'error', 'Only the Managing Director can change or remove a client\'s associate.');
+    flash.set(req, 'error', 'Only the MD, the ED and people with "Manage associate rules" can change or remove a client\'s associate.');
     res.status(403);
     back(res, a.id, 'clients');
     return;
@@ -569,12 +569,12 @@ async function unlinkClient(req, res) {
     const client = await clientRepository.find(clientId);
     if (target) {
       await associateService.linkClient(clientId, Number(target.id), 'md_change', null, associateService.todayIst(), req.user.id);
-      await associateService.notify(target, 'link_changed', `${client.company_legal_name} is now registered as your client (decided by the Managing Director: ${reason}).`, clientId, null, null, req.user.id);
+      await associateService.notify(target, 'link_changed', `${client.company_legal_name} is now registered as your client (decided by NexaCrest management: ${reason}).`, clientId, null, null, req.user.id);
     } else {
       await db.execute('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL WHERE id = :id', { id: clientId });
     }
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_UNLINKED', 'clients', clientId, 'associate_id', String(a.id), target ? String(target.id) : null);
-    await associateService.notify(a, 'link_changed', `${client.company_legal_name} is no longer registered as your client. Decided by the Managing Director. Reason: ${reason}`, clientId, null, null, req.user.id);
+    await associateService.notify(a, 'link_changed', `${client.company_legal_name} is no longer registered as your client. Decided by NexaCrest management. Reason: ${reason}`, clientId, null, null, req.user.id);
     flash.set(req, 'success', target ? `Client moved to ${target.name}; both associates were told.` : 'Client unlinked; the associate was told.');
   }
   back(res, a.id, 'clients');
@@ -1069,7 +1069,7 @@ async function clawback(req, res) {
 
 /**
  * Owner decision D-245 P3: when an associate's commission is paid, the counting-order
- * threshold, buyer registration, GST — the MD changes these (manage_pricing); TDS and
+ * threshold, buyer registration, GST — "Manage associate rules" (D-411: MD, ED, others given it); TDS and
  * the bank waiting days as before. Commission levels and the ladder: Admin → Pricing.
  */
 async function ladder(req, res) {
@@ -1092,13 +1092,22 @@ async function ladder(req, res) {
     groupDays: await require('../services/associateRules').groupDays(),
     groupDaysMin: require('../services/associateRules').GROUP_DAYS_MIN,
     groupDaysMax: require('../services/associateRules').GROUP_DAYS_MAX,
-    canPricing: can(req, 'manage_pricing'),
+    canPricing: can(req, 'manage_associate_rules'), // D-411
   }, 'layout/base');
 }
 
 async function saveLadder(req, res) {
   const associateCommission = require('../services/associateCommission');
   const body = req.body || {};
+  // D-411: someone with "Manage associate rules" but not "Manage associates" changes only the rules; TDS and the
+  // bank-details checks keep what is stored.
+  if (!can(req, 'manage_associates')) {
+    const bankDetailsCheck = require('../services/bankDetailsCheck');
+    body.associate_tds_pct = String(await associateService.tdsPct());
+    body.associate_bank_wait_first_days = String(await bankDetailsCheck.waitDays(true));
+    body.associate_bank_wait_change_days = String(await bankDetailsCheck.waitDays(false));
+    body.bank_details_check_people = await bankDetailsCheck.people();
+  }
   const values = {};
   const int = (v) => (/^-?\d+$/.test(String(v ?? '').trim()) ? parseInt(v, 10) : null);
   const tds = isNum(body.associate_tds_pct) ? Number(body.associate_tds_pct) : null;
@@ -1122,7 +1131,7 @@ async function saveLadder(req, res) {
   values.associate_bank_wait_change_days = String(waitChange);
   values.bank_details_check_people = people;
   // The commission rules: the MD only (fields posted by others are ignored).
-  if (can(req, 'manage_pricing')) {
+  if (can(req, 'manage_associate_rules')) {
     const days = int(body.associate_commission_due_days);
     const run = String(body.associate_payout_run || '');
     // D-292: monthly 1–28 or 'last'; weekly 1–7 (the weekday field, or the old single field).

@@ -227,7 +227,8 @@ final class AssociateRulesD410Test extends DbTestCase
     public function testB9ChangingWhatTheClientPriceIncludesNeedsAReason(): void
     {
         // The change first: PHP's + keeps the left-hand key.
-        $r = $this->call('POST', '/pricing/settings', ['associate_price_rule' => 'ladder'] + PricingRepository::settings());
+        // D-411: the client-price choice has its own form (/pricing/settings/associate-price-rule).
+        $r = $this->call('POST', '/pricing/settings/associate-price-rule', ['associate_price_rule' => 'ladder']);
         self::assertSame('error', $r['type']);
         self::assertStringContainsString("Give the reason for changing what the client's price includes", (string) $r['flash']);
         self::assertSame('fixed', AssociateRules::companyPriceRule()['rule']);

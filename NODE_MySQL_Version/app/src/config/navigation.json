@@ -87,12 +87,12 @@
         { "label": "Registrations", "href": "/associates/registrations", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] }, "count": "associateRegistrations" },
         { "label": "Price requests", "href": "/associates/price-requests", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } },
         { "label": "Commission", "children": [
-          { "label": "Commission settings and ladder", "href": "/associates/ladder", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] } },
-          { "label": "Commission levels", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"], "flags": ["mod_associates"] } }
+          { "label": "Commission settings and ladder", "href": "/associates/ladder", "when": { "any": ["manage_associates", "manage_associate_rules"], "flags": ["mod_associates"] } },
+          { "label": "Commission levels", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing", "manage_associate_rules"], "flags": ["mod_associates"] } }
         ] },
         { "label": "Payouts", "href": "/incentives/payouts#associate-payouts", "when": { "any": ["pay_incentives"], "flags": ["mod_associates", "mod_team_incentive"] } },
         { "label": "TDS register", "href": "/associates/tds", "when": { "any": ["manage_incentives", "pay_incentives", "ca_module_view"], "flags": ["mod_associates"] } },
-        { "label": "Access levels", "href": "/associates/access-levels", "when": { "any": ["view_associates", "manage_associates"], "flags": ["mod_associates"] } },
+        { "label": "Access levels", "href": "/associates/access-levels", "when": { "any": ["view_associates", "manage_associates", "manage_associate_rules"], "flags": ["mod_associates"] } },
         { "label": "Report", "href": "/reports/associates", "when": { "any": ["manage_associates"], "flags": ["mod_associates"] } }
       ]
     },
@@ -107,7 +107,7 @@
         { "label": "Categories", "href": "/products/categories", "when": { "any": ["manage_product_catalog"] } },
         { "label": "Specifications (HS)", "href": "/products/hs-specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
         { "label": "Pricing", "children": [
-          { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
+          { "label": "Commission levels and ladder", "href": "/pricing/commission-levels", "when": { "any": ["view_price_buildup", "manage_pricing", "manage_associate_rules"] } },
           { "label": "Specifications", "href": "/pricing/specifications", "when": { "any": ["view_price_buildup", "manage_pricing"] } },
           { "label": "Forms of stone", "href": "/pricing/forms", "when": { "any": ["view_price_buildup", "manage_pricing"] } }
         ] },

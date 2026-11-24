@@ -185,7 +185,8 @@ describe('Associate commission rules (D-410)', () => {
 
   it('B9: changing what the client price includes needs a reason', async () => {
     const agent = await staff();
-    const r = await post(agent, '/pricing/settings', '/pricing/settings', { ...(await pricingRepository.settings()), associate_price_rule: 'ladder' });
+    // D-411: the client-price choice has its own form (/pricing/settings/associate-price-rule).
+    const r = await post(agent, '/pricing/settings', '/pricing/settings/associate-price-rule', { associate_price_rule: 'ladder' });
     expect([r.type, r.message]).toEqual(['error', expect.stringContaining("Give the reason for changing what the client's price includes")]);
     expect((await associateRules.companyPriceRule()).rule).toBe('fixed');
   });

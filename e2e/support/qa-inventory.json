@@ -1952,8 +1952,11 @@
     "POST /associates/registrations/settings",
     "POST /associates/registrations/{id}/accept",
     "POST /associates/registrations/{id}/reject",
-    "GET /associates/ladder",
-    "POST /associates/ladder",
+    "GET /associates/access-levels (any of view_associates|manage_associates|manage_associate_rules)",
+    "POST /associates/{id}/access (any of manage_associates|manage_associate_rules)",
+    "POST /associates/{id}/access/not-yet (any of manage_associates|manage_associate_rules)",
+    "GET /associates/ladder (any of manage_associates|manage_associate_rules)",
+    "POST /associates/ladder (any of manage_associates|manage_associate_rules)",
     "GET /reports/associates",
     "GET /associates/{id} (any of view_associates|manage_associates|manage_associate_bank)",
     "GET /associates/{id}/edit",
@@ -1972,9 +1975,10 @@
     "POST /associates/{id}/messages",
     "POST /associates/payouts/{payoutId}/hold",
     "POST /associates/payouts/{payoutId}/release",
-    "POST /associates/payouts/{payoutId}/clawback"
+    "POST /associates/payouts/{payoutId}/clawback",
+    "GET /associates/{id}/payment-advices/{adviceId}/{format}"
    ],
-   "route_gate_count": 30,
+   "route_gate_count": 34,
    "php_check_sites": [
     "PHP_MySQL_Version/app/src/Controllers/AssociateRegistrationController.php (1)",
     "PHP_MySQL_Version/app/src/Controllers/AssociateAdminController.php (2)",
@@ -1997,6 +2001,51 @@
     "NODE_MySQL_Version/app/src/services/associateKyc.js (1)",
     "NODE_MySQL_Version/app/src/repositories/associateRepository.js (1)",
     "NODE_MySQL_Version/app/views/layout/base.njk (1)"
+   ],
+   "money_permission": false
+  },
+  {
+   "key": "manage_associate_rules",
+   "name": "Manage associate rules",
+   "category": "Associates",
+   "description": "Change the associate commission rules: levels and ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice corrections, a client's associate, portal access levels (reason kept)",
+   "granted_to_roles": [
+    "Managing Director",
+    "Executive Director"
+   ],
+   "route_gates": [
+    "GET /associates/access-levels (any of view_associates|manage_associates|manage_associate_rules)",
+    "POST /associates/access-levels",
+    "POST /associates/{id}/access (any of manage_associates|manage_associate_rules)",
+    "POST /associates/{id}/access/not-yet (any of manage_associates|manage_associate_rules)",
+    "GET /associates/ladder (any of manage_associates|manage_associate_rules)",
+    "POST /associates/ladder (any of manage_associates|manage_associate_rules)",
+    "GET /associates/{id}/commission-rule",
+    "POST /associates/{id}/commission-rule",
+    "GET /pricing/settings (any of view_price_buildup|manage_pricing|manage_associate_rules)",
+    "POST /pricing/settings/associate-price-rule",
+    "GET /pricing/commission-levels (any of view_price_buildup|manage_pricing|manage_associate_rules)",
+    "POST /pricing/commission-levels",
+    "POST /pricing/commission-levels/{id}",
+    "POST /pricing/commission-levels/{id}/active",
+    "POST /pricing/commission-levels/{id}/delete",
+    "POST /pricing/commission-ladder",
+    "POST /associates/{id}/payment-advices/{adviceId}/revise"
+   ],
+   "route_gate_count": 17,
+   "php_check_sites": [
+    "PHP_MySQL_Version/app/src/Services/AssociateRules.php (1)",
+    "PHP_MySQL_Version/app/src/Controllers/AssociateAdminController.php (5)",
+    "PHP_MySQL_Version/app/src/Controllers/PricingController.php (2)",
+    "PHP_MySQL_Version/app/src/Helpers/PermittedLinks.php (2)",
+    "PHP_MySQL_Version/public_html/index.php (17)"
+   ],
+   "node_check_sites": [
+    "NODE_MySQL_Version/app/src/services/associateRules.js (1)",
+    "NODE_MySQL_Version/app/src/controllers/associateAdminController.js (5)",
+    "NODE_MySQL_Version/app/src/controllers/pricingController.js (2)",
+    "NODE_MySQL_Version/app/src/helpers/permittedLinks.js (2)",
+    "NODE_MySQL_Version/app/src/server.js (17)"
    ],
    "money_permission": false
   },
@@ -2054,9 +2103,10 @@
    ],
    "route_gates": [
     "GET /associates (any of view_associates|manage_associates|manage_associate_bank)",
+    "GET /associates/access-levels (any of view_associates|manage_associates|manage_associate_rules)",
     "GET /associates/{id} (any of view_associates|manage_associates|manage_associate_bank)"
    ],
-   "route_gate_count": 2,
+   "route_gate_count": 3,
    "php_check_sites": [
     "PHP_MySQL_Version/app/src/Helpers/PermittedLinks.php (1)",
     "PHP_MySQL_Version/app/views/partials/associate_line.php (1)",
@@ -2683,15 +2733,15 @@
     "POST /associates/price-requests/{id}/price",
     "GET /associates/{id}/price-access",
     "POST /associates/{id}/price-access",
-    "GET /pricing/settings (any of view_price_buildup|manage_pricing)",
+    "GET /products/categories/{id} (any of manage_product_catalog|manage_pricing|view_price_buildup)",
+    "POST /products/categories/{id}/price-rules",
+    "GET /products/price-rules (any of manage_pricing|view_price_buildup)",
+    "GET /pricing/settings (any of view_price_buildup|manage_pricing|manage_associate_rules)",
     "POST /pricing/settings",
-    "GET /pricing/commission-levels (any of view_price_buildup|manage_pricing)",
-    "POST /pricing/commission-levels",
-    "POST /pricing/commission-levels/{id}",
-    "POST /pricing/commission-levels/{id}/active",
-    "POST /pricing/commission-levels/{id}/delete",
-    "POST /pricing/commission-ladder",
+    "GET /pricing/commission-levels (any of view_price_buildup|manage_pricing|manage_associate_rules)",
     "POST /products/{id}/pricing",
+    "POST /pricing/fx-rates/fetch",
+    "POST /pricing/fx-rates/{id}/decide",
     "GET /pricing/specifications (any of view_price_buildup|manage_pricing)",
     "POST /pricing/specifications",
     "POST /pricing/specifications/{id}",
@@ -2701,9 +2751,18 @@
     "POST /pricing/spec-options/{id}",
     "POST /pricing/spec-options/{id}/active",
     "POST /pricing/spec-options/{id}/delete",
-    "GET /products/{id}/specifications (any of view_price_buildup|manage_product_specifications|manage_pricing)"
+    "GET /products/{id}/specifications (any of view_price_buildup|manage_product_specifications|manage_pricing)",
+    "GET /pricing/forms (any of view_price_buildup|manage_pricing)",
+    "POST /pricing/forms",
+    "POST /pricing/forms/{id}",
+    "POST /pricing/forms/{id}/delete",
+    "GET /products/hs-specifications (any of view_price_buildup|manage_pricing)",
+    "POST /products/hs-specifications",
+    "POST /products/hs-specifications/{id}",
+    "POST /products/hs-specifications/{id}/delete",
+    "POST /associates/{id}/price-rule"
    ],
-   "route_gate_count": 25,
+   "route_gate_count": 34,
    "php_check_sites": [
     "PHP_MySQL_Version/app/src/Controllers/IncentiveController.php (1)",
     "PHP_MySQL_Version/app/src/Controllers/ProductController.php (2)",
@@ -2906,13 +2965,18 @@
     "GET /reports/incentives/to-pay (any of manage_incentives|pay_incentives|view_price_buildup)",
     "GET /reports/incentives/owed (any of manage_incentives|pay_incentives|view_price_buildup)",
     "GET /reports/incentives/statement (any of manage_incentives|pay_incentives|view_price_buildup)",
-    "GET /pricing/settings (any of view_price_buildup|manage_pricing)",
-    "GET /pricing/commission-levels (any of view_price_buildup|manage_pricing)",
+    "GET /products/categories/{id} (any of manage_product_catalog|manage_pricing|view_price_buildup)",
+    "GET /products/price-rules (any of manage_pricing|view_price_buildup)",
+    "GET /pricing/settings (any of view_price_buildup|manage_pricing|manage_associate_rules)",
+    "GET /pricing/commission-levels (any of view_price_buildup|manage_pricing|manage_associate_rules)",
     "GET /products/{id}/market-prices (any of record_market_prices|view_price_buildup)",
+    "GET /products/suppliers/{supplierId}/price (any of record_market_prices|view_price_buildup)",
     "GET /pricing/specifications (any of view_price_buildup|manage_pricing)",
-    "GET /products/{id}/specifications (any of view_price_buildup|manage_product_specifications|manage_pricing)"
+    "GET /products/{id}/specifications (any of view_price_buildup|manage_product_specifications|manage_pricing)",
+    "GET /pricing/forms (any of view_price_buildup|manage_pricing)",
+    "GET /products/hs-specifications (any of view_price_buildup|manage_pricing)"
    ],
-   "route_gate_count": 10,
+   "route_gate_count": 15,
    "php_check_sites": [
     "PHP_MySQL_Version/app/src/Controllers/ProductController.php (1)",
     "PHP_MySQL_Version/app/src/Controllers/OrderController.php (2)",
@@ -4943,7 +5007,7 @@
    "key": "view_associate_commission_rules",
    "name": "See associate commission rules",
    "category": "Associates",
-   "description": "See an associate's commission rule (standard ladder, own ladder or fixed), the level and % of their next order, how many orders have counted and the ladder steps. Without it staff see \"Set by the MD\". Changing the rule needs Manage pricing (the MD)."
+   "description": "See an associate's commission rule (standard ladder, own ladder or fixed), the level and % of their next order, how many orders have counted and the ladder steps. Without it staff see \"Set by the MD / ED\". Changing it needs Manage associate rules."
   },
   {
    "key": "approve_buyer_details_change",
@@ -21656,7 +21720,8 @@
    "requires_any": [
     [
      "view_associates",
-     "manage_associates"
+     "manage_associates",
+     "manage_associate_rules"
     ]
    ],
    "guards": [
@@ -21682,7 +21747,7 @@
    "controller": "AssociateAccessController",
    "action": "saveLevels",
    "requires_all": [
-    "manage_associates"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -21708,10 +21773,13 @@
    "path": "/associates/{id}/access",
    "controller": "AssociateAccessController",
    "action": "setLevel",
-   "requires_all": [
-    "manage_associates"
+   "requires_all": [],
+   "requires_any": [
+    [
+     "manage_associates",
+     "manage_associate_rules"
+    ]
    ],
-   "requires_any": [],
    "guards": [
     "session",
     "csrf"
@@ -21735,10 +21803,13 @@
    "path": "/associates/{id}/access/not-yet",
    "controller": "AssociateAccessController",
    "action": "notYet",
-   "requires_all": [
-    "manage_associates"
+   "requires_all": [],
+   "requires_any": [
+    [
+     "manage_associates",
+     "manage_associate_rules"
+    ]
    ],
-   "requires_any": [],
    "guards": [
     "session",
     "csrf"
@@ -21762,10 +21833,13 @@
    "path": "/associates/ladder",
    "controller": "AssociateAdminController",
    "action": "ladder",
-   "requires_all": [
-    "manage_associates"
+   "requires_all": [],
+   "requires_any": [
+    [
+     "manage_associates",
+     "manage_associate_rules"
+    ]
    ],
-   "requires_any": [],
    "guards": [
     "session"
    ],
@@ -21805,10 +21879,13 @@
    "path": "/associates/ladder",
    "controller": "AssociateAdminController",
    "action": "saveLadder",
-   "requires_all": [
-    "manage_associates"
+   "requires_all": [],
+   "requires_any": [
+    [
+     "manage_associates",
+     "manage_associate_rules"
+    ]
    ],
-   "requires_any": [],
    "guards": [
     "session",
     "csrf"
@@ -22500,7 +22577,7 @@
    "controller": "AssociateAdminController",
    "action": "commissionRule",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -22526,7 +22603,7 @@
    "controller": "AssociateAdminController",
    "action": "saveCommissionRule",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -34803,7 +34880,8 @@
    "requires_any": [
     [
      "view_price_buildup",
-     "manage_pricing"
+     "manage_pricing",
+     "manage_associate_rules"
     ]
    ],
    "guards": [
@@ -34853,6 +34931,46 @@
    "php_line": 1244,
    "node_line": 1473,
    "node_handler": "pricingController.saveSettings",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "OrderLinePricingTest.php",
+     "PricingSetupTest.php"
+    ],
+    "node": [
+     "d256PricingUsability.test.js",
+     "orderLinePricing.test.js",
+     "pricingSetup.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/pricing/settings/associate-price-rule",
+   "controller": "PricingController",
+   "action": "saveAssociatePriceRule",
+   "requires_all": [
+    "manage_associate_rules"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "pricingController.saveAssociatePriceRule",
    "node_difference": null,
    "sweep_coverage": [
     "RouteMatrix: 403 for zero-permission user (both stacks)",
@@ -35133,7 +35251,8 @@
    "requires_any": [
     [
      "view_price_buildup",
-     "manage_pricing"
+     "manage_pricing",
+     "manage_associate_rules"
     ]
    ],
    "guards": [
@@ -35170,7 +35289,7 @@
    "controller": "PricingController",
    "action": "addLevel",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -35207,7 +35326,7 @@
    "controller": "PricingController",
    "action": "updateLevel",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -35240,7 +35359,7 @@
    "controller": "PricingController",
    "action": "toggleLevel",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -35277,7 +35396,7 @@
    "controller": "PricingController",
    "action": "deleteLevel",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -35314,7 +35433,7 @@
    "controller": "PricingController",
    "action": "saveLadder",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [
@@ -37181,7 +37300,7 @@
    "controller": "AssociateAdminController",
    "action": "revisePaymentAdvice",
    "requires_all": [
-    "manage_pricing"
+    "manage_associate_rules"
    ],
    "requires_any": [],
    "guards": [

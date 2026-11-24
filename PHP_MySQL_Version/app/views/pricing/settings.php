@@ -167,17 +167,25 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="price_request_valid_days" min="1" max="365" step="1" required value="<?= View::e($settings['price_request_valid_days']) ?>" placeholder="e.g. 7"<?= $__ro ?>></label>
     </fieldset>
 
+
+    <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>
+  </form>
+
+  <?php // D-411 (24 Nov 2026): its own form — the MD, the ED and people with "Manage associate rules". ?>
+  <?php $__roA = !empty($canManageRules) ? '' : ' disabled'; ?>
+  <form method="post" action="/pricing/settings/associate-price-rule" id="associate-price-rule-form">
+    <?= Csrf::field() ?>
     <?php // D-410 (24 Nov 2026): the % of an associate's commission included in the client's price.
       $__ar = (string) $settings['associate_price_rule']; $__ar = isset(\App\Services\AssociateRules::PRICE_RULES[$__ar]) ? $__ar : 'fixed';
       $__ap = (float) $settings['associate_price_fixed_pct']; $__wi = $whatIf ?? null; ?>
     <fieldset id="associate-price-rule" data-testid="associate-price-rule-setting"><legend>Associate commission in the client's price (D-410)</legend>
       <p class="help-line">&#8505; An associate earns their full commission %. This setting decides how much of it is built into the price the client is quoted; any commission above it is paid from our margin. It applies to new prices only — orders with an approved Quotation or an issued Proforma Invoice keep their prices. Each associate can have their own choice (associate page › Commission).</p>
-      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="starting"<?= $__ar === 'starting' ? ' checked' : '' ?><?= $__ro ?>> Starting rate <span class="muted">(the first ladder step)</span></label>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="starting"<?= $__ar === 'starting' ? ' checked' : '' ?><?= $__roA ?>> Starting rate <span class="muted">(the first ladder step)</span></label>
         <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['starting']) ?></span></div>
-      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="fixed"<?= $__ar === 'fixed' ? ' checked' : '' ?><?= $__ro ?>> A fixed % <span class="muted">(default)</span></label>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="fixed"<?= $__ar === 'fixed' ? ' checked' : '' ?><?= $__roA ?>> A fixed % <span class="muted">(default)</span></label>
         <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['fixed']) ?></span>
-        <label class="choice-extra">Fixed % <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="<?= View::e(number_format($__ap, 2, '.', '')) ?>" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."<?= $__ro ?>> %</label></div>
-      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="ladder"<?= $__ar === 'ladder' ? ' checked' : '' ?><?= $__ro ?>> Ladder rate <span class="muted">(each associate's current %)</span></label>
+        <label class="choice-extra">Fixed % <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="<?= View::e(number_format($__ap, 2, '.', '')) ?>" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."<?= $__roA ?>> %</label></div>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="ladder"<?= $__ar === 'ladder' ? ' checked' : '' ?><?= $__roA ?>> Ladder rate <span class="muted">(each associate's current %)</span></label>
         <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['ladder']) ?></span></div>
       <p class="small" style="border:1px solid #C9962B;padding:6px 8px" data-testid="associate-price-right-now"><strong>Right now:</strong>
         <?php if ($__ar === 'fixed'): ?>every client price includes <strong><?= View::e(PricingService::pct($__ap)) ?></strong>. Associates above it are paid the rest from our margin; associates below it have room to negotiate.
@@ -193,10 +201,9 @@ $__ro = $canManage ? '' : ' disabled';
       </table>
       <?php endif; ?>
       <label>Reason for changing this setting <small class="muted">(needed when the choice or the % changes; kept in the Audit Log)</small>
-        <input type="text" name="associate_price_reason" minlength="10" maxlength="300" placeholder="e.g. margin too thin on high-volume associates"<?= $__ro ?>><small class="reason-hint muted">Must be at least 10 characters.</small></label>
+        <input type="text" name="associate_price_reason" minlength="10" maxlength="300" placeholder="e.g. margin too thin on high-volume associates"<?= $__roA ?>><small class="reason-hint muted">Must be at least 10 characters.</small></label>
     </fieldset>
-
-    <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>
+    <?php if (!empty($canManageRules)): ?><button type="submit">Save what the client's price includes</button><?php else: ?><p class="muted small"><?= View::e(\App\Services\AssociateRules::WHO_CHANGES) ?></p><?php endif; ?>
   </form>
 
   <h2>Who Can Do What</h2>
@@ -204,7 +211,8 @@ $__ro = $canManage ? '' : ' disabled';
     <tr><th>Permission</th><th>Default roles</th></tr>
     <tr><td>Record supplier / market prices and costs to FOB</td><td>Procurement (Executive, Manager, Director), MD</td></tr>
     <tr><td>See the full price build-up</td><td>MD, ED</td></tr>
-    <tr><td>Change these settings, product overrides, commission levels and ladder, category specifications</td><td>MD only</td></tr>
+    <tr><td>Change these settings, product overrides, category specifications</td><td>MD only</td></tr>
+    <tr><td>Change the associate rules: commission levels and ladder, what the client's price includes, Associates › Settings (D-411)</td><td>MD, ED and roles or people given "Manage associate rules"</td></tr>
     <tr><td>Change one product's specifications (hide, change, add for that product)</td><td>Roles with "Manage a product's specifications" — Admin and MD to start</td></tr>
   </table>
   <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/products/price-rules">Category price rules</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>

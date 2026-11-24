@@ -512,8 +512,9 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(await associateEventRepository.hasEvent(Number(a.id), 'direct_contact', c, null)).toBe(true); // the same VAT number without the code: the associate is told
 
     const params = { id: String(a.id), clientId: String(c) };
-    await call(associateAdminController.unlinkClient, { as: ed, params, body: { reason: 'The buyer says another agent introduced them.', move_to: String(other.id) } });
-    expect(flash().message).toBe('Only the Managing Director can change or remove a client\'s associate.');
+    // D-411 (24 Nov 2026): the MD, the ED and people with "Manage associate rules" — a Finance Manager is refused.
+    await call(associateAdminController.unlinkClient, { as: finance1, params, body: { reason: 'The buyer says another agent introduced them.', move_to: String(other.id) } });
+    expect(flash().message).toBe('Only the MD, the ED and people with "Manage associate rules" can change or remove a client\'s associate.');
     expect(String(await value('SELECT associate_id FROM clients WHERE id = :id', { id: c }))).toBe(String(a.id));
 
     await call(associateAdminController.unlinkClient, { as: md, params, body: { reason: 'short', move_to: '' } });
@@ -681,9 +682,12 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(flash().message).toBe('Choose the payout day: the 1st to the 28th or the last day of the month for a monthly run, a weekday for a weekly run.');
     await call(associateAdminController.saveLadder, { as: md, body: { ...base, associate_payout_day: '10' } });
     expect([(await associateCommission.settings()).day, (await associateCommission.settings()).run]).toEqual([10, 'monthly']);
-    // The ED may save TDS but not the commission rules (MD only).
-    await call(associateAdminController.saveLadder, { as: ed, body: { ...base, associate_payout_day: '20' } });
+    // D-411: the ED now may change the commission rules too; someone with "Manage associates" only (Admin
+    // without "Manage associate rules") saves TDS but not the rules.
+    await call(associateAdminController.saveLadder, { as: admin, body: { ...base, associate_payout_day: '20' } });
     expect((await associateCommission.settings()).day).toBe(10);
+    await call(associateAdminController.saveLadder, { as: ed, body: { ...base, associate_payout_day: '15' } });
+    expect((await associateCommission.settings()).day).toBe(15);
     await incentiveRepository.setSetting('associate_payout_day', '5', admin);
   });
 });

@@ -183,15 +183,8 @@ async function canChangeLink(req) {
   if (await superAdminService.isEffective(req.user.id)) {
     return true;
   }
-  const grantGuard = require('./grantGuard');
-  const roleRepository = require('../repositories/roleRepository');
-  for (const roleId of await grantGuard.ownRoleIds(req)) {
-    const role = await roleRepository.find(roleId);
-    if (role && role.name === 'Managing Director') {
-      return true;
-    }
-  }
-  return false;
+  // D-411 (24 Nov 2026): the MD, the ED and people with "Manage associate rules" (until then the MD only).
+  return !!(req.permissions && req.permissions[require('./associateRules').MANAGE_PERMISSION]);
 }
 
 /** Called when an order is created (D-245 P3: the level shown is provisional; fixed at PI): fixes the associate's rate on it (AS-17) and tells the associate. */

@@ -255,8 +255,8 @@ final class AssociateAccess
      */
     public static function setLevel(array $associate, string $level, array $customTicks, string $reason, array $user): ?string
     {
-        if (!IncentiveService::isMd($user)) {
-            return 'Only the Managing Director can change an associate\'s portal access.';
+        if (!AssociateRules::canManage($user)) { // D-411: MD, ED and "Manage associate rules"
+            return 'Only the MD, the ED and people with "Manage associate rules" can change an associate\'s portal access.';
         }
         if (!isset(self::ALL_LEVELS[$level])) {
             return 'Choose a level.';
@@ -294,8 +294,8 @@ final class AssociateAccess
     /** Saves the level matrix ($ticks[level][] = feature). MD only, reason needed. @return string|null error */
     public static function saveMatrix(array $ticks, string $reason, array $user, bool $restoreDefaults = false): ?string
     {
-        if (!IncentiveService::isMd($user)) {
-            return 'Only the Managing Director can change the level settings.';
+        if (!AssociateRules::canManage($user)) { // D-411
+            return 'Only the MD, the ED and people with "Manage associate rules" can change the level settings.';
         }
         $reason = trim($reason);
         if (mb_strlen($reason) < 10) {
@@ -440,8 +440,8 @@ final class AssociateAccess
     /** "Not yet": hides the suggestion until one more order is completed and fully paid. MD only. */
     public static function dismissUpgrade(array $associate, array $user): ?string
     {
-        if (!IncentiveService::isMd($user)) {
-            return 'Only the Managing Director can answer this.';
+        if (!AssociateRules::canManage($user)) { // D-411
+            return 'Only the MD, the ED and people with "Manage associate rules" can answer this.';
         }
         $n = self::trackRecord((int) $associate['id'])['completed_paid'];
         Database::connection()->prepare('UPDATE associates SET upgrade_dismissed_at_count = :n WHERE id = :id')->execute(['n' => $n, 'id' => (int) $associate['id']]);

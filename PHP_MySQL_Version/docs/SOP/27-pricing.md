@@ -27,13 +27,14 @@ empty field means "use the value of the level above" — product, else category,
 | Record supplier / market prices | Procurement Executive, Manager, Director; MD | Product → **Market prices** and **Edit price**: add a supplier price (dated, valid until, notes), correct one, copy a supplier quote from Procurement; on Procurement & suppliers › Suppliers switch an **offer** on or off and **+ Add product** (with *Manage suppliers*). No selling prices, margins or floors. |
 | Manage product catalogue | MD, ED (Admin) | **Configure** a product (its base price and its own margin, costs, buffer and physical values), switch it **Active**, **Duplicate** it, **Link a supplier**. |
 | See the full price build-up | MD, ED | The build-up on the product page, every associate level's floor and quote price, the extra columns on the product list, the pricing settings. |
-| Manage pricing | MD only | Change the pricing settings, a product's own settings, the commission levels and ladder, and each associate's commission level. |
+| Manage pricing | MD only | Change the pricing settings and a product's own settings. |
+| Manage associate rules (D-411) | MD, ED (and any role or person given it) | Change the commission levels and ladder, what the client's price includes for associates (its own Save button on Global pricing settings), and each associate's commission rule. |
 
 Sales staff (anyone who may see selling prices) see only **Quote price** and **Your
 lowest price** on the product page and list. Supplier prices and cost components on the
 product page are shown only to people who may see purchase prices.
 
-## Global pricing settings, commission levels and ladder (MD)
+## Global pricing settings (MD), commission levels and ladder (MD, ED — D-411)
 
 1. **Global pricing settings** (the link on the Products screen): minimum margin (% of price), other costs to FOB (%), pricing
    exchange rate (₹ per USD — keep it a little below the market rate), negotiating buffer

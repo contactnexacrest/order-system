@@ -2,8 +2,8 @@
 /**
  * Owner decisions 11 Nov 2026, points 8 and 9 (D-291 / D-292): the commission rule on the associate's
  * staff page. With "See associate commission rules": the rule, the % and level of the next order, the
- * counting orders so far ("3 of 5"), the steps and the plain counting rule; the MD (manage_pricing)
- * changes it. Everyone else: "Set by the MD." Expects $a, $id, $rule (null without the permission),
+ * counting orders so far ("3 of 5"), the steps and the plain counting rule; "Manage associate rules" (D-411: MD, ED,
+ * others given it) changes it. Everyone else: "Set by the MD / ED." Expects $a, $id, $rule (null without the permission),
  * $canPricing. Node twin: views/associates/_commission_rule.njk.
  * D-410 (24 Nov 2026): "Ladder steps so far" with the new counting text, what the client's price includes for this
  * associate (company setting or their own, MD with a reason), the "Right now" line and "Paid from our margin so far".
@@ -17,7 +17,7 @@ use App\Helpers\Dates;
     <?php if ((int) ($a['no_commission'] ?? 0) === 1): ?>
       <p><b>No commission</b> (introductions only).</p>
     <?php elseif ($rule === null): ?>
-      <p data-commission-rule-hidden>Set by the MD. <small class="muted">(rule, levels and rates not shown)</small></p>
+      <p data-commission-rule-hidden>Set by the MD / ED. <small class="muted">(rule, levels and rates not shown)</small></p>
     <?php else: ?>
       <table class="kv" data-commission-rule>
         <tr><th>Rule</th><td><b><?= htmlspecialchars($rule['rule']) ?></b><?php if (!empty($rule['changed_at'])): ?> <small class="muted">(set <?= htmlspecialchars(Dates::short(substr((string) $rule['changed_at'], 0, 10))) ?><?= $rule['changed_by'] ? ' by ' . htmlspecialchars((string) $rule['changed_by']) : '' ?><?= $rule['reason'] ? ' — reason: "' . htmlspecialchars((string) $rule['reason']) . '"' : '' ?>)</small><?php endif; ?>

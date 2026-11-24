@@ -39,14 +39,14 @@
     <fieldset><legend>Commission level (D-245)</legend>
       {% set cmode = a0.commission_mode or '' %}{% set clid = (a0.commission_level_id or '') | string %}
       {% if a0.id %}{# D-291: an existing associate's rule is changed on their page, with a reason #}
-        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
+        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, the ED or people with "Manage associate rules", with a reason; new orders only).</p>
       {% elif canPricing %}
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>
               <option value="">Choose…</option>
               <option value="ladder"{{ ' selected' if cmode == 'ladder' }}>Standard ladder (moves up with counting orders)</option>
-              <option value="fixed"{{ ' selected' if cmode == 'fixed' }}>Fixed % (one commission level, stays until the MD changes it)</option>
+              <option value="fixed"{{ ' selected' if cmode == 'fixed' }}>Fixed % (one commission level, stays until it is changed on the associate's page)</option>
             </select></label>
           <label>Level (for a fixed level)
             <select name="commission_level_id" data-required-if="commission_mode=fixed" data-required-if-message="Choose the commission level.">
@@ -58,7 +58,7 @@
         </div>
         <p class="muted small">Commission is built into this associate's price. A change applies to new quotes only. <a href="/pricing/commission-levels">Commission levels and ladder</a></p>
       {% else %}
-        <p class="muted small">Set by the MD: {{ 'fixed level' if cmode == 'fixed' else 'ladder' }}.</p>
+        <p class="muted small">Set by the MD / ED: {{ 'fixed level' if cmode == 'fixed' else 'ladder' }}.</p>
       {% endif %}
     </fieldset>
     <label>Notes<input type="text" name="notes" maxlength="500" value="{{ a0.notes }}" placeholder="Optional notes"></label>

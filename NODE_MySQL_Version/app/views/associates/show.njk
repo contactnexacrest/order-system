@@ -6,7 +6,7 @@
    docKinds (KINDS map), invitationStatuses (map), allAssociates (all associates, for the MD move-to select), csrfToken. #}
 {% set id = a.id %}
 {% set full = canManage or canBank %}
-{% set __sourceLabel = {'link': 'buyer registration link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD'} %}
+{% set __sourceLabel = {'link': 'buyer registration link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD / ED'} %}
 <div class="card page-wide">
   <div class="page-header-row sticky-actions" data-testid="associate-actions">{# D-320 (point 26): name and main buttons stay at the top while scrolling #}
     <div>
@@ -101,7 +101,7 @@
   <div class="section" id="clients">
     <h2>Clients introduced ({{ clients.length }})</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th>{% if canChangeLink %}<th>Change (MD only)</th>{% endif %}</tr>
+      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th>{% if canChangeLink %}<th>Change</th>{% endif %}</tr>
       {% for c in clients %}
         <tr>
           <td><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a> <small class="muted">{{ c.client_unique_number }}</small></td>
@@ -134,7 +134,7 @@
         <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="How they introduced the client" aria-label="How they introduced the client">
         <button type="submit" class="btn-sm">Link</button>
       </form>
-      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
+      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD, the ED and people with "Manage associate rules" can change it.</p>
     {% endif %}
   </div>
 
@@ -156,7 +156,7 @@
   <div class="section" id="payment-advices">
     <h2>Payment advices</h2>
     <table class="list" data-payment-advices>
-      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th>{% if canPricing %}<th>Correct (MD)</th>{% endif %}</tr>
+      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th>{% if canPricing %}<th>Correct</th>{% endif %}</tr>
       {% for v in advices %}
         <tr><td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}<br><small class="muted">{{ v.revision_reason }}</small>{% endif %}{% if v.superseded_at %} <small class="muted">(superseded)</small>{% endif %}</td>
           <td>{{ v.paid_on | shortDate }}</td><td>{{ v.paid_reference or '—' }}</td>

@@ -772,12 +772,12 @@ $router->post('/associates/registrations/{id}/accept', [$associateRegistration, 
 $router->post('/associates/registrations/{id}/reject', [$associateRegistration, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 // D-261 (owner approval 6 Nov 2026): associate portal access levels — only the MD changes them (checked in the service).
 $associateAccess = new \App\Controllers\AssociateAccessController();
-$router->get('/associates/access-levels', [$associateAccess, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates'])]);
-$router->post('/associates/access-levels', [$associateAccess, 'saveLevels'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
-$router->post('/associates/{id}/access', [$associateAccess, 'setLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
-$router->post('/associates/{id}/access/not-yet', [$associateAccess, 'notYet'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
-$router->get('/associates/ladder', [$associateAdmin, 'ladder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
-$router->post('/associates/ladder', [$associateAdmin, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->get('/associates/access-levels', [$associateAccess, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_rules'])]);
+$router->post('/associates/access-levels', [$associateAccess, 'saveLevels'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/access', [$associateAccess, 'setLevel'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_rules']), CsrfCheck::verify()]);
+$router->post('/associates/{id}/access/not-yet', [$associateAccess, 'notYet'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_rules']), CsrfCheck::verify()]);
+$router->get('/associates/ladder', [$associateAdmin, 'ladder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_rules'])]);
+$router->post('/associates/ladder', [$associateAdmin, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_rules']), CsrfCheck::verify()]);
 $router->get('/reports/associates', [$associateAdmin, 'report'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
 $router->get('/associates/{id}', [$associateAdmin, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_bank'])]);
 $router->get('/associates/{id}/edit', [$associateAdmin, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
@@ -796,12 +796,12 @@ $router->post('/associates/{id}/bank/{bankId}/verify', [$associateAdmin, 'verify
 $router->post('/associates/{id}/bank/{bankId}/reject', [$associateAdmin, 'rejectBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
 // Owner decisions 11 Nov 2026 (D-291, D-293): remind the associate to confirm new bank details; the MD sets the commission rule.
 $router->post('/associates/{id}/bank/{bankId}/remind', [$associateAdmin, 'remindBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
-$router->get('/associates/{id}/commission-rule', [$associateAdmin, 'commissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
-$router->post('/associates/{id}/commission-rule', [$associateAdmin, 'saveCommissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/commission-rule', [$associateAdmin, 'commissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules')]);
+$router->post('/associates/{id}/commission-rule', [$associateAdmin, 'saveCommissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 // D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
 // D-410 (8): payment advices — staff download (manage_associates) and the MD's correction (Rev n, reason).
 $router->get('/associates/{id}/payment-advices/{adviceId}/{format}', [$associateAdmin, 'paymentAdvice'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
-$router->post('/associates/{id}/payment-advices/{adviceId}/revise', [$associateAdmin, 'revisePaymentAdvice'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/payment-advices/{adviceId}/revise', [$associateAdmin, 'revisePaymentAdvice'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/price-rule', [$associateAdmin, 'savePriceRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
@@ -1259,7 +1259,9 @@ $router->post('/products/suppliers/{supplierId}/set-primary', [$products, 'setPr
 $router->post('/products/{id}/misc-charges/add', [$products, 'addMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 // Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
-$router->get('/pricing/settings', [$pricing, 'settings'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->get('/pricing/settings', [$pricing, 'settings'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing', 'manage_associate_rules'])]);
+// D-411 (24 Nov 2026): what the client's price includes for associates — its own form, "Manage associate rules".
+$router->post('/pricing/settings/associate-price-rule', [$pricing, 'saveAssociatePriceRule'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/pricing/settings', [$pricing, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 // Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
 // D-379: Department level = the read-only team view; All (with manage_sales_targets) = the full page.
@@ -1269,12 +1271,12 @@ $router->post('/sales-targets/settings', [$salesTargets, 'saveSettings'], [Sessi
 $router->post('/sales-targets/person/{id}', [$salesTargets, 'savePerson'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
 $router->post('/sales-targets/associate/{id}', [$salesTargets, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
 $router->post('/sales-targets/credit/{orderId}', [$salesTargets, 'moveCredit'], [SessionAuth::required(), PermissionCheck::requires('manage_sales_targets'), ReportAccessCheck::requires('sales_targets', 'all'), CsrfCheck::verify()]);
-$router->get('/pricing/commission-levels', [$pricing, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
-$router->post('/pricing/commission-levels', [$pricing, 'addLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/pricing/commission-levels/{id}', [$pricing, 'updateLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/pricing/commission-levels/{id}/active', [$pricing, 'toggleLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/pricing/commission-levels/{id}/delete', [$pricing, 'deleteLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
-$router->post('/pricing/commission-ladder', [$pricing, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/pricing/commission-levels', [$pricing, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing', 'manage_associate_rules'])]);
+$router->post('/pricing/commission-levels', [$pricing, 'addLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}', [$pricing, 'updateLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}/active', [$pricing, 'toggleLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}/delete', [$pricing, 'deleteLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-ladder', [$pricing, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/products/{id}/pricing', [$pricing, 'saveProductOverrides'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/products/{id}/market-prices', [$pricing, 'marketPrices'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'view_price_buildup'])]);
 $router->post('/products/{id}/market-prices', [$pricing, 'addMarketPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);

@@ -258,7 +258,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         self::assertStringContainsString('Ladder steps so far', $page);
         $this->asUser($this->createTestUser('Export Executive'));
         $page = $this->call('GET', "/associates/{$a['id']}")['body'];
-        self::assertStringContainsString('Set by the MD.', $page);
+        self::assertStringContainsString('Set by the MD / ED.', $page);
         self::assertStringNotContainsString('Ladder steps so far', $page);
 
         // The associate: only the current %, never levels, ladder or counts.

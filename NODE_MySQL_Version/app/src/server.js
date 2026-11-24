@@ -1281,12 +1281,12 @@ app.post('/associates/registrations/:id/accept', requireAuth, requirePermission(
 app.post('/associates/registrations/:id/reject', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.reject));
 // D-261 (owner approval 6 Nov 2026): associate portal access levels — only the MD changes them (checked in the service).
 const associateAccessController = require('./controllers/associateAccessController');
-app.get('/associates/access-levels', requireAuth, requirePermissionAny(['view_associates', 'manage_associates']), asyncHandler(associateAccessController.levels));
-app.post('/associates/access-levels', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.saveLevels));
-app.post('/associates/:id/access', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.setLevel));
-app.post('/associates/:id/access/not-yet', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.notYet));
-app.get('/associates/ladder', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.ladder));
-app.post('/associates/ladder', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.saveLadder));
+app.get('/associates/access-levels', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_rules']), asyncHandler(associateAccessController.levels));
+app.post('/associates/access-levels', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(associateAccessController.saveLevels));
+app.post('/associates/:id/access', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_rules']), verifyCsrf, asyncHandler(associateAccessController.setLevel));
+app.post('/associates/:id/access/not-yet', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_rules']), verifyCsrf, asyncHandler(associateAccessController.notYet));
+app.get('/associates/ladder', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_rules']), asyncHandler(associateAdminController.ladder));
+app.post('/associates/ladder', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_rules']), verifyCsrf, asyncHandler(associateAdminController.saveLadder));
 app.get('/reports/associates', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.report));
 app.get('/associates/:id', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.show));
 app.get('/associates/:id/edit', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.edit));
@@ -1305,12 +1305,12 @@ app.post('/associates/:id/bank/:bankId/verify', requireAuth, requirePermission('
 app.post('/associates/:id/bank/:bankId/reject', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.rejectBank));
 // Owner decisions 11 Nov 2026 (D-291, D-293): remind the associate to confirm new bank details; the MD sets the commission rule.
 app.post('/associates/:id/bank/:bankId/remind', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.remindBank));
-app.get('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), asyncHandler(associateAdminController.commissionRule));
-app.post('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.saveCommissionRule));
+app.get('/associates/:id/commission-rule', requireAuth, requirePermission('manage_associate_rules'), asyncHandler(associateAdminController.commissionRule));
+app.post('/associates/:id/commission-rule', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(associateAdminController.saveCommissionRule));
 // D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
 // D-410 (8): payment advices — staff download (manage_associates) and the MD's correction (Rev n, reason).
 app.get('/associates/:id/payment-advices/:adviceId/:format', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.paymentAdvice));
-app.post('/associates/:id/payment-advices/:adviceId/revise', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.revisePaymentAdvice));
+app.post('/associates/:id/payment-advices/:adviceId/revise', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(associateAdminController.revisePaymentAdvice));
 app.post('/associates/:id/price-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.savePriceRule));
 app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
@@ -1553,8 +1553,10 @@ app.post('/products/suppliers/:supplierId/set-primary', requireAuth, requirePerm
 app.post('/products/:id/misc-charges/add', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.addMiscCharge));
 app.post('/products/misc-charges/:chargeId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteMiscCharge));
 // Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
-app.get('/pricing/settings', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.settings));
+app.get('/pricing/settings', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing', 'manage_associate_rules']), asyncHandler(pricingController.settings));
 app.post('/pricing/settings', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveSettings));
+// D-411 (24 Nov 2026): what the client's price includes for associates — its own form, "Manage associate rules".
+app.post('/pricing/settings/associate-price-rule', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.saveAssociatePriceRule));
 // Owner decision D-378 (15 Nov 2026): sales targets — the Targets page, its settings, a person's / associate's target, moving an order's target credit.
 // D-379: Department level = the read-only team view; All (with manage_sales_targets) = the full page.
 app.get('/sales-targets', requireAuth, requireReport('sales_targets', 'department'), asyncHandler(salesTargetController.index));
@@ -1563,12 +1565,12 @@ app.post('/sales-targets/settings', requireAuth, requirePermission('manage_sales
 app.post('/sales-targets/person/:id', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.savePerson));
 app.post('/sales-targets/associate/:id', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.saveAssociate));
 app.post('/sales-targets/credit/:orderId', requireAuth, requirePermission('manage_sales_targets'), requireReport('sales_targets', 'all'), verifyCsrf, asyncHandler(salesTargetController.moveCredit));
-app.get('/pricing/commission-levels', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.levels));
-app.post('/pricing/commission-levels', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.addLevel));
-app.post('/pricing/commission-levels/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.updateLevel));
-app.post('/pricing/commission-levels/:id/active', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.toggleLevel));
-app.post('/pricing/commission-levels/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.deleteLevel));
-app.post('/pricing/commission-ladder', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveLadder));
+app.get('/pricing/commission-levels', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing', 'manage_associate_rules']), asyncHandler(pricingController.levels));
+app.post('/pricing/commission-levels', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.addLevel));
+app.post('/pricing/commission-levels/:id', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.updateLevel));
+app.post('/pricing/commission-levels/:id/active', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.toggleLevel));
+app.post('/pricing/commission-levels/:id/delete', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.deleteLevel));
+app.post('/pricing/commission-ladder', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(pricingController.saveLadder));
 app.post('/products/:id/pricing', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveProductOverrides));
 app.get('/products/:id/market-prices', requireAuth, requirePermissionAny(['record_market_prices', 'view_price_buildup']), asyncHandler(pricingController.marketPrices));
 app.post('/products/:id/market-prices', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addMarketPrice));

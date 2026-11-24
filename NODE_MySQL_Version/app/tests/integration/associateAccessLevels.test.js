@@ -181,13 +181,19 @@ describe('Associate portal access levels (D-261)', () => {
   });
 
   it('only the MD changes access, and a reason is needed', async () => {
+    // D-411 (24 Nov 2026): the MD, the ED and people with "Manage associate rules" — not Admin by default.
     const a = await associate('starter');
-    const adminAgent = await staff(admin);
+    const adminAgent = await staff(await user('Admin'));
     expect(await post(adminAgent, `/associates/${a.id}`, `/associates/${a.id}/access`, { access_level: 'full', reason: 'Promote them to the full portal' }))
-      .toBe("Only the Managing Director can change an associate's portal access.");
+      .toBe('Only the MD, the ED and people with "Manage associate rules" can change an associate\'s portal access.');
     expect((await associateRepository.find(Number(a.id))).access_level).toBe('starter');
     expect(await post(adminAgent, '/associates/access-levels', '/associates/access-levels', { 'tick[starter][]': 'clients', reason: 'Admin tries to change the matrix', action: 'save' }))
-      .toBe('Only the Managing Director can change the level settings.');
+      .toBeNull(); // Admin has no "Manage associate rules": the route refuses
+    // The ED now may change the level.
+    const edAgent = await staff(await user('Executive Director'));
+    expect(await post(edAgent, `/associates/${a.id}`, `/associates/${a.id}/access`, { access_level: 'quoting', reason: 'The ED promotes them after three paid orders' }))
+      .toMatch(/^Portal access changed\./);
+    await db.execute('UPDATE associates SET access_level = :l WHERE id = :id', { l: 'starter', id: Number(a.id) });
 
     const mdAgent = await staff(md);
     expect(await post(mdAgent, `/associates/${a.id}`, `/associates/${a.id}/access`, { access_level: 'quoting', reason: 'short' }))

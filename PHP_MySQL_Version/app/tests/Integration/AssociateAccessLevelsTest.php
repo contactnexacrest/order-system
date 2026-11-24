@@ -224,14 +224,20 @@ final class AssociateAccessLevelsTest extends DbTestCase
 
     public function testOnlyTheMdChangesAccessAndAReasonIsNeeded(): void
     {
+        // D-411 (24 Nov 2026): the MD, the ED and people with "Manage associate rules" — not Admin by default.
         $a = $this->associate('starter');
-        Database::connection()->exec("UPDATE users SET is_super_admin = 1 WHERE id = {$this->admin}");
         $this->asStaff($this->admin);
         $r = $this->call('POST', "/associates/{$a['id']}/access", ['access_level' => 'full', 'reason' => 'Promote them to the full portal']);
-        self::assertSame("Only the Managing Director can change an associate's portal access.", $r['flash']);
+        self::assertSame('Only the MD, the ED and people with "Manage associate rules" can change an associate\'s portal access.', $r['flash']);
         self::assertSame('starter', AssociateRepository::find((int) $a['id'])['access_level']);
         $r = $this->call('POST', '/associates/access-levels', ['tick' => ['starter' => ['clients']], 'reason' => 'Admin tries to change the matrix', 'action' => 'save']);
-        self::assertSame('Only the Managing Director can change the level settings.', $r['flash']);
+        self::assertSame(403, $r['status'] ?? 403, 'Admin has no "Manage associate rules": the route refuses');
+        self::assertNotSame('success', $r['type'] ?? null);
+        // The ED now may change the level.
+        $this->asStaff($this->createTestUser('Executive Director'));
+        $r = $this->call('POST', "/associates/{$a['id']}/access", ['access_level' => 'quoting', 'reason' => 'The ED promotes them after three paid orders']);
+        self::assertStringStartsWith('Portal access changed.', (string) $r['flash']);
+        Database::connection()->prepare('UPDATE associates SET access_level = :l WHERE id = :id')->execute(['l' => 'starter', 'id' => (int) $a['id']]);
 
         $this->asStaff($this->md);
         $r = $this->call('POST', "/associates/{$a['id']}/access", ['access_level' => 'quoting', 'reason' => 'short']);

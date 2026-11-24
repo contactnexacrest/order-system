@@ -3,7 +3,7 @@ use App\Helpers\Csrf;
 use App\Helpers\View;
 use App\Services\PricingService;
 
-/** Owner decision D-245 (4 Nov 2026), P1: associate commission levels (CRUD) and the ladder. */
+/** Owner decision D-245 (4 Nov 2026), P1: associate commission levels (CRUD) and the ladder. D-411: changed by "Manage associate rules". */
 $__rows = $ladder;
 for ($i = 0; $i < 2; $i++) {
     $__rows[] = ['from_order' => '', 'to_order' => '', 'level_id' => ''];
@@ -11,6 +11,7 @@ for ($i = 0; $i < 2; $i++) {
 ?>
 <div class="card page-wide">
   <h1>Associate Commission Levels</h1>
+  <?php if (!$canManage): // D-411 ?><p class="alert alert-info" data-rules-read-only><?= View::e(\App\Services\AssociateRules::WHO_CHANGES) ?></p><?php endif; ?>
   <p class="muted">Commission is built into the associate's price: a higher level raises the buyer's price, never lowers NexaCrest's margin. A level used by an associate or the ladder can only be deactivated, not deleted. A change applies to new quotes only — orders with an issued Proforma Invoice keep their commission. Every change is in the audit log. (Commission is paid on these levels from phase P3.)</p>
   <?php if ($sample !== null): ?>
     <p class="muted small">Floors shown for <strong><?= View::e($sample['product']['name']) ?></strong> (staff floor USD <?= number_format($sample['pricing']['build']['staff_floor'], 2) ?>).</p>

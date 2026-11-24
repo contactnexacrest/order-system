@@ -1,7 +1,7 @@
 <?php
 /**
  * D-261 (owner approval 6 Nov 2026, mockups 1 and 2): the associate's Portal access level
- * and Track record, on the staff associate page. Only the MD changes the level.
+ * and Track record, on the staff associate page. The MD, the ED and people with "Manage associate rules" change the level (D-411).
  * Expects $a, $portalAccess. Node twin: _portal_access.njk.
  */
 use App\Helpers\Csrf;
@@ -17,7 +17,7 @@ $__old = \App\Helpers\Flash::pullOld();
     <div class="alert alert-info" data-upgrade-suggestion><b>Ready for the Quoting level?</b> <?= htmlspecialchars((string) $a['name']) ?> has <?= (int) $__tr['completed_paid'] ?> completed, fully paid orders. Nothing upgrades by itself.
       <?php if ($__pa['isMd']): ?><form method="post" action="/associates/<?= (int) $a['id'] ?>/access/not-yet" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Not yet</button></form><?php endif; ?></div>
   <?php endif; ?>
-  <?php if (!$__pa['isMd']): ?><p class="muted small">Only the MD can change this.</p><?php endif; ?>
+  <?php if (!$__pa['isMd']): ?><p class="muted small">Only the MD, the ED and people with "Manage associate rules" can change this.</p><?php endif; ?>
   <form method="post" action="/associates/<?= (int) $a['id'] ?>/access" data-portal-access>
     <?= Csrf::field() ?>
     <fieldset<?= $__pa['isMd'] ? '' : ' disabled' ?>>
@@ -51,5 +51,5 @@ $__old = \App\Helpers\Flash::pullOld();
     <div class="stat"><div class="stat-label">Order value</div><div class="stat-value"><?= $__tr['value'] === [] ? '—' : htmlspecialchars(implode(' · ', array_map(static fn (string $c, float $v): string => $c . ' ' . number_format($v, 2), array_keys($__tr['value']), $__tr['value']))) ?></div></div>
     <div class="stat"><div class="stat-label">Completed &amp; fully paid</div><div class="stat-value"><?= (int) $__tr['completed_paid'] ?></div></div>
   </div>
-  <p class="small muted">The MD is asked about the Quoting level after <?= (int) $__pa['upgradeAfter'] ?> completed, fully paid orders.</p>
+  <p class="small muted">The MD, the ED and people with "Manage associate rules" are asked about the Quoting level after <?= (int) $__pa['upgradeAfter'] ?> completed, fully paid orders.</p>
 </div>

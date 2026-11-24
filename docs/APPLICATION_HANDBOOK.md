@@ -1021,9 +1021,9 @@ role (D-214).
 
 | # | Role | Department / designation | Seed permissions | In one line |
 |---|---|---|---|---|
-| 1 | Admin | none (keeps own role, D-214) | 94 | Full system access incl. users, roles and audit log. Lacks only `manage_approval_limits` and `approve_buyer_details_change`. |
-| 2 | Managing Director | Company Management · director | 96 (all) | Full business authority; the only role with every key. |
-| 3 | Executive Director | Company Management · director | 89 | Same as MD except: `manage_pricing`, `manage_incentives`, `manage_divisions`, `manage_product_specifications`, `manage_associate_bank`, `pay_incentives`, `record_market_prices`. |
+| 1 | Admin | none (keeps own role, D-214) | 94 | Full system access incl. users, roles and audit log. Lacks only `manage_approval_limits`, `approve_buyer_details_change` and `manage_associate_rules` (D-411). |
+| 2 | Managing Director | Company Management · director | 97 (all) | Full business authority; the only role with every key. |
+| 3 | Executive Director | Company Management · director | 90 | Same as MD except: `manage_pricing`, `manage_incentives`, `manage_divisions`, `manage_product_specifications`, `manage_associate_bank`, `pay_incentives`, `record_market_prices`. |
 | 4 | Export Executive | Sales & Export · executive ("Sales/Export Executive") | 22 | Day-to-day order work QT → OC, documents, records (not clears) payments. |
 | 5 | Accounts Executive | Accounts & Finance · executive | 29 | Payment tracking, clearing, supplier payments, INR actuals, CA view. |
 | 6 | Logistics Executive | Logistics · executive | 14 | Packing, freight, BL, shipping documents, logistics bills. |
@@ -1124,7 +1124,8 @@ can change any role's ticks in **Users & roles › Roles and permissions**
 | `manage_logistics_partners` | Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. | Admin, MD, ED, LogMgr, LogDir |
 | `manage_payment_presets` | Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). | Admin, MD, ED, SysAdmin |
 | `manage_ports` | Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. | Admin, MD, ED, SysAdmin |
-| `manage_pricing` | Change the pricing settings, a product's pricing overrides, the associate commission levels and ladder, and an associate's commission level. | Admin, MD |
+| `manage_pricing` | Change the pricing settings and a product's pricing overrides. (The associate commission levels, ladder and rules: `manage_associate_rules`, D-411.) | Admin, MD |
+| `manage_associate_rules` | D-411 (24 Nov 2026): change the associate commission rules — commission levels and the ladder, what the client's price includes for associates (its own form on Pricing › Settings), an associate's own commission rule, Associates › Settings, payment advice corrections (Rev), a client's associate, the portal access levels and an associate's level. Always with a reason (Audit Log). Can be given to any role or one person in Admin › Roles. | MD, ED |
 | `override_line_hs_code` | Change a line's HS code from its specification, with a reason: on an order line with a Sold as, type a different HS code from the HS Code Master instead of the one the specification sets; audited `HS_CODE_OVERRIDDEN` (D-385, 18 Nov 2026). | MD, Founder & MD, ED, Founder & ED |
 | `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. *Note: also Duplicate a product (D-358) and Configure it — base price, product-level values, switching it Active (D-361; Thickness rules also need `manage_product_specifications`, D-363).* | Admin, MD, ED |
 | `manage_product_specifications` | Change one product's specifications: hide a specification or option, change an option's value, add options or specifications for that product only, reset to the category. | Admin, MD |
@@ -1646,8 +1647,9 @@ Default matrix (`AssociateAccess::DEFAULTS`; MD can change it in
   `associate_access_features`.
 - New associates start on **Starter**; every associate that existed before
   6 Nov 2026 stays **Full**.
-- Only the MD changes a level (associate page → Portal access, reason ≥ 10
-  characters, logged in `associate_access_log`).
+- The MD, the ED and people with `manage_associate_rules` (D-411) change a
+  level (associate page → Portal access, reason ≥ 10 characters, logged in
+  `associate_access_log`).
 - After 3 completed, fully paid orders (setting) "Ready for the Quoting
   level?" shows on the associate page and on the dashboard of everyone with
   `manage_associates` (D-263; not tied to the MD role). Nothing upgrades by
@@ -1655,8 +1657,10 @@ Default matrix (`AssociateAccess::DEFAULTS`; MD can change it in
 
 Staff permissions for associates: `manage_associates` (Admin, MD, ED),
 `view_associates` (Sales roles: who introduced which client, no amounts),
-`manage_associate_bank` (Admin, MD, Finance Manager/Director). Only the MD
-(or a Super Admin) can move or remove a client's associate, with a reason.
+`manage_associate_bank` (Admin, MD, Finance Manager/Director),
+`manage_associate_rules` (MD, ED — D-411). Only people with
+`manage_associate_rules` (or a Super Admin) can move or remove a client's
+associate, with a reason.
 
 ### 4.12 SOP access by role (D-266)
 
@@ -3010,7 +3014,7 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
     (default) / **Own ladder** (a copy of the standard ladder, edited for this
     associate; it overrides the standard one — `associate_ladder_steps`;
     "+ Add own ladder" / Edit / Remove) / **Fixed %** (a commission level).
-    Only the MD (`manage_pricing`) on the associate page › Commission
+    The MD, the ED and people with `manage_associate_rules` (D-411) on the associate page › Commission
     (`/associates/{id}/commission-rule`), with a reason (Audit Log
     `ASSOCIATE_COMMISSION_RULE_CHANGED`; `associates.commission_rule_*`); new
     orders only (an order keeps the level fixed at its PI). The edit form no
@@ -3951,7 +3955,8 @@ Every %, amount and the buffer has a global value (Products › Pricing, `pricin
 | Permission | Default holders | Sees |
 |---|---|---|
 | `view_price_buildup` | MD, ED | Cost, margin, minimum, reserve, every floor and quote, Try a price, Pricing ready? |
-| `manage_pricing` | MD only | Changes pricing settings, product overrides, commission levels and ladder, an associate's level, approves below-floor lines |
+| `manage_pricing` | MD only | Changes pricing settings, product overrides, approves below-floor lines |
+| `manage_associate_rules` | MD, ED (D-411; any role or person can be given it) | Changes commission levels and ladder, what the client's price includes, an associate's rule, Associates › Settings, advice corrections, a client's associate, portal access levels |
 | Selling-price staff (Sales) | — | Only **Quote price** and **Your lowest price** (their floor) |
 | `record_market_prices` | Procurement Executive/Manager/Director, MD | Supplier prices only, never selling prices |
 | Associate | — | Their own quote and lowest price (through Get price) |
@@ -4597,7 +4602,7 @@ Associates are the only partner type and the only people outside the company who
 | Level 3 | 7 % | 11–20 |
 | Level 4 | 10 % | 21 onward |
 
-A level may also be a fixed USD amount per unit. Per associate the MD chooses **Standard ladder** (default), **Own ladder** (a copy of the standard ladder, changed for that associate; it overrides the standard one) or **Fixed %** — with a reason, new orders only (D-291). Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
+A level may also be a fixed USD amount per unit. Per associate the MD (D-411: or the ED, or anyone with `manage_associate_rules`) chooses **Standard ladder** (default), **Own ladder** (a copy of the standard ladder, changed for that associate; it overrides the standard one) or **Fixed %** — with a reason, new orders only (D-291). Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
 
 **Who earns and ladder steps (D-410, 24 Nov 2026; replaces D-175 and the first-10-days window of D-245).** `AssociateRules` (Node `associateRules.js`):
 
@@ -4608,9 +4613,9 @@ A level may also be a fixed USD amount per unit. Per associate the MD chooses **
 - **Statuses the associate sees:** "Not earned yet — buyer still paying" (no date) → 🔵 "Will be paid to you on <date>" → 🟢 "Paid to you on <date> · bank ref <UTR>". A refund after payment: the associate keeps the commission (D-245); only the step goes.
 - **Associate number:** A + 4 digits from the id (e.g. A0119), on the associate page and the portal profile (used on payment advices, push 2).
 
-**Commission Payment Advice (D-410 point 8).** `AssociatePaymentAdvice` (Node `associatePaymentAdvice.js`), table `associate_payment_advices`, `incentive_payouts.payment_advice_id` (migration 2026-11-24b). When payouts are marked paid (`IncentiveController::markPaid`), one advice per bank transfer (associate + paid-on date + bank reference) is made: number `NC/SC/CPA/A{4-digit associate no.}/{YY}/{NNN}`, counted per associate per financial year (YY = the year it starts on 1 April). Its content is frozen in `context_json` (made once). A payout marked paid later into a transfer that already has an advice (paid one by one, always so abroad) makes "Rev n" of that advice with all its payouts, reason "Another order paid in the same bank transfer was added". The MD corrects it with a reason (`POST /associates/{id}/payment-advices/{adviceId}/revise`, `manage_pricing`): a new row "Rev n" with the same number, the old one gets `superseded_at`. Template `templates/CPA/payment_advice` on the shared `_layout` (same design as QT/PI/CI), PDF (DOMPDF / Chromium) and Word (Docx components); company details from Admin, no TAN, never costs or margins. Screens: portal Commission › "Payments to you" (own advices only, `/associate/payment-advices/{id}/{pdf|docx}`), associate page › Payment advices (`manage_associates`), Incentive Payouts › "Bank transfers made this run". Audit Log `ASSOCIATE_PAYMENT_ADVICE_MADE` / `_REVISED`.
+**Commission Payment Advice (D-410 point 8).** `AssociatePaymentAdvice` (Node `associatePaymentAdvice.js`), table `associate_payment_advices`, `incentive_payouts.payment_advice_id` (migration 2026-11-24b). When payouts are marked paid (`IncentiveController::markPaid`), one advice per bank transfer (associate + paid-on date + bank reference) is made: number `NC/SC/CPA/A{4-digit associate no.}/{YY}/{NNN}`, counted per associate per financial year (YY = the year it starts on 1 April). Its content is frozen in `context_json` (made once). A payout marked paid later into a transfer that already has an advice (paid one by one, always so abroad) makes "Rev n" of that advice with all its payouts, reason "Another order paid in the same bank transfer was added". The MD, the ED or anyone with `manage_associate_rules` corrects it with a reason (`POST /associates/{id}/payment-advices/{adviceId}/revise`, `manage_associate_rules`, D-411): a new row "Rev n" with the same number, the old one gets `superseded_at`. Template `templates/CPA/payment_advice` on the shared `_layout` (same design as QT/PI/CI), PDF (DOMPDF / Chromium) and Word (Docx components); company details from Admin, no TAN, never costs or margins. Screens: portal Commission › "Payments to you" (own advices only, `/associate/payment-advices/{id}/{pdf|docx}`), associate page › Payment advices (`manage_associates`), Incentive Payouts › "Bank transfers made this run". Audit Log `ASSOCIATE_PAYMENT_ADVICE_MADE` / `_REVISED`.
 
-**Commission included in the client's price (D-410).** `pricing_settings.associate_price_rule` = `starting` | `fixed` (default) | `ladder`, `associate_price_fixed_pct` (default 5.00); per associate `associates.price_rule_override` / `price_rule_fixed_pct` (associate page › Commission, MD, reason, Audit Log `ASSOCIATE_PRICE_RULE_CHANGED`). The % is fixed on the order with the PI (`orders.associate_included_pct`). Associate quote = staff floor ÷ (1 − included %) × (1 + buffer); associate lowest = staff floor ÷ (1 − min(rate, included %)) (`PricingEngine::associateIncluded`). Above the included % the rest of the commission comes from our margin: the order page shows a margin box to MD/ED (`view_price_buildup`), the associate page "Paid from our margin so far" (financial year) and "Right now". Pricing settings show "What each choice would cost us" over the last 12 months; saving a level or the ladder reminds the MD what the client's price includes. Staff prices and prices for clients without an associate are unchanged.
+**Commission included in the client's price (D-410).** Saved by its own form on Pricing › Settings (`POST /pricing/settings/associate-price-rule`, `manage_associate_rules` — D-411). `pricing_settings.associate_price_rule` = `starting` | `fixed` (default) | `ladder`, `associate_price_fixed_pct` (default 5.00); per associate `associates.price_rule_override` / `price_rule_fixed_pct` (associate page › Commission, `manage_associate_rules` — MD, ED — with a reason, Audit Log `ASSOCIATE_PRICE_RULE_CHANGED`). The % is fixed on the order with the PI (`orders.associate_included_pct`). Associate quote = staff floor ÷ (1 − included %) × (1 + buffer); associate lowest = staff floor ÷ (1 − min(rate, included %)) (`PricingEngine::associateIncluded`). Above the included % the rest of the commission comes from our margin: the order page shows a margin box to MD/ED (`view_price_buildup`), the associate page "Paid from our margin so far" (financial year) and "Right now". Pricing settings show "What each choice would cost us" over the last 12 months; saving a level or the ladder reminds the MD what the client's price includes. Staff prices and prices for clients without an associate are unchanged.
 
 **Formula** (`AssociateCommission::forOrder()`):
 

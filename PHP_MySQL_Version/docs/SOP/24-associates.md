@@ -25,9 +25,10 @@ clients and those clients' orders.
 | Manage associates (`manage_associates`) | MD, ED, Admin | The register, rates, status, portal access, personal codes, linking a client already on file, documents, messages, holds and take-backs, TDS and bank wait (commission settings: MD only, `manage_pricing`), the report |
 | View associates (`view_associates`) | Export Executive, Sales/Export Manager, Sales Director (and MD, ED, Admin) | Who introduced which client — no rates, amounts, bank details or agreements |
 | Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Bank details: enter, first check, verify, reject, see the full number (every view is in the audit log) |
+| Manage associate rules (`manage_associate_rules`, D-411) | MD, ED (Admin › Roles can give it to any role or one person) | Change the associate commission rules: commission levels and the ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice corrections, a client's associate, the portal access levels — always with a reason |
 | Pay incentives (`pay_incentives`) | Accounts | Pay due commission on Incentive Payouts (chapter 20) |
 
-Only the **Managing Director** (or a Super Admin) can remove a client's
+Only the **MD, the ED and people with Manage associate rules** (or a Super Admin) can remove a client's
 associate or move the client to another associate, always with a written
 reason that the associate(s) are shown.
 
@@ -84,8 +85,8 @@ the same links, filters and actions, and switch to each other.
 
 ### Commission settings (Admin)
 
-**Associates › Commission › Commission settings and ladder** (`/associates/ladder`). The MD
-(permission `manage_pricing`) sets, and every change is in the audit log:
+**Associates › Commission › Commission settings and ladder** (`/associates/ladder`). The MD, the ED
+and people with Manage associate rules (`manage_associate_rules`, D-411) set, and every change is in the audit log:
 - **Days after full payment** before commission is due (default 30).
 - **Payment run** (D-292, 11 Nov 2026): monthly on the 1st–28th or the
   **Last day of the month**, or weekly on a weekday (default: the last day
@@ -130,7 +131,7 @@ are in **Associates › Commission › Commission levels**.
 ### Commission rule per associate (owner decisions 11 Nov 2026, D-291 / D-292)
 
 Every associate starts on the **Standard ladder**. On the associate's page,
-section **Commission**, the MD (Manage pricing) can:
+section **Commission**, the MD, the ED and people with Manage associate rules (D-411) can:
 - **+ Add own ladder for this associate** — opens a copy of the standard
   ladder to change (steps from order 1, no gaps, last step "onward"). It
   overrides the standard ladder for this associate. **Edit own ladder** /
@@ -148,9 +149,9 @@ to reach 7%", the step boxes, the counting rule (D-410: "An order of
 Orders of the same client within 15 days of the first order of the group
 are one step"), the "Ladder step" column on the orders table, **Commission
 in the client's price** (company setting or this associate's own choice —
-the MD changes it under "Change for this associate", with a reason), the
+the MD or the ED changes it under "Change for this associate", with a reason), the
 **Right now** line and **Paid from our margin so far** (this financial
-year). Other staff see **"Set by the MD."** The associate sees
+year). Other staff see **"Set by the MD / ED."** The associate sees
 **only their current %** — "5% of the FOB value of each order from the
 clients you introduced" — with **How it works** (1. fixed when we send the
 Proforma Invoice; 2. worked out on the FOB value on the Commercial Invoice;
@@ -233,8 +234,8 @@ has not ordered yet ends, and before an agreement ends (daily job, chapter
 15 — the same cron as the daily digest).
 
 A client already on file can be linked by Manage associates (**Link a client
-already on file**, with how they introduced it). After that, only the MD can
-change it.
+already on file**, with how they introduced it). After that, only the MD, the ED
+and people with Manage associate rules can change it.
 
 ## Commission
 
@@ -462,7 +463,7 @@ associate paid on the same day with the same bank reference (UTR / SWIFT).
   by one (always so for associates abroad) stay one advice: each one added
   makes "Rev n" of the transfer's advice ("Another order paid in the same
   bank transfer was added").
-- **Corrections (MD):** associate page › Payment advices › reason ›
+- **Corrections (MD, ED, Manage associate rules):** associate page › Payment advices › reason ›
   **Make Rev**. A new advice "Rev 1" with the same number and the reason
   is made; the old one is kept and marked superseded.
 - **Where:** the associate sees it under Commission › **Payments to you**
@@ -718,9 +719,9 @@ A new associate does not get the whole portal at once. The MD decides how much e
 - **Full** — the whole portal, including order amounts in notices and e-mails. Every associate who was set up before 6 Nov 2026 is on Full, so nothing changed for them.
 - **Custom** — the MD ticks features one by one for this associate only.
 
-**Changing an associate's level (MD only)** — open the associate, go to **Portal access**, choose the level (or Custom and the ticks), give the reason (at least 10 characters) and save. The history under the card shows who changed what, when and why. Other staff see the card greyed out.
+**Changing an associate's level (MD, ED, Manage associate rules)** — open the associate, go to **Portal access**, choose the level (or Custom and the ticks), give the reason (at least 10 characters) and save. The history under the card shows who changed what, when and why. Other staff see the card greyed out.
 
-**Changing what a level shows (MD only)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back (the browser asks "Put the recommended defaults back for all three levels?" first; Cancel changes nothing). "Show FOB order value" is off for Starter by default.
+**Changing what a level shows (MD, ED, Manage associate rules)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back (the browser asks "Put the recommended defaults back for all three levels?" first; Cancel changes nothing). "Show FOB order value" is off for Starter by default.
 
 **When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) "Ready for the Quoting level?" shows on the associate page and on the dashboard of everyone with **Manage associates** (D-263). Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
 

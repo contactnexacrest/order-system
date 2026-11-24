@@ -1,7 +1,7 @@
 <?php
 /**
  * D-261 (owner approval 6 Nov 2026, mockup 6): Admin › Associates › Access levels — what
- * Starter, Quoting and Full show in the Associate Portal. Only the MD changes it; a reason
+ * Starter, Quoting and Full show in the Associate Portal. D-411: the MD, the ED and people with "Manage associate rules" change it; a reason
  * is needed and every change is logged. Node twin: access_levels.njk.
  */
 use App\Helpers\Csrf;
@@ -14,7 +14,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
   <h1>Associate access levels</h1>
   <p class="muted">Tick what each level shows in the Associate Portal. <b>Changes apply to every associate on that level at once. An associate on Custom keeps their own ticks.</b>
     Hidden features are refused by the server too, not only hidden from the menu. Cost, margin, supplier prices and CAFIN are never shown at any level.</p>
-  <?php if (!$isMd): ?><p class="alert alert-info">Only the MD can change the level settings.</p><?php endif; ?>
+  <?php if (!$isMd): ?><p class="alert alert-info">Only the MD, the ED and people with "Manage associate rules" can change the level settings.</p><?php endif; ?>
   <form method="post" action="/associates/access-levels" data-access-levels>
     <?= Csrf::field() ?>
     <table class="list">

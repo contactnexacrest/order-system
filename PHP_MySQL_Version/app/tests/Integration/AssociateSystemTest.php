@@ -514,10 +514,11 @@ final class AssociateSystemTest extends DbTestCase
         $this->submit($this->intakePost('Other name', ['vat_eori_tax_no' => (string) $row['vat_eori_tax_no']]));
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'direct_contact', $client, null), 'the same VAT number without the code: the associate is told');
 
-        $this->as($this->ed);
+        // D-411 (24 Nov 2026): the MD, the ED and people with "Manage associate rules" — a Finance Manager is refused.
+        $this->as($this->finance1);
         $_POST = ['reason' => 'The buyer says another agent introduced them.', 'move_to' => (string) $other['id']];
         (new AssociateAdminController())->unlinkClient(['id' => (string) $a['id'], 'clientId' => (string) $client]);
-        self::assertSame('Only the Managing Director can change or remove a client\'s associate.', $this->flash()['message']);
+        self::assertSame('Only the MD, the ED and people with "Manage associate rules" can change or remove a client\'s associate.', $this->flash()['message']);
         self::assertSame((string) $a['id'], (string) Database::connection()->query("SELECT associate_id FROM clients WHERE id = {$client}")->fetchColumn());
 
         $this->as($this->md);
@@ -696,11 +697,16 @@ final class AssociateSystemTest extends DbTestCase
         $_POST = ['associate_payout_day' => '10'] + $base;
         (new AssociateAdminController())->saveLadder([]);
         self::assertSame([10, 'monthly'], [\App\Services\AssociateCommission::settings()['day'], \App\Services\AssociateCommission::settings()['run']]);
-        // The ED may save TDS but not the commission rules (MD only).
-        $this->as($this->ed);
+        // D-411: the ED now may change the commission rules too; someone with "Manage associates" only (Admin
+        // without "Manage associate rules") saves TDS but not the rules.
+        $this->as($this->admin);
         $_POST = ['associate_payout_day' => '20'] + $base;
         (new AssociateAdminController())->saveLadder([]);
         self::assertSame(10, \App\Services\AssociateCommission::settings()['day']);
+        $this->as($this->ed);
+        $_POST = ['associate_payout_day' => '15'] + $base;
+        (new AssociateAdminController())->saveLadder([]);
+        self::assertSame(15, \App\Services\AssociateCommission::settings()['day']);
         IncentiveRepository::setSetting('associate_payout_day', '5', $this->admin);
     }
 }

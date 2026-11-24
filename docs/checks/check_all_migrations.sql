@@ -117,6 +117,13 @@ FROM (
          CASE (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'associate_payment_advices')
             + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'incentive_payouts' AND column_name = 'payment_advice_id')
               WHEN 2 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-24c',
+         'New permission "Manage associate rules" for the MD and the ED (D-411)',
+         CASE (SELECT COUNT(*) FROM permissions WHERE permission_key = 'manage_associate_rules')
+            + (SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id
+                WHERE p.permission_key = 'manage_associate_rules' AND r.name IN ('Managing Director', 'Executive Director'))
+              WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

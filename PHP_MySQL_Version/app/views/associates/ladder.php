@@ -1,7 +1,7 @@
 <?php
 /**
  * Owner decision D-245 P3: associate commission settings. When commission is paid,
- * the counting-order threshold, buyer registration and GST are the MD's (manage_pricing);
+ * the counting-order threshold, buyer registration and GST: "Manage associate rules" (D-411: MD, ED, others given it);
  * TDS and the bank waiting days as before. Levels and the ladder: Admin → Pricing.
  */
 use App\Helpers\Csrf;
@@ -12,7 +12,7 @@ $__dis = $canPricing ? '' : ' disabled';
   <p class="muted">Commission is worked out on the final FOB value of the goods, line by line, at the commission level fixed on each order when its Proforma Invoice is issued, and only once the buyer has paid the order in full. The levels and the ladder are set in <a href="/pricing/commission-levels">Admin &rarr; Pricing &rarr; Commission levels</a>.</p>
   <form method="post" action="/associates/ladder">
     <?= Csrf::field() ?>
-    <fieldset><legend>When commission is paid <?= $canPricing ? '' : '<small class="muted">(the MD changes these)</small>' ?></legend>
+    <fieldset><legend>When commission is paid <?= $canPricing ? '' : '<small class="muted">(the MD, the ED and people with "Manage associate rules" change these)</small>' ?></legend>
       <div class="field-grid">
         <label>Days after full payment *<input type="number" name="associate_commission_due_days" required min="0" max="365" step="1" value="<?= (int) $commission['due_days'] ?>" placeholder="e.g. 30"<?= $__dis ?>><span class="help-line">Example: 30 → buyer pays in full on 4 Nov, commission due on 4 Dec.</span></label>
         <label>Payment run *<select name="associate_payout_run" required<?= $__dis ?>><option value="">Choose…</option><option value="monthly"<?= $commission['run'] === 'monthly' ? ' selected' : '' ?>>Monthly</option><option value="weekly"<?= $commission['run'] === 'weekly' ? ' selected' : '' ?>>Weekly</option></select><span class="help-line">Example: monthly → commission due on 4 Dec is paid in the run on 31 Dec (the first run on or after the due date).</span></label>
@@ -37,7 +37,7 @@ $__dis = $canPricing ? '' : ' disabled';
       </div>
       <p class="small muted">After payment a commission is never taken back, except for the associate's fraud or breach of the agreement — with a written reason.</p>
     </fieldset>
-    <fieldset><legend>Ladder and registration <?= $canPricing ? '' : '<small class="muted">(the MD changes these)</small>' ?></legend>
+    <fieldset><legend>Ladder and registration <?= $canPricing ? '' : '<small class="muted">(the MD, the ED and people with "Manage associate rules" change these)</small>' ?></legend>
       <div class="field-grid">
         <?php // D-410 (owner 24 Nov 2026): the minimum order value now decides both commission and ladder steps; orders of one client within N days are one step. ?>
         <label>Minimum order value for commission and ladder steps (₹, FOB of the goods) *<input type="number" name="associate_counting_threshold_inr" required min="0" step="1" value="<?= htmlspecialchars(number_format((float) $commission['threshold_inr'], 0, '.', '')) ?>" placeholder="e.g. 500000"<?= $__dis ?>><span class="help-line">Example: ₹5,00,000 → an order of ₹6 lakh earns commission and counts as a ladder step; one of ₹2 lakh earns nothing and does not count — except the client's first order, which always earns.</span></label>
@@ -50,7 +50,7 @@ $__dis = $canPricing ? '' : ' disabled';
         <label>Zoho account for associate payout costs <small class="muted">(D-264: the Zoho Books account id the exchange difference and transfer charges of each associate payout are booked to, against the bank; empty = they stay in the app only)</small><input type="text" name="zoho_payout_costs_account_id" maxlength="40" pattern="[0-9A-Za-z_\-]*" value="<?= htmlspecialchars((string) $commission['zoho_payout_costs_account_id']) ?>" placeholder="e.g. 460000000067890"<?= $__dis ?>><span class="help-line">Example: USD 1,250.00 sent abroad cost ₹1,05,125.00 + ₹1,850.00 charges against the fixed ₹1,04,312.50 → one Zoho journal of ₹2,662.50, Associate payout costs debited, the bank credited.</span></label>
       </div>
     </fieldset>
-    <fieldset><legend>Personal code and portal access <?= $canPricing ? '' : '<small class="muted">(the MD changes these)</small>' ?></legend>
+    <fieldset><legend>Personal code and portal access <?= $canPricing ? '' : '<small class="muted">(the MD, the ED and people with "Manage associate rules" change these)</small>' ?></legend>
       <div class="field-grid">
         <?php // Owner decision 11 Nov 2026 (P4): the two settings that were only in the database are editable here. ?>
         <label>Personal code changes allowed per year *<input type="number" name="associate_code_changes_per_year" required min="0" max="12" step="1" value="<?= (int) $codeChanges ?>" placeholder="e.g. 3"<?= $__dis ?>><span class="help-line">Example: 3 → an associate may choose a new personal code up to 3 times in 12 months (D-254).</span></label>

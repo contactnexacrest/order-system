@@ -1,5 +1,5 @@
 {# D-261 (owner approval 6 Nov 2026, mockups 1 and 2): the associate's Portal access level and Track record,
-   on the staff associate page. Only the MD changes the level. Expects a, portalAccess. PHP twin: _portal_access.php. #}
+   on the staff associate page. The MD, the ED and people with "Manage associate rules" change the level (D-411). Expects a, portalAccess. PHP twin: _portal_access.php. #}
 {% set pa = portalAccess %}
 <div class="section" id="portal-access">
   <h2>Portal access <small class="muted">— now: {{ pa.describe }}</small></h2>
@@ -7,7 +7,7 @@
     <div class="alert alert-info" data-upgrade-suggestion><b>Ready for the Quoting level?</b> {{ a.name }} has {{ pa.track.completed_paid }} completed, fully paid orders. Nothing upgrades by itself.
       {% if pa.isMd %}<form method="post" action="/associates/{{ a.id }}/access/not-yet" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Not yet</button></form>{% endif %}</div>
   {% endif %}
-  {% if not pa.isMd %}<p class="muted small">Only the MD can change this.</p>{% endif %}
+  {% if not pa.isMd %}<p class="muted small">Only the MD, the ED and people with "Manage associate rules" can change this.</p>{% endif %}
   <form method="post" action="/associates/{{ a.id }}/access" data-portal-access>
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset{% if not pa.isMd %} disabled{% endif %}>
@@ -41,5 +41,5 @@
     <div class="stat"><div class="stat-label">Order value</div><div class="stat-value">{{ pa.valueText or '—' }}</div></div>
     <div class="stat"><div class="stat-label">Completed &amp; fully paid</div><div class="stat-value">{{ pa.track.completed_paid }}</div></div>
   </div>
-  <p class="small muted">The MD is asked about the Quoting level after {{ pa.upgradeAfter }} completed, fully paid orders.</p>
+  <p class="small muted">The MD, the ED and people with "Manage associate rules" are asked about the Quoting level after {{ pa.upgradeAfter }} completed, fully paid orders.</p>
 </div>

@@ -43,14 +43,14 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
     <fieldset><legend>Commission level (D-245)</legend>
       <?php $__mode = (string) ($__a['commission_mode'] ?? ''); $__lid = (string) ($__a['commission_level_id'] ?? ''); ?>
       <?php if (!empty($__a['id'])): // D-291: an existing associate's rule is changed on their page, with a reason ?>
-        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, with a reason; new orders only).</p>
+        <p class="muted small">Commission rule: change it on the associate's page (Commission — the MD, the ED or people with "Manage associate rules", with a reason; new orders only).</p>
       <?php elseif (!empty($canPricing)): ?>
         <div class="field-grid">
           <label>How the commission is set *
             <select name="commission_mode" required>
               <option value="">Choose…</option>
               <option value="ladder"<?= $__mode === 'ladder' ? ' selected' : '' ?>>Standard ladder (moves up with counting orders)</option>
-              <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed % (one commission level, stays until the MD changes it)</option>
+              <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed % (one commission level, stays until it is changed on the associate's page)</option>
             </select></label>
           <label>Level (for a fixed level)
             <select name="commission_level_id" data-required-if="commission_mode=fixed" data-required-if-message="Choose the commission level.">
@@ -62,7 +62,7 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
         </div>
         <p class="muted small">Commission is built into this associate's price. A change applies to new quotes only. <a href="/pricing/commission-levels">Commission levels and ladder</a></p>
       <?php else: ?>
-        <p class="muted small">Set by the MD: <?= $__mode === 'fixed' ? 'fixed level' : 'ladder' ?>.</p>
+        <p class="muted small">Set by the MD / ED: <?= $__mode === 'fixed' ? 'fixed level' : 'ladder' ?>.</p>
       <?php endif; ?>
     </fieldset>
     <label>Notes<input type="text" name="notes" maxlength="500" value="<?= $__v('notes') ?>" placeholder="Optional notes"></label>

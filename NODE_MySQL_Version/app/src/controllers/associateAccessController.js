@@ -21,7 +21,7 @@ async function levels(req, res) {
     features: Object.entries(associateAccess.FEATURES).map(([key, [label, help]]) => ({ key, label, help })),
     history: await associateAccess.history(null, 50),
     counts: await associateAccess.countsPerLevel(),
-    isMd: await incentiveService.isMd(req.user),
+    isMd: await require('../services/associateRules').canManage(req.user), // D-411: may change the levels
     old: flash.pullOld(req),
   });
 }

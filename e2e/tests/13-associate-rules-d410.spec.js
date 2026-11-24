@@ -12,7 +12,7 @@ const { isNodeStack } = require('./support/stack');
  *  - MD: "Associate commission in the client's price" (Admin › Pricing › Settings) — each choice grouped with
  *    its text, a change needs a reason; the associate's own choice ("Change for this associate"), the associate
  *    number, "Ladder steps so far"; Associates › Settings: 15 days, 7–45, a change needs a reason.
- *  - Export Executive: "Set by the MD." — no rule, ladder or client-price choice.
+ *  - Export Executive: "Set by the MD / ED." — no rule, ladder or client-price choice.
  *  - Payment advice: made when a payout is marked paid (one per bank transfer); the associate sees it under
  *    "Payments to you" and downloads it (PDF / Word); another associate's advice is refused; the MD makes "Rev 1".
  * The app's own service makes the advice from a paid payout (the same call Accounts' "Mark paid" makes).
@@ -65,7 +65,7 @@ test.describe.serial('D-410: associate rules, client-price choice and payment ad
     await expect(box).toContainText('What each choice would cost us');
     // Switch to "Ladder rate" without a reason: refused, the setting stays "A fixed %".
     await box.locator('input[name="associate_price_rule"][value="ladder"]').check();
-    await page.getByRole('button', { name: 'Save settings' }).click();
+    await page.getByRole('button', { name: "Save what the client's price includes" }).click(); // D-411: its own form
     await expect(page.locator('.alert-error')).toContainText("Give the reason for changing what the client's price includes");
     await page.goto('/pricing/settings');
     await expect(page.locator('#associate-price-rule input[name="associate_price_rule"][value="fixed"]')).toBeChecked();
@@ -105,10 +105,20 @@ test.describe.serial('D-410: associate rules, client-price choice and payment ad
     await expect(page.locator('input[name="associate_group_days"]')).toHaveValue('15');
   });
 
-  test('Export Executive: "Set by the MD." — no rule, ladder or client-price choice', async ({ page }) => {
+  test('ED (D-411): may change the associate rules — the ladder and the client-price choice', async ({ page }) => {
+    await login(page, 'executiveDirector');
+    await page.goto('/pricing/commission-levels');
+    await expect(page.getByRole('button', { name: 'Save ladder' })).toBeVisible();
+    await expect(page.locator('[data-rules-read-only]')).toHaveCount(0);
+    await page.goto('/pricing/settings');
+    await expect(page.getByRole('button', { name: "Save what the client's price includes" })).toBeVisible();
+    await expect(page.locator('#associate-price-rule input[name="associate_price_rule"][value="ladder"]')).toBeEnabled();
+  });
+
+  test('Export Executive: "Set by the MD / ED." — no rule, ladder or client-price choice', async ({ page }) => {
     await login(page, 'exportExecutive');
     await page.goto(`/associates/${associateId}`);
-    await expect(page.locator('[data-commission-rule-hidden]')).toContainText('Set by the MD.');
+    await expect(page.locator('[data-commission-rule-hidden]')).toContainText('Set by the MD / ED.');
     await expect(page.locator('[data-price-rule]')).toHaveCount(0);
     await expect(page.locator('[data-margin-so-far]')).toHaveCount(0);
   });

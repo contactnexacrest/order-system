@@ -43,6 +43,7 @@ final class PricingController
             'settings' => PricingRepository::settings() + PricingService::DEFAULTS,
             'labels' => PricingService::LABELS,
             'canManage' => self::can('manage_pricing'),
+            'canManageRules' => self::can('manage_associate_rules'), // D-411: the associate block has its own form
             'programOn' => PricingService::programOn(),
             // D-301 (point 4): the exchange rate in use, its source and date, and the history.
             // D-340: with what the "Rate used for prices right now" box and the field badges say.
@@ -74,7 +75,10 @@ final class PricingController
     }
     public function saveSettings(array $params): void
     {
-        [$values, $errors] = PricingService::readSettingsForm($_POST);
+        // D-411: what the client's price includes for associates is saved by its own form (saveAssociatePriceRule).
+        $post = $_POST;
+        unset($post['associate_price_rule'], $post['associate_price_fixed_pct']);
+        [$values, $errors] = PricingService::readSettingsForm($post);
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             header('Location: /pricing/settings');
@@ -82,26 +86,62 @@ final class PricingController
         }
         $userId = (int) self::user()['id'];
         $before = PricingRepository::settings() + PricingService::DEFAULTS;
-        // D-410: changing what the client's price includes for associates needs a reason (kept in the Audit Log).
-        $ruleChanged = (isset($values['associate_price_rule']) && $values['associate_price_rule'] !== (string) $before['associate_price_rule'])
-            || (isset($values['associate_price_fixed_pct']) && $values['associate_price_fixed_pct'] !== (string) $before['associate_price_fixed_pct']);
-        $reason = trim((string) ($_POST['associate_price_reason'] ?? ''));
-        if ($ruleChanged && mb_strlen($reason) < 10) {
-            Flash::set('error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
-            header('Location: /pricing/settings#associate-price-rule');
-            return;
-        }
         $changed = 0;
         foreach ($values as $k => $v) {
             if ((string) $before[$k] !== $v) {
                 PricingRepository::setSetting($k, $v, $userId);
-                AuditLogRepository::log($userId, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, $k, (string) $before[$k],
-                    in_array($k, ['associate_price_rule', 'associate_price_fixed_pct'], true) ? $v . ' — reason: ' . $reason : $v);
+                AuditLogRepository::log($userId, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, $k, (string) $before[$k], $v);
                 $changed++;
             }
         }
         Flash::set('success', $changed === 0 ? 'Nothing changed.' : 'Global pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
         header('Location: /pricing/settings');
+    }
+
+    /**
+     * D-410 / D-411 (24 Nov 2026): what the client's price includes for associates — its own form, for the MD, the ED
+     * and people with "Manage associate rules". A change needs a reason (kept in the Audit Log).
+     */
+    public function saveAssociatePriceRule(array $params): void
+    {
+        $post = ['associate_price_rule' => $_POST['associate_price_rule'] ?? ''];
+        if (array_key_exists('associate_price_fixed_pct', $_POST)) {
+            $post['associate_price_fixed_pct'] = $_POST['associate_price_fixed_pct'];
+        }
+        $errors = [];
+        $rule = (string) $post['associate_price_rule'];
+        if (!isset(\App\Services\AssociateRules::PRICE_RULES[$rule])) {
+            $errors[] = "Choose what the client's price includes for associates: starting rate, a fixed % or ladder rate.";
+        }
+        $values = ['associate_price_rule' => $rule];
+        if ($rule === 'fixed') {
+            $pct = trim((string) ($post['associate_price_fixed_pct'] ?? ''));
+            if ($pct === '' || !is_numeric($pct) || preg_match('/^\d+(\.\d{1,2})?$/', $pct) !== 1 || (float) $pct < 0 || (float) $pct > 50) {
+                $errors[] = PricingService::LABELS['associate_price_fixed_pct'] . ': enter a number from 0 to 50 with at most 2 decimals.';
+            } else {
+                $values['associate_price_fixed_pct'] = number_format((float) $pct, 2, '.', '');
+            }
+        }
+        if ($errors !== []) {
+            Flash::set('error', implode(' ', $errors));
+            header('Location: /pricing/settings#associate-price-rule');
+            return;
+        }
+        $userId = (int) self::user()['id'];
+        $before = PricingRepository::settings() + PricingService::DEFAULTS;
+        $changedKeys = array_filter(array_keys($values), static fn (string $k): bool => (string) $before[$k] !== $values[$k]);
+        $reason = trim((string) ($_POST['associate_price_reason'] ?? ''));
+        if ($changedKeys !== [] && mb_strlen($reason) < 10) {
+            Flash::set('error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
+            header('Location: /pricing/settings#associate-price-rule');
+            return;
+        }
+        foreach ($changedKeys as $k) {
+            PricingRepository::setSetting($k, $values[$k], $userId);
+            AuditLogRepository::log($userId, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, $k, (string) $before[$k], $values[$k] . ' — reason: ' . $reason);
+        }
+        Flash::set('success', $changedKeys === [] ? 'Nothing changed.' : "Saved: what the client's price includes for associates. It applies to new prices only.");
+        header('Location: /pricing/settings#associate-price-rule');
     }
 
     // ---------------------------------------------------- levels and the ladder
@@ -132,7 +172,7 @@ final class PricingController
             'ladder' => $ladder,
             'sample' => $sample,
             'floors' => $floors,
-            'canManage' => self::can('manage_pricing'),
+            'canManage' => self::can('manage_associate_rules'), // D-411: the levels and the ladder are associate rules
         ], 'layout/base');
     }
 

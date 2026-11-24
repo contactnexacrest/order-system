@@ -154,20 +154,16 @@ final class AssociateService
     }
 
     /**
-     * Owner decision 1 Nov 2026 (guarantee 3): only the MD changes or removes
-     * a client's associate, with a written reason; the associate is told at once.
+     * Owner decision 1 Nov 2026 (guarantee 3): a client's associate is changed or removed only with a written
+     * reason; the associate is told at once. D-411 (24 Nov 2026): by the MD, the ED and people with
+     * "Manage associate rules" (until then the MD only).
      */
     public static function canChangeLink(array $user): bool
     {
         if (SuperAdminService::isEffective((int) $user['id'])) {
             return true;
         }
-        foreach (GrantGuard::ownRoleIds($user) as $roleId) {
-            if ((\App\Repositories\RoleRepository::find($roleId)['name'] ?? '') === 'Managing Director') {
-                return true;
-            }
-        }
-        return false;
+        return AssociateRules::canManage($user);
     }
 
     /**

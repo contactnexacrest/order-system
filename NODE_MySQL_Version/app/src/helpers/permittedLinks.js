@@ -34,7 +34,7 @@ const RULES = [
   // UI-007: the Setup checklist and Lists › Dropdown options link to product and pricing pages.
   [/^\/products(?:[?#]|$)/, ['view_product_catalog']],
   [/^\/products\/categories\/\d+(?:[?#]|$)/, ['manage_product_catalog', 'manage_pricing', 'view_price_buildup']],
-  [/^\/pricing\/commission-levels(?:[?#]|$)/, ['view_price_buildup', 'manage_pricing']],
+  [/^\/pricing\/commission-levels(?:[?#]|$)/, ['view_price_buildup', 'manage_pricing', 'manage_associate_rules']],
   // SUI-002: the product page's "Pricing ready?" list and Market prices link to these.
   [/^\/products\/\d+\/configure(?:[?#]|$)/, ['manage_product_catalog']],
   [/^\/products\/\d+\/specifications(?:[?#]|$)/, ['view_price_buildup', 'manage_product_specifications', 'manage_pricing']],
@@ -54,12 +54,14 @@ const RULES = [
   [/^\/associates\/tds(?:[/?#]|$)/, ['manage_incentives', 'pay_incentives', 'ca_module_view']],
   // Owner decision D-255 (5 Nov 2026): associate price requests and an associate's price access.
   [/^\/associates\/price-requests(?:[/?#]|$)/, ['manage_pricing', 'view_price_buildup']],
-  [/^\/associates\/\d+\/(?:price-access|commission-rule)(?:[/?#]|$)/, ['manage_pricing']], // D-291: the commission rule page is the MD's (manage_pricing)
+  [/^\/associates\/\d+\/price-access(?:[/?#]|$)/, ['manage_pricing']],
+  [/^\/associates\/\d+\/commission-rule(?:[/?#]|$)/, ['manage_associate_rules']], // D-291, D-411: "Manage associate rules"
   [/^\/associates\/\d+\/bank\/\d+\/number(?:[/?#]|$)/, ['manage_associate_bank']],
   [/^\/associates\/\d+\/documents\/\d+(?:[/?#]|$)/, ['manage_associates', 'manage_associate_bank']],
   [/^\/associates\/\d+\/payment-advices\/\d+\/[^/?#]+(?:[/?#]|$)/, ['manage_associates']], // D-410: the Commission Payment Advice
-  [/^\/associates\/access-levels(?:[/?#]|$)/, ['view_associates', 'manage_associates']], // D-261
-  [/^\/associates\/(?:new|ladder|registrations|\d+\/(?:edit|view-as|agreement))(?:[/?#]|$)/, ['manage_associates']],
+  [/^\/associates\/access-levels(?:[/?#]|$)/, ['view_associates', 'manage_associates', 'manage_associate_rules']], // D-261, D-411
+  [/^\/associates\/ladder(?:[/?#]|$)/, ['manage_associates', 'manage_associate_rules']], // D-411
+  [/^\/associates\/(?:new|registrations|\d+\/(?:edit|view-as|agreement))(?:[/?#]|$)/, ['manage_associates']],
   [/^\/associates(?:[/?#]|$)/, ['view_associates', 'manage_associates', 'manage_associate_bank']],
   // Owner decision D-245 P5: incentive & commission reports.
   [/^\/reports\/incentives(?:[/?#]|$)/, ['manage_incentives', 'pay_incentives', 'view_price_buildup']],

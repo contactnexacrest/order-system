@@ -127,22 +127,22 @@ final class AssociateAdminController
             'editing' => $a,
             'currencies' => LookupRepository::currencies(),
             'users' => UserRepository::listActive(),
-            // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
+            // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder. D-411: "Manage associate rules".
             'commissionLevels' => \App\Repositories\PricingRepository::levels(),
-            'canPricing' => self::can('manage_pricing'),
+            'canPricing' => self::can('manage_associate_rules'),
         ], 'layout/base');
     }
 
     /**
      * Owner decision D-245: the associate's commission mode and level, read only for
-     * people with manage_pricing (everyone else keeps what is stored).
+     * people with manage_associate_rules (D-411; everyone else keeps what is stored).
      *
      * @return array{0: ?array{mode:string,level:?int}, 1: ?string}
      */
     private static function readCommissionLevel(?array $existing): array
     {
         // D-291 (11 Nov 2026): an existing associate's rule is changed on their page (Commission rule), with a reason.
-        if (!self::can('manage_pricing') || $existing !== null) {
+        if (!self::can('manage_associate_rules') || $existing !== null) {
             return [null, null];
         }
         $mode = (string) ($_POST['commission_mode'] ?? '');
@@ -315,7 +315,7 @@ final class AssociateAdminController
             'rightNow' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::rightNow($a, \App\Services\AssociateCommission::levelForAssociate($a, null)[0]) : null,
             'marginSoFar' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::marginSoFar((int) $a['id']) : null,
             'advices' => self::can('manage_associates') ? \App\Services\AssociatePaymentAdvice::forAssociate((int) $a['id']) : [], // D-410 (8)
-            'canPricing' => self::can('manage_pricing'),
+            'canPricing' => self::can('manage_associate_rules'), // D-411: may change the rule and correct advices
             'clients' => AssociatePortalRepository::clients($id),
             'me' => self::user(),
         ];
@@ -342,7 +342,7 @@ final class AssociateAdminController
                 'portalAccess' => (static function () use ($a, $id): array {
                     $track = \App\Services\AssociateAccess::trackRecord($id);
                     return ['track' => $track, 'history' => \App\Services\AssociateAccess::history($id, 20),
-                        'isMd' => IncentiveService::isMd(self::user()), 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
+                        'isMd' => \App\Services\AssociateRules::canManage(self::user()) /* D-411: may change the level */, 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
                         'suggest' => \App\Services\AssociateAccess::suggestUpgrade($a, $track['completed_paid'])];
                 })(),
             ];
@@ -699,7 +699,7 @@ final class AssociateAdminController
         }
         if (!AssociateService::canChangeLink($user)) {
             http_response_code(403);
-            Flash::set('error', 'Only the Managing Director can change or remove a client\'s associate.');
+            Flash::set('error', 'Only the MD, the ED and people with "Manage associate rules" can change or remove a client\'s associate.');
             self::back((int) $a['id'], 'clients');
             return;
         }
@@ -712,12 +712,12 @@ final class AssociateAdminController
             $client = \App\Repositories\ClientRepository::find($clientId);
             if ($target !== null) {
                 AssociateService::linkClient($clientId, (int) $target['id'], 'md_change', null, date('Y-m-d'), (int) $user['id']);
-                AssociateService::notify($target, 'link_changed', "{$client['company_legal_name']} is now registered as your client (decided by the Managing Director: {$reason}).", $clientId, null, null, (int) $user['id']);
+                AssociateService::notify($target, 'link_changed', "{$client['company_legal_name']} is now registered as your client (decided by NexaCrest management: {$reason}).", $clientId, null, null, (int) $user['id']);
             } else {
                 Database::connection()->prepare('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL WHERE id = :id')->execute(['id' => $clientId]);
             }
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_UNLINKED', 'clients', $clientId, 'associate_id', (string) $a['id'], $target !== null ? (string) $target['id'] : null);
-            AssociateService::notify($a, 'link_changed', "{$client['company_legal_name']} is no longer registered as your client" . ($target !== null ? '' : '') . ". Decided by the Managing Director. Reason: {$reason}", $clientId, null, null, (int) $user['id']);
+            AssociateService::notify($a, 'link_changed', "{$client['company_legal_name']} is no longer registered as your client" . ($target !== null ? '' : '') . ". Decided by NexaCrest management. Reason: {$reason}", $clientId, null, null, (int) $user['id']);
             Flash::set('success', $target !== null ? "Client moved to {$target['name']}; both associates were told." : 'Client unlinked; the associate was told.');
         }
         self::back((int) $a['id'], 'clients');
@@ -1115,7 +1115,7 @@ final class AssociateAdminController
 
     /**
      * Owner decision D-245 P3: when an associate's commission is paid, the counting-order
-     * threshold, buyer registration, GST — the MD changes these (manage_pricing); TDS and
+     * threshold, buyer registration, GST — "Manage associate rules" (D-411: MD, ED, others given it); TDS and
      * the bank waiting days as before. Commission levels and the ladder: Admin → Pricing.
      */
     /** @return list<string> D-264: the currencies an associate abroad can be paid in — the active currencies other than INR. */
@@ -1133,7 +1133,7 @@ final class AssociateAdminController
             'bankPeople' => \App\Services\BankDetailsCheck::people(),
             'codeChanges' => AssociateCodeService::changesPerYear(), 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
             'commission' => \App\Services\AssociateCommission::settings(),
-            'canPricing' => self::can('manage_pricing'),
+            'canPricing' => self::can('manage_associate_rules'), // D-411: may change the rule and correct advices
         ], 'layout/base');
     }
 
@@ -1141,6 +1141,14 @@ final class AssociateAdminController
     {
         $user = self::user();
         $values = [];
+        // D-411: someone with "Manage associate rules" but not "Manage associates" changes only the rules; TDS and the
+        // bank-details checks keep what is stored.
+        if (!self::can('manage_associates')) {
+            $_POST['associate_tds_pct'] = (string) AssociateService::tdsPct();
+            $_POST['associate_bank_wait_first_days'] = (string) \App\Services\BankDetailsCheck::waitDays(true);
+            $_POST['associate_bank_wait_change_days'] = (string) \App\Services\BankDetailsCheck::waitDays(false);
+            $_POST['bank_details_check_people'] = \App\Services\BankDetailsCheck::people();
+        }
         $tds = filter_var($_POST['associate_tds_pct'] ?? '', FILTER_VALIDATE_FLOAT);
         // D-293: two waits (0–90) and one or two people; left as they are when not on the form.
         $waitFirst = filter_var($_POST['associate_bank_wait_first_days'] ?? \App\Services\BankDetailsCheck::waitDays(true), FILTER_VALIDATE_INT);
@@ -1160,8 +1168,8 @@ final class AssociateAdminController
         $values['associate_bank_wait_first_days'] = (string) $waitFirst;
         $values['associate_bank_wait_change_days'] = (string) $waitChange;
         $values['bank_details_check_people'] = $people;
-        // The commission rules: the MD only (fields posted by others are ignored).
-        if (self::can('manage_pricing')) {
+        // The commission rules: "Manage associate rules" only (D-411; fields posted by others are ignored).
+        if (self::can('manage_associate_rules')) {
             $days = filter_var($_POST['associate_commission_due_days'] ?? '', FILTER_VALIDATE_INT);
             $run = (string) ($_POST['associate_payout_run'] ?? '');
             // D-292: monthly 1–28 or 'last'; weekly 1–7 (the weekday field, or the old single field).

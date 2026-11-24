@@ -30,7 +30,7 @@ final class AssociateAccessController
             'matrix' => AssociateAccess::matrix(),
             'history' => AssociateAccess::history(null, 50),
             'counts' => AssociateAccess::countsPerLevel(),
-            'isMd' => IncentiveService::isMd(self::user()),
+            'isMd' => \App\Services\AssociateRules::canManage(self::user()), // D-411: may change the levels
         ], 'layout/base');
     }
 

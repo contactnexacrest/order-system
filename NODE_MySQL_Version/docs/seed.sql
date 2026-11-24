@@ -2729,7 +2729,7 @@ UPDATE product_categories SET allowed_units = 'CBM,SQM,SQFT,PCS,TON,RMT', weight
 -- ---------------------------------------------------------------------------
 -- D-292: who sees an associate's commission rule, level and progress (others see "Set by the MD").
 INSERT INTO permissions (permission_key, name, description, category)
-SELECT 'view_associate_commission_rules', 'See associate commission rules', 'See an associate''s commission rule (standard ladder, own ladder or fixed), the level and % of their next order, how many orders have counted and the ladder steps. Without it staff see "Set by the MD". Changing the rule needs Manage pricing (the MD).', 'Associates'
+SELECT 'view_associate_commission_rules', 'See associate commission rules', 'See an associate''s commission rule (standard ladder, own ladder or fixed), the level and % of their next order, how many orders have counted and the ladder steps. Without it staff see "Set by the MD / ED". Changing it needs Manage associate rules.', 'Associates'
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'view_associate_commission_rules');
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'view_associate_commission_rules'
@@ -3238,3 +3238,15 @@ INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
   ('associate_group_days', '15'),
   ('associate_rules_from', DATE_FORMAT(CURDATE(), '%Y-%m-%d'));
+
+-- D-411 (24 Nov 2026, owner): "Manage associate rules" — who may change the associate commission rules (commission
+-- levels and the ladder, what the client's price includes, an associate's own rule, Associates › Settings, a payment
+-- advice correction, a client's associate, the portal access levels). MD and ED to start; Admin › Roles can give it to
+-- any other role or person (same as docs/migrations/2026-11-24c-manage-associate-rules.sql).
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'manage_associate_rules', 'Manage associate rules', 'Change the associate commission rules: levels and ladder, what the client''s price includes, an associate''s own rule, Associates › Settings, payment advice corrections, a client''s associate, portal access levels (reason kept)', 'Associates'
+WHERE NOT EXISTS (SELECT 1 FROM permissions x WHERE x.permission_key = 'manage_associate_rules');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_associate_rules'
+ WHERE r.name IN ('Managing Director', 'Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);

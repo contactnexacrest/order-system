@@ -35,6 +35,22 @@ const GROUP_DAYS_MIN = 7;
 const GROUP_DAYS_MAX = 45;
 
 const commission = () => require('./associateCommission');
+
+/**
+ * Owner decision D-411 (24 Nov 2026): who may change the associate commission rules — commission levels and the
+ * ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice
+ * corrections, a client's associate and the portal access levels. The permission "Manage associate rules": the MD
+ * and the ED to start; Admin › Roles can give it to any role or person. (Until D-411: the MD only.)
+ * PHP twin: AssociateRules::canManage().
+ */
+const MANAGE_PERMISSION = 'manage_associate_rules';
+const WHO_CHANGES = 'Only the MD, the ED and people with "Manage associate rules" can change this.';
+async function canManage(user) {
+  if (!user || !user.id) return false;
+  if (await require('./superAdminService').isEffective(user.id)) return true;
+  const perms = await require('./permissionService').load(user.id, user.role_id != null ? Number(user.role_id) : null);
+  return !!perms[MANAGE_PERMISSION];
+}
 const incentiveService = () => require('./incentiveService');
 const ymd = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v || '').slice(0, 10));
 const fmtPct = (v) => `${String(Number(v).toFixed(2)).replace(/\.?0+$/, '')}%`;
@@ -319,6 +335,7 @@ async function ownRuleCount() {
 }
 
 module.exports = {
+  MANAGE_PERMISSION, WHO_CHANGES, canManage,
   PRICE_RULES, PRICE_RULE_TEXT, GROUP_DAYS_MIN, GROUP_DAYS_MAX,
   reset, groupDays, minOrderInr, cutover, newRules, stepTriggered, orderValueInr, history, stepsCounted, stepFor, groupCovering,
   earnsOnValue, stepText, companyPriceRule, priceRuleFor, startingPct, includedPct, companyIncludedPct, levelPrices, marginPct,

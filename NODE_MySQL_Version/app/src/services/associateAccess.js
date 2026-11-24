@@ -211,8 +211,9 @@ async function maskNotice(associate, message) {
 
 // ------------------------------------------------------------ changes (MD only)
 
-async function isMd(user) {
-  return require('./incentiveService').isMd(user);
+/** D-411: the MD, the ED and people with "Manage associate rules" (until then the MD only). */
+async function canManageRules(user) {
+  return require('./associateRules').canManage(user);
 }
 
 /** "Starter" or "Custom: My clients, …" — what the history table shows. */
@@ -228,7 +229,7 @@ async function describe(associate) {
 
 /** Sets an associate's level (and, for Custom, the ticks). MD only, reason of 10+ characters. Returns an error or null. */
 async function setLevel(associate, newLevel, customTicks, reason, user) {
-  if (!(await isMd(user))) return "Only the Managing Director can change an associate's portal access.";
+  if (!(await canManageRules(user))) return 'Only the MD, the ED and people with "Manage associate rules" can change an associate\'s portal access.'; // D-411
   if (!ALL_LEVELS[newLevel]) return 'Choose a level.';
   const why = String(reason ?? '').trim();
   if ([...why].length < 10) return 'Give the reason for the change (at least 10 characters).';
@@ -255,7 +256,7 @@ async function setLevel(associate, newLevel, customTicks, reason, user) {
 
 /** Saves the level matrix (ticks[level] = [feature, …]). MD only, reason needed. Returns an error or null. */
 async function saveMatrix(ticks, reason, user, restoreDefaults = false) {
-  if (!(await isMd(user))) return 'Only the Managing Director can change the level settings.';
+  if (!(await canManageRules(user))) return 'Only the MD, the ED and people with "Manage associate rules" can change the level settings.'; // D-411
   const why = String(reason ?? '').trim();
   if ([...why].length < 10) return 'Give the reason for the change (at least 10 characters).';
   const before = await matrix();
@@ -352,7 +353,7 @@ async function suggestUpgrade(associate, completedPaid = null) {
 
 /** "Not yet": hides the suggestion until one more order is completed and fully paid. MD only. */
 async function dismissUpgrade(associate, user) {
-  if (!(await isMd(user))) return 'Only the Managing Director can answer this.';
+  if (!(await canManageRules(user))) return 'Only the MD, the ED and people with "Manage associate rules" can answer this.'; // D-411
   const n = (await trackRecord(Number(associate.id))).completed_paid;
   await db.execute('UPDATE associates SET upgrade_dismissed_at_count = :n WHERE id = :id', { n, id: Number(associate.id) });
   return null;

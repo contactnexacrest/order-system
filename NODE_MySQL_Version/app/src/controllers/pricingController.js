@@ -35,6 +35,7 @@ async function settings(req, res) {
     settings: await pricingService.settingsRaw(),
     labels: pricingService.LABELS,
     canManage: can(req, 'manage_pricing'),
+    canManageRules: can(req, 'manage_associate_rules'), // D-411: the associate block has its own form
     programOn: await pricingService.programOn(),
     // D-301 (point 4): the exchange rate in use, its source and date, and the history.
     // D-340: with what the "Rate used for prices right now" box and the field badges say.
@@ -67,33 +68,70 @@ async function fetchFxRate(req, res) {
 }
 
 async function saveSettings(req, res) {
-  const [values, errors] = pricingService.readSettingsForm(req.body || {});
+  // D-411: what the client's price includes for associates is saved by its own form (saveAssociatePriceRule).
+  const post = { ...(req.body || {}) };
+  delete post.associate_price_rule;
+  delete post.associate_price_fixed_pct;
+  const [values, errors] = pricingService.readSettingsForm(post);
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
     res.redirect('/pricing/settings');
     return;
   }
   const before = await pricingService.settingsRaw();
-  // D-410: changing what the client's price includes for associates needs a reason (kept in the Audit Log).
-  const ruleChanged = (values.associate_price_rule !== undefined && values.associate_price_rule !== String(before.associate_price_rule))
-    || (values.associate_price_fixed_pct !== undefined && values.associate_price_fixed_pct !== String(before.associate_price_fixed_pct));
-  const reason = String((req.body || {}).associate_price_reason ?? '').trim();
-  if (ruleChanged && [...reason].length < 10) {
-    flash.set(req, 'error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
-    res.redirect('/pricing/settings#associate-price-rule');
-    return;
-  }
   let changed = 0;
   for (const [k, v] of Object.entries(values)) {
     if (String(before[k]) !== v) {
       await pricingRepository.setSetting(k, v, req.user.id);
-      await auditLogRepository.log(req.user.id, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, k, String(before[k]),
-        ['associate_price_rule', 'associate_price_fixed_pct'].includes(k) ? `${v} — reason: ${reason}` : v);
+      await auditLogRepository.log(req.user.id, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, k, String(before[k]), v);
       changed += 1;
     }
   }
   flash.set(req, 'success', changed === 0 ? 'Nothing changed.' : 'Global pricing settings saved. New quotes use them; orders with an issued Proforma Invoice keep their prices.');
   res.redirect('/pricing/settings');
+}
+
+/**
+ * D-410 / D-411 (24 Nov 2026): what the client's price includes for associates — its own form, for the MD, the ED
+ * and people with "Manage associate rules". A change needs a reason (kept in the Audit Log). PHP twin:
+ * PricingController::saveAssociatePriceRule().
+ */
+async function saveAssociatePriceRule(req, res) {
+  const body = req.body || {};
+  const rules = require('../services/associateRules');
+  const errors = [];
+  const rule = String(body.associate_price_rule ?? '');
+  if (!Object.prototype.hasOwnProperty.call(rules.PRICE_RULES, rule)) {
+    errors.push("Choose what the client's price includes for associates: starting rate, a fixed % or ladder rate.");
+  }
+  const values = { associate_price_rule: rule };
+  if (rule === 'fixed') {
+    const pct = String(body.associate_price_fixed_pct ?? '').trim();
+    if (pct === '' || !/^\d+(\.\d{1,2})?$/.test(pct) || Number(pct) < 0 || Number(pct) > 50) {
+      errors.push(`${pricingService.LABELS.associate_price_fixed_pct}: enter a number from 0 to 50 with at most 2 decimals.`);
+    } else {
+      values.associate_price_fixed_pct = Number(pct).toFixed(2);
+    }
+  }
+  if (errors.length) {
+    flash.set(req, 'error', errors.join(' '));
+    res.redirect('/pricing/settings#associate-price-rule');
+    return;
+  }
+  const before = await pricingService.settingsRaw();
+  const changedKeys = Object.keys(values).filter((k) => String(before[k]) !== values[k]);
+  const reason = String(body.associate_price_reason ?? '').trim();
+  if (changedKeys.length && [...reason].length < 10) {
+    flash.set(req, 'error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
+    res.redirect('/pricing/settings#associate-price-rule');
+    return;
+  }
+  for (const k of changedKeys) {
+    await pricingRepository.setSetting(k, values[k], req.user.id);
+    await auditLogRepository.log(req.user.id, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, k, String(before[k]), `${values[k]} — reason: ${reason}`);
+  }
+  flash.set(req, 'success', changedKeys.length === 0 ? 'Nothing changed.' : "Saved: what the client's price includes for associates. It applies to new prices only.");
+  res.redirect('/pricing/settings#associate-price-rule');
 }
 
 // ----------------------------------------------------- levels and the ladder
@@ -136,7 +174,7 @@ async function levels(req, res) {
     ladderRows: rows,
     sample,
     floors,
-    canManage: can(req, 'manage_pricing'),
+    canManage: can(req, 'manage_associate_rules'), // D-411: the levels and the ladder are associate rules
   }, 'layout/base');
 }
 
@@ -901,7 +939,7 @@ async function updateMarketDates(req, res) {
 }
 
 module.exports = {
-  settings, saveSettings, levels, addLevel, updateLevel, toggleLevel, deleteLevel, saveLadder,
+  settings, saveSettings, saveAssociatePriceRule, levels, addLevel, updateLevel, toggleLevel, deleteLevel, saveLadder,
   saveProductOverrides, marketPrices, addMarketPrice, useForPricing, updateMarketDates,
   editPrice, savePrice, decideFxRate, fetchFxRate, gridView, chaView, addThicknessPrice, setBase, priceCard, addView,
 };

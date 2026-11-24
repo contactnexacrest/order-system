@@ -10,7 +10,7 @@ $full = $canManage || $canBank;
 $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%';
 $__money = static fn ($v): string => number_format((float) $v, 2);
 $__d = static fn ($v): string => $v ? Dates::short(substr((string) $v, 0, 10)) : '—';
-$__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code', 'staff' => 'linked by NexaCrest', 'md_change' => 'changed by the MD'];
+$__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code', 'staff' => 'linked by NexaCrest', 'md_change' => 'changed by the MD / ED'];
 ?>
 <div class="card page-wide">
   <div class="page-header-row sticky-actions" data-testid="associate-actions"><?php // D-320 (point 26): name and main buttons stay at the top while scrolling ?>
@@ -105,7 +105,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   <div class="section" id="clients">
     <h2>Clients introduced (<?= count($clients) ?>)</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th><?php if ($canChangeLink): ?><th>Change (MD only)</th><?php endif; ?></tr>
+      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th><?php if ($canChangeLink): ?><th>Change</th><?php endif; ?></tr>
       <?php foreach ($clients as $c): ?>
         <tr>
           <td><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a> <small class="muted"><?= htmlspecialchars((string) $c['client_unique_number']) ?></small></td>
@@ -138,7 +138,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
         <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="How they introduced the client" aria-label="How they introduced the client">
         <button type="submit" class="btn-sm">Link</button>
       </form>
-      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
+      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD, the ED and people with "Manage associate rules" can change it.</p>
     <?php endif; ?>
   </div>
 
@@ -160,7 +160,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   <div class="section" id="payment-advices">
     <h2>Payment advices</h2>
     <table class="list" data-payment-advices>
-      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th><?php if ($canPricing): ?><th>Correct (MD)</th><?php endif; ?></tr>
+      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th><?php if ($canPricing): ?><th>Correct</th><?php endif; ?></tr>
       <?php foreach ($advices as $__v): ?>
         <tr><td><?= htmlspecialchars((string) $__v['advice_no']) ?><?= (int) $__v['revision'] > 0 ? ' Rev ' . (int) $__v['revision'] . '<br><small class="muted">' . htmlspecialchars((string) $__v['revision_reason']) . '</small>' : '' ?><?= !empty($__v['superseded_at']) ? ' <small class="muted">(superseded)</small>' : '' ?></td>
           <td><?= $__d($__v['paid_on']) ?></td><td><?= htmlspecialchars((string) ($__v['paid_reference'] ?? '—')) ?></td>
