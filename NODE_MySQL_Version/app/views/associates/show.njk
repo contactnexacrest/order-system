@@ -152,6 +152,26 @@
     </table>
   </div>
 
+  {% if advices and advices.length %}{# D-410 (8): this associate's Commission Payment Advices (one per bank transfer) #}
+  <div class="section" id="payment-advices">
+    <h2>Payment advices</h2>
+    <table class="list" data-payment-advices>
+      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th>{% if canPricing %}<th>Correct (MD)</th>{% endif %}</tr>
+      {% for v in advices %}
+        <tr><td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}<br><small class="muted">{{ v.revision_reason }}</small>{% endif %}{% if v.superseded_at %} <small class="muted">(superseded)</small>{% endif %}</td>
+          <td>{{ v.paid_on | shortDate }}</td><td>{{ v.paid_reference or '—' }}</td>
+          <td class="num">{{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</td>
+          <td><a href="/associates/{{ id }}/payment-advices/{{ v.id }}/pdf">PDF</a> · <a href="/associates/{{ id }}/payment-advices/{{ v.id }}/docx">Word</a></td>
+          {% if canPricing %}<td>{% if not v.superseded_at %}
+            <form method="post" action="/associates/{{ id }}/payment-advices/{{ v.id }}/revise" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="e.g. Bank reference typed wrong" aria-label="Reason for the correction">
+              <button type="submit" class="btn-sm btn-secondary">Make Rev</button></form>{% else %}—{% endif %}</td>{% endif %}</tr>
+      {% endfor %}
+    </table>
+    <p class="muted small">Made once when the payment is marked paid. A correction makes "Rev 1" with your reason; the earlier advice is kept and marked superseded.</p>
+  </div>
+  {% endif %}
+
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">

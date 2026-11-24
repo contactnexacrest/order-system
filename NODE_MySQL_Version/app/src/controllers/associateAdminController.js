@@ -311,6 +311,7 @@ async function show(req, res) {
     rightNow: can(req, 'view_associate_commission_rules')
       ? await require('../services/associateRules').rightNow(a, (await require('../services/associateCommission').levelForAssociate(a, null))[0]) : null,
     marginSoFar: can(req, 'view_associate_commission_rules') ? await require('../services/associateRules').marginSoFar(Number(a.id)) : null,
+    advices: can(req, 'manage_associates') ? await require('../services/associatePaymentAdvice').forAssociate(Number(a.id)) : [], // D-410 (8)
     priceRules: require('../services/associateRules').PRICE_RULES,
     priceRuleText: require('../services/associateRules').PRICE_RULE_TEXT,
     groupDays: await require('../services/associateRules').groupDays(),
@@ -746,6 +747,40 @@ async function commissionRule(req, res) {
     a, chosen, rows: [...rows, blank, { ...blank }], levels, ruleLabels: associateCommission.RULE_LABELS,
     currentRule: associateCommission.RULE_LABELS[a.commission_mode] || 'Standard ladder', standardSummary: associateCommission.ladderSummary(standard),
   }, 'layout/base');
+}
+
+/** D-410 (8): sends a payment advice as PDF or Word. */
+async function sendAdvice(res, advice, format) {
+  const advices = require('../services/associatePaymentAdvice');
+  const docx = format === 'docx';
+  const bytes = docx ? await advices.docx(advice) : await advices.pdf(advice);
+  res.setHeader('Content-Type', docx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${advices.fileName(advice, docx ? 'docx' : 'pdf')}"`);
+  res.send(Buffer.from(bytes));
+}
+
+/** D-410 (8): staff download of one of this associate's payment advices. */
+async function paymentAdvice(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const advice = await require('../services/associatePaymentAdvice').find(parseInt(req.params.adviceId, 10));
+  if (!advice || Number(advice.associate_id) !== Number(a.id)) {
+    res.status(404).send('Payment advice not found.');
+    return;
+  }
+  await sendAdvice(res, advice, String(req.params.format || 'pdf'));
+}
+
+/** D-410 (8): the MD corrects a payment advice — a new "Rev n" with a reason; the old one is kept, marked superseded. */
+async function revisePaymentAdvice(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const advices = require('../services/associatePaymentAdvice');
+  const advice = await advices.find(parseInt(req.params.adviceId, 10));
+  const error = !advice || Number(advice.associate_id) !== Number(a.id) ? 'That payment advice no longer exists.'
+    : await advices.revise(Number(advice.id), String((req.body || {}).reason ?? ''), req.user.id);
+  flash.set(req, error === null ? 'success' : 'error', error ?? 'Corrected advice made. The associate sees the new one; the earlier one is kept and marked superseded.');
+  res.redirect(`/associates/${Number(a.id)}#payment-advices`);
 }
 
 /** D-410: the associate's own choice of what the client's price includes (empty = the company setting). MD, with a reason. */
@@ -1255,6 +1290,6 @@ module.exports = {
   abroadCurrencyCodes,
   reviewDocument,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
-  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, savePriceRule, bankNumber, uploadDocument, downloadDocument, reply,
+  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, savePriceRule, sendAdvice, paymentAdvice, revisePaymentAdvice, bankNumber, uploadDocument, downloadDocument, reply,
   holdPayout, releasePayout, clawback, ladder, saveLadder, report,
 };

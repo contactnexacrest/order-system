@@ -34,6 +34,19 @@
   </table>
   {% if __pctCol %}<p class="muted small">Each order shows the % it was given when its Proforma Invoice was sent. Orders still being paid by the buyer are listed under Orders as "Not earned yet — buyer still paying".</p>{% endif %}
   {% endif %}
+  {% if not print and advices and advices.length %}{# D-410 (8): "Payments to you" — one line per bank transfer, with its advice #}
+  <h2 id="payments-to-you">Payments to you</h2>
+  <table class="list" data-payments-to-you>
+    <tr><th>Paid on</th><th>Bank reference</th><th class="num">Paid to you</th><th>Payment advice</th></tr>
+    {% for v in advices %}
+      <tr><td>{{ v.paid_on | shortDate }}</td><td>{{ v.paid_reference or '—' }}</td>
+        <td class="num"><span class="badge badge-active">🟢 {{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</span></td>
+        <td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}{% endif %}{% if v.superseded_at %} <small class="muted">(replaced by a corrected advice)</small>{% endif %}
+          · <a href="/associate/payment-advices/{{ v.id }}/pdf">PDF</a> · <a href="/associate/payment-advices/{{ v.id }}/docx">Word</a></td></tr>
+    {% endfor %}
+  </table>
+  <p class="muted small">Each line is one bank transfer to you. The payment advice lists the orders it pays, the tax deducted and the bank reference.</p>
+  {% endif %}
   {% if not print and access.tds_certificates %}
   <h2>Tax certificates (Form 16A) and foreign payment forms (15CA / 15CB) from NexaCrest</h2>
   <p class="small muted">By law, we deduct tax (TDS) from your commission. Every three months we give you a certificate of this tax (Form 16A). You will find it here.</p>

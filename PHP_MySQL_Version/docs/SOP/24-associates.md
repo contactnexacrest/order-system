@@ -442,6 +442,31 @@ on TDS in Zoho Books is a change the CA makes in Zoho (and logs in the Zoho
 change log); then its tax id goes into the setting. A take-back is not sent to Zoho automatically: the CA books the
 recovery (vendor credit) from the associate's statement.
 
+### Commission Payment Advice (D-410, 24 Nov 2026)
+
+When Accounts marks associate payouts **paid**, the app makes one
+**Commission Payment Advice** for each bank transfer: the payouts of one
+associate paid on the same day with the same bank reference (UTR / SWIFT).
+
+- **Number:** `NC/SC/CPA/A0119/26/001` — A + the 4-digit associate number,
+  the year the financial year starts (1 April), and a running number for
+  that associate in that year.
+- **What it shows:** paid by (company details from Admin — no TAN), paid
+  to (associate, PAN, bank account ending, bank reference), each order with
+  the value of the goods, the %, the commission before tax, TDS and the
+  amount paid, the total paid, how the commission is worked out, and the
+  TDS note. Never costs, margins or supplier prices. Same design as the
+  Quotation / PI / CI; PDF and Word.
+- **Made once.** What it shows is kept as it was; later edits to the
+  payouts do not change it.
+- **Corrections (MD):** associate page › Payment advices › reason ›
+  **Make Rev**. A new advice "Rev 1" with the same number and the reason
+  is made; the old one is kept and marked superseded.
+- **Where:** the associate sees it under Commission › **Payments to you**
+  (one line per bank transfer, PDF / Word). Staff with Manage associates
+  see it on the associate page; Accounts sees **Bank transfers made this
+  run** on Incentive Payouts.
+
 ## Bank details (the associate confirms, one person verifies, a wait)
 
 Owner decisions 11 Nov 2026 (D-293). Flow: **entered → the associate

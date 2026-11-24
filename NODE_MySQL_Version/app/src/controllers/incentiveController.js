@@ -500,6 +500,8 @@ async function payouts(req, res) {
   // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.
   const payoutCosts = await require('../services/associatePayoutService').payoutCostsForMonth(month);
   res.renderView('incentives/payouts', {
+    // D-410 (8): "Bank transfers made this run" — one line per transfer (payment advice) to an associate.
+    transfers: await require('../services/associatePaymentAdvice').forMonth(month),
     payoutCosts,
     payoutCostsTotal: round2(payoutCosts.reduce((t, x) => t + Number(x.payout_difference_inr), 0)),
     payoutCostsUnmapped: (await require('../services/associateCommission').settings()).zoho_payout_costs_account_id === '' ? require('../services/caSyncService').PAYOUT_COSTS_UNMAPPED : null,
@@ -523,6 +525,7 @@ async function markPaid(req, res) {
   const month = incentiveService.isMonth(body.month) ? String(body.month) : '';
   const single = req.params.payoutId !== undefined;
   const ids = single ? [parseInt(req.params.payoutId, 10)] : asArray(body.payout_ids).map((v) => parseInt(v, 10));
+  const paidAssociatePayouts = []; // D-410 (8)
   const paidOn = String(body.paid_on || '');
   if (!DATE_RE.test(paidOn) || paidOn > todayIso()) {
     flash.set(req, 'error', 'Enter the date it was paid (today or earlier).');
@@ -692,9 +695,12 @@ async function markPaid(req, res) {
         await db.execute('UPDATE incentive_payouts SET gst_pct = COALESCE(gst_pct, :p), gst_inr = :g WHERE id = :id', { p: (await associateCommission.settings()).gst_pct, g: gst, id });
       }
       await associateService.onPayoutPaid(id, req.user.id);
+      paidAssociatePayouts.push(id); // D-410 (8): one payment advice per bank transfer, made below
     }
     count++;
   }
+  // D-410 point 8: the Commission Payment Advice — one per bank transfer (associate, day, bank reference).
+  await require('../services/associatePaymentAdvice').afterPaid(paidAssociatePayouts, req.user.id);
   // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
   const dueNote = skippedDue ? ` ${skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open.` : '';
   const docsNote = skippedDocs ? ` ${skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA${(await associateTds.settings()).cb_required ? '/15CB' : ''} not yet on file — pay them one by one.` : '';

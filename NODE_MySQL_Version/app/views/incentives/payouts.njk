@@ -64,6 +64,19 @@
     {% if rows.length == 0 %}<tr><td colspan="6" class="muted">No incentives for this month.</td></tr>{% endif %}
   </table>
 
+  {% if transfers and transfers.length %}{# D-410 (8) #}
+  <h2 id="bank-transfers">Bank transfers made this run — {{ incentive.monthLabel(month) }}</h2>
+  <p class="small muted">One line per bank transfer to an associate, with its Commission Payment Advice (sent to the associate's portal).</p>
+  <table class="list" data-bank-transfers>
+    <tr><th>Paid on</th><th>Associate</th><th>Bank reference</th><th class="num">Paid</th><th>Payment advice</th></tr>
+    {% for v in transfers %}
+      <tr><td>{{ v.paid_on | shortDate }}</td><td><a href="/associates/{{ v.associate_id }}#payment-advices">{{ v.associate_name }}</a> <small class="muted">A{{ ('0000' + v.associate_id).slice(-4) }}</small></td>
+        <td>{{ v.paid_reference or '—' }}</td><td class="num">{{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</td>
+        <td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}{% endif %}{% if v.superseded_at %} <small class="muted">(superseded)</small>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
   {% if payoutCosts and payoutCosts.length %}
   <h2 id="associate-payouts">Associate payout costs — {{ incentive.monthLabel(month) }}</h2>
   <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>

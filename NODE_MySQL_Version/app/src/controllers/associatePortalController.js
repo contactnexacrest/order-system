@@ -426,6 +426,7 @@ async function commission(req, res) {
     print: req.query.print === '1',
     invoiceByPayout,
     documents: await associateDocumentRepository.forAssociate(id),
+    advices: await require('../services/associatePaymentAdvice').forAssociate(id), // D-410 (8): "Payments to you"
     docKinds: associateDocumentRepository.KINDS,
     // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
     ...(await myCommissionData(a)),
@@ -671,6 +672,17 @@ async function bankNotMe(req, res) {
   res.redirect('/associate/profile');
 }
 
+/** D-410 (8): the associate downloads their own payment advice (PDF or Word). */
+async function paymentAdvice(req, res) {
+  const a = await me(req);
+  const advice = await require('../services/associatePaymentAdvice').find(parseInt(req.params.id, 10));
+  if (!advice || Number(advice.associate_id) !== Number(a.id)) {
+    notFound(res, 'Payment advice not found.');
+    return;
+  }
+  await require('./associateAdminController').sendAdvice(res, advice, String(req.params.format || 'pdf'));
+}
+
 async function downloadDocument(req, res) {
   const a = await me(req);
   const doc = await associateDocumentRepository.find(parseInt(req.params.id, 10));
@@ -818,7 +830,7 @@ async function priceRequest(req, res) {
 module.exports = {
   proposeCode,
   codeLink, showLogin, login, showCode, verifyCode, logout, showForgotPassword, forgotPassword, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
-  orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
+  orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement, paymentAdvice,
   showBankConfirm, sendBankCode, confirmBank, bankNotMe, commissionHeadline,
   messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,
 };

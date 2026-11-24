@@ -1306,6 +1306,9 @@ app.post('/associates/:id/bank/:bankId/remind', requireAuth, requirePermission('
 app.get('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), asyncHandler(associateAdminController.commissionRule));
 app.post('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.saveCommissionRule));
 // D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
+// D-410 (8): payment advices — staff download (manage_associates) and the MD's correction (Rev n, reason).
+app.get('/associates/:id/payment-advices/:adviceId/:format', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.paymentAdvice));
+app.post('/associates/:id/payment-advices/:adviceId/revise', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.revisePaymentAdvice));
 app.post('/associates/:id/price-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.savePriceRule));
 app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
@@ -1776,6 +1779,8 @@ app.get('/associate/catalogue/:id', requireAssociateAuth, asyncHandler(associate
 app.post('/associate/catalogue/:id/price', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.requestPrice));
 app.get('/associate/price-requests/:id', requireAssociateAuth, asyncHandler(associatePortalController.priceRequest));
 app.get('/associate/commission', requireAssociateAuth, asyncHandler(associatePortalController.commission));
+// D-410 (8): the associate's payment advices (their own only).
+app.get('/associate/payment-advices/:id/:format', requireAssociateAuth, asyncHandler(associatePortalController.paymentAdvice));
 app.post('/associate/commission/:id/invoice', requireAssociateAuth, uploadLarge.single('invoice_file'), verifyCsrf, asyncHandler(associatePortalController.uploadInvoice));
 app.get('/associate/profile', requireAssociateAuth, asyncHandler(associatePortalController.profile));
 app.post('/associate/profile', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.saveProfile));
