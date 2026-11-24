@@ -4,7 +4,7 @@
 {% if permissions.view_price_buildup and (c.margin_pct | float) > 0 %}
   {% set __p = { inc: (c.included_pct | float(0)).toFixed(2) | replace(r/\.?0+$/, ''), rate: (c.rate | float(0)).toFixed(2) | replace(r/\.?0+$/, ''), m: (c.margin_pct | float(0)).toFixed(2) | replace(r/\.?0+$/, '') } %}
   <div class="notice notice-info" data-margin-box style="margin-top:8px">
-    <b>Paid from our margin:</b> {{ c.currency }} {{ c.margin_fc | money }} · ₹{{ c.margin_inr | money }}
+    <b>Paid from our margin:</b> {{ c.currency }} {{ c.margin_fc | money }} · ₹{{ c.margin_inr | inr }}
     <br><small>The client's price includes {{ __p.inc }}% commission; the associate is at {{ __p.rate }}%, so the other {{ __p.m }}% of the value of the goods comes from our margin. <span class="help" title="Set in Admin → Pricing → Settings ('Commission included in the client's price') or on the associate's page. The order's prices never go below the minimum price.">ℹ</span></small>
   </div>
 {% endif %}

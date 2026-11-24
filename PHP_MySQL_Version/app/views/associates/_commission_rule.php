@@ -41,7 +41,7 @@ use App\Helpers\Dates;
         <table class="kv" data-price-rule>
           <tr><th>Uses</th><td><b><?= htmlspecialchars(AssociateRules::PRICE_RULES[$priceRule['rule']]) ?><?= $priceRule['pct'] !== null ? ' — ' . htmlspecialchars(rtrim(rtrim(number_format((float) $priceRule['pct'], 2, '.', ''), '0'), '.')) . '%' : '' ?></b> <small class="muted"><?= $priceRule['own'] ? '(this associate\'s own choice)' : '(the company setting — Admin → Pricing)' ?></small></td></tr>
           <tr><th>Right now</th><td data-right-now><?= htmlspecialchars((string) $rightNow) ?></td></tr>
-          <?php if ($marginSoFar !== null): ?><tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose % was fixed at the Proforma Invoice.">ℹ</span></th><td data-margin-so-far>₹<?= number_format((float) $marginSoFar['inr'], 2) ?> <small class="muted">on <?= (int) $marginSoFar['orders'] ?> order<?= (int) $marginSoFar['orders'] === 1 ? '' : 's' ?> this financial year</small></td></tr><?php endif; ?>
+          <?php if ($marginSoFar !== null): ?><tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose % was fixed at the Proforma Invoice.">ℹ</span></th><td data-margin-so-far>₹<?= \App\Helpers\MoneyFormat::indian((float) $marginSoFar['inr']) ?> <small class="muted">on <?= (int) $marginSoFar['orders'] ?> order<?= (int) $marginSoFar['orders'] === 1 ? '' : 's' ?> this financial year</small></td></tr><?php endif; ?>
         </table>
         <?php if ($canPricing): ?>
           <details class="card"><summary>Change for this associate</summary>
