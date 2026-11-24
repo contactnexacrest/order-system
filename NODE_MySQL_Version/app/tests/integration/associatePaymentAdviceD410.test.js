@@ -64,6 +64,20 @@ describe('Commission Payment Advice (D-410 point 8)', () => {
     expect(await advices.afterPaid([p1, p2], md)).toEqual([]); // made once
   });
 
+  it('stays one advice when payouts of one transfer are marked paid one by one', async () => {
+    const a = await associate();
+    const p1 = await paidPayout(a, '2026-07-31', 'UTR-SAME', 9000);
+    const p2 = await paidPayout(a, '2026-07-31', 'UTR-SAME', 5000);
+    const [first] = await advices.afterPaid([p1], md);
+    const [second] = await advices.afterPaid([p2], md);
+    const old = await advices.find(first);
+    const nw = await advices.find(second);
+    expect(old.superseded_at).not.toBeNull(); // the first advice is replaced
+    expect([nw.advice_no, Number(nw.revision), nw.revision_reason]).toEqual([old.advice_no, 1, 'Another order paid in the same bank transfer was added']);
+    expect(advices.storedContext(nw).lines).toHaveLength(2);
+    expect(advices.storedContext(nw).total_paid).toBe('₹14,000.00');
+  });
+
   it('is frozen, and an MD correction makes Rev 1', async () => {
     const a = await associate();
     const p = await paidPayout(a, '2026-07-31', 'UTR-WRONG', 9000);

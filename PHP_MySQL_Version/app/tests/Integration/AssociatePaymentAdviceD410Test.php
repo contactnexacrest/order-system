@@ -67,6 +67,21 @@ final class AssociatePaymentAdviceD410Test extends DbTestCase
         self::assertSame([], AssociatePaymentAdvice::afterPaid([$p1, $p2], $this->md), 'made once: a second call makes none');
     }
 
+    public function testPaidOneByOneIntoTheSameTransferStaysOneAdvice(): void
+    {
+        $a = $this->associate();
+        $p1 = $this->paidPayout($a, '2026-07-31', 'UTR-SAME', 9000.0);
+        $p2 = $this->paidPayout($a, '2026-07-31', 'UTR-SAME', 5000.0);
+        [$first] = AssociatePaymentAdvice::afterPaid([$p1], $this->md);
+        [$second] = AssociatePaymentAdvice::afterPaid([$p2], $this->md);
+        $old = AssociatePaymentAdvice::find($first);
+        $new = AssociatePaymentAdvice::find($second);
+        self::assertNotNull($old['superseded_at'], 'the first advice is replaced');
+        self::assertSame([$old['advice_no'], 1, 'Another order paid in the same bank transfer was added'], [$new['advice_no'], (int) $new['revision'], $new['revision_reason']]);
+        self::assertCount(2, AssociatePaymentAdvice::storedContext($new)['lines']);
+        self::assertSame('₹14,000.00', AssociatePaymentAdvice::storedContext($new)['total_paid']);
+    }
+
     public function testTheAdviceIsFrozenAndAnMdCorrectionMakesRev1(): void
     {
         $a = $this->associate();

@@ -68,8 +68,18 @@ final class AssociatePaymentAdvice
             $groups[(int) $r['associate_id'] . '|' . $r['paid_on'] . '|' . (string) $r['paid_reference']][] = (int) $r['id'];
         }
         $made = [];
-        foreach ($groups as $ids) {
+        foreach ($groups as $key => $ids) {
             try {
+                // Paid one by one into the same bank transfer (always so abroad): the transfer's advice is corrected to include it (Rev n).
+                [$aId, $day, $ref] = explode('|', $key, 3);
+                $s = Database::connection()->prepare('SELECT * FROM associate_payment_advices WHERE associate_id = :a AND paid_on = :d AND COALESCE(paid_reference, \'\') = :r AND superseded_at IS NULL ORDER BY id DESC LIMIT 1');
+                $s->execute(['a' => (int) $aId, 'd' => $day, 'r' => $ref]);
+                $existing = $s->fetch() ?: null;
+                if ($existing !== null) {
+                    $linked = array_map('intval', Database::connection()->query('SELECT id FROM incentive_payouts WHERE payment_advice_id = ' . (int) $existing['id'])->fetchAll(\PDO::FETCH_COLUMN));
+                    $made[] = self::create(array_values(array_unique(array_merge($linked, $ids))), $userId, $existing, 'Another order paid in the same bank transfer was added');
+                    continue;
+                }
                 $made[] = self::create($ids, $userId, null, null);
             } catch (\Throwable $e) {
                 error_log('[associate payment advice] ' . $e->getMessage()); // the payment itself is recorded; the advice can be made again

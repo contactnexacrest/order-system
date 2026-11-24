@@ -58,8 +58,19 @@ async function afterPaid(payoutIds, userId) {
     groups.get(key).push(Number(r.id));
   }
   const made = [];
-  for (const g of groups.values()) {
+  for (const [key, g] of groups.entries()) {
     try {
+      // Paid one by one into the same bank transfer (always so abroad): the transfer's advice is corrected to include it (Rev n).
+      const [aId, day, ...rest] = key.split('|');
+      const existing = await db.queryOne(
+        "SELECT * FROM associate_payment_advices WHERE associate_id = :a AND paid_on = :d AND COALESCE(paid_reference, '') = :r AND superseded_at IS NULL ORDER BY id DESC LIMIT 1",
+        { a: Number(aId), d: day, r: rest.join('|') }
+      );
+      if (existing) {
+        const linked = (await db.query('SELECT id FROM incentive_payouts WHERE payment_advice_id = :id', { id: existing.id })).map((x) => Number(x.id));
+        made.push(await create([...new Set([...linked, ...g])], userId, existing, 'Another order paid in the same bank transfer was added'));
+        continue;
+      }
       made.push(await create(g, userId, null, null));
     } catch (e) {
       console.error('[associate payment advice]', e.message); // the payment itself is recorded; the advice can be made again

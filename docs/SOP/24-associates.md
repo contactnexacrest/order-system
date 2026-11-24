@@ -458,7 +458,10 @@ associate paid on the same day with the same bank reference (UTR / SWIFT).
   TDS note. Never costs, margins or supplier prices. Same design as the
   Quotation / PI / CI; PDF and Word.
 - **Made once.** What it shows is kept as it was; later edits to the
-  payouts do not change it.
+  payouts do not change it. Payouts of the same transfer marked paid one
+  by one (always so for associates abroad) stay one advice: each one added
+  makes "Rev n" of the transfer's advice ("Another order paid in the same
+  bank transfer was added").
 - **Corrections (MD):** associate page › Payment advices › reason ›
   **Make Rev**. A new advice "Rev 1" with the same number and the reason
   is made; the old one is kept and marked superseded.
