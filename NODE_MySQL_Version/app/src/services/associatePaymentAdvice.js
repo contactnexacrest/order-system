@@ -204,7 +204,7 @@ async function context(payouts, no, revision, reason) {
     total_tds: tds > 0 ? inr(tds) : '',
     tds_text: sectionRate,
     total_paid: m(paid),
-    total_paid_raw: Math.round(paid * 100) / 100,
+    total_paid_raw: require('../helpers/money').phpRound(paid, 2),
     headline: `PAID: ${m(paid)} was transferred to your bank account on ${paidOn}${ref !== '' ? ` (bank ref ${ref})` : ''}.`,
   };
 }

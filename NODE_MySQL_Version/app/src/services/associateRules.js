@@ -229,7 +229,7 @@ async function companyIncludedPct(level) {
 /** The part of the commission paid from NexaCrest's margin, in % of the FOB (0 when the price covers it). */
 function marginPct(ratePct, incPct) {
   if (ratePct === null || ratePct === undefined || incPct === null || incPct === undefined) return 0;
-  return Math.max(0, Math.round((Number(ratePct) - Number(incPct)) * 10000) / 10000);
+  return Math.max(0, require('../helpers/money').phpRound(Number(ratePct) - Number(incPct), 4));
 }
 
 /** An associate level's prices under the company setting, with the part paid from the margin (product page, levels page). */
