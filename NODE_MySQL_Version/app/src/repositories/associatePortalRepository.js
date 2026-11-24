@@ -139,11 +139,12 @@ async function commission(associateId, o) {
   if ((o.associate_rate_source ?? null) === 'none') return none('No commission under your agreement');
   const order = (await orderRepository.find(Number(o.id))) || {};
   const c = await associateCommission.forOrder(Number(o.id), order);
-  if (!c) return none(NONE_REPEAT);
+  if (!c) return none((await require('../services/associateRules').newRules(order)) ? 'No commission on this order' : NONE_REPEAT);
+  if (c.below_min) return none(await belowMinLabel()); // D-410: below the minimum order value (not the client's first order)
   // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
   const fullyPaidOn = await incentive().fullyPaidOn(Number(o.id));
   const label = fullyPaidOn !== null
-    ? `Earned — will be paid on ${dates.short(await associateCommission.payoutRunOn(await associateCommission.dueOn(String(fullyPaidOn).slice(0, 10))))}`
+    ? `Will be paid to you on ${dates.short(await associateCommission.payoutRunOn(await associateCommission.dueOn(String(fullyPaidOn).slice(0, 10))))}`
     : NOT_EARNED_LABEL;
   return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
     level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
@@ -158,6 +159,22 @@ async function commission(associateId, o) {
 const NOT_EARNED_LABEL = 'Not earned yet — buyer still paying';
 const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
 
+/** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
+async function belowMinLabel() {
+  const min = await require('../services/associateRules').minOrderInr();
+  return `No commission — the value of the goods (FOB) is below ₹${Math.round(min).toLocaleString('en-US')} (only the client's first order earns whatever its size)`;
+}
+
+/** D-410: the status badge for a commission line — 'to_be_paid' (🔵), 'paid' (🟢), or null. */
+function badge(cm) {
+  switch ((cm && cm.state) || '') {
+    case 'paid': return 'paid';
+    case 'earned': return 'to_be_paid';
+    case 'expected': return String(cm.label).startsWith('Will be paid') ? 'to_be_paid' : null;
+    default: return null;
+  }
+}
+
 /**
  * D-292: "Earned — will be paid on <date>", "Paid on <date> (ref)", "On hold — a buyer claim on this order is
  * open" ("Not earned yet — buyer still paying" in commission()). A hold by NexaCrest keeps its reason.
@@ -165,11 +182,12 @@ const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
 function payoutLabel(p, claim, incentiveMonth = '', today = null) { // eslint-disable-line no-unused-vars
   const d = (v) => dates.short(String(v).slice(0, 10));
   const claimHeld = p.status === 'held' && String(p.hold_reason || '') === require('../services/associatePayoutService').CLAIM_HOLD_REASON;
-  if (p.status === 'paid') return `Paid on ${d(p.paid_on)}${p.paid_reference ? ` (${p.paid_reference})` : ''}`;
+  // D-410 (owner 24 Nov 2026): "Paid to you on <date> · bank ref <UTR>" / "Will be paid to you on <date>".
+  if (p.status === 'paid') return `Paid to you on ${d(p.paid_on)}${p.paid_reference ? ` · bank ref ${p.paid_reference}` : ''}`;
   if (claim || claimHeld) return CLAIM_LABEL;
   if (p.status === 'held') return 'On hold' + (p.hold_reason ? ` — ${p.hold_reason}` : '');
-  if (p.payout_run_on) return `Earned — will be paid on ${d(p.payout_run_on)}`;
-  return `Earned — will be paid in the ${incentive().monthLabel(String(incentiveMonth))} payout`;
+  if (p.payout_run_on) return `Will be paid to you on ${d(p.payout_run_on)}`;
+  return `Will be paid to you in the ${incentive().monthLabel(String(incentiveMonth))} payout`;
 }
 
 /** D-292: the % fixed on an order, as the associate sees it ("5%"), or null when none is fixed yet. */
@@ -240,4 +258,4 @@ async function totals(associateId, months = null, today = null) {
 }
 
 module.exports = {
-  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals, payoutLabel, fcText, orderRateText, NOT_EARNED_LABEL, CLAIM_LABEL };
+  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals, payoutLabel, fcText, orderRateText, NOT_EARNED_LABEL, CLAIM_LABEL, belowMinLabel, badge };

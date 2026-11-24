@@ -140,8 +140,8 @@ describe('Associate payments (D-264)', () => {
     expect(associatePortalRepository.fcText(t.fc.paid)).toBe('USD 0.00');
     const p = await payout(orderId);
     // D-292 (owner 11 Nov 2026): the associate's status wording.
-    expect(associatePortalRepository.payoutLabel(p, false, '', '2026-11-20')).toBe('Earned — will be paid on 05 Jan 2027');
-    expect(associatePortalRepository.payoutLabel(p, false, '', '2026-12-20')).toBe('Earned — will be paid on 05 Jan 2027');
+    expect(associatePortalRepository.payoutLabel(p, false, '', '2026-11-20')).toBe('Will be paid to you on 05 Jan 2027');
+    expect(associatePortalRepository.payoutLabel(p, false, '', '2026-12-20')).toBe('Will be paid to you on 05 Jan 2027');
   });
 
   it('pays an associate in India in INR always, one abroad in an active currency, never INR', async () => {

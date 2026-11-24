@@ -118,8 +118,11 @@ async function leftToday(associate) {
 }
 
 /** The associate's floor and quote from a build (staff figures with no level). */
-function priceFrom(build, level) {
+async function priceFrom(build, level, associate = null) {
   if (!level) return { floor: build.staff_floor, quote: build.staff_quote };
+  // D-410: the quote includes the % chosen for the client's price (company setting or the associate's own), the lowest price their rate.
+  const included = associate ? await require('./associateRules').includedPct(associate, level) : null;
+  if (included !== null) return pricingEngine.associateIncluded(build.raw, Number(level.value), included);
   return pricingEngine.associate(build.raw, String(level.kind), Number(level.value));
 }
 
@@ -160,7 +163,7 @@ async function work(associate, product, selection) {
     if (!out.manual && p.spec !== null && !(p.spec.errors || []).length) out.manual = true;
     return out;
   }
-  const prices = priceFrom(p.build, level);
+  const prices = await priceFrom(p.build, level, associate);
   const adj = p.spec.adj;
   const breakdown = [{ label: `Base: ${productSpecs.describe(p.spec.offered, baseMap(p.spec.offered), true) || 'standard specification'}`, change: '—' }];
   if (p.exact) breakdown.push({ label: `Exact price for ${p.exact}`, change: 'used' });
@@ -174,7 +177,7 @@ async function work(associate, product, selection) {
     } else {
       // The effect of this amount on the associate's quote price: worked out with and without it.
       const without = pricingEngine.build(engineInput(p, { pct: adj.pct, usd: adj.usd - Number(l.usd_effect), qty_pct: adj.qty_pct }));
-      const effect = prices.quote - priceFrom(without, level).quote;
+      const effect = prices.quote - (await priceFrom(without, level, associate)).quote;
       breakdown.push({ label: `${l.option} (${l.spec.toLowerCase()})`, change: `${effect < 0 ? '−' : '+'}USD ${money(Math.abs(effect))} on this price${adj.basis === 'cbm' ? ' per CBM' : ''}` });
     }
   }

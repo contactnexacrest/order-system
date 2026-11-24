@@ -39,13 +39,18 @@ $__usd = static fn (float $v): string => 'USD ' . number_format($v, 2);
       <tr><td>Staff quote price (+ <?= View::e(PricingService::pct($__e['buffer_pct'])) ?> buffer)</td><td class="num"><strong><?= $__usd($__b['staff_quote']) ?></strong></td></tr>
     </table>
     <?php if ($__p['levels'] !== []): ?>
-      <h3>Associates <small class="muted">(floor = staff floor ÷ (1 − commission %), or + a fixed amount)</small></h3>
-      <table class="list" style="max-width:720px">
-        <tr><th>Commission level</th><th>Commission</th><th class="num">Associate lowest (USD)</th><th class="num">Quote price (USD)</th></tr>
+      <?php $__rule = \App\Services\AssociateRules::companyPriceRule(); // D-410 ?>
+      <h3>Associates <small class="muted">(lowest and quote price per ladder level)</small></h3>
+      <p class="small" data-testid="associate-price-rule">Commission in the client's price: <strong><?= View::e(\App\Services\AssociateRules::PRICE_RULES[$__rule['rule']]) ?><?= $__rule['pct'] !== null ? ' — ' . View::e(PricingService::pct($__rule['pct'])) : '' ?></strong> (company setting) — <a href="/pricing/settings#associate-price-rule">change in Pricing settings</a></p>
+      <table class="list" style="max-width:900px">
+        <tr><th>Ladder level</th><th>Associate's commission</th><th class="num">Associate lowest (USD)</th><th class="num">Client quote price (USD)</th><th>Paid from our margin</th></tr>
         <?php foreach ($__p['levels'] as $l): ?>
-          <tr><td><?= View::e($l['name']) ?></td><td><?= View::e($l['label']) ?></td><td class="num"><?= number_format($l['floor'], 2) ?></td><td class="num"><?= number_format($l['quote'], 2) ?></td></tr>
+          <?php $__room = ($l['included_pct'] ?? null) !== null && preg_match('/^([\d.]+)%/', (string) $l['label'], $__m) && (float) $l['included_pct'] > (float) $__m[1] ? (float) $l['included_pct'] - (float) $__m[1] : 0.0; ?>
+          <tr><td><?= View::e($l['name']) ?></td><td><?= View::e($l['label']) ?></td><td class="num"><?= number_format($l['floor'], 2) ?></td><td class="num"><strong><?= number_format($l['quote'], 2) ?></strong></td>
+            <td><?= ($l['margin_pct'] ?? 0) > 0 ? View::e(PricingService::pct($l['margin_pct'])) : ($__room > 0 ? '— (' . View::e(PricingService::pct($__room)) . ' room to negotiate)' : '—') ?></td></tr>
         <?php endforeach; ?>
       </table>
+      <p class="help-line">&#8505; <?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT[$__rule['rule']]) ?> Staff see only the staff floor and quote. An associate sees only their own quote and lowest price (Get price).</p>
     <?php endif; ?>
   <?php endif; ?>
 

@@ -2992,6 +2992,8 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
 - **SOP / decisions.** SOP 27, 24 (price requests); D-240 (replaced),
   D-245, D-255, D-256.
 
+- **D-410 (24 Nov 2026):** the associate price uses the % included in the client's price (company setting or the associate's own choice), not always the associate's full rate — see §7.3. Product page › Associates table: Ladder level · Associate's commission · Associate lowest · Client quote price · Paid from our margin.
+
 ### 6.4 Associates and commission / TDS
 
 - **Purpose.** Outside agents who introduce buyers and earn commission.
@@ -3017,7 +3019,7 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
   - **Who sees what (D-292):** with `view_associate_commission_rules` (Admin,
     MD, ED, Finance Director, Finance Manager) the associate page shows the
     rule (with who set it, when and why), "Next order earns x% — Level n",
-    "Orders counted so far x of y — n more counting orders to reach z%", the
+    "Ladder steps so far x of y — n more to reach z%" (D-410), the
     step boxes (current step marked) and the counting rule; the Level column
     of the orders table and the list's "Commission rule" column (Standard and
     Kanban). Everyone else sees "Set by the MD." The associate sees **only**
@@ -4597,7 +4599,16 @@ Associates are the only partner type and the only people outside the company who
 
 A level may also be a fixed USD amount per unit. Per associate the MD chooses **Standard ladder** (default), **Own ladder** (a copy of the standard ladder, changed for that associate; it overrides the standard one) or **Fixed %** — with a reason, new orders only (D-291). Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
 
-**Counting order.** A fully paid order whose in-range invoiced FOB in INR is at least `associate_counting_threshold_inr` (₹5,00,000). A smaller order earns the current step and does not count.
+**Who earns and ladder steps (D-410, 24 Nov 2026; replaces D-175 and the first-10-days window of D-245).** `AssociateRules` (Node `associateRules.js`):
+
+- **Every order** of the associate's client earns while the agreement is active, when its value of the goods (in-range FOB, INR) is at least `associate_counting_threshold_inr` (₹5,00,000). The **client's first order always earns**, whatever its size. The MD's "associate: yes" on an order also overrides the minimum; "associate: no" stops it. Below the minimum: commission 0, the associate sees "No commission — the value of the goods (FOB) is below ₹…".
+- **Ladder steps:** an order of ₹5,00,000 or more counts as one step once its **advance has cleared** (LC orders: once the LC is confirmed, `order_lc_details.lc_confirmed_at`; no advance and no LC: once the buyer has paid in full). Orders of the **same client within `associate_group_days`** (default 15, 7–45, Associates › Settings, reason needed) of the first order of the group share that step and its fixed level. A cancelled or lost order loses its step; earlier orders keep their %.
+- The history is worked out again on every request (`AssociateRules::history()`), so the ladder follows these rules from the start; the "Ladder step" column (associate page) and the staff statement show "Step n" / "Same step as <order> (same client within 15 days)" / "Does not count — below ₹500,000" / "Counts when the advance has cleared". The associate never sees steps or counts (D-393).
+- **Cut-over (2A):** `incentive_settings.associate_rules_from` (set by migration 2026-11-24a to the day it runs). An order whose PI was issued before that date keeps the old first-10-days rule; no retroactive commission.
+- **Statuses the associate sees:** "Not earned yet — buyer still paying" (no date) → 🔵 "Will be paid to you on <date>" → 🟢 "Paid to you on <date> · bank ref <UTR>". A refund after payment: the associate keeps the commission (D-245); only the step goes.
+- **Associate number:** A + 4 digits from the id (e.g. A0119), on the associate page and the portal profile (used on payment advices, push 2).
+
+**Commission included in the client's price (D-410).** `pricing_settings.associate_price_rule` = `starting` | `fixed` (default) | `ladder`, `associate_price_fixed_pct` (default 5.00); per associate `associates.price_rule_override` / `price_rule_fixed_pct` (associate page › Commission, MD, reason, Audit Log `ASSOCIATE_PRICE_RULE_CHANGED`). The % is fixed on the order with the PI (`orders.associate_included_pct`). Associate quote = staff floor ÷ (1 − included %) × (1 + buffer); associate lowest = staff floor ÷ (1 − min(rate, included %)) (`PricingEngine::associateIncluded`). Above the included % the rest of the commission comes from our margin: the order page shows a margin box to MD/ED (`view_price_buildup`), the associate page "Paid from our margin so far" (financial year) and "Right now". Pricing settings show "What each choice would cost us" over the last 12 months; saving a level or the ladder reminds the MD what the client's price includes. Staff prices and prices for clients without an associate are unchanged.
 
 **Formula** (`AssociateCommission::forOrder()`):
 

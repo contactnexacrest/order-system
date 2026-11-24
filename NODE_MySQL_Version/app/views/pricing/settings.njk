@@ -162,6 +162,35 @@
         <input type="number" name="price_request_valid_days" min="1" max="365" step="1" required value="{{ settings.price_request_valid_days }}" placeholder="e.g. 7"{{ ro }}></label>
     </fieldset>
 
+    {# D-410 (24 Nov 2026): the % of an associate's commission included in the client's price. #}
+    {% set __ar = settings.associate_price_rule if associatePriceRules.labels[settings.associate_price_rule] else 'fixed' %}
+    {% set __ap = settings.associate_price_fixed_pct | float %}
+    <fieldset id="associate-price-rule" data-testid="associate-price-rule-setting"><legend>Associate commission in the client's price (D-410)</legend>
+      <p class="help-line">&#8505; An associate earns their full commission %. This setting decides how much of it is built into the price the client is quoted; any commission above it is paid from our margin. It applies to new prices only — orders with an approved Quotation or an issued Proforma Invoice keep their prices. Each associate can have their own choice (associate page › Commission).</p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="starting"{{ ' checked' if __ar == 'starting' }}{{ ro }}> <strong>Starting rate</strong> (the first ladder step)</label>
+      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.starting }}</p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="fixed"{{ ' checked' if __ar == 'fixed' }}{{ ro }}> <strong>A fixed %</strong>
+        <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="{{ __ap.toFixed(2) }}" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."{{ ro }}> % (default)</label>
+      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.fixed }}</p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="ladder"{{ ' checked' if __ar == 'ladder' }}{{ ro }}> <strong>Ladder rate</strong> (each associate's current %)</label>
+      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.ladder }}</p>
+      <p class="small" style="border:1px solid #C9962B;padding:6px 8px" data-testid="associate-price-right-now"><strong>Right now:</strong>
+        {% if __ar == 'fixed' %}every client price includes <strong>{{ pricingFmt.pct(__ap) }}</strong>. Associates above it are paid the rest from our margin; associates below it have room to negotiate.
+        {% elif __ar == 'starting' %}every client price includes the first ladder step. Associates above it are paid the rest from our margin.
+        {% else %}every client price includes the associate's current %; nothing comes from our margin, and the price rises as the associate climbs.{% endif %}
+        {% if ownRuleCount > 0 %}{{ ownRuleCount }} associate(s) follow their own choice (associate page › Commission).{% endif %}</p>
+      {% if whatIf %}
+      <table class="list" style="max-width:760px" data-testid="associate-price-what-if"><caption style="text-align:left"><strong>What each choice would cost us</strong> — the last 12 months of associate orders ({{ whatIf.orders }}), with today's ladder</caption>
+        <tr><th>Choice</th><th class="num">Paid from our margin in 12 months</th></tr>
+        <tr{% if __ar == 'starting' %} style="font-weight:700"{% endif %}><td>Starting rate</td><td class="num">&#8377;{{ whatIf.starting | money }}</td></tr>
+        <tr{% if __ar == 'fixed' %} style="font-weight:700"{% endif %}><td>A fixed {{ pricingFmt.pct(whatIf.fixed_pct) }}</td><td class="num">&#8377;{{ whatIf.fixed | money }}</td></tr>
+        <tr{% if __ar == 'ladder' %} style="font-weight:700"{% endif %}><td>Ladder rate</td><td class="num">&#8377;0.00 <small class="muted">(the client's price rises instead)</small></td></tr>
+      </table>
+      {% endif %}
+      <label>Reason for changing this setting <small class="muted">(needed when the choice or the % changes; kept in the Audit Log)</small>
+        <input type="text" name="associate_price_reason" minlength="10" maxlength="300" placeholder="e.g. margin too thin on high-volume associates"{{ ro }}><small class="reason-hint muted">Must be at least 10 characters.</small></label>
+    </fieldset>
+
     {% if canManage %}<button type="submit">Save settings</button>{% else %}<p class="muted small">Only the MD can change these settings.</p>{% endif %}
   </form>
 

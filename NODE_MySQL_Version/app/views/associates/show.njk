@@ -10,7 +10,7 @@
 <div class="card page-wide">
   <div class="page-header-row sticky-actions" data-testid="associate-actions">{# D-320 (point 26): name and main buttons stay at the top while scrolling #}
     <div>
-      <h1>{{ a.name }} {% set __st = a.status %}{% include "associates/_status_badge.njk" %}</h1>
+      <h1>{{ a.name }} <small class="muted" data-associate-no title="Associate number (D-410) — used on payment advices">A{{ ('0000' + a.id).slice(-4) }}</small> {% set __st = a.status %}{% include "associates/_status_badge.njk" %}</h1>
       <p class="muted" style="margin:0">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}
         · paid in {{ a.currency_code }}{% if a.personal_code %} · personal code <b>{{ a.personal_code }}</b>{% endif %}
         {% if a.status_reason %} · {{ a.status_reason }}{% endif %}</p>
@@ -155,14 +155,14 @@
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">
-      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th>{% if rule %}<th>Level</th>{% endif %}<th>Commission</th></tr>
+      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th>{% if rule %}<th>Level</th><th>Ladder step <span class="help" title="Which ladder step this order is (D-410). Orders of the same client within the group days share one step; orders below the minimum do not count.">ℹ</span></th>{% endif %}<th>Commission</th></tr>
       {% for o in orders %}{% set cm = o.commission %}
         <tr><td><a href="/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td>
           <td>{{ o.currency_code }} {{ o.fob_value | money }}</td><td>{{ 'Yes' if o.buyer_paid_in_full else 'No' }}</td>
-          {% if rule %}<td>{{ cm.level or '—' }}</td>{% endif %}{# D-292: levels only with "See associate commission rules" #}
+          {% if rule %}<td>{{ cm.level or '—' }}</td><td data-ladder-step>{{ (cm.detail.ladder_text if cm.detail) or '—' }}</td>{% endif %}{# D-292: levels only with "See associate commission rules" #}
           <td>{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}<br>{% endif %}<small>{{ cm.label }}</small></td></tr>
       {% endfor %}
-      {% if orders.length == 0 %}<tr><td colspan="7" class="muted">No orders yet.</td></tr>{% endif %}
+      {% if orders.length == 0 %}<tr><td colspan="8" class="muted">No orders yet.</td></tr>{% endif %}
     </table>
     <h3>Payouts</h3>
     <table class="list">

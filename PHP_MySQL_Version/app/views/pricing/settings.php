@@ -1,6 +1,7 @@
 <?php
 use App\Helpers\Csrf;
 use App\Helpers\View;
+use App\Services\PricingService;
 
 /** Owner decision D-245 (4 Nov 2026), P1: the global pricing rules. MD changes them; ED may look. */
 $__ro = $canManage ? '' : ' disabled';
@@ -164,6 +165,35 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="price_request_daily_limit" min="0" max="1000" step="1" required value="<?= View::e($settings['price_request_daily_limit']) ?>" placeholder="e.g. 10"<?= $__ro ?>></label>
       <label class="setting-row"><span class="setting-label"><?= View::e($labels['price_request_valid_days']) ?> *<small class="muted">How long the price an associate gets stays valid.</small><span class="help-line">Example: 7 → a price given on 5 Nov is valid until 12 Nov; after that the associate asks again.</span></span>
         <input type="number" name="price_request_valid_days" min="1" max="365" step="1" required value="<?= View::e($settings['price_request_valid_days']) ?>" placeholder="e.g. 7"<?= $__ro ?>></label>
+    </fieldset>
+
+    <?php // D-410 (24 Nov 2026): the % of an associate's commission included in the client's price.
+      $__ar = (string) $settings['associate_price_rule']; $__ar = isset(\App\Services\AssociateRules::PRICE_RULES[$__ar]) ? $__ar : 'fixed';
+      $__ap = (float) $settings['associate_price_fixed_pct']; $__wi = $whatIf ?? null; ?>
+    <fieldset id="associate-price-rule" data-testid="associate-price-rule-setting"><legend>Associate commission in the client's price (D-410)</legend>
+      <p class="help-line">&#8505; An associate earns their full commission %. This setting decides how much of it is built into the price the client is quoted; any commission above it is paid from our margin. It applies to new prices only — orders with an approved Quotation or an issued Proforma Invoice keep their prices. Each associate can have their own choice (associate page › Commission).</p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="starting"<?= $__ar === 'starting' ? ' checked' : '' ?><?= $__ro ?>> <strong>Starting rate</strong> (the first ladder step)</label>
+      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['starting']) ?></p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="fixed"<?= $__ar === 'fixed' ? ' checked' : '' ?><?= $__ro ?>> <strong>A fixed %</strong>
+        <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="<?= View::e(number_format($__ap, 2, '.', '')) ?>" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."<?= $__ro ?>> % (default)</label>
+      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['fixed']) ?></p>
+      <label class="inline"><input type="radio" name="associate_price_rule" value="ladder"<?= $__ar === 'ladder' ? ' checked' : '' ?><?= $__ro ?>> <strong>Ladder rate</strong> (each associate's current %)</label>
+      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['ladder']) ?></p>
+      <p class="small" style="border:1px solid #C9962B;padding:6px 8px" data-testid="associate-price-right-now"><strong>Right now:</strong>
+        <?php if ($__ar === 'fixed'): ?>every client price includes <strong><?= View::e(PricingService::pct($__ap)) ?></strong>. Associates above it are paid the rest from our margin; associates below it have room to negotiate.
+        <?php elseif ($__ar === 'starting'): ?>every client price includes the first ladder step. Associates above it are paid the rest from our margin.
+        <?php else: ?>every client price includes the associate's current %; nothing comes from our margin, and the price rises as the associate climbs.<?php endif; ?>
+        <?= (int) ($ownRuleCount ?? 0) > 0 ? View::e((string) (int) $ownRuleCount) . ' associate(s) follow their own choice (associate page › Commission).' : '' ?></p>
+      <?php if ($__wi !== null): ?>
+      <table class="list" style="max-width:760px" data-testid="associate-price-what-if"><caption style="text-align:left"><strong>What each choice would cost us</strong> — the last 12 months of associate orders (<?= (int) $__wi['orders'] ?>), with today's ladder</caption>
+        <tr><th>Choice</th><th class="num">Paid from our margin in 12 months</th></tr>
+        <tr<?= $__ar === 'starting' ? ' style="font-weight:700"' : '' ?>><td>Starting rate</td><td class="num">&#8377;<?= number_format((float) $__wi['starting'], 2) ?></td></tr>
+        <tr<?= $__ar === 'fixed' ? ' style="font-weight:700"' : '' ?>><td>A fixed <?= View::e(PricingService::pct((float) $__wi['fixed_pct'])) ?></td><td class="num">&#8377;<?= number_format((float) $__wi['fixed'], 2) ?></td></tr>
+        <tr<?= $__ar === 'ladder' ? ' style="font-weight:700"' : '' ?>><td>Ladder rate</td><td class="num">&#8377;0.00 <small class="muted">(the client's price rises instead)</small></td></tr>
+      </table>
+      <?php endif; ?>
+      <label>Reason for changing this setting <small class="muted">(needed when the choice or the % changes; kept in the Audit Log)</small>
+        <input type="text" name="associate_price_reason" minlength="10" maxlength="300" placeholder="e.g. margin too thin on high-volume associates"<?= $__ro ?>><small class="reason-hint muted">Must be at least 10 characters.</small></label>
     </fieldset>
 
     <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>

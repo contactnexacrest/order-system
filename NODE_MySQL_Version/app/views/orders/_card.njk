@@ -13,7 +13,11 @@
         {% if seesAllOrders and o.assignee_names %}<span class="tag tag-navy">{{ o.assignee_names }}</span>{% endif %}
         {% if o.is_prospect_order %}<span class="tag tag-gold" data-testid="prospect-badge">Prospect</span>{% endif %}{# D-394 (mockups 4/5) #}
       </div>
-      {% if sees.client !== false %}<div class="entity-card-sub">{{ o.company_legal_name }}</div>{% endif %}{# D-214: Procurement sees the order number only (QA R7-N02) #}
+      {% if sees.client !== false %}<div class="entity-card-sub">{{ o.company_legal_name }}</div>
+        {# D-410 / M13 (owner 24 Nov 2026): the contact person and e-mail on two short lines, same visibility as the client name. #}
+        {% if o.contact_person and o.contact_person | trim %}<div class="entity-card-contact small muted" data-card-contact>{{ o.contact_person }}</div>{% endif %}
+        {% if o.client_email and o.client_email | trim %}<div class="entity-card-contact small muted" data-card-email>{{ o.client_email }}</div>{% endif %}
+      {% endif %}{# D-214: Procurement sees the order number only (QA R7-N02) #}
       {% if o.is_prospect_order %}<div class="small prospect-expiry{{ ' prospect-expiry-urgent' if o.prospect_urgent else '' }}">{{ o.prospect_line }}</div>{% endif %}
       <div>
         <div class="mini-stage-track">

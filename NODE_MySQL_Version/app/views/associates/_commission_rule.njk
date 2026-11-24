@@ -1,7 +1,10 @@
 {# Port of _commission_rule.php. Owner decisions 11 Nov 2026, points 8 and 9 (D-291 / D-292): the commission rule on
    the associate's staff page. With "See associate commission rules": the rule, the % and level of the next order,
    the counting orders so far ("3 of 5"), the steps and the plain counting rule; the MD (manage_pricing) changes it.
-   Everyone else: "Set by the MD." Expects a, id, rule (null without the permission), canPricing. #}
+   Everyone else: "Set by the MD." Expects a, id, rule (null without the permission), canPricing.
+   D-410 (24 Nov 2026): "Ladder steps so far" with the new counting text, what the client's price includes for this
+   associate (company setting or their own, MD with a reason), the "Right now" line and "Paid from our margin so far".
+   Also expects priceRule, rightNow, marginSoFar, priceRules, priceRuleText, groupDays, minOrderInr. #}
   <div class="section" id="commission-rule">
     <h2>Commission{% if rule %} — {{ a.name }}{% endif %}</h2>
     {% if a.no_commission == 1 %}
@@ -14,7 +17,7 @@
           {% if rule.mode == 'ladder' %}<br><small class="muted">{{ rule.standard }}</small>{% endif %}</td></tr>
         <tr><th>Next order earns</th><td><b class="stat-value">{{ rule.rate }}</b>{% if rule.level_name %} — {{ rule.level_name }}{% endif %}</td></tr>
         {% if rule.mode != 'fixed' %}
-        <tr><th>Orders counted so far</th><td><b>{{ rule.count }}{% if rule.of !== null %} of {{ rule.of }}{% endif %}</b>{% if rule.next_rate !== null %} — {{ rule.more }} more counting order{{ '' if rule.more == 1 else 's' }} to reach {{ rule.next_rate }}{% else %} — the top step{% endif %}</td></tr>
+        <tr><th>Ladder steps so far <span class="help" title="Orders of ₹{{ minOrderInr | money0 }} or more count as one step each once the advance has cleared. Orders of the same client within {{ groupDays }} days of the first are one step.">ℹ</span></th><td><b>{{ rule.count }}{% if rule.of !== null %} of {{ rule.of }}{% endif %}</b>{% if rule.next_rate !== null %} — {{ rule.more }} more counting order{{ '' if rule.more == 1 else 's' }} to reach {{ rule.next_rate }}{% else %} — the top step{% endif %}</td></tr>
         {% endif %}
       </table>
       {% if rule.mode != 'fixed' %}
@@ -24,7 +27,32 @@
               <div class="stat-value">{{ s.rate }}</div><small>{{ s.level_name }}{{ ' · ← now' if s.current }}</small></div>
           {% endfor %}
         </div>
-        <p class="muted small">An order counts once the buyer has paid in full and its invoiced FOB value is ₹{{ rule.threshold_inr | money0 }} or more. A smaller order earns the current % but does not count.</p>
+        <p class="muted small" data-step-rule>An order of ₹{{ minOrderInr | money0 }} or more (value of the goods, FOB) counts as one ladder step once its advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once the buyer has paid in full). Orders of the same client within {{ groupDays }} days of the first order of the group are one step. A smaller order earns nothing and does not count — except the client's first order, which always earns. Cancelled orders never count.</p>
+      {% endif %}
+      {% if priceRule %}
+        {% set __fmtPct = (priceRule.pct | float).toFixed(2) | replace(r/\.?0+$/, '') %}
+        <h3 id="price-rule">Commission in the client's price <span class="help" title="How much commission the client's price already includes for this associate. Above it, the rest is paid from our margin.">ℹ</span></h3>
+        <table class="kv" data-price-rule>
+          <tr><th>Uses</th><td><b>{{ priceRules[priceRule.rule] }}{% if priceRule.pct !== null %} — {{ __fmtPct }}%{% endif %}</b> <small class="muted">{{ "(this associate's own choice)" if priceRule.own else '(the company setting — Admin → Pricing)' }}</small></td></tr>
+          <tr><th>Right now</th><td data-right-now>{{ rightNow }}</td></tr>
+          {% if marginSoFar %}<tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose % was fixed at the Proforma Invoice.">ℹ</span></th><td data-margin-so-far>₹{{ marginSoFar.inr | money }} <small class="muted">on {{ marginSoFar.orders }} order{{ '' if marginSoFar.orders == 1 else 's' }} this financial year</small></td></tr>{% endif %}
+        </table>
+        {% if canPricing %}
+          <details class="card"><summary>Change for this associate</summary>
+          <form method="post" action="/associates/{{ id }}/price-rule" data-price-rule-form>
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label><input type="radio" name="price_rule" value="company"{{ ' checked' if not priceRule.own }} required> Use the company setting</label>
+            {% for k, l in priceRules %}
+              <label><input type="radio" name="price_rule" value="{{ k }}"{{ ' checked' if priceRule.own and priceRule.rule == k }}> {{ l }}</label>
+              <small class="muted" style="display:block;margin:0 0 .5em 1.6em">{{ priceRuleText[k] }}</small>
+            {% endfor %}
+            <label>Fixed % (when "A fixed %")<input type="number" name="price_rule_fixed_pct" min="0" max="50" step="0.01" placeholder="e.g. 5" data-required-when="price_rule=fixed" value="{{ priceRule.pct if (priceRule.own and priceRule.rule == 'fixed') else '' }}"></label>
+            <label>Reason for the change *<input type="text" name="price_rule_reason" required minlength="10" maxlength="255" placeholder="e.g. Agreed with the associate on 24 Nov for the new market"></label>
+            <p class="muted small">New prices only: orders whose prices are already fixed keep them. Kept in the Audit Log.</p>
+            <button type="submit">Save</button>
+          </form>
+          </details>
+        {% endif %}
       {% endif %}
       {% if canPricing %}
         <div class="btn-row">

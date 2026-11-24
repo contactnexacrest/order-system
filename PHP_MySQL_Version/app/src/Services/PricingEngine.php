@@ -100,6 +100,28 @@ final class PricingEngine
     }
 
     /**
+     * Owner decision D-410 (24 Nov 2026): an associate's prices when the client's price includes a chosen %
+     * (company setting or the associate's own: starting rate / a fixed % / ladder rate), not their own rate.
+     *   quote  = staff floor ÷ (1 − included %) × (1 + buffer %)   — the same at every ladder step
+     *   lowest = staff floor ÷ (1 − min(rate, included %))         — below the included % the associate has room to negotiate
+     * Commission above the included % is paid from the margin (never lowers the price below the minimum price).
+     *
+     * @param array{staff_floor: float, buffer_pct: float} $raw  build()['raw']
+     * @return array{floor: float, quote: float}
+     */
+    public static function associateIncluded(array $raw, float $ratePct, float $includedPct): array
+    {
+        foreach ([$ratePct, $includedPct] as $v) {
+            if ($v < 0 || $v >= 100) {
+                throw new \InvalidArgumentException('A commission % must be at least 0 and below 100.');
+            }
+        }
+        $quoteFloor = $raw['staff_floor'] / (1 - $includedPct / 100);
+        $floor = $raw['staff_floor'] / (1 - min($ratePct, $includedPct) / 100);
+        return ['floor' => self::round2($floor), 'quote' => self::round2($quoteFloor * (1 + $raw['buffer_pct'] / 100))];
+    }
+
+    /**
      * Half-up rounding to 2 decimals that ignores binary noise (1326.125 → 1326.13,
      * 1357.0249999999999 → 1357.03), done on the decimal string so Node matches exactly.
      */

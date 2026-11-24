@@ -29,6 +29,7 @@ abstract class DbTestCase extends TestCase
 
     protected function setUp(): void
     {
+        \App\Services\AssociateRules::reset(); // D-410: no ladder history carried over between tests
         parent::setUp();
         // Each test is a new "request": no permission or department state carried over from the last one.
         \App\Services\PermissionService::resetCache();

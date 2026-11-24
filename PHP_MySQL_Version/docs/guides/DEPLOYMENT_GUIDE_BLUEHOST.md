@@ -534,7 +534,7 @@ harmless.
      `2026-11-18a-product-forms-and-hs.sql`, `2026-11-18b-cha-per-supplier.sql`,
      `2026-11-18c-documents-bl-and-po.sql`, `2026-11-20a-quick-quote-prospects.sql`,
      `2026-11-20b-merchant-trade-executive-role.sql`, `2026-11-21a-marine-insurance.sql`,
-     `2026-11-22a-insurance-basis.sql`.
+     `2026-11-22a-insurance-basis.sql`, `2026-11-24a-associate-rules.sql`.
    - **#1060 Duplicate column name** on a file marked `PLAIN ALTER (owner D-371)` means that column
      is already there — harmless; carry on with the next statement or file.
    - phpMyAdmin refuses `PREPARE` with information_schema (**#1044**); migrations are written

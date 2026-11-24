@@ -3229,3 +3229,12 @@ INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
   ('insurance_min_premium', ''),
   ('insurance_rounding', 'up'),
   ('insurance_add_gst', '0');
+
+-- D-410 (24 Nov 2026): new associate commission rules (same as docs/migrations/2026-11-24a-associate-rules.sql):
+-- the client's price includes a fixed 5 %; orders of one client within 15 days are one ladder step; the rules apply from the install day.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('associate_price_rule', 'fixed'),
+  ('associate_price_fixed_pct', '5.00');
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
+  ('associate_group_days', '15'),
+  ('associate_rules_from', DATE_FORMAT(CURDATE(), '%Y-%m-%d'));

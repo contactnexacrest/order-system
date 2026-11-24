@@ -5,6 +5,7 @@
   <h1>My profile</h1>
   <table class="kv">
     <tr><th>Name</th><td>{{ me.name }}</td></tr>
+    <tr><th>Associate number</th><td data-associate-no>A{{ ('0000' + me.id).slice(-4) }} <small class="muted">— shown on your payment advices</small></td></tr>
     <tr><th>E-mail (login)</th><td>{{ me.email }} <small class="muted">— ask NexaCrest to change it</small></td></tr>
     <tr><th>Agreement</th><td>signed {{ (me.agreement_signed_on | shortDate) if me.agreement_signed_on else '—' }}, ends {{ (me.agreement_ends_on | shortDate) if me.agreement_ends_on else '—' }}{% if me.agreement_file_id %} · <a href="/associate/agreement">Download my agreement</a>{% endif %}</td></tr>
     <tr><th>My commission</th><td>

@@ -160,7 +160,7 @@ final class PriceRequestService
             }
             return $out;
         }
-        $prices = self::priceFrom($p['build'], $level);
+        $prices = self::priceFrom($p['build'], $level, $associate);
         $adj = $p['spec']['adj'];
         $breakdown = [['label' => 'Base: ' . (ProductSpecs::describe($p['spec']['offered'], self::baseMap($p['spec']['offered']), true) ?: 'standard specification'), 'change' => '—']];
         if (!empty($p['exact'])) {
@@ -176,7 +176,7 @@ final class PriceRequestService
             } else {
                 // The effect of this amount on the associate's quote price: worked out with and without it.
                 $without = PricingEngine::build(self::engineInput($p, ['pct' => $adj['pct'], 'usd' => $adj['usd'] - (float) $l['usd_effect'], 'qty_pct' => $adj['qty_pct']]));
-                $effect = $prices['quote'] - self::priceFrom($without, $level)['quote'];
+                $effect = $prices['quote'] - self::priceFrom($without, $level, $associate)['quote'];
                 $breakdown[] = ['label' => $l['option'] . ' (' . strtolower($l['spec']) . ')', 'change' => ($effect < 0 ? '−' : '+') . 'USD ' . number_format(abs($effect), 2) . ' on this price' . ($adj['basis'] === 'cbm' ? ' per CBM' : '')];
             }
         }
@@ -199,10 +199,15 @@ final class PriceRequestService
     }
 
     /** @return array{floor: float, quote: float} the associate's floor and quote from a build (staff figures with no level) */
-    private static function priceFrom(array $build, ?array $level): array
+    private static function priceFrom(array $build, ?array $level, ?array $associate = null): array
     {
         if ($level === null) {
             return ['floor' => $build['staff_floor'], 'quote' => $build['staff_quote']];
+        }
+        // D-410: the quote includes the % chosen for the client's price (company setting or the associate's own), the lowest price their rate.
+        $included = $associate !== null ? AssociateRules::includedPct($associate, $level) : null;
+        if ($included !== null) {
+            return PricingEngine::associateIncluded($build['raw'], (float) $level['value'], $included);
         }
         return PricingEngine::associate($build['raw'], (string) $level['kind'], (float) $level['value']);
     }

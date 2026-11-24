@@ -199,7 +199,9 @@ final class AssociateCommission
             return null;
         }
         $mode = (string) (($incentiveRow ?? (isset($order['id']) ? IncentiveRepository::forOrder((int) $order['id']) : null))['associate_mode'] ?? 'auto');
-        if ($mode === 'no' || ($mode !== 'yes' && isset($order['id']) && !IncentiveService::withinFirstTenDays($order))) {
+        // D-410 (24 Nov 2026): every order of the client earns; the old "client's first 10 days only" rule still decides
+        // orders whose PI was issued before the cut-over date (owner choice 2A).
+        if ($mode === 'no' || ($mode !== 'yes' && isset($order['id']) && !AssociateRules::newRules($order) && !IncentiveService::withinFirstTenDays($order))) {
             return null;
         }
         $a = AssociateRepository::find((int) $client['associate_id']);
@@ -209,16 +211,10 @@ final class AssociateCommission
         return $a;
     }
 
-    /** The associate's earlier counting orders (fixed and counted when their order was locked). */
+    /** D-410: the associate's ladder steps counted so far (AssociateRules works the history out again each time), leaving one order out. */
     public static function countingOrders(int $associateId, ?int $excludeOrderId = null): int
     {
-        $stmt = Database::connection()->prepare(
-            "SELECT COUNT(*) FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-              WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND (oi.locked_at IS NOT NULL OR oi.associate_fixed_at IS NOT NULL) AND oi.order_id <> :x
-                AND o.status NOT IN ('cancelled','lost')"
-        );
-        $stmt->execute(['a' => $associateId, 'x' => $excludeOrderId ?? 0]);
-        return (int) $stmt->fetchColumn();
+        return AssociateRules::stepsCounted($associateId, $excludeOrderId);
     }
 
     /**
@@ -233,6 +229,19 @@ final class AssociateCommission
     {
         if (($associate['commission_mode'] ?? 'ladder') === 'fixed') {
             return [!empty($associate['commission_level_id']) ? PricingRepository::findLevel((int) $associate['commission_level_id']) : null, null];
+        }
+        // D-410: an order of the same client within the group days of a counted order shares that order's step and level.
+        if ($excludeOrderId !== null) {
+            $order = OrderRepository::find($excludeOrderId);
+            $group = $order !== null ? AssociateRules::groupCovering((int) $associate['id'], $order) : null;
+            if ($group !== null) {
+                $first = OrderRepository::find((int) $group['order_id']);
+                $fixed = $first !== null ? self::fixedLevel($first, (int) $associate['id']) : null;
+                if ($fixed !== null) {
+                    $level = $fixed['id'] !== null ? PricingRepository::findLevel((int) $fixed['id']) : null;
+                    return [array_merge($level ?? [], ['id' => $fixed['id'], 'name' => $fixed['name'], 'kind' => $fixed['kind'], 'value' => $fixed['value']]), (int) $group['step'] - 1];
+                }
+            }
         }
         $count = self::countingOrders((int) $associate['id'], $excludeOrderId);
         $position = ($orderInRangeInr === null || $orderInRangeInr >= self::settings()['threshold_inr']) ? $count + 1 : max($count, 1);
@@ -363,6 +372,7 @@ final class AssociateCommission
     /** Called when the PI is issued: fixes the associate's commission level on the order (once). */
     public static function fixLevelAtPi(int $orderId): void
     {
+        AssociateRules::reset();
         $order = OrderRepository::find($orderId);
         if ($order === null || !empty($order['associate_level_fixed_at'])) {
             return;
@@ -377,9 +387,12 @@ final class AssociateCommission
         }
         Database::connection()->prepare(
             'UPDATE orders SET associate_id = :a, associate_level_id = :l, associate_level_name = :n, associate_level_kind = :k, associate_level_value = :v,
-                    associate_level_fixed_at = NOW(), associate_rate_pct = :r, associate_rate_source = :s WHERE id = :id AND associate_level_fixed_at IS NULL'
+                    associate_level_fixed_at = NOW(), associate_rate_pct = :r, associate_rate_source = :s, associate_included_pct = :inc
+              WHERE id = :id AND associate_level_fixed_at IS NULL'
         )->execute(['a' => $a['id'], 'l' => $level['id'], 'n' => $level['name'], 'k' => $level['kind'], 'v' => $level['value'],
-            'r' => $level['kind'] === 'pct' ? $level['value'] : null, 's' => ($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'fixed' : 'ladder', 'id' => $orderId]);
+            'r' => $level['kind'] === 'pct' ? $level['value'] : null, 's' => ($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'fixed' : 'ladder',
+            // D-410: the % included in the client's price, fixed with the PI (the margin box and "paid from our margin" read it).
+            'inc' => AssociateRules::includedPct($a, $level), 'id' => $orderId]);
         if ((int) $order['is_test_data'] !== 1 && (int) $order['is_sample_data'] !== 1) {
             // D-292: the associate is told only their %, never a level name.
             AssociateService::notify($a, 'order_created', "We have sent the proforma invoice for order {$order['order_reference']}. Your commission rate on this order is now final: " . self::rateLabel($level) . '.',
@@ -573,7 +586,22 @@ final class AssociateCommission
         $state = $settle['unpaid'] ? 'unpaid' : ($fullyPaidOn !== null ? 'paid' : 'awaiting');
         $dueOn = $fullyPaidOn !== null ? self::dueOn($fullyPaidOn, $set) : null;
         $basisInr = round($basis * $realised['rate'], 2);
-        $counts = $state === 'paid' && $basisInr >= $set['threshold_inr'];
+        // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
+        $newRules = AssociateRules::newRules($order);
+        // The MD's "associate: yes" on the order overrides the minimum, as it overrides the old 10-day window.
+        $forcedYes = (string) ($fixedRow['associate_mode'] ?? 'auto') === 'yes';
+        $belowMin = $newRules && !$forcedYes && !AssociateRules::earnsOnValue($order, $basisInr);
+        if ($belowMin && $override === null) {
+            $commissionFc = 0.0;
+            $commissionInr = 0.0;
+        }
+        $ladder = AssociateRules::stepFor((int) $a['id'], $orderId);
+        $counts = $ladder !== null && $ladder['status'] === 'counted';
+        // D-410: the % the client's price includes — fixed at the PI, before that today's choice for this associate.
+        $included = isset($order['associate_included_pct']) && $order['associate_included_pct'] !== null ? (float) $order['associate_included_pct']
+            : ($fixed ? null : AssociateRules::includedPct($a, $level));
+        $ratePct = $level !== null && $level['kind'] === 'pct' ? (float) $level['value'] : null;
+        $marginPct = AssociateRules::marginPct($ratePct, $included);
         return [
             'id' => (int) $a['id'], 'name' => (string) $a['name'], 'status' => (string) $a['status'], 'gstin' => (string) ($a['gstin'] ?? ''),
             'mode' => (string) ($a['commission_mode'] ?? 'ladder'),
@@ -589,7 +617,12 @@ final class AssociateCommission
             'due_on' => $dueOn, 'payout_run_on' => $dueOn !== null ? self::payoutRunOn($dueOn, $set) : null,
             'claim_hold' => $dueOn !== null && $set['claim_hold'] && self::claimOpen($orderId, $dueOn),
             'counts' => $counts, 'threshold_inr' => $set['threshold_inr'],
-            'counting_number' => $counts ? self::countingOrders((int) $a['id'], $orderId) + 1 : null,
+            'counting_number' => $counts ? (int) $ladder['step'] : null,
+            // D-410
+            'new_rules' => $newRules, 'below_min' => $belowMin, 'ladder' => $ladder, 'ladder_text' => AssociateRules::stepText($ladder),
+            'included_pct' => $included, 'margin_pct' => $marginPct,
+            'margin_fc' => $ratePct > 0 && $marginPct > 0 ? round($commissionFc * $marginPct / $ratePct, 2) : 0.0,
+            'margin_inr' => $ratePct > 0 && $marginPct > 0 ? round($commissionInr * $marginPct / $ratePct, 2) : 0.0,
             'gst_pct' => $set['gst_pct'],
             'fixed' => $fixedRate !== null, 'fixed_at' => $fixedRate !== null ? (string) $fixedRow['associate_fixed_at'] : null, 'fixed_rate' => $fixedRate,
             'override' => $override !== null, 'override_reason' => $override !== null ? (string) $fixedRow['associate_override_reason'] : null,

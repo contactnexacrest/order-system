@@ -15,7 +15,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
 <div class="card page-wide">
   <div class="page-header-row sticky-actions" data-testid="associate-actions"><?php // D-320 (point 26): name and main buttons stay at the top while scrolling ?>
     <div>
-      <h1><?= htmlspecialchars((string) $a['name']) ?> <?php $__st = (string) $a['status']; require __DIR__ . '/_status_badge.php'; ?></h1>
+      <h1><?= htmlspecialchars((string) $a['name']) ?> <small class="muted" data-associate-no title="Associate number (D-410) — used on payment advices">A<?= sprintf('%04d', (int) $a['id']) ?></small> <?php $__st = (string) $a['status']; require __DIR__ . '/_status_badge.php'; ?></h1>
       <p class="muted" style="margin:0"><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?>
         · paid in <?= htmlspecialchars((string) $a['currency_code']) ?><?php if (!empty($a['personal_code'])): ?> · personal code <b><?= htmlspecialchars((string) $a['personal_code']) ?></b><?php endif; ?>
         <?php if (!empty($a['status_reason'])): ?> · <?= htmlspecialchars((string) $a['status_reason']) ?><?php endif; ?></p>
@@ -159,14 +159,14 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">
-      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><?php if ($rule !== null): ?><th>Level</th><?php endif; ?><th>Commission</th></tr>
+      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><?php if ($rule !== null): ?><th>Level</th><th>Ladder step <span class="help" title="Which ladder step this order is (D-410). Orders of the same client within the group days share one step; orders below the minimum do not count.">ℹ</span></th><?php endif; ?><th>Commission</th></tr>
       <?php foreach ($orders as $o): $cm = $o['commission']; ?>
         <tr><td><a href="/orders/<?= (int) $o['id'] ?>"><?= htmlspecialchars((string) $o['order_reference']) ?></a></td><td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td><td><?= htmlspecialchars((string) $o['stage']) ?></td>
           <td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= $__money($o['fob_value']) ?></td><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'No' ?></td>
-          <?php if ($rule !== null): // D-292: levels only with "See associate commission rules" ?><td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td><?php endif; ?>
+          <?php if ($rule !== null): // D-292: levels only with "See associate commission rules" ?><td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td><td data-ladder-step><?= htmlspecialchars((string) ($cm['detail']['ladder_text'] ?? '—')) ?></td><?php endif; ?>
           <td><?= $cm['amount'] !== null ? htmlspecialchars((string) $o['currency_code']) . ' ' . $__money($cm['amount']) . '<br>' : '' ?><small><?= htmlspecialchars($cm['label']) ?></small></td></tr>
       <?php endforeach; ?>
-      <?php if ($orders === []): ?><tr><td colspan="7" class="muted">No orders yet.</td></tr><?php endif; ?>
+      <?php if ($orders === []): ?><tr><td colspan="8" class="muted">No orders yet.</td></tr><?php endif; ?>
     </table>
     <h3>Payouts</h3>
     <table class="list">

@@ -2,5 +2,6 @@
 {% set cm = o.commission %}
 {# D-292: the % fixed on the order (never a level name) and the owner's statuses. #}
 {% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.rate_text %} <small class="muted">({{ cm.rate_text }})</small>{% endif %}<br>{% endif %}
-<span class="badge {{ {'paid': 'badge-active', 'earned': 'badge-active', 'held': 'badge-lost', 'expected': 'badge-pending'}[cm.state] or 'badge-inactive' }}">{{ cm.label }}</span>
+{% set __b = badgeOf(cm) if badgeOf else null %}{# D-410: 🔵 To be paid / 🟢 Paid #}
+<span class="badge {% if __b == 'paid' %}badge-active{% elif __b == 'to_be_paid' %}badge-tobepaid{% else %}{{ {'held': 'badge-lost', 'expected': 'badge-pending'}[cm.state] or 'badge-inactive' }}{% endif %}" data-badge="{{ __b or '' }}">{% if __b == 'paid' %}🟢 {% elif __b == 'to_be_paid' %}🔵 {% endif %}{{ cm.label }}</span>
 {% if cm.fixed_line %}<br><small data-fixed-rupees>{{ cm.fixed_line }}</small>{% endif %}{# D-264: India only, once fixed (set by the portal controller) #}

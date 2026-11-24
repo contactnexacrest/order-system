@@ -5,7 +5,11 @@
  * counting orders so far ("3 of 5"), the steps and the plain counting rule; the MD (manage_pricing)
  * changes it. Everyone else: "Set by the MD." Expects $a, $id, $rule (null without the permission),
  * $canPricing. Node twin: views/associates/_commission_rule.njk.
+ * D-410 (24 Nov 2026): "Ladder steps so far" with the new counting text, what the client's price includes for this
+ * associate (company setting or their own, MD with a reason), the "Right now" line and "Paid from our margin so far".
+ * Also expects $priceRule, $rightNow, $marginSoFar (null without the permission).
  */
+use App\Services\AssociateRules;
 use App\Helpers\Dates;
 ?>
   <div class="section" id="commission-rule">
@@ -20,7 +24,7 @@ use App\Helpers\Dates;
           <?php if ($rule['mode'] === 'ladder'): ?><br><small class="muted"><?= htmlspecialchars($rule['standard']) ?></small><?php endif; ?></td></tr>
         <tr><th>Next order earns</th><td><b class="stat-value"><?= htmlspecialchars($rule['rate']) ?></b><?= $rule['level_name'] ? ' — ' . htmlspecialchars((string) $rule['level_name']) : '' ?></td></tr>
         <?php if ($rule['mode'] !== 'fixed'): ?>
-        <tr><th>Orders counted so far</th><td><b><?= (int) $rule['count'] ?><?= $rule['of'] !== null ? ' of ' . (int) $rule['of'] : '' ?></b><?= $rule['next_rate'] !== null ? ' — ' . (int) $rule['more'] . ' more counting order' . ((int) $rule['more'] === 1 ? '' : 's') . ' to reach ' . htmlspecialchars((string) $rule['next_rate']) : ' — the top step' ?></td></tr>
+        <tr><th>Ladder steps so far <span class="help" title="Orders of ₹<?= number_format(AssociateRules::minOrderInr(), 0) ?> or more count as one step each once the advance has cleared. Orders of the same client within <?= AssociateRules::groupDays() ?> days of the first are one step.">ℹ</span></th><td><b><?= (int) $rule['count'] ?><?= $rule['of'] !== null ? ' of ' . (int) $rule['of'] : '' ?></b><?= $rule['next_rate'] !== null ? ' — ' . (int) $rule['more'] . ' more counting order' . ((int) $rule['more'] === 1 ? '' : 's') . ' to reach ' . htmlspecialchars((string) $rule['next_rate']) : ' — the top step' ?></td></tr>
         <?php endif; ?>
       </table>
       <?php if ($rule['mode'] !== 'fixed'): ?>
@@ -30,7 +34,31 @@ use App\Helpers\Dates;
               <div class="stat-value"><?= htmlspecialchars($__s['rate']) ?></div><small><?= htmlspecialchars((string) $__s['level_name']) ?><?= $__s['current'] ? ' · ← now' : '' ?></small></div>
           <?php endforeach; ?>
         </div>
-        <p class="muted small">An order counts once the buyer has paid in full and its invoiced FOB value is ₹<?= number_format((float) $rule['threshold_inr'], 0) ?> or more. A smaller order earns the current % but does not count.</p>
+        <p class="muted small" data-step-rule>An order of ₹<?= number_format(AssociateRules::minOrderInr(), 0) ?> or more (value of the goods, FOB) counts as one ladder step once its advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once the buyer has paid in full). Orders of the same client within <?= AssociateRules::groupDays() ?> days of the first order of the group are one step. A smaller order earns nothing and does not count — except the client's first order, which always earns. Cancelled orders never count.</p>
+      <?php endif; ?>
+      <?php if (!empty($priceRule)): ?>
+        <h3 id="price-rule">Commission in the client's price <span class="help" title="How much commission the client's price already includes for this associate. Above it, the rest is paid from our margin.">ℹ</span></h3>
+        <table class="kv" data-price-rule>
+          <tr><th>Uses</th><td><b><?= htmlspecialchars(AssociateRules::PRICE_RULES[$priceRule['rule']]) ?><?= $priceRule['pct'] !== null ? ' — ' . htmlspecialchars(rtrim(rtrim(number_format((float) $priceRule['pct'], 2, '.', ''), '0'), '.')) . '%' : '' ?></b> <small class="muted"><?= $priceRule['own'] ? '(this associate\'s own choice)' : '(the company setting — Admin → Pricing)' ?></small></td></tr>
+          <tr><th>Right now</th><td data-right-now><?= htmlspecialchars((string) $rightNow) ?></td></tr>
+          <?php if ($marginSoFar !== null): ?><tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose % was fixed at the Proforma Invoice.">ℹ</span></th><td data-margin-so-far>₹<?= number_format((float) $marginSoFar['inr'], 2) ?> <small class="muted">on <?= (int) $marginSoFar['orders'] ?> order<?= (int) $marginSoFar['orders'] === 1 ? '' : 's' ?> this financial year</small></td></tr><?php endif; ?>
+        </table>
+        <?php if ($canPricing): ?>
+          <details class="card"><summary>Change for this associate</summary>
+          <form method="post" action="/associates/<?= $id ?>/price-rule" data-price-rule-form>
+            <?= \App\Helpers\Csrf::field() ?>
+            <label><input type="radio" name="price_rule" value="company"<?= !$priceRule['own'] ? ' checked' : '' ?> required> Use the company setting</label>
+            <?php foreach (AssociateRules::PRICE_RULES as $__k => $__l): ?>
+              <label><input type="radio" name="price_rule" value="<?= $__k ?>"<?= $priceRule['own'] && $priceRule['rule'] === $__k ? ' checked' : '' ?>> <?= htmlspecialchars($__l) ?></label>
+              <small class="muted" style="display:block;margin:0 0 .5em 1.6em"><?= htmlspecialchars(AssociateRules::PRICE_RULE_TEXT[$__k]) ?></small>
+            <?php endforeach; ?>
+            <label>Fixed % (when "A fixed %")<input type="number" name="price_rule_fixed_pct" min="0" max="50" step="0.01" placeholder="e.g. 5" data-required-when="price_rule=fixed" value="<?= $priceRule['own'] && $priceRule['rule'] === 'fixed' ? htmlspecialchars((string) $priceRule['pct']) : '' ?>"></label>
+            <label>Reason for the change *<input type="text" name="price_rule_reason" required minlength="10" maxlength="255" placeholder="e.g. Agreed with the associate on 24 Nov for the new market"></label>
+            <p class="muted small">New prices only: orders whose prices are already fixed keep them. Kept in the Audit Log.</p>
+            <button type="submit">Save</button>
+          </form>
+          </details>
+        <?php endif; ?>
       <?php endif; ?>
       <?php if ($canPricing): ?>
         <div class="btn-row">

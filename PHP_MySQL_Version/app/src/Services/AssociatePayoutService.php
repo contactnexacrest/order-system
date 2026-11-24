@@ -126,6 +126,7 @@ final class AssociatePayoutService
     /** Called after a buyer payment is cleared or its rupees recorded: fixes the commission if the order is now fully paid. Never throws. */
     public static function afterPaymentChange(int $orderId, ?int $userId = null): void
     {
+        AssociateRules::reset(); // D-410: a payment can move a ladder step
         try {
             self::autoFix($orderId, $userId);
         } catch (\Throwable $e) {
@@ -140,6 +141,7 @@ final class AssociatePayoutService
      */
     public static function autoFix(int $orderId, ?int $userId = null): bool
     {
+        AssociateRules::reset(); // D-410
         $order = OrderRepository::find($orderId);
         if ($order === null || in_array($order['status'] ?? '', ['cancelled', 'lost'], true)) {
             return false;

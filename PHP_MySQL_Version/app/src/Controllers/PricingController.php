@@ -49,6 +49,9 @@ final class PricingController
             'fx' => \App\Services\FxRateService::status(),
             'fxHistory' => \App\Services\FxRateService::history(30),
             'fxSources' => \App\Services\FxRateService::SOURCES,
+            // D-410: what each choice would have cost over the last 12 months of associate orders.
+            'whatIf' => \App\Services\AssociateRules::whatIf((float) ((PricingRepository::settings() + PricingService::DEFAULTS)['associate_price_fixed_pct'])),
+            'ownRuleCount' => \App\Services\AssociateRules::ownRuleCount(),
         ], 'layout/base');
     }
 
@@ -79,11 +82,21 @@ final class PricingController
         }
         $userId = (int) self::user()['id'];
         $before = PricingRepository::settings() + PricingService::DEFAULTS;
+        // D-410: changing what the client's price includes for associates needs a reason (kept in the Audit Log).
+        $ruleChanged = (isset($values['associate_price_rule']) && $values['associate_price_rule'] !== (string) $before['associate_price_rule'])
+            || (isset($values['associate_price_fixed_pct']) && $values['associate_price_fixed_pct'] !== (string) $before['associate_price_fixed_pct']);
+        $reason = trim((string) ($_POST['associate_price_reason'] ?? ''));
+        if ($ruleChanged && mb_strlen($reason) < 10) {
+            Flash::set('error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
+            header('Location: /pricing/settings#associate-price-rule');
+            return;
+        }
         $changed = 0;
         foreach ($values as $k => $v) {
             if ((string) $before[$k] !== $v) {
                 PricingRepository::setSetting($k, $v, $userId);
-                AuditLogRepository::log($userId, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, $k, (string) $before[$k], $v);
+                AuditLogRepository::log($userId, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, $k, (string) $before[$k],
+                    in_array($k, ['associate_price_rule', 'associate_price_fixed_pct'], true) ? $v . ' — reason: ' . $reason : $v);
                 $changed++;
             }
         }
@@ -108,7 +121,7 @@ final class PricingController
         $floors = [];
         if ($sample !== null) {
             foreach ($levels as $l) {
-                $floors[(int) $l['id']] = \App\Services\PricingEngine::associate($sample['pricing']['build']['raw'], (string) $l['kind'], (float) $l['value']);
+                $floors[(int) $l['id']] = \App\Services\AssociateRules::levelPrices($sample['pricing']['build']['raw'], $l); // D-410
             }
         }
         $ladder = PricingRepository::ladder();
@@ -179,7 +192,7 @@ final class PricingController
         PricingRepository::updateLevel($id, $l['name'], $l['kind'], $l['value'], $userId);
         AuditLogRepository::log($userId, 'COMMISSION_LEVEL_CHANGED', 'commission_levels', $id, null,
             $existing['name'] . ' — ' . PricingService::levelLabel($existing), $l['name'] . ' — ' . PricingService::levelLabel($l));
-        Flash::set('success', "Level \"{$l['name']}\" saved. New quotes use it; orders with an issued Proforma Invoice keep the commission they had.");
+        Flash::set('success', "Level \"{$l['name']}\" saved. New quotes use it; orders with an issued Proforma Invoice keep the commission they had." . self::priceRuleReminder());
         header('Location: /pricing/commission-levels');
     }
 
@@ -222,6 +235,19 @@ final class PricingController
         header('Location: /pricing/commission-levels');
     }
 
+    /** D-410 (M12): after a ladder or level % change, remind the MD what the client's price includes. */
+    private static function priceRuleReminder(): string
+    {
+        $r = \App\Services\AssociateRules::companyPriceRule();
+        $what = match ($r['rule']) {
+            'starting' => 'the first ladder step — it follows this change',
+            'ladder' => "each associate's ladder rate — client prices change with this",
+            default => 'a fixed ' . rtrim(rtrim(number_format((float) $r['pct'], 2, '.', ''), '0'), '.') . '% — it does not change by itself',
+        };
+        return ' Reminder: client prices include ' . $what . '. Check "Commission included in the client\'s price" in Admin → Pricing → Settings'
+            . (\App\Services\AssociateRules::ownRuleCount() > 0 ? ' (and the ' . \App\Services\AssociateRules::ownRuleCount() . ' associate(s) with their own choice)' : '') . '.';
+    }
+
     public function saveLadder(array $params): void
     {
         $levelsById = [];
@@ -245,7 +271,7 @@ final class PricingController
             PricingRepository::replaceLadder($steps, $userId);
             AuditLogRepository::log($userId, 'COMMISSION_LADDER_CHANGED', 'commission_ladder_steps', null, null, $before, $after);
         }
-        Flash::set('success', $before === $after ? 'Nothing changed.' : 'Ladder saved. It counts orders from P3 on; associates on "Ladder" use it.');
+        Flash::set('success', $before === $after ? 'Nothing changed.' : 'Ladder saved. Associates on "Ladder" use it for new Proforma Invoices.' . self::priceRuleReminder());
         header('Location: /pricing/commission-levels#ladder');
     }
 

@@ -75,16 +75,18 @@ const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 
 const auditLog = (...a) => require('../repositories/auditLogRepository').log(...a);
 const { round2 } = require('../helpers/money'); // HNT-L01: PHP round()
 
-/** The order is one the client's associate earns on: forced "yes", or within the first-order window and not forced "no". */
-async function associateEarnsOn(order) {
-  let mode = 'auto';
+/** D-410: the client's associate sells this order — not set to "associate: no", and the associate takes commission. */
+async function associateSells(order, associate) {
+  if (Number(associate.no_commission || 0) === 1) return false;
   if (order.id) {
     const row = await require('../repositories/incentiveRepository').forOrder(Number(order.id));
-    mode = String((row && row.associate_mode) || 'auto');
+    const mode = String((row && row.associate_mode) || 'auto');
+    if (mode === 'no') return false;
+    if (mode !== 'yes' && !(await require('./associateRules').newRules(order)) && !(await require('./incentiveService').withinFirstTenDays(order))) {
+      return false; // a PI issued before the cut-over date keeps the old rule (2A)
+    }
   }
-  if (mode === 'no') return false;
-  if (mode === 'yes' || !order.id) return true;
-  return require('./incentiveService').withinFirstTenDays(order);
+  return true;
 }
 
 /**
@@ -108,14 +110,16 @@ async function levelForAssociate(associate, excludeOrderId) {
 
 /** Who sells this order: the client's associate at their level (when the order is one they earn on), else staff. */
 async function context(order) {
-  const ctx = { associate: null, level: null, key: 'staff', label: 'Staff', ladder_count: null,
+  const ctx = { associate: null, level: null, key: 'staff', label: 'Staff', ladder_count: null, included_pct: null,
     usd: String((order && order.currency_code) || '').toUpperCase() === 'USD',
     // D-342: once the Quotation is approved, prices are worked out at the rate fixed then — never today's.
     fixed_fx: require('./priceLock').fixedRate(order || {}) };
   const client = order && order.client_id ? await require('../repositories/clientRepository').find(Number(order.client_id)) : null;
   if (!client || !client.associate_id) return ctx;
   const associate = await require('../repositories/associateRepository').find(Number(client.associate_id));
-  if (!associate || !(await associateEarnsOn(order))) return ctx;
+  // D-410 (24 Nov 2026): every order of an associate's client is priced for the associate (every order earns),
+  // unless the MD set "associate: no" on it or the associate takes no commission.
+  if (!associate || !(await associateSells(order, associate))) return ctx;
   const [level, count] = await levelForAssociate(associate, order.id ? Number(order.id) : null);
   ctx.associate = associate;
   ctx.ladder_count = count;
@@ -123,6 +127,9 @@ async function context(order) {
     ctx.level = level;
     ctx.key = `L${Number(level.id)}`;
     ctx.label = `${associate.name} (${pricingService.levelLabel(level)})`;
+    // D-410: the % the client's price includes — fixed on the order with its PI, else from the setting.
+    ctx.included_pct = order.associate_included_pct !== null && order.associate_included_pct !== undefined && order.associate_level_fixed_at
+      ? Number(order.associate_included_pct) : await require('./associateRules').includedPct(associate, level);
   }
   return ctx;
 }
@@ -142,7 +149,9 @@ async function liveFigures(product, ctx, selection = null, lineThicknessMm = nul
   let floor = b.staff_floor;
   let quote = b.staff_quote;
   if (ctx.level) {
-    const a = pricingEngine.associate(b.raw, String(ctx.level.kind), Number(ctx.level.value));
+    const a = ctx.included_pct !== null && ctx.included_pct !== undefined && (ctx.level.kind || 'pct') === 'pct'
+      ? pricingEngine.associateIncluded(b.raw, Number(ctx.level.value), Number(ctx.included_pct))
+      : pricingEngine.associate(b.raw, String(ctx.level.kind), Number(ctx.level.value));
     floor = a.floor;
     quote = a.quote;
   }

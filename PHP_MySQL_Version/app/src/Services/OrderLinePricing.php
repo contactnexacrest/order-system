@@ -99,7 +99,7 @@ final class OrderLinePricing
      */
     public static function context(array $order): array
     {
-        $ctx = ['associate' => null, 'level' => null, 'key' => 'staff', 'label' => 'Staff', 'ladder_count' => null,
+        $ctx = ['associate' => null, 'level' => null, 'key' => 'staff', 'label' => 'Staff', 'ladder_count' => null, 'included_pct' => null,
             'usd' => strtoupper((string) ($order['currency_code'] ?? '')) === 'USD',
             // D-342: once the Quotation is approved, prices are worked out at the rate fixed then — never today's.
             'fixed_fx' => PriceLock::fixedRate($order)];
@@ -108,7 +108,9 @@ final class OrderLinePricing
             return $ctx;
         }
         $associate = AssociateRepository::find((int) $client['associate_id']);
-        if ($associate === null || !self::associateEarnsOn($order)) {
+        // D-410 (24 Nov 2026): every order of an associate's client is priced for the associate (every order earns),
+        // unless the MD set "associate: no" on it or the associate takes no commission.
+        if ($associate === null || !self::associateSells($order, $associate)) {
             return $ctx;
         }
         $orderId = isset($order['id']) ? (int) $order['id'] : null;
@@ -119,24 +121,29 @@ final class OrderLinePricing
             $ctx['level'] = $level;
             $ctx['key'] = 'L' . (int) $level['id'];
             $ctx['label'] = (string) $associate['name'] . ' (' . PricingService::levelLabel($level) . ')';
+            // D-410: the % the client's price includes — fixed on the order with its PI, else from the setting.
+            $ctx['included_pct'] = isset($order['associate_included_pct']) && $order['associate_included_pct'] !== null && !empty($order['associate_level_fixed_at'])
+                ? (float) $order['associate_included_pct'] : AssociateRules::includedPct($associate, $level);
         }
         return $ctx;
     }
 
-    /** The order is one the client's associate earns on: forced "yes", or within the first-order window and not forced "no". */
-    private static function associateEarnsOn(array $order): bool
+    /** D-410: the client's associate sells this order — not set to "associate: no", and the associate takes commission. */
+    private static function associateSells(array $order, array $associate): bool
     {
-        $mode = 'auto';
-        if (!empty($order['id'])) {
-            $mode = (string) (IncentiveRepository::forOrder((int) $order['id'])['associate_mode'] ?? 'auto');
-        }
-        if ($mode === 'no') {
+        if ((int) ($associate['no_commission'] ?? 0) === 1) {
             return false;
         }
-        if ($mode === 'yes' || empty($order['id'])) {
-            return true;
+        if (!empty($order['id'])) {
+            $mode = (string) (IncentiveRepository::forOrder((int) $order['id'])['associate_mode'] ?? 'auto');
+            if ($mode === 'no') {
+                return false;
+            }
+            if ($mode !== 'yes' && !AssociateRules::newRules($order) && !IncentiveService::withinFirstTenDays($order)) {
+                return false; // a PI issued before the cut-over date keeps the old rule (2A)
+            }
         }
-        return IncentiveService::withinFirstTenDays($order);
+        return true;
     }
 
     /**
@@ -183,7 +190,9 @@ final class OrderLinePricing
         $floor = $b['staff_floor'];
         $quote = $b['staff_quote'];
         if ($ctx['level'] !== null) {
-            $a = PricingEngine::associate($b['raw'], (string) $ctx['level']['kind'], (float) $ctx['level']['value']);
+            $a = ($ctx['included_pct'] ?? null) !== null && ($ctx['level']['kind'] ?? 'pct') === 'pct'
+                ? PricingEngine::associateIncluded($b['raw'], (float) $ctx['level']['value'], (float) $ctx['included_pct'])
+                : PricingEngine::associate($b['raw'], (string) $ctx['level']['kind'], (float) $ctx['level']['value']);
             $floor = $a['floor'];
             $quote = $a['quote'];
         }

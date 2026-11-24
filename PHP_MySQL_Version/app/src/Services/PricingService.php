@@ -41,6 +41,9 @@ final class PricingService
         'container_max_t' => '27.00',
         'container_cbm' => '8.00',
         'thick_k_factor' => '40',
+        // D-410 (24 Nov 2026): the % of an associate's commission included in the client's price (fixed 5 % by default).
+        'associate_price_rule' => 'fixed',
+        'associate_price_fixed_pct' => '5.00',
     ] + MarineInsurance::DEFAULTS; // D-402 (21 Nov 2026): marine insurance on CIF orders
 
     /** Labels for the settings page and the audit log. */
@@ -63,6 +66,8 @@ final class PricingService
         'container_max_t' => 'Container max tonnes',
         'container_cbm' => 'Container CBM',
         'thick_k_factor' => 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
+        'associate_price_rule' => "Commission included in the client's price",
+        'associate_price_fixed_pct' => "Fixed % included in the client's price",
     ] + MarineInsurance::LABELS; // D-402
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -168,6 +173,18 @@ final class PricingService
                 // Stored as before: 2.70 / 27.00 / 8.00 / 40 (more decimals only when typed).
                 $typed = str_contains($v, '.') ? strlen(rtrim(substr($v, strpos($v, '.') + 1), '0')) : 0;
                 $values[$key] = number_format((float) $v, max($key === 'thick_k_factor' ? 0 : 2, $typed), '.', '');
+            }
+        }
+        // D-410 (24 Nov 2026): the % of the associate's commission in the client's price (only when the form carries it).
+        if (array_key_exists('associate_price_rule', $post)) {
+            $rule = (string) $post['associate_price_rule'];
+            if (!isset(AssociateRules::PRICE_RULES[$rule])) {
+                $errors[] = "Choose what the client's price includes for associates: starting rate, a fixed % or ladder rate.";
+                $rule = 'fixed';
+            }
+            $values['associate_price_rule'] = $rule;
+            if ($rule === 'fixed') {
+                $values['associate_price_fixed_pct'] = $num('associate_price_fixed_pct', 0, 50, false, false, 2);
             }
         }
         // D-402 (21 Nov 2026): marine insurance on CIF orders (only when the form carries the fields).
@@ -415,7 +432,7 @@ final class PricingService
         ]);
         $out['build'] = $build;
         foreach ($levels ?? PricingRepository::levels(true) as $l) {
-            $a = PricingEngine::associate($build['raw'], (string) $l['kind'], (float) $l['value']);
+            $a = AssociateRules::levelPrices($build['raw'], $l); // D-410: the company setting decides what the client's price includes
             $out['levels'][] = ['id' => (int) $l['id'], 'name' => (string) $l['name'], 'label' => self::levelLabel($l)] + $a;
             if ($out['lowest'] === null || $a['floor'] < $out['lowest']['floor']) {
                 $out['lowest'] = end($out['levels']);

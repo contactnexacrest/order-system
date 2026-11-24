@@ -15,7 +15,7 @@ clients and those clients' orders.
 | Their clients: registered, protected until, first order, the 10-day window | Unit prices, discounts, costs, profit, margin |
 | Each order: reference, products (description only), product FOB value, stage in plain words (Quotation · Order confirmed · In production · Shipping · Shipped; Cancelled / Did not go ahead) — the same words the buyer sees in the client portal (D-330) | Suppliers, purchase prices, freight |
 | Whether the buyer has paid in full — yes / no, no amounts | CAFIN, the annexure, any PI / CI / BL or other document |
-| Their commission per order: rate (personal or standard), amount, and state (waiting for full payment · earned · on hold · paid with date, TDS and bank reference); repeat orders marked "no commission" | The buyer's payment amounts and bank references |
+| Their commission per order: rate (personal or standard), amount, and state (waiting for full payment · earned · on hold · paid with date, TDS and bank reference); orders below ₹5,00,000 (except the client's first) marked "no commission" | The buyer's payment amounts and bank references |
 | Their statement (CSV and printable), Form 16A / 15CA / 15CB uploaded by NexaCrest, their agreement, profile, bank details masked (••••1234) | Other associates and their clients, staff notes, team incentives |
 
 ## Staff permissions
@@ -142,18 +142,24 @@ was issued.
 
 **Who sees what.** Staff with **See associate commission rules** (Admin, MD,
 ED, Finance Director, Finance Manager) see the rule (who set it, when, why),
-"Next order earns 5% — Level 2", "Orders counted so far 3 of 5 — 2 more
-counting orders to reach 7%", the step boxes and the counting rule ("An
-order counts once the buyer has paid in full and its invoiced FOB value is
-₹5,00,000 or more"). Other staff see **"Set by the MD."** The associate sees
+"Next order earns 5% — Level 2", "Ladder steps so far 3 of 5 — 2 more
+to reach 7%", the step boxes, the counting rule (D-410: "An order of
+₹5,00,000 or more counts as one ladder step once its advance has cleared …
+Orders of the same client within 15 days of the first order of the group
+are one step"), the "Ladder step" column on the orders table, **Commission
+in the client's price** (company setting or this associate's own choice —
+the MD changes it under "Change for this associate", with a reason), the
+**Right now** line and **Paid from our margin so far** (this financial
+year). Other staff see **"Set by the MD."** The associate sees
 **only their current %** — "5% of the FOB value of each order from the
 clients you introduced" — with **How it works** (1. fixed when we send the
 Proforma Invoice; 2. worked out on the FOB value on the Commercial Invoice;
 3. yours when the buyer has paid in full; 4. paid N days later in our
 monthly payment on the last day of the month), the % on each order, and
-these statuses: "Not earned yet — buyer still paying" / "Earned — will be
-paid on <date>" / "Paid on <date> (ref)" / "On hold — a buyer claim on this
-order is open". Never a level name, the ladder, counts or the next step.
+these statuses (D-410): "Not earned yet — buyer still paying" (no date) /
+🔵 "Will be paid to you on <date>" / 🟢 "Paid to you on <date> · bank ref
+<UTR>" / "On hold — a buyer claim on this order is open". Their profile
+shows their **associate number** (A + 4 digits, e.g. A0119). Never a level name, the ladder, counts or the next step.
 
 **The level is fixed on the order when its Proforma Invoice is issued**
 (the order shows "Level 2 — 5%" and "fixed at PI on …"). Until then the
@@ -235,19 +241,31 @@ change it.
 Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
 (R8-N05), the per-associate rung rates and pro rata (AS-9).
 
-- **Which orders**: the client's first orders — everything ordered in the
-  **10 days from the client's first PO received** (chapter 20). After that
-  only the MD can force "associate: yes" on an order, with a written reason
-  (10–300 characters); it is recorded in the audit log.
+- **Which orders** (D-410, 24 Nov 2026): **every order** of the client while
+  the agreement is active, when the value of the goods (FOB) is at least
+  **₹5,00,000**; the client's **first order always earns**, whatever its
+  size. The MD can still set "associate: yes" (this also overrides the
+  minimum) or "associate: no" on an order, with a written reason (10–300
+  characters); it is recorded in the audit log. Orders whose Proforma
+  Invoice was issued before the change keep the old rule (the client's
+  first 10 days).
 - **Basis**: the **final invoiced FOB of the goods**, line by line
   (services and charges excluded). A line the MD approved **below the
   floor** earns **0**. Only an **agreed discount** or a **settled buyer
   claim** lowers the basis; bank charges never do.
 - **Level**: the level fixed on the order at the PI. On the ladder the step
-  is set by the associate's **counting orders**: fully paid orders whose
-  invoiced FOB on in-range lines is at least the threshold (default
-  ₹5 lakh). An order below the threshold earns the current step but does
-  not count towards the next.
+  is set by the associate's **ladder steps**: an order of ₹5 lakh or more
+  counts once its **advance has cleared** (LC orders: once the LC is
+  confirmed; no advance and no LC: once paid in full). Orders of the same
+  client within **15 days** (Associates › Settings, 7–45, reason needed) of
+  the first order of the group are **one step** and share its level. A
+  cancelled order loses its step.
+- **Price** (D-410): the client's price includes a set % of commission
+  (Admin › Pricing › Settings › "Associate commission in the client's
+  price": Starting rate / A fixed %, default 5 % / Ladder rate). An
+  associate above that % is paid the rest from our margin (the MD and ED
+  see a margin box on the order page); below it, the associate has room to
+  negotiate. Staff prices do not change.
 - **Full payment only**: earned only when the buyer has paid the order in
   full. A shortfall cleared as "not paid by the buyer" means **no
   commission**; there is no pro rata. When a manager clears a short payment

@@ -3055,6 +3055,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-20a-quick-quote-prospect
 mysql -u <user> -p <database> < docs/migrations/2026-11-20b-merchant-trade-executive-role.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-21a-marine-insurance.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-22a-insurance-basis.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-24a-associate-rules.sql
 ```
 
 The files of 18 Nov, 20 Nov (20a), 21 Nov and 22 Nov that add columns are `PLAIN ALTER (owner D-371)`: a second run only stops with "#1060 Duplicate column

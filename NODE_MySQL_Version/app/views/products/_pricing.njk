@@ -34,13 +34,19 @@
       <tr><td>Staff quote price (+ {{ pricingFmt.pct(E.buffer_pct) }} buffer)</td><td class="num"><strong>USD {{ B.staff_quote | money }}</strong></td></tr>
     </table>
     {% if P.levels.length %}
-      <h3>Associates <small class="muted">(floor = staff floor ÷ (1 − commission %), or + a fixed amount)</small></h3>
-      <table class="list" style="max-width:720px">
-        <tr><th>Commission level</th><th>Commission</th><th class="num">Associate lowest (USD)</th><th class="num">Quote price (USD)</th></tr>
+      {% set __rule = P.price_rule or { rule: 'fixed', pct: 5 } %}{# D-410 #}
+      <h3>Associates <small class="muted">(lowest and quote price per ladder level)</small></h3>
+      <p class="small" data-testid="associate-price-rule">Commission in the client's price: <strong>{{ associatePriceRules.labels[__rule.rule] }}{% if __rule.pct !== null %} — {{ pricingFmt.pct(__rule.pct) }}{% endif %}</strong> (company setting) — <a href="/pricing/settings#associate-price-rule">change in Pricing settings</a></p>
+      <table class="list" style="max-width:900px">
+        <tr><th>Ladder level</th><th>Associate's commission</th><th class="num">Associate lowest (USD)</th><th class="num">Client quote price (USD)</th><th>Paid from our margin</th></tr>
         {% for l in P.levels %}
-          <tr><td>{{ l.name }}</td><td>{{ l.label }}</td><td class="num">{{ l.floor | money }}</td><td class="num">{{ l.quote | money }}</td></tr>
+          {% set __lp = (l.label | string).match(r/^([\d.]+)%/) %}
+          {% set __room = ((l.included_pct | float) - (__lp[1] | float)) if (l.included_pct !== null and l.included_pct !== undefined and __lp and (l.included_pct | float) > (__lp[1] | float)) else 0 %}
+          <tr><td>{{ l.name }}</td><td>{{ l.label }}</td><td class="num">{{ l.floor | money }}</td><td class="num"><strong>{{ l.quote | money }}</strong></td>
+            <td>{% if (l.margin_pct | float) > 0 %}{{ pricingFmt.pct(l.margin_pct) }}{% elif __room > 0 %}— ({{ pricingFmt.pct(__room) }} room to negotiate){% else %}—{% endif %}</td></tr>
         {% endfor %}
       </table>
+      <p class="help-line">&#8505; {{ associatePriceRules.text[__rule.rule] }} Staff see only the staff floor and quote. An associate sees only their own quote and lowest price (Get price).</p>
     {% endif %}
   {% endif %}
 

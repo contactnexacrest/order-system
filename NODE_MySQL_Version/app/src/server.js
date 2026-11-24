@@ -244,6 +244,8 @@ njkEnv.addGlobal('salesTargetLostCategories', require('./services/salesTargetSer
 njkEnv.addFilter('targetNum', (v) => require('./services/salesTargetService').num1(v));
 njkEnv.addFilter('inr', (v) => require('./helpers/moneyFormat').indian(Number(v) || 0));
 njkEnv.addFilter('docAmount', (v, currency) => require('./helpers/moneyFormat').amount(Number(v) || 0, currency));
+// D-410 (24 Nov 2026): the choices for what the client's price includes, with their owner-approved texts.
+njkEnv.addGlobal('associatePriceRules', { labels: require('./services/associateRules').PRICE_RULES, text: require('./services/associateRules').PRICE_RULE_TEXT });
 njkEnv.addGlobal('pricingFmt', {
   pct: (v) => require('./services/pricingService').pct(v),
   modeLabel: (m, v) => require('./services/pricingService').modeLabel(m, v),
@@ -1303,6 +1305,8 @@ app.post('/associates/:id/bank/:bankId/reject', requireAuth, requirePermission('
 app.post('/associates/:id/bank/:bankId/remind', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.remindBank));
 app.get('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), asyncHandler(associateAdminController.commissionRule));
 app.post('/associates/:id/commission-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.saveCommissionRule));
+// D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
+app.post('/associates/:id/price-rule', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(associateAdminController.savePriceRule));
 app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
 // Owner decision D-252 (A3): accept / reject one KYC document.

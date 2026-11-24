@@ -19,8 +19,9 @@ describe('Associate statement shows no counts row in the portal (D-393)', () => 
   it('shows the ladder row to staff only', () => {
     const m = src.match(/\{% if not c\.portal %\}\s*<tr><th>Counts toward the ladder<\/th>([\s\S]*?)<\/tr>\s*\{% endif %\}/);
     expect(m).not.toBeNull();
-    expect(m[1]).toContain('yes (counting order no. {{ c.counting_number }})');
-    expect(m[1]).toContain('no — under ₹{{ c.threshold_inr | money0 }} within range');
+    // D-410 (24 Nov 2026): the row shows the ladder status line worked out by associateRules.stepText().
+    expect(m[1]).toContain("{{ c.ladder_text or '—' }}");
+    expect(m[1]).toContain('₹{{ c.threshold_inr | money0 }} or more counts as one step');
     expect(src.match(/Counts toward/g)).toHaveLength(1);
   });
 });

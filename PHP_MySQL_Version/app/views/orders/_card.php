@@ -32,7 +32,11 @@ $amount = $domStage !== null
         <?php $__prospect = \App\Controllers\OrderController::isProspectOrder($o); // D-394 (mockups 4/5) ?>
         <?php if ($__prospect): ?><span class="tag tag-gold" data-testid="prospect-badge">Prospect</span><?php endif; ?>
       </div>
-      <?php if (!isset($sees['client']) || $sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div><?php endif; ?>
+      <?php if (!isset($sees['client']) || $sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div>
+        <?php // D-410 / M13 (owner 24 Nov 2026): the contact person and e-mail on two short lines, same visibility as the client name. ?>
+        <?php if (trim((string) ($o['contact_person'] ?? '')) !== ''): ?><div class="entity-card-contact small muted" data-card-contact><?= htmlspecialchars((string) $o['contact_person']) ?></div><?php endif; ?>
+        <?php if (trim((string) ($o['client_email'] ?? '')) !== ''): ?><div class="entity-card-contact small muted" data-card-email><?= htmlspecialchars((string) $o['client_email']) ?></div><?php endif; ?>
+      <?php endif; ?>
       <?php if ($__prospect): ?><div class="small prospect-expiry<?= \App\Services\ProspectService::isUrgent($o['client_prospect_expires_on'] ?? null) ? ' prospect-expiry-urgent' : '' ?>"><?= htmlspecialchars(\App\Services\ProspectService::orderExpiryLine($o['client_prospect_expires_on'] ?? null)) ?></div><?php endif; ?>
       <div>
         <div class="mini-stage-track">

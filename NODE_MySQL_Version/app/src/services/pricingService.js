@@ -38,6 +38,9 @@ const DEFAULTS = {
   container_max_t: '27.00',
   container_cbm: '8.00',
   thick_k_factor: '40',
+  // D-410 (24 Nov 2026): the % of an associate's commission included in the client's price (fixed 5 % by default).
+  associate_price_rule: 'fixed',
+  associate_price_fixed_pct: '5.00',
   ...marineInsurance.DEFAULTS, // D-402 (21 Nov 2026): marine insurance on CIF orders
 };
 
@@ -60,6 +63,8 @@ const LABELS = {
   container_max_t: 'Container max tonnes',
   container_cbm: 'Container CBM',
   thick_k_factor: 'Thickness factor (50 mm and above per CBM = base per SQM × this)',
+  associate_price_rule: "Commission included in the client's price",
+  associate_price_fixed_pct: "Fixed % included in the client's price",
   ...marineInsurance.LABELS, // D-402
 };
 
@@ -179,6 +184,16 @@ function readSettingsForm(post) {
       const typed = v.includes('.') ? v.slice(v.indexOf('.') + 1).replace(/0+$/, '').length : 0;
       values[key] = Number(v).toFixed(Math.max(key === 'thick_k_factor' ? 0 : 2, typed));
     }
+  }
+  // D-410 (24 Nov 2026): the % of the associate's commission in the client's price (only when the form carries it).
+  if (Object.prototype.hasOwnProperty.call(post, 'associate_price_rule')) {
+    let rule = String(post.associate_price_rule);
+    if (!require('./associateRules').PRICE_RULES[rule]) {
+      errors.push("Choose what the client's price includes for associates: starting rate, a fixed % or ladder rate.");
+      rule = 'fixed';
+    }
+    values.associate_price_rule = rule;
+    if (rule === 'fixed') values.associate_price_fixed_pct = num('associate_price_fixed_pct', 0, 50, false, false, 2);
   }
   // D-402 (21 Nov 2026): marine insurance on CIF orders (only when the form carries the fields).
   if (Object.prototype.hasOwnProperty.call(post, 'insurance_rate_pct')) {
@@ -377,11 +392,12 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   });
   out.build = build;
   for (const l of levels || (await pricingRepository.levels(true))) {
-    const a = pricingEngine.associate(build.raw, String(l.kind), Number(l.value));
+    const a = await require('./associateRules').levelPrices(build.raw, l); // D-410: the company setting decides what the client's price includes
     const row = { id: Number(l.id), name: String(l.name), label: levelLabel(l), ...a };
     out.levels.push(row);
     if (out.lowest === null || a.floor < out.lowest.floor) out.lowest = row;
   }
+  out.price_rule = await require('./associateRules').companyPriceRule(); // D-410: shown above the associates table
   return out;
 }
 

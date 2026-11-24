@@ -255,11 +255,11 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         $this->asUser($this->createTestUser('Finance Manager'));
         $page = $this->call('GET', "/associates/{$a['id']}")['body'];
         self::assertStringContainsString('data-commission-rule', $page);
-        self::assertStringContainsString('Orders counted so far', $page);
+        self::assertStringContainsString('Ladder steps so far', $page);
         $this->asUser($this->createTestUser('Export Executive'));
         $page = $this->call('GET', "/associates/{$a['id']}")['body'];
         self::assertStringContainsString('Set by the MD.', $page);
-        self::assertStringNotContainsString('Orders counted so far', $page);
+        self::assertStringNotContainsString('Ladder steps so far', $page);
 
         // The associate: only the current %, never levels, ladder or counts.
         [$level] = AssociateCommission::levelForAssociate($a, null);
@@ -278,8 +278,8 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
 
         // The owner's statuses.
         self::assertSame('Not earned yet — buyer still paying', AssociatePortalRepository::NOT_EARNED_LABEL);
-        self::assertSame('Paid on 30 Nov 2026 (SWIFT FT2611300001)', AssociatePortalRepository::payoutLabel(['status' => 'paid', 'paid_on' => '2026-11-30', 'paid_reference' => 'SWIFT FT2611300001'], false));
-        self::assertSame('Earned — will be paid on 31 Dec 2026', AssociatePortalRepository::payoutLabel(['status' => 'due', 'due_on' => '2026-12-28', 'payout_run_on' => '2026-12-31'], false));
+        self::assertSame('Paid to you on 30 Nov 2026 · bank ref SWIFT FT2611300001', AssociatePortalRepository::payoutLabel(['status' => 'paid', 'paid_on' => '2026-11-30', 'paid_reference' => 'SWIFT FT2611300001'], false));
+        self::assertSame('Will be paid to you on 31 Dec 2026', AssociatePortalRepository::payoutLabel(['status' => 'due', 'due_on' => '2026-12-28', 'payout_run_on' => '2026-12-31'], false));
         self::assertSame('On hold — a buyer claim on this order is open', AssociatePortalRepository::payoutLabel(['status' => 'due', 'payout_run_on' => '2026-12-31'], true));
         self::assertSame('On hold — a buyer claim on this order is open', AssociatePortalRepository::payoutLabel(['status' => 'held', 'hold_reason' => \App\Services\AssociatePayoutService::CLAIM_HOLD_REASON], false));
     }

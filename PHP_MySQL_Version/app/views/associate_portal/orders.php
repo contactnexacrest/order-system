@@ -1,6 +1,7 @@
 <div class="card page-wide">
   <h1>Orders of my clients</h1>
-  <p class="muted">You earn commission on a client's first orders: everything they order within 10 days of their first purchase order. You earn it when the buyer has paid the order in full, not when they pay only the advance. Later repeat orders do not earn commission.</p>
+  <p class="muted" data-orders-intro>You earn commission on every order of the clients you introduced, while your agreement is active, when the value of the goods (FOB) is ₹<?= number_format(\App\Services\AssociateRules::minOrderInr(), 0) ?> or more — a client's first order always earns, whatever its size. You earn it when the buyer has paid the order in full, not when they pay only the advance. <span class="help" title="Not earned yet — buyer still paying: the buyer has not paid in full yet. Will be paid to you on <date>: the buyer has paid in full; this is the payout date. Paid to you on <date> · bank ref: we have paid it; the bank reference is on your bank statement.">ℹ</span></p>
+  <p class="small" data-badge-legend><span class="badge badge-pending">Not earned yet — buyer still paying</span> <span class="badge badge-tobepaid">🔵 To be paid</span> <span class="badge badge-active">🟢 Paid</span></p>
   <table class="list">
     <?php $__fob = !empty($access['fob_value']); $__com = !empty($access['commission']); // D-261 ?>
     <tr><th>Order</th><th>Client</th><th>Products</th><?php if ($__fob): ?><th>Value of the goods (FOB, without freight)</th><?php endif; ?><th>Stage</th><th>Buyer paid in full</th><?php if ($__com): ?><th>Commission</th><?php endif; ?></tr>

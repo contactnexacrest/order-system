@@ -71,6 +71,7 @@ $__rule = $__c['rule'];
       </table>
     <?php endif; ?>
     <?php if (!empty($__c['associate'])): $c = $__c['associate']; ?>
+      <?php require __DIR__ . '/_associate_margin.php'; ?>
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary><?php require __DIR__ . '/../associate_portal/_statement.php'; ?></details>
     <?php endif; ?>
     <?php if (!empty($incentiveCanEdit) && $__state === 'locked'): ?>
@@ -101,6 +102,7 @@ $__rule = $__c['rule'];
       <p class="muted small">Lines the MD approved below the floor lowered this order's profit (USD <?= number_format($__c['incentive_cut_usd'], 2) ?> of incentive reserve on the price check). The incentive is a % of the actual profit, so that is already counted — it is not taken off a second time.</p>
     <?php endif; ?>
     <?php if ($__c['associate'] !== null): $c = $__c['associate']; ?>
+      <?php require __DIR__ . '/_associate_margin.php'; ?>
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary><?php require __DIR__ . '/../associate_portal/_statement.php'; ?></details>
     <?php endif; ?>
 

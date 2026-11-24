@@ -27,7 +27,7 @@
     {# D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. #}
     {# D-393 (owner 19 Nov 2026, following D-292): the associate never sees whether an order counts toward a level — staff only. #}
     {% if not c.portal %}
-    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}we will know when the buyer has paid in full{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+    <tr><th>Counts toward the ladder</th><td data-ladder-step>{{ c.ladder_text or '—' }} <span class="help" title="D-410: an order of ₹{{ c.threshold_inr | money0 }} or more counts as one step once its advance has cleared (LC: LC confirmed; no advance and no LC: paid in full). Same client within the group days = one step.">ℹ</span></td></tr>
     {% endif %}
   </table>
   <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>

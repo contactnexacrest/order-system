@@ -291,7 +291,10 @@ describe('Team incentive program and associates', () => {
 
     const later = await paidOrder(client);
     await db.execute('UPDATE orders SET created_at = DATE_ADD(created_at, INTERVAL 15 DAY) WHERE id = :id', { id: later });
-    expect((await incentiveService.calculate(later)).associate).toBeNull(); // after day 10 it is a repeat order: no commission
+    // D-410 (24 Nov 2026): every order earns, but this one (USD 4,500, about ₹4 lakh) is below the ₹5,00,000 minimum and is not the client's first.
+    const repeat = (await incentiveService.calculate(later)).associate;
+    expect(repeat.below_min).toBe(true); // below the minimum order value
+    expect(repeat.amount_fc).toBe(0); // so no commission
     await incentiveRepository.saveOrder(later, { associate_mode: 'yes' }, admin);
     expect((await incentiveService.calculate(later)).associate.amount_fc).toBe(90); // forced on: commission again
   });

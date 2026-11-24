@@ -6307,6 +6307,9 @@ ALTER TABLE catalog_products ADD COLUMN weight_t_per_cbm DECIMAL(6,3) NULL;
 ALTER TABLE product_categories ADD COLUMN insurance_rate_pct DECIMAL(7,4) NULL, ADD COLUMN insurance_cover_wording VARCHAR(80) NULL;
 -- D-405 (22 Nov 2026): what a CIF order's insurance was worked out from (FOB | freight | categories).
 ALTER TABLE orders ADD COLUMN insurance_basis VARCHAR(255) NULL;
+-- D-410 (24 Nov 2026): the associate's own choice of what the client's price includes, and the % fixed on an order at its PI.
+ALTER TABLE associates ADD COLUMN price_rule_override VARCHAR(10) NULL, ADD COLUMN price_rule_fixed_pct DECIMAL(5,2) NULL;
+ALTER TABLE orders ADD COLUMN associate_included_pct DECIMAL(5,2) NULL;
 -- Owner decisions 11 Nov 2026, points 6 and 7 (D-290): KYC. The ID document's
 -- type (Passport / National ID card / Residence permit / Driving licence) is
 -- kept with the document; ID proof and Address proof are separate required

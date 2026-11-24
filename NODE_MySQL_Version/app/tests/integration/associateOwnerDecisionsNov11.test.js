@@ -208,10 +208,10 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     const a = await associate();
     let page = (await (await staff(await user('Finance Manager'))).get(`/associates/${a.id}`)).text;
     expect(page).toContain('data-commission-rule');
-    expect(page).toContain('Orders counted so far');
+    expect(page).toContain('Ladder steps so far');
     page = (await (await staff(await user('Export Executive'))).get(`/associates/${a.id}`)).text;
     expect(page).toContain('Set by the MD.');
-    expect(page).not.toContain('Orders counted so far');
+    expect(page).not.toContain('Ladder steps so far');
 
     const [level] = await associateCommission.levelForAssociate(a, null);
     const agent = await portal(a);
@@ -227,8 +227,8 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     expect(commission).toContain('<th>Your %</th>');
 
     expect(associatePortalRepository.NOT_EARNED_LABEL).toBe('Not earned yet — buyer still paying');
-    expect(associatePortalRepository.payoutLabel({ status: 'paid', paid_on: '2026-11-30', paid_reference: 'SWIFT FT2611300001' }, false)).toBe('Paid on 30 Nov 2026 (SWIFT FT2611300001)');
-    expect(associatePortalRepository.payoutLabel({ status: 'due', due_on: '2026-12-28', payout_run_on: '2026-12-31' }, false)).toBe('Earned — will be paid on 31 Dec 2026');
+    expect(associatePortalRepository.payoutLabel({ status: 'paid', paid_on: '2026-11-30', paid_reference: 'SWIFT FT2611300001' }, false)).toBe('Paid to you on 30 Nov 2026 · bank ref SWIFT FT2611300001');
+    expect(associatePortalRepository.payoutLabel({ status: 'due', due_on: '2026-12-28', payout_run_on: '2026-12-31' }, false)).toBe('Will be paid to you on 31 Dec 2026');
     expect(associatePortalRepository.payoutLabel({ status: 'due', payout_run_on: '2026-12-31' }, true)).toBe('On hold — a buyer claim on this order is open');
     expect(associatePortalRepository.payoutLabel({ status: 'held', hold_reason: associatePayoutService.CLAIM_HOLD_REASON }, false)).toBe('On hold — a buyer claim on this order is open');
   });

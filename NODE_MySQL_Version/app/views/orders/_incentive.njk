@@ -59,6 +59,7 @@
       </table>
     {% endif %}
     {% if calc.associate %}{% set c = calc.associate %}
+      {% include "orders/_associate_margin.njk" %}
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary>{% include "associate_portal/_statement.njk" %}</details>
     {% endif %}
     {% if incentiveCanEdit and st == 'locked' %}
@@ -89,6 +90,7 @@
       <p class="muted small">Lines the MD approved below the floor lowered this order's profit (USD {{ calc.incentive_cut_usd | money }} of incentive reserve on the price check). The incentive is a % of the actual profit, so that is already counted — it is not taken off a second time.</p>
     {% endif %}
     {% if calc.associate %}{% set c = calc.associate %}
+      {% include "orders/_associate_margin.njk" %}
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary>{% include "associate_portal/_statement.njk" %}</details>
     {% endif %}
 

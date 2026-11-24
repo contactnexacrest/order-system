@@ -34,7 +34,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <tr><th>When we pay</th><td><?= $c['due_on'] ? 'due ' . $__d($c['due_on']) . ', paid on ' . $__d($c['payout_run_on']) : 'after the buyer has paid in full' ?><?= $c['claim_hold'] ? ' — <b>on hold while the buyer has an open claim</b>' : '' ?></td></tr>
     <?php // D-393 (owner 19 Nov 2026, following D-292): the associate never sees whether an order counts toward a level — staff only. ?>
     <?php if (empty($c['portal'])): ?>
-    <tr><th>Counts toward the ladder</th><td><?= $c['state'] !== 'paid' ? 'we will know when the buyer has paid in full' : ($c['counts'] ? 'yes (counting order no. ' . (int) $c['counting_number'] . ')' : 'no — under ₹' . number_format((float) $c['threshold_inr'], 0) . ' within range') ?></td></tr>
+    <tr><th>Counts toward the ladder</th><td data-ladder-step><?= htmlspecialchars((string) ($c['ladder_text'] ?? '—')) ?> <span class="help" title="D-410: an order of ₹<?= number_format((float) $c['threshold_inr'], 0) ?> or more counts as one step once its advance has cleared (LC: LC confirmed; no advance and no LC: paid in full). Same client within the group days = one step.">ℹ</span></td></tr>
     <?php endif; ?>
   </table>
   <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>

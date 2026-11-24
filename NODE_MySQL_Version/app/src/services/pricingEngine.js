@@ -77,4 +77,18 @@ function associate(raw, kind, value) {
   return { floor: round2(floor), quote: round2(floor * (1 + raw.buffer_pct / 100)) };
 }
 
-module.exports = { build, associate, round2 };
+/**
+ * D-410 (owner 24 Nov 2026): an associate's prices when the client's price includes a set % of commission.
+ * Quote: staff floor ÷ (1 − included %) × (1 + buffer). Lowest: staff floor ÷ (1 − min(rate, included %)).
+ * Above the included % the rest comes from NexaCrest's margin; the price never goes below the staff floor.
+ */
+function associateIncluded(raw, ratePct, includedPct) {
+  for (const v of [ratePct, includedPct]) {
+    if (v < 0 || v >= 100) throw new Error('A commission % must be at least 0 and below 100.');
+  }
+  const quoteFloor = raw.staff_floor / (1 - includedPct / 100);
+  const floor = raw.staff_floor / (1 - Math.min(ratePct, includedPct) / 100);
+  return { floor: round2(floor), quote: round2(quoteFloor * (1 + raw.buffer_pct / 100)) };
+}
+
+module.exports = { build, associate, associateIncluded, round2 };

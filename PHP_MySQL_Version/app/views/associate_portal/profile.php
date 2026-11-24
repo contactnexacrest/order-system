@@ -12,6 +12,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
   <h1>My profile</h1>
   <table class="kv">
     <tr><th>Name</th><td><?= htmlspecialchars((string) $me['name']) ?></td></tr>
+    <tr><th>Associate number</th><td data-associate-no>A<?= sprintf('%04d', (int) $me['id']) ?> <small class="muted">— shown on your payment advices</small></td></tr>
     <tr><th>E-mail (login)</th><td><?= htmlspecialchars((string) $me['email']) ?> <small class="muted">— ask NexaCrest to change it</small></td></tr>
     <tr><th>Agreement</th><td>signed <?= $__d($me['agreement_signed_on']) ?>, ends <?= $__d($me['agreement_ends_on']) ?><?php if (!empty($me['agreement_file_id'])): ?> · <a href="/associate/agreement">Download my agreement</a><?php endif; ?></td></tr>
     <tr><th>My commission</th><td>

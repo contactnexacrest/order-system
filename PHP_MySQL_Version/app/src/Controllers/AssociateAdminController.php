@@ -310,6 +310,10 @@ final class AssociateAdminController
             'canChangeLink' => AssociateService::canChangeLink(self::user()),
             // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
             'rule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateCommission::ruleProgress($a) : null,
+            // D-410: the price rule, what comes from the margin, and the ladder status per order (same permission as the rule).
+            'priceRule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::priceRuleFor($a) : null,
+            'rightNow' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::rightNow($a, \App\Services\AssociateCommission::levelForAssociate($a, null)[0]) : null,
+            'marginSoFar' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::marginSoFar((int) $a['id']) : null,
             'canPricing' => self::can('manage_pricing'),
             'clients' => AssociatePortalRepository::clients($id),
             'me' => self::user(),
@@ -362,6 +366,45 @@ final class AssociateAdminController
         $blank = ['from_order' => '', 'to_order' => '', 'level_id' => ''];
         View::render('associates/commission_rule', ['a' => $a, 'chosen' => $chosen, 'standard' => $standard, 'rows' => array_merge(array_map(static fn (array $s): array => $s, $rows), [$blank, $blank]),
             'levels' => \App\Repositories\PricingRepository::levels()], 'layout/base');
+    }
+
+    /** D-410: the associate's own choice of what the client's price includes (empty = the company setting). MD, with a reason. */
+    public function savePriceRule(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $back = '/associates/' . (int) $a['id'] . '#commission-rule';
+        $rule = (string) ($_POST['price_rule'] ?? '');
+        $reason = trim((string) ($_POST['price_rule_reason'] ?? ''));
+        if ($rule !== 'company' && !isset(\App\Services\AssociateRules::PRICE_RULES[$rule])) {
+            Flash::set('error', "Choose what this associate's client prices include.");
+            header('Location: ' . $back);
+            return;
+        }
+        $pct = null;
+        if ($rule === 'fixed') {
+            $v = trim((string) ($_POST['price_rule_fixed_pct'] ?? ''));
+            if (!preg_match('/^\d{1,2}(\.\d{1,2})?$/', $v) || (float) $v > 50) {
+                Flash::set('error', 'Enter the fixed % from 0 to 50, with at most 2 decimals.');
+                header('Location: ' . $back);
+                return;
+            }
+            $pct = number_format((float) $v, 2, '.', '');
+        }
+        if (mb_strlen($reason) < 10) {
+            Flash::set('error', 'Give the reason for the change (at least 10 characters) — it is kept in the Audit Log.');
+            header('Location: ' . $back);
+            return;
+        }
+        $before = (string) ($a['price_rule_override'] ?? '') === '' ? 'company setting' : $a['price_rule_override'] . ($a['price_rule_fixed_pct'] !== null ? ' ' . $a['price_rule_fixed_pct'] . '%' : '');
+        $after = $rule === 'company' ? 'company setting' : $rule . ($pct !== null ? ' ' . $pct . '%' : '');
+        \App\Config\Database::connection()->prepare('UPDATE associates SET price_rule_override = :r, price_rule_fixed_pct = :p WHERE id = :id')
+            ->execute(['r' => $rule === 'company' ? null : $rule, 'p' => $pct, 'id' => (int) $a['id']]);
+        \App\Repositories\AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_PRICE_RULE_CHANGED', 'associates', (int) $a['id'], 'price_rule_override', $before, $after . ' — reason: ' . $reason);
+        Flash::set('success', "Saved. New prices for this associate's clients follow it; orders with fixed prices keep theirs.");
+        header('Location: ' . $back);
     }
 
     public function saveCommissionRule(array $params): void
@@ -1133,6 +1176,22 @@ final class AssociateAdminController
                 header('Location: /associates/ladder');
                 return;
             }
+            // D-410: the group days (7–45); a change of the minimum or the days needs a reason (Audit Log).
+            $groupDays = filter_var($_POST['associate_group_days'] ?? \App\Services\AssociateRules::groupDays(), FILTER_VALIDATE_INT);
+            if ($groupDays === false || $groupDays < \App\Services\AssociateRules::GROUP_DAYS_MIN || $groupDays > \App\Services\AssociateRules::GROUP_DAYS_MAX) {
+                Flash::set('error', 'Enter the days for one ladder step as 7 to 45.');
+                header('Location: /associates/ladder');
+                return;
+            }
+            $ladderChanged = abs((float) ($current['associate_counting_threshold_inr'] ?? 500000) - (float) $threshold) > 0.004
+                || (int) ($current['associate_group_days'] ?? 15) !== $groupDays;
+            $ladderReason = trim((string) ($_POST['ladder_reason'] ?? ''));
+            if ($ladderChanged && (mb_strlen($ladderReason) < 10 || mb_strlen($ladderReason) > 300)) {
+                Flash::set('error', 'Give the reason for changing the minimum order value or the days (10 to 300 characters) — it is kept in the Audit Log.');
+                header('Location: /associates/ladder');
+                return;
+            }
+            $values['associate_group_days'] = (string) $groupDays;
             $values['associate_counting_threshold_inr'] = number_format($threshold, 2, '.', '');
             $values['associate_protection_months'] = (string) $months;
             $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
@@ -1161,7 +1220,8 @@ final class AssociateAdminController
             if ((string) ($before[$k] ?? '') !== $v) {
                 IncentiveRepository::setSetting($k, $v, (int) $user['id']);
                 AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, $k, $before[$k] ?? null, $v,
-                    in_array($k, ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'], true) ? (trim((string) ($_POST['payout_reason'] ?? '')) ?: null) : null);
+                    in_array($k, ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'], true) ? (trim((string) ($_POST['payout_reason'] ?? '')) ?: null)
+                        : (in_array($k, ['associate_counting_threshold_inr', 'associate_group_days'], true) ? (trim((string) ($_POST['ladder_reason'] ?? '')) ?: null) : null));
             }
         }
         Flash::set('success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');

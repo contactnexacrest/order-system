@@ -160,12 +160,15 @@ final class AssociatePortalRepository
         $order = OrderRepository::find((int) $o['id']) ?? [];
         $c = AssociateCommission::forOrder((int) $o['id'], $order);
         if ($c === null) {
-            return $none($repeat);
+            return $none(\App\Services\AssociateRules::newRules($order) ? 'No commission on this order' : $repeat);
         }
         // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
         $fullyPaidOn = IncentiveService::fullyPaidOn((int) $o['id']);
+        if (!empty($c['below_min'])) { // D-410: below the minimum order value (not the client's first order)
+            return $none(self::belowMinLabel());
+        }
         $label = $fullyPaidOn !== null
-            ? 'Earned — will be paid on ' . \App\Helpers\Dates::short(AssociateCommission::payoutRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
+            ? 'Will be paid to you on ' . \App\Helpers\Dates::short(AssociateCommission::payoutRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
             : self::NOT_EARNED_LABEL;
         return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
             'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),
@@ -184,17 +187,35 @@ final class AssociatePortalRepository
         $d = static fn ($v): string => \App\Helpers\Dates::short(substr((string) $v, 0, 10));
         $claimHeld = $p['status'] === 'held' && (string) ($p['hold_reason'] ?? '') === \App\Services\AssociatePayoutService::CLAIM_HOLD_REASON;
         return match (true) {
-            $p['status'] === 'paid' => 'Paid on ' . $d($p['paid_on']) . (!empty($p['paid_reference']) ? ' (' . $p['paid_reference'] . ')' : ''),
+            // D-410 (owner 24 Nov 2026): "Paid to you on <date> · bank ref <UTR>" / "Will be paid to you on <date>".
+            $p['status'] === 'paid' => 'Paid to you on ' . $d($p['paid_on']) . (!empty($p['paid_reference']) ? ' · bank ref ' . $p['paid_reference'] : ''),
             $claim || $claimHeld => self::CLAIM_LABEL,
             $p['status'] === 'held' => 'On hold' . (!empty($p['hold_reason']) ? ' — ' . $p['hold_reason'] : ''),
-            !empty($p['payout_run_on']) => 'Earned — will be paid on ' . $d($p['payout_run_on']),
-            default => 'Earned — will be paid in the ' . IncentiveService::monthLabel($incentiveMonth) . ' payout',
+            !empty($p['payout_run_on']) => 'Will be paid to you on ' . $d($p['payout_run_on']),
+            default => 'Will be paid to you in the ' . IncentiveService::monthLabel($incentiveMonth) . ' payout',
         };
     }
 
     /** D-292: the associate's commission statuses (exact wording, owner 11 Nov 2026). */
     public const NOT_EARNED_LABEL = 'Not earned yet — buyer still paying';
     public const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
+
+    /** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
+    public static function belowMinLabel(): string
+    {
+        return 'No commission — the value of the goods (FOB) is below ₹' . number_format(\App\Services\AssociateRules::minOrderInr(), 0) . ' (only the client\'s first order earns whatever its size)';
+    }
+
+    /** D-410: the status badge for a commission line — 'to_be_paid' (🔵), 'paid' (🟢), or null. */
+    public static function badge(array $cm): ?string
+    {
+        return match ($cm['state'] ?? '') {
+            'paid' => 'paid',
+            'earned' => 'to_be_paid',
+            'expected' => str_starts_with((string) $cm['label'], 'Will be paid') ? 'to_be_paid' : null,
+            default => null,
+        };
+    }
 
     /** D-292: the % fixed on an order, as the associate sees it ("5%"), or null when none is fixed yet. */
     public static function orderRateText(array $row): ?string

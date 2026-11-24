@@ -184,11 +184,13 @@ take-backs, Zoho bills — is chapter [24 Associates](./24-associates.md).
 Associates are outside people, in India or abroad, who introduce new
 clients under a signed Associate Agreement. Management keeps their register
 and links each client to the associate who introduced it. An associate is
-paid the agreement's rate on the client's first orders once the buyer has
-fully paid; nothing on repeat orders. Their payment appears on the Incentive
+paid the agreement's rate on every order of the client of ₹5,00,000 or
+more (the client's first order always) once the buyer has fully paid
+(D-410, 24 Nov 2026; chapter 24). Their payment appears on the Incentive
 Payouts list in the same incentive month.
 
-**The 10 days.** Everything from the client in the 10 days from the day
+**The 10 days (old rule).** Only for orders whose Proforma Invoice was
+issued before the D-410 change: everything from the client in the 10 days from the day
 the client's **first PO was received** (Day 1, recorded at Step 4d) counts
 as one order under the agreement: for a first PO received on 4 March, POs
 received up to 13 March (Day 10) are part of it, and a PO received on 14

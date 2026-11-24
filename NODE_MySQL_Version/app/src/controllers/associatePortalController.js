@@ -107,7 +107,9 @@ function totalsText(totals) {
 
 async function render(req, res, view, data = {}) {
   const a = await me(req);
-  res.renderView(`associate_portal/${view}`, { ...(await layoutData(req, a)), ...data }, LAYOUT);
+  // D-410: the minimum order value (orders intro) and the status badge helper, on every portal page.
+  res.renderView(`associate_portal/${view}`, { ...(await layoutData(req, a)), minOrderInr: await require('../services/associateRules').minOrderInr(),
+    badgeOf: associatePortalRepository.badge, ...data }, LAYOUT);
 }
 
 /** Q-R8-2: refuses a change by a suspended associate; true when refused (the redirect is sent). */

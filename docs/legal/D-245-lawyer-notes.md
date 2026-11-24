@@ -81,3 +81,15 @@ When an order is for a category other than Natural Stone, the QT, PI, OC, CI and
 - on the supplier PO: Conformity to Specification, and Traceability & Test Certificates
 
 Please review them before the first non-stone sale. The stone clauses are unchanged. The wording can be changed in Settings › Admin overrides without a code change.
+
+## 6. Associate agreement: new commission rules (D-410, 24 Nov 2026)
+
+The owner has changed how associates earn (owner-decisions register D-410). The Associate Agreement must be updated to match before new agreements are signed, and existing associates told in writing:
+
+1. **Which orders earn.** No longer only the client's orders in the first 10 days from the first PO (clause 4.1 today). Now every order of an introduced client earns while the agreement is active, when the value of the goods (FOB) is at least ₹5,00,000. The client's first order always earns, whatever its size.
+2. **Ladder steps.** An order of ₹5,00,000 or more counts as one step once the buyer's advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once paid in full). Orders of the same client within 15 days of the first order of the group are one step. NexaCrest may change the ₹ minimum and the 15 days (7–45) for orders whose Proforma Invoice is issued after the change. A cancelled order loses its step; earlier orders keep their %.
+3. **Payment.** Commission is due only after the buyer has paid in full, on the payout date. A refund to the buyer after the commission was paid does not take the commission back (as before); only the ladder step is removed.
+4. **Price.** The client's price includes a set % of commission chosen by NexaCrest; the associate's commission % is not changed by it. Please confirm no clause promises the associate a say in the client's price.
+5. **Transition.** Orders whose Proforma Invoice was issued before the change keep the old 10-day rule; no commission is paid retroactively under the new rule.
+
+Please also confirm the wording the associate sees: "Not earned yet — buyer still paying", "Will be paid to you on <date>", "Paid to you on <date> · bank ref <reference>".

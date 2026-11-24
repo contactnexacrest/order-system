@@ -306,6 +306,15 @@ async function show(req, res) {
     canBank,
     // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
     rule: can(req, 'view_associate_commission_rules') ? await require('../services/associateCommission').ruleProgress(a) : null,
+    // D-410: the price rule, what comes from the margin, and the ladder status per order (same permission as the rule).
+    priceRule: can(req, 'view_associate_commission_rules') ? await require('../services/associateRules').priceRuleFor(a) : null,
+    rightNow: can(req, 'view_associate_commission_rules')
+      ? await require('../services/associateRules').rightNow(a, (await require('../services/associateCommission').levelForAssociate(a, null))[0]) : null,
+    marginSoFar: can(req, 'view_associate_commission_rules') ? await require('../services/associateRules').marginSoFar(Number(a.id)) : null,
+    priceRules: require('../services/associateRules').PRICE_RULES,
+    priceRuleText: require('../services/associateRules').PRICE_RULE_TEXT,
+    groupDays: await require('../services/associateRules').groupDays(),
+    minOrderInr: await require('../services/associateRules').minOrderInr(),
     canPricing: can(req, 'manage_pricing'),
     canChangeLink: await associateService.canChangeLink(req),
     clients: await associatePortalRepository.clients(id),
@@ -739,6 +748,36 @@ async function commissionRule(req, res) {
   }, 'layout/base');
 }
 
+/** D-410: the associate's own choice of what the client's price includes (empty = the company setting). MD, with a reason. */
+async function savePriceRule(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const rules = require('../services/associateRules');
+  const body = req.body || {};
+  const back = `/associates/${Number(a.id)}#commission-rule`;
+  const fail = (msg) => {
+    flash.set(req, 'error', msg);
+    res.redirect(back);
+  };
+  const rule = String(body.price_rule || '');
+  const reason = String(body.price_rule_reason || '').trim();
+  if (rule !== 'company' && !rules.PRICE_RULES[rule]) return fail("Choose what this associate's client prices include.");
+  let pct = null;
+  if (rule === 'fixed') {
+    const v = String(body.price_rule_fixed_pct ?? '').trim();
+    if (!/^\d{1,2}(\.\d{1,2})?$/.test(v) || Number(v) > 50) return fail('Enter the fixed % from 0 to 50, with at most 2 decimals.');
+    pct = Number(v).toFixed(2);
+  }
+  if (len(reason) < 10) return fail('Give the reason for the change (at least 10 characters) — it is kept in the Audit Log.');
+  const before = !a.price_rule_override ? 'company setting' : `${a.price_rule_override}${a.price_rule_fixed_pct !== null && a.price_rule_fixed_pct !== undefined ? ` ${Number(a.price_rule_fixed_pct).toFixed(2)}%` : ''}`;
+  const after = rule === 'company' ? 'company setting' : `${rule}${pct !== null ? ` ${pct}%` : ''}`;
+  await db.execute('UPDATE associates SET price_rule_override = :r, price_rule_fixed_pct = :p WHERE id = :id',
+    { r: rule === 'company' ? null : rule, p: pct, id: Number(a.id) });
+  await auditLogRepository.log(req.user.id, 'ASSOCIATE_PRICE_RULE_CHANGED', 'associates', Number(a.id), 'price_rule_override', before, `${after} — reason: ${reason}`);
+  flash.set(req, 'success', "Saved. New prices for this associate's clients follow it; orders with fixed prices keep theirs.");
+  res.redirect(back);
+}
+
 async function saveCommissionRule(req, res) {
   const a = await found(req, res);
   if (!a) return;
@@ -1013,6 +1052,10 @@ async function ladder(req, res) {
     commission,
     thresholdValue: commission.threshold_inr.toFixed(0),
     gstValue: commission.gst_pct.toFixed(2),
+    // D-410: orders of one client within N days are one ladder step (7–45).
+    groupDays: await require('../services/associateRules').groupDays(),
+    groupDaysMin: require('../services/associateRules').GROUP_DAYS_MIN,
+    groupDaysMax: require('../services/associateRules').GROUP_DAYS_MAX,
     canPricing: can(req, 'manage_pricing'),
   }, 'layout/base');
 }
@@ -1096,6 +1139,23 @@ async function saveLadder(req, res) {
       res.redirect('/associates/ladder');
       return;
     }
+    // D-410: the group days (7–45); a change of the minimum or the days needs a reason (Audit Log).
+    const rules = require('../services/associateRules');
+    const groupDays = int(body.associate_group_days ?? await rules.groupDays());
+    if (groupDays === null || groupDays < rules.GROUP_DAYS_MIN || groupDays > rules.GROUP_DAYS_MAX) {
+      flash.set(req, 'error', 'Enter the days for one ladder step as 7 to 45.');
+      res.redirect('/associates/ladder');
+      return;
+    }
+    const ladderChanged = Math.abs(Number(now.associate_counting_threshold_inr ?? 500000) - threshold) > 0.004
+      || parseInt(now.associate_group_days ?? '15', 10) !== groupDays;
+    const ladderReason = String(body.ladder_reason || '').trim();
+    if (ladderChanged && (len(ladderReason) < 10 || len(ladderReason) > 300)) {
+      flash.set(req, 'error', 'Give the reason for changing the minimum order value or the days (10 to 300 characters) — it is kept in the Audit Log.');
+      res.redirect('/associates/ladder');
+      return;
+    }
+    values.associate_group_days = String(groupDays);
     values.associate_counting_threshold_inr = threshold.toFixed(2);
     values.associate_protection_months = String(months);
     values.associate_gst_pct = gst.toFixed(2);
@@ -1124,7 +1184,8 @@ async function saveLadder(req, res) {
     if (String(before[k] ?? '') !== v) {
       await incentiveRepository.setSetting(k, v, req.user.id);
       await auditLogRepository.log(req.user.id, 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, k, before[k] ?? null, v,
-        ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'].includes(k) ? (String(body.payout_reason || '').trim() || null) : null);
+        ['associate_payout_run', 'associate_payout_day', 'associate_payout_holiday_rule'].includes(k) ? (String(body.payout_reason || '').trim() || null)
+          : (['associate_counting_threshold_inr', 'associate_group_days'].includes(k) ? (String(body.ladder_reason || '').trim() || null) : null));
     }
   }
   flash.set(req, 'success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');
@@ -1194,6 +1255,6 @@ module.exports = {
   abroadCurrencyCodes,
   reviewDocument,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
-  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, bankNumber, uploadDocument, downloadDocument, reply,
+  linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, savePriceRule, bankNumber, uploadDocument, downloadDocument, reply,
   holdPayout, releasePayout, clawback, ladder, saveLadder, report,
 };

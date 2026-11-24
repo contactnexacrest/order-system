@@ -24,6 +24,7 @@ const db = require('../config/db');
 const { short } = require('../helpers/dates');
 const incentiveRepository = require('../repositories/incentiveRepository');
 const pricingRepository = require('../repositories/pricingRepository');
+const rules = () => require('./associateRules'); // D-410 (lazy: associateRules requires this module)
 
 const SETTLEMENT_KINDS = {
   agreed_discount: 'Agreed discount — lowers the associate commission basis',
@@ -177,21 +178,17 @@ async function earningAssociate(order, incentiveRow = null) {
   const row = incentiveRow || (order.id ? await incentiveRepository.forOrder(Number(order.id)) : null);
   const mode = String((row && row.associate_mode) || 'auto');
   if (mode === 'no') return null;
-  if (mode !== 'yes' && order.id && !(await require('./incentiveService').withinFirstTenDays(order))) return null;
+  // D-410 (24 Nov 2026): every order of the client earns; the old "client's first 10 days only" rule still decides
+  // orders whose PI was issued before the cut-over date (owner choice 2A).
+  if (mode !== 'yes' && order.id && !(await rules().newRules(order)) && !(await require('./incentiveService').withinFirstTenDays(order))) return null;
   const a = await require('../repositories/associateRepository').find(Number(client.associate_id));
   if (!a || Number(a.no_commission || 0) === 1) return null;
   return a;
 }
 
-/** The associate's earlier counting orders (fixed and counted when their order was locked). */
+/** D-410: the associate's ladder steps counted so far (associateRules works the history out again each time), leaving one order out. */
 async function countingOrders(associateId, excludeOrderId = null) {
-  const row = await db.queryOne(
-    `SELECT COUNT(*) AS n FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-      WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND (oi.locked_at IS NOT NULL OR oi.associate_fixed_at IS NOT NULL) AND oi.order_id <> :x
-        AND o.status NOT IN ('cancelled','lost')`,
-    { a: associateId, x: excludeOrderId || 0 }
-  );
-  return Number(row.n);
+  return rules().stepsCounted(associateId, excludeOrderId);
 }
 
 /**
@@ -203,6 +200,20 @@ async function countingOrders(associateId, excludeOrderId = null) {
 async function levelForAssociate(associate, excludeOrderId, orderInRangeInr = null) {
   if ((associate.commission_mode || 'ladder') === 'fixed') {
     return [associate.commission_level_id ? await pricingRepository.findLevel(Number(associate.commission_level_id)) : null, null];
+  }
+  // D-410: an order of the same client within the group days of a counted order shares that order's step and level.
+  if (excludeOrderId !== null && excludeOrderId !== undefined) {
+    const orderRepository = require('../repositories/orderRepository');
+    const order = await orderRepository.find(Number(excludeOrderId));
+    const group = order ? await rules().groupCovering(Number(associate.id), order) : null;
+    if (group) {
+      const first = await orderRepository.find(Number(group.order_id));
+      const fx = first ? fixedLevel(first, Number(associate.id)) : null;
+      if (fx) {
+        const level = fx.id !== null ? await pricingRepository.findLevel(Number(fx.id)) : null;
+        return [{ ...(level || {}), id: fx.id, name: fx.name, kind: fx.kind, value: fx.value }, Number(group.step) - 1];
+      }
+    }
   }
   const count = await countingOrders(Number(associate.id), excludeOrderId);
   const set = await settings();
@@ -347,9 +358,12 @@ async function fixLevelAtPi(orderId) {
   if (!level) return;
   await db.execute(
     `UPDATE orders SET associate_id = :a, associate_level_id = :l, associate_level_name = :n, associate_level_kind = :k, associate_level_value = :v,
-            associate_level_fixed_at = NOW(), associate_rate_pct = :r, associate_rate_source = :s WHERE id = :id AND associate_level_fixed_at IS NULL`,
+            associate_level_fixed_at = NOW(), associate_rate_pct = :r, associate_rate_source = :s, associate_included_pct = :inc
+      WHERE id = :id AND associate_level_fixed_at IS NULL`,
     { a: a.id, l: level.id, n: level.name, k: level.kind, v: level.value, r: level.kind === 'pct' ? level.value : null,
-      s: (a.commission_mode || 'ladder') === 'fixed' ? 'fixed' : 'ladder', id: orderId }
+      s: (a.commission_mode || 'ladder') === 'fixed' ? 'fixed' : 'ladder',
+      // D-410: the % included in the client's price, fixed with the PI (the margin box and "paid from our margin" read it).
+      inc: await rules().includedPct(a, level), id: orderId }
   );
   if (Number(order.is_test_data) !== 1 && Number(order.is_sample_data) !== 1) {
     // D-292: the associate is told only their %, never a level name.
@@ -470,7 +484,22 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   const state = settle.unpaid ? 'unpaid' : (fullyPaidOn !== null ? 'paid' : 'awaiting');
   const due = fullyPaidOn !== null ? await dueOn(fullyPaidOn, set) : null;
   const basisInr = round2(basis * realised.rate);
-  const counts = state === 'paid' && basisInr >= set.threshold_inr;
+  // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
+  const isNew = await rules().newRules(order);
+  // The MD's "associate: yes" on the order overrides the minimum, as it overrides the old 10-day window.
+  const forcedYes = String((fixedRow && fixedRow.associate_mode) || 'auto') === 'yes';
+  const belowMin = isNew && !forcedYes && !(await rules().earnsOnValue(order, basisInr));
+  if (belowMin && override === null) {
+    commissionFc = 0;
+    commissionInr = 0;
+  }
+  const ladder = await rules().stepFor(Number(a.id), orderId);
+  const counts = !!ladder && ladder.status === 'counted';
+  // D-410: the % the client's price includes — fixed at the PI, before that today's choice for this associate.
+  const included = order.associate_included_pct !== null && order.associate_included_pct !== undefined ? Number(order.associate_included_pct)
+    : (fixed ? null : await rules().includedPct(a, level));
+  const ratePct = level && level.kind === 'pct' ? Number(level.value) : null;
+  const mPct = rules().marginPct(ratePct, included);
   return {
     id: Number(a.id), name: String(a.name), status: String(a.status), gstin: String(a.gstin || ''), mode: String(a.commission_mode || 'ladder'),
     level, level_label: levelLabel(level), level_fixed: fixed,
@@ -485,7 +514,12 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     due_on: due, payout_run_on: due !== null ? await payoutRunOn(due, set) : null,
     claim_hold: due !== null && set.claim_hold && await claimOpen(orderId, due),
     counts, threshold_inr: set.threshold_inr,
-    counting_number: counts ? (await countingOrders(Number(a.id), orderId)) + 1 : null,
+    counting_number: counts ? Number(ladder.step) : null,
+    // D-410
+    new_rules: isNew, below_min: belowMin, ladder, ladder_text: await rules().stepText(ladder),
+    included_pct: included, margin_pct: mPct,
+    margin_fc: ratePct > 0 && mPct > 0 ? round2(commissionFc * mPct / ratePct) : 0,
+    margin_inr: ratePct > 0 && mPct > 0 ? round2(commissionInr * mPct / ratePct) : 0,
     gst_pct: set.gst_pct,
     fixed: fixedRate !== null, fixed_at: fixedRate !== null ? fixedRow.associate_fixed_at : null, fixed_rate: fixedRate,
     override: override !== null, override_reason: override !== null ? String(fixedRow.associate_override_reason || '') : null,

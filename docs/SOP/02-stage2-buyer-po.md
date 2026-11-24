@@ -51,8 +51,8 @@ Step 4 on the order page has four sub-steps, done in order:
    email or post, not the date printed on it; it starts at today and can't
    be in the future or before the order was created). The page then shows
    "received on" with that date. For a client introduced by an associate,
-   this date is **Day 1** of the Associate Agreement's 10 days (chapter
-   20). When the buyer completes Step 4 themselves through the link or
+   this date starts the 15 days in which the client's orders are one
+   ladder step (D-410, chapter 24). When the buyer completes Step 4 themselves through the link or
    the portal, the day they upload is recorded as the date received.
    Typed the wrong date, or confirmed before the date was asked? Under
    "Buyer PO recorded", **Correct the date received** (or **Record the

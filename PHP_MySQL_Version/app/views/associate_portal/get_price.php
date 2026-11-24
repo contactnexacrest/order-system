@@ -31,4 +31,5 @@ $__old = \App\Helpers\Flash::pullOld();
     <div><button type="submit" class="btn-sm btn-accent">Get price</button></div>
   </form>
   <p class="small muted">Prices are FOB: goods loaded on the ship at the Indian port, without sea freight. Prices are per unit; for stone 50 mm or thicker they are per cubic metre (CBM). Your price is also shown per CBM, per SQM and per SQFT for the thickness you choose. The final price is on the proforma invoice. These prices are only for you — please do not share this page.</p>
+  <p class="small muted" data-get-price-explain>ℹ The quote price already includes your commission, so you do not add anything to it. The lowest price is the least you may agree with the buyer; below it, please ask our team.</p><?php // D-410: same quote at every level ?>
 </div>

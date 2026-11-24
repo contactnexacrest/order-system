@@ -302,7 +302,10 @@ final class TeamIncentiveTest extends DbTestCase
 
         $later = $this->paidOrder($client);
         Database::connection()->prepare('UPDATE orders SET created_at = DATE_ADD(created_at, INTERVAL 15 DAY) WHERE id = :id')->execute(['id' => $later]);
-        self::assertNull(IncentiveService::calculate($later)['associate'], 'after day 10 it is a repeat order: no commission');
+        // D-410 (24 Nov 2026): every order earns, but this one (USD 4,500, about ₹4 lakh) is below the ₹5,00,000 minimum and is not the client's first.
+        $repeat = IncentiveService::calculate($later)['associate'];
+        self::assertTrue($repeat['below_min'], 'below the minimum order value');
+        self::assertSame(0.0, $repeat['amount_fc'], 'so no commission');
         IncentiveRepository::saveOrder($later, ['associate_mode' => 'yes'], $this->admin);
         self::assertSame(90.0, IncentiveService::calculate($later)['associate']['amount_fc'], 'forced on: commission again');
     }

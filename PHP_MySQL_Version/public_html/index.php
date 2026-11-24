@@ -798,6 +798,8 @@ $router->post('/associates/{id}/bank/{bankId}/reject', [$associateAdmin, 'reject
 $router->post('/associates/{id}/bank/{bankId}/remind', [$associateAdmin, 'remindBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/commission-rule', [$associateAdmin, 'commissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
 $router->post('/associates/{id}/commission-rule', [$associateAdmin, 'saveCommissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+// D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
+$router->post('/associates/{id}/price-rule', [$associateAdmin, 'savePriceRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
 // Owner decision D-252 (A3): accept / reject one KYC document.

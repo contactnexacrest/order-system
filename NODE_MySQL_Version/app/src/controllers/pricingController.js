@@ -43,6 +43,9 @@ async function settings(req, res) {
     fxJumpPct: fxRateService.JUMP_PCT,
     // D-402 (21 Nov 2026): the category rates listed under Marine Insurance.
     insuranceCategories: await require('../services/marineInsurance').categories(),
+    // D-410: what each choice would have cost over the last 12 months of associate orders.
+    whatIf: await require('../services/associateRules').whatIf(Number({ ...pricingService.DEFAULTS, ...(await pricingRepository.settings()) }.associate_price_fixed_pct)),
+    ownRuleCount: await require('../services/associateRules').ownRuleCount(),
   }, 'layout/base');
 }
 
@@ -71,11 +74,21 @@ async function saveSettings(req, res) {
     return;
   }
   const before = await pricingService.settingsRaw();
+  // D-410: changing what the client's price includes for associates needs a reason (kept in the Audit Log).
+  const ruleChanged = (values.associate_price_rule !== undefined && values.associate_price_rule !== String(before.associate_price_rule))
+    || (values.associate_price_fixed_pct !== undefined && values.associate_price_fixed_pct !== String(before.associate_price_fixed_pct));
+  const reason = String((req.body || {}).associate_price_reason ?? '').trim();
+  if (ruleChanged && [...reason].length < 10) {
+    flash.set(req, 'error', "Give the reason for changing what the client's price includes for associates (at least 10 characters).");
+    res.redirect('/pricing/settings#associate-price-rule');
+    return;
+  }
   let changed = 0;
   for (const [k, v] of Object.entries(values)) {
     if (String(before[k]) !== v) {
       await pricingRepository.setSetting(k, v, req.user.id);
-      await auditLogRepository.log(req.user.id, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, k, String(before[k]), v);
+      await auditLogRepository.log(req.user.id, 'PRICING_SETTING_CHANGED', 'pricing_settings', null, k, String(before[k]),
+        ['associate_price_rule', 'associate_price_fixed_pct'].includes(k) ? `${v} — reason: ${reason}` : v);
       changed += 1;
     }
   }
@@ -84,6 +97,17 @@ async function saveSettings(req, res) {
 }
 
 // ----------------------------------------------------- levels and the ladder
+
+/** D-410 (M12): after a ladder or level % change, remind the MD what the client's price includes. */
+async function priceRuleReminder() {
+  const rules = require('../services/associateRules');
+  const r = await rules.companyPriceRule();
+  const what = r.rule === 'starting' ? 'the first ladder step — it follows this change'
+    : (r.rule === 'ladder' ? "each associate's ladder rate — client prices change with this"
+      : `a fixed ${String(Number(r.pct).toFixed(2)).replace(/\.?0+$/, '')}% — it does not change by itself`);
+  const own = await rules.ownRuleCount();
+  return ` Reminder: client prices include ${what}. Check "Commission included in the client's price" in Admin → Pricing → Settings${own > 0 ? ` (and the ${own} associate(s) with their own choice)` : ''}.`;
+}
 
 async function levels(req, res) {
   const all = await pricingRepository.levels();
@@ -98,7 +122,7 @@ async function levels(req, res) {
   }
   const floors = {};
   if (sample) {
-    for (const l of all) floors[Number(l.id)] = pricingEngine.associate(sample.pricing.build.raw, String(l.kind), Number(l.value));
+    for (const l of all) floors[Number(l.id)] = await require('../services/associateRules').levelPrices(sample.pricing.build.raw, l); // D-410
   }
   const ladder = await pricingRepository.ladder();
   const stepsPerLevel = {};
@@ -161,7 +185,7 @@ async function updateLevel(req, res) {
   await pricingRepository.updateLevel(id, l.name, l.kind, l.value, req.user.id);
   await auditLogRepository.log(req.user.id, 'COMMISSION_LEVEL_CHANGED', 'commission_levels', id, null,
     `${existing.name} — ${pricingService.levelLabel(existing)}`, `${l.name} — ${pricingService.levelLabel(l)}`);
-  flash.set(req, 'success', `Level "${l.name}" saved. New quotes use it; orders with an issued Proforma Invoice keep the commission they had.`);
+  flash.set(req, 'success', `Level "${l.name}" saved. New quotes use it; orders with an issued Proforma Invoice keep the commission they had.${await priceRuleReminder()}`);
   res.redirect('/pricing/commission-levels');
 }
 
@@ -220,7 +244,7 @@ async function saveLadder(req, res) {
     await pricingRepository.replaceLadder(steps, req.user.id);
     await auditLogRepository.log(req.user.id, 'COMMISSION_LADDER_CHANGED', 'commission_ladder_steps', null, null, before, after);
   }
-  flash.set(req, 'success', before === after ? 'Nothing changed.' : 'Ladder saved. It counts orders from P3 on; associates on "Ladder" use it.');
+  flash.set(req, 'success', before === after ? 'Nothing changed.' : `Ladder saved. Associates on "Ladder" use it for new Proforma Invoices.${await priceRuleReminder()}`);
   res.redirect('/pricing/commission-levels#ladder');
 }
 

@@ -320,6 +320,7 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge{display:inline-block;font-size:0.7rem;padding:0.15rem 0.5rem;border-radius:6px;margin-left:0.4rem;font-weight:600;}
 .badge-sensitive{background:var(--danger-soft);color:var(--danger);}
 .badge-active{background:var(--success-soft);color:var(--success);}
+.badge-tobepaid{background:#e7f0fb;color:#1f5fa8;} /* D-410: associate "Will be paid to you on <date>" */
 .badge-inactive{background:var(--danger-soft);color:var(--danger);}
 .badge-protected{background:var(--gold-soft);color:var(--gold-strong);}
 .badge-superadmin{background:var(--navy-soft);color:var(--navy);}

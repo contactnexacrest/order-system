@@ -23,7 +23,7 @@ final class AssociateStatementNoCountsD393Test extends TestCase
             'rate_estimated' => false, 'fixed' => true, 'fixed_at' => '2026-11-19', 'fixed_rate' => 84.0, 'level_label' => 'Level 1 — 2%',
             'level_fixed' => true, 'amount_fc' => 340.0, 'amount_inr' => 28560.0, 'state' => 'paid', 'override' => false,
             'override_reason' => null, 'gstin' => '', 'gst_pct' => 18.0, 'fully_paid_on' => '2026-11-19', 'due_on' => '2026-12-19',
-            'payout_run_on' => '2026-12-31', 'claim_hold' => false, 'counts' => true, 'counting_number' => 3, 'threshold_inr' => 500000.0,
+            'payout_run_on' => '2026-12-31', 'claim_hold' => false, 'counts' => true, 'counting_number' => 3, 'threshold_inr' => 500000.0, 'ladder_text' => 'Step 3',
             'show_fob' => true, 'show_pct' => true, 'portal' => false,
         ], $over);
         ob_start();
@@ -45,7 +45,8 @@ final class AssociateStatementNoCountsD393Test extends TestCase
     {
         $html = self::render(['portal' => false]);
         self::assertStringContainsString('<th>Counts toward the ladder</th>', $html);
-        self::assertStringContainsString('yes (counting order no. 3)', $html);
-        self::assertStringContainsString('no — under ₹500,000 within range', self::render(['portal' => false, 'counts' => false]));
+        // D-410 (24 Nov 2026): the row shows the ladder status line ("Step 3", "Same step as …", "Does not count — below ₹…").
+        self::assertStringContainsString('Step 3', $html);
+        self::assertStringContainsString('Does not count — below ₹500,000', self::render(['portal' => false, 'counts' => false, 'ladder_text' => 'Does not count — below ₹500,000']));
     }
 }
