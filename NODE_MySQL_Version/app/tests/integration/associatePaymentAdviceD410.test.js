@@ -7,6 +7,12 @@
  *  - company details from Admin, no TAN; only the associate's commission.
  * PHP twin: tests/Integration/AssociatePaymentAdviceD410Test.php.
  */
+// No real browser under Jest: the PDF renderer is replaced; the HTML it is given is what is checked.
+jest.mock('../../src/services/pdfRenderService', () => ({
+  renderPdfFromHtml: jest.fn().mockResolvedValue(Buffer.from('%PDF-fake')),
+  closeBrowser: jest.fn(),
+}));
+
 const crypto = require('crypto');
 const db = require('../../src/config/db');
 const associateRepository = require('../../src/repositories/associateRepository');

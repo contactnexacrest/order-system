@@ -63,7 +63,9 @@ describe('Associate commission rules (D-410)', () => {
     let flash = { type: null, message: null };
     if (res.status === 302 && res.headers.location) {
       const m = (await agent.get(res.headers.location)).text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/g);
-      const last = m ? m[m.length - 1].match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/) : null;
+      // The flash (success / error) — some pages also carry their own info boxes.
+      const pick = m ? (m.find((x) => /alert-(success|error)"/.test(x)) || m[m.length - 1]) : null;
+      const last = pick ? pick.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/) : null;
       if (last) flash = { type: last[1], message: unescape(last[2]) };
     }
     return { status: res.status, ...flash };
@@ -184,8 +186,7 @@ describe('Associate commission rules (D-410)', () => {
   it('B9: changing what the client price includes needs a reason', async () => {
     const agent = await staff();
     const r = await post(agent, '/pricing/settings', '/pricing/settings', { ...(await pricingRepository.settings()), associate_price_rule: 'ladder' });
-    expect(r.type).toBe('error');
-    expect(r.message).toContain("Give the reason for changing what the client's price includes");
+    expect([r.type, r.message]).toEqual(['error', expect.stringContaining("Give the reason for changing what the client's price includes")]);
     expect((await associateRules.companyPriceRule()).rule).toBe('fixed');
   });
 

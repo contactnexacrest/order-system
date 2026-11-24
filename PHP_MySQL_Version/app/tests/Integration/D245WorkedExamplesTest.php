@@ -302,9 +302,13 @@ final class D245WorkedExamplesTest extends DbTestCase
     {
         $productId = $this->product();
         [$a, $client] = $this->associate('ladder', null);
+        // D-410: a ladder step is an order of the associate's client of at least ₹5 lakh (goods, FOB), counted once paid.
+        // Five such orders of five different clients (no 15-day grouping) are the five steps so far.
         for ($i = 0; $i < 5; $i++) {
-            $old = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
-            IncentiveRepository::saveOrder($old, ['associate_id' => $a, 'associate_counts' => 1, 'locked_at' => date('Y-m-d H:i:s')], $this->admin);
+            $c = $this->createTestClient();
+            Database::connection()->prepare("UPDATE clients SET associate_id = :a, associate_registered_on = '2026-09-01' WHERE id = :c")->execute(['a' => $a, 'c' => $c]);
+            [$old] = $this->order($productId, [['10', '1395.92']], $c, [$this->p['sales']]);
+            $this->money($old, 83.0, '2026-10-25', 820000.0);
         }
         self::assertSame(5, AssociateCommission::countingOrders($a));
         [$big] = $this->order($productId, [['10', '1395.92']], $client, [$this->p['sales']]);
