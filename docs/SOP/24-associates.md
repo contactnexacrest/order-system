@@ -244,8 +244,8 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
 - **Which orders** (D-410, 24 Nov 2026): **every order** of the client while
   the agreement is active, when the value of the goods (FOB) is at least
   **₹5,00,000**; the client's **first order always earns**, whatever its
-  size. The MD can still set "associate: yes" (this also overrides the
-  minimum) or "associate: no" on an order, with a written reason (10–300
+  size. The MD can still set "associate: yes" (the ₹5,00,000 minimum still
+  applies) or "associate: no" on an order, with a written reason (10–300
   characters); it is recorded in the audit log. Orders whose Proforma
   Invoice was issued before the change keep the old rule (the client's
   first 10 days).

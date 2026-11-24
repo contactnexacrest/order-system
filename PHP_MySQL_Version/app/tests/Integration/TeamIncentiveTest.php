@@ -307,7 +307,7 @@ final class TeamIncentiveTest extends DbTestCase
         self::assertTrue($repeat['below_min'], 'below the minimum order value');
         self::assertSame(0.0, $repeat['amount_fc'], 'so no commission');
         IncentiveRepository::saveOrder($later, ['associate_mode' => 'yes'], $this->admin);
-        self::assertSame(90.0, IncentiveService::calculate($later)['associate']['amount_fc'], 'forced on: commission again');
+        self::assertSame(0.0, IncentiveService::calculate($later)['associate']['amount_fc'], 'D-410: "yes" does not override the ₹5,00,000 minimum');
     }
 
     public function testThePayoutMonthIsThePayoutRunAfterTheDate(): void

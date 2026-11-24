@@ -296,7 +296,7 @@ describe('Team incentive program and associates', () => {
     expect(repeat.below_min).toBe(true); // below the minimum order value
     expect(repeat.amount_fc).toBe(0); // so no commission
     await incentiveRepository.saveOrder(later, { associate_mode: 'yes' }, admin);
-    expect((await incentiveService.calculate(later)).associate.amount_fc).toBe(90); // forced on: commission again
+    expect((await incentiveService.calculate(later)).associate.amount_fc).toBe(0); // D-410: "yes" does not override the ₹5,00,000 minimum
   });
 
   it('the payout month is the payout run after the date', async () => {

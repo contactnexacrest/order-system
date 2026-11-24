@@ -486,9 +486,8 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   const basisInr = round2(basis * realised.rate);
   // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
   const isNew = await rules().newRules(order);
-  // The MD's "associate: yes" on the order overrides the minimum, as it overrides the old 10-day window.
-  const forcedYes = String((fixedRow && fixedRow.associate_mode) || 'auto') === 'yes';
-  const belowMin = isNew && !forcedYes && !(await rules().earnsOnValue(order, basisInr));
+  // The minimum applies to every order, also one the MD set to "associate: yes" (owner, 24 Nov 2026).
+  const belowMin = isNew && !(await rules().earnsOnValue(order, basisInr));
   if (belowMin && override === null) {
     commissionFc = 0;
     commissionInr = 0;

@@ -588,9 +588,8 @@ final class AssociateCommission
         $basisInr = round($basis * $realised['rate'], 2);
         // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
         $newRules = AssociateRules::newRules($order);
-        // The MD's "associate: yes" on the order overrides the minimum, as it overrides the old 10-day window.
-        $forcedYes = (string) ($fixedRow['associate_mode'] ?? 'auto') === 'yes';
-        $belowMin = $newRules && !$forcedYes && !AssociateRules::earnsOnValue($order, $basisInr);
+        // The minimum applies to every order, also one the MD set to "associate: yes" (owner, 24 Nov 2026).
+        $belowMin = $newRules && !AssociateRules::earnsOnValue($order, $basisInr);
         if ($belowMin && $override === null) {
             $commissionFc = 0.0;
             $commissionInr = 0.0;
