@@ -82,7 +82,8 @@ async function orders(associateId, orderId = null) {
   }
   const rows = [];
   for (const o of await db.query(`${sql} ORDER BY o.created_at DESC, o.id DESC`, params)) {
-    o.fob_value = await orderProductRepository.totalFobValue(Number(o.id));
+    // D-410: the FOB value of the goods lines only — the figure the commission is worked out on (no freight, insurance, services or charges).
+    o.fob_value = (await require('../services/associateCommission').goodsLines(Number(o.id))).reduce((t, l) => t + Number(l.fob_value || 0), 0);
     o.products = await productSummary(Number(o.id));
     o.stage = stageLabel(o);
     o.buyer_paid_in_full = (await incentive().fullyPaidOn(Number(o.id))) !== null;

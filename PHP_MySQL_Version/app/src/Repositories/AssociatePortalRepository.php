@@ -96,7 +96,8 @@ final class AssociatePortalRepository
         $stmt->execute($params);
         $rows = [];
         foreach ($stmt->fetchAll() as $o) {
-            $o['fob_value'] = OrderProductRepository::totalFobValue((int) $o['id']);
+            // D-410: the FOB value of the goods lines only — the figure the commission is worked out on (no freight, insurance, services or charges).
+            $o['fob_value'] = array_sum(array_map(static fn (array $l): float => (float) $l['fob_value'], \App\Services\AssociateCommission::goodsLines((int) $o['id'])));
             $o['products'] = self::productSummary((int) $o['id']);
             $o['stage'] = self::stageLabel($o);
             $o['buyer_paid_in_full'] = IncentiveService::fullyPaidOn((int) $o['id']) !== null;

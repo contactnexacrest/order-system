@@ -167,13 +167,13 @@
     {% set __ap = settings.associate_price_fixed_pct | float %}
     <fieldset id="associate-price-rule" data-testid="associate-price-rule-setting"><legend>Associate commission in the client's price (D-410)</legend>
       <p class="help-line">&#8505; An associate earns their full commission %. This setting decides how much of it is built into the price the client is quoted; any commission above it is paid from our margin. It applies to new prices only — orders with an approved Quotation or an issued Proforma Invoice keep their prices. Each associate can have their own choice (associate page › Commission).</p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="starting"{{ ' checked' if __ar == 'starting' }}{{ ro }}> <strong>Starting rate</strong> (the first ladder step)</label>
-      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.starting }}</p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="fixed"{{ ' checked' if __ar == 'fixed' }}{{ ro }}> <strong>A fixed %</strong>
-        <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="{{ __ap.toFixed(2) }}" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."{{ ro }}> % (default)</label>
-      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.fixed }}</p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="ladder"{{ ' checked' if __ar == 'ladder' }}{{ ro }}> <strong>Ladder rate</strong> (each associate's current %)</label>
-      <p class="help-line" style="margin-left:1.6em">{{ associatePriceRules.text.ladder }}</p>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="starting"{{ ' checked' if __ar == 'starting' }}{{ ro }}> Starting rate <span class="muted">(the first ladder step)</span></label>
+        <span class="choice-help">{{ associatePriceRules.text.starting }}</span></div>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="fixed"{{ ' checked' if __ar == 'fixed' }}{{ ro }}> A fixed % <span class="muted">(default)</span></label>
+        <span class="choice-help">{{ associatePriceRules.text.fixed }}</span>
+        <label class="choice-extra">Fixed % <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="{{ __ap.toFixed(2) }}" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."{{ ro }}> %</label></div>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="ladder"{{ ' checked' if __ar == 'ladder' }}{{ ro }}> Ladder rate <span class="muted">(each associate's current %)</span></label>
+        <span class="choice-help">{{ associatePriceRules.text.ladder }}</span></div>
       <p class="small" style="border:1px solid #C9962B;padding:6px 8px" data-testid="associate-price-right-now"><strong>Right now:</strong>
         {% if __ar == 'fixed' %}every client price includes <strong>{{ pricingFmt.pct(__ap) }}</strong>. Associates above it are paid the rest from our margin; associates below it have room to negotiate.
         {% elif __ar == 'starting' %}every client price includes the first ladder step. Associates above it are paid the rest from our margin.

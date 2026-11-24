@@ -321,6 +321,13 @@ legend{padding:0 0.5rem;font-weight:700;color:var(--navy);text-transform:capital
 .badge-sensitive{background:var(--danger-soft);color:var(--danger);}
 .badge-active{background:var(--success-soft);color:var(--success);}
 .badge-tobepaid{background:#e7f0fb;color:#1f5fa8;} /* D-410: associate "Will be paid to you on <date>" */
+.badge-notyet{background:#fff1db;color:#8a5a00;} /* D-410: associate "Not earned yet — buyer still paying" */
+/* D-410: a radio choice and its explanation as one group */
+.choice-group{border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:6px 0;background:var(--surface,#fff);}
+.choice-group > label{display:block;margin:0;font-weight:600;}
+.choice-group .choice-help{display:block;margin:2px 0 0 1.7em;color:var(--muted,#6b6b6b);font-size:.9em;line-height:1.4;}
+.choice-group .choice-extra{display:flex;align-items:center;gap:8px;margin:6px 0 0 1.7em;font-weight:600;}
+.choice-group .choice-extra input{width:7em;margin:0;}
 .badge-inactive{background:var(--danger-soft);color:var(--danger);}
 .badge-protected{background:var(--gold-soft);color:var(--gold-strong);}
 .badge-superadmin{background:var(--navy-soft);color:var(--navy);}

@@ -162,7 +162,7 @@ async function context(payouts, no, revision, reason) {
       no: i + 1,
       order: String(p.order_reference),
       client: String((client && client.company_legal_name) || ''),
-      fob: `${p.order_currency} ${money2(await orderProductRepository.totalFobValue(Number(p.order_id)))}`,
+      fob: `${p.order_currency} ${money2((await require('./associateCommission').goodsLines(Number(p.order_id))).reduce((t, l) => t + Number(l.fob_value || 0), 0))}`,
       pct: portal.orderRateText(order) || ratePct,
       gross: m(lineGross),
       tds: lineTds > 0 ? inr(lineTds) : '—',

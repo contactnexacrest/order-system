@@ -80,7 +80,7 @@ for ($i = 0; $i < 2; $i++) {
   <?php endif; ?>
 
   <h2 id="ladder">Ladder</h2>
-  <p class="muted">Used by associates set to "Ladder": the level for each counting order (invoiced FOB of ₹5 lakh or more on in-range lines). Steps start at order 1 and run on without gaps; leave the last step's "to" empty so it runs onward. Leave a blank row empty, or tick "Remove" to drop a step.</p>
+  <p class="muted">Used by associates set to "Ladder": the level for each counting order (FOB value of the goods ₹5 lakh or more on in-range lines). Steps start at order 1 and run on without gaps; leave the last step's "to" empty so it runs onward. Leave a blank row empty, or tick "Remove" to drop a step.</p>
   <form method="post" action="/pricing/commission-ladder">
     <?= Csrf::field() ?>
     <table class="list">

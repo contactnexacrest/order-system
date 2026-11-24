@@ -34,7 +34,7 @@
       <tr><th>Agreement</th><td>signed {{ (a.agreement_signed_on | shortDate) if a.agreement_signed_on else '—' }}, ends {{ (a.agreement_ends_on | shortDate) if a.agreement_ends_on else '—' }}{% if a.agreement_file_id %} · <a href="/associates/{{ id }}/agreement" class="small">Signed copy</a>{% endif %}</td></tr>
       <tr><th>Commission</th><td>
         {% if a.no_commission == 1 %}<b>No commission</b> (introductions only){% else %}
-          On the invoiced FOB of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
+          On the FOB value of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
           due {{ commissionNow.set.due_days }} days later and paid in the payout run ({{ commissionNow.runLabel }}).
         {% endif %}</td></tr>
       {# D-291 / D-292 (11 Nov 2026): the rule, level and progress are in the Commission section below. #}

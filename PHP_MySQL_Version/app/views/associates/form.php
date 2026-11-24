@@ -35,7 +35,7 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
       <label>Agreement ends on<input type="date" name="agreement_ends_on" value="<?= $__v('agreement_ends_on') ?>"></label>
       <label>Signed agreement (PDF)<?= !empty($__a['agreement_file_id']) ? ' &middot; <a href="/associates/' . (int) $__a['id'] . '/agreement">copy on file</a>, choose a file only to replace it' : '' ?><input type="file" name="agreement_file" accept=".pdf,application/pdf"<?= !empty($__a['agreement_file_id']) ? '' : ' data-required-if="agreement_signed_on" data-required-if-message="Attach the signed agreement (PDF) with its signing date."' ?>></label>
     </div>
-    <fieldset><legend>Commission (on the invoiced FOB of the goods of every order of the clients introduced — ₹5 lakh or more, the first order always — paid once the buyer has paid in full)</legend>
+    <fieldset><legend>Commission (on the FOB value of the goods of every order of the clients introduced — ₹5 lakh or more, the first order always — paid once the buyer has paid in full)</legend>
       <p class="muted small">D-245: the rate comes from the commission level below — a fixed level, or the ladder. When commission is paid, GST and the registration period: <a href="/associates/ladder">Commission settings</a>.</p>
       <label class="checkbox"><input type="checkbox" name="no_commission" value="1"<?= (int) ($__a['no_commission'] ?? 0) === 1 ? ' checked' : '' ?>> No commission for this associate (introductions only)</label>
     </fieldset>

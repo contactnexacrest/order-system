@@ -172,13 +172,13 @@ $__ro = $canManage ? '' : ' disabled';
       $__ap = (float) $settings['associate_price_fixed_pct']; $__wi = $whatIf ?? null; ?>
     <fieldset id="associate-price-rule" data-testid="associate-price-rule-setting"><legend>Associate commission in the client's price (D-410)</legend>
       <p class="help-line">&#8505; An associate earns their full commission %. This setting decides how much of it is built into the price the client is quoted; any commission above it is paid from our margin. It applies to new prices only — orders with an approved Quotation or an issued Proforma Invoice keep their prices. Each associate can have their own choice (associate page › Commission).</p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="starting"<?= $__ar === 'starting' ? ' checked' : '' ?><?= $__ro ?>> <strong>Starting rate</strong> (the first ladder step)</label>
-      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['starting']) ?></p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="fixed"<?= $__ar === 'fixed' ? ' checked' : '' ?><?= $__ro ?>> <strong>A fixed %</strong>
-        <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="<?= View::e(number_format($__ap, 2, '.', '')) ?>" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."<?= $__ro ?>> % (default)</label>
-      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['fixed']) ?></p>
-      <label class="inline"><input type="radio" name="associate_price_rule" value="ladder"<?= $__ar === 'ladder' ? ' checked' : '' ?><?= $__ro ?>> <strong>Ladder rate</strong> (each associate's current %)</label>
-      <p class="help-line" style="margin-left:1.6em"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['ladder']) ?></p>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="starting"<?= $__ar === 'starting' ? ' checked' : '' ?><?= $__ro ?>> Starting rate <span class="muted">(the first ladder step)</span></label>
+        <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['starting']) ?></span></div>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="fixed"<?= $__ar === 'fixed' ? ' checked' : '' ?><?= $__ro ?>> A fixed % <span class="muted">(default)</span></label>
+        <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['fixed']) ?></span>
+        <label class="choice-extra">Fixed % <input type="number" name="associate_price_fixed_pct" min="0" max="50" step="0.01" value="<?= View::e(number_format($__ap, 2, '.', '')) ?>" placeholder="e.g. 5.00" aria-label="Fixed % included in the client's price" style="width:7em" data-required-when="associate_price_rule=fixed" data-required-when-message="Enter the % included in the client's price."<?= $__ro ?>> %</label></div>
+      <div class="choice-group"><label><input type="radio" name="associate_price_rule" value="ladder"<?= $__ar === 'ladder' ? ' checked' : '' ?><?= $__ro ?>> Ladder rate <span class="muted">(each associate's current %)</span></label>
+        <span class="choice-help"><?= View::e(\App\Services\AssociateRules::PRICE_RULE_TEXT['ladder']) ?></span></div>
       <p class="small" style="border:1px solid #C9962B;padding:6px 8px" data-testid="associate-price-right-now"><strong>Right now:</strong>
         <?php if ($__ar === 'fixed'): ?>every client price includes <strong><?= View::e(PricingService::pct($__ap)) ?></strong>. Associates above it are paid the rest from our margin; associates below it have room to negotiate.
         <?php elseif ($__ar === 'starting'): ?>every client price includes the first ladder step. Associates above it are paid the rest from our margin.

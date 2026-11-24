@@ -47,12 +47,13 @@ use App\Helpers\Dates;
           <details class="card"><summary>Change for this associate</summary>
           <form method="post" action="/associates/<?= $id ?>/price-rule" data-price-rule-form>
             <?= \App\Helpers\Csrf::field() ?>
-            <label><input type="radio" name="price_rule" value="company"<?= !$priceRule['own'] ? ' checked' : '' ?> required> Use the company setting</label>
+            <div class="choice-group"><label><input type="radio" name="price_rule" value="company"<?= !$priceRule['own'] ? ' checked' : '' ?> required> Use the company setting</label>
+              <span class="choice-help">Follows Admin › Pricing › Settings (today: <?= htmlspecialchars(AssociateRules::PRICE_RULES[AssociateRules::companyPriceRule()['rule']]) ?>).</span></div>
             <?php foreach (AssociateRules::PRICE_RULES as $__k => $__l): ?>
-              <label><input type="radio" name="price_rule" value="<?= $__k ?>"<?= $priceRule['own'] && $priceRule['rule'] === $__k ? ' checked' : '' ?>> <?= htmlspecialchars($__l) ?></label>
-              <small class="muted" style="display:block;margin:0 0 .5em 1.6em"><?= htmlspecialchars(AssociateRules::PRICE_RULE_TEXT[$__k]) ?></small>
+              <div class="choice-group"><label><input type="radio" name="price_rule" value="<?= $__k ?>"<?= $priceRule['own'] && $priceRule['rule'] === $__k ? ' checked' : '' ?>> <?= htmlspecialchars($__l) ?></label>
+                <span class="choice-help"><?= htmlspecialchars(AssociateRules::PRICE_RULE_TEXT[$__k]) ?></span>
+                <?php if ($__k === 'fixed'): ?><label class="choice-extra">Fixed % <input type="number" name="price_rule_fixed_pct" min="0" max="50" step="0.01" placeholder="e.g. 5" style="width:7em" aria-label="Fixed % included in the client's price" data-required-when="price_rule=fixed" value="<?= $priceRule['own'] && $priceRule['rule'] === 'fixed' ? htmlspecialchars((string) $priceRule['pct']) : '' ?>"> %</label><?php endif; ?></div>
             <?php endforeach; ?>
-            <label>Fixed % (when "A fixed %")<input type="number" name="price_rule_fixed_pct" min="0" max="50" step="0.01" placeholder="e.g. 5" data-required-when="price_rule=fixed" value="<?= $priceRule['own'] && $priceRule['rule'] === 'fixed' ? htmlspecialchars((string) $priceRule['pct']) : '' ?>"></label>
             <label>Reason for the change *<input type="text" name="price_rule_reason" required minlength="10" maxlength="255" placeholder="e.g. Agreed with the associate on 24 Nov for the new market"></label>
             <p class="muted small">New prices only: orders whose prices are already fixed keep them. Kept in the Audit Log.</p>
             <button type="submit">Save</button>

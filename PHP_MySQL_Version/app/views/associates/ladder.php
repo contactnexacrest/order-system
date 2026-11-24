@@ -9,7 +9,7 @@ $__dis = $canPricing ? '' : ' disabled';
 ?>
 <div class="card">
   <h1>Associates — commission settings</h1>
-  <p class="muted">Commission is worked out on the final invoiced FOB of the goods, line by line, at the commission level fixed on each order when its Proforma Invoice is issued, and only once the buyer has paid the order in full. The levels and the ladder are set in <a href="/pricing/commission-levels">Admin &rarr; Pricing &rarr; Commission levels</a>.</p>
+  <p class="muted">Commission is worked out on the final FOB value of the goods, line by line, at the commission level fixed on each order when its Proforma Invoice is issued, and only once the buyer has paid the order in full. The levels and the ladder are set in <a href="/pricing/commission-levels">Admin &rarr; Pricing &rarr; Commission levels</a>.</p>
   <form method="post" action="/associates/ladder">
     <?= Csrf::field() ?>
     <fieldset><legend>When commission is paid <?= $canPricing ? '' : '<small class="muted">(the MD changes these)</small>' ?></legend>

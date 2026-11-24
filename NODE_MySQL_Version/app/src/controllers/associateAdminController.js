@@ -314,6 +314,7 @@ async function show(req, res) {
     advices: can(req, 'manage_associates') ? await require('../services/associatePaymentAdvice').forAssociate(Number(a.id)) : [], // D-410 (8)
     priceRules: require('../services/associateRules').PRICE_RULES,
     priceRuleText: require('../services/associateRules').PRICE_RULE_TEXT,
+    companyPriceRule: (await require('../services/associateRules').companyPriceRule()).rule,
     groupDays: await require('../services/associateRules').groupDays(),
     minOrderInr: await require('../services/associateRules').minOrderInr(),
     canPricing: can(req, 'manage_pricing'),

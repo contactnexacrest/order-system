@@ -13,7 +13,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
 <div class="statement">
   <table class="list">
     <?php $__fob = $c['show_fob'] ?? true; // D-261: the associate portal hides the FOB value unless their access level shows it ?>
-    <tr><th>Line</th><?php if ($__fob): ?><th class="r">Invoice value of the goods (<?= $__cur ?>)</th><?php endif; ?><th>Price within range?</th><th class="r">Commission (<?= $__cur ?>)</th></tr>
+    <tr><th>Line</th><?php if ($__fob): ?><th class="r">FOB value of the goods (<?= $__cur ?>)</th><?php endif; ?><th>Price within range?</th><th class="r">Commission (<?= $__cur ?>)</th></tr>
     <?php foreach ($c['lines'] as $l): ?>
       <tr><td><?= (int) $l['line_no'] ?> · <?= htmlspecialchars(mb_substr($l['description'], 0, 60)) ?></td><?php if ($__fob): ?><td class="r"><?= $__n($l['fob']) ?></td><?php endif; ?>
         <td><?= $l['in_range'] ? '<span class="badge badge-active">Yes</span>' : '<span class="badge badge-pending">Sold below the lowest price (we agreed to it) — no commission on this line</span>' ?></td><td class="r"><?= $__n($l['commission']) ?></td></tr>
@@ -37,5 +37,5 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <tr><th>Counts toward the ladder</th><td data-ladder-step><?= htmlspecialchars((string) ($c['ladder_text'] ?? '—')) ?> <span class="help" title="D-410: an order of ₹<?= number_format((float) $c['threshold_inr'], 0) ?> or more counts as one step once its advance has cleared (LC: LC confirmed; no advance and no LC: paid in full). Same client within the group days = one step.">ℹ</span></td></tr>
     <?php endif; ?>
   </table>
-  <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
+  <p class="muted small">We work out your commission on the final FOB value of the goods only (as on the Commercial Invoice). Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
 </div>

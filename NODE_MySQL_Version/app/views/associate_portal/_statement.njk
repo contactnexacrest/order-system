@@ -5,7 +5,7 @@
   <table class="list">
     {# D-261: the associate portal hides the FOB value unless their access level shows it #}
     {% set showFob = c.show_fob !== false %}
-    <tr><th>Line</th>{% if showFob %}<th class="r">Invoice value of the goods ({{ c.currency }})</th>{% endif %}<th>Price within range?</th><th class="r">Commission ({{ c.currency }})</th></tr>
+    <tr><th>Line</th>{% if showFob %}<th class="r">FOB value of the goods ({{ c.currency }})</th>{% endif %}<th>Price within range?</th><th class="r">Commission ({{ c.currency }})</th></tr>
     {% for l in c.lines %}
       <tr><td>{{ l.line_no }} · {{ l.description | truncate(60, true, '') }}</td>{% if showFob %}<td class="r">{{ l.fob | money }}</td>{% endif %}
         <td>{% if l.in_range %}<span class="badge badge-active">Yes</span>{% else %}<span class="badge badge-pending">Sold below the lowest price (we agreed to it) — no commission on this line</span>{% endif %}</td><td class="r">{{ l.commission | money }}</td></tr>
@@ -30,5 +30,5 @@
     <tr><th>Counts toward the ladder</th><td data-ladder-step>{{ c.ladder_text or '—' }} <span class="help" title="D-410: an order of ₹{{ c.threshold_inr | money0 }} or more counts as one step once its advance has cleared (LC: LC confirmed; no advance and no LC: paid in full). Same client within the group days = one step.">ℹ</span></td></tr>
     {% endif %}
   </table>
-  <p class="muted small">We work out your commission on the final invoice value of the goods only. Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
+  <p class="muted small">We work out your commission on the final FOB value of the goods only (as on the Commercial Invoice). Freight, insurance and services are not included. Bank charges do not lower it. An agreed discount or a settled claim does lower it. If the buyer does not pay the order in full, there is no commission.</p>
 </div>

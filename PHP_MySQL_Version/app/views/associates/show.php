@@ -38,7 +38,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       <tr><th>Agreement</th><td>signed <?= $__d($a['agreement_signed_on']) ?>, ends <?= $__d($a['agreement_ends_on']) ?><?php if (!empty($a['agreement_file_id'])): ?> · <a href="/associates/<?= $id ?>/agreement" class="small">Signed copy</a><?php endif; ?></td></tr>
       <tr><th>Commission</th><td>
         <?php if ((int) $a['no_commission'] === 1): ?><b>No commission</b> (introductions only)<?php else: ?>
-          On the invoiced FOB of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
+          On the FOB value of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
           due <?= (int) $commissionSettings['due_days'] ?> days later and paid in the payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel($commissionSettings)) ?>).
         <?php endif; ?></td></tr>
       <?php // D-291 / D-292 (11 Nov 2026): the rule, level and progress are in the Commission section below. ?>

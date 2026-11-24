@@ -193,7 +193,7 @@ final class AssociatePaymentAdvice
                 'no' => $i + 1,
                 'order' => (string) $p['order_reference'],
                 'client' => (string) $client,
-                'fob' => (string) $p['order_currency'] . ' ' . number_format(OrderProductRepository::totalFobValue((int) $p['order_id']), 2),
+                'fob' => (string) $p['order_currency'] . ' ' . number_format(array_sum(array_map(static fn (array $l): float => (float) $l['fob_value'], AssociateCommission::goodsLines((int) $p['order_id']))), 2),
                 'pct' => AssociatePortalRepository::orderRateText($order) ?? ($p['associate_rate_pct'] !== null ? rtrim(rtrim(number_format((float) $p['associate_rate_pct'], 2), '0'), '.') . '%' : '—'),
                 'gross' => $m($lineGross),
                 'tds' => $lineTds > 0 ? $inr($lineTds) : '—',

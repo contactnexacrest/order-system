@@ -2,7 +2,7 @@
 <div class="card page-wide">
   <h1>Orders of my clients</h1>
   <p class="muted" data-orders-intro>You earn commission on every order of the clients you introduced, while your agreement is active, when the value of the goods (FOB) is ₹{{ minOrderInr | money0 }} or more — a client's first order always earns, whatever its size. You earn it when the buyer has paid the order in full, not when they pay only the advance. <span class="help" title="Not earned yet — buyer still paying: the buyer has not paid in full yet. Will be paid to you on <date>: the buyer has paid in full; this is the payout date. Paid to you on <date> · bank ref: we have paid it; the bank reference is on your bank statement.">ℹ</span></p>
-  <p class="small" data-badge-legend><span class="badge badge-pending">Not earned yet — buyer still paying</span> <span class="badge badge-tobepaid">🔵 To be paid</span> <span class="badge badge-active">🟢 Paid</span></p>
+  <p class="small" data-badge-legend><span class="badge badge-notyet">🟠 Not earned yet — buyer still paying</span> <span class="badge badge-tobepaid">🔵 To be paid</span> <span class="badge badge-active">🟢 Paid</span></p>
   <table class="list">
     {# D-261: the FOB value and the commission only where the access level shows them #}
     <tr><th>Order</th><th>Client</th><th>Products</th>{% if access.fob_value %}<th>Value of the goods (FOB, without freight)</th>{% endif %}<th>Stage</th><th>Buyer paid in full</th>{% if access.commission %}<th>Commission</th>{% endif %}</tr>
