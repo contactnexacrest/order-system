@@ -130,6 +130,23 @@ About 24 roles, one part per role or close pair, 8–12 minutes each; listed in 
 | E02 | `E02-Divisions-Import-And-Distribution.mp4` | IMP: import, customs duty, landed cost, stock, local sale | **Recorded + checked + sent 21 Nov 2026 (English and Hindi):** 8.45 min, −19.9 dB; Hindi 10.57 min, −17.4 dB. Distribution Sales Executive: import, landed cost, stock check, local sale with GST tax invoice. Re-recorded after the Group E fixes (D-400: spaced stage strip, "GST" wording, Settings › Divisions) and the new role (D-399). **Re-sent 22 Nov 2026** (owner asked for all Group E again): recorded again on the current app (after QA Round 10 and D-405–D-407), English 8.40 min, Hindi 10.57 min, both checked. |
 | E03 | `E03-Divisions-Merchant-Trade.mp4` | MTT: buy abroad, sell abroad, both legs in foreign currency; plus Admin › Divisions activation checklist | **Recorded + checked + sent 21 Nov 2026 (English and Hindi):** 8.56 min, −20.1 dB; Hindi 10.48 min, −17.2 dB. MD switches Merchant Trade on in Settings › Divisions; the Merchant Trade Executive (D-399) records both legs, RBI checks, AD bank checklist. Re-recorded after the Group E fixes (D-400: spaced stage strip, "GST" wording, Settings › Divisions) and the new role (D-399). **Re-sent 22 Nov 2026** (owner asked for all Group E again): recorded again on the current app (after QA Round 10 and D-405–D-407), English 8.55 min, Hindi 10.50 min, both checked. |
 
+## Group F — Associate life cycle under the new rules (D-410) — owner request 24 Nov 2026
+
+One story for all four videos (the owner's 4 sections): TEST Scenario Associate (India), 2 clients, 25 orders Jan–Nov 2026 of
+Black Galaxy Granite (demo) at the app's own quote USD 50.93/SQM, app ladder 2/5/7/10 %, client's price includes a fixed 5 %.
+Built off camera on the clean tutorial database by the scenario builder (scratchpad `scn410tut/build.sh`: settings, associate,
+clients, priced product, 25 orders through the app's services, receipts, Accounts paying each monthly run on the Payouts screen,
+stages) and saved as `$TUT_WORK/scenario-ready.sql`; every recording starts from it. Shared set-up: `scripts/_scn410.js`.
+
+| Code | File | Owner's section | Status |
+|---|---|---|---|
+| F01 | `F01-Associate-Lifecycle-1-What-The-Associate-Sees.mp4` | 1 — what the associate sees: Get price, orders and statuses, order statement, the % rising, Commission page, Payments to you, profile | **Recorded + checked 24 Nov 2026:** 6.20 min |
+| F02 | `F02-Associate-Lifecycle-2-What-The-MD-And-Staff-See.mp4` | 2 — the same year for MD / Accounts / ED / Export Executive: associate page, ladder step per order, payment advice Rev 1, Associates › Settings, payout runs | **Recorded + checked 24 Nov 2026:** 5.41 min |
+| F03 | `F03-Associate-Lifecycle-3-How-The-Quote-Price-Is-Worked-Out.mp4` | 3 — how the quote is worked out (MD/ED): pricing settings choice + cost of each choice, product price build-up and associates table, levels, the price on the order | **Recorded + checked 24 Nov 2026:** 4.40 min |
+| F04 | `F04-Associate-Lifecycle-4-Profit-And-The-Associates-P-And-L.mp4` | 4 — profit and the associate's P&L (MD/ED): Step 12 profit and margin box (2 / 7 / 10 % orders), Order Profitability, person statement, Associates report, paid from our margin so far | **Recorded + checked 24 Nov 2026** |
+
+English only so far (Hindi on request).
+
 ## Out of date after the 11 Nov 2026 build — waiting for the owner's decision
 
 Written 11 Nov 2026, after the owner-approved build of D-268, D-269 and D-270 – D-330 (register rows of
