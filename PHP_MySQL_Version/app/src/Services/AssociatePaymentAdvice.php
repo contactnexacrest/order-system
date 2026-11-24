@@ -173,7 +173,9 @@ final class AssociatePaymentAdvice
         $a = AssociateRepository::find((int) $first['associate_id']) ?? [];
         $india = AssociatePayoutService::isIndia($a);
         $cur = $india ? 'INR' : (string) ($first['currency_code'] ?: 'USD');
-        $m = static fn (float $v): string => ($cur === 'INR' ? '₹' : $cur . ' ') . number_format($v, 2);
+        // Rupees in Indian grouping (₹1,98,914.40), as on the confirmed M14 sample; other currencies as usual.
+        $inr = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::indian($v);
+        $m = static fn (float $v): string => $cur === 'INR' ? $inr($v) : $cur . ' ' . number_format($v, 2);
         $lines = [];
         $gross = 0.0;
         $tds = 0.0;
@@ -194,7 +196,7 @@ final class AssociatePaymentAdvice
                 'fob' => (string) $p['order_currency'] . ' ' . number_format(OrderProductRepository::totalFobValue((int) $p['order_id']), 2),
                 'pct' => AssociatePortalRepository::orderRateText($order) ?? ($p['associate_rate_pct'] !== null ? rtrim(rtrim(number_format((float) $p['associate_rate_pct'], 2), '0'), '.') . '%' : '—'),
                 'gross' => $m($lineGross),
-                'tds' => $lineTds > 0 ? '₹' . number_format($lineTds, 2) : '—',
+                'tds' => $lineTds > 0 ? $inr($lineTds) : '—',
                 'paid' => $m($linePaid),
             ];
         }
@@ -204,7 +206,7 @@ final class AssociatePaymentAdvice
         $deductions = [];
         $stmt->execute(array_merge([(int) $first['associate_id']], $refs));
         foreach ($stmt->fetchAll() as $d) {
-            $deductions[] = ['text' => (string) ($d['note'] ?: 'Commission taken back'), 'amount' => '− ₹' . number_format(abs((float) $d['amount_inr']), 2)];
+            $deductions[] = ['text' => (string) ($d['note'] ?: 'Commission taken back'), 'amount' => '− ' . $inr(abs((float) $d['amount_inr']))];
         }
         $bank = AssociateBankRepository::usable((int) $first['associate_id'], (string) $first['paid_on']);
         $sectionRate = $tds > 0 ? trim('section ' . ($first['tds_section'] ?: '194H') . ($first['tds_rate'] !== null ? ', ' . AssociateTds::pct((float) $first['tds_rate']) : '')) : '';
@@ -230,7 +232,7 @@ final class AssociatePaymentAdvice
             'lines' => $lines,
             'deductions' => $deductions,
             'total_gross' => $m($gross),
-            'total_tds' => $tds > 0 ? '₹' . number_format($tds, 2) : '',
+            'total_tds' => $tds > 0 ? $inr($tds) : '',
             'tds_text' => $sectionRate,
             'total_paid' => $m($paid),
             'total_paid_raw' => round($paid, 2),

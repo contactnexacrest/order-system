@@ -179,7 +179,7 @@
       {% for o in orders %}{% set cm = o.commission %}
         <tr><td><a href="/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td>
           <td>{{ o.currency_code }} {{ o.fob_value | money }}</td><td>{{ 'Yes' if o.buyer_paid_in_full else 'No' }}</td>
-          {% if rule %}<td>{{ cm.level or '—' }}</td><td data-ladder-step>{{ (cm.detail.ladder_text if cm.detail) or '—' }}</td>{% endif %}{# D-292: levels only with "See associate commission rules" #}
+          {% if rule %}<td>{{ cm.level or '—' }}</td><td data-ladder-step>{{ (cm.detail.ladder_text if cm.detail else cm.ladder_text) or '—' }}</td>{% endif %}{# D-292: levels only with "See associate commission rules" #}
           <td>{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}<br>{% endif %}<small>{{ cm.label }}</small></td></tr>
       {% endfor %}
       {% if orders.length == 0 %}<tr><td colspan="8" class="muted">No orders yet.</td></tr>{% endif %}

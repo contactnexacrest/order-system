@@ -183,7 +183,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       <?php foreach ($orders as $o): $cm = $o['commission']; ?>
         <tr><td><a href="/orders/<?= (int) $o['id'] ?>"><?= htmlspecialchars((string) $o['order_reference']) ?></a></td><td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td><td><?= htmlspecialchars((string) $o['stage']) ?></td>
           <td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= $__money($o['fob_value']) ?></td><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'No' ?></td>
-          <?php if ($rule !== null): // D-292: levels only with "See associate commission rules" ?><td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td><td data-ladder-step><?= htmlspecialchars((string) ($cm['detail']['ladder_text'] ?? '—')) ?></td><?php endif; ?>
+          <?php if ($rule !== null): // D-292: levels only with "See associate commission rules" ?><td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td><td data-ladder-step><?= htmlspecialchars((string) ($cm['detail']['ladder_text'] ?? $cm['ladder_text'] ?? '—')) ?></td><?php endif; ?>
           <td><?= $cm['amount'] !== null ? htmlspecialchars((string) $o['currency_code']) . ' ' . $__money($cm['amount']) . '<br>' : '' ?><small><?= htmlspecialchars($cm['label']) ?></small></td></tr>
       <?php endforeach; ?>
       <?php if ($orders === []): ?><tr><td colspan="8" class="muted">No orders yet.</td></tr><?php endif; ?>

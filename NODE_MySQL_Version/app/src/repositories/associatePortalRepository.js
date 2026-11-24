@@ -140,7 +140,7 @@ async function commission(associateId, o) {
   const order = (await orderRepository.find(Number(o.id))) || {};
   const c = await associateCommission.forOrder(Number(o.id), order);
   if (!c) return none((await require('../services/associateRules').newRules(order)) ? 'No commission on this order' : NONE_REPEAT);
-  if (c.below_min) return none(await belowMinLabel()); // D-410: below the minimum order value (not the client's first order)
+  if (c.below_min) return { ...none(await belowMinLabel()), ladder_text: c.ladder_text }; // D-410: below the minimum (staff still see why it does not count)
   // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
   const fullyPaidOn = await incentive().fullyPaidOn(Number(o.id));
   const label = fullyPaidOn !== null

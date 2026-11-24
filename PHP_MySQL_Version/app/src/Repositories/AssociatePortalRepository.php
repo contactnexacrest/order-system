@@ -165,7 +165,7 @@ final class AssociatePortalRepository
         // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
         $fullyPaidOn = IncentiveService::fullyPaidOn((int) $o['id']);
         if (!empty($c['below_min'])) { // D-410: below the minimum order value (not the client's first order)
-            return $none(self::belowMinLabel());
+            return ['ladder_text' => $c['ladder_text']] + $none(self::belowMinLabel()); // staff still see why it does not count
         }
         $label = $fullyPaidOn !== null
             ? 'Will be paid to you on ' . \App\Helpers\Dates::short(AssociateCommission::payoutRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))

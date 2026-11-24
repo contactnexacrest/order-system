@@ -138,7 +138,9 @@ async function context(payouts, no, revision, reason) {
   const a = (await require('../repositories/associateRepository').find(Number(first.associate_id))) || {};
   const india = require('./associatePayoutService').isIndia(a);
   const cur = india ? 'INR' : String(first.currency_code || 'USD');
-  const m = (v) => `${cur === 'INR' ? '₹' : `${cur} `}${money2(v)}`;
+  // Rupees in Indian grouping (₹1,98,914.40), as on the confirmed M14 sample; other currencies as usual.
+  const inr = (v) => `₹${require('../helpers/moneyFormat').indian(Number(v))}`;
+  const m = (v) => (cur === 'INR' ? inr(v) : `${cur} ${money2(v)}`);
   const orderRepository = require('../repositories/orderRepository');
   const orderProductRepository = require('../repositories/orderProductRepository');
   const portal = require('../repositories/associatePortalRepository');
@@ -163,7 +165,7 @@ async function context(payouts, no, revision, reason) {
       fob: `${p.order_currency} ${money2(await orderProductRepository.totalFobValue(Number(p.order_id)))}`,
       pct: portal.orderRateText(order) || ratePct,
       gross: m(lineGross),
-      tds: lineTds > 0 ? `₹${money2(lineTds)}` : '—',
+      tds: lineTds > 0 ? inr(lineTds) : '—',
       paid: m(linePaid),
     });
   }
@@ -173,7 +175,7 @@ async function context(payouts, no, revision, reason) {
   refs.forEach((r, i) => { params[`r${i}`] = r; });
   const deductions = (await db.query(
     `SELECT amount_inr, note FROM incentive_payouts WHERE associate_id = :a AND clawback_of_payout_id IS NOT NULL AND paid_reference IN (${refs.map((_, i) => `:r${i}`).join(',')}) ORDER BY id`, params
-  )).map((d) => ({ text: String(d.note || 'Commission taken back'), amount: `− ₹${money2(Math.abs(Number(d.amount_inr)))}` }));
+  )).map((d) => ({ text: String(d.note || 'Commission taken back'), amount: `− ${inr(Math.abs(Number(d.amount_inr)))}` }));
   const bank = await require('../repositories/associateBankRepository').usable(Number(first.associate_id), ymd(first.paid_on));
   const sectionRate = tds > 0 ? `section ${first.tds_section || '194H'}${first.tds_rate !== null && first.tds_rate !== undefined ? `, ${require('./associateTds').pct(Number(first.tds_rate))}` : ''}` : '';
   const company = await require('./documentDataAssembler').companyBlock();
@@ -199,7 +201,7 @@ async function context(payouts, no, revision, reason) {
     lines,
     deductions,
     total_gross: m(gross),
-    total_tds: tds > 0 ? `₹${money2(tds)}` : '',
+    total_tds: tds > 0 ? inr(tds) : '',
     tds_text: sectionRate,
     total_paid: m(paid),
     total_paid_raw: Math.round(paid * 100) / 100,
