@@ -30,7 +30,7 @@
         <p class="muted small" data-step-rule>An order of ₹{{ minOrderInr | money0 }} or more (value of the goods, FOB) counts as one ladder step once its advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once the buyer has paid in full). Orders of the same client within {{ groupDays }} days of the first order of the group are one step. A smaller order earns nothing and does not count — except the client's first order, which always earns. Cancelled orders never count.</p>
       {% endif %}
       {% if priceRule %}
-        {% set __fmtPct = (priceRule.pct | float).toFixed(2) | replace(r/\.?0+$/, '') %}
+        {% set __fmtPct = (priceRule.pct | float(0)).toFixed(2) | replace(r/\.?0+$/, '') %}
         <h3 id="price-rule">Commission in the client's price <span class="help" title="How much commission the client's price already includes for this associate. Above it, the rest is paid from our margin.">ℹ</span></h3>
         <table class="kv" data-price-rule>
           <tr><th>Uses</th><td><b>{{ priceRules[priceRule.rule] }}{% if priceRule.pct !== null %} — {{ __fmtPct }}%{% endif %}</b> <small class="muted">{{ "(this associate's own choice)" if priceRule.own else '(the company setting — Admin → Pricing)' }}</small></td></tr>

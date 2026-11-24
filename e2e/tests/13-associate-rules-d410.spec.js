@@ -29,12 +29,12 @@ function sqlStr(v) { return `'${String(v).replace(/'/g, "''")}'`; }
 /** Runs the stack's own AssociatePaymentAdvice::afterPaid for one payout; returns the advice id. */
 function makeAdvice(payoutId) {
   const r = isNodeStack()
-    ? spawnSync('node', ['-e', `require('./src/services/associatePaymentAdvice').afterPaid([${payoutId}], null).then(async (ids) => { console.log(ids[0]); await require('./src/config/db').pool.end(); });`],
-      { cwd: '/home/user/order-system/NODE_MySQL_Version/app', env: { ...process.env, TZ: 'Asia/Kolkata' } })
+    ? spawnSync('node', ['-e', `require('./src/services/associatePaymentAdvice').afterPaid([${payoutId}], null).then(async (ids) => { console.log(String(ids[0])); await require('./src/config/db').pool.end(); });`],
+      { cwd: '/home/user/order-system/NODE_MySQL_Version/app', env: { ...process.env, NODE_OPTIONS: '', TZ: 'Asia/Kolkata' } })
     : spawnSync('php', ['-r', `require "bootstrap.php"; echo App\\Services\\AssociatePaymentAdvice::afterPaid([${payoutId}], null)[0];`],
       { cwd: '/home/user/order-system/PHP_MySQL_Version/app' });
   const out = r.stdout.toString().trim().split('\n').pop();
-  if (r.status !== 0 || !/^\d+$/.test(out)) throw new Error(`advice not made: ${r.stderr.toString()} ${r.stdout.toString()}`);
+  if (r.status !== 0 || !/^\d+$/.test(out)) throw new Error(`advice not made (status ${r.status}, signal ${r.signal}): ${r.stderr.toString()} ${r.stdout.toString()}`);
   return Number(out);
 }
 
