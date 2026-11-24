@@ -799,6 +799,9 @@ $router->post('/associates/{id}/bank/{bankId}/remind', [$associateAdmin, 'remind
 $router->get('/associates/{id}/commission-rule', [$associateAdmin, 'commissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
 $router->post('/associates/{id}/commission-rule', [$associateAdmin, 'saveCommissionRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 // D-410 (24 Nov 2026): this associate's own choice of what the client's price includes (MD only, with a reason).
+// D-410 (8): payment advices — staff download (manage_associates) and the MD's correction (Rev n, reason).
+$router->get('/associates/{id}/payment-advices/{adviceId}/{format}', [$associateAdmin, 'paymentAdvice'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates/{id}/payment-advices/{adviceId}/revise', [$associateAdmin, 'revisePaymentAdvice'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/price-rule', [$associateAdmin, 'savePriceRule'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
@@ -1158,6 +1161,8 @@ $router->get('/associate/catalogue/{id}', [$associatePortal, 'getPriceForm'], [A
 $router->post('/associate/catalogue/{id}/price', [$associatePortal, 'requestPrice'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/price-requests/{id}', [$associatePortal, 'priceRequest'], [AssociateAuth::required()]);
 $router->get('/associate/commission', [$associatePortal, 'commission'], [AssociateAuth::required()]);
+// D-410 (8): the associate's payment advices (their own only).
+$router->get('/associate/payment-advices/{id}/{format}', [$associatePortal, 'paymentAdvice'], [AssociateAuth::required()]);
 $router->post('/associate/commission/{id}/invoice', [$associatePortal, 'uploadInvoice'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/profile', [$associatePortal, 'profile'], [AssociateAuth::required()]);
 $router->post('/associate/profile', [$associatePortal, 'saveProfile'], [AssociateAuth::required(), CsrfCheck::verify()]);

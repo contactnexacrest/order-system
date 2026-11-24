@@ -1,0 +1,78 @@
+{% extends "_layout.html.twig" %}
+{# Owner decision D-410 point 8 (24 Nov 2026, mockup M14 confirmed twice): the Commission Payment Advice (CPA), one per
+   bank transfer to an associate. Same design as the Quotation / PI / CI. Every figure arrives formatted and frozen
+   (AssociatePaymentAdvice::context); this only prints. No TAN. Only the associate's commission — never costs,
+   margins or supplier prices. Node twin: templates/CPA/payment_advice.njk. #}
+
+{% block header_incoterm %}<span class="incoterm">Associate commission — paid</span>{% endblock %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td><span class="label">ADVICE NO.</span><span class="value">{{ number }}{% if revision_label %} {{ revision_label }}{% endif %}</span></td>
+    <td><span class="label">PAID ON</span><span class="value">{{ paid_on }}</span></td>
+    <td><span class="label">BANK REFERENCE</span><span class="value">{{ paid_reference ?: '—' }}</span></td>
+    <td><span class="label">ASSOCIATE NO.</span><span class="value">{{ associate_no }}</span></td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="banner banner-green"><span class="headline">{{ headline }}</span></div>
+{% if revision_label %}<div class="banner banner-amber"><span class="label">{{ revision_label }} — CORRECTED:</span> <span class="value">{{ revision_reason }}. It replaces the earlier advice with the same number.</span></div>{% endif %}
+{% if superseded %}<div class="banner banner-amber"><span class="label">SUPERSEDED:</span> <span class="value">A corrected advice with the same number replaces this one.</span></div>{% endif %}
+{% endblock %}
+
+{% block section1 %}
+<div class="section-title">1. PAID BY</div>
+<table class="kv">
+  <tr><td class="k">Company / Legal Entity</td><td class="v">{{ company.legal_name }}</td></tr>
+  <tr><td class="k">Registered Office</td><td class="v">{{ company.registered_office }}</td></tr>
+  <tr><td class="k">GSTIN</td><td class="v">{{ company.gstin }}</td></tr>
+  <tr><td class="k">IEC / PAN</td><td class="v">{{ company.iec_pan }}</td></tr>
+  <tr><td class="k">Email / Phone</td><td class="v">{{ company.email }}{% if company.email and company.phone %} · {% endif %}{{ company.phone }}</td></tr>
+</table>
+{% endblock %}
+
+{% block body %}
+<div class="section-title">2. PAID TO</div>
+<table class="kv">
+  <tr><td class="k">Associate</td><td class="v">{{ associate.name }} ({{ associate_no }})</td></tr>
+  {% if associate.pan %}<tr><td class="k">PAN</td><td class="v">{{ associate.pan }}</td></tr>{% endif %}
+  <tr><td class="k">Bank Account</td><td class="v">{{ bank }}</td></tr>
+  <tr><td class="k">Paid Via</td><td class="v">{{ paid_via }}{% if paid_reference %} · bank ref {{ paid_reference }}{% endif %}</td></tr>
+</table>
+
+<div class="section-title">3. COMMISSION PAID</div>
+<table class="products">
+  <tr class="col-head"><th>#</th><th>Order</th><th>Client</th><th>Value of the goods (FOB)</th><th>Your %</th><th>Commission (before tax)</th><th>TDS</th><th>Paid to you</th></tr>
+  {% for l in lines %}
+  <tr>
+    <td class="line-no" style="color:{{ loop.index is odd ? '#1D6FA8' : '#2D7D56' }};">{{ l.no }}</td>
+    <td>{{ l.order }}</td><td>{{ l.client }}</td><td class="num">{{ l.fob }}</td><td class="num">{{ l.pct }}</td>
+    <td class="num">{{ l.gross }}</td><td class="num">{{ l.tds }}</td><td class="num">{{ l.paid }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr><td class="k" style="text-align:right;">Commission before tax</td><td class="v" style="text-align:right;">{{ total_gross }}</td></tr>
+  {% for d in deductions %}<tr><td class="k" style="text-align:right;">{{ d.text }}</td><td class="v" style="text-align:right;">{{ d.amount }}</td></tr>{% endfor %}
+  {% if total_tds %}<tr><td class="k" style="text-align:right;">Less: tax deducted at source (TDS) — {{ tds_text }}</td><td class="v" style="text-align:right;">{{ total_tds }}</td></tr>{% endif %}
+  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL PAID TO YOUR BANK</td><td class="v" style="text-align:right;">{{ total_paid }}</td></tr>
+</table>
+
+<div class="section-title">4. HOW THE COMMISSION IS WORKED OUT</div>
+<p>Each commission is your % of the value of the goods (FOB) of the order, fixed when the buyer paid the order in full, at the rate the bank used for the buyer's payment. It does not change later. NexaCrest pays all bank charges.</p>
+
+{% if total_tds %}
+<div class="section-title">5. TAX (TDS)</div>
+<p>The tax deducted ({{ total_tds }}) is deposited against your PAN. The TDS certificate (Form 16A) for this quarter will be available in your associate portal under Commission.</p>
+{% endif %}
+{% endblock %}
+
+{% block terms_section %}{% endblock %}
+{% block legal_terms_definitions %}{% endblock %}
+
+{% block signature_block %}
+<p class="footer-entity-note">This is a computer-generated advice and needs no signature. It shows only your commission — never costs, margins or supplier prices. "NexaCrest" in this document refers to {{ company.legal_name }}.</p>
+{% endblock %}

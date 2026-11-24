@@ -350,6 +350,7 @@ final class AssociatePortalController
         }
         self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id, $months), 'print' => ($_GET['print'] ?? '') === '1',
             'documents' => AssociateDocumentRepository::forAssociate($id),
+            'advices' => \App\Services\AssociatePaymentAdvice::forAssociate($id), // D-410 (8): "Payments to you"
             // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
             'headline' => self::commissionHeadline(self::me()), 'commissionSettings' => \App\Services\AssociateCommission::settings()]);
     }
@@ -680,6 +681,19 @@ final class AssociatePortalController
         }
         Flash::set('error', \App\Services\AssociateBankConfirmation::NOT_ME_MESSAGE);
         header('Location: /associate/profile');
+    }
+
+    /** D-410 (8): the associate downloads their own payment advice (PDF or Word). */
+    public function paymentAdvice(array $params): void
+    {
+        $a = self::me();
+        $advice = \App\Services\AssociatePaymentAdvice::find((int) ($params['id'] ?? 0));
+        if ($advice === null || (int) $advice['associate_id'] !== (int) $a['id']) {
+            http_response_code(404);
+            echo 'Payment advice not found.';
+            return;
+        }
+        AssociateAdminController::sendAdvice($advice, (string) ($params['format'] ?? 'pdf'));
     }
 
     public function downloadDocument(array $params): void

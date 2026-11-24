@@ -156,6 +156,26 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
     </table>
   </div>
 
+  <?php if (!empty($advices)): // D-410 (8): this associate's Commission Payment Advices (one per bank transfer) ?>
+  <div class="section" id="payment-advices">
+    <h2>Payment advices</h2>
+    <table class="list" data-payment-advices>
+      <tr><th>Advice</th><th>Paid on</th><th>Bank reference</th><th class="num">Paid</th><th>Download</th><?php if ($canPricing): ?><th>Correct (MD)</th><?php endif; ?></tr>
+      <?php foreach ($advices as $__v): ?>
+        <tr><td><?= htmlspecialchars((string) $__v['advice_no']) ?><?= (int) $__v['revision'] > 0 ? ' Rev ' . (int) $__v['revision'] . '<br><small class="muted">' . htmlspecialchars((string) $__v['revision_reason']) . '</small>' : '' ?><?= !empty($__v['superseded_at']) ? ' <small class="muted">(superseded)</small>' : '' ?></td>
+          <td><?= $__d($__v['paid_on']) ?></td><td><?= htmlspecialchars((string) ($__v['paid_reference'] ?? '—')) ?></td>
+          <td class="num"><?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' : $__v['currency_code'] . ' ') . number_format((float) $__v['total_paid'], 2)) ?></td>
+          <td><a href="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/pdf">PDF</a> · <a href="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/docx">Word</a></td>
+          <?php if ($canPricing): ?><td><?php if (empty($__v['superseded_at'])): ?>
+            <form method="post" action="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/revise" class="inline-form"><?= \App\Helpers\Csrf::field() ?>
+              <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="e.g. Bank reference typed wrong" aria-label="Reason for the correction">
+              <button type="submit" class="btn-sm btn-secondary">Make Rev</button></form><?php else: ?>—<?php endif; ?></td><?php endif; ?></tr>
+      <?php endforeach; ?>
+    </table>
+    <p class="muted small">Made once when the payment is marked paid. A correction makes "Rev 1" with your reason; the earlier advice is kept and marked superseded.</p>
+  </div>
+  <?php endif; ?>
+
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">

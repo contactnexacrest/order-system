@@ -520,6 +520,8 @@ final class IncentiveController
             'rows' => $rows,
             // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.
             'payoutCosts' => \App\Services\AssociatePayoutService::payoutCostsForMonth($month),
+            // D-410 (8): "Bank transfers made this run" — one line per transfer (payment advice) to an associate.
+            'transfers' => \App\Services\AssociatePaymentAdvice::forMonth($month),
         ], 'layout/base');
     }
 
@@ -691,9 +693,12 @@ final class IncentiveController
                         ->execute(['p' => \App\Services\AssociateCommission::settings()['gst_pct'], 'g' => $gst, 'id' => $id]);
                 }
                 \App\Services\AssociateService::onPayoutPaid($id, (int) $user['id']);
+                $paidAssociatePayouts[] = $id; // D-410 (8): one payment advice per bank transfer, made below
             }
             $count++;
         }
+        // D-410 point 8: the Commission Payment Advice — one per bank transfer (associate, day, bank reference).
+        \App\Services\AssociatePaymentAdvice::afterPaid($paidAssociatePayouts ?? [], (int) $user['id']);
         // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
         if ($count === 0) {
             Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.' . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')

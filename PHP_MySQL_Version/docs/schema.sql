@@ -6310,6 +6310,35 @@ ALTER TABLE orders ADD COLUMN insurance_basis VARCHAR(255) NULL;
 -- D-410 (24 Nov 2026): the associate's own choice of what the client's price includes, and the % fixed on an order at its PI.
 ALTER TABLE associates ADD COLUMN price_rule_override VARCHAR(10) NULL, ADD COLUMN price_rule_fixed_pct DECIMAL(5,2) NULL;
 ALTER TABLE orders ADD COLUMN associate_included_pct DECIMAL(5,2) NULL;
+-- D-410 point 8 (24 Nov 2026): the Commission Payment Advice (one per bank transfer to an associate).
+CREATE TABLE is safe to repeat; a second run stops at the
+-- ALTER with "#1060 Duplicate column name", which is harmless.
+-- Run docs/checks/check_all_migrations.sql first: this file's row says NEEDED until it has run.
+SET NAMES utf8mb4;
+CREATE TABLE associate_payment_advices (
+  id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  associate_id     BIGINT UNSIGNED NOT NULL,
+  advice_no        VARCHAR(40) NOT NULL,
+  fy_yy            CHAR(2) NOT NULL,
+  seq              INT UNSIGNED NOT NULL,
+  revision         INT UNSIGNED NOT NULL DEFAULT 0,
+  supersedes_id    BIGINT UNSIGNED NULL,
+  superseded_at    DATETIME NULL,
+  revision_reason  VARCHAR(300) NULL,
+  paid_on          DATE NOT NULL,
+  paid_reference   VARCHAR(100) NULL,
+  currency_code    CHAR(3) NOT NULL DEFAULT 'INR',
+  total_paid       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  context_json     MEDIUMTEXT NOT NULL,
+  created_by       BIGINT UNSIGNED NULL,
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_cpa_number (associate_id, fy_yy, seq, revision),
+  KEY idx_cpa_associate (associate_id, paid_on),
+  CONSTRAINT fk_cpa_associate FOREIGN KEY (associate_id) REFERENCES associates(id),
+  CONSTRAINT fk_cpa_supersedes FOREIGN KEY (supersedes_id) REFERENCES associate_payment_advices(id),
+  CONSTRAINT fk_cpa_created_by FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE incentive_payouts ADD COLUMN payment_advice_id BIGINT UNSIGNED NULL;
 -- Owner decisions 11 Nov 2026, points 6 and 7 (D-290): KYC. The ID document's
 -- type (Passport / National ID card / Residence permit / Driving licence) is
 -- kept with the document; ID proof and Address proof are separate required

@@ -314,6 +314,7 @@ final class AssociateAdminController
             'priceRule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::priceRuleFor($a) : null,
             'rightNow' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::rightNow($a, \App\Services\AssociateCommission::levelForAssociate($a, null)[0]) : null,
             'marginSoFar' => self::can('view_associate_commission_rules') ? \App\Services\AssociateRules::marginSoFar((int) $a['id']) : null,
+            'advices' => self::can('manage_associates') ? \App\Services\AssociatePaymentAdvice::forAssociate((int) $a['id']) : [], // D-410 (8)
             'canPricing' => self::can('manage_pricing'),
             'clients' => AssociatePortalRepository::clients($id),
             'me' => self::user(),
@@ -366,6 +367,44 @@ final class AssociateAdminController
         $blank = ['from_order' => '', 'to_order' => '', 'level_id' => ''];
         View::render('associates/commission_rule', ['a' => $a, 'chosen' => $chosen, 'standard' => $standard, 'rows' => array_merge(array_map(static fn (array $s): array => $s, $rows), [$blank, $blank]),
             'levels' => \App\Repositories\PricingRepository::levels()], 'layout/base');
+    }
+
+    /** D-410 (8): sends a payment advice as PDF or Word. */
+    public static function sendAdvice(array $advice, string $format): void
+    {
+        $docx = $format === 'docx';
+        $bytes = $docx ? \App\Services\AssociatePaymentAdvice::docx($advice) : \App\Services\AssociatePaymentAdvice::pdf($advice);
+        header('Content-Type: ' . ($docx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'));
+        header('Content-Disposition: attachment; filename="' . \App\Services\AssociatePaymentAdvice::fileName($advice, $docx ? 'docx' : 'pdf') . '"');
+        header('Content-Length: ' . strlen($bytes));
+        echo $bytes;
+    }
+
+    /** D-410 (8): staff download of one of this associate's payment advices. */
+    public function paymentAdvice(array $params): void
+    {
+        $a = self::found($params);
+        $advice = $a !== null ? \App\Services\AssociatePaymentAdvice::find((int) ($params['adviceId'] ?? 0)) : null;
+        if ($advice === null || (int) $advice['associate_id'] !== (int) $a['id']) {
+            http_response_code(404);
+            echo 'Payment advice not found.';
+            return;
+        }
+        self::sendAdvice($advice, (string) ($params['format'] ?? 'pdf'));
+    }
+
+    /** D-410 (8): the MD corrects a payment advice — a new "Rev n" with a reason; the old one is kept, marked superseded. */
+    public function revisePaymentAdvice(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $advice = \App\Services\AssociatePaymentAdvice::find((int) ($params['adviceId'] ?? 0));
+        $error = $advice === null || (int) $advice['associate_id'] !== (int) $a['id'] ? 'That payment advice no longer exists.'
+            : \App\Services\AssociatePaymentAdvice::revise((int) $advice['id'], (string) ($_POST['reason'] ?? ''), (int) self::user()['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? 'Corrected advice made. The associate sees the new one; the earlier one is kept and marked superseded.');
+        header('Location: /associates/' . (int) $a['id'] . '#payment-advices');
     }
 
     /** D-410: the associate's own choice of what the client's price includes (empty = the company setting). MD, with a reason. */

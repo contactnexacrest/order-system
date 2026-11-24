@@ -43,6 +43,19 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
   </table>
   <?php if ($__pctCol): ?><p class="muted small">Each order shows the % it was given when its Proforma Invoice was sent. Orders still being paid by the buyer are listed under Orders as "Not earned yet — buyer still paying".</p><?php endif; ?>
   <?php endif; ?>
+  <?php if (!$print && !empty($advices)): // D-410 (8): "Payments to you" — one line per bank transfer, with its advice ?>
+  <h2 id="payments-to-you">Payments to you</h2>
+  <table class="list" data-payments-to-you>
+    <tr><th>Paid on</th><th>Bank reference</th><th class="num">Paid to you</th><th>Payment advice</th></tr>
+    <?php foreach ($advices as $__v): ?>
+      <tr><td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__v['paid_on'])) ?></td><td><?= htmlspecialchars((string) ($__v['paid_reference'] ?? '—')) ?></td>
+        <td class="num"><span class="badge badge-active">🟢 <?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' : $__v['currency_code'] . ' ') . number_format((float) $__v['total_paid'], 2)) ?></span></td>
+        <td><?= htmlspecialchars((string) $__v['advice_no']) ?><?= (int) $__v['revision'] > 0 ? ' Rev ' . (int) $__v['revision'] : '' ?><?= !empty($__v['superseded_at']) ? ' <small class="muted">(replaced by a corrected advice)</small>' : '' ?>
+          · <a href="/associate/payment-advices/<?= (int) $__v['id'] ?>/pdf">PDF</a> · <a href="/associate/payment-advices/<?= (int) $__v['id'] ?>/docx">Word</a></td></tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted small">Each line is one bank transfer to you. The payment advice lists the orders it pays, the tax deducted and the bank reference.</p>
+  <?php endif; ?>
   <?php if (!$print && !empty($access['tds_certificates'])): ?>
   <h2>Tax certificates (Form 16A) and foreign payment forms (15CA / 15CB) from NexaCrest</h2>
   <p class="small muted">By law, we deduct tax (TDS) from your commission. Every three months we give you a certificate of this tax (Form 16A). You will find it here.</p>

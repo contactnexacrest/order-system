@@ -111,6 +111,12 @@ FROM (
             + (SELECT COUNT(*) FROM pricing_settings WHERE setting_key IN ('associate_price_rule', 'associate_price_fixed_pct'))
             + (SELECT COUNT(*) FROM incentive_settings WHERE setting_key IN ('associate_group_days', 'associate_rules_from'))
               WHEN 7 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-24b',
+         'Commission Payment Advice: table associate_payment_advices, incentive_payouts.payment_advice_id (D-410 point 8)',
+         CASE (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'associate_payment_advices')
+            + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'incentive_payouts' AND column_name = 'payment_advice_id')
+              WHEN 2 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

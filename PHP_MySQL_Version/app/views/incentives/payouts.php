@@ -87,6 +87,19 @@ foreach ($rows as $r) {
     <?php if ($rows === []): ?><tr><td colspan="6" class="muted">No incentives for this month.</td></tr><?php endif; ?>
   </table>
 
+  <?php if (!empty($transfers)): // D-410 (8) ?>
+  <h2 id="bank-transfers">Bank transfers made this run — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
+  <p class="small muted">One line per bank transfer to an associate, with its Commission Payment Advice (sent to the associate's portal).</p>
+  <table class="list" data-bank-transfers>
+    <tr><th>Paid on</th><th>Associate</th><th>Bank reference</th><th class="num">Paid</th><th>Payment advice</th></tr>
+    <?php foreach ($transfers as $__t): ?>
+      <tr><td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__t['paid_on'])) ?></td><td><a href="/associates/<?= (int) $__t['associate_id'] ?>#payment-advices"><?= htmlspecialchars((string) $__t['associate_name']) ?></a> <small class="muted"><?= htmlspecialchars(\App\Services\AssociatePaymentAdvice::associateNo((int) $__t['associate_id'])) ?></small></td>
+        <td><?= htmlspecialchars((string) ($__t['paid_reference'] ?? '—')) ?></td><td class="num"><?= htmlspecialchars(($__t['currency_code'] === 'INR' ? '₹' : $__t['currency_code'] . ' ') . number_format((float) $__t['total_paid'], 2)) ?></td>
+        <td><?= htmlspecialchars((string) $__t['advice_no']) ?><?= (int) $__t['revision'] > 0 ? ' Rev ' . (int) $__t['revision'] : '' ?><?= !empty($__t['superseded_at']) ? ' <small class="muted">(superseded)</small>' : '' ?></td></tr>
+    <?php endforeach; ?>
+  </table>
+  <?php endif; ?>
+
   <?php if (!empty($payoutCosts)): ?>
   <h2 id="associate-payouts">Associate payout costs — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
   <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
