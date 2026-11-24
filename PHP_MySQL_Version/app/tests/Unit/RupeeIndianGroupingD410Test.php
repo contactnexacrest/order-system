@@ -14,17 +14,17 @@ use PHPUnit\Framework\TestCase;
  */
 final class RupeeIndianGroupingD410Test extends TestCase
 {
-    private const VIEWS = ['associates/_commission_rule.php', 'associates/show.php', 'orders/_associate_margin.php', 'associate_portal/commission.php', 'incentives/payouts.php'];
+    private const VIEWS = ['associates/_commission_rule.php', 'associates/show.php', 'orders/_associate_margin.php', 'associate_portal/commission.php', 'incentives/payouts.php', 'pricing/settings.php'];
 
     public function testRupeeAmountsUseIndianGrouping(): void
     {
         $bad = [];
         foreach (self::VIEWS as $v) {
             foreach (file(dirname(__DIR__, 2) . '/views/' . $v) as $n => $line) {
-                if (str_contains($line, 'per USD')) {
+                if (str_contains($line, 'per USD') || str_contains($line, "\$fx['") || str_contains($line, 'market_rate')) { // exchange rates
                     continue;
                 }
-                if (preg_match('/₹<\?= number_format\(|\'₹\' \. number_format\(|\'₹\' : [^;]*number_format\(\(float\) \$__[a-z]+\[\'total_paid\'\]/u', $line)) {
+                if (preg_match('/(₹|&#8377;)<\?= number_format\(\(float\) \$__wi|₹<\?= number_format\(|\'₹\' \. number_format\(|\'₹\' : [^;]*number_format\(\(float\) \$__[a-z]+\[\'total_paid\'\]/u', $line)) {
                     $bad[] = $v . ':' . ($n + 1);
                 }
             }

@@ -187,8 +187,8 @@ $__ro = $canManage ? '' : ' disabled';
       <?php if ($__wi !== null): ?>
       <table class="list" style="max-width:760px" data-testid="associate-price-what-if"><caption style="text-align:left"><strong>What each choice would cost us</strong> — the last 12 months of associate orders (<?= (int) $__wi['orders'] ?>), with today's ladder</caption>
         <tr><th>Choice</th><th class="num">Paid from our margin in 12 months</th></tr>
-        <tr<?= $__ar === 'starting' ? ' style="font-weight:700"' : '' ?>><td>Starting rate</td><td class="num">&#8377;<?= number_format((float) $__wi['starting'], 2) ?></td></tr>
-        <tr<?= $__ar === 'fixed' ? ' style="font-weight:700"' : '' ?>><td>A fixed <?= View::e(PricingService::pct((float) $__wi['fixed_pct'])) ?></td><td class="num">&#8377;<?= number_format((float) $__wi['fixed'], 2) ?></td></tr>
+        <tr<?= $__ar === 'starting' ? ' style="font-weight:700"' : '' ?>><td>Starting rate</td><td class="num">&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $__wi['starting']) ?></td></tr>
+        <tr<?= $__ar === 'fixed' ? ' style="font-weight:700"' : '' ?>><td>A fixed <?= View::e(PricingService::pct((float) $__wi['fixed_pct'])) ?></td><td class="num">&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $__wi['fixed']) ?></td></tr>
         <tr<?= $__ar === 'ladder' ? ' style="font-weight:700"' : '' ?>><td>Ladder rate</td><td class="num">&#8377;0.00 <small class="muted">(the client's price rises instead)</small></td></tr>
       </table>
       <?php endif; ?>

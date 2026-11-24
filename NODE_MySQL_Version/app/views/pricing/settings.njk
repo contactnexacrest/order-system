@@ -182,8 +182,8 @@
       {% if whatIf %}
       <table class="list" style="max-width:760px" data-testid="associate-price-what-if"><caption style="text-align:left"><strong>What each choice would cost us</strong> — the last 12 months of associate orders ({{ whatIf.orders }}), with today's ladder</caption>
         <tr><th>Choice</th><th class="num">Paid from our margin in 12 months</th></tr>
-        <tr{% if __ar == 'starting' %} style="font-weight:700"{% endif %}><td>Starting rate</td><td class="num">&#8377;{{ whatIf.starting | money }}</td></tr>
-        <tr{% if __ar == 'fixed' %} style="font-weight:700"{% endif %}><td>A fixed {{ pricingFmt.pct(whatIf.fixed_pct) }}</td><td class="num">&#8377;{{ whatIf.fixed | money }}</td></tr>
+        <tr{% if __ar == 'starting' %} style="font-weight:700"{% endif %}><td>Starting rate</td><td class="num">&#8377;{{ whatIf.starting | inr }}</td></tr>
+        <tr{% if __ar == 'fixed' %} style="font-weight:700"{% endif %}><td>A fixed {{ pricingFmt.pct(whatIf.fixed_pct) }}</td><td class="num">&#8377;{{ whatIf.fixed | inr }}</td></tr>
         <tr{% if __ar == 'ladder' %} style="font-weight:700"{% endif %}><td>Ladder rate</td><td class="num">&#8377;0.00 <small class="muted">(the client's price rises instead)</small></td></tr>
       </table>
       {% endif %}

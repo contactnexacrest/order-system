@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { indian } = require('../../src/helpers/moneyFormat');
 
-const VIEWS = ['associates/_commission_rule.njk', 'associates/show.njk', 'orders/_associate_margin.njk', 'associate_portal/commission.njk', 'incentives/payouts.njk'];
+const VIEWS = ['associates/_commission_rule.njk', 'associates/show.njk', 'orders/_associate_margin.njk', 'associate_portal/commission.njk', 'incentives/payouts.njk', 'pricing/settings.njk'];
 
 describe('D-410 rupee amounts use Indian grouping', () => {
   it('has no Western-grouped rupee amount in the D-410 views', () => {
@@ -18,7 +18,7 @@ describe('D-410 rupee amounts use Indian grouping', () => {
       fs.readFileSync(path.join(__dirname, '../../views', v), 'utf8').split('\n').forEach((line, i) => {
         if (line.includes('per USD')) return;
         // The D-410 amounts (same as the PHP twin): advice totals, the margin box, "Paid from our margin so far", the minimum.
-        if (/₹\{\{\s*[\w.]*(total_paid|margin_inr|marginSoFar\.inr|minOrderInr)\s*\|\s*money0?\s*\}\}|'₹' if [^%]*total_paid\s*\|\s*money/.test(line)) bad.push(`${v}:${i + 1}`);
+        if (/&#8377;\{\{\s*whatIf\.\w+\s*\|\s*money\s*\}\}|₹\{\{\s*[\w.]*(total_paid|margin_inr|marginSoFar\.inr|minOrderInr)\s*\|\s*money0?\s*\}\}|'₹' if [^%]*total_paid\s*\|\s*money/.test(line)) bad.push(`${v}:${i + 1}`);
       });
     }
     expect(bad).toEqual([]);
