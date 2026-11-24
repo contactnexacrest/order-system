@@ -71,7 +71,7 @@
     <tr><th>Paid on</th><th>Associate</th><th>Bank reference</th><th class="num">Paid</th><th>Payment advice</th></tr>
     {% for v in transfers %}
       <tr><td>{{ v.paid_on | shortDate }}</td><td><a href="/associates/{{ v.associate_id }}#payment-advices">{{ v.associate_name }}</a> <small class="muted">A{{ ('0000' + v.associate_id).slice(-4) }}</small></td>
-        <td>{{ v.paid_reference or '—' }}</td><td class="num">{{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</td>
+        <td>{{ v.paid_reference or '—' }}</td><td class="num">{% if v.currency_code == 'INR' %}₹{{ v.total_paid | inr }}{% else %}{{ v.currency_code }} {{ v.total_paid | money }}{% endif %}</td>
         <td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}{% endif %}{% if v.superseded_at %} <small class="muted">(superseded)</small>{% endif %}</td></tr>
     {% endfor %}
   </table>

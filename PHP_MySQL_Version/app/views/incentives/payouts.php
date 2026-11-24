@@ -94,7 +94,7 @@ foreach ($rows as $r) {
     <tr><th>Paid on</th><th>Associate</th><th>Bank reference</th><th class="num">Paid</th><th>Payment advice</th></tr>
     <?php foreach ($transfers as $__t): ?>
       <tr><td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__t['paid_on'])) ?></td><td><a href="/associates/<?= (int) $__t['associate_id'] ?>#payment-advices"><?= htmlspecialchars((string) $__t['associate_name']) ?></a> <small class="muted"><?= htmlspecialchars(\App\Services\AssociatePaymentAdvice::associateNo((int) $__t['associate_id'])) ?></small></td>
-        <td><?= htmlspecialchars((string) ($__t['paid_reference'] ?? '—')) ?></td><td class="num"><?= htmlspecialchars(($__t['currency_code'] === 'INR' ? '₹' : $__t['currency_code'] . ' ') . number_format((float) $__t['total_paid'], 2)) ?></td>
+        <td><?= htmlspecialchars((string) ($__t['paid_reference'] ?? '—')) ?></td><td class="num"><?= htmlspecialchars(($__t['currency_code'] === 'INR' ? '₹' . \App\Helpers\MoneyFormat::indian((float) $__t['total_paid']) : $__t['currency_code'] . ' ' . number_format((float) $__t['total_paid'], 2))) ?></td>
         <td><?= htmlspecialchars((string) $__t['advice_no']) ?><?= (int) $__t['revision'] > 0 ? ' Rev ' . (int) $__t['revision'] : '' ?><?= !empty($__t['superseded_at']) ? ' <small class="muted">(superseded)</small>' : '' ?></td></tr>
     <?php endforeach; ?>
   </table>

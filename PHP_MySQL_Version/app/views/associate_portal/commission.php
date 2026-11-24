@@ -49,7 +49,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <tr><th>Paid on</th><th>Bank reference</th><th class="num">Paid to you</th><th>Payment advice</th></tr>
     <?php foreach ($advices as $__v): ?>
       <tr><td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__v['paid_on'])) ?></td><td><?= htmlspecialchars((string) ($__v['paid_reference'] ?? '—')) ?></td>
-        <td class="num"><span class="badge badge-active">🟢 <?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' : $__v['currency_code'] . ' ') . number_format((float) $__v['total_paid'], 2)) ?></span></td>
+        <td class="num"><span class="badge badge-active">🟢 <?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' . \App\Helpers\MoneyFormat::indian((float) $__v['total_paid']) : $__v['currency_code'] . ' ' . number_format((float) $__v['total_paid'], 2))) ?></span></td>
         <td><?= htmlspecialchars((string) $__v['advice_no']) ?><?= (int) $__v['revision'] > 0 ? ' Rev ' . (int) $__v['revision'] : '' ?><?= !empty($__v['superseded_at']) ? ' <small class="muted">(replaced by a corrected advice)</small>' : '' ?>
           · <a href="/associate/payment-advices/<?= (int) $__v['id'] ?>/pdf">PDF</a> · <a href="/associate/payment-advices/<?= (int) $__v['id'] ?>/docx">Word</a></td></tr>
     <?php endforeach; ?>

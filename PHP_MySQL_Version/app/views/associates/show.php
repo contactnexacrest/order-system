@@ -164,7 +164,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       <?php foreach ($advices as $__v): ?>
         <tr><td><?= htmlspecialchars((string) $__v['advice_no']) ?><?= (int) $__v['revision'] > 0 ? ' Rev ' . (int) $__v['revision'] . '<br><small class="muted">' . htmlspecialchars((string) $__v['revision_reason']) . '</small>' : '' ?><?= !empty($__v['superseded_at']) ? ' <small class="muted">(superseded)</small>' : '' ?></td>
           <td><?= $__d($__v['paid_on']) ?></td><td><?= htmlspecialchars((string) ($__v['paid_reference'] ?? '—')) ?></td>
-          <td class="num"><?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' : $__v['currency_code'] . ' ') . number_format((float) $__v['total_paid'], 2)) ?></td>
+          <td class="num"><?= htmlspecialchars(($__v['currency_code'] === 'INR' ? '₹' . \App\Helpers\MoneyFormat::indian((float) $__v['total_paid']) : $__v['currency_code'] . ' ' . number_format((float) $__v['total_paid'], 2))) ?></td>
           <td><a href="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/pdf">PDF</a> · <a href="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/docx">Word</a></td>
           <?php if ($canPricing): ?><td><?php if (empty($__v['superseded_at'])): ?>
             <form method="post" action="/associates/<?= $id ?>/payment-advices/<?= (int) $__v['id'] ?>/revise" class="inline-form"><?= \App\Helpers\Csrf::field() ?>

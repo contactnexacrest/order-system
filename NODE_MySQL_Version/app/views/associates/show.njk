@@ -160,7 +160,7 @@
       {% for v in advices %}
         <tr><td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}<br><small class="muted">{{ v.revision_reason }}</small>{% endif %}{% if v.superseded_at %} <small class="muted">(superseded)</small>{% endif %}</td>
           <td>{{ v.paid_on | shortDate }}</td><td>{{ v.paid_reference or '—' }}</td>
-          <td class="num">{{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</td>
+          <td class="num">{% if v.currency_code == 'INR' %}₹{{ v.total_paid | inr }}{% else %}{{ v.currency_code }} {{ v.total_paid | money }}{% endif %}</td>
           <td><a href="/associates/{{ id }}/payment-advices/{{ v.id }}/pdf">PDF</a> · <a href="/associates/{{ id }}/payment-advices/{{ v.id }}/docx">Word</a></td>
           {% if canPricing %}<td>{% if not v.superseded_at %}
             <form method="post" action="/associates/{{ id }}/payment-advices/{{ v.id }}/revise" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">

@@ -48,7 +48,7 @@ test.describe.serial('D-410: associate rules, client-price choice and payment ad
     associateId = Number(runSql(`SELECT id FROM associates WHERE email = ${sqlStr(ASSOCIATE_EMAIL)}`, 'associate id'));
     const orderId = Number(runSql("SELECT MIN(id) FROM orders WHERE status <> 'cancelled'", 'an order'));
     runSql(`INSERT INTO incentive_payouts (order_id, payee_kind, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, status, paid_on, paid_inr, tds_inr, tds_section, paid_via, paid_reference)
-            VALUES (${orderId}, 'associate', ${associateId}, 'associate', 10000, 120, 'USD', DATE_FORMAT(CURDATE(), '%Y-%m'), 'paid', CURDATE(), 9800, 200, '194H', 'bank_transfer', ${sqlStr(UTR)})`, 'paid payout');
+            VALUES (${orderId}, 'associate', ${associateId}, 'associate', 202040, 2405.24, 'USD', DATE_FORMAT(CURDATE(), '%Y-%m'), 'paid', CURDATE(), 198000, 4040, '194H', 'bank_transfer', ${sqlStr(UTR)})`, 'paid payout');
     const payoutId = Number(runSql(`SELECT id FROM incentive_payouts WHERE paid_reference = ${sqlStr(UTR)}`, 'payout id'));
     adviceId = makeAdvice(payoutId);
   });
@@ -134,6 +134,7 @@ test.describe.serial('D-410: associate rules, client-price choice and payment ad
     const pay = page.locator('[data-payments-to-you]');
     await expect(pay).toContainText(UTR);
     await expect(pay).toContainText(`NC/SC/CPA/A${String(associateId).padStart(4, '0')}/`);
+    await expect(pay).toContainText('₹1,98,000.00'); // rupees in Indian grouping
     const pdf = await page.request.get(`/associate/payment-advices/${adviceId}/pdf`);
     expect(pdf.status()).toBe(200);
     expect(pdf.headers()['content-type']).toContain('application/pdf');
@@ -153,6 +154,7 @@ test.describe.serial('D-410: associate rules, client-price choice and payment ad
     await page.goto(`/associates/${associateId}`);
     const list = page.locator('[data-payment-advices]');
     await expect(list).toContainText(UTR);
+    await expect(list).toContainText('₹1,98,000.00'); // rupees in Indian grouping
     const form = list.locator(`form[action$="/payment-advices/${adviceId}/revise"]`);
     await form.locator('input[name="reason"]').fill('E2E: bank reference typed wrong');
     await form.getByRole('button', { name: 'Make Rev' }).click();

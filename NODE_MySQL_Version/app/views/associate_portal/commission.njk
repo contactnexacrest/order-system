@@ -40,7 +40,7 @@
     <tr><th>Paid on</th><th>Bank reference</th><th class="num">Paid to you</th><th>Payment advice</th></tr>
     {% for v in advices %}
       <tr><td>{{ v.paid_on | shortDate }}</td><td>{{ v.paid_reference or '—' }}</td>
-        <td class="num"><span class="badge badge-active">🟢 {{ '₹' if v.currency_code == 'INR' else (v.currency_code + ' ') }}{{ v.total_paid | money }}</span></td>
+        <td class="num"><span class="badge badge-active">🟢 {% if v.currency_code == 'INR' %}₹{{ v.total_paid | inr }}{% else %}{{ v.currency_code }} {{ v.total_paid | money }}{% endif %}</span></td>
         <td>{{ v.advice_no }}{% if v.revision > 0 %} Rev {{ v.revision }}{% endif %}{% if v.superseded_at %} <small class="muted">(replaced by a corrected advice)</small>{% endif %}
           · <a href="/associate/payment-advices/{{ v.id }}/pdf">PDF</a> · <a href="/associate/payment-advices/{{ v.id }}/docx">Word</a></td></tr>
     {% endfor %}
