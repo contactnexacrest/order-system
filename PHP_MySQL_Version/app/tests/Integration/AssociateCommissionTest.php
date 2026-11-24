@@ -157,11 +157,13 @@ final class AssociateCommissionTest extends DbTestCase
         [$a, $client] = $this->associate('ladder');
         $assoc = AssociateRepository::find($a);
         self::assertSame('Level 1', AssociateCommission::levelForAssociate($assoc, null)[0]['name'], 'first order: step 1 (2%)');
-        // Five counting orders already.
+        // Five counting orders already — D-410: orders of ₹5 lakh or more of five of the associate's clients, paid (five steps).
         for ($i = 0; $i < 5; $i++) {
-            $old = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
-            IncentiveRepository::saveOrder($old, ['associate_id' => $a, 'associate_counts' => 1, 'locked_at' => date('Y-m-d H:i:s')], $this->admin);
+            $c = $this->createTestClient();
+            Database::connection()->prepare("UPDATE clients SET associate_id = :a, associate_registered_on = '2026-09-01' WHERE id = :c")->execute(['a' => $a, 'c' => $c]);
+            $this->order($c, [[10000.0, 10.0]]);
         }
+        \App\Services\AssociateRules::reset(); // payments written straight to the database: forget this request's ladder history
         self::assertSame(5, AssociateCommission::countingOrders($a));
         self::assertSame('Level 2', AssociateCommission::levelForAssociate($assoc, null, 600000.0)[0]['name'], 'the 6th counting order: 5%');
         self::assertSame('Level 1', AssociateCommission::levelForAssociate($assoc, null, 100000.0)[0]['name'], 'under ₹5 lakh: the current step (2%), not counting');
@@ -201,8 +203,9 @@ final class AssociateCommissionTest extends DbTestCase
         self::assertSame(['unpaid', 0.0, 0.0], [$c['state'], $c['amount_fc'], $c['amount_inr']], 'no pro rata: nothing unless paid in full');
         IncentiveService::lockIfReady($unpaid, $this->admin);
         self::assertNull($this->associatePayout($unpaid));
-        self::assertSame('0', (string) IncentiveRepository::forOrder($unpaid)['associate_counts']);
-        self::assertSame(0, AssociateCommission::countingOrders($a2));
+        // D-410 point 2: a ladder step counts once the advance has cleared — the buyer stopping on the balance earns nothing,
+        // but the step stays.
+        self::assertSame(1, AssociateCommission::countingOrders($a2));
     }
 
     public function testNothingBeforeFullPaymentAndTheShortfallMustSayWhatItIs(): void

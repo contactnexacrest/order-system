@@ -57,6 +57,7 @@ const RULES = [
   [/^\/associates\/\d+\/(?:price-access|commission-rule)(?:[/?#]|$)/, ['manage_pricing']], // D-291: the commission rule page is the MD's (manage_pricing)
   [/^\/associates\/\d+\/bank\/\d+\/number(?:[/?#]|$)/, ['manage_associate_bank']],
   [/^\/associates\/\d+\/documents\/\d+(?:[/?#]|$)/, ['manage_associates', 'manage_associate_bank']],
+  [/^\/associates\/\d+\/payment-advices\/\d+\/[^/?#]+(?:[/?#]|$)/, ['manage_associates']], // D-410: the Commission Payment Advice
   [/^\/associates\/access-levels(?:[/?#]|$)/, ['view_associates', 'manage_associates']], // D-261
   [/^\/associates\/(?:new|ladder|registrations|\d+\/(?:edit|view-as|agreement))(?:[/?#]|$)/, ['manage_associates']],
   [/^\/associates(?:[/?#]|$)/, ['view_associates', 'manage_associates', 'manage_associate_bank']],

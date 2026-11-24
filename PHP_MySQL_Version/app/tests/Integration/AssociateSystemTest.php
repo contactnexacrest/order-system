@@ -298,9 +298,12 @@ final class AssociateSystemTest extends DbTestCase
         $this->verifiedBank($a);
         $this->completeAssociateKyc((int) $a['id']); // D-252: paid only once the KYC is complete
         // D-245 P3: paid only from its due date (30 days after full payment).
+        // A due date in the future whatever day the suite runs (the order's own one, 24 Nov 2026, is no longer ahead).
+        $due = date('Y-m-d', strtotime('+10 days'));
+        Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d WHERE id = :p')->execute(['d' => $due, 'p' => (int) $p1['id']]);
         $_POST['month'] = $p1['incentive_month'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);
-        self::assertStringStartsWith('This commission is due on 24 Nov 2026', $this->flash()['message']);
+        self::assertStringStartsWith('This commission is due on ' . date('d M Y', strtotime($due)), $this->flash()['message']);
         Database::connection()->prepare("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o")->execute(['o' => $o1]);
         $_POST['month'] = '2026-11';
         $_POST['paid_inr'] = (string) round((float) $p1['amount_inr'] * 0.98, 2);

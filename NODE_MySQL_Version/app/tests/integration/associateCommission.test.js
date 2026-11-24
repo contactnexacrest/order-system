@@ -150,9 +150,11 @@ describe('Associate commission (D-245, P3)', () => {
     const [a, client] = await associate('ladder');
     const assoc = await associateRepository.find(a);
     expect((await associateCommission.levelForAssociate(assoc, null))[0].name).toBe('Level 1');
+    // Five counting orders already — D-410: orders of ₹5 lakh or more of five of the associate's clients, paid (five steps).
     for (let i = 0; i < 5; i++) {
-      const old = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
-      await incentiveRepository.saveOrder(old, { associate_id: a, associate_counts: 1, locked_at: '2026-10-01 10:00:00' }, admin.id);
+      const c = await createTestClient();
+      await db.execute("UPDATE clients SET associate_id = :a, associate_registered_on = '2026-09-01' WHERE id = :c", { a, c });
+      await order(c, [[10000, 10]]);
     }
     expect(await associateCommission.countingOrders(a)).toBe(5);
     expect((await associateCommission.levelForAssociate(assoc, null, 600000))[0].name).toBe('Level 2');
@@ -192,8 +194,9 @@ describe('Associate commission (D-245, P3)', () => {
     expect([u.state, u.amount_fc, u.amount_inr]).toEqual(['unpaid', 0, 0]);
     await incentiveService.lockIfReady(unpaid, admin.id);
     expect(await payoutOf(unpaid)).toBeNull();
-    expect(String((await incentiveRepository.forOrder(unpaid)).associate_counts)).toBe('0');
-    expect(await associateCommission.countingOrders(a2)).toBe(0);
+    // D-410 point 2: a ladder step counts once the advance has cleared — the buyer stopping on the balance earns nothing,
+    // but the step stays.
+    expect(await associateCommission.countingOrders(a2)).toBe(1);
   });
 
   it('nothing before full payment; the shortfall kinds', async () => {

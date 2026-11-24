@@ -17,7 +17,7 @@
           {% if rule.mode == 'ladder' %}<br><small class="muted">{{ rule.standard }}</small>{% endif %}</td></tr>
         <tr><th>Next order earns</th><td><b class="stat-value">{{ rule.rate }}</b>{% if rule.level_name %} — {{ rule.level_name }}{% endif %}</td></tr>
         {% if rule.mode != 'fixed' %}
-        <tr><th>Ladder steps so far <span class="help" title="Orders of ₹{{ minOrderInr | money0 }} or more count as one step each once the advance has cleared. Orders of the same client within {{ groupDays }} days of the first are one step.">ℹ</span></th><td><b>{{ rule.count }}{% if rule.of !== null %} of {{ rule.of }}{% endif %}</b>{% if rule.next_rate !== null %} — {{ rule.more }} more counting order{{ '' if rule.more == 1 else 's' }} to reach {{ rule.next_rate }}{% else %} — the top step{% endif %}</td></tr>
+        <tr><th>Ladder steps so far <span class="help" title="Orders of ₹{{ minOrderInr | inr0 }} or more count as one step each once the advance has cleared. Orders of the same client within {{ groupDays }} days of the first are one step.">ℹ</span></th><td><b>{{ rule.count }}{% if rule.of !== null %} of {{ rule.of }}{% endif %}</b>{% if rule.next_rate !== null %} — {{ rule.more }} more counting order{{ '' if rule.more == 1 else 's' }} to reach {{ rule.next_rate }}{% else %} — the top step{% endif %}</td></tr>
         {% endif %}
       </table>
       {% if rule.mode != 'fixed' %}
@@ -27,7 +27,7 @@
               <div class="stat-value">{{ s.rate }}</div><small>{{ s.level_name }}{{ ' · ← now' if s.current }}</small></div>
           {% endfor %}
         </div>
-        <p class="muted small" data-step-rule>An order of ₹{{ minOrderInr | money0 }} or more (value of the goods, FOB) counts as one ladder step once its advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once the buyer has paid in full). Orders of the same client within {{ groupDays }} days of the first order of the group are one step. A smaller order earns nothing and does not count — except the client's first order, which always earns. Cancelled orders never count.</p>
+        <p class="muted small" data-step-rule>An order of ₹{{ minOrderInr | inr0 }} or more (value of the goods, FOB) counts as one ladder step once its advance has cleared (LC orders: once the LC is confirmed; no advance and no LC: once the buyer has paid in full). Orders of the same client within {{ groupDays }} days of the first order of the group are one step. A smaller order earns nothing and does not count — except the client's first order, which always earns. Cancelled orders never count.</p>
       {% endif %}
       {% if priceRule %}
         {% set __fmtPct = (priceRule.pct | float(0)).toFixed(2) | replace(r/\.?0+$/, '') %}

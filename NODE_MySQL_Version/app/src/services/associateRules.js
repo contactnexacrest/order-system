@@ -38,7 +38,7 @@ const commission = () => require('./associateCommission');
 const incentiveService = () => require('./incentiveService');
 const ymd = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v || '').slice(0, 10));
 const fmtPct = (v) => `${String(Number(v).toFixed(2)).replace(/\.?0+$/, '')}%`;
-const inrWhole = (v) => Math.round(Number(v)).toLocaleString('en-US'); // PHP number_format(v, 0)
+const inrWhole = (v) => require('../helpers/moneyFormat').indian(Number(v), 0); // PHP MoneyFormat::indian(v, 0) — rupees in Indian grouping
 
 function reset() {}
 

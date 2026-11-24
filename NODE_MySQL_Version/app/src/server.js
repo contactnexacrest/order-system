@@ -243,6 +243,8 @@ njkEnv.addGlobal('salesTargetLostCategories', require('./services/salesTargetSer
 // order-currency amount as the documents print it — PHP's $__num, MoneyFormat::indian and MoneyFormat::amount.
 njkEnv.addFilter('targetNum', (v) => require('./services/salesTargetService').num1(v));
 njkEnv.addFilter('inr', (v) => require('./helpers/moneyFormat').indian(Number(v) || 0));
+// Whole rupees in Indian grouping (₹5,00,000) — PHP MoneyFormat::indian($v, 0).
+njkEnv.addFilter('inr0', (v) => require('./helpers/moneyFormat').indian(Number(v) || 0, 0));
 njkEnv.addFilter('docAmount', (v, currency) => require('./helpers/moneyFormat').amount(Number(v) || 0, currency));
 // D-410 (24 Nov 2026): the choices for what the client's price includes, with their owner-approved texts.
 njkEnv.addGlobal('associatePriceRules', { labels: require('./services/associateRules').PRICE_RULES, text: require('./services/associateRules').PRICE_RULE_TEXT });

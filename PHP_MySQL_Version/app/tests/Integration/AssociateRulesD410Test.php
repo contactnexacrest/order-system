@@ -151,7 +151,7 @@ final class AssociateRulesD410Test extends DbTestCase
         $c = AssociateCommission::forOrder($small);
         self::assertTrue($c['below_min']);
         self::assertSame(0.0, $c['amount_fc']);
-        self::assertSame('Does not count — below ₹500,000', $this->steps($a)[1]);
+        self::assertSame('Does not count — below ₹5,00,000', $this->steps($a)[1]);
     }
 
     public function testB4AStepCountsWhenTheAdvanceClearsOrTheLcIsConfirmed(): void
@@ -226,7 +226,8 @@ final class AssociateRulesD410Test extends DbTestCase
 
     public function testB9ChangingWhatTheClientPriceIncludesNeedsAReason(): void
     {
-        $r = $this->call('POST', '/pricing/settings', PricingRepository::settings() + ['associate_price_rule' => 'ladder']);
+        // The change first: PHP's + keeps the left-hand key.
+        $r = $this->call('POST', '/pricing/settings', ['associate_price_rule' => 'ladder'] + PricingRepository::settings());
         self::assertSame('error', $r['type']);
         self::assertStringContainsString("Give the reason for changing what the client's price includes", (string) $r['flash']);
         self::assertSame('fixed', AssociateRules::companyPriceRule()['rule']);

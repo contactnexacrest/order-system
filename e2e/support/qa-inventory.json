@@ -37137,6 +37137,152 @@
    },
    "money_route": true,
    "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/associates/{id}/payment-advices/{adviceId}/{format}",
+   "controller": "AssociateAdminController",
+   "action": "paymentAdvice",
+   "requires_all": [
+    "manage_associates"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session"
+   ],
+   "php_line": 803,
+   "node_line": 1310,
+   "node_handler": "associateAdminController.paymentAdvice",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "PHP_MySQL_Version/app/tests/Integration/AssociateRulesD410Test.php",
+     "PHP_MySQL_Version/app/tests/Integration/AssociatePaymentAdviceD410Test.php"
+    ],
+    "node": [
+     "NODE_MySQL_Version/app/tests/integration/associateRulesD410.test.js",
+     "NODE_MySQL_Version/app/tests/integration/associatePaymentAdviceD410.test.js"
+    ],
+    "e2e": [
+     "e2e/tests/13-associate-rules-d410.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/associates/{id}/payment-advices/{adviceId}/revise",
+   "controller": "AssociateAdminController",
+   "action": "revisePaymentAdvice",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 804,
+   "node_line": 1311,
+   "node_handler": "associateAdminController.revisePaymentAdvice",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "PHP_MySQL_Version/app/tests/Integration/AssociateRulesD410Test.php",
+     "PHP_MySQL_Version/app/tests/Integration/AssociatePaymentAdviceD410Test.php"
+    ],
+    "node": [
+     "NODE_MySQL_Version/app/tests/integration/associateRulesD410.test.js",
+     "NODE_MySQL_Version/app/tests/integration/associatePaymentAdviceD410.test.js"
+    ],
+    "e2e": [
+     "e2e/tests/13-associate-rules-d410.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/associates/{id}/price-rule",
+   "controller": "AssociateAdminController",
+   "action": "savePriceRule",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 805,
+   "node_line": 1312,
+   "node_handler": "associateAdminController.savePriceRule",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "PHP_MySQL_Version/app/tests/Integration/AssociateRulesD410Test.php",
+     "PHP_MySQL_Version/app/tests/Integration/AssociatePaymentAdviceD410Test.php"
+    ],
+    "node": [
+     "NODE_MySQL_Version/app/tests/integration/associateRulesD410.test.js",
+     "NODE_MySQL_Version/app/tests/integration/associatePaymentAdviceD410.test.js"
+    ],
+    "e2e": [
+     "e2e/tests/13-associate-rules-d410.spec.js"
+    ]
+   },
+   "money_route": true,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/associate/payment-advices/{id}/{format}",
+   "controller": "AssociatePortalController",
+   "action": "paymentAdvice",
+   "requires_all": [],
+   "requires_any": [],
+   "guards": [
+    "associate_auth"
+   ],
+   "php_line": 1165,
+   "node_line": 1783,
+   "node_handler": "associatePortalController.paymentAdvice",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "associate_portal",
+   "specific_test_files": {
+    "php": [
+     "PHP_MySQL_Version/app/tests/Integration/AssociateRulesD410Test.php",
+     "PHP_MySQL_Version/app/tests/Integration/AssociatePaymentAdviceD410Test.php"
+    ],
+    "node": [
+     "NODE_MySQL_Version/app/tests/integration/associateRulesD410.test.js",
+     "NODE_MySQL_Version/app/tests/integration/associatePaymentAdviceD410.test.js"
+    ],
+    "e2e": [
+     "e2e/tests/13-associate-rules-d410.spec.js"
+    ]
+   }
   }
  ],
  "payment_presets": [

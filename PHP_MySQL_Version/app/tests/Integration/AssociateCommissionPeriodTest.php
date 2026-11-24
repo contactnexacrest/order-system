@@ -42,7 +42,9 @@ final class AssociateCommissionPeriodTest extends DbTestCase
         '/\b(?:orders|business|turnover|order value)\s*(?:\(\s*\d+\s*\)|:\s*(?:<[^>]+>\s*)*(?:₹|USD|EUR|\d))/iu',
         '/\b\d+\s+(?:completed,?\s+)?(?:fully paid\s+|paid\s+)?orders\b/i',
         '/under ₹[\d,]+ within range/iu',
-        '/5,00,000|500,000|5 lakh/i',
+        // D-410 (24 Nov 2026, mockup M01 confirmed twice): the minimum order value (₹5,00,000) now decides whether an order earns,
+        // so the associate is told it — in Indian grouping. A total of orders or business is still never shown.
+        '/500,000|5 lakh/i',
     ];
 
     private static function router(): Router

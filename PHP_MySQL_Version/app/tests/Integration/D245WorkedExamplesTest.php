@@ -310,10 +310,12 @@ final class D245WorkedExamplesTest extends DbTestCase
             [$old] = $this->order($productId, [['10', '1395.92']], $c, [$this->p['sales']]);
             $this->money($old, 83.0, '2026-10-25', 820000.0);
         }
+        \App\Services\AssociateRules::reset();
         self::assertSame(5, AssociateCommission::countingOrders($a));
         [$big] = $this->order($productId, [['10', '1395.92']], $client, [$this->p['sales']]);
         AssociateCommission::fixLevelAtPi($big);
         $this->money($big, 83.0, '2026-10-25', 820000.0);
+        \App\Services\AssociateRules::reset(); // payments written straight to the database: forget this request's ladder history
         $c = AssociateCommission::forOrder($big);
         self::assertSame(['Level 2 — 5%', 13959.2, 697.96, 57930.68, true], [$c['level_label'], $c['basis_fc'], $c['amount_fc'], $c['amount_inr'], $c['counts']]);
         self::assertNull(IncentiveService::lockIfReady($big, $this->admin));

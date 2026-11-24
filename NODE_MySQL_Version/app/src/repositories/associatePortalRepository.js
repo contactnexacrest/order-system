@@ -163,7 +163,7 @@ const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
 /** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
 async function belowMinLabel() {
   const min = await require('../services/associateRules').minOrderInr();
-  return `No commission — the value of the goods (FOB) is below ₹${Math.round(min).toLocaleString('en-US')} (only the client's first order earns whatever its size)`;
+  return `No commission — the value of the goods (FOB) is below ₹${require('../helpers/moneyFormat').indian(min, 0)} (only the client's first order earns whatever its size)`;
 }
 
 /** D-410: the status badge for a commission line — 'to_be_paid' (🔵), 'paid' (🟢), or null. */

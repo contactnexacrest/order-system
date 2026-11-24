@@ -206,7 +206,7 @@ final class AssociateRules
         return match ($row['status']) {
             'counted' => 'Step ' . $row['step'],
             'same_group' => 'Same step as ' . ($row['group_reference'] ?? ('#' . $row['group_order_id'])) . ' (same client within ' . self::groupDays() . ' days)',
-            'below_min' => 'Does not count — below ₹' . number_format(self::minOrderInr(), 0),
+            'below_min' => 'Does not count — below ₹' . \App\Helpers\MoneyFormat::indian(self::minOrderInr(), 0),
             default => 'Counts when the advance has cleared',
         };
     }

@@ -96,7 +96,7 @@ final class PricingSetupTest extends DbTestCase
 
         $this->actAs($this->createTestUser('Managing Director'));
         $page = $this->render(fn () => (new ProductController())->show(['id' => (string) $productId]));
-        foreach (['Price build-up', 'USD 1,000.00', 'USD 1,250.00', 'USD 37.50', 'USD 1,287.50', 'USD 1,326.13', '1,355.26', '1,395.92', '1,430.56', "Save this product's settings"] as $s) {
+        foreach (['Price build-up', 'USD 1,000.00', 'USD 1,250.00', 'USD 37.50', 'USD 1,287.50', 'USD 1,326.13', '1,313.78', '1,355.26', '1,395.92', "Save this product's settings"] as $s) { // D-410: the client's price includes a fixed 5% — quote 1,395.92 at every level; lowest 1,313.78 (2%) / 1,355.26 (5% and above, the rest from our margin)
             self::assertStringContainsString($s, $page, "MD sees {$s}");
         }
         $list = $this->render(fn () => (new ProductController())->index([]));

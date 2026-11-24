@@ -319,8 +319,14 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await verifiedBank(a);
     await completeAssociateKyc(a.id); // D-252: paid only once the KYC is complete
     // D-245 P3: paid only from its due date (30 days after full payment).
+    // A due date in the future whatever day the suite runs (the order's own one, 24 Nov 2026, is no longer ahead).
+    const dueD = new Date(`${todayIst()}T00:00:00Z`);
+    dueD.setUTCDate(dueD.getUTCDate() + 10);
+    const due = dueD.toISOString().slice(0, 10);
+    await db.execute('UPDATE incentive_payouts SET due_on = :d WHERE id = :p', { d: due, p: p1.id });
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) }, body: { ...pay, month: p1.incentive_month } });
-    expect(flash().message).toMatch(/^This commission is due on 24 Nov 2026/);
+    const dueText = `${String(dueD.getUTCDate()).padStart(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dueD.getUTCMonth()]} ${dueD.getUTCFullYear()}`;
+    expect(flash().message.startsWith(`This commission is due on ${dueText}`)).toBe(true);
     await db.execute("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o", { o: o1 });
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) },
       // D-235: below the ₹20,000 threshold the app works out no TDS; a different figure needs a reason.

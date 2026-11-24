@@ -204,7 +204,7 @@ final class AssociatePortalRepository
     /** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
     public static function belowMinLabel(): string
     {
-        return 'No commission — the value of the goods (FOB) is below ₹' . number_format(\App\Services\AssociateRules::minOrderInr(), 0) . ' (only the client\'s first order earns whatever its size)';
+        return 'No commission — the value of the goods (FOB) is below ₹' . \App\Helpers\MoneyFormat::indian(\App\Services\AssociateRules::minOrderInr(), 0) . ' (only the client\'s first order earns whatever its size)';
     }
 
     /** D-410: the status badge for a commission line — 'to_be_paid' (🔵), 'paid' (🟢), or null. */

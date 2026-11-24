@@ -123,7 +123,7 @@ describe('Associate commission rules (D-410)', () => {
     const c = await associateCommission.forOrder(small);
     expect(c.below_min).toBe(true);
     expect(c.amount_fc).toBe(0);
-    expect((await steps(a))[1]).toBe('Does not count — below ₹500,000');
+    expect((await steps(a))[1]).toBe('Does not count — below ₹5,00,000');
   });
 
   it('B4: a step counts when the advance clears or the LC is confirmed', async () => {

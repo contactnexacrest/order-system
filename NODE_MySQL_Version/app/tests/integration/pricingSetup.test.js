@@ -94,7 +94,7 @@ describe('Pricing setup (D-245, P1)', () => {
 
     const md = await login(await user('Managing Director'));
     let page = (await md.get(`/products/${productId}`)).text;
-    for (const s of ['Price build-up', 'USD 1,000.00', 'USD 1,250.00', 'USD 37.50', 'USD 1,287.50', 'USD 1,326.13', '1,355.26', '1,395.92', '1,430.56', "Save this product's settings"]) {
+    for (const s of ['Price build-up', 'USD 1,000.00', 'USD 1,250.00', 'USD 37.50', 'USD 1,287.50', 'USD 1,326.13', '1,313.78', '1,355.26', '1,395.92', "Save this product's settings"]) { // D-410: the client's price includes a fixed 5% — quote 1,395.92 at every level; lowest 1,313.78 (2%) / 1,355.26 (5% and above, the rest from our margin)
       expect([s, page.includes(s)]).toEqual([s, true]);
     }
     let list = (await md.get('/products')).text;
