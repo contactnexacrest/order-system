@@ -6309,10 +6309,6 @@ ALTER TABLE orders ADD COLUMN insurance_basis VARCHAR(255) NULL;
 ALTER TABLE associates ADD COLUMN price_rule_override VARCHAR(10) NULL, ADD COLUMN price_rule_fixed_pct DECIMAL(5,2) NULL;
 ALTER TABLE orders ADD COLUMN associate_included_pct DECIMAL(5,2) NULL;
 -- D-410 point 8 (24 Nov 2026): the Commission Payment Advice (one per bank transfer to an associate).
-CREATE TABLE is safe to repeat; a second run stops at the
--- ALTER with "#1060 Duplicate column name", which is harmless.
--- Run docs/checks/check_all_migrations.sql first: this file's row says NEEDED until it has run.
-SET NAMES utf8mb4;
 CREATE TABLE associate_payment_advices (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   associate_id     BIGINT UNSIGNED NOT NULL,
