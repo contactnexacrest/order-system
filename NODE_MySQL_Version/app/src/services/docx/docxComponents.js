@@ -471,8 +471,13 @@ function paymentTermsBox(lines) {
 // rows: [{label, value, labelBg, valueBg, full, bg}]
 // --------------------------------------------------------------------
 
-function kvTable(rows, solidLabel = false, labelWidthPct = 30) {
+/**
+ * opts.compact (D-412, the Commission Payment Advice only): no space under the text inside the cells, as in the PHP
+ * Word copy, so a corrected advice fits one page. Every other document calls it without opts and is unchanged.
+ */
+function kvTable(rows, solidLabel = false, labelWidthPct = 30, opts = {}) {
   const valueWidthPct = 100 - labelWidthPct;
+  const tight = opts.compact ? { spacing: { after: 0 } } : {};
   const trRows = rows.map((row, i) => {
     if (row.full) {
       return new TableRow({
@@ -480,13 +485,14 @@ function kvTable(rows, solidLabel = false, labelWidthPct = 30) {
       });
     }
     const shaded = solidLabel || i % 2 === 0;
-    const labelCell = cell(plain(String(row.label ?? ''), { bold: true, size: 19, color: NAVY }), {
+    const labelCell = cell(plain(String(row.label ?? ''), { bold: true, size: 19, color: NAVY }, tight), {
       width: pctWidth(labelWidthPct),
       shading: shade(row.labelBg || (shaded ? GRAY_LIGHT : WHITE)),
       borders: thinBorders(),
       verticalAlign: VerticalAlign.TOP,
     });
-    const valueCell = cell(renderValue(row.value).map((p) => p), {
+    const valueCell = cell(opts.compact && !(row.value instanceof Paragraph) && !Array.isArray(row.value) && typeof row.value !== 'function'
+      ? [plain(String(row.value ?? ''), {}, tight)] : renderValue(row.value).map((p) => p), {
       width: pctWidth(valueWidthPct),
       shading: shade(row.valueBg !== undefined ? row.valueBg : WHITE),
       borders: thinBorders(),
@@ -495,7 +501,7 @@ function kvTable(rows, solidLabel = false, labelWidthPct = 30) {
     return new TableRow({ children: [labelCell, valueCell] });
   });
   const table = new Table({ width: FULL_WIDTH, margins: TABLE_MARGINS, rows: trRows });
-  return [table, spacer(120)];
+  return [table, spacer(opts.compact ? 40 : 120)];
 }
 
 // --------------------------------------------------------------------

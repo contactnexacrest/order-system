@@ -266,10 +266,10 @@ async function docx(advice) {
   if (c.revision_label) add(C.plain(`${c.revision_label} — corrected: ${c.revision_reason}. It replaces the earlier advice with the same number.`, { italics: true }));
   add(C.sectionTitle('1. PAID BY'));
   add(C.kvTable(kv([['Company / Legal Entity', c.company.legal_name], ['Registered Office', c.company.registered_office], ['GSTIN', c.company.gstin], ['IEC / PAN', c.company.iec_pan],
-    ['Email / Phone', [c.company.email, c.company.phone].filter(Boolean).join(' · ')]])));
+    ['Email / Phone', [c.company.email, c.company.phone].filter(Boolean).join(' · ')]]), false, 30, { compact: true })); // D-412: one page
   add(C.sectionTitle('2. PAID TO'));
   add(C.kvTable(kv([['Associate', `${c.associate.name} (${c.associate_no})`], ...(c.associate.pan ? [['PAN', c.associate.pan]] : []), ['Bank Account', c.bank],
-    ['Paid Via', `${c.paid_via}${c.paid_reference ? ` · bank ref ${c.paid_reference}` : ''}`]])));
+    ['Paid Via', `${c.paid_via}${c.paid_reference ? ` · bank ref ${c.paid_reference}` : ''}`]]), false, 30, { compact: true })); // D-412
   add(C.sectionTitle('3. COMMISSION PAID'));
   add(C.productsTable(['#', 'Order', 'Client', 'Value of the goods (FOB)', 'Your %', 'Commission (before tax)', 'TDS', 'Paid to you'], [4, 14, 20, 15, 8, 14, 11, 14],
     c.lines.map((l) => ({ cells: [String(l.no), l.order, l.client, l.fob, l.pct, l.gross, l.tds, l.paid], lineColor: l.no % 2 === 1 ? '1D6FA8' : '2D7D56',

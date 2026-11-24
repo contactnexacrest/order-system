@@ -4,6 +4,13 @@
    (associatePaymentAdvice.context); this only prints. No TAN. Only the associate's commission — never costs,
    margins or supplier prices. PHP twin: templates/CPA/payment_advice.html.twig. #}
 
+{# Owner decision D-412 (24 Nov 2026, point 6, confirmed twice): slightly tighter spacing so a corrected advice (Rev 1,
+   one more banner) still fits one page. Spacing only — no word, figure or section changes. #}
+{% block extra_style %}
+  table.kv td { padding: 2.5pt 7pt; }
+  .section-title { margin-top: 6pt; }
+{% endblock %}
+
 {% block header_incoterm %}<span class="incoterm">Associate commission — paid</span>{% endblock %}
 
 {% block meta_table %}

@@ -1,0 +1,56 @@
+{
+ "doc_title": "COMMISSION PAYMENT ADVICE",
+ "number": "NC/SC/CPA/A0119/26/007",
+ "revision": 1,
+ "revision_label": "Rev 1",
+ "revision_reason": "Bank reference typed wrong on the October transfer",
+ "paid_on": "31 Oct 2026",
+ "paid_reference": "TESTUTR20261031",
+ "paid_via": "Bank transfer (NEFT / RTGS / IMPS)",
+ "associate_no": "A0119",
+ "associate": {
+  "name": "TEST Scenario Associate",
+  "pan": "AAAAA0000A",
+  "country": "India"
+ },
+ "bank": "TEST Bank · account ending 0000 · IFSC TEST0000000",
+ "company": {
+  "legal_name": "NexaCrest International Private Limited",
+  "registered_office": "Registered office address, City – 000000, India",
+  "gstin": "29AAAAA0000A1ZY",
+  "iec_pan": "AAAAA0000A",
+  "phone": "+91-0000000000",
+  "email": "info@email.com"
+ },
+ "currency": "INR",
+ "india": true,
+ "lines": [
+  {
+   "no": 1,
+   "order": "TEST-SCN-20",
+   "fob": "USD 16,108.92",
+   "pct": "7%",
+   "gross": "₹94,720.08",
+   "tds": "₹1,894.00",
+   "paid": "₹92,826.08",
+   "client": "TEST Scenario Buyer GmbH"
+  },
+  {
+   "no": 2,
+   "order": "TEST-SCN-21",
+   "fob": "USD 16,108.92",
+   "pct": "7%",
+   "gross": "₹94,720.08",
+   "tds": "₹1,894.00",
+   "paid": "₹92,826.08",
+   "client": "TEST Scenario Buyer GmbH"
+  }
+ ],
+ "deductions": [],
+ "total_gross": "₹1,89,440.16",
+ "total_tds": "₹3,788.00",
+ "tds_text": "section 194H, 2%",
+ "total_paid": "₹1,85,652.16",
+ "total_paid_raw": 198000,
+ "headline": "PAID: ₹1,85,652.16 was transferred to your bank account on 31 Oct 2026 (bank ref TESTUTR20261031)."
+}
