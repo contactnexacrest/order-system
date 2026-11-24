@@ -233,6 +233,39 @@ final class AssociateRulesD410Test extends DbTestCase
         self::assertSame('fixed', AssociateRules::companyPriceRule()['rule']);
     }
 
+    /** Owner 24 Nov 2026 (recommendation 5): "Paid from our margin so far" counts earned commission only; open orders apart. */
+    public function testMarginSoFarCountsEarnedCommissionAndShowsOpenOrdersApart(): void
+    {
+        $a = $this->associate();
+        $pdo = Database::connection();
+        $today = date('Y-m-d');
+        $ids = [];
+        foreach (['paid', 'open'] as $kind) {
+            $client = $this->createTestClient();
+            $pdo->prepare("UPDATE clients SET associate_id = :a, associate_registered_on = '2025-12-01' WHERE id = :c")->execute(['a' => (int) $a['id'], 'c' => $client]);
+            $id = $this->order($client, $today, 10000.0);
+            $pdo->prepare("UPDATE orders SET associate_id = :a, associate_level_name = 'Level 3', associate_level_kind = 'pct', associate_level_value = 7,
+                           associate_rate_pct = 7, associate_included_pct = 5, associate_level_fixed_at = NOW() WHERE id = :o")->execute(['a' => (int) $a['id'], 'o' => $id]);
+            $pdo->prepare('UPDATE order_payment_status SET advance_amount = 3000, advance_inr_actual = 252000, advance_exchange_rate = 84, balance_amount = 7000,
+                           balance_cleared_at = :b, balance_inr_actual = :bi, balance_exchange_rate = 84 WHERE order_id = :o')
+                ->execute(['b' => $kind === 'paid' ? $today . ' 13:00:00' : null, 'bi' => $kind === 'paid' ? 588000 : null, 'o' => $id]);
+            $ins = $pdo->prepare("INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, inr_credited, bank_reference) VALUES (:o, :l, :amt, :d, 84, :inr, 'UTR-MSF')");
+            $ins->execute(['o' => $id, 'l' => 'advance', 'amt' => 3000, 'd' => $today, 'inr' => 252000]);
+            if ($kind === 'paid') {
+                $ins->execute(['o' => $id, 'l' => 'balance', 'amt' => 7000, 'd' => $today, 'inr' => 588000]);
+            }
+            $ids[$kind] = $id;
+        }
+        AssociateRules::reset();
+        $paid = AssociateCommission::forOrder($ids['paid']);
+        $open = AssociateCommission::forOrder($ids['open']);
+        self::assertSame(['paid', 'awaiting'], [$paid['state'], $open['state']]);
+        $m = AssociateRules::marginSoFar((int) $a['id'], $today);
+        self::assertSame([1, 1], [$m['orders'], $m['open_orders']], 'one earned order counted; the order still being paid shown apart');
+        self::assertSame(round((float) $paid['amount_inr'] * 2 / 7, 2), $m['inr'], '2 % of the 7 % comes from our margin');
+        self::assertSame(round((float) $open['amount_inr'] * 2 / 7, 2), $m['open_inr']);
+    }
+
     public function testIncludedPercentFollowsTheChoice(): void
     {
         $a = $this->associate();

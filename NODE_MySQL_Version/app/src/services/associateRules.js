@@ -264,17 +264,21 @@ async function marginSoFar(associateId, today = null) {
         AND status NOT IN ('cancelled','lost')`,
     { a: associateId, f: fyStart }
   );
+  // Owner 24 Nov 2026 (recommendation 5): only earned commission (the buyer paid in full) counts; orders whose
+  // buyer is still paying are shown apart as "expected", since they may never be paid.
   let inr = 0;
   let n = 0;
+  let openInr = 0;
+  let openN = 0;
   for (const o of rows) {
     const m = marginPct(Number(o.associate_rate_pct), Number(o.associate_included_pct));
     if (m <= 0) continue;
     const c = await commission().forOrder(Number(o.id));
-    if (!c || Number(c.rate || 0) <= 0) continue;
-    inr += pricingEngine.round2(Number(c.amount_inr) * m / Number(c.rate));
-    n += 1;
+    if (!c || Number(c.rate || 0) <= 0 || c.state === 'unpaid') continue;
+    const part = pricingEngine.round2(Number(c.amount_inr) * m / Number(c.rate));
+    if (c.state === 'paid') { inr += part; n += 1; } else { openInr += part; openN += 1; }
   }
-  return { inr: pricingEngine.round2(inr), orders: n };
+  return { inr: pricingEngine.round2(inr), orders: n, open_inr: pricingEngine.round2(openInr), open_orders: openN };
 }
 
 /**

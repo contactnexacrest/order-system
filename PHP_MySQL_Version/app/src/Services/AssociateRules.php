@@ -319,21 +319,31 @@ final class AssociateRules
                 AND status NOT IN ('cancelled','lost')"
         );
         $stmt->execute(['a' => $associateId, 'f' => $fyStart]);
+        // Owner 24 Nov 2026 (recommendation 5): only earned commission (the buyer paid in full) counts; orders whose
+        // buyer is still paying are shown apart as "expected", since they may never be paid.
         $inr = 0.0;
         $n = 0;
+        $openInr = 0.0;
+        $openN = 0;
         foreach ($stmt->fetchAll() as $o) {
             $m = self::marginPct((float) $o['associate_rate_pct'], (float) $o['associate_included_pct']);
             if ($m <= 0) {
                 continue;
             }
             $c = AssociateCommission::forOrder((int) $o['id']);
-            if ($c === null || (float) ($c['rate'] ?? 0) <= 0) {
+            if ($c === null || (float) ($c['rate'] ?? 0) <= 0 || ($c['state'] ?? '') === 'unpaid') {
                 continue;
             }
-            $inr += round((float) $c['amount_inr'] * $m / (float) $c['rate'], 2);
-            $n++;
+            $part = round((float) $c['amount_inr'] * $m / (float) $c['rate'], 2);
+            if (($c['state'] ?? '') === 'paid') {
+                $inr += $part;
+                $n++;
+            } else {
+                $openInr += $part;
+                $openN++;
+            }
         }
-        return ['inr' => round($inr, 2), 'orders' => $n];
+        return ['inr' => round($inr, 2), 'orders' => $n, 'open_inr' => round($openInr, 2), 'open_orders' => $openN];
     }
 
     /**

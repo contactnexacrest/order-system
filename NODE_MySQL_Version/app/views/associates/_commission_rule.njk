@@ -35,7 +35,7 @@
         <table class="kv" data-price-rule>
           <tr><th>Uses</th><td><b>{{ priceRules[priceRule.rule] }}{% if priceRule.pct !== null %} — {{ __fmtPct }}%{% endif %}</b> <small class="muted">{{ "(this associate's own choice)" if priceRule.own else '(the company setting — Admin → Pricing)' }}</small></td></tr>
           <tr><th>Right now</th><td data-right-now>{{ rightNow }}</td></tr>
-          {% if marginSoFar %}<tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose % was fixed at the Proforma Invoice.">ℹ</span></th><td data-margin-so-far>₹{{ marginSoFar.inr | inr }} <small class="muted">on {{ marginSoFar.orders }} order{{ '' if marginSoFar.orders == 1 else 's' }} this financial year</small></td></tr>{% endif %}
+          {% if marginSoFar %}<tr><th>Paid from our margin so far <span class="help" title="This financial year (from 1 April): the commission above the % in the client's price, on orders whose buyer has paid in full. Orders whose buyer is still paying are shown on the line below as expected.">ℹ</span></th><td data-margin-so-far>₹{{ marginSoFar.inr | inr }} <small class="muted">on {{ marginSoFar.orders }} order{{ '' if marginSoFar.orders == 1 else 's' }} this financial year (buyer paid in full)</small>{% if marginSoFar.open_orders > 0 %}<br><small class="muted" data-margin-expected>+ ₹{{ marginSoFar.open_inr | inr }} expected on {{ marginSoFar.open_orders }} open order{{ '' if marginSoFar.open_orders == 1 else 's' }} (buyer still paying)</small>{% endif %}</td></tr>{% endif %}
         </table>
         {% if canPricing %}
           <details class="card"><summary>Change for this associate</summary>

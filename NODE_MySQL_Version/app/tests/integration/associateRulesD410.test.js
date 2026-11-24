@@ -190,6 +190,33 @@ describe('Associate commission rules (D-410)', () => {
     expect((await associateRules.companyPriceRule()).rule).toBe('fixed');
   });
 
+  it('"Paid from our margin so far" counts earned commission and shows open orders apart (owner 24 Nov 2026)', async () => {
+    const a = await associate();
+    const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+    const ids = {};
+    for (const kind of ['paid', 'open']) {
+      const client = await createTestClient();
+      await db.execute("UPDATE clients SET associate_id = :a, associate_registered_on = '2025-12-01' WHERE id = :c", { a: a.id, c: client });
+      const id = await order(client, today, 10000);
+      await db.execute(`UPDATE orders SET associate_id = :a, associate_level_name = 'Level 3', associate_level_kind = 'pct', associate_level_value = 7,
+                        associate_rate_pct = 7, associate_included_pct = 5, associate_level_fixed_at = NOW() WHERE id = :o`, { a: a.id, o: id });
+      await db.execute(`UPDATE order_payment_status SET advance_amount = 3000, advance_inr_actual = 252000, advance_exchange_rate = 84, balance_amount = 7000,
+                        balance_cleared_at = :b, balance_inr_actual = :bi, balance_exchange_rate = 84 WHERE order_id = :o`,
+        { b: kind === 'paid' ? `${today} 13:00:00` : null, bi: kind === 'paid' ? 588000 : null, o: id });
+      const ins = "INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, inr_credited, bank_reference) VALUES (:o, :l, :amt, :d, 84, :inr, 'UTR-MSF')";
+      await db.execute(ins, { o: id, l: 'advance', amt: 3000, d: today, inr: 252000 });
+      if (kind === 'paid') await db.execute(ins, { o: id, l: 'balance', amt: 7000, d: today, inr: 588000 });
+      ids[kind] = id;
+    }
+    const paid = await associateCommission.forOrder(ids.paid);
+    const open = await associateCommission.forOrder(ids.open);
+    expect([paid.state, open.state]).toEqual(['paid', 'awaiting']);
+    const m = await associateRules.marginSoFar(Number(a.id), today);
+    expect([m.orders, m.open_orders]).toEqual([1, 1]); // one earned order counted; the order still being paid shown apart
+    expect(m.inr).toBe(Math.round(Number(paid.amount_inr) * 2 / 7 * 100) / 100); // 2 % of the 7 % comes from our margin
+    expect(m.open_inr).toBe(Math.round(Number(open.amount_inr) * 2 / 7 * 100) / 100);
+  });
+
   it('works out the included % from the choice', async () => {
     const a = await associate();
     const level7 = { kind: 'pct', value: 7 };
