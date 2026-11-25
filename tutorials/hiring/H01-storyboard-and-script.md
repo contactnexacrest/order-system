@@ -108,7 +108,7 @@ card shows `[contact details added by NexaCrest]`.
 | 8.3 | Portal › Profile › bank form with the "Why we ask" note (demo) | Why we ask for your bank details | Why do we ask for your bank details? So we pay the right account, in your own name. So nobody can send your money somewhere else. And because tax rules and rules for sending money abroad say we must. Only our accounts team can see them. | 20 |
 | 8.4 | Graphic: "Your own portal: password + a code by e-mail" | Your portal | When you are approved, you get your own portal. You log in with your password and a code we send to your e-mail. You start with the basic portal, and more opens up as your orders are completed. | 15 |
 | 8.5 | Recap drawing: one buyer → many orders → many coins; then three buyers → three full jars | — | So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again. Bring more buyers, and earn more. There is no limit. | 20 |
-| 8.6 | **End card:** "Start your story today. Contact us: [contact details added by NexaCrest]" + small line "Example numbers only. These are not NexaCrest's real rates. Your real numbers are in your signed agreement." | — | Start your story today. Contact us. We look forward to growing together. | 8 |
+| 8.6 | **End card:** "Start your story today. Contact us: [contact details added by NexaCrest]" + two small lines at the bottom: "Example numbers only. These are not NexaCrest's real rates. Your real numbers are in your signed agreement." · "This video gives a simple picture of how things work today. Your signed agreement is what counts, and NexaCrest may update its terms from time to time." | — | Start your story today. Contact us. We look forward to growing together. Just so you know: this video shows how things work today. Your signed agreement is what counts, and our terms may be updated from time to time. | 12 |
 
 **Total ≈ 12 minutes.**
 
@@ -125,8 +125,9 @@ card shows `[contact details added by NexaCrest]`.
    Nothing in the app limits an associate's commission.
 4. **5.5, the rate fixed at the Proforma Invoice:** how the app works today (D-410, D-245).
 5. **Dates:** the order part has no date (D-425); part 6 says "once a month" and the closing-day rule (D-421).
-6. **5.8 corrected after approval (25 Nov 2026):** under D-292 (11 Nov 2026) the associate's portal shows only the current %, never levels, ladder or counts. So 5.8 now says the portal shows "your current rate" (not "your level" and "how many more orders"). The video still explains levels and counting (D-425), as the owner asked.
-7. **Owner's review of 25 Nov 2026** (D-424, D-425) is applied: nothing to pay, export experience, two people
+6. **Small disclaimer (owner, 25 Nov 2026):** only at the very end, small and friendly — "This video gives a simple picture of how things work today. Your signed agreement is what counts, and NexaCrest may update its terms from time to time." On screen in small type, and one calm spoken sentence. It protects NexaCrest if terms change later, without putting the viewer off.
+7. **5.8 corrected after approval (25 Nov 2026):** under D-292 (11 Nov 2026) the associate's portal shows only the current %, never levels, ladder or counts. So 5.8 now says the portal shows "your current rate" (not "your level" and "how many more orders"). The video still explains levels and counting (D-425), as the owner asked.
+8. **Owner's review of 25 Nov 2026** (D-424, D-425) is applied: nothing to pay, export experience, two people
    with the same buyer, no margin, "no commission on an order cancelled before full payment", NexaCrest Group,
    prices from the portal, FOB value of the goods on the order, we always pay the fixed rupee amount, orders not
    clients, the minimum order value and the number of days, very simple language, told as a story that motivates.
