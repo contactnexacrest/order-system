@@ -218,6 +218,23 @@ final class AssociateCommission
         return 'monthly payment on the ' . (!empty($settings['last_day']) ? 'last day of the month' : self::ordinal((int) $settings['day']));
     }
 
+    /**
+     * Owner 25 Nov 2026 (D-421 follow-up): step 4 of the associate's "How it works" — when the commission is paid,
+     * in plain words, with the waiting days and the cut-off day as set (never "0 days later").
+     */
+    public static function whenPaidText(?array $settings = null): string
+    {
+        $settings ??= self::settings();
+        $days = (int) ($settings['due_days'] ?? 0);
+        $cutoff = (int) ($settings['cutoff_day'] ?? 0);
+        $after = $days > 0 ? $days . ' day' . ($days === 1 ? '' : 's') . ' after the buyer\'s last payment reached our bank, ' : '';
+        if ($settings['run'] === 'monthly' && $cutoff > 0) {
+            $when = $days > 0 ? 'if that day is on or before the ' . self::ordinal($cutoff) : 'if the buyer\'s last payment reached our bank by the ' . self::ordinal($cutoff);
+            return 'We pay it ' . $after . 'in our ' . self::payDayText($settings) . ': ' . $when . ', in that month\'s payment; if later, in the next month\'s.';
+        }
+        return 'We pay it ' . ($after !== '' ? $after : 'after the buyer\'s last payment has reached our bank, ') . 'in our ' . self::payDayText($settings) . '.';
+    }
+
     /** A buyer complaint or claim opened on or before the due date and not resolved. */
     public static function claimOpen(int $orderId, string $dueOn): bool
     {

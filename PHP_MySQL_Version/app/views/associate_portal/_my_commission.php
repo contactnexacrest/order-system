@@ -25,7 +25,7 @@ $__cur = ['INR' => 'Indian rupees', 'USD' => 'US dollars', 'EUR' => 'euros', 'GB
     <li>Your % is <b>fixed for an order</b> when we send the buyer its Proforma Invoice — it does not change later.</li>
     <li>It is worked out on the <b>FOB value on the Commercial Invoice</b>.</li>
     <li>It becomes yours when the buyer has <b>paid in full</b>.</li>
-    <li>We pay it <b><?= (int) $commissionSettings['due_days'] ?> days later</b>, in our <b><?= htmlspecialchars(AssociateCommission::payDayText($commissionSettings)) ?></b>, in <?= htmlspecialchars($__cur) ?> to your verified bank account.</li>
+    <li data-when-paid><?= htmlspecialchars(AssociateCommission::whenPaidText($commissionSettings)) ?> In <?= htmlspecialchars($__cur) ?>, to your verified bank account.</li>
   </ol>
   <?php if (trim((string) ($me['gstin'] ?? '')) !== ''): ?><p class="muted small">GST-registered? We add GST on top once your tax invoice is uploaded.</p><?php endif; ?>
 </div>

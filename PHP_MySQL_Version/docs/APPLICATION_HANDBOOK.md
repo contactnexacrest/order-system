@@ -3049,15 +3049,19 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
     of the month, working day before. A change of the payment run needs a
     reason (Audit Log). `AssociateCommission::payoutRunOn / scheduledRunOn /
     workingDay / payDayText`.
-  - Only orders in the 10 days from the client's first PO received; later
-    only the MD can force "associate: yes" with a reason.
+  - Every order of the associate's client earns while the agreement is
+    active (D-410; the old first-10-days rule is gone): the client's first
+    order always, later orders when their FOB value is at or above the
+    minimum order value; a client with an order stays the associate's
+    (D-426).
   - Earned only when the buyer has **paid in full**; no pro rata; nothing on
     cancelled orders; ready on the day the client's last payment is cleared +
     the waiting days (0 since D-421); paid in that month's run when ready on or
     before the cut-off day (20th), else in the next month's run
     (`AssociateCommission::associateRunOn`, D-421, 25 Nov 2026; company-level
     settings only, no per-associate override); against the associate's
-    invoice; held while a buyer claim is open.
+    invoice; held while a buyer claim is open. The associate's "How it works"
+    says this in plain words (`whenPaidText`, D-427).
   - Take-back after payment only for fraud or breach (negative line on the
     next payout).
   - **TDS (D-235):** section 194H at 2% above ₹20,000 a financial year

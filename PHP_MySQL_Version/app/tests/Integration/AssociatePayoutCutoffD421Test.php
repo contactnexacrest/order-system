@@ -80,4 +80,16 @@ final class AssociatePayoutCutoffD421Test extends DbTestCase
         self::assertSame(25, AssociateCommission::settings()['cutoff_day']);
         $pdo->exec("UPDATE incentive_settings SET setting_value = '20' WHERE setting_key = 'associate_payout_cutoff_day'");
     }
+
+    public function testTheAssociateReadsWhenItIsPaidInPlainWords(): void
+    {
+        // Owner 25 Nov 2026: step 4 of "How it works" never says "0 days later" and names the cut-off day.
+        self::assertSame("We pay it in our monthly payment on the last day of the month: if the buyer's last payment reached our bank by the 20th, in that month's payment; if later, in the next month's.",
+            AssociateCommission::whenPaidText($this->set()));
+        self::assertSame("We pay it 10 days after the buyer's last payment reached our bank, in our monthly payment on the last day of the month: if that day is on or before the 20th, in that month's payment; if later, in the next month's.",
+            AssociateCommission::whenPaidText($this->set(['due_days' => 10])));
+        self::assertSame("We pay it after the buyer's last payment has reached our bank, in our weekly payment every Friday.",
+            AssociateCommission::whenPaidText($this->set(['run' => 'weekly', 'last_day' => false, 'day' => 5])));
+    }
 }
+

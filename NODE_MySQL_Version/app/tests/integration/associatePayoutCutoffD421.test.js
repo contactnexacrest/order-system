@@ -60,4 +60,11 @@ describe('D-421 associate payout cut-off day', () => {
     expect((await ac.settings()).cutoff_day).toBe(25);
     await db.execute("UPDATE incentive_settings SET setting_value = '20' WHERE setting_key = 'associate_payout_cutoff_day'");
   });
+
+  it('tells the associate when it is paid in plain words (owner, 25 Nov 2026)', () => {
+    expect(ac.whenPaidText(set())).toBe("We pay it in our monthly payment on the last day of the month: if the buyer's last payment reached our bank by the 20th, in that month's payment; if later, in the next month's.");
+    expect(ac.whenPaidText(set({ due_days: 10 }))).toBe("We pay it 10 days after the buyer's last payment reached our bank, in our monthly payment on the last day of the month: if that day is on or before the 20th, in that month's payment; if later, in the next month's.");
+    expect(ac.whenPaidText(set({ run: 'weekly', last_day: false, day: 5 }))).toBe("We pay it after the buyer's last payment has reached our bank, in our weekly payment every Friday.");
+  });
 });
+

@@ -76,6 +76,7 @@ async function myCommissionData(a) {
     headline: await commissionHeadline(a),
     commissionSettings: set,
     payDayText: associateCommission.payDayText(set),
+    whenPaidText: associateCommission.whenPaidText(set),
     currencyName: { INR: 'Indian rupees', USD: 'US dollars', EUR: 'euros', GBP: 'pounds sterling' }[payCur] || payCur,
   };
 }

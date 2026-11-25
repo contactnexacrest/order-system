@@ -16,7 +16,7 @@
     <li>Your % is <b>fixed for an order</b> when we send the buyer its Proforma Invoice — it does not change later.</li>
     <li>It is worked out on the <b>FOB value on the Commercial Invoice</b>.</li>
     <li>It becomes yours when the buyer has <b>paid in full</b>.</li>
-    <li>We pay it <b>{{ commissionSettings.due_days }} days later</b>, in our <b>{{ payDayText }}</b>, in {{ currencyName }} to your verified bank account.</li>
+    <li data-when-paid>{{ whenPaidText }} In {{ currencyName }}, to your verified bank account.</li>
   </ol>
   {% if me.gstin %}<p class="muted small">GST-registered? We add GST on top once your tax invoice is uploaded.</p>{% endif %}
 </div>

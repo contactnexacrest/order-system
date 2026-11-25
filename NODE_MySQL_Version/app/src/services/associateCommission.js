@@ -197,6 +197,21 @@ function payDayText(set) {
   return `monthly payment on the ${set.last_day ? 'last day of the month' : ordinal(Number(set.day))}`;
 }
 
+/**
+ * Owner 25 Nov 2026 (D-421 follow-up): step 4 of the associate's "How it works" — when the commission is paid,
+ * in plain words, with the waiting days and the cut-off day as set (never "0 days later"). PHP: AssociateCommission::whenPaidText.
+ */
+function whenPaidText(set) {
+  const days = Number(set.due_days || 0);
+  const cutoff = Number(set.cutoff_day || 0);
+  const after = days > 0 ? `${days} day${days === 1 ? '' : 's'} after the buyer's last payment reached our bank, ` : '';
+  if (set.run === 'monthly' && cutoff > 0) {
+    const when = days > 0 ? `if that day is on or before the ${ordinal(cutoff)}` : `if the buyer's last payment reached our bank by the ${ordinal(cutoff)}`;
+    return `We pay it ${after}in our ${payDayText(set)}: ${when}, in that month's payment; if later, in the next month's.`;
+  }
+  return `We pay it ${after || "after the buyer's last payment has reached our bank, "}in our ${payDayText(set)}.`;
+}
+
 /** A buyer complaint or claim opened on or before the due date and not resolved. */
 async function claimOpen(orderId, due) {
   const row = await db.queryOne("SELECT 1 AS x FROM order_complaints WHERE order_id = :o AND status <> 'resolved' AND DATE(created_at) <= :d LIMIT 1", { o: orderId, d: ymd(due) });
@@ -640,7 +655,7 @@ async function lapseRegistrations(today = null) {
 module.exports = {
   associateRunOn, payExamples,
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
-  RULE_LABELS, ladderFor, stepLabel, ladderSummary, ruleProgress, scheduledRunOn, workingDay, ordinal, payDayText,
+  RULE_LABELS, ladderFor, stepLabel, ladderSummary, ruleProgress, scheduledRunOn, workingDay, ordinal, payDayText, whenPaidText,
   earningAssociate, countingOrders, levelForAssociate, levelLabel, rateLabel, PORTAL_MONTH_CHOICES, portalMonths, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
   settlements, realisedRate, usdRate, estimateInr, forOrder, gstFor, payoutDescription, lapseRegistrations,
 };
