@@ -188,9 +188,9 @@ test.describe('Role-based navigation visibility', () => {
   test('the order page has an action bar of buttons, and no "Edit Order Details" text link', async ({ page }) => {
     await login(page, 'admin');
     await page.goto('/orders');
-    const first = page.locator('a[href^="/orders/"]').filter({ hasText: /\S/ }).first();
-    const href = await first.getAttribute('href');
-    const id = (href.match(/^\/orders\/(\d+)/) || [])[1];
+    // The first link to an actual order (/orders/123), not a menu or tab link such as "New order".
+    const hrefs = await page.locator('a[href^="/orders/"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    const id = (hrefs.map((h) => (String(h).match(/^\/orders\/(\d+)(?:$|[?#])/) || [])[1]).find(Boolean)) || null;
     test.skip(!id, 'no order to open');
     await page.goto(`/orders/${id}`);
     const bar = page.getByTestId('order-action-bar');
