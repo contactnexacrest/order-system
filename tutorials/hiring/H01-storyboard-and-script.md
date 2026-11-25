@@ -81,7 +81,7 @@ card shows `[contact details added by NexaCrest]`.
 | 5.5 | Card: "Your rate for an order is fixed when its Proforma Invoice is made." | Rate fixed per order | Rule four. When we send the buyer the Proforma Invoice, the rate for that order is fixed. Later changes to your level do not change it. | 12 |
 | 5.6 | Card: "Order cancelled before the buyer paid everything → no commission. It stops counting for your level. Your other orders keep their rate." | Cancelled orders | Rule five. If an order is cancelled before the buyer has paid everything, there is no commission on that order, and it stops counting for your level. Your other orders keep their rate. | 15 |
 | 5.7 | Card: "Your client stays yours. A new sign-up with no order for a long time ends (how long: in your agreement)." | Keep your client | Rule six. Your client stays yours. Only a new sign-up that places no order for a long time ends. How long is written in your agreement. Then you can invite them again. | 15 |
-| 5.8 | Portal › Commission (demo, example rates): "Your level", "Your next order earns" | Always in your portal | You never have to guess. Your portal always shows your level, what your next order earns, and how many more orders you need for the next level. | 12 |
+| 5.8 | Portal › Commission (demo, example rate): "10% of the FOB value of each order from the clients you introduced" | Your rate in your portal | Your portal always shows your current rate: the percent your next order earns. And each order shows its own percent. | 10 |
 | | **6 · Getting paid** | | | |
 | 6.1 | Chapter card | — | Part six. Getting paid. | 3 |
 | 6.2 | Calendar: "Buyer paid everything before the month's closing day → paid this month · after it → paid next month" | Paid once a month | We pay commission once a month. If the buyer's last payment reaches our bank before that month's closing day, you are paid that month. If it comes later, you are paid the next month. | 18 |
@@ -125,7 +125,8 @@ card shows `[contact details added by NexaCrest]`.
    Nothing in the app limits an associate's commission.
 4. **5.5, the rate fixed at the Proforma Invoice:** how the app works today (D-410, D-245).
 5. **Dates:** the order part has no date (D-425); part 6 says "once a month" and the closing-day rule (D-421).
-6. **Owner's review of 25 Nov 2026** (D-424, D-425) is applied: nothing to pay, export experience, two people
+6. **5.8 corrected after approval (25 Nov 2026):** under D-292 (11 Nov 2026) the associate's portal shows only the current %, never levels, ladder or counts. So 5.8 now says the portal shows "your current rate" (not "your level" and "how many more orders"). The video still explains levels and counting (D-425), as the owner asked.
+7. **Owner's review of 25 Nov 2026** (D-424, D-425) is applied: nothing to pay, export experience, two people
    with the same buyer, no margin, "no commission on an order cancelled before full payment", NexaCrest Group,
    prices from the portal, FOB value of the goods on the order, we always pay the fixed rupee amount, orders not
    clients, the minimum order value and the number of days, very simple language, told as a story that motivates.
