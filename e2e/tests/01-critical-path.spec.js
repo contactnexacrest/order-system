@@ -407,7 +407,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await recordForm.locator('input[name="advance_bank_reference"]').fill('E2E-UTR-ADVANCE-0001');
     await expect(recordForm.locator('[data-remit-statement]')).toContainText('credited by the bank');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
-    await expect(page.locator('.alert')).toContainText('Received EUR 1,800.00; ₹162,222.12 credited by the bank — exchange rate worked out ₹90.1234');
+    await expect(page.locator('.alert')).toContainText('Received EUR 1,800.00; ₹1,62,222.12 credited by the bank — exchange rate worked out ₹90.1234');
 
     await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
