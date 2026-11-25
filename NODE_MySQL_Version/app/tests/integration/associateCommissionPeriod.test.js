@@ -217,7 +217,7 @@ describe('Associate commission period and no business totals (D-263)', () => {
     const set = await associateCommission.settings();
     const fields = {
       associate_tds_pct: '2', associate_bank_wait_days: '2', associate_commission_due_days: String(set.due_days), associate_payout_run: set.run,
-      associate_payout_day: set.last_day ? 'last' : String(set.day), associate_counting_threshold_inr: String(set.threshold_inr), associate_protection_months: String(set.registration_months),
+      associate_payout_day: set.last_day ? 'last' : String(set.day), associate_payout_cutoff_day: '1', associate_counting_threshold_inr: String(set.threshold_inr), associate_protection_months: String(set.registration_months),
       associate_gst_pct: String(set.gst_pct), associate_claim_hold: set.claim_hold ? '1' : '',
     };
     const save = async (agent, months) => {

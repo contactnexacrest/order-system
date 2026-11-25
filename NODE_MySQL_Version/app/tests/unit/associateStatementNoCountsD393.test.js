@@ -21,7 +21,7 @@ describe('Associate statement shows no counts row in the portal (D-393)', () => 
     expect(m).not.toBeNull();
     // D-410 (24 Nov 2026): the row shows the ladder status line worked out by associateRules.stepText().
     expect(m[1]).toContain("{{ c.ladder_text or '—' }}");
-    expect(m[1]).toContain('₹{{ c.threshold_inr | money0 }} or more counts as one step');
+    expect(m[1]).toContain('₹{{ c.threshold_inr | inr0 }} or more counts as one step');
     expect(src.match(/Counts toward/g)).toHaveLength(1);
   });
 });
