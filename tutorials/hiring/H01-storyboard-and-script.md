@@ -39,7 +39,7 @@ captions, the same narrator voice), plus simple story drawings (a map, a calenda
 
 **Recording set-up:** a demo associate whose demo rates are the example rates (10 / 15 / 20 / 25 / 30 / 35 %),
 demo buyers "TEST Example Buyer 1/2/3", demo products with example prices. Demo data removed afterwards. The end
-card shows `[contact details added by NexaCrest]`.
+card says: write to us by e-mail; the address is on our website (owner 25 Nov 2026).
 
 ---
 
@@ -108,7 +108,7 @@ card shows `[contact details added by NexaCrest]`.
 | 8.3 | Portal › Profile › bank form with the "Why we ask" note (demo) | Why we ask for your bank details | Why do we ask for your bank details? So we pay the right account, in your own name. So nobody can send your money somewhere else. And because tax rules and rules for sending money abroad say we must. Only our accounts team can see them. | 20 |
 | 8.4 | Graphic: "Your own portal: password + a code by e-mail" | Your portal | When you are approved, you get your own portal. You log in with your password and a code we send to your e-mail. You start with the basic portal, and more opens up as your orders are completed. | 15 |
 | 8.5 | Recap drawing: one buyer → many orders → many coins; then three buyers → three full jars | — | So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again. Bring more buyers, and earn more. There is no limit. | 20 |
-| 8.6 | **End card:** "Start your story today. Contact us: [contact details added by NexaCrest]" + two small lines at the bottom: "Example numbers only. These are not NexaCrest's real rates. Your real numbers are in your signed agreement." · "This video gives a simple picture of how things work. Your signed agreement is what counts, and NexaCrest may update its terms from time to time." | — | Start your story today. Contact us. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time. | 12 |
+| 8.6 | **End card:** "Start your story today. Contact us: Write to us by e-mail. You will find our e-mail address on our website." (owner 25 Nov 2026) + two small lines at the bottom: "Example numbers only. These are not NexaCrest's real rates. Your real numbers are in your signed agreement." · "This video gives a simple picture of how things work. Your signed agreement is what counts, and NexaCrest may update its terms from time to time." | — | Start your story today. Contact us. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time. | 12 |
 
 **Total ≈ 12 minutes.**
 

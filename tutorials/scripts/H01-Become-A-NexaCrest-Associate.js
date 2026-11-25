@@ -205,9 +205,9 @@ module.exports = {
       'Bring more buyers, and earn more. There is no limit.',
     ], say: 'So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again. Bring more buyers, and earn more. There is no limit.' },
     { card: 'list', kicker: 'Start your story today', title: 'Contact us', items: [
-      process.env.TUT_H01_CONTACT || '[contact details added by NexaCrest]',
+      'Write to us by e-mail. You will find our e-mail address on our website.',
       EXAMPLE,
       'This video gives a simple picture of how things work. Your signed agreement is what counts, and NexaCrest may update its terms from time to time.',
-    ], say: 'Start your story today. Contact us. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time.' },
+    ], say: 'Start your story today. Write to us by e-mail; you will find our e-mail address on our website. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time.' },
   ],
 };
