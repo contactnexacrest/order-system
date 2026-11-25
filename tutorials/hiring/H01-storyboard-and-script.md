@@ -27,7 +27,7 @@ captions, the same narrator voice), plus simple story drawings (a map, a calenda
 | Every order of your client can earn, for as long as your agreement is active. No limit on what you can earn. | D-410 |
 | Paid only by bank transfer into the associate's own checked account. No cheques mentioned. | D-416 |
 | Never mention NexaCrest's margin. | D-425 |
-| "NexaCrest Group is an export company in India." Prices come from the associate's portal. | D-425 |
+| "NexaCrest Group is an export company registered in India … We work through divisions, each with its own name for its own products. Whichever division you applied to, you are joining NexaCrest. Your agreement and your payments come from our registered company." End card footer (on screen only): "NexaCrest Group · registered company: NexaCrest International Private Limited". Prices come from the associate's portal. | D-425, D-430 |
 | Levels count **orders**, not clients; the counting rules are explained with examples. | D-410, D-425 |
 | First order always earns. Later orders earn only at or above the minimum order value. | D-410, D-425 |
 | **No commission on an order cancelled before full payment.** A paid commission is never taken back (except fraud or breach of the agreement). | D-245, D-410 |
@@ -50,7 +50,7 @@ card says: write to us by e-mail; the address is on our website (owner 25 Nov 20
 | **0** | Drawing: a person shaking hands with a shop owner abroad; coins drop into a jar — once, twice, three times | **Become a NexaCrest Associate** | Imagine this. You introduce one buyer to us. Just one. That buyer orders from us. Then orders again. And again. And every time, you earn. This is what it means to be a NexaCrest Associate. Let us show you how it works. | 20 |
 | | **1 · Who we are** | | | |
 | 1.1 | Chapter card | — | Part one. Who we are. | 3 |
-| 1.2 | Graphic: India → ship → world map; icons "price · papers · shipping · payment" | NexaCrest Group | NexaCrest Group is an export company in India. We sell goods to buyers in other countries. We do all the hard work: the price, the export papers, the shipping, and collecting the money. | 18 |
+| 1.2 | Graphic: India → ship → world map; icons "price · papers · shipping · payment" | NexaCrest Group | NexaCrest Group is an export company registered in India. We sell goods to buyers in other countries. We do all the hard work: the price, the export papers, the shipping, and collecting the money. | 18 |
 | | **2 · Your story begins: you bring one buyer** | | | |
 | 2.1 | Chapter card | — | Part two. Your story begins. | 3 |
 | 2.2 | Drawing: you talk to a shop owner in another country | You know a buyer | You know a shop owner in another country. They need goods that we sell. You tell them about NexaCrest. That is your job: bring us a buyer. | 15 |

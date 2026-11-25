@@ -15,7 +15,7 @@ module.exports = {
   group: 'Join NexaCrest',
   title: 'Become a NexaCrest Associate',
   subtitle: 'Bring buyers. Earn on their orders — again and again.',
-  minutes: '10',
+  minutes: '11',
   restoreDb: true,
 
   async setup(demo) {
@@ -40,10 +40,12 @@ module.exports = {
 
     // 1 · Who we are
     { card: 'chapter', title: 'Who we are', subtitle: 'NexaCrest Group', say: 'Part one. Who we are.' },
-    { card: 'list', kicker: 'NexaCrest Group', title: 'An export company in India', items: [
+    { card: 'list', kicker: 'NexaCrest Group', title: 'An export company registered in India', items: [
       'We sell goods to buyers in other countries.',
       'We do all the hard work: the price, the export papers, the shipping, and collecting the money.',
-    ], say: 'NexaCrest Group is an export company in India. We sell goods to buyers in other countries. We do all the hard work: the price, the export papers, the shipping, and collecting the money.' },
+      'We work through divisions, each with its own name for its own products.',
+      'Whichever division you applied to, you are joining NexaCrest. Your agreement and your payments come from our registered company.',
+    ], say: 'NexaCrest Group is an export company registered in India. We sell goods to buyers in other countries. We do all the hard work: the price, the export papers, the shipping, and collecting the money. We work through divisions, each with its own name for its own products. Whichever division you applied to, you are joining NexaCrest. Your agreement and your payments come from our registered company.' },
 
     // 2 · Your story begins
     { card: 'chapter', title: 'Your story begins', subtitle: 'You bring one buyer', say: 'Part two. Your story begins.' },
@@ -208,6 +210,6 @@ module.exports = {
       'Write to us by e-mail. You will find our e-mail address on our website.',
       EXAMPLE,
       'This video gives a simple picture of how things work. Your signed agreement is what counts, and NexaCrest may update its terms from time to time.',
-    ], say: 'Start your story today. Write to us by e-mail; you will find our e-mail address on our website. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time.' },
+    ], note: 'NexaCrest Group · registered company: NexaCrest International Private Limited', say: 'Start your story today. Write to us by e-mail; you will find our e-mail address on our website. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time.' },
   ],
 };

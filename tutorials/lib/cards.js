@@ -66,14 +66,16 @@ function chapterCard({ number, title, subtitle }) {
 </div>`);
 }
 
-function listCard({ kicker, title, items = [], next }) {
+function listCard({ kicker, title, items = [], next, note }) {
   const lis = items.map((t, i) => `<li class="in d${Math.min(i + 2, 5)}"><span class="tick">✓</span>${esc(t)}</li>`).join('');
   return shell(`<div class="wrap">
   <div class="kicker in">${esc(kicker || ui('recap') || 'Recap')}</div>
   <h1 class="in d1" style="font-size:46px">${esc(title)}</h1>
   <ul class="list">${lis}</ul>
   ${next ? `<div class="next in d5">${esc(ui('next') || 'Up next →')} <b>${esc(next)}</b></div>` : ''}
-</div>`, `.list{list-style:none;padding:0;margin:26px 0 0}
+  ${note ? `<div class="note in d5">${esc(note)}</div>` : ''}
+</div>`, `.note{margin-top:30px;font-size:17px;color:#c3cfee;opacity:.85}
+.list{list-style:none;padding:0;margin:26px 0 0}
 .list li{font-size:24px;margin:0 0 16px;display:flex;gap:16px;align-items:flex-start;line-height:1.4}
 .tick{flex:0 0 34px;height:34px;border-radius:50%;background:${cfg.BRAND.gold};color:${cfg.BRAND.navyStrong};display:grid;place-items:center;font-weight:700;font-size:18px}
 .next{margin-top:34px;font-size:20px;color:#dbe4ff;border-top:1px solid rgba(255,255,255,.2);padding-top:22px}`);
