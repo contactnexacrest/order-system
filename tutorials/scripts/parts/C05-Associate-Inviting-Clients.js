@@ -1,6 +1,6 @@
 'use strict';
 // C05 — Inviting a client: the buyer registration link (one buyer), the personal code and
-// quotation link (any buyer), the buyer's side, NexaCrest accepting, and the certificate.
+// quotation link (any buyer), the buyer's side, NexaCrest accepting, and the client in your list (no certificate since D-428).
 const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.inviter@email.com';
@@ -94,10 +94,8 @@ module.exports = {
         await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ }));
         await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(1800);
       } },
-      { caption: 'Registration certificate', say: 'Open the registration certificate. It records who introduced whom, and when. It is your proof, should there ever be a question.', do: async (d) => {
-        const href = await d.page.locator('tr', { hasText: BUYER }).getByRole('link', { name: 'Registration certificate' }).first().getAttribute('href');
-        await d.point(d.page.locator('tr', { hasText: BUYER }).getByRole('link', { name: 'Registration certificate' }).first(), 600);
-        await d.goto(href); await d.point('h1', 1500);
+      { caption: 'Your record', say: 'This list is your record: who you introduced, and when. NexaCrest keeps the same record, and nobody can change it without the Managing Director and a written reason.', do: async (d) => {
+        await d.point(d.page.locator('tr', { hasText: BUYER }).first(), 2200);
       } },
       { card: 'list', kicker: 'Good to know', title: 'Rules that protect you', items: [
         'The first completed registration of a company counts.',
@@ -109,7 +107,7 @@ module.exports = {
         'My clients → Company + country → Create buyer registration link → send it.',
         'Or share your personal code / quotation link with any buyer.',
         'Buyer registers, verifies their e-mail, confirms you introduced them.',
-        'NexaCrest accepts: the company is your client, certificate ready.',
+        'NexaCrest accepts: the company is your client, listed in My clients.',
       ], next: 'Video C04 · Prices, special requests and access levels', say: 'Great work! You created a link, met your personal code, and watched a buyer become your client. Next, in video C04, we get a price for that buyer, straight from the catalogue. See you there!' },
     ];
   },

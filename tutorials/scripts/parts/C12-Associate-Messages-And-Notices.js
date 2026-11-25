@@ -21,7 +21,7 @@ module.exports = {
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'starter', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
     const until = new Date(Date.now() + 182 * 864e5).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     demo.sql(`INSERT INTO associate_events (associate_id, event, message, is_notice, created_at) VALUES
-      (${s.a.id}, 'client_accepted', 'TEST Demo Stone Buyer BV is now registered as your client. Once they place an order, they stay your client while your agreement runs; if they place no order by ${until}, the registration ends. Your registration certificate is in the portal (My clients).', 1, NOW() - INTERVAL 3 DAY),
+      (${s.a.id}, 'client_accepted', 'TEST Demo Stone Buyer BV is now registered as your client. Once they place an order, they stay your client while your agreement runs; if they place no order by ${until}, the registration ends. You can see them in the portal (My clients).', 1, NOW() - INTERVAL 3 DAY),
       (${s.a.id}, 'order_created', 'New order TEST-TUT-1201 from your client TEST Demo Stone Buyer BV. Your commission rate for now is [rate in your agreement]. It becomes final when we send the buyer the proforma invoice.', 1, NOW() - INTERVAL 1 DAY)`);
     return s;
   },
