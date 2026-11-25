@@ -187,15 +187,15 @@ final class ScreenshotFixesNov11Test extends DbTestCase
     public function testIndiaAssociateReadsRupeesInBothPlaces(): void
     {
         $page = $this->commissionPage($this->associate(['based_in' => 'india', 'country' => 'India', 'currency_code' => 'USD']));
-        self::assertStringContainsString('in Indian rupees to your verified bank account.</li>', $page);
-        self::assertStringNotContainsString('in US dollars to your verified bank account', $page);
+        self::assertStringContainsString('In Indian rupees, to your verified bank account.</li>', $page);
+        self::assertStringNotContainsString('In US dollars, to your verified bank account', $page);
         self::assertStringContainsString('we turn it into rupees at the rate the bank used for the buyer\'s payment. We pay you that rupee amount.', $page);
     }
 
     public function testAbroadAssociateReadsTheirCurrencyInBothPlaces(): void
     {
         $page = $this->commissionPage($this->associate(['based_in' => 'abroad', 'country' => 'Germany', 'currency_code' => 'EUR']));
-        self::assertStringContainsString('in euros to your verified bank account.</li>', $page);
+        self::assertStringContainsString('In euros, to your verified bank account.</li>', $page);
         self::assertStringContainsString('we set the amount in euros. We pay you exactly that amount in euros into your checked bank account.', $page);
         self::assertStringNotContainsString('rupee', $page);
     }

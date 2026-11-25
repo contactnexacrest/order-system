@@ -269,7 +269,8 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         self::assertStringContainsString('>' . AssociateCommission::rateLabel($level) . '</span> <b>of the FOB value of each order from the clients you introduced</b>', $profile);
         self::assertStringContainsString('How it works', $profile);
         self::assertStringContainsString('It is worked out on the <b>FOB value on the Commercial Invoice</b>.', $profile);
-        self::assertStringContainsString('in our <b>monthly payment on the last day of the month</b>, in Indian rupees to your verified bank account.', $profile);
+        self::assertStringContainsString('monthly payment on the last day of the month', $profile); // D-427 wording
+        self::assertStringContainsString('In Indian rupees, to your verified bank account.', $profile);
         self::assertStringNotContainsString((string) $level['name'], $profile);
         self::assertStringNotContainsString('goods value', $profile);
         $this->asAssociate($a);

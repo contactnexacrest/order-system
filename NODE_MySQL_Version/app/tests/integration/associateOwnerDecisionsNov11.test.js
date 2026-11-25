@@ -220,7 +220,8 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     expect(profile).toContain(`>${associateCommission.rateLabel(level)}</span> <b>of the FOB value of each order from the clients you introduced</b>`);
     expect(profile).toContain('How it works');
     expect(profile).toContain('It is worked out on the <b>FOB value on the Commercial Invoice</b>.');
-    expect(profile).toContain('in our <b>monthly payment on the last day of the month</b>, in Indian rupees to your verified bank account.');
+    expect(profile).toContain('monthly payment on the last day of the month'); // D-427 wording
+    expect(profile).toContain('In Indian rupees, to your verified bank account.');
     expect(profile).not.toContain(String(level.name));
     expect(profile).not.toContain('goods value');
     const commission = (await agent.get('/associate/commission')).text;

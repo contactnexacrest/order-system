@@ -146,15 +146,15 @@ describe('11 Nov 2026 screenshot fixes', () => {
     it('an associate in India (even with an old USD record) reads "rupees" in both places', async () => {
       const a = await associate({ based_in: 'india', country: 'India', currency_code: 'USD' });
       const page = (await (await portal(a)).get('/associate/commission')).text.replace(/&#39;/g, "'");
-      expect(page).toContain('in Indian rupees to your verified bank account.</li>');
-      expect(page).not.toContain('in US dollars to your verified bank account');
+      expect(page).toContain('In Indian rupees, to your verified bank account.</li>');
+      expect(page).not.toContain('In US dollars, to your verified bank account');
       expect(page).toContain("we turn it into rupees at the rate the bank used for the buyer's payment. We pay you that rupee amount.");
     });
 
     it('an associate abroad paid in euros reads "euros" in both places, never rupees', async () => {
       const a = await associate({ based_in: 'abroad', country: 'Germany', currency_code: 'EUR' });
       const page = (await (await portal(a)).get('/associate/commission')).text.replace(/&#39;/g, "'");
-      expect(page).toContain('in euros to your verified bank account.</li>');
+      expect(page).toContain('In euros, to your verified bank account.</li>');
       expect(page).toContain('we set the amount in euros. We pay you exactly that amount in euros into your checked bank account.');
       expect(page).not.toContain('rupee');
     });
