@@ -688,7 +688,7 @@ final class AssociateSystemTest extends DbTestCase
         self::assertStringContainsString('When commission is paid', $this->render(fn () => (new AssociateAdminController())->ladder([])));
         self::assertStringContainsString('TDS register', $this->render(fn () => (new AssociateAdminController())->report([])));
         self::assertStringContainsString('Change status', $this->render(fn () => (new AssociateAdminController())->show(['id' => (string) $a['id']])));
-        $base = ['associate_tds_pct' => '2', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '40',
+        $base = ['associate_tds_pct' => '2', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_payout_run' => 'monthly', 'associate_payout_cutoff_day' => '1', 'associate_payout_day' => '40',
             'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_claim_hold' => '1', 'associate_portal_commission_months' => '12',
             'payout_reason' => 'Test: change of the payout day.']; // D-292: a payment-run change needs a reason
         $_POST = $base;
