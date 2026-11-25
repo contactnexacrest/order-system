@@ -2,7 +2,7 @@
    invitations (each with i.usable), invitationStatuses (map), newLink, codeLink, protectionMonths, csrfToken. #}
 <div class="card page-wide">
   <h1>My clients</h1>
-  <p class="muted">Your buyer registers with NexaCrest using your buyer registration link or your quotation link (which has your personal code). They fill in their own details and confirm that you introduced them. When we accept the registration, the company is your client for {{ protectionMonths }} months, however they contact us later. If two people register the same company, the first one finished counts.</p>
+  <p class="muted">Your buyer registers with NexaCrest using your buyer registration link or your quotation link (which has your personal code). They fill in their own details and confirm that you introduced them. When we accept the registration, the company is your client, however they contact us later. Once they have placed an order, they stay your client while your agreement runs; if they place no order within {{ protectionMonths }} months, the registration ends and you can invite them again. If two people register the same company, the first one finished counts.</p>
 
   {% if newLink %}
     <div class="alert alert-success">Your new buyer registration link — copy it and send it to your buyer (valid 30 days, for one registration):<br><code style="user-select:all">{{ newLink }}</code></div>

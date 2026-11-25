@@ -101,10 +101,10 @@ module.exports = {
       } },
       { card: 'list', kicker: 'Good to know', title: 'Rules that protect you', items: [
         'The first completed registration of a company counts.',
-        'The company stays your client for 6 months; with no order by then, the link lapses.',
-        'Commission comes from the first orders: those within 10 days of the first purchase order.',
+        'Once the company has ordered, it stays your client while your agreement runs; with no order within 6 months, the registration ends.',
+        'Every order of your client can earn commission while your agreement runs.',
         'You can cancel an unused link at any time.',
-      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. The company stays your client for six months, and if they place no order in that time, the link lapses. Commission comes from the client\'s first orders, those within ten days of their first purchase order. And you can cancel a link you no longer need.' },
+      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. Once the company has placed an order, it stays your client while your agreement runs. If they place no order within six months, the registration ends. And every order of your client can earn commission, for as long as your agreement runs. And you can cancel a link you no longer need.' },
       { card: 'list', kicker: 'Recap', title: 'Inviting, step by step', items: [
         'My clients → Company + country → Create buyer registration link → send it.',
         'Or share your personal code / quotation link with any buyer.',

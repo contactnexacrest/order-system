@@ -6,6 +6,8 @@
 // clients ("Your client until", "Last day for orders that earn commission"), Orders ("Order values are not
 // shown for your account"), the locked page ("This page is not open for your account") and the tax heading
 // ("Tax certificates (Form 16A) …"). Selectors changed: the 10-day column and the tax-certificates heading.
+// Updated 25 Nov 2026 (D-426): the "Last day for orders that earn commission" column is gone; "Your client" shows
+// "Yours while your agreement runs" once the client has ordered; the intro says a client with an order stays yours.
 const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.starter@email.com';
@@ -32,9 +34,8 @@ module.exports = {
     { caption: 'One client, one order', say: 'Our demo associate has one client, a stone buyer in the Netherlands, and one order. The order shows up under Latest orders, with its stage and its commission status.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Latest orders' })); await d.ring(d.page.locator('table.list').first()); await d.wait(1500); } },
 
     { card: 'chapter', title: 'My clients', subtitle: 'Who is yours, and for how long.', say: 'Part one. My clients.' },
-    { goto: '/associate/clients', caption: 'How a buyer becomes your client', say: 'The text at the top explains the rule. Your buyer registers with NexaCrest, through your buyer registration link or your quotation link with your personal code, and confirms that you introduced them. Once NexaCrest accepts, the company is your client for six months, however they contact NexaCrest later.', do: async (d) => { await d.point('p.muted', 2000); } },
-    { caption: 'Registered clients', say: 'In the table: the client, the country, how they came to us, the date they registered, and the column Your client until. Until that date, any order from that company counts as yours. Then the order numbers of that client.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ })); await d.ring(d.page.locator('h2:has-text("Registered clients") + .table-scroll table')); await d.wait(1800); } },
-    { caption: 'Last day for orders that earn commission', say: 'And this column: last day for orders that earn commission. Commission is earned on a client\'s first orders: everything they order within ten days of their first purchase order. After that day, repeat orders earn no commission. So the first order is the big moment!', do: async (d) => { await d.ring(d.page.locator('th', { hasText: 'Last day for orders that earn commission' })); await d.wait(1500); } },
+    { goto: '/associate/clients', caption: 'How a buyer becomes your client', say: 'The text at the top explains the rule. Your buyer registers with NexaCrest, through your buyer registration link or your quotation link with your personal code, and confirms that you introduced them. Once NexaCrest accepts, the company is your client. Once they have placed an order, they stay your client while your agreement runs. If they place no order within six months, the registration ends, and you can invite them again.', do: async (d) => { await d.point('p.muted', 2000); } },
+    { caption: 'Registered clients', say: 'In the table: the client, the country, how they came to us, the date they registered, the column Your client, and the order numbers of that client. A client who has ordered shows: yours while your agreement runs. A buyer who has signed up but not ordered yet shows the day the sign-up ends.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ })); await d.ring(d.page.locator('h2:has-text("Registered clients") + .table-scroll table')); await d.wait(1800); } },
     { caption: 'Registration certificate', say: 'Each client has a registration certificate. It is your proof that this buyer was introduced by you, with the date. Keep it handy.', do: async (d) => { await d.point(d.page.getByRole('link', { name: 'Registration certificate' }).first(), 1500); } },
 
     { card: 'chapter', title: 'Orders', subtitle: 'Follow every order without chasing anyone.', say: 'Part two. Orders.' },
