@@ -92,7 +92,7 @@ final class GstRefundTest extends DbTestCase
 
         self::assertStringContainsString('bank reference (RFD-05 / UTR) is required', $credit(['bank_reference' => ''] + $body)['message']);
         self::assertStringContainsString('provisional part or the final', $credit(['part' => ''] + $body)['message']);
-        self::assertStringContainsString('more than what is still open on this claim (₹206,000.00)', $credit(['amount' => '206000.01'] + $body)['message']);
+        self::assertStringContainsString('more than what is still open on this claim (₹2,06,000.00)', $credit(['amount' => '206000.01'] + $body)['message']);
         self::assertSame([], GstRefundRepository::creditsFor($claimId), 'nothing saved');
 
         $done = $credit($body);

@@ -135,23 +135,23 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         $proforma = OrderVendorBillRepository::create($orderId, 'supplier', ['supplier_po_id' => (int) $po['id'], 'bill_for' => 'advance', 'doc_kind' => 'proforma', 'requested_amount_inr' => 196664.70, 'bill_no' => 'PI-7', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 655549, 'gst_inr' => 0], $this->userId);
         $tpn = OrderVendorBillRepository::toPayNow(OrderVendorBillRepository::find($proforma));
         self::assertSame(196664.70, $tpn['amount']);
-        self::assertSame('asked now on the proforma ₹196,664.70', $tpn['working']);
+        self::assertSame('asked now on the proforma ₹1,96,664.70', $tpn['working']);
 
         $bills = OrderVendorBillRepository::forOrder($orderId);
-        self::assertSame(['amount' => 196664.70, 'working' => 'planned advance ₹196,664.70 − already paid ₹0.00'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'advance'));
+        self::assertSame(['amount' => 196664.70, 'working' => 'planned advance ₹1,96,664.70 − already paid ₹0.00'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'advance'));
 
         self::assertSame('success', $this->pay($orderId, $proforma, 196664.70, 'advance')['type']);
         $invoice = OrderVendorBillRepository::create($orderId, 'supplier', ['supplier_po_id' => (int) $po['id'], 'bill_for' => 'balance', 'doc_kind' => 'invoice', 'replaces_bill_id' => $proforma, 'bill_no' => 'TI-7', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 655549, 'gst_inr' => 0], $this->userId);
 
         $tpn = OrderVendorBillRepository::toPayNow(OrderVendorBillRepository::find($invoice));
         self::assertSame(458884.30, $tpn['amount']);
-        self::assertSame('bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70', $tpn['working']);
+        self::assertSame('bill total ₹6,55,549.00 − advance paid on proforma PI-7 ₹1,96,664.70', $tpn['working']);
         $bills = OrderVendorBillRepository::forOrder($orderId);
-        self::assertSame(['amount' => 458884.30, 'working' => 'PO total ₹655,549.00 − advance paid ₹196,664.70 − balance already paid ₹0.00'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'balance'));
-        self::assertSame(['amount' => 0.0, 'working' => 'planned advance ₹196,664.70 − already paid ₹196,664.70'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'advance'));
+        self::assertSame(['amount' => 458884.30, 'working' => 'PO total ₹6,55,549.00 − advance paid ₹1,96,664.70 − balance already paid ₹0.00'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'balance'));
+        self::assertSame(['amount' => 0.0, 'working' => 'planned advance ₹1,96,664.70 − already paid ₹1,96,664.70'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'advance'));
 
         $page = $this->render($orderId);
-        self::assertStringContainsString('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>', $page);
+        self::assertStringContainsString('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹6,55,549.00 − advance paid on proforma PI-7 ₹1,96,664.70)</small>', $page);
         self::assertStringContainsString('<strong>Balance to pay now: &#8377;4,58,884.30</strong>', $page);
 
         self::assertSame('success', $this->pay($orderId, $invoice, 458884.30, 'balance')['type']);
@@ -169,7 +169,7 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         $proforma = OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'cha', 'payment_kind' => 'advance', 'doc_kind' => 'proforma', 'bill_no' => 'CHA-PI', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 196664.70, 'gst_inr' => 0], $this->userId);
         self::assertSame('success', $this->pay($orderId, $proforma, 196664.70)['type']);
         $invoice = OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'cha', 'payment_kind' => 'final', 'doc_kind' => 'invoice', 'replaces_bill_id' => $proforma, 'bill_no' => 'CHA-TI', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 655549, 'gst_inr' => 0], $this->userId);
-        self::assertSame('bill total ₹655,549.00 − advance paid on proforma CHA-PI ₹196,664.70', OrderVendorBillRepository::toPayNow(OrderVendorBillRepository::find($invoice))['working']);
+        self::assertSame('bill total ₹6,55,549.00 − advance paid on proforma CHA-PI ₹1,96,664.70', OrderVendorBillRepository::toPayNow(OrderVendorBillRepository::find($invoice))['working']);
         self::assertSame('success', $this->pay($orderId, $invoice, 458884.30)['type']);
         self::assertSame(['cost' => 655549.0, 'paid' => 655549.0, 'due' => 0.0], OrderVendorBillRepository::totalsFor(OrderVendorBillRepository::forOrder($orderId, 'logistics')));
     }
@@ -225,14 +225,14 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         self::assertNull(CourierCharges::parse(['courier_charges_inr' => '0']));
         self::assertSame('Courier charges must be a number of rupees (0 or more), or leave the box blank.', CourierCharges::parse(['courier_charges_inr' => '-5']));
         self::assertSame('Courier charges must be a number of rupees (0 or more), or leave the box blank.', CourierCharges::parse(['courier_charges_inr' => 'abc']));
-        self::assertSame('Courier charges of ₹100,000.01 look too high for one document courier (more than ₹100,000.00). Check the courier bill.', CourierCharges::parse(['courier_charges_inr' => '100000.01']));
+        self::assertSame('Courier charges of ₹1,00,000.01 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.', CourierCharges::parse(['courier_charges_inr' => '100000.01']));
         self::assertSame('Choose what the courier charges were paid from.', CourierCharges::parse(['courier_charges_inr' => '10', 'courier_paid_from' => 'cash']));
         self::assertSame(['amount' => 100000.0, 'company' => '', 'paid_from' => 'company_account'], CourierCharges::parse(['courier_charges_inr' => '100000']));
 
         // Refused: nothing is closed or booked.
         $orderId = $this->orderAtStage9();
         $this->close($orderId, ['courier_tracking_number' => '1234567890', 'courier_charges_inr' => '250000']);
-        self::assertSame('Courier charges of ₹250,000.00 look too high for one document courier (more than ₹100,000.00). Check the courier bill.', $this->lastFlash()['message']);
+        self::assertSame('Courier charges of ₹2,50,000.00 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.', $this->lastFlash()['message']);
         self::assertSame('active', OrderRepository::find($orderId)['status']);
 
         $this->close($orderId, ['courier_tracking_number' => '1234567890', 'courier_company' => 'DHL Express', 'courier_charges_inr' => '3540', 'courier_paid_from' => 'company_card']);

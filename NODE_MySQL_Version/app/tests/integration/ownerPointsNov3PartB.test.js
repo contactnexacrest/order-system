@@ -117,19 +117,19 @@ describe('owner points of 3 Nov 2026 — part B', () => {
   it('5 + 6: To pay now and the Total row with the screenshot figures', async () => {
     const [orderId, po] = await orderWithSupplierPo();
     const proforma = await bill(orderId, 'supplier', { supplier_po_id: po.id, bill_for: 'advance', doc_kind: 'proforma', requested_amount_inr: 196664.70, bill_no: 'PI-7', taxable_inr: 655549 });
-    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(proforma))).toEqual({ amount: 196664.70, working: 'asked now on the proforma ₹196,664.70' });
+    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(proforma))).toEqual({ amount: 196664.70, working: 'asked now on the proforma ₹1,96,664.70' });
     let bills = await orderVendorBillRepository.forOrder(orderId);
-    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'advance')).toEqual({ amount: 196664.70, working: 'planned advance ₹196,664.70 − already paid ₹0.00' });
+    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'advance')).toEqual({ amount: 196664.70, working: 'planned advance ₹1,96,664.70 − already paid ₹0.00' });
 
     expect((await pay(orderId, proforma, 196664.70, 'advance')).type).toBe('success');
     const invoice = await bill(orderId, 'supplier', { supplier_po_id: po.id, bill_for: 'balance', doc_kind: 'invoice', replaces_bill_id: proforma, bill_no: 'TI-7', taxable_inr: 655549 });
-    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(invoice))).toEqual({ amount: 458884.30, working: 'bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70' });
+    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(invoice))).toEqual({ amount: 458884.30, working: 'bill total ₹6,55,549.00 − advance paid on proforma PI-7 ₹1,96,664.70' });
     bills = await orderVendorBillRepository.forOrder(orderId);
-    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'balance')).toEqual({ amount: 458884.30, working: 'PO total ₹655,549.00 − advance paid ₹196,664.70 − balance already paid ₹0.00' });
-    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'advance')).toEqual({ amount: 0, working: 'planned advance ₹196,664.70 − already paid ₹196,664.70' });
+    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'balance')).toEqual({ amount: 458884.30, working: 'PO total ₹6,55,549.00 − advance paid ₹1,96,664.70 − balance already paid ₹0.00' });
+    expect(vendorBillsView.supplierLegToPayNow(bills, po, 'advance')).toEqual({ amount: 0, working: 'planned advance ₹1,96,664.70 − already paid ₹1,96,664.70' });
 
     let html = await page(orderId);
-    expect(html).toContain('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>');
+    expect(html).toContain('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹6,55,549.00 − advance paid on proforma PI-7 ₹1,96,664.70)</small>');
     expect(html).toContain('<strong>Balance to pay now: &#8377;4,58,884.30</strong>');
 
     expect((await pay(orderId, invoice, 458884.30, 'balance')).type).toBe('success');
@@ -147,7 +147,7 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     const proforma = await bill(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'cha', payment_kind: 'advance', doc_kind: 'proforma', bill_no: 'CHA-PI', taxable_inr: 196664.70 });
     expect((await pay(orderId, proforma, 196664.70)).type).toBe('success');
     const invoice = await bill(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'cha', payment_kind: 'final', doc_kind: 'invoice', replaces_bill_id: proforma, bill_no: 'CHA-TI', taxable_inr: 655549 });
-    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(invoice)).working).toBe('bill total ₹655,549.00 − advance paid on proforma CHA-PI ₹196,664.70');
+    expect(vendorBillsView.toPayNow(await orderVendorBillRepository.find(invoice)).working).toBe('bill total ₹6,55,549.00 − advance paid on proforma CHA-PI ₹1,96,664.70');
     expect((await pay(orderId, invoice, 458884.30)).type).toBe('success');
     expect(vendorBillsView.totals(await orderVendorBillRepository.forOrder(orderId, 'logistics'))).toEqual({ cost: 655549, paid: 655549, due: 0 });
   });
@@ -199,13 +199,13 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     expect(courierCharges.parse({ courier_charges_inr: '0' })).toBeNull();
     expect(courierCharges.parse({ courier_charges_inr: '-5' })).toBe('Courier charges must be a number of rupees (0 or more), or leave the box blank.');
     expect(courierCharges.parse({ courier_charges_inr: 'abc' })).toBe('Courier charges must be a number of rupees (0 or more), or leave the box blank.');
-    expect(courierCharges.parse({ courier_charges_inr: '100000.01' })).toBe('Courier charges of ₹100,000.01 look too high for one document courier (more than ₹100,000.00). Check the courier bill.');
+    expect(courierCharges.parse({ courier_charges_inr: '100000.01' })).toBe('Courier charges of ₹1,00,000.01 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.');
     expect(courierCharges.parse({ courier_charges_inr: '10', courier_paid_from: 'cash' })).toBe('Choose what the courier charges were paid from.');
     expect(courierCharges.parse({ courier_charges_inr: '100000' })).toEqual({ amount: 100000, company: '', paid_from: 'company_account' });
 
     const orderId = await orderAtStage9();
     expect((await close(orderId, { courier_tracking_number: '1234567890', courier_charges_inr: '250000' })).message)
-      .toBe('Courier charges of ₹250,000.00 look too high for one document courier (more than ₹100,000.00). Check the courier bill.');
+      .toBe('Courier charges of ₹2,50,000.00 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.');
     expect((await orderRepository.find(orderId)).status).toBe('active');
 
     await close(orderId, { courier_tracking_number: '1234567890', courier_company: 'DHL Express', courier_charges_inr: '3540', courier_paid_from: 'company_card' });

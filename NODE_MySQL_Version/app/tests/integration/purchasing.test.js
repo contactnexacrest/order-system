@@ -110,7 +110,7 @@ describe('Procurement (D-214 phase 3)', () => {
     expect((await purchasingRepository.find(id)).status).toBe('quoted');
 
     const result = await post(mgr, page, `/procurement/${id}/award`, { quote_id: String(quotes[0].id) });
-    expect(result.message).toContain('for ₹205,320.00. Approved — within your approval limit.');
+    expect(result.message).toContain('for ₹2,05,320.00. Approved — within your approval limit.');
     expect((await purchasingRepository.find(id)).status).toBe('approved');
   });
 
@@ -127,10 +127,10 @@ describe('Procurement (D-214 phase 3)', () => {
     expect((await exec.post(`/procurement/${id}/approve`).type('form').send({ _csrf: csrf })).status).toBe(403);
 
     const mgr = await member('Procurement Manager', 100000);
-    expect((await post(mgr, page, `/procurement/${id}/approve`, {})).message).toBe('This award (₹212,400.00) is above your approval limit of ₹100,000.00 — a higher approver must approve it.');
+    expect((await post(mgr, page, `/procurement/${id}/approve`, {})).message).toBe('This award (₹2,12,400.00) is above your approval limit of ₹1,00,000.00 — a higher approver must approve it.');
 
     const dir = await member('Procurement Director', null);
-    expect((await post(dir, page, `/procurement/${id}/approve`, {})).message).toBe(`Purchase PR-${id} approved: ${quote.supplier_legal_name}, ₹212,400.00.`);
+    expect((await post(dir, page, `/procurement/${id}/approve`, {})).message).toBe(`Purchase PR-${id} approved: ${quote.supplier_legal_name}, ₹2,12,400.00.`);
     const r = await purchasingRepository.find(id);
     expect(r.status).toBe('approved');
     expect(Number(r.approved_by)).not.toBe(exec.userId);
@@ -172,7 +172,7 @@ describe('Procurement (D-214 phase 3)', () => {
     expect((await purchasingRepository.find(id)).status).toBe('awarded');
 
     const mgr2 = await roleOnly('Procurement Manager', 100000);
-    expect((await post(mgr2, page, `/procurement/${id}/approve`, {})).message).toBe('This award (₹212,400.00) is above your approval limit of ₹100,000.00 — a higher approver must approve it.');
+    expect((await post(mgr2, page, `/procurement/${id}/approve`, {})).message).toBe('This award (₹2,12,400.00) is above your approval limit of ₹1,00,000.00 — a higher approver must approve it.');
 
     const id2 = await raise();
     const page2 = `/procurement/${id2}`;

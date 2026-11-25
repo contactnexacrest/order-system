@@ -82,7 +82,7 @@ final class OrderPageFlowTest extends DbTestCase
         self::assertEquals(1800, (float) $payment['advance_amount']);
         self::assertEquals(83.25, (float) $payment['advance_exchange_rate']);
         self::assertSame($this->userId, (int) $payment['advance_exchange_rate_set_by']);
-        self::assertStringContainsString('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹149,850.00, estimated until the INR credited is known).', $this->lastFlash());
+        self::assertStringContainsString('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹1,49,850.00, estimated until the INR credited is known).', $this->lastFlash());
     }
 
     public function testOneSaveStoresEveryComplianceRowOfTheCard(): void

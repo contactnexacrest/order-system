@@ -200,7 +200,7 @@ describe('Logistics enters logistics bills, Accounts pays; our bank charges on a
     expect(remittanceDifference.postedOwnBankCharges({ own_bank_charges_inr: '  ' })).toBeNull();
     expect(remittanceDifference.postedOwnBankCharges({ own_bank_charges_inr: '590' })).toEqual({ value: 590 });
     expect(remittanceDifference.postedOwnBankCharges({ own_bank_charges_inr: '-5' }).error).toBe("Our bank's charges must be an amount in rupees above 0 — or leave the field empty.");
-    expect(remittanceDifference.postedOwnBankCharges({ own_bank_charges_inr: '250000' }).error).toBe("Our bank's charges of ₹250,000.00 look too high for one credit (more than ₹100,000.00). Check the bank advice and enter the fee only.");
+    expect(remittanceDifference.postedOwnBankCharges({ own_bank_charges_inr: '250000' }).error).toBe("Our bank's charges of ₹2,50,000.00 look too high for one credit (more than ₹1,00,000.00). Check the bank advice and enter the fee only.");
 
     const accounts = await user('Accounts Executive');
     const orderId = await orderAtAdvance();

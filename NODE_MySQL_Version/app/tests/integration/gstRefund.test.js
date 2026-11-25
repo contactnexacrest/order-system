@@ -85,7 +85,7 @@ describe('GST refunds under LUT', () => {
 
     expect((await credit({ ...body, bank_reference: '' })).message).toContain('bank reference (RFD-05 / UTR) is required');
     expect((await credit({ ...body, part: '' })).message).toContain('provisional part or the final');
-    expect((await credit({ ...body, amount: '206000.01' })).message).toContain('more than what is still open on this claim (₹206,000.00)');
+    expect((await credit({ ...body, amount: '206000.01' })).message).toContain('more than what is still open on this claim (₹2,06,000.00)');
     expect(await gstRefundRepository.creditsFor(claimId)).toEqual([]); // nothing saved
 
     const description = `GST refund under LUT, Apr–Jun 2026, claim ${arn} · provisional · ₹185,400.00 credited ${today()} · bank ref RFD05-AA270226004411`;

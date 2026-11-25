@@ -73,7 +73,7 @@ describe('Order page flow (owner requests 2026-10-26)', () => {
     expect(Number(payment.advance_amount)).toBe(1800);
     expect(Number(payment.advance_exchange_rate)).toBe(83.25);
     expect(Number(payment.advance_exchange_rate_set_by)).toBe(adminId);
-    expect(lastFlash(req)).toContain('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹149,850.00, estimated until the INR credited is known).');
+    expect(lastFlash(req)).toContain('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹1,49,850.00, estimated until the INR credited is known).');
   });
 
   it('stores every compliance row of a card with one Save', async () => {

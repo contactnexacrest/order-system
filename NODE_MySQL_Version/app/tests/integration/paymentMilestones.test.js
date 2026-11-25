@@ -180,7 +180,7 @@ describe('Payment milestones (D-215, 5a)', () => {
     const order = await orderRepository.find(orderId);
     const expected = `Milestone 2 (50% ${DUE}) received from ${order.company_legal_name} for order ${order.buyer_inquiry_ref}`
       + ` · USD 2,250.00 at ₹84.10 · against Proforma Invoice ${piRef} · bank ref UTR778899`;
-    expect(await call('record', body, { milestoneId: String(m.id) })).toBe(`Recorded: ${expected}. Received USD 2,250.00 at the exchange rate of ₹84.1000 (≈ ₹189,225.00, estimated until the INR credited is known). Mark it cleared once your bank confirms receipt.`);
+    expect(await call('record', body, { milestoneId: String(m.id) })).toBe(`Recorded: ${expected}. Received USD 2,250.00 at the exchange rate of ₹84.1000 (≈ ₹1,89,225.00, estimated until the INR credited is known). Mark it cleared once your bank confirms receipt.`);
     expect(await call('record', body, { milestoneId: String(m.id) })).toBe('Milestone 2 remittance is already recorded — nothing changed.');
 
     // The balance waits for every milestone.

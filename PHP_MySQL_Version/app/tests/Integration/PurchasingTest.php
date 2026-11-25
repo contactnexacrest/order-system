@@ -120,7 +120,7 @@ final class PurchasingTest extends DbTestCase
         self::assertSame('awarded', PurchasingRepository::find($id)['status']);
 
         $this->roleOnly('Procurement Manager', 100000.0);
-        self::assertSame('This award (₹212,400.00) is above your approval limit of ₹100,000.00 — a higher approver must approve it.', $this->post('approve', [], ['id' => $id])['message']);
+        self::assertSame('This award (₹2,12,400.00) is above your approval limit of ₹1,00,000.00 — a higher approver must approve it.', $this->post('approve', [], ['id' => $id])['message']);
         self::assertSame('awarded', PurchasingRepository::find($id)['status']);
 
         // No limit set for a manager-level designation: unknown, so no self-approval.
@@ -163,7 +163,7 @@ final class PurchasingTest extends DbTestCase
         self::assertSame('quoted', PurchasingRepository::find($id)['status']);
 
         $result = $this->post('award', ['quote_id' => $quotes[0]['id']], ['id' => $id]);
-        self::assertStringContainsString('for ₹205,320.00. Approved — within your approval limit.', $result['message']);
+        self::assertStringContainsString('for ₹2,05,320.00. Approved — within your approval limit.', $result['message']);
         self::assertSame('approved', PurchasingRepository::find($id)['status']);
     }
 
@@ -178,10 +178,10 @@ final class PurchasingTest extends DbTestCase
         self::assertSame('Approving a purchase needs the "Approve purchases" permission.', $this->post('approve', [], ['id' => $id])['message']);
 
         $this->member('Procurement Manager', 100000.0);
-        self::assertSame('This award (₹212,400.00) is above your approval limit of ₹100,000.00 — a higher approver must approve it.', $this->post('approve', [], ['id' => $id])['message']);
+        self::assertSame('This award (₹2,12,400.00) is above your approval limit of ₹1,00,000.00 — a higher approver must approve it.', $this->post('approve', [], ['id' => $id])['message']);
 
         $this->member('Procurement Director', null);
-        self::assertSame('Purchase PR-' . $id . ' approved: ' . $quote['supplier_legal_name'] . ', ₹212,400.00.', $this->post('approve', [], ['id' => $id])['message']);
+        self::assertSame('Purchase PR-' . $id . ' approved: ' . $quote['supplier_legal_name'] . ', ₹2,12,400.00.', $this->post('approve', [], ['id' => $id])['message']);
         self::assertSame('approved', PurchasingRepository::find($id)['status']);
         self::assertNotSame($exec, (int) PurchasingRepository::find($id)['approved_by']);
     }

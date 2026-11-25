@@ -88,7 +88,7 @@ describe('D-244: INR credited on buyer remittances', () => {
     const orderId = await orderAtAdvance();
     const r = await call('recordAdvancePayment', orderId, advance('1800', { advance_inr_credited: '149850.00' }));
     expect(r.type).toBe('success');
-    expect(r.message).toContain('Received USD 1,800.00; ₹149,850.00 credited by the bank — exchange rate worked out ₹83.2500.');
+    expect(r.message).toContain('Received USD 1,800.00; ₹1,49,850.00 credited by the bank — exchange rate worked out ₹83.2500.');
 
     const receipt = (await receipts(orderId))[0];
     expect([receipt.inr_credited, receipt.exchange_rate, receipt.bank_rate, receipt.rate_gap_inr, receipt.rate_gap_choice]).toEqual(['149850.00', '83.2500', null, null, null]);
@@ -185,7 +185,7 @@ describe('D-244: INR credited on buyer remittances', () => {
 
     const r = await call('recordAdvancePayment', orderId, advance('1800', { advance_inr_unknown: '1', advance_exchange_rate: '83.40' }));
     expect(r.type).toBe('success');
-    expect(r.message).toContain('Received USD 1,800.00 at the exchange rate of ₹83.4000 (≈ ₹150,120.00, estimated until the INR credited is known).');
+    expect(r.message).toContain('Received USD 1,800.00 at the exchange rate of ₹83.4000 (≈ ₹1,50,120.00, estimated until the INR credited is known).');
     expect((await receipts(orderId))[0].inr_credited).toBeNull();
     expect((await orderPaymentStatusRepository.find(orderId)).advance_inr_actual).toBeNull();
 

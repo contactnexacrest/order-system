@@ -256,7 +256,7 @@ final class LogisticsBillsAndOwnBankChargesTest extends DbTestCase
         self::assertNull(RemittanceDifference::postedOwnBankCharges(['own_bank_charges_inr' => '  ']));
         self::assertSame(590.0, RemittanceDifference::postedOwnBankCharges(['own_bank_charges_inr' => '590']));
         self::assertSame("Our bank's charges must be an amount in rupees above 0 — or leave the field empty.", RemittanceDifference::postedOwnBankCharges(['own_bank_charges_inr' => '-5']));
-        self::assertSame("Our bank's charges of ₹250,000.00 look too high for one credit (more than ₹100,000.00). Check the bank advice and enter the fee only.", RemittanceDifference::postedOwnBankCharges(['own_bank_charges_inr' => '250000']));
+        self::assertSame("Our bank's charges of ₹2,50,000.00 look too high for one credit (more than ₹1,00,000.00). Check the bank advice and enter the fee only.", RemittanceDifference::postedOwnBankCharges(['own_bank_charges_inr' => '250000']));
 
         $orderId = $this->orderAtAdvance();
         $this->signIn($this->createTestUser('Accounts Executive'));

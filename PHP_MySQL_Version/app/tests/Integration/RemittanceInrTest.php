@@ -98,7 +98,7 @@ final class RemittanceInrTest extends DbTestCase
         $orderId = $this->orderAtAdvance();
         $r = $this->call('recordAdvancePayment', $orderId, $this->advance('1800', ['advance_inr_credited' => '149850.00']));
         self::assertSame('success', $r['type'], $r['message']);
-        self::assertStringContainsString('Received USD 1,800.00; ₹149,850.00 credited by the bank — exchange rate worked out ₹83.2500.', $r['message']);
+        self::assertStringContainsString('Received USD 1,800.00; ₹1,49,850.00 credited by the bank — exchange rate worked out ₹83.2500.', $r['message']);
 
         $receipt = $this->receipts($orderId)[0];
         self::assertSame(['149850.00', '83.2500', null, null, null], [$receipt['inr_credited'], $receipt['exchange_rate'], $receipt['bank_rate'], $receipt['rate_gap_inr'], $receipt['rate_gap_choice']]);
@@ -207,7 +207,7 @@ final class RemittanceInrTest extends DbTestCase
 
         $r = $this->call('recordAdvancePayment', $orderId, $this->advance('1800', ['advance_inr_unknown' => '1', 'advance_exchange_rate' => '83.40']));
         self::assertSame('success', $r['type'], $r['message']);
-        self::assertStringContainsString('Received USD 1,800.00 at the exchange rate of ₹83.4000 (≈ ₹150,120.00, estimated until the INR credited is known).', $r['message']);
+        self::assertStringContainsString('Received USD 1,800.00 at the exchange rate of ₹83.4000 (≈ ₹1,50,120.00, estimated until the INR credited is known).', $r['message']);
         self::assertNull($this->receipts($orderId)[0]['inr_credited']);
         self::assertNull(OrderPaymentStatusRepository::find($orderId)['advance_inr_actual']);
 
