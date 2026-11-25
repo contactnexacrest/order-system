@@ -4465,6 +4465,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <small class="muted" style="display:block">Supplier &#8377;<?= number_format($orderPurchaseGst['supplier'], 2) ?> · logistics &#8377;<?= number_format($orderPurchaseGst['logistics'], 2) ?>. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
             <?php endif; ?>
           </div>
+          <?php if (!empty($profitability['actual_money_only'])): // D-413 ?>
+            <p class="muted small" data-actual-money-only>This order was cancelled or lost: only money that actually moved is counted — what the buyer paid (less a refund paid back), what was paid to the supplier, and real bills and expenses. Nothing is estimated.</p>
+          <?php endif; ?>
           <?php if ($profitability['revenue_is_estimated']): ?>
             <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>
           <?php endif; ?>

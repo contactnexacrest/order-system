@@ -76,7 +76,15 @@ final class OrderProfitabilityService
         $currencyCode = $order['currency_code'] ?? null;
         $payment = self::withLcPayment($order, OrderPaymentStatusRepository::find($orderId));
 
-        [$revenueInr, $isEstimated] = self::revenueInInr($fobValue, $payment);
+        // Owner decision D-413 (25 Nov 2026, confirmed twice): a cancelled or lost order counts only the money
+        // that actually moved — what the buyer paid (less a completed refund), what was paid to the supplier, and
+        // real bills and expenses. No estimate: no balance still to come, no full supplier order, no freight or
+        // insurance not yet billed, no export benefit not yet received.
+        $actualOnly = in_array((string) ($order['status'] ?? ''), ['cancelled', 'lost'], true);
+        [$revenueInr, $isEstimated] = $actualOnly ? [self::actualReceivedInr($payment), false] : self::revenueInInr($fobValue, $payment);
+        if ($actualOnly) {
+            $revenueInr -= self::completedRefundInr($orderId, $payment);
+        }
         $revenueInr += (float) ($payment['lc_extra_inr'] ?? 0.0);
         // Owner 2 Nov 2026: where the rupees actually credited are used, the bank charges the banks
         // deducted are added back — the buyer paid them; they are counted once, as the order cost.
@@ -89,13 +97,22 @@ final class OrderProfitabilityService
         // the balance leg leaves them out (D-215).
         $__milestones = \App\Repositories\PaymentMilestoneRepository::inInr($orderId, $fobValue,
             $payment !== null ? (($payment['balance_exchange_rate'] ?? null) !== null ? (float) $payment['balance_exchange_rate'] : (($payment['advance_exchange_rate'] ?? null) !== null ? (float) $payment['advance_exchange_rate'] : null)) : null);
-        if ($__milestones['rows'] !== []) {
+        if ($__milestones['rows'] !== [] && $actualOnly) {
+            foreach ($__milestones['rows'] as $__m) { // D-413: only milestones the buyer actually paid
+                if (in_array($__m['inr_basis'] ?? null, ['actual', 'rate'], true)) {
+                    $revenueInr += (float) $__m['inr'];
+                }
+            }
+        } elseif ($__milestones['rows'] !== []) {
             $revenueInr += $__milestones['inr'];
             $isEstimated = $isEstimated || $__milestones['estimated'];
         }
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $supplierCostInr = ($supplierPo !== null && $supplierPo['total_payable_inr'] !== null) ? (float) $supplierPo['total_payable_inr'] : 0.0;
+        if ($actualOnly) { // D-413: only what was actually paid to the supplier
+            $supplierCostInr = $supplierPo !== null ? (float) ($supplierPo['advance_paid_amount_inr'] ?? 0) + (float) ($supplierPo['balance_paid_amount_inr'] ?? 0) : 0.0;
+        }
 
         // Owner decision D6 of 2 Nov 2026 (confirmed twice; register D-225): the Step 9a
         // confirmed freight rate and insurance are entered in the ORDER's
@@ -109,6 +126,9 @@ final class OrderProfitabilityService
         [$freightRate, $freightRateSource] = self::freightRateToInr($payment);
         $freightCostInr = ($freightForeign !== null && $freightRate !== null) ? $freightForeign * $freightRate : 0.0;
         $insuranceCostInr = ($insuranceForeign !== null && $freightRate !== null) ? $insuranceForeign * $freightRate : 0.0;
+        if ($actualOnly) { // D-413: a freight rate or insurance not billed is not money that moved
+            [$freightForeign, $insuranceForeign, $freightCostInr, $insuranceCostInr] = [null, null, 0.0, 0.0];
+        }
 
         // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
         // transport, forwarder) are costs of the order. The forwarder's real
@@ -149,7 +169,7 @@ final class OrderProfitabilityService
             $byCategory[$cat] = ($byCategory[$cat] ?? 0.0) + (float) $entry['amount_inr'];
         }
 
-        [$exportBenefitsInr, $exportBenefitsIsEstimated] = self::exportBenefitsInInr($orderId);
+        [$exportBenefitsInr, $exportBenefitsIsEstimated] = self::exportBenefitsInInr($orderId, $actualOnly);
 
         // Owner decision 2026-10-29 (CAFIN change confirmed twice): expenses
         // booked in Zoho Books and linked to this order count in its cost —
@@ -173,6 +193,7 @@ final class OrderProfitabilityService
             'team_incentive_inr'   => round((float) (\App\Repositories\IncentiveRepository::costEntries($orderId)['team']['amount_inr'] ?? 0), 2),
             'associate_commission_inr' => round((float) (\App\Repositories\IncentiveRepository::costEntries($orderId)['associate']['amount_inr'] ?? 0), 2),
             'revenue_is_estimated' => $isEstimated,
+            'actual_money_only'    => $actualOnly, // D-413: a cancelled or lost order — only money that moved
             'export_benefits_inr'  => round($exportBenefitsInr, 2),
             'export_benefits_is_estimated' => $exportBenefitsIsEstimated,
             'supplier_cost_inr'    => round($supplierCostInr, 2),
@@ -331,7 +352,42 @@ final class OrderProfitabilityService
      *
      * @return array{0: float, 1: bool} [exportBenefitsInr, isEstimated]
      */
-    private static function exportBenefitsInInr(int $orderId): array
+    /** D-413: the rupees actually received from the buyer on the advance, balance and freight legs (no estimate). */
+    private static function actualReceivedInr(?array $payment): float
+    {
+        if ($payment === null) {
+            return 0.0;
+        }
+        $total = 0.0;
+        foreach (['advance', 'balance', 'freight'] as $leg) {
+            if (($payment[$leg . '_inr_actual'] ?? null) !== null) {
+                $total += (float) $payment[$leg . '_inr_actual'];
+            } elseif (($payment[$leg . '_remittance_received_at'] ?? null) !== null && ($payment[$leg . '_amount'] ?? null) !== null && ($payment[$leg . '_exchange_rate'] ?? null) !== null) {
+                $total += (float) $payment[$leg . '_amount'] * (float) $payment[$leg . '_exchange_rate']; // received, rupees not entered yet
+            }
+        }
+        return $total;
+    }
+
+    /**
+     * D-413: a refund paid back to the buyer on a cancelled order (approved, refund completed). It is kept in the
+     * order's currency, so it is turned into rupees at the rate the buyer's money came in at (advance, else balance).
+     */
+    private static function completedRefundInr(int $orderId, ?array $payment): float
+    {
+        $stmt = \App\Config\Database::connection()->prepare("SELECT COALESCE(SUM(refund_amount), 0) FROM order_cancellations
+            WHERE order_id = :o AND status = 'approved' AND refund_status = 'completed' AND refund_amount IS NOT NULL");
+        $stmt->execute(['o' => $orderId]);
+        $refund = (float) $stmt->fetchColumn();
+        if ($refund <= 0) {
+            return 0.0;
+        }
+        $rate = $payment['advance_exchange_rate'] ?? null;
+        $rate = $rate !== null ? (float) $rate : (($payment['balance_exchange_rate'] ?? null) !== null ? (float) $payment['balance_exchange_rate'] : 0.0);
+        return round($refund * $rate, 2);
+    }
+
+    private static function exportBenefitsInInr(int $orderId, bool $receivedOnly = false): array
     {
         $benefits = CaExportBenefitRepository::forOrder($orderId);
         $total = 0.0;
@@ -339,7 +395,7 @@ final class OrderProfitabilityService
         foreach ($benefits as $benefit) {
             if ($benefit['received_amount'] !== null) {
                 $total += (float) $benefit['received_amount'];
-            } else {
+            } elseif (!$receivedOnly) { // D-413: a cancelled order counts only benefits received
                 $total += (float) $benefit['claimed_amount'];
                 $isEstimated = true;
             }

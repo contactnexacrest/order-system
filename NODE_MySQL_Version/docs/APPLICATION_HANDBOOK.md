@@ -4765,6 +4765,8 @@ margin %      = profit ÷ revenue × 100
 
 Insurance is a seller cost on **CIF only** (on FOB/CFR the buyer insures, D-049). A freight amount with no rate is left out and flagged "not counted yet", never added as rupees (D-225).
 
+**Cancelled or lost orders (D-413).** Only money that actually moved is counted: revenue = rupees actually received on each leg (INR credited, else amount received × that leg's rate) less a refund paid back (approved cancellation, refund *completed*, at the advance rate), plus milestones received; supplier cost = advance + balance paid to the supplier, not the PO total; the Step 9a freight rate and insurance count nil; export benefits only when received; real bills, cost entries, expenses and Zoho expenses as usual. Nothing is estimated (`actual_money_only`); the order page says so. This flows into Step 12c, the report and CAFIN.
+
 **Incentive layer** (`incentiveLayer()`):
 
 ```

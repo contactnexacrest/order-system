@@ -68,9 +68,14 @@ async function computeForOrder(orderId, withIncentives = true) {
   const currencyCode = (order && order.currency_code) || null;
   const payment = await withLcPayment(order, await orderPaymentStatusRepository.find(orderId));
 
-  const [revenueBeforeLcExtra, revenueIsEstimatedLegs] = revenueInInr(fobValue, payment);
+  // Owner decision D-413 (25 Nov 2026, confirmed twice): a cancelled or lost order counts only the money
+  // that actually moved — what the buyer paid (less a completed refund), what was paid to the supplier, and
+  // real bills and expenses. No estimate. PHP twin: OrderProfitabilityService::computeForOrder().
+  const actualOnly = ['cancelled', 'lost'].includes(String((order && order.status) || ''));
+  const [revenueBeforeLcExtra, revenueIsEstimatedLegs] = actualOnly ? [actualReceivedInr(payment), false] : revenueInInr(fobValue, payment);
   let revenueIsEstimated = revenueIsEstimatedLegs;
   let revenueInr = revenueBeforeLcExtra + Number((payment && payment.lc_extra_inr) || 0);
+  if (actualOnly) revenueInr -= await completedRefundInr(orderId, payment);
   // Owner 2 Nov 2026: where the rupees actually credited are used, the bank charges the banks
   // deducted are added back — the buyer paid them; they are counted once, as the order cost.
   for (const leg of ['advance', 'balance', 'freight']) {
@@ -85,15 +90,22 @@ async function computeForOrder(orderId, withIncentives = true) {
       : (payment.advance_exchange_rate !== null && payment.advance_exchange_rate !== undefined ? Number(payment.advance_exchange_rate) : null))
     : null;
   const milestones = await require('../repositories/paymentMilestoneRepository').inInr(orderId, fobValue, fallbackRate);
-  if (milestones.rows.length > 0) {
+  if (milestones.rows.length > 0 && actualOnly) {
+    for (const m of milestones.rows) { // D-413: only milestones the buyer actually paid
+      if (['actual', 'rate'].includes(m.inr_basis)) revenueInr += Number(m.inr);
+    }
+  } else if (milestones.rows.length > 0) {
     revenueInr += milestones.inr;
     revenueIsEstimated = revenueIsEstimated || milestones.estimated;
   }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
-  const supplierCostInr = supplierPo && supplierPo.total_payable_inr !== null
+  let supplierCostInr = supplierPo && supplierPo.total_payable_inr !== null
     ? Number(supplierPo.total_payable_inr)
     : 0;
+  if (actualOnly) { // D-413: only what was actually paid to the supplier
+    supplierCostInr = supplierPo ? Number(supplierPo.advance_paid_amount_inr || 0) + Number(supplierPo.balance_paid_amount_inr || 0) : 0;
+  }
 
   // Owner decision D6 of 2 Nov 2026 (confirmed twice; register D-225): the Step 9a
   // confirmed freight rate and insurance are entered in the ORDER's
@@ -102,15 +114,18 @@ async function computeForOrder(orderId, withIncentives = true) {
   // Q-R5-2: insurance is a seller cost on CIF only; on FOB/CFR the buyer insures.
   const freight = await orderFreightRepository.find(orderId);
   const isCif = String((order && order.incoterm_code) || '').toUpperCase() === 'CIF';
-  const freightForeign = freight && freight.confirmed_freight_rate !== null && freight.confirmed_freight_rate !== undefined
+  let freightForeign = freight && freight.confirmed_freight_rate !== null && freight.confirmed_freight_rate !== undefined
     ? Number(freight.confirmed_freight_rate)
     : null;
-  const insuranceForeign = isCif && freight && freight.insurance_amount !== null && freight.insurance_amount !== undefined
+  let insuranceForeign = isCif && freight && freight.insurance_amount !== null && freight.insurance_amount !== undefined
     ? Number(freight.insurance_amount)
     : null;
   const [freightRate, freightRateSource] = freightRateToInr(payment);
   let freightCostInr = freightForeign !== null && freightRate !== null ? freightForeign * freightRate : 0;
-  const insuranceCostInr = insuranceForeign !== null && freightRate !== null ? insuranceForeign * freightRate : 0;
+  let insuranceCostInr = insuranceForeign !== null && freightRate !== null ? insuranceForeign * freightRate : 0;
+  if (actualOnly) { // D-413: a freight rate or insurance not billed is not money that moved
+    [freightForeign, insuranceForeign, freightCostInr, insuranceCostInr] = [null, null, 0, 0];
+  }
 
   // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
   // transport, forwarder) are costs of the order. The forwarder's real
@@ -149,7 +164,7 @@ async function computeForOrder(orderId, withIncentives = true) {
     byCategory[cat] = (byCategory[cat] || 0) + Number(entry.amount_inr);
   }
 
-  const [exportBenefitsInr, exportBenefitsIsEstimated] = await exportBenefitsInInr(orderId);
+  const [exportBenefitsInr, exportBenefitsIsEstimated] = await exportBenefitsInInr(orderId, actualOnly);
 
   // Owner decision 2026-10-29 (CAFIN change confirmed twice): expenses
   // booked in Zoho Books and linked to this order count in its cost —
@@ -168,6 +183,7 @@ async function computeForOrder(orderId, withIncentives = true) {
     currency_code: currencyCode,
     fob_value_foreign: fobValue,
     revenue_inr: round2(revenueInr),
+    actual_money_only: actualOnly, // D-413: a cancelled or lost order — only money that moved
     zoho_expenses_inr: round2(zohoExpensesInr),
     // Owner decision 2026-10-30: the team incentive and associate commission,
     // already inside other_costs_inr (commission cost entries), shown apart.
@@ -217,14 +233,43 @@ async function computeForOrder(orderId, withIncentives = true) {
  *
  * @returns {Promise<[number, boolean]>} [exportBenefitsInr, isEstimated]
  */
-async function exportBenefitsInInr(orderId) {
+/** D-413: the rupees actually received from the buyer on the advance, balance and freight legs (no estimate). */
+function actualReceivedInr(payment) {
+  if (!payment) return 0;
+  let total = 0;
+  for (const leg of ['advance', 'balance', 'freight']) {
+    if (payment[`${leg}_inr_actual`] != null) {
+      total += Number(payment[`${leg}_inr_actual`]);
+    } else if (payment[`${leg}_remittance_received_at`] != null && payment[`${leg}_amount`] != null && payment[`${leg}_exchange_rate`] != null) {
+      total += Number(payment[`${leg}_amount`]) * Number(payment[`${leg}_exchange_rate`]); // received, rupees not entered yet
+    }
+  }
+  return total;
+}
+
+/**
+ * D-413: a refund paid back to the buyer on a cancelled order (approved, refund completed). It is kept in the
+ * order's currency, so it is turned into rupees at the rate the buyer's money came in at (advance, else balance).
+ */
+async function completedRefundInr(orderId, payment) {
+  const row = await require('../config/db').queryOne(
+    `SELECT COALESCE(SUM(refund_amount), 0) AS r FROM order_cancellations
+      WHERE order_id = :o AND status = 'approved' AND refund_status = 'completed' AND refund_amount IS NOT NULL`, { o: orderId });
+  const refund = Number(row ? row.r : 0);
+  if (refund <= 0) return 0;
+  const rate = payment && payment.advance_exchange_rate !== null && payment.advance_exchange_rate !== undefined ? Number(payment.advance_exchange_rate)
+    : (payment && payment.balance_exchange_rate !== null && payment.balance_exchange_rate !== undefined ? Number(payment.balance_exchange_rate) : 0);
+  return round2(refund * rate);
+}
+
+async function exportBenefitsInInr(orderId, receivedOnly = false) {
   const benefits = await caExportBenefitRepository.forOrder(orderId);
   let total = 0;
   let isEstimated = false;
   for (const benefit of benefits) {
     if (benefit.received_amount !== null) {
       total += Number(benefit.received_amount);
-    } else {
+    } else if (!receivedOnly) { // D-413: a cancelled order counts only benefits received
       total += Number(benefit.claimed_amount);
       isEstimated = true;
     }
