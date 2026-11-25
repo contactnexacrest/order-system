@@ -599,8 +599,9 @@ final class AssociateSystemTest extends DbTestCase
         $_GET = ['format' => 'csv'];
         self::assertStringNotContainsString('Portal Buyer B', $this->render(fn () => $portal->commission([])));
         $_GET = [];
-        self::assertStringContainsString('Client registration certificate', $this->render(fn () => $portal->certificate(['id' => (string) $ca])));
-        self::assertStringContainsString('Client not found.', $this->render(fn () => $portal->certificate(['id' => (string) $cb])));
+        // D-428 (owner 25 Nov 2026, confirmed twice): no client registration certificate any more.
+        self::assertFalse(method_exists($portal, 'certificate'), 'the certificate page is gone');
+        self::assertStringNotContainsString('Registration certificate', $this->render(fn () => $portal->clients([])));
     }
 
     public function testStaffViewAsIsReadOnly(): void

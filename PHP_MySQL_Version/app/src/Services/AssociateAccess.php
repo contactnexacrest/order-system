@@ -129,7 +129,7 @@ final class AssociateAccess
         $path = rtrim($path, '/');
         $method = strtoupper($method);
         $rules = [
-            ['#^/associate/clients(/\d+/certificate)?$#', 'GET', ['clients']],
+            ['#^/associate/clients$#', 'GET', ['clients']],
             ['#^/associate/(invitations|code)(/.*)?$#', 'POST', ['registration_links']],
             ['#^/associate/orders(/\d+)?$#', 'GET', ['orders']],
             ['#^/associate/(prices|catalogue)$#', 'GET', ['catalogue']],

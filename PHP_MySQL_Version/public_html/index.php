@@ -1148,7 +1148,6 @@ $router->get('/associate/logout', [$associatePortal, 'logout']);
 $router->post('/associate/logout', [$associatePortal, 'logout'], [CsrfCheck::verify()]);
 $router->get('/associate', [$associatePortal, 'home'], [AssociateAuth::required()]);
 $router->get('/associate/clients', [$associatePortal, 'clients'], [AssociateAuth::required()]);
-$router->get('/associate/clients/{id}/certificate', [$associatePortal, 'certificate'], [AssociateAuth::required()]);
 $router->post('/associate/invitations', [$associatePortal, 'createInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->post('/associate/invitations/{id}/cancel', [$associatePortal, 'cancelInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->post('/associate/code/propose', [$associatePortal, 'proposeCode'], [AssociateAuth::required(), CsrfCheck::verify()]);

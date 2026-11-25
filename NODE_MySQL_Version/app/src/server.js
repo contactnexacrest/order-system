@@ -1770,7 +1770,6 @@ app.get('/associate/logout', asyncHandler(associatePortalController.logout));
 app.post('/associate/logout', verifyCsrf, asyncHandler(associatePortalController.logout));
 app.get('/associate', requireAssociateAuth, asyncHandler(associatePortalController.home));
 app.get('/associate/clients', requireAssociateAuth, asyncHandler(associatePortalController.clients));
-app.get('/associate/clients/:id/certificate', requireAssociateAuth, asyncHandler(associatePortalController.certificate));
 app.post('/associate/invitations', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.createInvitation));
 app.post('/associate/invitations/:id/cancel', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.cancelInvitation));
 app.post('/associate/code/propose', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.proposeCode));

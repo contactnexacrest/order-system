@@ -223,8 +223,10 @@ Then:
    the website, the same company as another associate's client, or the
    e-mail not yet verified.
 5. **Accept** creates the client and links it to the associate: the
-   **protection** starts (default 6 months; it lapses if the buyer places no order in that time) and the associate is told, with a
-   printable **registration certificate** in the portal.
+   **protection** starts (default 6 months; it lapses if the buyer places no order in that time) and the associate is told; the
+   client then shows in the associate's **My clients** list. Once the client has ordered, it stays
+   the associate's client while the agreement runs (D-426). There is no registration certificate
+   to print or download (D-428).
    - Not verified yet: Accept is refused until the buyer has entered the code.
    - **First completed registration wins**: if another associate's
      registration of the same company was completed (code entered) earlier

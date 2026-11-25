@@ -592,8 +592,9 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(otherOrder.text).toContain('Order not found.');
     expect(otherOrder.text).toContain('Back to your home page'); // shown inside the portal with a way back home
     expect((await agent.get('/associate/commission?format=csv')).text).not.toContain('Portal Buyer B');
-    expect((await agent.get(`/associate/clients/${ca}/certificate`)).text).toContain('Client registration certificate');
-    expect((await agent.get(`/associate/clients/${cb}/certificate`)).text).toContain('Client not found.');
+    // D-428 (owner 25 Nov 2026, confirmed twice): no client registration certificate any more.
+    expect((await agent.get(`/associate/clients/${ca}/certificate`)).status).toBe(404);
+    expect((await agent.get('/associate/clients')).text).not.toContain('Registration certificate');
   });
 
   it('staff "view as" is read-only', async () => {

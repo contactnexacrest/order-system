@@ -260,7 +260,7 @@ describe('Associate commission period and no business totals (D-263)', () => {
       const agent = await portal(a);
       const pages = ['/associate', '/associate/clients', '/associate/orders', `/associate/orders/${first.order}`, '/associate/commission',
         '/associate/commission?format=csv', '/associate/commission?print=1', '/associate/messages', '/associate/catalogue', '/associate/prices',
-        '/associate/profile', `/associate/clients/${first.client}/certificate`];
+        '/associate/profile'];
       for (const p of pages) {
         const r = await agent.get(p);
         expect([level, p, r.status < 500]).toEqual([level, p, true]);

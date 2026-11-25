@@ -73,7 +73,8 @@ rendered pages, not a direct controller/HTTP call.
   creates a one-off link; the buyer opens the link (the associate is
   carried as a hidden field — no checkbox or code box), registers and
   enters the e-mailed code; staff accept on Quotation Intake and the
-  client is linked; the associate prints the registration certificate;
+  client is linked; the associate sees the client in My clients (no
+  registration certificate since D-428);
   Sales sees who introduced whom, no amounts. The associate's profile
   shows the personal rate carried upward (D-221: "clients 6–10: 1.25%
   (personal)" when only 1–5 has a personal rate).

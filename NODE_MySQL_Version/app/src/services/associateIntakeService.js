@@ -257,7 +257,7 @@ async function onAccepted(s, clientId, userId) {
   await auditLogRepository.log(userId, 'ASSOCIATE_CLIENT_LINKED', 'clients', clientId, 'associate_id', null, String(a.id));
   const until = associateService.addMonths(associateService.todayIst(), await associateService.protectionMonths());
   await associateService.notify(a, 'client_accepted', `${s.company_legal_name} is now registered as your client. Once they place an order, they stay your client while your agreement runs; if they place no order by ${dates.short(until)}`
-    + ', the registration ends. Your registration certificate is in the portal (My clients).', clientId, null, invId, userId);
+    + ', the registration ends. You can see them in the portal (My clients).', clientId, null, invId, userId);
   return `Linked to associate ${a.name} — protected until ${dates.short(until)}.`;
 }
 

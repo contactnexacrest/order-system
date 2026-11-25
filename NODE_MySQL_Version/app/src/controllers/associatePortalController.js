@@ -36,7 +36,6 @@ const associateAccess = require('../services/associateAccess');
 
 const LAYOUT = 'layout/associate';
 const len = (v) => [...String(v ?? '')].length;
-const MONTHS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 async function me(req) {
   return (await associatePortalService.current(req)) || {};
@@ -463,20 +462,6 @@ async function uploadInvoice(req, res) {
   res.redirect('/associate/commission');
 }
 
-/** The registration certificate (guarantee 5): a printable page, kept by the associate. */
-async function certificate(req, res) {
-  const a = await me(req);
-  const client = (await associateRepository.clients(Number(a.id))).find((c) => Number(c.id) === parseInt(req.params.id, 10));
-  if (!client) {
-    await notFoundPage(req, res, 'Client not found.');
-    return;
-  }
-  const events = (await associateEventRepository.forAssociate(Number(a.id), Number(client.id))).reverse();
-  const now = new Date(Date.now() + 5.5 * 3600 * 1000);
-  const printedAt = `${now.getUTCDate()} ${MONTHS3[now.getUTCMonth()]} ${now.getUTCFullYear()}, ${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
-  res.renderView('associate_portal/certificate', { a, c: client, events, printedAt }, null);
-}
-
 async function profile(req, res) {
   const a = await me(req);
   const id = Number(a.id);
@@ -838,7 +823,7 @@ async function priceRequest(req, res) {
 module.exports = {
   proposeCode,
   codeLink, showLogin, login, showCode, verifyCode, logout, showForgotPassword, forgotPassword, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
-  orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement, paymentAdvice,
+  orders, order, commission, uploadInvoice, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement, paymentAdvice,
   showBankConfirm, sendBankCode, confirmBank, bankNotMe, commissionHeadline,
   messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,
 };

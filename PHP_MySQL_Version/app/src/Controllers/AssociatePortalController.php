@@ -383,23 +383,6 @@ final class AssociatePortalController
         header('Location: /associate/commission');
     }
 
-    /** The registration certificate (guarantee 5): a printable page, kept by the associate. */
-    public function certificate(array $params): void
-    {
-        $a = self::me();
-        $client = null;
-        foreach (AssociateRepository::clients((int) $a['id']) as $c) {
-            if ((int) $c['id'] === (int) $params['id']) {
-                $client = $c;
-            }
-        }
-        if ($client === null) {
-            self::notFound('Client not found.');
-            return;
-        }
-        $events = AssociateEventRepository::forAssociate((int) $a['id'], (int) $client['id']);
-        View::render('associate_portal/certificate', ['a' => $a, 'c' => $client, 'events' => $events], null);
-    }
 
     /**
      * D-292 (owner 11 Nov 2026): the associate's current % only — "5%" + "of the FOB value of each order from

@@ -16,7 +16,6 @@ const EXPECTED = [
   'GET /associate associate',
   'GET /associate/agreement associate',
   'GET /associate/clients associate',
-  'GET /associate/clients/{}/certificate associate',
   'GET /associate/commission associate',
   'GET /associate/documents/{} associate',
   'GET /associate/login public',
@@ -399,7 +398,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(30); // D-410: + GET /associate/payment-advices/{id}/{format}; D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
+    expect(checked).toBe(29); // D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -446,7 +445,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(63); // D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/:token, POST /vendor-bank-confirm/:token/not-us
+    expect(checked).toBe(62); // D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/:token, POST /vendor-bank-confirm/:token/not-us
     expect(failed).toEqual([]);
   }, 120000);
 

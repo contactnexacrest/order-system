@@ -102,7 +102,7 @@ function featuresForPath(method, path, query = {}, post = {}) {
   const p = String(path || '/').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
   const rules = [
-    [/^\/associate\/clients(\/\d+\/certificate)?$/, 'GET', ['clients']],
+    [/^\/associate\/clients$/, 'GET', ['clients']],
     [/^\/associate\/(invitations|code)(\/.*)?$/, 'POST', ['registration_links']],
     [/^\/associate\/orders(\/\d+)?$/, 'GET', ['orders']],
     [/^\/associate\/(prices|catalogue)$/, 'GET', ['catalogue']],

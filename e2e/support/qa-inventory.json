@@ -32063,39 +32063,6 @@
    "cafin_route": false
   },
   {
-   "method": "GET",
-   "path": "/associate/clients/{id}/certificate",
-   "controller": "AssociatePortalController",
-   "action": "certificate",
-   "requires_all": [],
-   "requires_any": [],
-   "guards": [
-    "associate_auth"
-   ],
-   "php_line": 1138,
-   "node_line": 1675,
-   "node_handler": "associatePortalController.certificate",
-   "node_difference": null,
-   "sweep_coverage": [
-    "UngatedRoutes: sign-in / CSRF / unknown-id sweep"
-   ],
-   "php_file": "PHP_MySQL_Version/public_html/index.php",
-   "node_file": "NODE_MySQL_Version/app/src/server.js",
-   "public": false,
-   "actor": "associate_portal",
-   "specific_test_files": {
-    "php": [
-     "AssociateSystemTest.php"
-    ],
-    "node": [
-     "associateSystem.test.js"
-    ],
-    "e2e": []
-   },
-   "money_route": false,
-   "cafin_route": false
-  },
-  {
    "method": "POST",
    "path": "/associate/invitations",
    "controller": "AssociatePortalController",

@@ -149,7 +149,6 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /associate associate',
         'GET /associate/agreement associate',
         'GET /associate/clients associate',
-        'GET /associate/clients/{}/certificate associate',
         'GET /associate/commission associate',
         'GET /associate/documents/{} associate',
         'GET /associate/login public',
@@ -504,7 +503,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(30, $checked); // D-410: + GET /associate/payment-advices/{id}/{format}; D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
+        self::assertSame(29, $checked); // D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-283: + /associate/keep-alive; D-293: + GET/POST /associate/bank/confirm, POST /associate/bank/confirm/code, POST /associate/bank/not-me
         self::assertSame([], $wrong);
     }
 
@@ -596,7 +595,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(63, $checked); // D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/{token}, POST /vendor-bank-confirm/{token}/not-us
+        self::assertSame(62, $checked); // D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/{token}, POST /vendor-bank-confirm/{token}/not-us
         self::assertSame([], $failed);
     }
 

@@ -86,8 +86,9 @@ the company is already another associate's client.
 - If another associate's registration of the same company was completed
   earlier and is still pending, decide that one first (the first completed
   registration wins).
-- On Accept the client is linked to the associate for 12 months; the
-  associate is told and gets a registration certificate. Reject tells the
+- On Accept the client is linked to the associate (6 months to place a first
+  order; after that, while the agreement runs); the associate is told and sees
+  the client in My clients (no certificate, D-428). Reject tells the
   associate, with the reason.
 - A plain enquiry from a company that is already an associate's client is
   recognised (name, VAT number, e-mail domain or phone) and the associate

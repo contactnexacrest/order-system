@@ -12,7 +12,7 @@ const { verifyAssociateBank } = require('./support/db');
  *   → creates a one-off link for a buyer → the buyer registers themselves,
  *   enters the e-mail code and confirms the introduction → staff accept on
  *   Quotation Intake → the client is the associate's, protected 12 months,
- *   with a registration certificate → Sales sees who introduced whom, no
+ *   seen in My clients (no certificate since D-428) → Sales sees who introduced whom, no
  *   amounts.
  * In development the e-mailed codes and links are also flashed on screen
  * ("Development only — …"), which is what this test reads.
@@ -118,7 +118,7 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await expect(page.locator('#invitations')).toContainText('Accepted — your client');
   });
 
-  test('the associate sees the client and prints the registration certificate; Sales sees no amounts', async ({ page, browser }) => {
+  test('the associate sees the client (no certificate, D-428); Sales sees no amounts', async ({ page, browser }) => {
     await page.goto('/associate/login');
     await page.getByLabel('E-mail').fill(ASSOCIATE_EMAIL);
     await page.getByLabel('Password').fill(PASSWORD);
@@ -128,12 +128,10 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page.locator('body')).toContainText('is now registered as your client');
     await page.getByRole('link', { name: 'My clients' }).click();
-    const row = page.locator('tr', { hasText: BUYER }).filter({ has: page.getByRole('link', { name: 'Registration certificate' }) });
+    const row = page.locator('tr', { hasText: BUYER });
     await expect(row).toBeVisible();
-    const href = await row.getByRole('link', { name: 'Registration certificate' }).getAttribute('href');
-    await page.goto(href);
-    await expect(page.locator('h1')).toContainText('Client registration certificate');
-    await expect(page.locator('body')).toContainText(ASSOCIATE_NAME);
+    // D-428 (owner 25 Nov 2026): no registration certificate to print or download.
+    await expect(page.getByRole('link', { name: 'Registration certificate' })).toHaveCount(0);
 
     const sales = await browser.newPage();
     await login(sales, 'exportExecutive');

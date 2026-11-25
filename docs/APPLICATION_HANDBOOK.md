@@ -1543,7 +1543,7 @@ everyday words; staff screens keep their terms. Rules the code follows:
   template only while its body is still the old seeded text (an admin's edit is never
   overwritten; safe to run twice).
 - Associate portal: "This page is not open for your account"; My clients columns "How they came to
-  us · Your client" (a client with an order: "Yours while your agreement runs"; a sign-up with no order: "Signed up — ends on <date> if no order by then"; D-426), code field "Your word for
+  us · Your client" (a client with an order: "Yours while your agreement runs"; a sign-up with no order: "Signed up — ends on <date> if no order by then"; D-426; no registration certificate button or page since D-428), code field "Your word for
   the code", button "Show another ending"; statement and notices as in SOP 24 (no "basis",
   "ladder", "payout run" or "protection" in what the associate reads; the FOB masking of notices
   also matches "invoice value of the goods").

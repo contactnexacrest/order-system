@@ -288,7 +288,7 @@ final class AssociateIntakeService
         AuditLogRepository::log($userId, 'ASSOCIATE_CLIENT_LINKED', 'clients', $clientId, 'associate_id', null, (string) $a['id']);
         $until = date('Y-m-d', strtotime('+' . AssociateService::protectionMonths() . ' months'));
         AssociateService::notify($a, 'client_accepted', "{$s['company_legal_name']} is now registered as your client. Once they place an order, they stay your client while your agreement runs; if they place no order by " . \App\Helpers\Dates::short($until)
-            . ', the registration ends. Your registration certificate is in the portal (My clients).', $clientId, null, $invId, $userId);
+            . ', the registration ends. You can see them in the portal (My clients).', $clientId, null, $invId, $userId);
         return "Linked to associate {$a['name']} — protected until " . \App\Helpers\Dates::short($until) . '.';
     }
 

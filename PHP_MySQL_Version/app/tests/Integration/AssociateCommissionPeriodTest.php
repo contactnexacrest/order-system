@@ -301,7 +301,7 @@ final class AssociateCommissionPeriodTest extends DbTestCase
             $this->asAssociate($a);
             $pages = ['/associate', '/associate/clients', '/associate/orders', "/associate/orders/{$first['order']}", '/associate/commission',
                 '/associate/commission?format=csv', '/associate/commission?print=1', '/associate/messages', '/associate/catalogue', '/associate/prices',
-                '/associate/profile', "/associate/clients/{$first['client']}/certificate"];
+                '/associate/profile'];
             foreach ($pages as $p) {
                 $r = $this->call('GET', $p);
                 self::assertLessThan(500, $r['code'], "{$level} {$p}");
