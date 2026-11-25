@@ -543,7 +543,7 @@ async function linkClient(req, res) {
     await associateService.linkClient(clientId, Number(a.id), 'staff', null, registeredOn, req.user.id);
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_LINKED', 'clients', clientId, 'associate_id', null, String(a.id));
     const until = associateService.addMonths(associateService.todayIst(), await associateService.protectionMonths());
-    await associateService.notify(a, 'client_accepted', `${client.company_legal_name} is now registered as your client (NexaCrest linked them to you: ${reason}). It stays your client until ${dates.short(until)}.`, clientId, null, null, req.user.id);
+    await associateService.notify(a, 'client_accepted', `${client.company_legal_name} is now registered as your client (NexaCrest linked them to you: ${reason}). Once they place an order, they stay your client while your agreement runs; if they place no order by ${dates.short(until)}, the registration ends.`, clientId, null, null, req.user.id);
     flash.set(req, 'success', 'Client linked to the associate.');
   }
   back(res, a.id, 'clients');

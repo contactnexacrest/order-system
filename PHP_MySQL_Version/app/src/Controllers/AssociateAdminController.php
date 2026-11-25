@@ -676,8 +676,8 @@ final class AssociateAdminController
         } else {
             AssociateService::linkClient($clientId, (int) $a['id'], 'staff', null, $registeredOn, (int) $user['id']);
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_LINKED', 'clients', $clientId, 'associate_id', null, (string) $a['id']);
-            AssociateService::notify($a, 'client_accepted', "{$client['company_legal_name']} is now registered as your client (NexaCrest linked them to you: {$reason}). It stays your client until "
-                . \App\Helpers\Dates::short(date('Y-m-d', strtotime('+' . AssociateService::protectionMonths() . ' months'))) . '.', $clientId, null, null, (int) $user['id']);
+            AssociateService::notify($a, 'client_accepted', "{$client['company_legal_name']} is now registered as your client (NexaCrest linked them to you: {$reason}). Once they place an order, they stay your client while your agreement runs; if they place no order by "
+                . \App\Helpers\Dates::short(date('Y-m-d', strtotime('+' . AssociateService::protectionMonths() . ' months'))) . ', the registration ends.', $clientId, null, null, (int) $user['id']);
             Flash::set('success', 'Client linked to the associate.');
         }
         self::back((int) $a['id'], 'clients');
