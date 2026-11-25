@@ -106,6 +106,23 @@ final class CancelledOrderActualMoneyD413Test extends DbTestCase
         self::assertSame(84000.0, $p['freight_cost_inr'], 'USD 1,000 × 84');
     }
 
+    public function testTheProfitabilityReportTagsIt(): void
+    {
+        // D-422 (25 Nov 2026): the finance report says which rows are "actual money only".
+        $cancelled = $this->order('cancelled');
+        $lost = $this->order('lost');
+        $open = $this->order('active');
+        $rows = array_column(\App\Repositories\ReportRepository::orderProfitabilityReport(null, null)['rows'], null, 'order_id');
+        self::assertTrue($rows[$cancelled]['actual_money_only']);
+        self::assertSame('cancelled', $rows[$cancelled]['order_status']);
+        self::assertSame('lost', $rows[$lost]['order_status']);
+        self::assertFalse($rows[$open]['actual_money_only']);
+        $view = (string) file_get_contents(dirname(__DIR__, 2) . '/views/reports/profitability.php');
+        self::assertStringContainsString('data-actual-money-tag', $view);
+        self::assertStringContainsString(' — actual money only', $view);
+        self::assertStringContainsString('data-actual-money-legend', $view);
+    }
+
     public function testTheOrderPageExplainsIt(): void
     {
         $orderId = $this->order('cancelled');

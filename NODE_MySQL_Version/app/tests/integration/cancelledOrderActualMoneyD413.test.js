@@ -102,6 +102,22 @@ describe('D-413 cancelled or lost orders count only money that moved', () => {
     expect(p.freight_cost_inr).toBe(84000);
   });
 
+  it('tags it on the profitability report (D-422)', async () => {
+    const cancelled = await order('cancelled');
+    const lost = await order('lost');
+    const open = await order('active');
+    const { rows } = await require('../../src/repositories/reportRepository').orderProfitabilityReport(null, null);
+    const byId = Object.fromEntries(rows.map((r) => [Number(r.order_id), r]));
+    expect(byId[cancelled].actual_money_only).toBe(true);
+    expect(byId[cancelled].order_status).toBe('cancelled');
+    expect(byId[lost].order_status).toBe('lost');
+    expect(byId[open].actual_money_only).toBe(false);
+    const view = require('fs').readFileSync(require('path').join(__dirname, '../../views/reports/profitability.njk'), 'utf8');
+    expect(view).toContain('data-actual-money-tag');
+    expect(view).toContain(' — actual money only');
+    expect(view).toContain('data-actual-money-legend');
+  });
+
   it('explains it on the order page', async () => {
     const orderId = await order('cancelled');
     const agent = request.agent(app);

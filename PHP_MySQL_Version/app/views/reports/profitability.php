@@ -59,7 +59,7 @@
         <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
         <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
         <td><?= htmlspecialchars((string) $r['created_at']) ?></td>
-        <td><?= \App\Helpers\MoneyFormat::indian($r['revenue_inr'], 2) ?><?= $r['revenue_is_estimated'] ? ' <span class="muted small">(est.)</span>' : '' ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['revenue_inr'], 2) ?><?= $r['revenue_is_estimated'] ? ' <span class="muted small">(est.)</span>' : '' ?><?= !empty($r['actual_money_only']) ? ' <span class="badge" data-actual-money-tag>' . ($r['order_status'] === 'lost' ? 'Lost' : 'Cancelled') . ' — actual money only</span>' : '' ?></td>
         <td><?= \App\Helpers\MoneyFormat::indian($r['cost_before_incentives_inr'], 2) ?></td>
         <td><?= \App\Helpers\MoneyFormat::indian($r['profit_before_commission_inr'], 2) ?></td>
         <?php if (!empty($seeIncentives)): ?>
@@ -72,5 +72,6 @@
       <?php endforeach; ?>
       <?php if (empty($rows)): ?><tr><td colspan="<?= !empty($seeIncentives) ? 10 : 6 ?>" class="muted">No orders in this period.</td></tr><?php endif; ?>
     </table>
+    <p class="muted small" data-actual-money-legend><span class="badge">Cancelled / Lost — actual money only</span> = only money that actually moved is counted: what the buyer paid minus any refund already paid back, what we paid the supplier, and real bills and expenses. Estimates are not counted (D-413).</p>
   </div>
 </div>

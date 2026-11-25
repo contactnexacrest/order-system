@@ -1343,7 +1343,7 @@ final class ReportRepository
             $where[] = 'EXISTS (SELECT 1 FROM order_incentives oi WHERE oi.order_id = o.id AND oi.locked_at IS NOT NULL)';
         }
 
-        $sql = 'SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
+        $sql = 'SELECT o.id, o.order_reference, o.created_at, o.status, o.company_legal_name
                 FROM orders o
                 WHERE ' . implode(' AND ', $where) . '
                 ORDER BY o.created_at DESC, o.id DESC';
@@ -1372,6 +1372,9 @@ final class ReportRepository
                 'created_at'      => $o['created_at'],
                 'revenue_inr'     => $p['revenue_inr'],
                 'revenue_is_estimated' => $p['revenue_is_estimated'],
+                // D-413 / D-422: a cancelled or lost order counts only the money that moved — tagged on the report.
+                'actual_money_only' => !empty($p['actual_money_only']),
+                'order_status'    => (string) ($o['status'] ?? ''),
                 'cost_before_incentives_inr' => $p['cost_before_incentives_inr'],
                 'profit_before_commission_inr' => $p['profit_before_commission_inr'],
                 'commission_inr'  => $p['commission_inr'],
