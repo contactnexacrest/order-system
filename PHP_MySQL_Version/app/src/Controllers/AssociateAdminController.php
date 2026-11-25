@@ -1146,6 +1146,11 @@ final class AssociateAdminController
             'codeChanges' => AssociateCodeService::changesPerYear(), 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
             'commission' => \App\Services\AssociateCommission::settings(),
             'canPricing' => self::can('manage_associate_rules'), // D-411: may change the rule and correct advices
+            // D-421: the "How it works with these settings" table — examples worked out by the real rule, and the
+            // holidays the page's live preview needs.
+            'payExamples' => \App\Services\AssociateCommission::payExamples(),
+            'payHolidays' => array_map(static fn ($d): string => substr((string) $d, 0, 10),
+                \App\Repositories\CompanyHolidayRepository::datesBetween(date('Y-m-01'), date('Y-m-d', (int) strtotime(date('Y-m-01') . ' +4 months')))),
         ], 'layout/base');
     }
 
@@ -1198,11 +1203,15 @@ final class AssociateAdminController
             $current = \App\Services\AssociateCommission::settings();
             $abroadCharges = (string) ($_POST['associate_abroad_charges'] ?? $current['abroad_charges']);
             $abroadMin = filter_var($_POST['associate_abroad_min_payout_usd'] ?? $current['abroad_min_usd'], FILTER_VALIDATE_FLOAT);
+            // D-421: the monthly run's cut-off day (1–28), before the payment day; left as it is when not on the form.
+            $cutoff = $run === 'monthly' ? filter_var($_POST['associate_payout_cutoff_day'] ?? $current['cutoff_day'], FILTER_VALIDATE_INT) : (int) $current['cutoff_day'];
             $error = match (true) {
-                $days === false || $days < 0 || $days > 365 => 'Enter the days after full payment as 0 to 365.',
+                $days === false || $days < 0 || $days > 365 => 'Enter the waiting days after the client\'s last payment is cleared as 0 to 365.',
                 !in_array($run, ['monthly', 'weekly'], true) => 'Choose a monthly or a weekly payout run.',
                 $day === false || ($day !== 'last' && (($run === 'monthly' && ($day < 1 || $day > 28)) || ($run === 'weekly' && ($day < 1 || $day > 7)))) => 'Choose the payout day: the 1st to the 28th or the last day of the month for a monthly run, a weekday for a weekly run.',
                 !in_array($holidayRule, ['before', 'after'], true) => 'Choose what happens when the payment day is a Sunday or holiday: the working day before or after.',
+                $run === 'monthly' && ($cutoff === false || $cutoff < 1 || $cutoff > 28) => 'Choose the cut-off day: the 1st to the 28th of the month.',
+                $run === 'monthly' && $day !== 'last' && $cutoff >= (int) $day => 'The cut-off day must be before the payment day (the ' . \App\Services\AssociateCommission::ordinal((int) $day) . ').',
                 $codeChanges === false || $codeChanges < 0 || $codeChanges > 12 => 'Enter the personal code changes allowed per year as 0 to 12.',
                 $upgradeAfter === false || $upgradeAfter < 1 || $upgradeAfter > 50 => 'Enter after how many paid orders "Quoting" is suggested, 1 to 50.',
                 $threshold === false || $threshold < 0 || $threshold > 1000000000 => 'Enter the counting-order threshold in rupees (0 or more).',
@@ -1219,6 +1228,7 @@ final class AssociateAdminController
                 return;
             }
             $values['associate_commission_due_days'] = (string) $days;
+            $values['associate_payout_cutoff_day'] = (string) (int) $cutoff; // D-421
             $values['associate_claim_hold'] = !empty($_POST['associate_claim_hold']) ? '1' : '0';
             $values['associate_payout_run'] = $run;
             $values['associate_payout_day'] = (string) $day;
@@ -1228,7 +1238,9 @@ final class AssociateAdminController
             // D-292: a change of the payment run (run, day, Sunday/holiday rule) needs a reason, kept in the Audit Log.
             $current = IncentiveRepository::settings();
             $runChanged = (string) ($current['associate_payout_run'] ?? 'monthly') !== $run || (string) ($current['associate_payout_day'] ?? 'last') !== (string) $day
-                || (string) ($current['associate_payout_holiday_rule'] ?? 'before') !== $holidayRule;
+                || (string) ($current['associate_payout_holiday_rule'] ?? 'before') !== $holidayRule
+                || (string) (int) ($current['associate_payout_cutoff_day'] ?? 0) !== (string) (int) $cutoff // D-421
+                || (string) (int) ($current['associate_commission_due_days'] ?? 30) !== (string) $days;
             $payoutReason = trim((string) ($_POST['payout_reason'] ?? ''));
             if ($runChanged && (mb_strlen($payoutReason) < 10 || mb_strlen($payoutReason) > 300)) {
                 Flash::set('error', 'Give the reason for changing the payment run (10 to 300 characters) — it is kept in the Audit Log.');

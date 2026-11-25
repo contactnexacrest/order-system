@@ -57,6 +57,9 @@ final class AssociateCommission
             'last_day' => $last,
             'holiday_rule' => ($s['associate_payout_holiday_rule'] ?? 'before') === 'after' ? 'after' : 'before',
             'due_days' => max(0, (int) ($s['associate_commission_due_days'] ?? 30)),
+            // Owner decision D-421 (25 Nov 2026): monthly run cut-off day (1–28; 0 = none). Ready on or before it → this
+            // month's run; after it → next month's run.
+            'cutoff_day' => max(0, min(28, (int) ($s['associate_payout_cutoff_day'] ?? 0))),
             'claim_hold' => ($s['associate_claim_hold'] ?? '1') === '1',
             'run' => $run,
             'day' => $run === 'weekly' ? max(1, min(7, $day > 0 ? $day : 5)) : ($last ? 0 : max(1, min(28, $day > 0 ? $day : 5))),
@@ -106,6 +109,58 @@ final class AssociateCommission
             $run = self::workingDay(self::scheduledRunOn(date('Y-m-d', (int) strtotime($candidate . ' +1 day')), $settings), $rule);
         }
         return $run;
+    }
+
+    /**
+     * Owner decision D-421 (25 Nov 2026): the payout run of an associate commission that is ready on $readyOn
+     * (the day the client's last payment was cleared + the waiting days). Monthly run with a cut-off day: ready on
+     * or before the cut-off → this month's run; after it → next month's run (Sunday / holiday rule as before; a run
+     * that would move before the ready day goes to the next month). Weekly run or no cut-off: the first run on or
+     * after the ready day, as before.
+     */
+    public static function associateRunOn(string $readyOn, ?array $settings = null): string
+    {
+        $settings ??= self::settings();
+        $cutoff = (int) ($settings['cutoff_day'] ?? 0);
+        if ($settings['run'] !== 'monthly' || $cutoff < 1) {
+            return self::payoutRunOn($readyOn, $settings);
+        }
+        $readyOn = substr($readyOn, 0, 10);
+        $month = date('Y-m-01', (int) strtotime($readyOn));
+        if ((int) date('j', (int) strtotime($readyOn)) > $cutoff) {
+            $month = date('Y-m-01', (int) strtotime($month . ' +1 month'));
+        }
+        $rule = (string) ($settings['holiday_rule'] ?? 'before');
+        $runIn = static fn (string $m): string => date('Y-m-', (int) strtotime($m))
+            . sprintf('%02d', !empty($settings['last_day']) ? (int) date('t', (int) strtotime($m)) : (int) $settings['day']);
+        $run = self::workingDay($runIn($month), $rule);
+        if ($run < $readyOn) {
+            $run = self::workingDay($runIn(date('Y-m-01', (int) strtotime($month . ' +1 month'))), $rule);
+        }
+        return $run;
+    }
+
+    /**
+     * D-421: the settings page's "How it works with these settings" rows — four example days of this month on which
+     * the client's last payment is cleared (the 10th, the cut-off day, the day after it, the 28th), the day the
+     * commission is ready (+ the waiting days) and the day it is paid.
+     * @return list<array{cleared:string, ready:string, by_cutoff:?bool, paid:string}>
+     */
+    public static function payExamples(?array $settings = null, ?string $today = null): array
+    {
+        $settings ??= self::settings();
+        $month = date('Y-m-01', (int) strtotime($today ?? date('Y-m-d')));
+        $cutoff = (int) ($settings['cutoff_day'] ?? 0);
+        $days = array_values(array_unique(array_filter([10, $cutoff, $cutoff > 0 ? $cutoff + 1 : 0, 28], static fn (int $d): bool => $d >= 1 && $d <= 28)));
+        sort($days);
+        $rows = [];
+        foreach ($days as $d) {
+            $cleared = date('Y-m-', (int) strtotime($month)) . sprintf('%02d', $d);
+            $ready = self::dueOn($cleared, $settings);
+            $byCutoff = $settings['run'] === 'monthly' && $cutoff > 0 ? (int) date('j', (int) strtotime($ready)) <= $cutoff : null;
+            $rows[] = ['cleared' => $cleared, 'ready' => $ready, 'by_cutoff' => $byCutoff, 'paid' => self::associateRunOn($ready, $settings)];
+        }
+        return $rows;
     }
 
     /** The calendar day of the first run on or after $from, before any Sunday / holiday move. */
@@ -178,7 +233,7 @@ final class AssociateCommission
             return null;
         }
         if ($on < (string) $payout['due_on']) {
-            return 'This commission is due on ' . \App\Helpers\Dates::short((string) $payout['due_on']) . ' (' . self::settings()['due_days'] . ' days after the buyer paid in full) — it cannot be paid before that.';
+            return 'This commission is due on ' . \App\Helpers\Dates::short((string) $payout['due_on']) . ' (' . (self::settings()['due_days'] > 0 ? self::settings()['due_days'] . ' waiting days after the client\'s last payment was cleared' : 'the day the client\'s last payment was cleared') . ') — it cannot be paid before that.';
         }
         if (self::settings()['claim_hold'] && self::claimOpen((int) $payout['order_id'], (string) $payout['due_on'])) {
             return 'A buyer claim on this order is open — the commission waits until it is resolved.';
@@ -613,7 +668,7 @@ final class AssociateCommission
             'amount_inr' => $state === 'unpaid' ? 0.0 : $commissionInr,
             'usd_rate' => $usdRate,
             'state' => $state, 'fully_paid_on' => $fullyPaidOn,
-            'due_on' => $dueOn, 'payout_run_on' => $dueOn !== null ? self::payoutRunOn($dueOn, $set) : null,
+            'due_on' => $dueOn, 'payout_run_on' => $dueOn !== null ? self::associateRunOn($dueOn, $set) : null,
             'claim_hold' => $dueOn !== null && $set['claim_hold'] && self::claimOpen($orderId, $dueOn),
             'counts' => $counts, 'threshold_inr' => $set['threshold_inr'],
             'counting_number' => $counts ? (int) $ladder['step'] : null,

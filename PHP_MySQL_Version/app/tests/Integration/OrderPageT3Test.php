@@ -145,6 +145,6 @@ final class OrderPageT3Test extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Received USD 1,800.00 on 26 Oct 2026 at today\'s exchange rate of &#8377;83.2500 (= &#8377;149,850.00). Bank ref UTR-TEST-0001.', $html);
+        self::assertStringContainsString('Received USD 1,800.00 on 26 Oct 2026 at today\'s exchange rate of &#8377;83.2500 (= &#8377;1,49,850.00). Bank ref UTR-TEST-0001.', $html);
     }
 }

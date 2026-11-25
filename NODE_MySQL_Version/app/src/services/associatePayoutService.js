@@ -138,7 +138,7 @@ async function autoFix(orderId, userId = null) {
   const t = today();
   const set = await ac.settings();
   const dueOn = await ac.dueOn(paidOn, set);
-  const runOn = await ac.payoutRunOn(dueOn, set);
+  const runOn = await ac.associateRunOn(dueOn, set); // D-421
   const rate = round6(a.rate_inr);
   const done = await db.transaction(async (c) => {
     await c.execute('INSERT IGNORE INTO order_incentives (order_id, updated_by) VALUES (:id, :u)', { id: orderId, u: uid });

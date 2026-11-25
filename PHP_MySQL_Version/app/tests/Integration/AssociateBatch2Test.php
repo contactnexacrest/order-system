@@ -126,9 +126,9 @@ final class AssociateBatch2Test extends DbTestCase
         $a = $this->associate(['gstin' => '29ABCDE1234F1Z5']);
         $labels = array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($a));
         // D-290 (11 Nov 2026): ID proof and address proof are separate required items in India and abroad.
-        self::assertSame(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate'], $labels);
+        self::assertSame(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate', 'Live video KYC (ID proof and address proof clearly visible)'], $labels); // D-417: live video KYC
         $abroad = $this->associate(['based_in' => 'abroad', 'currency_code' => 'USD']);
-        self::assertSame(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement'], array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($abroad)));
+        self::assertSame(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'Live video KYC (ID proof and address proof clearly visible)'], array_map(static fn (array $i): string => $i['label'], AssociateKyc::checklist($abroad)));
 
         $pan = $this->doc((int) $a['id'], 'pan', 'ABCDE1234F');
         $aad = $this->doc((int) $a['id'], 'aadhaar', 'XXXX XXXX 1234');
@@ -136,7 +136,7 @@ final class AssociateBatch2Test extends DbTestCase
         $bank = $this->doc((int) $a['id'], 'bank_proof');
         $agr = $this->doc((int) $a['id'], 'agreement');
         $gst = $this->doc((int) $a['id'], 'gst', '29ABCDE1234F1Z5');
-        self::assertSame(['pending'], array_values(array_unique(array_map(static fn (array $i): string => $i['status'], AssociateKyc::checklist($a)))));
+        self::assertSame(['pending'], array_values(array_unique(array_map(static fn (array $i): string => $i['status'], array_filter(AssociateKyc::checklist($a), static fn (array $i): bool => $i['key'] !== 'video')))));
 
         // A reject needs a reason; the associate sees it.
         $this->actAs($this->admin);
@@ -167,6 +167,9 @@ final class AssociateBatch2Test extends DbTestCase
         self::assertSame('pending', array_column(AssociateKyc::checklist($a), null, 'key')['bank']['status'], 'a re-upload is pending again');
         $_POST = ['decision' => 'accept'];
         (new AssociateAdminController())->reviewDocument(['id' => (string) $a['id'], 'docId' => (string) $bank2]);
+        self::assertSame([AssociateKyc::VIDEO_LABEL], AssociateKyc::missing($a), 'D-417: the live video KYC is still to do');
+        self::assertNull(AssociateKyc::recordVideo($a, date('Y-m-d'), 'Passport and electricity bill shown clearly', $this->admin));
+        $a = \App\Repositories\AssociateRepository::find((int) $a['id']);
         self::assertSame([], AssociateKyc::missing($a));
         self::assertNull(AssociateCommission::payBlockReason($payout, date('Y-m-d')), 'KYC complete — the payout may be paid');
 

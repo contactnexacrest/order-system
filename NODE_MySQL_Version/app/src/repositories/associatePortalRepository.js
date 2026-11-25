@@ -145,7 +145,7 @@ async function commission(associateId, o) {
   // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
   const fullyPaidOn = await incentive().fullyPaidOn(Number(o.id));
   const label = fullyPaidOn !== null
-    ? `Will be paid to you on ${dates.short(await associateCommission.payoutRunOn(await associateCommission.dueOn(String(fullyPaidOn).slice(0, 10))))}`
+    ? `Will be paid to you on ${dates.short(await associateCommission.associateRunOn(await associateCommission.dueOn(String(fullyPaidOn).slice(0, 10))))}`
     : NOT_EARNED_LABEL;
   return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
     level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),

@@ -56,6 +56,9 @@ async function settings() {
   const months = parseInt(s.associate_protection_months ?? '6', 10);
   return {
     due_days: Math.max(0, parseInt(s.associate_commission_due_days ?? '30', 10) || 0),
+    // Owner decision D-421 (25 Nov 2026): monthly run cut-off day (1–28; 0 = none). Ready on or before it → this
+    // month's run; after it → next month's run.
+    cutoff_day: Math.max(0, Math.min(28, parseInt(s.associate_payout_cutoff_day ?? '0', 10) || 0)),
     claim_hold: (s.associate_claim_hold ?? '1') === '1',
     run,
     last_day: lastDay,
@@ -129,6 +132,54 @@ async function payoutRunOn(due, set = null) {
   return run;
 }
 
+/**
+ * Owner decision D-421 (25 Nov 2026): the payout run of an associate commission that is ready on `readyOn` (the day
+ * the client's last payment was cleared + the waiting days). Monthly run with a cut-off day: ready on or before the
+ * cut-off → this month's run; after it → next month's run (Sunday / holiday rule as before; a run that would move
+ * before the ready day goes to the next month). Weekly run or no cut-off: the first run on or after the ready day.
+ */
+async function associateRunOn(readyOn, set = null) {
+  set = set || await settings();
+  const cutoff = Number(set.cutoff_day || 0);
+  if (set.run !== 'monthly' || cutoff < 1) return payoutRunOn(readyOn, set);
+  const ready = ymd(readyOn);
+  const d = new Date(`${ready}T00:00:00Z`);
+  let y = d.getUTCFullYear();
+  let m = d.getUTCMonth() + (d.getUTCDate() > cutoff ? 1 : 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const runIn = (yy, mm) => {
+    const first = new Date(Date.UTC(yy, mm, 1));
+    const fy = first.getUTCFullYear();
+    const fm = first.getUTCMonth();
+    return `${fy}-${pad(fm + 1)}-${pad(set.last_day ? new Date(Date.UTC(fy, fm + 1, 0)).getUTCDate() : set.day)}`;
+  };
+  const rule = set.holiday_rule || 'before';
+  let run = await workingDay(runIn(y, m), rule);
+  if (run < ready) run = await workingDay(runIn(y, m + 1), rule);
+  return run;
+}
+
+/**
+ * D-421: the settings page's "How it works with these settings" rows — four example days of this month on which the
+ * client's last payment is cleared (the 10th, the cut-off day, the day after it, the 28th), the day the commission
+ * is ready (+ the waiting days) and the day it is paid.
+ */
+async function payExamples(set = null, today = null) {
+  set = set || await settings();
+  const t = ymd(today || require('../helpers/dbDateTime').todayIst());
+  const month = t.slice(0, 8);
+  const cutoff = Number(set.cutoff_day || 0);
+  const days = [...new Set([10, cutoff, cutoff > 0 ? cutoff + 1 : 0, 28])].filter((x) => x >= 1 && x <= 28).sort((a, b) => a - b);
+  const rows = [];
+  for (const x of days) {
+    const cleared = `${month}${String(x).padStart(2, '0')}`;
+    const ready = await dueOn(cleared, set);
+    const byCutoff = set.run === 'monthly' && cutoff > 0 ? Number(ready.slice(8, 10)) <= cutoff : null;
+    rows.push({ cleared, ready, by_cutoff: byCutoff, paid: await associateRunOn(ready, set) });
+  }
+  return rows;
+}
+
 /** "1st", "2nd", "23rd", "28th". */
 function ordinal(n) {
   const suffix = (n % 100 >= 11 && n % 100 <= 13) ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] || 'th');
@@ -157,7 +208,7 @@ async function payBlockReason(payout, on) {
   if ((payout.payee_kind || '') !== 'associate' || !payout.due_on || Number(payout.amount_inr) < 0) return null;
   const set = await settings();
   if (ymd(on) < ymd(payout.due_on)) {
-    return `This commission is due on ${short(ymd(payout.due_on))} (${set.due_days} days after the buyer paid in full) — it cannot be paid before that.`;
+    return `This commission is due on ${short(ymd(payout.due_on))} (${set.due_days > 0 ? `${set.due_days} waiting days after the client's last payment was cleared` : "the day the client's last payment was cleared"}) — it cannot be paid before that.`;
   }
   if (set.claim_hold && await claimOpen(Number(payout.order_id), payout.due_on)) {
     return 'A buyer claim on this order is open — the commission waits until it is resolved.';
@@ -510,7 +561,7 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     amount_inr: state === 'unpaid' ? 0 : commissionInr,
     usd_rate: usdRateValue,
     state, fully_paid_on: fullyPaidOn,
-    due_on: due, payout_run_on: due !== null ? await payoutRunOn(due, set) : null,
+    due_on: due, payout_run_on: due !== null ? await associateRunOn(due, set) : null,
     claim_hold: due !== null && set.claim_hold && await claimOpen(orderId, due),
     counts, threshold_inr: set.threshold_inr,
     counting_number: counts ? Number(ladder.step) : null,
@@ -587,6 +638,7 @@ async function lapseRegistrations(today = null) {
 }
 
 module.exports = {
+  associateRunOn, payExamples,
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
   RULE_LABELS, ladderFor, stepLabel, ladderSummary, ruleProgress, scheduledRunOn, workingDay, ordinal, payDayText,
   earningAssociate, countingOrders, levelForAssociate, levelLabel, rateLabel, PORTAL_MONTH_CHOICES, portalMonths, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,

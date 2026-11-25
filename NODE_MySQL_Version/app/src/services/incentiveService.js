@@ -675,7 +675,7 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
   // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
   const commissionSet = await associateCommission.settings();
   const due = calc.associate ? await associateCommission.dueOn(paidOn, commissionSet) : null;
-  const runOn = due ? await associateCommission.payoutRunOn(due, commissionSet) : null;
+  const runOn = due ? await associateCommission.associateRunOn(due, commissionSet) : null; // D-421
   let a = calc.associate;
   let earned = !!(a && a.state !== 'unpaid' && a.amount_fc > 0);
   let assocFixed = false;

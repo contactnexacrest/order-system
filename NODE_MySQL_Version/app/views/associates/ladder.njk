@@ -10,22 +10,38 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <fieldset><legend>When commission is paid {% if not canPricing %}<small class="muted">(the MD, the ED and people with "Manage associate rules" change these)</small>{% endif %}</legend>
       <div class="field-grid">
-        <label>Days after full payment *<input type="number" name="associate_commission_due_days" required min="0" max="365" step="1" value="{{ commission.due_days }}" placeholder="e.g. 30"{{ __dis }}><span class="help-line">Example: 30 → buyer pays in full on 4 Nov, commission due on 4 Dec.</span></label>
-        <label>Payment run *<select name="associate_payout_run" required{{ __dis }}><option value="">Choose…</option><option value="monthly"{{ ' selected' if commission.run == 'monthly' }}>Monthly</option><option value="weekly"{{ ' selected' if commission.run == 'weekly' }}>Weekly</option></select><span class="help-line">Example: monthly → commission due on 4 Dec is paid in the run on 31 Dec (the first run on or after the due date).</span></label>
+        <label>Waiting days after the client's last payment is cleared *<input type="number" name="associate_commission_due_days" required min="0" max="365" step="1" value="{{ commission.due_days }}" placeholder="e.g. 0" data-pay-wait{{ __dis }}><span class="help-line">0 = no waiting period. Counted from the day the last payment (advance, balance, freight, milestone, LC) is marked <b>Cleared</b> — the day the money is in our bank, not the day the client sends it.</span></label>
+        <label>Payment run *<select name="associate_payout_run" required{{ __dis }}><option value="">Choose…</option><option value="monthly"{{ ' selected' if commission.run == 'monthly' }}>Monthly</option><option value="weekly"{{ ' selected' if commission.run == 'weekly' }}>Weekly</option></select><span class="help-line">The cut-off day below applies to the monthly run only; a weekly run pays in the first run on or after the day the commission is ready.</span></label>
         {# D-292 (owner 11 Nov 2026): monthly 1st–28th or the last day of the month; weekly Monday–Sunday. #}
         <label>Pay on (monthly run)<select name="associate_payout_day" data-required-when="associate_payout_run=monthly" data-required-when-message="Choose the day of the month."{{ __dis }}><option value="">Choose…</option>
           {% for d in monthDays %}<option value="{{ d.value }}"{{ ' selected' if commission.run == 'monthly' and not commission.last_day and commission.day == d.value }}>{{ d.label }}</option>{% endfor %}
           <option value="last"{{ ' selected' if commission.run == 'monthly' and commission.last_day }}>Last day of the month</option></select>
           <span class="help-line">Choices: 1st … 28th of the month, or "Last day of the month" (28/29/30/31 as the month has).</span></label>
+        {# Owner decision D-421 (25 Nov 2026): the monthly run's cut-off day. #}
+        <label>Cut-off day (monthly run)<select name="associate_payout_cutoff_day" data-pay-cutoff data-required-when="associate_payout_run=monthly" data-required-when-message="Choose the cut-off day."{{ __dis }}><option value="">Choose…</option>
+          {% for d in monthDays %}<option value="{{ d.value }}"{{ ' selected' if commission.cutoff_day == d.value }}>{{ d.label }}</option>{% endfor %}</select>
+          <span class="help-line">Ready on or before this day → paid in this month's run. After it → next month's run. Gives Accounts the days between the cut-off and the payment day. Must be before the payment day.</span></label>
         <label>Pay on (weekly run)<select name="associate_payout_weekday" data-required-when="associate_payout_run=weekly" data-required-when-message="Choose the day of the week."{{ __dis }}><option value="">Choose…</option>
           {% for n, w in weekdays %}<option value="{{ n }}"{{ ' selected' if commission.run == 'weekly' and (commission.day | string) == (n | string) }}>{{ w }}</option>{% endfor %}</select></label>
         <label>If the payment day is a Sunday or holiday *<select name="associate_payout_holiday_rule" required{{ __dis }}><option value="">Choose…</option>
           <option value="before"{{ ' selected' if commission.holiday_rule == 'before' }}>Pay on the working day before</option>
           <option value="after"{{ ' selected' if commission.holiday_rule == 'after' }}>Pay on the working day after</option></select>
           <span class="help-line">Uses the <a href="/holidays">Holiday Calendar</a>. The associate portal and e-mails always show the actual date (e.g. "31 Dec 2026").</span></label>
-        <label>Reason for changing the payment run <small class="muted">(needed when the run, the day or the Sunday/holiday rule changes; kept in the Audit Log)</small><input type="text" name="payout_reason" minlength="10" maxlength="300" placeholder="e.g. Finance pays all vendors on the last working day"{{ __dis }}></label>
+        <label>Reason for changing the payment run <small class="muted">(needed when the waiting days, the run, the day, the cut-off day or the Sunday/holiday rule changes; kept in the Audit Log)</small><input type="text" name="payout_reason" minlength="10" maxlength="300" placeholder="e.g. Finance pays all vendors on the last working day"{{ __dis }}></label>
         <label><input type="checkbox" name="associate_claim_hold" value="1"{{ ' checked' if commission.claim_hold }}{{ __dis }}> Hold while a buyer claim (raised on or before the due date) is open</label>
         <label>Commission period shown to associates *<select name="associate_portal_commission_months" required{{ __dis }}><option value="">Choose…</option>{% for __m in [3, 6, 9, 12, 15, 18, 24] %}<option value="{{ __m }}"{{ ' selected' if commission.portal_months == __m }}>{{ __m }} months</option>{% endfor %}</select><span class="help-line">Example: 12 → in the portal an associate sees only the commission of the last 12 months (totals and list); commission still waiting to be paid is always shown. Staff screens show everything.</span></label>
+      </div>
+      {# D-421: how the settings work — rows worked out by the app's own rule; the page script updates them while the settings are changed (before saving). #}
+      <div class="pay-preview" data-pay-preview data-holidays="{{ payHolidays | dump }}" data-holiday-rule="{{ commission.holiday_rule }}">
+        <b>How it works with these settings</b>
+        <table class="list"><tr><th>Client's last payment cleared</th><th>Ready to pay (cleared + waiting days)</th><th>Paid to the associate on</th></tr>
+          <tbody data-pay-rows>
+          {% for x in payExamples %}
+            <tr><td>{{ x.cleared | shortDate }}</td><td>{{ x.ready | shortDate }}{% if x.by_cutoff === true %} — by the cut-off{% elif x.by_cutoff === false %} — after the cut-off{% endif %}</td><td><b>{{ x.paid | shortDate }}</b></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="help-line">The associate portal and e-mails show the same date ("Will be paid to you on …"). A Sunday or a Holiday Calendar day moves the payment day as set above.</p>
       </div>
       <div class="field-grid">
         <label>Bank charges of a transfer abroad *<select name="associate_abroad_charges" required{{ __dis }}><option value="">Choose…</option><option value="OUR"{{ ' selected' if commission.abroad_charges == 'OUR' }}>OUR — NexaCrest pays its own and the intermediary bank's charges (the associate receives the full amount)</option><option value="SHA"{{ ' selected' if commission.abroad_charges == 'SHA' }}>SHA — NexaCrest pays its own bank's charges; the associate's bank may charge on receipt</option></select><span class="help-line">D-264: bank charges are never deducted from commission. In India NexaCrest pays the (small) charges.</span></label>

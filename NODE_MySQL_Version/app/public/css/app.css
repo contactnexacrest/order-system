@@ -1391,3 +1391,6 @@ details.report-details[open] > summary .report-name::before{transform:rotate(90d
 .ca-summary .gain{color:var(--success);}
 .ca-summary .loss,.ca-summary .bad{color:var(--danger);}
 .ca-filters a.is-active{background:var(--navy);color:#fff;}
+/* D-421: "How it works with these settings" on Associates › Commission settings */
+.pay-preview { background: #eef6ff; border: 1px solid #bcd6f5; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+.pay-preview table.list { margin: 6px 0 4px; }

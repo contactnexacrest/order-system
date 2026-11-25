@@ -166,8 +166,8 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         $india = $this->associate();
         $abroad = $this->associate(['based_in' => 'abroad', 'currency_code' => 'USD']);
         $keys = static fn (array $a): array => array_map(static fn (array $i): string => $i['key'], AssociateKyc::requiredItems($a));
-        self::assertSame(['pan', 'id', 'address', 'bank', 'agreement'], $keys($india));
-        self::assertSame(['id', 'address', 'bank', 'agreement'], $keys($abroad));
+        self::assertSame(['pan', 'id', 'address', 'bank', 'agreement', 'video'], $keys($india));
+        self::assertSame(['id', 'address', 'bank', 'agreement', 'video'], $keys($abroad));
 
         // App-set file names (the same document may be uploaded under each — two records).
         self::assertSame('ID proof — Demo Associate — 11 Nov 2026.pdf', AssociateKyc::appFileName('identity', 'Demo Associate', 'scan.PDF', '2026-11-11'));
@@ -190,6 +190,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         $a = $this->associate();
         $this->completeAssociateKyc((int) $a['id']);
         Database::connection()->exec("DELETE FROM associate_documents WHERE associate_id = {$a['id']} AND kind = 'address'");
+        $a = AssociateRepository::find((int) $a['id']); // D-417: completeAssociateKyc also records the video KYC
         self::assertSame(['Address proof'], AssociateKyc::missing($a));
         self::assertSame(['Address proof'], AssociateKyc::missingForPayout($a, '2026-11-11'), 'without a grace date the payout waits');
         Database::connection()->exec("UPDATE associates SET address_proof_due_on = '2027-01-10' WHERE id = {$a['id']}");
@@ -317,7 +318,7 @@ final class AssociateOwnerDecisionsNov11Test extends DbTestCase
         self::assertStringContainsString('name="associate_code_changes_per_year"', $form);
         self::assertStringContainsString('name="associate_upgrade_after_orders"', $form);
         self::assertStringContainsString('name="bank_details_check_people"', $form);
-        $fields = ['associate_tds_pct' => '2', 'associate_commission_due_days' => '30', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '20', 'associate_payout_holiday_rule' => 'after',
+        $fields = ['associate_tds_pct' => '2', 'associate_commission_due_days' => '30', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '20', 'associate_payout_cutoff_day' => '15', 'associate_payout_holiday_rule' => 'after',
             'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_portal_commission_months' => '12',
             'associate_code_changes_per_year' => '4', 'associate_upgrade_after_orders' => '5', 'bank_details_check_people' => 'one',
             'associate_bank_wait_first_days' => '0', 'associate_bank_wait_change_days' => '15'];

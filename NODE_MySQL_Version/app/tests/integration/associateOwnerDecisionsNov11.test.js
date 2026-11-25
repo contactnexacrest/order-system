@@ -135,8 +135,8 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
 
     const india = await associate();
     const abroad = await associate({ based_in: 'abroad', currency_code: 'USD' });
-    expect(associateKyc.requiredItems(india).map((i) => i.key)).toEqual(['pan', 'id', 'address', 'bank', 'agreement']);
-    expect(associateKyc.requiredItems(abroad).map((i) => i.key)).toEqual(['id', 'address', 'bank', 'agreement']);
+    expect(associateKyc.requiredItems(india).map((i) => i.key)).toEqual(['pan', 'id', 'address', 'bank', 'agreement', 'video']);
+    expect(associateKyc.requiredItems(abroad).map((i) => i.key)).toEqual(['id', 'address', 'bank', 'agreement', 'video']);
 
     expect(associateKyc.appFileName('identity', 'Demo Associate', 'scan.PDF', '2026-11-11')).toBe('ID proof — Demo Associate — 11 Nov 2026.pdf');
     expect(associateKyc.appFileName('aadhaar', 'Demo Associate', 'a.jpg', '2026-11-11')).toBe('ID proof — Demo Associate — 11 Nov 2026.jpg');
@@ -156,6 +156,7 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     let a = await associate();
     await require('../support/fixtures').completeAssociateKyc(Number(a.id));
     await db.execute("DELETE FROM associate_documents WHERE associate_id = :a AND kind = 'address'", { a: a.id });
+    a = await associateRepository.find(Number(a.id)); // D-417: completeAssociateKyc also records the video KYC
     expect(await associateKyc.missing(a)).toEqual(['Address proof']);
     expect(await associateKyc.missingForPayout(a, '2026-11-11')).toEqual(['Address proof']);
     await db.execute("UPDATE associates SET address_proof_due_on = '2027-01-10' WHERE id = :a", { a: a.id });
@@ -261,7 +262,7 @@ describe('Associates — owner decisions 11 Nov 2026 (D-290 … D-294)', () => {
     expect(form).toContain('name="associate_code_changes_per_year"');
     expect(form).toContain('name="associate_upgrade_after_orders"');
     expect(form).toContain('name="bank_details_check_people"');
-    const fields = { associate_tds_pct: '2', associate_commission_due_days: '30', associate_payout_run: 'monthly', associate_payout_day: '20', associate_payout_holiday_rule: 'after',
+    const fields = { associate_tds_pct: '2', associate_commission_due_days: '30', associate_payout_run: 'monthly', associate_payout_day: '20', associate_payout_cutoff_day: '15', associate_payout_holiday_rule: 'after',
       associate_counting_threshold_inr: '500000', associate_protection_months: '6', associate_gst_pct: '18', associate_portal_commission_months: '12',
       associate_code_changes_per_year: '4', associate_upgrade_after_orders: '5', bank_details_check_people: 'one', associate_bank_wait_first_days: '0', associate_bank_wait_change_days: '15' };
     expect((await post(md, '/associates/ladder', '/associates/ladder', fields)).message).toBe('Give the reason for changing the payment run (10 to 300 characters) — it is kept in the Audit Log.');

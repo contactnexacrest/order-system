@@ -162,7 +162,7 @@ final class AssociatePayoutService
         $today = date('Y-m-d');
         $set = AssociateCommission::settings();
         $dueOn = AssociateCommission::dueOn($paidOn, $set);
-        $runOn = AssociateCommission::payoutRunOn($dueOn, $set);
+        $runOn = AssociateCommission::associateRunOn($dueOn, $set); // D-421
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {

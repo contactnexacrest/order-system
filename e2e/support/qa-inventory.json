@@ -22736,6 +22736,41 @@
    "cafin_route": false
   },
   {
+   "method": "POST",
+   "path": "/associates/{id}/video-kyc",
+   "controller": "AssociateAdminController",
+   "action": "recordVideoKyc",
+   "requires_all": [
+    "manage_associates"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "associateAdminController.recordVideoKyc",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBatch2Test.php"
+    ],
+    "node": [],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
    "method": "GET",
    "path": "/associates/{id}/documents/{docId}",
    "controller": "AssociateAdminController",
@@ -49560,6 +49595,34 @@
      "type": "text",
      "required": true,
      "placeholder": "Reason (needed to reject)",
+     "minlength": "10",
+     "maxlength": "300"
+    }
+   ],
+   "data_entry": true,
+   "enctype": null,
+   "node_counterpart": "app/views/associates/show.njk:229"
+  },
+  {
+   "view": "PHP_MySQL_Version/app/views/associates/show.php",
+   "line": 233,
+   "method": "POST",
+   "action": "/associates/{id}/video-kyc",
+   "route": "POST /associates/{id}/video-kyc",
+   "permission": [
+    "manage_associates"
+   ],
+   "fields": [
+    {
+     "name": "seen_on",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": true,
+     "placeholder": "e.g. Passport and electricity bill shown clearly; name and address match",
      "minlength": "10",
      "maxlength": "300"
     }

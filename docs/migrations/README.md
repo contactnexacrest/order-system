@@ -71,6 +71,7 @@ removed from this folder; git history keeps them (last commit with them:
 | `2026-11-24b-associate-payment-advices.sql` | D-410 (8) | New table `associate_payment_advices` (the Commission Payment Advice, one per bank transfer to an associate, numbered `NC/SC/CPA/A0000/YY/NNN` per associate per financial year, content frozen in `context_json`, "Rev 1" for MD corrections) and column `incentive_payouts.payment_advice_id`. **Plain ALTER (D-371):** a second run only says "Duplicate column name". |
 | `2026-11-24c-manage-associate-rules.sql` | D-411 | New permission `manage_associate_rules` ("Manage associate rules") for the Managing Director and the Executive Director: changes the associate commission rules (levels and ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice corrections, a client's associate, portal access levels). Plain INSERT … WHERE NOT EXISTS and one UPDATE of a permission description; safe to run twice. |
 | `2026-11-25a-associate-video-kyc.sql` | D-417 | Live video KYC for associates: `associates.video_kyc_at`, `video_kyc_by`, `video_kyc_note`, `video_kyc_due_on`; existing associates get 60 days before payouts wait for it. PLAIN ALTER (D-371). |
+| `2026-11-25b-associate-payout-cutoff.sql` | D-421 | Associate payout cut-off day: `incentive_settings.associate_payout_cutoff_day` = 20, waiting days (`associate_commission_due_days`) = 0. Plain INSERT/UPDATE. |
 
 ### Rules for every migration file (enforced by tests)
 

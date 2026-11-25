@@ -1106,6 +1106,14 @@ async function ladder(req, res) {
     groupDaysMin: require('../services/associateRules').GROUP_DAYS_MIN,
     groupDaysMax: require('../services/associateRules').GROUP_DAYS_MAX,
     canPricing: can(req, 'manage_associate_rules'), // D-411
+    // D-421: the "How it works with these settings" table and the holidays its live preview needs.
+    payExamples: await associateCommission.payExamples(commission),
+    payHolidays: await (async () => {
+      const { todayIst, ymd } = require('../helpers/dbDateTime');
+      const first = `${todayIst().slice(0, 8)}01`;
+      const d = new Date(`${first}T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 4);
+      return (await require('../repositories/companyHolidayRepository').datesBetween(first, d.toISOString().slice(0, 10))).map((h) => String(h instanceof Date ? ymd(h) : h).slice(0, 10));
+    })(),
   }, 'layout/base');
 }
 
@@ -1162,11 +1170,15 @@ async function saveLadder(req, res) {
     const abroadCharges = String(body.associate_abroad_charges ?? current.abroad_charges);
     const abroadMinRaw = body.associate_abroad_min_payout_usd ?? current.abroad_min_usd;
     const abroadMin = isNum(abroadMinRaw) ? Number(abroadMinRaw) : null;
+    // D-421: the monthly run's cut-off day (1–28), before the payment day; left as it is when not on the form.
+    const cutoff = run === 'monthly' ? int(body.associate_payout_cutoff_day ?? current.cutoff_day) : Number(current.cutoff_day);
     let error = null;
-    if (days === null || days < 0 || days > 365) error = 'Enter the days after full payment as 0 to 365.';
+    if (days === null || days < 0 || days > 365) error = "Enter the waiting days after the client's last payment is cleared as 0 to 365.";
     else if (!['monthly', 'weekly'].includes(run)) error = 'Choose a monthly or a weekly payout run.';
     else if (day === null || (day !== 'last' && ((run === 'monthly' && (day < 1 || day > 28)) || (run === 'weekly' && (day < 1 || day > 7))))) error = 'Choose the payout day: the 1st to the 28th or the last day of the month for a monthly run, a weekday for a weekly run.';
     else if (!['before', 'after'].includes(holidayRule)) error = 'Choose what happens when the payment day is a Sunday or holiday: the working day before or after.';
+    else if (run === 'monthly' && (cutoff === null || cutoff < 1 || cutoff > 28)) error = 'Choose the cut-off day: the 1st to the 28th of the month.';
+    else if (run === 'monthly' && day !== 'last' && cutoff >= Number(day)) error = `The cut-off day must be before the payment day (the ${associateCommission.ordinal(Number(day))}).`;
     else if (codeChanges === null || codeChanges < 0 || codeChanges > 12) error = 'Enter the personal code changes allowed per year as 0 to 12.';
     else if (upgradeAfter === null || upgradeAfter < 1 || upgradeAfter > 50) error = 'Enter after how many paid orders "Quoting" is suggested, 1 to 50.';
     else if (threshold === null || threshold < 0 || threshold > 1000000000) error = 'Enter the counting-order threshold in rupees (0 or more).';
@@ -1181,6 +1193,7 @@ async function saveLadder(req, res) {
       return;
     }
     values.associate_commission_due_days = String(days);
+    values.associate_payout_cutoff_day = String(Number(cutoff) || 0); // D-421
     values.associate_claim_hold = body.associate_claim_hold ? '1' : '0';
     values.associate_payout_run = run;
     values.associate_payout_day = String(day);
@@ -1190,7 +1203,9 @@ async function saveLadder(req, res) {
     // D-292: a change of the payment run (run, day, Sunday/holiday rule) needs a reason, kept in the Audit Log.
     const now = await incentiveRepository.settings();
     const runChanged = String(now.associate_payout_run ?? 'monthly') !== run || String(now.associate_payout_day ?? 'last') !== String(day)
-      || String(now.associate_payout_holiday_rule ?? 'before') !== holidayRule;
+      || String(now.associate_payout_holiday_rule ?? 'before') !== holidayRule
+      || String(parseInt(now.associate_payout_cutoff_day ?? '0', 10) || 0) !== String(Number(cutoff) || 0) // D-421
+      || String(parseInt(now.associate_commission_due_days ?? '30', 10)) !== String(days);
     const payoutReason = String(body.payout_reason || '').trim();
     if (runChanged && (len(payoutReason) < 10 || len(payoutReason) > 300)) {
       flash.set(req, 'error', 'Give the reason for changing the payment run (10 to 300 characters) — it is kept in the Audit Log.');

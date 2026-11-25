@@ -719,7 +719,7 @@ final class IncentiveService
             // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
             $commissionSet = AssociateCommission::settings();
             $dueOn = $a !== null ? AssociateCommission::dueOn($paidOn, $commissionSet) : null;
-            $runOn = $dueOn !== null ? AssociateCommission::payoutRunOn($dueOn, $commissionSet) : null;
+            $runOn = $dueOn !== null ? AssociateCommission::associateRunOn($dueOn, $commissionSet) : null; // D-421
             $earned = $a !== null && $a['state'] !== 'unpaid' && $a['amount_fc'] > 0;
             if ($earned) {
                 $payoutId = IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',

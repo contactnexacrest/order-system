@@ -2938,3 +2938,67 @@
     init();
   }
 })();
+
+// Owner decision D-421 (25 Nov 2026): Associates › Commission settings — "How it works with these settings".
+// Recomputes the example rows while the waiting days, run, payment day, cut-off day or Sunday/holiday rule are
+// changed (before saving), by the same rule as AssociateCommission::associateRunOn / associateCommission.associateRunOn.
+(function () {
+  'use strict';
+  function payPreview() {
+    var box = document.querySelector('[data-pay-preview]');
+    if (!box) return;
+    var form = box.closest('form');
+    var holidays = {};
+    try { JSON.parse(box.getAttribute('data-holidays') || '[]').forEach(function (d) { holidays[d] = true; }); } catch (e) { /* none */ }
+    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+    function short(d) { return ('0' + d.getDate()).slice(-2) + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+    function val(name) { var el = form.querySelector('[name="' + name + '"]'); return el ? el.value : ''; }
+    function working(d, rule) {
+      for (var i = 0; i < 40 && (d.getDay() === 0 || holidays[iso(d)]); i++) d.setDate(d.getDate() + (rule === 'after' ? 1 : -1));
+      return d;
+    }
+    function runIn(y, m, day) { return new Date(y, m, day === 'last' ? new Date(y, m + 1, 0).getDate() : parseInt(day, 10)); }
+    function paidOn(ready) {
+      var run = val('associate_payout_run') || 'monthly';
+      var rule = val('associate_payout_holiday_rule') || box.getAttribute('data-holiday-rule') || 'before';
+      if (run === 'weekly') {
+        var wd = parseInt(val('associate_payout_weekday') || '5', 10) % 7; // 1 = Monday … 7 = Sunday
+        var d = new Date(ready); d.setDate(d.getDate() + ((wd - d.getDay() + 7) % 7));
+        var w = working(new Date(d), rule);
+        if (w < ready) { d.setDate(d.getDate() + 7); w = working(new Date(d), rule); }
+        return w;
+      }
+      var day = val('associate_payout_day') || 'last';
+      var cutoff = parseInt(val('associate_payout_cutoff_day') || '0', 10);
+      var y = ready.getFullYear(); var m = ready.getMonth();
+      if (cutoff >= 1) {
+        if (ready.getDate() > cutoff) m += 1;
+      } else if (runIn(y, m, day) < ready) {
+        m += 1;
+      }
+      var r = working(runIn(y, m, day), rule);
+      if (r < ready) r = working(runIn(y, m + 1, day), rule);
+      return r;
+    }
+    function draw() {
+      var wait = parseInt(val('associate_commission_due_days') || '0', 10) || 0;
+      var cutoff = parseInt(val('associate_payout_cutoff_day') || '0', 10);
+      var monthly = (val('associate_payout_run') || 'monthly') === 'monthly';
+      var now = new Date();
+      var days = [10, cutoff, cutoff > 0 ? cutoff + 1 : 0, 28].filter(function (d, i, a) { return d >= 1 && d <= 28 && a.indexOf(d) === i; }).sort(function (a, b) { return a - b; });
+      var rows = days.map(function (d) {
+        var cleared = new Date(now.getFullYear(), now.getMonth(), d);
+        var ready = new Date(cleared); ready.setDate(ready.getDate() + wait);
+        var note = monthly && cutoff >= 1 ? (ready.getDate() <= cutoff ? ' — by the cut-off' : ' — after the cut-off') : '';
+        return '<tr><td>' + short(cleared) + '</td><td>' + short(ready) + note + '</td><td><b>' + short(paidOn(ready)) + '</b></td></tr>';
+      });
+      box.querySelector('[data-pay-rows]').innerHTML = rows.join('');
+    }
+    ['associate_commission_due_days', 'associate_payout_run', 'associate_payout_day', 'associate_payout_weekday', 'associate_payout_cutoff_day', 'associate_payout_holiday_rule'].forEach(function (n) {
+      var el = form.querySelector('[name="' + n + '"]');
+      if (el) { el.addEventListener('change', draw); el.addEventListener('input', draw); }
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', payPreview); else payPreview();
+})();

@@ -169,7 +169,7 @@ final class AssociatePortalRepository
             return ['ladder_text' => $c['ladder_text']] + $none(self::belowMinLabel()); // staff still see why it does not count
         }
         $label = $fullyPaidOn !== null
-            ? 'Will be paid to you on ' . \App\Helpers\Dates::short(AssociateCommission::payoutRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
+            ? 'Will be paid to you on ' . \App\Helpers\Dates::short(AssociateCommission::associateRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
             : self::NOT_EARNED_LABEL;
         return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
             'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'),

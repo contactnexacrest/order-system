@@ -87,7 +87,14 @@ the same links, filters and actions, and switch to each other.
 
 **Associates › Commission › Commission settings and ladder** (`/associates/ladder`). The MD, the ED
 and people with Manage associate rules (`manage_associate_rules`, D-411) set, and every change is in the audit log:
-- **Days after full payment** before commission is due (default 30).
+- **Waiting days after the client's last payment is cleared** (D-421, 25 Nov 2026; default 0). Counted from
+  the day the last payment (advance, balance, freight, milestone, LC) is marked **Cleared** — the day the money
+  is in our bank, not the day the client sends it.
+- **Cut-off day (monthly run)** (D-421; default the 20th; 1st–28th, before the payment day): a commission ready on
+  or before it is paid in that month's run, after it in the next month's run. Example with 0 waiting days and the
+  20th: cleared 15 Dec → paid 31 Dec; cleared 24 Dec → paid 30 Jan (31 Jan is a Sunday). The page's **How it
+  works with these settings** table shows examples and updates while the settings are changed, before saving.
+  These are company settings, the same for every associate (no per-associate override).
 - **Payment run** (D-292, 11 Nov 2026): monthly on the 1st–28th or the
   **Last day of the month**, or weekly on a weekday (default: the last day
   of the month). **If the payment day is a Sunday or holiday**: pay on the
@@ -274,8 +281,8 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   settled buyer claim, or not paid by the buyer.
 - **Rupees**: worked out in the order currency and converted at the rate
   actually realised on the order's receipts (bank charges added back).
-- **When**: due the set number of days after full payment, then paid in the
-  next payout run against the associate's **invoice** (uploaded per payout
+- **When**: ready on the day the client's last payment is cleared (+ the waiting days), paid in that month's
+  payout run when ready on or before the cut-off day, otherwise in the next month's run (D-421) against the associate's **invoice** (uploaded per payout
   in the portal). Before the due date, or while a buyer claim is open, the
   payout cannot be marked paid ("Not due until …" / "On hold: a buyer claim
   is open").
@@ -321,8 +328,8 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   freight, milestones, LC) — the app fixes the associate's commission by
   itself: in the order currency and in rupees at the rate of **all** the
   buyer's payments (rupees credited plus bank charges ÷ foreign amount). The
-  payout is created at once (due N days after full payment, paid in the
-  payout run), the associate gets a notice and an e-mail, and the order's
+  payout is created at once (ready on the day the last payment is cleared + the waiting days, paid in the
+  payout run by the cut-off rule, D-421), the associate gets a notice and an e-mail, and the order's
   profit uses the fixed amount. Nobody has to lock it. If a receipt's rupees
   are recorded later, the daily job fixes it then.
 - **It never changes.** A later move in the exchange rate does not raise or

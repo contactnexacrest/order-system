@@ -198,7 +198,7 @@ The installed values below are the owner's chosen starting values (a fresh insta
 | Negotiating buffer | 3% | Products › Global pricing settings |
 | Team incentive | program on; 15% of profit (review after 6 months) | Products › Global pricing settings |
 | Supplier price stale after | 60 days | Products › Global pricing settings |
-| Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission › Commission settings and ladder |
+| Commission paid | Cleared by the 20th → that month's run (last day); after the 20th → next month's run; 0 waiting days (D-421); held while a buyer claim is open | Associates › Commission › Commission settings and ladder |
 | Payout day | monthly, on the **last day of the month**; a Sunday or holiday moves to the working day before (D-292) | Associates › Commission › Commission settings and ladder |
 | Counting order | invoiced FOB of ₹5,00,000 or more | Associates › Commission › Commission settings and ladder |
 | Buyer registration valid | 6 months | Associates › Commission › Commission settings and ladder |

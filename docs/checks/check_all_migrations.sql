@@ -130,6 +130,10 @@ FROM (
          CASE (SELECT COUNT(*) FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = 'associates' AND column_name IN ('video_kyc_at', 'video_kyc_by', 'video_kyc_note', 'video_kyc_due_on'))
               WHEN 4 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-25b',
+         'Associate payout cut-off day (20th) and no waiting days: incentive_settings.associate_payout_cutoff_day (D-421)',
+         IF((SELECT COUNT(*) FROM incentive_settings WHERE setting_key = 'associate_payout_cutoff_day') = 1, 'already done', 'NEEDED')
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

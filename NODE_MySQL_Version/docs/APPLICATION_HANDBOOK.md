@@ -3052,8 +3052,12 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
   - Only orders in the 10 days from the client's first PO received; later
     only the MD can force "associate: yes" with a reason.
   - Earned only when the buyer has **paid in full**; no pro rata; nothing on
-    cancelled orders; due N days after full payment; paid next payout run
-    against the associate's invoice; held while a buyer claim is open.
+    cancelled orders; ready on the day the client's last payment is cleared +
+    the waiting days (0 since D-421); paid in that month's run when ready on or
+    before the cut-off day (20th), else in the next month's run
+    (`AssociateCommission::associateRunOn`, D-421, 25 Nov 2026; company-level
+    settings only, no per-associate override); against the associate's
+    invoice; held while a buyer claim is open.
   - Take-back after payment only for fraud or breach (negative line on the
     next payout).
   - **TDS (D-235):** section 194H at 2% above ₹20,000 a financial year
@@ -4638,7 +4642,8 @@ A level may also be a fixed USD amount per unit. Per associate the MD (D-411: or
 
 | Setting | Default | Rule |
 |---|---|---|
-| `associate_commission_due_days` | 30 | Due date = date of full payment + 30 days. |
+| `associate_commission_due_days` | 0 (D-421; was 30) | Waiting days: ready = the day the client's last payment is cleared + this. |
+| `associate_payout_cutoff_day` | 20 (D-421) | Monthly run: ready on or before this day → this month's run; after it → next month's run. 1–28, before the payment day. |
 | `associate_claim_hold` | 1 (on) | Held while a buyer claim opened on or before the due date is open. |
 | `associate_payout_run`, `associate_payout_day`, `associate_payout_holiday_rule` | monthly, last, before | Paid in the first payout run on or after the due date (monthly day 1–28 or `last` = the last day of the month, or weekly day 1–7); a run day on a Sunday or a Holiday Calendar day moves to the working day before (or after) (D-292). |
 | KYC (D-252, D-290, D-417) | — | **Mark paid** is refused until the associate's KYC is complete, live video KYC included (address proof: not before `address_proof_due_on` for associates accepted before 11 Nov 2026; video KYC: not before `video_kyc_due_on` for associates who existed on 25 Nov 2026). |
@@ -5423,7 +5428,8 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 
 | Key | Default | Where |
 |---|---|---|
-| `associate_commission_due_days` | 30 | Associates › Commission settings (MD) |
+| `associate_commission_due_days` | 0 (D-421) | Associates › Commission settings (Manage associate rules) |
+| `associate_payout_cutoff_day` | 20 (D-421) | Associates › Commission settings (Manage associate rules) |
 | `associate_claim_hold` | 1 | 〃 |
 | `associate_payout_run` / `associate_payout_day` | monthly / last | 〃 — day 1–28 or `last` (D-292); a change of the run needs a reason |
 | `associate_payout_holiday_rule` | before | 〃 — Sunday / holiday: the working day before or after (D-292) |

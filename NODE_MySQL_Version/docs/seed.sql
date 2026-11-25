@@ -1987,7 +1987,7 @@ UPDATE payment_presets SET allow_zero_advance = 1 WHERE payment_method = 'LC';
 INSERT INTO incentive_settings (setting_key, setting_value)
 SELECT k, v FROM (
   SELECT 'associate_tds_pct' AS k, '2.00' AS v UNION ALL SELECT 'associate_protection_months', '6'
-  UNION ALL SELECT 'associate_commission_due_days', '30' UNION ALL SELECT 'associate_claim_hold', '1'
+  UNION ALL SELECT 'associate_commission_due_days', '0' UNION ALL SELECT 'associate_payout_cutoff_day', '20' UNION ALL SELECT 'associate_claim_hold', '1'
   UNION ALL SELECT 'associate_payout_run', 'monthly' UNION ALL SELECT 'associate_payout_day', 'last'
   UNION ALL SELECT 'associate_counting_threshold_inr', '500000' UNION ALL SELECT 'associate_gst_pct', '18.00'
   -- Owner 4 Nov 2026: associate registration links last 7 days (D-253); a personal code may change 3 times a year (D-254).

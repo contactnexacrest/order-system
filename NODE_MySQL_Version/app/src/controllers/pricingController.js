@@ -462,7 +462,7 @@ function addView(rules, grid) {
     const typed = !!v && v.how === 'typed' && !v.auto;
     return {
       mm, cbm: isCbm, pct: thicknessPrices.fmt(p), label: thicknessPrices.label(mm, cbmFrom), per: isCbm ? '/ CBM' : '/ SQM', typed,
-      typedPrice: typed ? fmt2(v.price) : '', typedOn: typed && v.quoted_on ? v.quoted_on : '',
+      typedPrice: typed ? require("../helpers/moneyFormat").indian(v.price) : '', typedOn: typed && v.quoted_on ? v.quoted_on : '',
       change: isCbm ? `× ${thicknessPrices.fmt(rules.k)}` : (mm === baseMm ? 'the rules' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} %`),
       rule: isCbm ? `× ${thicknessPrices.fmt(rules.k)} of ${baseMm} mm per SQM` : (mm === baseMm ? 'base' : `${p < 0 ? '−' : '+'}${thicknessPrices.fmt(Math.abs(p))} % of ${baseMm} mm`),
       isBase: !isCbm && mm === baseMm, own: isCbm ? ownK : !!ownOpt.get(mm),

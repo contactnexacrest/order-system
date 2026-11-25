@@ -118,11 +118,11 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
   });
 
   it('KYC checklist, review and the payout gate', async () => {
-    const a = await associate({ gstin: '29ABCDE1234F1Z5' });
+    let a = await associate({ gstin: '29ABCDE1234F1Z5' });
     // D-290 (11 Nov 2026): ID proof and address proof are separate required items in India and abroad.
-    expect((await associateKyc.checklist(a)).map((i) => i.label)).toEqual(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate']);
+    expect((await associateKyc.checklist(a)).map((i) => i.label)).toEqual(['PAN card', 'ID proof (Aadhaar card, passport or other ID document)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'GST certificate', 'Live video KYC (ID proof and address proof clearly visible)']); // D-417: live video KYC
     const abroad = await associate({ based_in: 'abroad', currency_code: 'USD' });
-    expect((await associateKyc.checklist(abroad)).map((i) => i.label)).toEqual(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement']);
+    expect((await associateKyc.checklist(abroad)).map((i) => i.label)).toEqual(['ID proof (passport, national ID card, residence permit or driving licence)', 'Address proof', 'Bank proof (cancelled cheque or bank statement)', 'Signed agreement', 'Live video KYC (ID proof and address proof clearly visible)']);
 
     const pan = await doc(a.id, 'pan', 'ABCDE1234F');
     const aad = await doc(a.id, 'aadhaar', 'XXXX XXXX 1234');
@@ -130,7 +130,7 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     const bank = await doc(a.id, 'bank_proof');
     const agr = await doc(a.id, 'agreement');
     const gst = await doc(a.id, 'gst', '29ABCDE1234F1Z5');
-    expect([...new Set((await associateKyc.checklist(a)).map((i) => i.status))]).toEqual(['pending']);
+    expect([...new Set((await associateKyc.checklist(a)).filter((i) => i.key !== 'video').map((i) => i.status))]).toEqual(['pending']);
 
     await call(associateAdminController.reviewDocument, { as: admin, params: { id: String(a.id), docId: String(bank) }, body: { decision: 'reject', reason: 'blurry' } });
     expect(flash().message).toContain('at least 10 characters');
@@ -155,6 +155,9 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     const bank2 = await doc(a.id, 'bank_proof');
     expect(Object.fromEntries((await associateKyc.checklist(a)).map((i) => [i.key, i])).bank.status).toBe('pending'); // a re-upload is pending again
     await call(associateAdminController.reviewDocument, { as: admin, params: { id: String(a.id), docId: String(bank2) }, body: { decision: 'accept' } });
+    expect(await associateKyc.missing(a)).toEqual([associateKyc.VIDEO_LABEL]); // D-417: the live video KYC is still to do
+    expect(await associateKyc.recordVideo(a, require('../../src/helpers/dbDateTime').todayIst(), 'Passport and electricity bill shown clearly', admin)).toBeNull();
+    a = await require('../../src/repositories/associateRepository').find(Number(a.id));
     expect(await associateKyc.missing(a)).toEqual([]);
     expect(await associateCommission.payBlockReason(payout, '2026-11-05')).toBeNull(); // KYC complete — the payout may be paid
 
