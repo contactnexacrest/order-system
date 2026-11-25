@@ -15,7 +15,7 @@ module.exports = {
   group: 'Join NexaCrest',
   title: 'Become a NexaCrest Associate',
   subtitle: 'Bring buyers. Earn on their orders — again and again.',
-  minutes: '12',
+  minutes: '10',
   restoreDb: true,
 
   async setup(demo) {
@@ -205,7 +205,7 @@ module.exports = {
       'Bring more buyers, and earn more. There is no limit.',
     ], say: 'So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again. Bring more buyers, and earn more. There is no limit.' },
     { card: 'list', kicker: 'Start your story today', title: 'Contact us', items: [
-      '[contact details added by NexaCrest]',
+      process.env.TUT_H01_CONTACT || '[contact details added by NexaCrest]',
       EXAMPLE,
       'This video gives a simple picture of how things work. Your signed agreement is what counts, and NexaCrest may update its terms from time to time.',
     ], say: 'Start your story today. Contact us. We look forward to growing together. Just so you know: this video gives a simple picture of how things work. Your signed agreement is what counts, and our terms may be updated from time to time.' },
