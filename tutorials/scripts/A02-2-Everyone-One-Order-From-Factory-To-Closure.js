@@ -73,9 +73,9 @@ module.exports = {
     { card: 'list', kicker: 'Done by itself', title: 'The associate\'s commission is fixed', items: [
       'Fixed automatically the moment the buyer has paid in full.',
       'At the exchange rate of all the buyer\'s payments; it never changes after that.',
-      'A payout is created and the associate is told; due after 30 days, paid on the next payout day.',
+      'A payout is created and the associate is told; paid at the end of the month (cleared by the 20th) or of the next month.',
       'Only the team incentive still waits for the Managing Director\'s lock.',
-    ], say: 'And something happened by itself at that moment. Because the buyer has now paid in full, the associate\'s commission was fixed automatically, at the exchange rate of all the buyer\'s payments, so it never changes afterwards. The payout was created and the associate was told. It becomes due after thirty days, and is paid on the next payout day, by default the last day of the month; it goes on hold while a buyer claim is open. Only the team incentive still waits for the Managing Director to lock it.' },
+    ], say: 'And something happened by itself at that moment. Because the buyer has now paid in full, the associate\'s commission was fixed automatically, at the exchange rate of all the buyer\'s payments, so it never changes afterwards. The payout was created and the associate was told. It is paid in the monthly run on the last day of the month: that month if the buyer\'s last payment cleared by the twentieth, otherwise the next month; it goes on hold while a buyer claim is open. Only the team incentive still waits for the Managing Director to lock it.' },
 
     // ---------- 5. Closure ----------
     { card: 'chapter', title: 'Closing the order', subtitle: 'Stage 9 · Original documents to the buyer.', say: 'Chapter five. Closing the order.', do: async () => { A.move(demo, 'closeReady', order); } },

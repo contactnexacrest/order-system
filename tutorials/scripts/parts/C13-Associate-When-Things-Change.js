@@ -30,16 +30,16 @@ module.exports = {
   steps: ({ a = PLAN_A } = {}) => [
     { card: 'title', say: 'Business changes. Sometimes a client is moved, a code leaks, or an account is paused. This video shows each situation, so nothing ever surprises you, and you always know why.' },
 
-    { card: 'chapter', title: 'A client is moved', subtitle: 'Only the Managing Director can do it, always with a reason.', say: 'Part one. When a client is moved.' },
+    { card: 'chapter', title: 'A client is moved', subtitle: 'Only NexaCrest management (the MD or the ED) can do it, always with a reason.', say: 'Part one. When a client is moved.' },
     { as: 'associate', goto: '/associate/clients', caption: 'Your client today', say: 'Here is our demo associate, with one client, a marble importer in Germany.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ })); await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(1500); } },
-    { as: 'md', goto: `/associates/${a.id}#clients`, caption: 'Staff: Clients introduced', say: 'Once a client is linked, only the Managing Director can change that link. For example, if the buyer proves they were introduced by someone else. The Managing Director picks: remove the link, or move to another associate, and must write a reason. You see that reason.', do: async (d) => { await d.scrollTo('#clients'); await d.ring(d.page.locator('#clients tr', { hasText: BUYER })); await d.wait(1800); } },
+    { as: 'md', goto: `/associates/${a.id}#clients`, caption: 'Staff: Clients introduced', say: 'Once a client is linked, only NexaCrest management can change that link. For example, if the buyer proves they were introduced by someone else. Management picks: remove the link, or move to another associate, and must write a reason. You see that reason.', do: async (d) => { await d.scrollTo('#clients'); await d.ring(d.page.locator('#clients tr', { hasText: BUYER })); await d.wait(1800); } },
     { caption: 'Move, with a reason', say: 'Here, the client is moved to another associate, with the reason written down.', do: async (d) => {
       const row = d.page.locator('#clients tr', { hasText: BUYER });
       await d.select(row.locator('select[name="move_to"]'), { label: 'Move to Demo Associate Two' });
       await d.type(row.locator('input[name="reason"]'), 'Buyer showed an earlier introduction by another associate', { delay: 20 });
       await d.clickNav(row.getByRole('button', { name: 'Change' }));
     } },
-    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail: the company is no longer registered as your client, decided by the Managing Director, with the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2000); } },
+    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail: the company is no longer registered as your client, decided by NexaCrest management, with the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2000); } },
 
     { card: 'chapter', title: 'A code is blocked', subtitle: 'For example, after it leaked.', say: 'Part two. A blocked code.' },
     { as: 'md', goto: `/associates/${a.id}#portal`, caption: 'Staff: set a new code, block the old', say: 'Imagine your personal code was posted publicly, and strangers use it. NexaCrest can give you a new code, and block the old one, with a reason.', do: async (d) => {
@@ -88,11 +88,11 @@ module.exports = {
       await d.point(d.page.locator('.alert').first(), 1800);
     } },
     { card: 'list', kicker: 'Recap', title: 'Changes, without surprises', items: [
-      'Client moved: MD only, with a reason you see at once.',
+      'Client moved: by NexaCrest management only, with a reason you see at once.',
       'Code blocked: you get a new one; the leaked one stops working.',
       'New bank details: confirm them with the e-mailed code, or "This is not me".',
       'Suspended: you can look, not act; earned commission stays.',
       'Ended: no new logins; earned commission settled per the agreement.',
-    ], next: 'Part 3 · What you never see', say: 'To recap. A client can only be moved by the Managing Director, with a reason you see. A leaked code is blocked and replaced. New bank details are only used after you confirm them, and This is not me cancels them. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, in part three: what associates never see, and why.' },
+    ], next: 'Part 3 · What you never see', say: 'To recap. A client can only be moved by NexaCrest management, with a reason you see. A leaked code is blocked and replaced. New bank details are only used after you confirm them, and This is not me cancels them. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, in part three: what associates never see, and why.' },
   ],
 };
