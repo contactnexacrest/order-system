@@ -1,6 +1,6 @@
 # H01 — Become a NexaCrest Associate (hiring video)
 
-**Status:** DRAFT 4 storyboard and script for the owner's review. Nothing is recorded yet.
+**Status:** APPROVED by the owner (25 Nov 2026, draft 4). To be recorded in English after the push.
 **Language:** English only (D-419). **Length:** about 12 minutes.
 **Look and voice:** the same as videos C01–C15 (title cards, chapter cards, the associate portal with a pointer,
 captions, the same narrator voice), plus simple story drawings (a map, a calendar, a growing stack of coins).
