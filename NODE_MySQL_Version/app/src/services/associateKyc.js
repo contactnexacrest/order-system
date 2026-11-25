@@ -39,7 +39,7 @@ const ADDRESS_PROOF_GRACE_DAYS = 60;
 
 /** D-290: "ID proof — <name> — 11 Nov 2026.pdf" / "Address proof — …" (null for the other kinds). */
 function appFileName(kind, associateName, uploadedName, date = null) {
-  const label = ID_KINDS.includes(kind) ? 'ID proof' : (kind === 'address' ? 'Address proof' : null);
+  const label = ID_KINDS.includes(kind) ? 'ID proof' : (kind === 'address' ? 'Address proof' : (kind === 'video_kyc' ? 'Video KYC' : null)); // D-417: the call recording
   if (!label) return null;
   const m = String(uploadedName || '').match(/\.([^./\\]+)$/);
   const ext = m ? m[1].toLowerCase() : '';
@@ -184,12 +184,21 @@ function videoGraceNote(a, today = null) {
  * D-417: staff record the live video KYC — the date it was seen (not in the future) and a note on what was
  * seen. Recording it again replaces the earlier record; both are in the audit log. Returns an error or null.
  */
-async function recordVideo(a, seenOn, note, userId, today = null) {
+/** D-417: the date (not in the future) and the note (10–300 characters) of a video KYC — an error, or null. */
+function videoInputError(seenOn, note, today = null) {
   const day = String(today || require('../helpers/dbDateTime').todayIst()).slice(0, 10);
   const what = String(note ?? '').trim();
   const on = String(seenOn ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(on) || on > day || on < '2020-01-01') return 'Enter the date of the video call (today or earlier).';
   if (len(what) < 10 || len(what) > 300) return 'Say what was seen on the call, 10 to 300 characters (for example: passport and electricity bill shown, name and address match).';
+  return null;
+}
+
+async function recordVideo(a, seenOn, note, userId, today = null) {
+  const error = videoInputError(seenOn, note, today);
+  if (error) return error;
+  const what = String(note ?? '').trim();
+  const on = String(seenOn ?? '');
   const before = a.video_kyc_at ? `${dayOf(a.video_kyc_at)} — ${a.video_kyc_note || ''}` : '';
   await db.execute('UPDATE associates SET video_kyc_at = :d, video_kyc_by = :u, video_kyc_note = :n WHERE id = :id',
     { d: `${on} 00:00:00`, u: userId, n: what, id: Number(a.id) });
@@ -240,5 +249,5 @@ async function notifyStaffOfUpload(a, kind) {
 module.exports = {
   REFERENCE_RULES, OTHER_RULE, STATUS_LABELS, ID_DOC_TYPES, ID_KINDS, ADDRESS_PROOF_GRACE_DAYS,
   normaliseReference, requiredItems, checklist, missing, missingForPayout, addressGraceNote, appFileName, idDocType, checkUpload, review, notifyStaffOfUpload,
-  VIDEO_LABEL, videoGraceNote, recordVideo,
+  VIDEO_LABEL, videoGraceNote, recordVideo, videoInputError,
 };

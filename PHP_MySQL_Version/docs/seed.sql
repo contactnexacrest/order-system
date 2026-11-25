@@ -2013,6 +2013,10 @@ SELECT r.id, p.id FROM roles r JOIN permissions p
 INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
 SELECT 'associate_document', 'pdf,jpg,jpeg,png', 10485760, 'An associate''s own documents (KYC, tax papers, commission invoices, bank proof, 15CA/CB, TDS certificates) — internal; seen by the associate and by manage_associates / manage_associate_bank only.'
 WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'associate_document');
+-- D-417 (owner 25 Nov 2026): the optional recording or screenshots of an associate's live video KYC call (staff only).
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'associate_video_kyc', 'mp4,mov,webm,3gp,jpg,jpeg,png,pdf', 26214400, 'Live video KYC recording or screenshots of an associate (D-417) — staff only (manage_associates / manage_associate_bank); never shown to the associate.'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'associate_video_kyc');
 
 
 -- Gap list answers 1 Nov 2026 (D-218, G-4): upload context for LC amendment copies (2026-11-02c)

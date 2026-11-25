@@ -962,8 +962,33 @@ async function recordVideoKyc(req, res) {
   const a = await found(req, res);
   if (!a) return;
   const body = req.body || {};
-  const error = await associateKyc.recordVideo(a, String(body.seen_on || ''), String(body.note || ''), req.user.id);
-  flash.set(req, error ? 'error' : 'success', error || 'Live video KYC recorded.');
+  const seenOn = String(body.seen_on || '');
+  const note = String(body.note || '');
+  const inputError = associateKyc.videoInputError(seenOn, note);
+  if (inputError) {
+    flash.set(req, 'error', inputError);
+    back(res, a.id, 'documents');
+    return;
+  }
+  // D-417 (owner 25 Nov 2026): an optional recording or screenshots of the call, kept with the KYC documents (staff only).
+  let fileId = null;
+  if (req.file) {
+    try {
+      fileId = await fileUploadService.handleUpload(req, 'video_file', 'associate_video_kyc', 'associates/documents', null, null, req.user.id,
+        associateKyc.appFileName('video_kyc', a.name, req.file.originalname), a.name, associateDocumentRepository.KINDS.video_kyc);
+    } catch (e) {
+      flash.setErrorFromException(req, e);
+      back(res, a.id, 'documents');
+      return;
+    }
+  }
+  const error = await associateKyc.recordVideo(a, seenOn, note, req.user.id);
+  if (!error && fileId) {
+    const docId = await associateDocumentRepository.add(Number(a.id), 'video_kyc', fileId, null, null, false, req.user.id);
+    await require('../config/db').execute("UPDATE associate_documents SET status = 'accepted', reviewed_by = :u, reviewed_at = NOW() WHERE id = :id", { u: req.user.id, id: docId });
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(a.id), 'kind', null, 'video_kyc');
+  }
+  flash.set(req, error ? 'error' : 'success', error || (fileId ? 'Live video KYC recorded, with the file.' : 'Live video KYC recorded.'));
   back(res, a.id, 'documents');
 }
 

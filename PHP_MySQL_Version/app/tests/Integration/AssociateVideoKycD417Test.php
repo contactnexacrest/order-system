@@ -156,6 +156,35 @@ final class AssociateVideoKycD417Test extends DbTestCase
         self::assertStringContainsString('Done on ', $portal);
     }
 
+    public function testTheOptionalRecordingIsStaffOnly(): void
+    {
+        // D-417 follow-up (owner 25 Nov 2026): an optional recording or screenshots, 25 MB, staff only.
+        $ctx = Database::connection()->query("SELECT allowed_extensions, max_size_bytes FROM file_upload_contexts WHERE context_key = 'associate_video_kyc'")->fetch();
+        self::assertSame('mp4,mov,webm,3gp,jpg,jpeg,png,pdf', $ctx['allowed_extensions']);
+        self::assertSame(26214400, (int) $ctx['max_size_bytes']);
+        self::assertNotContains('video_kyc', \App\Repositories\AssociateDocumentRepository::ASSOCIATE_KINDS, 'the associate cannot upload it');
+
+        $a = $this->associate();
+        $_SESSION = ['_auth_user_id' => $this->staff, '_session_version' => AuthService::sessionVersion() ?? 0];
+        $tmp = tempnam(sys_get_temp_dir(), 'vk');
+        file_put_contents($tmp, 'MZ not a video');
+        $_FILES = ['video_file' => ['name' => 'call.exe', 'type' => 'application/octet-stream', 'tmp_name' => $tmp, 'error' => 0, 'size' => 14]];
+        $r = $this->call('POST', '/associates/' . $a['id'] . '/video-kyc', ['seen_on' => date('Y-m-d'), 'note' => 'Passport and bank statement shown clearly']);
+        $_FILES = [];
+        self::assertStringContainsString('not allowed', (string) $r['flash']);
+        self::assertNull(AssociateRepository::find((int) $a['id'])['video_kyc_at'], 'a refused file records nothing');
+
+        // A stored recording is listed for staff but never in the associate's portal, nor downloadable there.
+        $pdo = Database::connection();
+        $pdo->exec("INSERT INTO file_store (file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type) VALUES ('RECEIVED', '/tmp/none.mp4', 'vk-" . bin2hex(random_bytes(4)) . ".mp4', 'Video KYC.mp4', 10, 'video/mp4')");
+        $docId = \App\Repositories\AssociateDocumentRepository::add((int) $a['id'], 'video_kyc', (int) $pdo->lastInsertId(), null, null, false, $this->staff);
+        self::assertStringContainsString('Video KYC recording / screenshots', $this->call('GET', '/associates/' . $a['id'])['body']);
+        $_SESSION = ['_associate_portal_id' => (int) $a['id']];
+        self::assertStringNotContainsString('Video KYC recording', $this->call('GET', '/associate/profile')['body']);
+        $this->call('GET', '/associate/documents/' . $docId);
+        self::assertSame(404, http_response_code());
+    }
+
     public function testTheVideoNoteNeedsManageAssociates(): void
     {
         $a = $this->associate();

@@ -426,7 +426,7 @@ async function commission(req, res) {
     howFixed: await payoutService.howFixedBox(a),
     print: req.query.print === '1',
     invoiceByPayout,
-    documents: await associateDocumentRepository.forAssociate(id),
+    documents: await portalDocuments(id),
     advices: await require('../services/associatePaymentAdvice').forAssociate(id), // D-410 (8): "Payments to you"
     docKinds: associateDocumentRepository.KINDS,
     // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
@@ -494,7 +494,7 @@ async function profile(req, res) {
     b.status_text = require('../services/associateBankConfirmation').associateStatus(b, today); // D-293
   }
   const usable = await associateBankRepository.usable(id);
-  const docs = await associateDocumentRepository.forAssociate(id);
+  const docs = await portalDocuments(id);
   await render(req, res, 'profile', {
     commissionNow,
     commissionSettings,
@@ -685,10 +685,15 @@ async function paymentAdvice(req, res) {
   await require('./associateAdminController').sendAdvice(res, advice, String(req.params.format || 'pdf'));
 }
 
+/** D-417: the associate's documents without the staff-only kinds (the video KYC recording). */
+async function portalDocuments(id) {
+  return (await associateDocumentRepository.forAssociate(id)).filter((d) => !associateDocumentRepository.STAFF_ONLY_KINDS.includes(String(d.kind)));
+}
+
 async function downloadDocument(req, res) {
   const a = await me(req);
   const doc = await associateDocumentRepository.find(parseInt(req.params.id, 10));
-  if (!doc || Number(doc.associate_id) !== Number(a.id)) {
+  if (!doc || Number(doc.associate_id) !== Number(a.id) || associateDocumentRepository.STAFF_ONLY_KINDS.includes(String(doc.kind))) {
     notFound(res, 'Document not found.');
     return;
   }

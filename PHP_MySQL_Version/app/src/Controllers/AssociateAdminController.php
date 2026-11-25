@@ -989,8 +989,34 @@ final class AssociateAdminController
         if ($a === null) {
             return;
         }
-        $error = \App\Services\AssociateKyc::recordVideo($a, (string) ($_POST['seen_on'] ?? ''), (string) ($_POST['note'] ?? ''), (int) self::user()['id']);
-        Flash::set($error === null ? 'success' : 'error', $error ?? 'Live video KYC recorded.');
+        $seenOn = (string) ($_POST['seen_on'] ?? '');
+        $note = (string) ($_POST['note'] ?? '');
+        if (($error = \App\Services\AssociateKyc::videoInputError($seenOn, $note)) !== null) {
+            Flash::set('error', $error);
+            self::back((int) $a['id'], 'documents');
+            return;
+        }
+        // D-417 (owner 25 Nov 2026): an optional recording or screenshots of the call, kept with the KYC documents (staff only).
+        $file = $_FILES['video_file'] ?? null;
+        $fileId = null;
+        if (is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $fileId = FileUploadService::handleUpload('video_file', 'associate_video_kyc', 'associates/documents', null, null, (int) self::user()['id'],
+                    \App\Services\AssociateKyc::appFileName('video_kyc', (string) $a['name'], (string) ($file['name'] ?? '')), (string) $a['name'], AssociateDocumentRepository::KINDS['video_kyc']);
+            } catch (\Throwable $e) {
+                Flash::setErrorFromException($e);
+                self::back((int) $a['id'], 'documents');
+                return;
+            }
+        }
+        $error = \App\Services\AssociateKyc::recordVideo($a, $seenOn, $note, (int) self::user()['id']);
+        if ($error === null && $fileId !== null) {
+            $docId = AssociateDocumentRepository::add((int) $a['id'], 'video_kyc', $fileId, null, null, false, (int) self::user()['id']);
+            \App\Config\Database::connection()->prepare("UPDATE associate_documents SET status = 'accepted', reviewed_by = :u, reviewed_at = NOW() WHERE id = :id")
+                ->execute(['u' => (int) self::user()['id'], 'id' => $docId]);
+            AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', (int) $a['id'], 'kind', null, 'video_kyc');
+        }
+        Flash::set($error === null ? 'success' : 'error', $error ?? ($fileId !== null ? 'Live video KYC recorded, with the file.' : 'Live video KYC recorded.'));
         self::back((int) $a['id'], 'documents');
     }
 

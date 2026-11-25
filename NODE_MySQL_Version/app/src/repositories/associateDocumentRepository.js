@@ -8,7 +8,10 @@ const KINDS = {
   company: 'Company registration', tax_residency: 'Tax residency certificate', form_10f: 'Form 10F',
   no_pe: 'No-PE declaration (no fixed place of business in India)', invoice: 'Commission invoice', form_16a: 'Form 16A (TDS certificate)',
   form_15ca: 'Form 15CA', form_15cb: 'Form 15CB', other: 'Other',
+  video_kyc: 'Video KYC recording / screenshots', // D-417 (owner 25 Nov 2026): staff only
 };
+/** D-417: kinds only staff see — never listed in or downloadable from the associate's portal. */
+const STAFF_ONLY_KINDS = ['video_kyc'];
 const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
 
 /** idDocType — D-290: the ID document's type (kind 'identity'). */
@@ -39,4 +42,4 @@ async function invoiceForPayout(payoutId) {
   return db.queryOne("SELECT * FROM associate_documents WHERE payout_id = :p AND kind = 'invoice' ORDER BY id DESC LIMIT 1", { p: payoutId });
 }
 
-module.exports = { KINDS, ASSOCIATE_KINDS, add, forAssociate, find, invoiceForPayout };
+module.exports = { KINDS, ASSOCIATE_KINDS, STAFF_ONLY_KINDS, add, forAssociate, find, invoiceForPayout };

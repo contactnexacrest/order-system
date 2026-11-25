@@ -662,8 +662,10 @@ live video call with the associate, who holds up the ID proof and the address
 proof so that both are clearly readable. On the associate's page, under *KYC
 and documents*, staff enter the date of the call and what was seen (10–300
 characters, e.g. "Passport and electricity bill shown clearly; name and
-address match") and press **Record video KYC**. Do not save a recording of the
-call in the app. The item then shows *Done* with the date and who saw it; it can
+address match") and press **Record video KYC**. You may also attach the recording or screenshots of
+the call (optional; MP4, MOV, WEBM, 3GP, JPG, PNG or PDF, up to 25 MB): the file
+is kept with the KYC documents, only staff with Manage associates or Manage
+associate bank can open it, and the associate never sees it. The item then shows *Done* with the date and who saw it; it can
 be recorded again (both records are in the audit log). Associates who already
 had an account on the day this was added have **60 days** before their payouts
 wait for it (the date shows on their page and in the portal); new associates

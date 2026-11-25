@@ -349,7 +349,7 @@ final class AssociatePortalController
             return;
         }
         self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id, $months), 'print' => ($_GET['print'] ?? '') === '1',
-            'documents' => AssociateDocumentRepository::forAssociate($id),
+            'documents' => self::portalDocuments($id),
             'advices' => \App\Services\AssociatePaymentAdvice::forAssociate($id), // D-410 (8): "Payments to you"
             // D-292: the current % and "How it works" at the top; the % fixed on each order in the list.
             'headline' => self::commissionHeadline(self::me()), 'commissionSettings' => \App\Services\AssociateCommission::settings()]);
@@ -424,7 +424,7 @@ final class AssociatePortalController
         $id = (int) self::me()['id'];
         $me = self::me();
         [$level] = \App\Services\AssociateCommission::levelForAssociate($me, null);
-        $documents = AssociateDocumentRepository::forAssociate($id);
+        $documents = self::portalDocuments($id);
         self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => $documents, 'kyc' => \App\Services\AssociateKyc::checklist($me, $documents),
             'codes' => AssociateCodeService::codes($id),
             // D-263: the rate only (no level name, no ladder wording), and only with "Show commission %".
@@ -696,11 +696,18 @@ final class AssociatePortalController
         AssociateAdminController::sendAdvice($advice, (string) ($params['format'] ?? 'pdf'));
     }
 
+    /** D-417: the associate's documents without the staff-only kinds (the video KYC recording). */
+    private static function portalDocuments(int $id): array
+    {
+        return array_values(array_filter(AssociateDocumentRepository::forAssociate($id),
+            static fn (array $d): bool => !in_array((string) $d['kind'], AssociateDocumentRepository::STAFF_ONLY_KINDS, true)));
+    }
+
     public function downloadDocument(array $params): void
     {
         $a = self::me();
         $doc = AssociateDocumentRepository::find((int) $params['id']);
-        if ($doc === null || (int) $doc['associate_id'] !== (int) $a['id']) {
+        if ($doc === null || (int) $doc['associate_id'] !== (int) $a['id'] || in_array((string) $doc['kind'], AssociateDocumentRepository::STAFF_ONLY_KINDS, true)) {
             http_response_code(404);
             echo 'Document not found.';
             return;

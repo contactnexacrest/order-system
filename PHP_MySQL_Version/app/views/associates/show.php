@@ -233,13 +233,14 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
     <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($a)) !== null): // D-290: 60 days for an associate accepted before 11 Nov 2026 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
     <?php if (($__vgrace = \App\Services\AssociateKyc::videoGraceNote($a)) !== null): // D-417 ?><p class="small" data-video-grace><?= htmlspecialchars($__vgrace) ?></p><?php endif; ?>
     <?php if ($canManage): // D-417: staff record the live video KYC ?>
-    <form method="post" action="/associates/<?= $id ?>/video-kyc" class="inline-form" data-video-kyc-form>
+    <form method="post" action="/associates/<?= $id ?>/video-kyc" class="inline-form" enctype="multipart/form-data" data-video-kyc-form>
       <?= Csrf::field() ?>
       <label class="small">Live video KYC seen on <input type="date" name="seen_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
       <input type="text" name="note" required minlength="10" maxlength="300" placeholder="e.g. Passport and electricity bill shown clearly; name and address match" aria-label="What was seen on the call" style="width:28em">
+      <label class="small">Recording or screenshots (optional)<input type="file" name="video_file" accept=".mp4,.mov,.webm,.3gp,.jpg,.jpeg,.png,.pdf"></label>
       <button type="submit" class="btn-sm btn-secondary"><?= !empty($a['video_kyc_at']) ? 'Record again' : 'Record video KYC' ?></button>
     </form>
-    <p class="muted small">A short live video call in which the associate holds up the ID proof and the address proof so that both are clearly readable. Record the date and what was seen. Do not save a recording of the call in the app.</p>
+    <p class="muted small">A short live video call in which the associate holds up the ID proof and the address proof so that both are clearly readable. Record the date and what was seen. You may add the recording or screenshots of the call (MP4, MOV, WEBM, 3GP, JPG, PNG or PDF, up to 25 MB): it is kept with the KYC documents below; only staff with Manage associates or Manage associate bank can open it, and the associate does not see it.</p>
     <?php endif; ?>
     <p class="muted small">ID proof and address proof are separate items, each checked on its own. The same document (e.g. a passport showing the address) may be uploaded under each; the app names the files "ID proof — name — date" and "Address proof — name — date".</p>
     <table class="list">

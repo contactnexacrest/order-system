@@ -134,6 +134,10 @@ FROM (
   SELECT '2026-11-25b',
          'Associate payout cut-off day (20th) and no waiting days: incentive_settings.associate_payout_cutoff_day (D-421)',
          IF((SELECT COUNT(*) FROM incentive_settings WHERE setting_key = 'associate_payout_cutoff_day') = 1, 'already done', 'NEEDED')
+  UNION ALL
+  SELECT '2026-11-25c',
+         'Video KYC recording upload: file_upload_contexts.associate_video_kyc (D-417)',
+         IF((SELECT COUNT(*) FROM file_upload_contexts WHERE context_key = 'associate_video_kyc') = 1, 'already done', 'NEEDED')
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

@@ -135,6 +135,31 @@ describe('D-417 live video KYC and D-418 why we ask for bank details', () => {
     expect(profile).toContain('Done on ');
   });
 
+  it('keeps an optional recording for staff only (D-417 follow-up)', async () => {
+    const ctx = await db.queryOne("SELECT allowed_extensions, max_size_bytes FROM file_upload_contexts WHERE context_key = 'associate_video_kyc'");
+    expect(ctx.allowed_extensions).toBe('mp4,mov,webm,3gp,jpg,jpeg,png,pdf');
+    expect(Number(ctx.max_size_bytes)).toBe(26214400);
+    const a = await associate();
+    const agent = await staff();
+    let page = (await agent.get(`/associates/${a.id}`)).text;
+    const refused = await agent.post(`/associates/${a.id}/video-kyc`).field('_csrf', csrfOf(page)).field('seen_on', todayIst()).field('note', 'Passport and bank statement shown clearly')
+      .attach('video_file', Buffer.from('MZ not a video'), 'call.exe');
+    expect(refused.status).toBe(302);
+    expect((await associateRepository.find(Number(a.id))).video_kyc_at).toBeNull();
+
+    page = (await agent.get(`/associates/${a.id}`)).text;
+    const ok = await agent.post(`/associates/${a.id}/video-kyc`).field('_csrf', csrfOf(page)).field('seen_on', todayIst()).field('note', 'Passport and bank statement shown clearly')
+      .attach('video_file', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]), 'call.jpg');
+    expect(ok.status).toBe(302);
+    const doc = await db.queryOne("SELECT id, status FROM associate_documents WHERE associate_id = :a AND kind = 'video_kyc'", { a: Number(a.id) });
+    expect(doc.status).toBe('accepted');
+    expect((await agent.get(`/associates/${a.id}`)).text).toContain('Video KYC recording / screenshots');
+
+    const p = await portal(await associateRepository.find(Number(a.id)));
+    expect((await p.get('/associate/profile')).text).not.toContain('Video KYC recording');
+    expect((await p.get(`/associate/documents/${doc.id}`)).status).toBe(404);
+  });
+
   it('needs Manage associates to record it', async () => {
     const a = await associate();
     const agent = await staff(await user('Export Executive'));

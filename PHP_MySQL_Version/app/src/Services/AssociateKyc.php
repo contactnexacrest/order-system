@@ -53,7 +53,7 @@ final class AssociateKyc
      */
     public static function appFileName(string $kind, string $associateName, string $uploadedName, ?string $date = null): ?string
     {
-        $label = in_array($kind, self::ID_KINDS, true) ? 'ID proof' : ($kind === 'address' ? 'Address proof' : null);
+        $label = in_array($kind, self::ID_KINDS, true) ? 'ID proof' : ($kind === 'address' ? 'Address proof' : ($kind === 'video_kyc' ? 'Video KYC' : null)); // D-417: the call recording
         if ($label === null) {
             return null;
         }
@@ -235,7 +235,8 @@ final class AssociateKyc
      * seen. Recording it again replaces the earlier record; both are in the audit log.
      * @return ?string an error, or null when saved
      */
-    public static function recordVideo(array $a, string $seenOn, string $note, int $userId, ?string $today = null): ?string
+    /** D-417: the date (not in the future) and the note (10–300 characters) of a video KYC — an error, or null. */
+    public static function videoInputError(string $seenOn, string $note, ?string $today = null): ?string
     {
         $today ??= date('Y-m-d');
         $note = trim($note);
@@ -244,6 +245,16 @@ final class AssociateKyc
         }
         if (mb_strlen($note) < 10 || mb_strlen($note) > 300) {
             return 'Say what was seen on the call, 10 to 300 characters (for example: passport and electricity bill shown, name and address match).';
+        }
+        return null;
+    }
+
+    public static function recordVideo(array $a, string $seenOn, string $note, int $userId, ?string $today = null): ?string
+    {
+        $today ??= date('Y-m-d');
+        $note = trim($note);
+        if (($error = self::videoInputError($seenOn, $note, $today)) !== null) {
+            return $error;
         }
         $before = !empty($a['video_kyc_at']) ? substr((string) $a['video_kyc_at'], 0, 10) . ' — ' . (string) ($a['video_kyc_note'] ?? '') : '';
         \App\Config\Database::connection()->prepare('UPDATE associates SET video_kyc_at = :d, video_kyc_by = :u, video_kyc_note = :n WHERE id = :id')

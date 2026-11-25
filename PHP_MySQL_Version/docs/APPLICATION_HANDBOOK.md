@@ -3147,7 +3147,12 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
     `video_kyc_by` / `video_kyc_note`; audit `ASSOCIATE_VIDEO_KYC_RECORDED`.
     Existing associates have until `associates.video_kyc_due_on` (60 days,
     set by migration 2026-11-25a) before payouts wait for it
-    (`AssociateKyc::recordVideo`, `videoGraceNote`). No recording is stored.
+    (`AssociateKyc::recordVideo`, `videoGraceNote`). Optional file with it (owner
+    25 Nov 2026): the recording or screenshots (mp4/mov/webm/3gp/jpg/png/pdf,
+    25 MB, upload context `associate_video_kyc`, migration 2026-11-25c), stored
+    as `associate_documents.kind = 'video_kyc'` (status accepted); staff only —
+    `AssociateDocumentRepository::STAFF_ONLY_KINDS` hides it from the portal list
+    and its download.
   - **Why we ask for bank details (D-418):** a note above the portal bank form.
   - Self-registration link (7 days), code change (up to 3, old codes keep
     working) (D-253, D-254).

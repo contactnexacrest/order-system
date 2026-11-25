@@ -72,6 +72,7 @@ removed from this folder; git history keeps them (last commit with them:
 | `2026-11-24c-manage-associate-rules.sql` | D-411 | New permission `manage_associate_rules` ("Manage associate rules") for the Managing Director and the Executive Director: changes the associate commission rules (levels and ladder, what the client's price includes, an associate's own rule, Associates › Settings, payment advice corrections, a client's associate, portal access levels). Plain INSERT … WHERE NOT EXISTS and one UPDATE of a permission description; safe to run twice. |
 | `2026-11-25a-associate-video-kyc.sql` | D-417 | Live video KYC for associates: `associates.video_kyc_at`, `video_kyc_by`, `video_kyc_note`, `video_kyc_due_on`; existing associates get 60 days before payouts wait for it. PLAIN ALTER (D-371). |
 | `2026-11-25b-associate-payout-cutoff.sql` | D-421 | Associate payout cut-off day: `incentive_settings.associate_payout_cutoff_day` = 20, waiting days (`associate_commission_due_days`) = 0. Plain INSERT/UPDATE. |
+| `2026-11-25c-associate-video-kyc-upload.sql` | D-417 | Upload context `associate_video_kyc` (mp4, mov, webm, 3gp, jpg, jpeg, png, pdf; 25 MB) for the optional video KYC recording / screenshots. Plain INSERT. Needs the server's PHP upload limit ≥ 25 MB. |
 
 ### Rules for every migration file (enforced by tests)
 
