@@ -25,7 +25,7 @@
   <h2>Thickness</h2>
   {% if not r.spec %}<p class="muted">This category has no Thickness specification — add one on the "Options and their price effect" tab first.</p>{% endif %}
   <table class="list">
-    <tr><th>Thickness</th><th>Price compared with {{ r.base_mm }} mm</th><th class="num">Example ({{ r.base_mm }} mm = ₹{{ v.example | money0 }} / SQM)</th></tr>
+    <tr><th>Thickness</th><th>Price compared with {{ r.base_mm }} mm</th><th class="num">Example ({{ r.base_mm }} mm = ₹{{ v.example | inr0 }} / SQM)</th></tr>
     {% for t in v.thickness %}
       <tr data-rule-row data-mm="{{ t.mm }}">
         <td>{{ t.name }}</td>

@@ -565,7 +565,7 @@ function gridView(rules, done) {
       mm: r.mm, cbm: r.cbm, pct: r.cbm ? null : thicknessPrices.fmt(r.pct), typed, rule, label: thicknessPrices.label(r.mm, rules.cbm_from),
       value: v ? v.price.toFixed(2) : '', placeholder: v ? v.calc.toFixed(2) : (r.cbm ? 'e.g. 64000.00' : 'e.g. 1600.00'),
       hint: typed && Math.abs(v.calc - v.price) > 0.005 ? `calculated would be ${fmt2(v.calc)}` : '',
-      perCbm: v ? `₹${fmt2(r.cbm ? v.price : thicknessPrices.m2ToCbm(v.price, r.mm))}` : '',
+      perCbm: v ? `₹${require("../helpers/moneyFormat").indian(r.cbm ? v.price : thicknessPrices.m2ToCbm(v.price, r.mm))}` : '',
     };
   });
 }
@@ -585,7 +585,7 @@ function chaView(rules, product, row) {
     def: def !== null ? fmt2(def) : null, fallbackText, includes: !row || Number(row.includes_packing_loading ?? 1) === 1,
     containerCbm: thicknessPrices.fmt(rules.container_cbm), containerMaxT: thicknessPrices.fmt(rules.container_max_t),
     ownContainer: rules.own.includes('container'), fitsCbm: fit.fits_cbm.toFixed(4),
-    perCbm: fit.per_cbm !== null ? `₹${fmt2(fit.per_cbm)} / CBM` : '—',
+    perCbm: fit.per_cbm !== null ? `₹${require("../helpers/moneyFormat").indian(fit.per_cbm)} / CBM` : '—',
     weightLine: rules.t_per_cbm !== null ? `Weight check: ${thicknessPrices.fmt(rules.container_cbm)} CBM × ${thicknessPrices.fmt(rules.t_per_cbm)} t = ${thicknessPrices.fmt(Math.round(fit.weight_t * 100) / 100)} t ${fit.by_weight
       ? `— over ${thicknessPrices.fmt(rules.container_max_t)} t, so only ${fmt2(fit.fits_cbm)} CBM fit and the price per CBM is worked out from that.`
       : `≤ ${thicknessPrices.fmt(rules.container_max_t)} t ✓`}` : null,

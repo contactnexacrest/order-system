@@ -65,8 +65,8 @@
     <p class="muted small">Every advance/balance/freight leg that has been marked cleared in the order pipeline: the actual INR amount credited, the forex gain/(loss) against the order's assumed exchange rate, and its FIRC/eBRC realization proof. Recorded from the order's own Payment Status section by whoever holds the "Add/edit INR actual" permission.</p>
     <div class="ca-summary" data-ca-summary>
       <div><strong>{{ summary.legs }}</strong>legs cleared</div>
-      <div><strong>&#8377;{{ summary.inr_credited | money }}</strong>INR credited</div>
-      <div><strong class="{{ 'loss' if summary.forex_net < 0 else 'gain' }}">{% if summary.forex_known %}&#8377;{{ (summary.forex_net | abs) | money }}{{ ' loss' if summary.forex_net < 0 else ' gain' }}{% else %}—{% endif %}</strong>forex, net</div>
+      <div><strong>&#8377;{{ summary.inr_credited | inr }}</strong>INR credited</div>
+      <div><strong class="{{ 'loss' if summary.forex_net < 0 else 'gain' }}">{% if summary.forex_known %}&#8377;{{ (summary.forex_net | abs) | inr }}{{ ' loss' if summary.forex_net < 0 else ' gain' }}{% else %}—{% endif %}</strong>forex, net</div>
       <div><strong class="{{ 'bad' if summary.firc_pending > 0 else '' }}">{{ summary.firc_pending }}</strong>FIRC / eBRC pending</div>
       <div><strong>{{ summary.not_in_zoho }}</strong>not yet in Zoho</div>
     </div>
@@ -91,14 +91,14 @@
           <td>{{ s.cleared_at }}</td>
           <td>
             {% if s.inr_actual != null %}
-              &#8377;{{ s.inr_actual | money }}
+              &#8377;{{ s.inr_actual | inr }}
               <div class="muted small">
                 {% if s.inr_actual_recorded_at != null %}
                   {{ s.inr_actual_recorded_at }}{% if s.inr_actual_recorded_by %} by {{ usersById[s.inr_actual_recorded_by] or ('User #' ~ s.inr_actual_recorded_by) }}{% endif %}
                 {% endif %}
               </div>
             {% elif s.inr_estimated != null %}{# D-244: INR not known yet — the amount at the recorded rate #}
-              &#8377;{{ s.inr_estimated | money }}
+              &#8377;{{ s.inr_estimated | inr }}
               <div class="muted small">estimated at recorded rate — INR credited not recorded yet</div>
             {% else %}
               <span class="muted">Not yet recorded</span>
@@ -108,10 +108,10 @@
             {# D-244: rupees the bank kept, booked as Bank Charges #}
             {% set bankCharges = s.bank_charges_inr %}
             {% if s.forex_gain_loss != null and (bankCharges == null or (s.forex_gain_loss | abs) >= 0.005) %}
-              <span>&#8377;{{ (s.forex_gain_loss | abs) | money }} {{ 'gain' if s.forex_gain_loss >= 0 else 'loss' }}</span>
+              <span>&#8377;{{ (s.forex_gain_loss | abs) | inr }} {{ 'gain' if s.forex_gain_loss >= 0 else 'loss' }}</span>
             {% endif %}
             {% if bankCharges != null %}
-              <div>&#8377;{{ bankCharges | money }} bank charges</div>
+              <div>&#8377;{{ bankCharges | inr }} bank charges</div>
             {% elif s.forex_gain_loss == null %}
               <span class="muted">—</span>
             {% endif %}

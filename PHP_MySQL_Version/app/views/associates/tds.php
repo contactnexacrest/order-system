@@ -44,10 +44,10 @@ $__fyYear = (int) substr($fyStart, 0, 4);
         <td><a href="/associates/<?= (int) $r['associate_id'] ?>"><?= htmlspecialchars((string) $r['name']) ?></a><?= $r['based_in'] !== 'india' ? ' <small class="muted">(abroad, ' . htmlspecialchars((string) $r['country']) . ')</small>' : '' ?></td>
         <td><?= htmlspecialchars((string) ($r['pan'] ?: '—')) ?></td>
         <td><?= htmlspecialchars((string) ($r['buyer_inquiry_ref'] ?: $r['order_reference'])) ?></td>
-        <td>&#8377;<?= number_format((float) $r['paid_inr'] + (float) ($r['tds_inr'] ?? 0), 2) ?></td>
-        <td>&#8377;<?= number_format((float) ($r['tds_inr'] ?? 0), 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $r['paid_inr'] + (float) ($r['tds_inr'] ?? 0), 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) ($r['tds_inr'] ?? 0), 2) ?></td>
         <td><?= htmlspecialchars(trim((string) ($r['tds_section'] ?? '') . ((float) ($r['tds_rate'] ?? 0) > 0 ? ' · ' . \App\Services\AssociateTds::pct((float) $r['tds_rate']) : ''), ' ·') ?: '—') ?></td>
-        <td>&#8377;<?= number_format((float) $r['paid_inr'], 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $r['paid_inr'], 2) ?></td>
         <td class="small"><?= htmlspecialchars((string) ($r['tds_reason'] ?? '—')) ?></td>
         <td>
           <?php if ((float) ($r['tds_inr'] ?? 0) <= 0): ?>
@@ -69,5 +69,5 @@ $__fyYear = (int) substr($fyStart, 0, 4);
     <?php endforeach; ?>
     <?php if ($rows === []): ?><tr><td colspan="12" class="muted">No associate commission paid in <?= htmlspecialchars($fyLabel) ?><?= $quarter !== null ? ' Q' . $quarter : '' ?>.</td></tr><?php endif; ?>
   </table>
-  <p><strong>Total:</strong> gross &#8377;<?= number_format($__gross, 2) ?> &middot; TDS &#8377;<?= number_format($__tds, 2) ?> &middot; net paid &#8377;<?= number_format($__gross - $__tds, 2) ?></p>
+  <p><strong>Total:</strong> gross &#8377;<?= \App\Helpers\MoneyFormat::indian($__gross, 2) ?> &middot; TDS &#8377;<?= \App\Helpers\MoneyFormat::indian($__tds, 2) ?> &middot; net paid &#8377;<?= \App\Helpers\MoneyFormat::indian($__gross - $__tds, 2) ?></p>
 </div>

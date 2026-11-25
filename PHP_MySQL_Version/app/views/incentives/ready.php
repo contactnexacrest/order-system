@@ -14,7 +14,7 @@ use App\Helpers\Dates;
         <td><?= htmlspecialchars(Dates::short((string) $r['paid_on'])) ?></td>
         <td><?= number_format($c['basis'], 2) ?></td>
         <td><?= number_format($c['team_total'], 2) ?><?= $c['over_profit'] ? ' <span class="badge badge-danger">more than the profit</span>' : ($c['margin_warning'] ? ' <span class="badge badge-warning">below minimum margin</span>' : '') ?></td>
-        <td><?= $c['associate'] !== null ? number_format((float) $c['associate']['amount_inr'], 2) : '—' ?></td>
+        <td><?= $c['associate'] !== null ? \App\Helpers\MoneyFormat::indian((float) $c['associate']['amount_inr'], 2) : '—' ?></td>
         <td><?php if ($canManagePricing): ?><form method="post" action="/orders/<?= (int) $o['id'] ?>/incentive/lock" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Lock</button></form><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>

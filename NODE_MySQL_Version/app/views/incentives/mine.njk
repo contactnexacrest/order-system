@@ -1,9 +1,9 @@
 <div class="card">
   <h1>My Incentives</h1>
   <div class="kv-grid">
-    <div><span class="k">Paid in {{ year }}</span><span class="v">&#8377;{{ paidThisYear | money0 }}</span></div>
+    <div><span class="k">Paid in {{ year }}</span><span class="v">&#8377;{{ paidThisYear | inr0 }}</span></div>
     {% for d in dueByMonth %}
-      <div><span class="k">Your {{ incentive.monthLabel(d.month) }} payout run</span><span class="v">&#8377;{{ d.amount | money0 }}</span></div>
+      <div><span class="k">Your {{ incentive.monthLabel(d.month) }} payout run</span><span class="v">&#8377;{{ d.amount | inr0 }}</span></div>
     {% endfor %}
   </div>
   <table class="list" style="margin-top:12px">
@@ -13,7 +13,7 @@
         <td>{{ p.buyer_inquiry_ref or p.order_reference }}</td>
         <td>{{ p.company_legal_name }}</td>
         <td>{{ incentive.roleLabel(p.role) }}</td>
-        <td>{{ (p.paid_inr if p.status == 'paid' else p.amount_inr) | money0 }}</td>
+        <td>{{ (p.paid_inr if p.status == 'paid' else p.amount_inr) | inr0 }}</td>
         <td>{% if p.status == 'paid' %}<span class="badge badge-success">{{ incentive.monthLabel(p.incentive_month) }} incentive — paid</span>{% else %}<span class="badge badge-warning">{{ incentive.monthLabel(p.incentive_month) }} incentive</span>{% endif %}</td>
       </tr>
     {% endfor %}

@@ -10,7 +10,7 @@
         <td>{{ r.paidOn | shortDate }}</td>
         <td>{{ r.calc.basis | money }}</td>
         <td>{{ r.calc.team_total | money }}{% if r.calc.over_profit %} <span class="badge badge-danger">more than the profit</span>{% elif r.calc.margin_warning %} <span class="badge badge-warning">below minimum margin</span>{% endif %}</td>
-        <td>{% if r.calc.associate %}{{ r.calc.associate.amount_inr | money }}{% else %}—{% endif %}</td>
+        <td>{% if r.calc.associate %}{{ r.calc.associate.amount_inr | inr }}{% else %}—{% endif %}</td>
         <td>{% if canManagePricing %}<form method="post" action="/orders/{{ r.order.id }}/incentive/lock" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Lock</button></form>{% endif %}</td>
       </tr>
     {% endfor %}

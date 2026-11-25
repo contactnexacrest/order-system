@@ -1,4 +1,4 @@
-<?php $__m = static fn ($v): string => '₹' . number_format((float) $v, 2); ?>
+<?php $__m = static fn ($v): string => '₹' . \App\Helpers\MoneyFormat::indian((float) $v, 2); ?>
 <div class="card page-wide">
   <h1>Welcome, <?= htmlspecialchars((string) $me['name']) ?></h1>
   <?php if ($me['status'] !== 'active'): ?><div class="alert alert-warning">Your account is <?= htmlspecialchars(strtolower(\App\Repositories\AssociateRepository::STATUSES[$me['status']] ?? $me['status'])) ?>. <?= $me['status'] === 'invited' ? 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' : 'Contact your relationship manager.' ?></div><?php endif; ?>

@@ -116,7 +116,7 @@
         {% for q in quotes %}
           <tr>
             <td>{{ q.supplier_legal_name }}</td>
-            <td class="num">{{ q.unit_price_inr | money }}{% if q.unit %} <small class="muted">per {{ q.unit }}</small>{% endif %}</td>
+            <td class="num">{{ q.unit_price_inr | inr }}{% if q.unit %} <small class="muted">per {{ q.unit }}</small>{% endif %}</td>
             <td>{{ q.recorded_on }}</td>
             <td>{{ q.valid_until or '—' }}</td>
             <td>{{ q.quote_reference or '' }}</td>

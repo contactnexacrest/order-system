@@ -46,7 +46,7 @@
     <p class="muted">{{ tp.missing }}</p>
   {% else %}
     <table class="list">
-      <tr><td>{% if tp.exact %}Exact supplier price "{{ tp.exact }}"{% else %}Supplier price{% endif %} &#8377;{{ tp.supplier_inr | money }} ÷ {{ tp.settings.pricing_fx_rate | money }} + other costs {{ tryPrice.otherLabel }}</td><td class="num">USD {{ (b.supplier_usd + b.other_costs) | money }}</td></tr>
+      <tr><td>{% if tp.exact %}Exact supplier price "{{ tp.exact }}"{% else %}Supplier price{% endif %} &#8377;{{ tp.supplier_inr | inr }} ÷ {{ tp.settings.pricing_fx_rate | money }} + other costs {{ tryPrice.otherLabel }}</td><td class="num">USD {{ (b.supplier_usd + b.other_costs) | money }}</td></tr>
       <tr><td>{% if tryPrice.opts.length %}{{ tryPrice.opts | join(' · ') }}{% else %}Base options — no changes{% endif %}{% if tryPrice.charges.length %}<br><small class="muted">{{ tryPrice.charges | join('; ') }}</small>{% endif %}</td><td class="num">cost USD {{ b.cost | money }}{{ ' / CBM' if tryPrice.basis == 'cbm' else '' }}</td></tr>
       <tr><td>Minimum price ({{ tryPrice.marginLabel }} margin)</td><td class="num">USD {{ b.minimum | money }}</td></tr>
       <tr><td>Staff floor (+ team incentive)</td><td class="num">USD {{ b.staff_floor | money }}</td></tr>

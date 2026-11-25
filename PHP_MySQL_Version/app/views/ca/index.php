@@ -80,8 +80,8 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
     <p class="muted small">Every advance/balance/freight leg that has been marked cleared in the order pipeline: the actual INR amount credited, the forex gain/(loss) against the order's assumed exchange rate, and its FIRC/eBRC realization proof. Recorded from the order's own Payment Status section by whoever holds the "Add/edit INR actual" permission.</p>
     <div class="ca-summary" data-ca-summary>
       <div><strong><?= (int) $summary['legs'] ?></strong>legs cleared</div>
-      <div><strong>&#8377;<?= number_format($summary['inr_credited'], 2) ?></strong>INR credited</div>
-      <div><strong class="<?= $summary['forex_net'] < 0 ? 'loss' : 'gain' ?>"><?= $summary['forex_known'] ? '&#8377;' . number_format(abs($summary['forex_net']), 2) . ($summary['forex_net'] < 0 ? ' loss' : ' gain') : '—' ?></strong>forex, net</div>
+      <div><strong>&#8377;<?= \App\Helpers\MoneyFormat::indian($summary['inr_credited'], 2) ?></strong>INR credited</div>
+      <div><strong class="<?= $summary['forex_net'] < 0 ? 'loss' : 'gain' ?>"><?= $summary['forex_known'] ? '&#8377;' . \App\Helpers\MoneyFormat::indian(abs($summary['forex_net']), 2) . ($summary['forex_net'] < 0 ? ' loss' : ' gain') : '—' ?></strong>forex, net</div>
       <div><strong class="<?= $summary['firc_pending'] > 0 ? 'bad' : '' ?>"><?= (int) $summary['firc_pending'] ?></strong>FIRC / eBRC pending</div>
       <div><strong><?= (int) $summary['not_in_zoho'] ?></strong>not yet in Zoho</div>
     </div>
@@ -106,14 +106,14 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
           <td><?= htmlspecialchars((string) $s['cleared_at']) ?></td>
           <td>
             <?php if ($s['inr_actual'] !== null): ?>
-              &#8377;<?= number_format((float) $s['inr_actual'], 2) ?>
+              &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $s['inr_actual'], 2) ?>
               <div class="muted small">
                 <?php if ($s['inr_actual_recorded_at'] !== null): ?>
                   <?= htmlspecialchars((string) $s['inr_actual_recorded_at']) ?><?php if ($s['inr_actual_recorded_by'] !== null): ?> by <?= htmlspecialchars($usersById[$s['inr_actual_recorded_by']] ?? ('User #' . $s['inr_actual_recorded_by'])) ?><?php endif; ?>
                 <?php endif; ?>
               </div>
             <?php elseif (($s['inr_estimated'] ?? null) !== null): // D-244: INR not known yet — the amount at the recorded rate ?>
-              &#8377;<?= number_format((float) $s['inr_estimated'], 2) ?>
+              &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $s['inr_estimated'], 2) ?>
               <div class="muted small">estimated at recorded rate — INR credited not recorded yet</div>
             <?php else: ?>
               <span class="muted">Not yet recorded</span>
@@ -122,10 +122,10 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
           <td>
             <?php $bankCharges = $s['bank_charges_inr'] ?? null; // D-244: rupees the bank kept, booked as Bank Charges ?>
             <?php if ($s['forex_gain_loss'] !== null && ($bankCharges === null || abs($s['forex_gain_loss']) >= 0.005)): ?>
-              <span class="<?= $s['forex_gain_loss'] >= 0 ? '' : 'muted' ?>">&#8377;<?= number_format(abs($s['forex_gain_loss']), 2) ?> <?= $s['forex_gain_loss'] >= 0 ? 'gain' : 'loss' ?></span>
+              <span class="<?= $s['forex_gain_loss'] >= 0 ? '' : 'muted' ?>">&#8377;<?= \App\Helpers\MoneyFormat::indian(abs($s['forex_gain_loss']), 2) ?> <?= $s['forex_gain_loss'] >= 0 ? 'gain' : 'loss' ?></span>
             <?php endif; ?>
             <?php if ($bankCharges !== null): ?>
-              <div>&#8377;<?= number_format((float) $bankCharges, 2) ?> bank charges</div>
+              <div>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $bankCharges, 2) ?> bank charges</div>
             <?php elseif ($s['forex_gain_loss'] === null): ?>
               <span class="muted">—</span>
             <?php endif; ?>

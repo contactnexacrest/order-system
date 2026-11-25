@@ -53,7 +53,7 @@
             <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
             <td><?= htmlspecialchars($r['supplier_legal_name']) ?></td>
             <td>Advance</td>
-            <td><?= number_format((float) ($r['advance_amount_inr'] ?? 0), 2) ?></td>
+            <td><?= \App\Helpers\MoneyFormat::indian((float) ($r['advance_amount_inr'] ?? 0), 2) ?></td>
             <td><?= htmlspecialchars((string) $r['advance_paid_at']) ?></td>
           </tr>
         <?php endif; ?>
@@ -63,7 +63,7 @@
             <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
             <td><?= htmlspecialchars($r['supplier_legal_name']) ?></td>
             <td>Balance</td>
-            <td><?= number_format((float) ($r['balance_amount_inr'] ?? 0), 2) ?></td>
+            <td><?= \App\Helpers\MoneyFormat::indian((float) ($r['balance_amount_inr'] ?? 0), 2) ?></td>
             <td><?= htmlspecialchars((string) $r['balance_paid_at']) ?></td>
           </tr>
         <?php endif; ?>

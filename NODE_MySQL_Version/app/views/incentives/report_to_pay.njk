@@ -18,7 +18,7 @@
   </form>
   {% for key, g in groups %}
   <div class="section" id="to-pay-{{ key }}">
-    <h2>{{ g.label }} — &#8377;{{ g.totals.amount_inr | money }}</h2>
+    <h2>{{ g.label }} — &#8377;{{ g.totals.amount_inr | inr }}</h2>
     {% set rows = g.rows %}{% set totals = g.totals %}
     {% include "incentives/_report_table.njk" %}
   </div>

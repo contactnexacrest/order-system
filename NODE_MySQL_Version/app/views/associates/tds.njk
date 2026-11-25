@@ -27,10 +27,10 @@
         <td><a href="/associates/{{ r.associate_id }}">{{ r.name }}</a>{% if r.based_in != 'india' %} <small class="muted">(abroad, {{ r.country }})</small>{% endif %}</td>
         <td>{{ r.pan or '—' }}</td>
         <td>{{ r.buyer_inquiry_ref or r.order_reference }}</td>
-        <td>&#8377;{{ r.gross | money }}</td>
-        <td>&#8377;{{ (r.tds_inr or 0) | money }}</td>
+        <td>&#8377;{{ r.gross | inr }}</td>
+        <td>&#8377;{{ (r.tds_inr or 0) | inr }}</td>
         <td>{% if r.tds_section or r.rateLabel %}{{ r.tds_section or '' }}{% if r.rateLabel %}{% if r.tds_section %} · {% endif %}{{ r.rateLabel }}{% endif %}{% else %}—{% endif %}</td>
-        <td>&#8377;{{ r.paid_inr | money }}</td>
+        <td>&#8377;{{ r.paid_inr | inr }}</td>
         <td class="small">{{ r.tds_reason or '—' }}</td>
         <td>
           {% if (r.tds_inr or 0) <= 0 %}
@@ -52,5 +52,5 @@
     {% endfor %}
     {% if rows.length == 0 %}<tr><td colspan="12" class="muted">No associate commission paid in {{ fyLabel }}{% if quarter %} Q{{ quarter }}{% endif %}.</td></tr>{% endif %}
   </table>
-  <p><strong>Total:</strong> gross &#8377;{{ gross | money }} &middot; TDS &#8377;{{ tds | money }} &middot; net paid &#8377;{{ (gross - tds) | money }}</p>
+  <p><strong>Total:</strong> gross &#8377;{{ gross | inr }} &middot; TDS &#8377;{{ tds | inr }} &middot; net paid &#8377;{{ (gross - tds) | inr }}</p>
 </div>

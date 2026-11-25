@@ -31,7 +31,7 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
     <legend>Costs to FOB <small class="muted">(added to every supplier price of this product — the only place for CHA and transport)</small></legend>
     <div class="field-grid">
       <label>CHA + transport per container (₹)<input type="text" inputmode="decimal" name="cha_transport_per_container" data-max-decimals="2" data-max-value="9999999999.99" value="<?= View::e(($product['cha_transport_per_container'] ?? null) !== null ? (string) $product['cha_transport_per_container'] : '') ?>" placeholder="e.g. 80000.00">
-        <?php if ($__fit !== null): ?><small class="muted">÷ <?= View::e(\App\Services\ThicknessPrices::fmt(round((float) $__fit['fits_cbm'], 2))) ?> CBM per container<?= $__fit['per_cbm'] !== null ? ' = ₹' . number_format((float) $__fit['per_cbm'], 2) . ' per CBM' : '' ?><?= $__fit['by_weight'] ? ' (the weight limit is reached first)' : '' ?></small><?php endif; ?></label>
+        <?php if ($__fit !== null): ?><small class="muted">÷ <?= View::e(\App\Services\ThicknessPrices::fmt(round((float) $__fit['fits_cbm'], 2))) ?> CBM per container<?= $__fit['per_cbm'] !== null ? ' = ₹' . \App\Helpers\MoneyFormat::indian((float) $__fit['per_cbm'], 2) . ' per CBM' : '' ?><?= $__fit['by_weight'] ? ' (the weight limit is reached first)' : '' ?></small><?php endif; ?></label>
       <label>Packing + loading per unit (₹)<input type="text" inputmode="decimal" name="packing_loading_cost" data-max-decimals="2" data-max-value="9999999999.99" value="<?= View::e($__packV) ?>" placeholder="e.g. 1500.00">
         <small class="muted">Added only when a supplier price does NOT include packing and loading.</small></label>
     </div>

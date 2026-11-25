@@ -30,7 +30,7 @@ $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['incl
         placeholder="<?= $__chaFallback['source'] !== null ? View::e(ThicknessPrices::chaFallbackText($__chaRow, $product)) : 'e.g. 60000.00' ?>"></label>
     <div><span class="muted small">Container holds</span><br><b><?= View::e(ThicknessPrices::fmt((float) $rules['container_cbm'])) ?> CBM · max <?= View::e(ThicknessPrices::fmt((float) $rules['container_max_t'])) ?> t</b>
       <br><small class="muted"><?= $rules['own'] !== [] && in_array('container', $rules['own'], true) ? 'this product\'s own figures' : 'from the category; a product can override' ?></small></div>
-    <div><span class="muted small">Per unit</span><br><b data-cha-per-cbm><?= $__fit['per_cbm'] !== null ? '₹' . number_format($__fit['per_cbm'], 2) . ' / CBM' : '—' ?></b></div>
+    <div><span class="muted small">Per unit</span><br><b data-cha-per-cbm><?= $__fit['per_cbm'] !== null ? '₹' . \App\Helpers\MoneyFormat::indian($__fit['per_cbm'], 2) . ' / CBM' : '—' ?></b></div>
   </div>
   <?php if ($rules['t_per_cbm'] !== null): ?>
     <p class="small muted">Weight check: <?= View::e(ThicknessPrices::fmt((float) $rules['container_cbm'])) ?> CBM × <?= View::e(ThicknessPrices::fmt((float) $rules['t_per_cbm'])) ?> t = <?= View::e(ThicknessPrices::fmt(round((float) $__fit['weight_t'], 2))) ?> t
@@ -44,7 +44,7 @@ $__incl = !isset($__chaRow['includes_packing_loading']) || (int) $__chaRow['incl
           <td class="num" data-cha-m2><?= $__fit['per_cbm'] !== null ? number_format($__fit['per_cbm'] * $__r['mm'] / 1000, 2) : '—' ?></td>
           <td class="num" data-cha-sqft><?= $__fit['per_cbm'] !== null ? number_format($__fit['per_cbm'] * $__r['mm'] / 1000 / \App\Services\LineUnits::SQFT_PER_M2, 2) : '—' ?></td></tr>
       <?php endforeach; ?>
-      <tr><td><?= (int) $rules['cbm_from'] ?> mm+</td><td colspan="3"><span data-cha-cbm-line><?= $__fit['per_cbm'] !== null ? '₹' . number_format($__fit['per_cbm'], 2) . ' per CBM' : '—' ?></span></td></tr>
+      <tr><td><?= (int) $rules['cbm_from'] ?> mm+</td><td colspan="3"><span data-cha-cbm-line><?= $__fit['per_cbm'] !== null ? '₹' . \App\Helpers\MoneyFormat::indian($__fit['per_cbm'], 2) . ' per CBM' : '—' ?></span></td></tr>
     </table>
   <?php endif; ?>
   <p class="small muted"><?php if ($__chaFallback['source'] !== null): ?><?= View::e(ThicknessPrices::chaFallbackText($__chaRow, $product)) ?><?php else: ?>Empty = the supplier's figure (Edit Supplier), else the product's default (none set yet — set it on the supplier or the product)<?php endif; ?>. FOB cost = supplier price + CHA and transport per unit; the selling price is then worked out from it as usual.</p>

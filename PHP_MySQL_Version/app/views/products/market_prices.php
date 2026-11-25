@@ -125,7 +125,7 @@ $__unit = (string) ($product['reference_unit'] ?? '') ?: 'unit';
         <?php foreach ($quotes as $q): ?>
           <tr>
             <td><?= View::e($q['supplier_legal_name']) ?></td>
-            <td class="num"><?= number_format((float) $q['unit_price_inr'], 2) ?><?= !empty($q['unit']) ? ' <small class="muted">per ' . View::e($q['unit']) . '</small>' : '' ?></td>
+            <td class="num"><?= \App\Helpers\MoneyFormat::indian((float) $q['unit_price_inr'], 2) ?><?= !empty($q['unit']) ? ' <small class="muted">per ' . View::e($q['unit']) . '</small>' : '' ?></td>
             <td><?= View::e(substr((string) $q['recorded_at'], 0, 10)) ?></td>
             <td><?= View::e((string) ($q['valid_until'] ?? '—')) ?></td>
             <td><?= View::e((string) ($q['quote_reference'] ?? '')) ?></td>

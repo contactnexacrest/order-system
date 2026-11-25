@@ -49,7 +49,7 @@
   {% if afCard %}
     <fieldset class="thickness-base">
       <legend class="legend-sentence">Base for orders</legend>
-      <label class="inline"><input type="radio" name="base" value="keep" checked> keep {{ afCard.base_label }}{% if afCard.base_price !== null %} ₹{{ afCard.base_price | money }} / {{ afCard.base_unit }}{% else %} (no price yet){% endif %}</label>
+      <label class="inline"><input type="radio" name="base" value="keep" checked> keep {{ afCard.base_label }}{% if afCard.base_price !== null %} ₹{{ afCard.base_price | inr }} / {{ afCard.base_unit }}{% else %} (no price yet){% endif %}</label>
       <label class="inline"><input type="radio" name="base" value="this"> make this <span data-calc-from>…</span> price the base</label>
     </fieldset>
   {% endif %}

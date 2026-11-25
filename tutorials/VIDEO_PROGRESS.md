@@ -67,6 +67,12 @@ scripts are, so a new session can continue.
 Status values: `script` (written, not recorded) · `recorded` (MP4 made, not yet checked) ·
 `checked` (watched / frames reviewed, ready to send) · `sent` (sent to the owner).
 
+## Language rule (owner D-419, 25 Nov 2026)
+
+From 25 Nov 2026 every new or re-recorded video is made in **English only**. Hindi versions are made only when the owner asks for a specific video. Existing Hindi files stay; when one no longer matches the app it is listed as out of date, not re-recorded.
+
+**Waiting to be re-recorded (English only):** D-411 wording — F02, F03, C08, C09, C13, C15 (6 recordings; old/new sentences in the owner-approved list of 25 Nov 2026). The Hindi C08, C09, C13 and C15 are out of date on those sentences. Associate hiring video (D-417): script and storyboard first; recording stopped until the owner says go.
+
 ## Group C — Associates
 
 **Group C complete (6 Nov 2026):** C01–C06 recorded and checked, all recorded with the card fix.

@@ -40,7 +40,7 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
     foreach ($__s['receipts'] as $__r) {
         // Owner 2 Nov 2026: the reason a receipt differed, and any bank charges the banks deducted.
         $__why = match ($__r['difference_reason'] ?? null) {
-            'bank_charges' => ' <small class="muted">+ ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['bank_charges'])) . ' bank charges (' . ($__inr ? '&#8377;' . number_format((float) $__r['bank_charges_inr'], 2) . ', ' : '') . 'order cost)</small>',
+            'bank_charges' => ' <small class="muted">+ ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['bank_charges'])) . ' bank charges (' . ($__inr ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['bank_charges_inr'], 2) . ', ' : '') . 'order cost)</small>',
             'short' => ' <small class="muted">· buyer paid less</small>',
             'excess' => ' <small class="muted">· buyer paid more</small>',
             default => '',
@@ -51,17 +51,17 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
         }
         // Owner (2 Nov 2026): our own bank's fee on this credit, booked as an order cost with the receipt.
         if ($__inr && !empty($__r['own_bank_charges_inr'])) {
-            $__why .= ' <small class="muted">· our bank\'s charges &#8377;' . number_format((float) $__r['own_bank_charges_inr'], 2) . ' (order cost)</small>';
+            $__why .= ' <small class="muted">· our bank\'s charges &#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['own_bank_charges_inr'], 2) . ' (order cost)</small>';
         }
         // D-244 (4 Nov 2026): the rupees the bank credited, and why they differ from the bank's rate when they do.
         if (!$__inr) {
             // R9-N01: no rupees or rates without inr_actual_view.
         } elseif (($__r['rate_gap_choice'] ?? null) === 'bank_charges') {
-            $__why .= ' <small class="muted">· the bank kept &#8377;' . number_format((float) $__r['rate_gap_inr'], 2) . ' at its rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' (order cost "Bank Charges")</small>';
+            $__why .= ' <small class="muted">· the bank kept &#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['rate_gap_inr'], 2) . ' at its rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' (order cost "Bank Charges")</small>';
         } elseif (($__r['rate_gap_choice'] ?? null) === 'other') {
             $__why .= ' <small class="muted">· &#8377;' . number_format(abs((float) $__r['rate_gap_inr']), 2) . ' apart from the bank\'s rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' — ' . htmlspecialchars((string) $__r['rate_gap_reason']) . '</small>';
         }
-        $__inrCell = ($__r['inr_credited'] ?? null) !== null ? '&#8377;' . number_format((float) $__r['inr_credited'], 2) : '<span class="muted">not known yet</span>';
+        $__inrCell = ($__r['inr_credited'] ?? null) !== null ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['inr_credited'], 2) : '<span class="muted">not known yet</span>';
         echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td>'
             . ($__inr ? '<td>' . $__inrCell . '</td><td>' . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td>' : '')
             . '<td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
@@ -255,7 +255,7 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
     // D-244 (4 Nov 2026): the rupees the bank credited, when known, with the rate worked out from them.
     // R9-N01: the rupees and the rate only for inr_actual_view holders; others read just what was received.
     $text .= empty($canViewInrActual) ? '.' : ($inrActual !== null && $rate !== null
-        ? ' — &#8377;' . number_format((float) $inrActual, 2) . ' credited by the bank (exchange rate &#8377;' . number_format((float) $rate, 4) . ').'
+        ? ' — &#8377;' . \App\Helpers\MoneyFormat::indian((float) $inrActual, 2) . ' credited by the bank (exchange rate &#8377;' . number_format((float) $rate, 4) . ').'
         : ($rate !== null
         ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
         : ' — exchange rate not recorded yet (record it below).'));
@@ -296,7 +296,7 @@ $renderExchangeRateWidget = function (string $leg, string $label) use ($payment,
       <strong style="font-size:0.85em;"><?= htmlspecialchars($label) ?> Exchange Rate</strong><br>
       <?php // Owner decision (2026-10-26, t4): the rate is recorded with the remittance itself, so there is no separate "Record/Update Rate" box any more — only a collapsed, reasoned correction for a mistyped rate, for inr_actual_edit holders. ?>
       <?php if ($rate !== null): ?>
-        <span class="muted small">Received @ &#8377;<?= number_format((float) $rate, 4) ?> per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Worked out from the INR credited by the bank (D-244) — or, where the INR was not known yet, the rate typed with the remittance, used for an estimate until the INR actual is recorded.</span>
+        <span class="muted small">Received @ &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $rate, 4) ?> per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Worked out from the INR credited by the bank (D-244) — or, where the INR was not known yet, the rate typed with the remittance, used for an estimate until the INR actual is recorded.</span>
       <?php else: ?>
         <span class="muted small">No exchange rate on record for this older entry.</span>
       <?php endif; ?>
@@ -344,7 +344,7 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
       <div style="width:100%;">
         <strong><?= htmlspecialchars($label) ?> — INR Actual (CA/Accounting)</strong><br>
         <?php if ($amount !== null): ?>
-          <span>&#8377;<?= number_format((float) $amount, 2) ?> credited — recorded <?= htmlspecialchars((string) $recordedAt) ?><?= $recordedByName ? ' by ' . htmlspecialchars($recordedByName) : '' ?></span>
+          <span>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $amount, 2) ?> credited — recorded <?= htmlspecialchars((string) $recordedAt) ?><?= $recordedByName ? ' by ' . htmlspecialchars($recordedByName) : '' ?></span>
           <?php if (($lockMessage === null || $canOverrideFyLock) && $canDeleteInrActual): ?>
             <?php if ($lockMessage !== null): ?>
               <span class="muted small">(&#9888; override — logged)</span>
@@ -355,7 +355,7 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
             </form>
           <?php endif; ?>
           <?php if ($forexGainLoss !== null): ?>
-            <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= number_format(abs($forexGainLoss), 2) ?> vs. this leg's own recorded rate.</span>
+            <br><span class="muted small">Forex <?= $forexGainLoss >= 0 ? 'gain' : 'loss' ?>: &#8377;<?= \App\Helpers\MoneyFormat::indian(abs($forexGainLoss), 2) ?> vs. this leg's own recorded rate.</span>
           <?php endif; ?>
         <?php elseif ($lockMessage !== null && !$canOverrideFyLock): ?>
           <span class="muted">&#128274; <?= htmlspecialchars($lockMessage) ?></span>
@@ -728,26 +728,26 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         <?php if ($showPartner): ?><td><span class="badge <?= $__isAdvanceBill ? 'badge-advance' : 'badge-final' ?>"><?= $__isAdvanceBill ? 'Advance' : 'Final' ?></span></td><?php endif; ?>
         <td><span class="badge <?= $__isProforma ? 'badge-proforma' : 'badge-invoice' ?>"><?= $__isProforma ? 'Proforma' : 'Tax invoice' ?></span></td>
         <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <?php if (\App\Services\MoneyVisibility::canSeeFile((int) $b['bill_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php else: ?>bill<?php endif; ?><?php endif; ?>
-          <?php if ($__isProforma && $b['requested_amount_inr'] !== null): ?><br><small class="muted">Asks for &#8377;<?= $money($b['requested_amount_inr']) ?> now</small><?php endif; ?>
+          <?php if ($__isProforma && $b['requested_amount_inr'] !== null): ?><br><small class="muted">Asks for &#8377;<?= \App\Helpers\MoneyFormat::indian((float) ($b['requested_amount_inr']), 2) ?> now</small><?php endif; ?>
           <?php if ($b['replaces_bill_no'] !== null): ?><br><small class="muted">Replaces proforma <?= htmlspecialchars($b['replaces_bill_no']) ?></small><?php endif; ?>
           <?php if ($b['replaced_by'] !== null): ?><br><small class="muted">Replaced by tax invoice <?= htmlspecialchars($b['replaced_by']) ?></small><?php endif; ?>
           <?php if (!empty($b['gst_reverse_charge'])): ?><br><small class="muted">Reverse charge — we pay the 5% GST</small><?php endif; ?>
           <?php if (in_array((int) $b['id'], $carriedIds, true)): ?><br><small class="muted">Added in Step 7e — shown here until fully paid</small><?php endif; ?>
           <?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
-        <td style="text-align:right"><?= $money($b['taxable_inr']) ?></td>
-        <td style="text-align:right"><?= $money($b['gst_inr']) ?></td>
-        <td style="text-align:right"><?= $money($b['total_inr']) ?><?php if ($__isProforma): ?><br><small class="muted">not a cost<?= $b['replaced_by'] === null && $b['own_paid'] > 0 ? ' — what is paid counts until its tax invoice arrives' : '' ?></small><?php endif; ?></td>
+        <td style="text-align:right"><?= \App\Helpers\MoneyFormat::indian((float) ($b['taxable_inr']), 2) ?></td>
+        <td style="text-align:right"><?= \App\Helpers\MoneyFormat::indian((float) ($b['gst_inr']), 2) ?></td>
+        <td style="text-align:right"><?= \App\Helpers\MoneyFormat::indian((float) ($b['total_inr']), 2) ?><?php if ($__isProforma): ?><br><small class="muted">not a cost<?= $b['replaced_by'] === null && $b['own_paid'] > 0 ? ' — what is paid counts until its tax invoice arrives' : '' ?></small><?php endif; ?></td>
         <td class="vendor-bill-payments">
           <?php foreach ($b['carried_payments'] as $__p): ?>
-            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= $money($__p['amount_inr']) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted">advance, on proforma <?= htmlspecialchars((string) $b['replaces_bill_no']) ?></small></div>
+            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= \App\Helpers\MoneyFormat::indian((float) ($__p['amount_inr']), 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted">advance, on proforma <?= htmlspecialchars((string) $b['replaces_bill_no']) ?></small></div>
           <?php endforeach; ?>
           <?php foreach ($b['payments'] as $__p): ?>
-            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= $money($__p['amount_inr']) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $__p['payment_mode']) ?> · <?= htmlspecialchars((string) $__p['payment_ref']) ?></small></div>
+            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= \App\Helpers\MoneyFormat::indian((float) ($__p['amount_inr']), 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $__p['payment_mode']) ?> · <?= htmlspecialchars((string) $__p['payment_ref']) ?></small></div>
           <?php endforeach; ?>
           <?php if ($b['settled']): ?>
             <?php if ($b['replaced_by'] !== null): ?><small class="muted">Nothing due — replaced</small><?php elseif ($b['payments'] === [] && $b['carried_payments'] === []): ?><small class="muted">Nothing due</small><?php endif; ?>
           <?php else: ?>
-            <span class="vendor-bill-due"><?= $b['payments'] === [] && $b['carried_payments'] === [] ? 'Unpaid' : 'Due &#8377;' . $money($b['remaining']) ?></span>
+            <span class="vendor-bill-due"><?= $b['payments'] === [] && $b['carried_payments'] === [] ? 'Unpaid' : 'Due &#8377;' . \App\Helpers\MoneyFormat::indian((float) ($b['remaining']), 2) ?></span>
             <?php if ($canPay && $__rowBlocked === null): ?>
             <details class="vendor-bill-pay">
               <summary class="btn-sm"><?= $b['payments'] === [] ? 'Mark Paid' : '&#8377; Record another payment' ?></summary>
@@ -756,7 +756,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
                 <?= \App\Helpers\Csrf::field() ?>
                 <?php if ($leg !== null): ?><input type="hidden" name="leg" value="<?= htmlspecialchars($leg) ?>"><?php endif; ?>
                 <?php $__tpn = \App\Repositories\OrderVendorBillRepository::toPayNow($b); // Owner request (3 Nov 2026): read-only, system-calculated ?>
-                <p class="full to-pay-now"><strong>To pay now: &#8377;<?= number_format($__tpn['amount'], 2) ?></strong> <small class="muted">(<?= htmlspecialchars($__tpn['working']) ?>)</small></p>
+                <p class="full to-pay-now"><strong>To pay now: &#8377;<?= \App\Helpers\MoneyFormat::indian($__tpn['amount'], 2) ?></strong> <small class="muted">(<?= htmlspecialchars($__tpn['working']) ?>)</small></p>
                 <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" name="paid_amount_inr" value="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" required placeholder="e.g. 25000.00"></label>
                 <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
                 <label>Mode *
@@ -781,7 +781,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         </td>
       </tr>
       <?php endforeach; ?>
-      <tr><td colspan="<?= $showPartner ? 7 : 5 ?>"><strong>Total cost</strong> <small class="muted">(tax invoices; a proforma only for what is paid on it, until its tax invoice arrives)</small></td><td style="text-align:right"><strong><?= $money($cost) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= $money($paid) ?></span><br><?= $due > 0.004 ? '<span class="vendor-bill-due">Due &#8377;' . $money($due) . '</span>' : '<span class="vendor-bill-paid">Nothing due</span>' ?></td></tr>
+      <tr><td colspan="<?= $showPartner ? 7 : 5 ?>"><strong>Total cost</strong> <small class="muted">(tax invoices; a proforma only for what is paid on it, until its tax invoice arrives)</small></td><td style="text-align:right"><strong><?= $money($cost) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= \App\Helpers\MoneyFormat::indian((float) ($paid), 2) ?></span><br><?= $due > 0.004 ? '<span class="vendor-bill-due">Due &#8377;' . \App\Helpers\MoneyFormat::indian((float) ($due), 2) . '</span>' : '<span class="vendor-bill-paid">Nothing due</span>' ?></td></tr>
     </table>
     <?php if ($canPay && $payBlocked !== null): ?>
       <p class="review-banner warn">&#9888; <?= htmlspecialchars($payBlocked) ?> Bills can still be added now.</p>
@@ -834,7 +834,7 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
       <select name="replaces_bill_id">
         <option value="">None — this invoice replaces no proforma</option>
         <?php foreach ($replaceable as $__pf): ?>
-          <option value="<?= (int) $__pf['id'] ?>"<?= count($replaceable) === 1 ? ' selected' : '' ?>><?= htmlspecialchars(($__pf['partner_name'] ?? null) !== null ? $__pf['partner_name'] . ' — ' : '') ?><?= htmlspecialchars((string) $__pf['bill_no']) ?> — &#8377;<?= number_format($__pf['own_paid'], 2) ?> paid</option>
+          <option value="<?= (int) $__pf['id'] ?>"<?= count($replaceable) === 1 ? ' selected' : '' ?>><?= htmlspecialchars(($__pf['partner_name'] ?? null) !== null ? $__pf['partner_name'] . ' — ' : '') ?><?= htmlspecialchars((string) $__pf['bill_no']) ?> — &#8377;<?= \App\Helpers\MoneyFormat::indian($__pf['own_paid'], 2) ?> paid</option>
         <?php endforeach; ?>
       </select>
       <small class="muted">What was paid on the proforma counts towards this invoice; the proforma stops counting as a cost.</small>
@@ -869,7 +869,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $carried = $leg === 'balance' ? array_values(array_filter($poBills, static fn (array $b): bool => $b['bill_for'] === 'advance' && $b['doc_kind'] === 'invoice' && !$b['settled'])) : [];
     $legBills = array_merge($carried, $legBills);
     $replaceable = array_values(array_filter($poBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null));
-    $inr = static fn ($v): string => is_numeric($v) ? '&#8377;' . number_format((float) $v, 2) : '—';
+    $inr = static fn ($v): string => is_numeric($v) ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $v, 2) : '—';
     echo '<div class="plan-bar"><div>Supplier PO<b>' . htmlspecialchars((string) $supplierPo['supplier_po_reference']) . '</b></div>'
         . '<div>PO total<b>' . $inr($supplierPo['total_payable_inr'] ?? null) . '</b></div>'
         . '<div>' . $label . ' planned<b>' . $inr($planned) . '</b></div>'
@@ -887,7 +887,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $payBlocked = null;
     // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
     if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
-        $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.';
+        $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . \App\Helpers\MoneyFormat::indian((float) $supplierPo['advance_amount_inr'], 2) . '.';
     }
     // Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a).
     $noAdvance = $leg === 'advance' && !$paidAt && (float) ($planned ?? 0) <= 0;
@@ -932,7 +932,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
             'asked' => $__askLeft > 0.004 ? $__askLeft : null,
             'asked_hint' => 'Pre-filled with the advance still to ask for under Supplier PO ' . $__spoRef . ' — change it if the proforma asks for a different amount.',
         ];
-        $vendorBillFields($leg === 'advance' ? 'proforma' : 'invoice', $replaceable, $leg === 'advance' && (float) ($planned ?? 0) > 0 ? 'the planned advance is ₹' . number_format((float) $planned, 2) : null, $__prefill);
+        $vendorBillFields($leg === 'advance' ? 'proforma' : 'invoice', $replaceable, $leg === 'advance' && (float) ($planned ?? 0) > 0 ? 'the planned advance is ₹' . \App\Helpers\MoneyFormat::indian((float) $planned, 2) : null, $__prefill);
         ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
@@ -1738,13 +1738,13 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
         <?php foreach ($ledgerEvents as $ev): ?>
         <tr class="ledger-<?= htmlspecialchars($ev['direction']) ?>">
           <td><?= htmlspecialchars(substr((string) $ev['date'], 0, 10)) ?></td>
-          <td><?= htmlspecialchars($ev['event']) ?><?php if ($ledgerTotals !== null && $ev['rate'] !== null): ?><br><span class="muted small">at &#8377;<?= number_format((float) $ev['rate'], 4) ?> per <?= htmlspecialchars($ev['currency']) ?><?= $ev['inr_basis'] === 'actual' ? ' — INR actual recorded' : '' ?></span><?php endif; ?></td>
+          <td><?= htmlspecialchars($ev['event']) ?><?php if ($ledgerTotals !== null && $ev['rate'] !== null): ?><br><span class="muted small">at &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $ev['rate'], 4) ?> per <?= htmlspecialchars($ev['currency']) ?><?= $ev['inr_basis'] === 'actual' ? ' — INR actual recorded' : '' ?></span><?php endif; ?></td>
           <?php if ($__showAmounts): ?>
           <td><?= $ev['amount'] !== null ? number_format((float) $ev['amount'], 2) . ' ' . htmlspecialchars($ev['currency']) : '—' ?></td>
           <?php endif; ?>
           <?php if ($ledgerTotals !== null): ?>
-          <td><?= $ev['direction'] === 'in' && $ev['inr'] !== null ? number_format((float) $ev['inr'], 2) : ($ev['direction'] === 'in' ? '<span class="muted small">no rate</span>' : '') ?></td>
-          <td><?= $ev['direction'] === 'out' ? number_format((float) $ev['inr'], 2) : '' ?></td>
+          <td><?= $ev['direction'] === 'in' && $ev['inr'] !== null ? \App\Helpers\MoneyFormat::indian((float) $ev['inr'], 2) : ($ev['direction'] === 'in' ? '<span class="muted small">no rate</span>' : '') ?></td>
+          <td><?= $ev['direction'] === 'out' ? \App\Helpers\MoneyFormat::indian((float) $ev['inr'], 2) : '' ?></td>
           <?php endif; ?>
           <td><?= htmlspecialchars($ev['source']) ?></td>
         </tr>
@@ -1754,12 +1754,12 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
       <?php endif; ?>
       <?php if ($ledgerTotals !== null): ?>
       <div class="kv-grid ledger-totals">
-        <div><span class="k">Received from buyer</span><span class="v"><?= number_format($ledgerTotals['buyer_foreign'], 2) ?> <?= htmlspecialchars($order['currency_code'] ?? '') ?> = &#8377;<?= number_format($ledgerTotals['buyer_inr'], 2) ?></span></div>
-        <div><span class="k">Export benefits received</span><span class="v">&#8377;<?= number_format($ledgerTotals['benefits_inr'], 2) ?></span></div>
-        <div><span class="k">Paid to supplier</span><span class="v">&#8377;<?= number_format($ledgerTotals['supplier_inr'], 2) ?></span></div>
-        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;<?= number_format($ledgerTotals['logistics_inr'], 2) ?></span></div>
-        <div><span class="k">Expenses</span><span class="v">&#8377;<?= number_format($ledgerTotals['expenses_inr'], 2) ?></span></div>
-        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;<?= number_format($ledgerTotals['net_inr'], 2) ?></strong></span></div>
+        <div><span class="k">Received from buyer</span><span class="v"><?= number_format($ledgerTotals['buyer_foreign'], 2) ?> <?= htmlspecialchars($order['currency_code'] ?? '') ?> = &#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['buyer_inr'], 2) ?></span></div>
+        <div><span class="k">Export benefits received</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['benefits_inr'], 2) ?></span></div>
+        <div><span class="k">Paid to supplier</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['supplier_inr'], 2) ?></span></div>
+        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['logistics_inr'], 2) ?></span></div>
+        <div><span class="k">Expenses</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['expenses_inr'], 2) ?></span></div>
+        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['net_inr'], 2) ?></strong></span></div>
       </div>
       <p class="muted small">INR uses each remittance's INR actual when recorded, otherwise the exchange rate recorded with it<?= $ledgerTotals['buyer_without_rate'] > 0 ? ' — ' . (int) $ledgerTotals['buyer_without_rate'] . ' remittance(s) have no rate yet and are left out of the INR totals' : '' ?>. Shown only to staff with the Order Financials permission.</p>
       <?php endif; ?>
@@ -1783,15 +1783,15 @@ if (PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !==
         <?php if ($canViewPaymentAmounts || $ledgerTotals !== null): ?>
         <?php foreach (['advance' => 'Advance', 'freight' => 'Freight', 'balance' => 'Balance'] as $__leg => $__label): ?>
         <?php if ($payment[$__leg . '_exchange_rate'] !== null): ?>
-        <div><span class="k"><?= $__label ?> Exchange Rate</span><span class="v">&#8377;<?= number_format((float) $payment[$__leg . '_exchange_rate'], 4) ?> per <?= htmlspecialchars($order['currency_code'] ?? '') ?></span></div>
+        <div><span class="k"><?= $__label ?> Exchange Rate</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $payment[$__leg . '_exchange_rate'], 4) ?> per <?= htmlspecialchars($order['currency_code'] ?? '') ?></span></div>
         <?php endif; ?>
         <?php endforeach; ?>
         <?php endif; ?>
         <?php if ($ledgerTotals !== null): ?>
-        <div><span class="k">Supplier Advance Paid</span><span class="v"><?= !empty($supplierPo['advance_paid_at']) ? '&#8377;' . number_format((float) ($supplierPo['advance_paid_amount_inr'] ?? $supplierPo['advance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['advance_paid_at']) : '—' ?></span></div>
-        <div><span class="k">Supplier Balance Paid</span><span class="v"><?= !empty($supplierPo['balance_paid_at']) ? '&#8377;' . number_format((float) ($supplierPo['balance_paid_amount_inr'] ?? $supplierPo['balance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['balance_paid_at']) : '—' ?></span></div>
-        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;<?= number_format($ledgerTotals['expenses_inr'], 2) ?></span></div>
-        <div><span class="k">Net So Far</span><span class="v">&#8377;<?= number_format($ledgerTotals['net_inr'], 2) ?></span></div>
+        <div><span class="k">Supplier Advance Paid</span><span class="v"><?= !empty($supplierPo['advance_paid_at']) ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) ($supplierPo['advance_paid_amount_inr'] ?? $supplierPo['advance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['advance_paid_at']) : '—' ?></span></div>
+        <div><span class="k">Supplier Balance Paid</span><span class="v"><?= !empty($supplierPo['balance_paid_at']) ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) ($supplierPo['balance_paid_amount_inr'] ?? $supplierPo['balance_amount_inr'] ?? 0), 2) . ' on ' . htmlspecialchars((string) $supplierPo['balance_paid_at']) : '—' ?></span></div>
+        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['expenses_inr'], 2) ?></span></div>
+        <div><span class="k">Net So Far</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($ledgerTotals['net_inr'], 2) ?></span></div>
         <?php endif; ?>
       </div>
       <?php endif; ?>
@@ -2996,9 +2996,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <tr class="<?= $__so['offered'] ? '' : 'not-offered' ?>">
                 <td><?= htmlspecialchars($__so['supplier']) ?><?= $__so['offered'] ? '' : ' (' . htmlspecialchars((string) $__so['why_not']) . ')' ?></td>
                 <?php if ($__so['offered']): ?>
-                  <td class="<?= $__so['lowest'] ? 'lowest' : '' ?>">₹<?= number_format((float) $__so['price'], 2) ?> <?= htmlspecialchars($__so['label']) ?><?= $__so['lowest'] ? ' (lowest)' : '' ?></td>
+                  <td class="<?= $__so['lowest'] ? 'lowest' : '' ?>">₹<?= \App\Helpers\MoneyFormat::indian((float) $__so['price'], 2) ?> <?= htmlspecialchars($__so['label']) ?><?= $__so['lowest'] ? ' (lowest)' : '' ?></td>
                   <td><?= htmlspecialchars((string) ($__so['valid_until'] ?? '—')) ?><?= $__so['expired'] ? ' <span class="spo-expired">expired — confirm price</span>' : '' ?></td>
-                  <td><?= $__so['po_value'] !== null ? '₹' . number_format((float) $__so['po_value'], 2) : '<span class="muted small">units differ</span>' ?></td>
+                  <td><?= $__so['po_value'] !== null ? '₹' . \App\Helpers\MoneyFormat::indian((float) $__so['po_value'], 2) : '<span class="muted small">units differ</span>' ?></td>
                   <td><input type="radio" name="spo_offer_pick" value="<?= (int) $__so['offer_id'] ?>" data-spo-offer data-supplier-id="<?= (int) $__so['supplier_id'] ?>" data-supplier-name="<?= htmlspecialchars($__so['supplier']) ?>"
                       data-price="<?= htmlspecialchars(number_format((float) $__so['price'], 2, '.', '')) ?>" data-quantity="<?= $__spl['quantity'] !== null ? htmlspecialchars(rtrim(rtrim(number_format($__spl['quantity'], 3, '.', ''), '0'), '.')) : '' ?>"
                       data-unit="<?= htmlspecialchars($__spl['unit']) ?>" data-product="<?= htmlspecialchars($__spl['product']) ?>" aria-label="Choose <?= htmlspecialchars($__so['supplier']) ?>"></td>
@@ -4088,19 +4088,19 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     </form><?php endif; ?>
 
     <div class="fin-kpis">
-      <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['revenue_inr'], 2) : '—' ?></span></div>
-      <div class="fin-kpi"><span class="l">Total costs</span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['total_cost_inr'], 2) : '—' ?></span></div>
-      <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;<?= number_format($__receivedBenefits, 2) ?><?php if ($__claimedBenefits > $__receivedBenefits): ?> <small class="muted">of &#8377;<?= number_format($__claimedBenefits, 2) ?> claimed</small><?php endif; ?></span></div>
+      <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . \App\Helpers\MoneyFormat::indian($profitability['revenue_inr'], 2) : '—' ?></span></div>
+      <div class="fin-kpi"><span class="l">Total costs</span><span class="v"><?= $profitability ? '&#8377;' . \App\Helpers\MoneyFormat::indian($profitability['total_cost_inr'], 2) : '—' ?></span></div>
+      <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($__receivedBenefits, 2) ?><?php if ($__claimedBenefits > $__receivedBenefits): ?> <small class="muted">of &#8377;<?= \App\Helpers\MoneyFormat::indian($__claimedBenefits, 2) ?> claimed</small><?php endif; ?></span></div>
       <?php $__seeInc = \App\Services\OrderProfitabilityService::viewerSeesIncentives(); ?>
       <?php if ($__seeInc): ?>
-      <div class="fin-kpi good"><span class="l">Net profit<?= $profitability && !$profitability['incentives_locked'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['profit_after_incentive_inr'], 2) . ($profitability['margin_after_pct'] !== null ? ' · ' . number_format($profitability['margin_after_pct'], 1) . '%' : '') : '—' ?></span></div>
+      <div class="fin-kpi good"><span class="l">Net profit<?= $profitability && !$profitability['incentives_locked'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . \App\Helpers\MoneyFormat::indian($profitability['profit_after_incentive_inr'], 2) . ($profitability['margin_after_pct'] !== null ? ' · ' . number_format($profitability['margin_after_pct'], 1) . '%' : '') : '—' ?></span></div>
       <?php else: ?>
-      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['profit_before_commission_inr'], 2) : '—' ?></span></div>
+      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v"><?= $profitability ? '&#8377;' . \App\Helpers\MoneyFormat::indian($profitability['profit_before_commission_inr'], 2) : '—' ?></span></div>
       <?php endif; ?>
     </div>
 
     <details class="step-card" id="financials-12a"<?= $__finOpen('12a') ?>>
-      <summary><?= $stepStatusIcon($__finIcon('12a')) ?><h2>Step 12a &middot; Order Costs</h2><span class="fin-sub-summary"><?= count($orderCostEntries) ?> cost<?= count($orderCostEntries) === 1 ? '' : 's' ?> · &#8377;<?= number_format($__costTotal, 2) ?></span></summary>
+      <summary><?= $stepStatusIcon($__finIcon('12a')) ?><h2>Step 12a &middot; Order Costs</h2><span class="fin-sub-summary"><?= count($orderCostEntries) ?> cost<?= count($orderCostEntries) === 1 ? '' : 's' ?> · &#8377;<?= \App\Helpers\MoneyFormat::indian($__costTotal, 2) ?></span></summary>
       <p class="muted small">Every cost this order carried besides the supplier, freight and insurance (those come in automatically). All amounts in INR.</p>
         <?php if (empty($orderCostEntries)): ?>
           <p class="muted">No other costs recorded for this order yet.</p>
@@ -4113,7 +4113,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
               <td><?= htmlspecialchars($c['description'] ?? '—') ?>
                 <?php if (isset(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']])): ?><br><small class="muted"><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']]) ?></small><?php elseif (!empty($c['zoho_expense_id'])): ?><br><small class="muted">In Zoho Books</small><?php endif; ?></td>
-              <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
+              <td><?= \App\Helpers\MoneyFormat::indian((float) $c['amount_inr'], 2) ?></td>
               <td><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$c['paid_from'] ?? ''] ?? '—') ?><?php if (($__ref = \App\Services\ZohoBooksService::moneyBankRef((string) ($c['paid_from'] ?? ''), $c['bank_reference'] ?? null)) !== null): // QA ZOH-005 (rule D-212) ?><br><small class="muted"><?= htmlspecialchars($__ref) ?></small><?php endif; ?></td>
               <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
               <td>
@@ -4140,17 +4140,17 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <div class="order-expenses" id="order-expenses">
         <h3 style="font-size:0.95em; margin-top:10px;">Order Expenses — travel &amp; other</h3>
         <div class="plan-bar">
-          <div>Travel budget<?= $orderTravelExpenses ? ' (' . number_format((float) $orderTravelExpenses['expense_pct'], 2) . '% of FOB)' : '' ?><b><?= $__travelBudget !== null ? '&#8377;' . number_format($__travelBudget, 2) : '—' ?></b></div>
-          <div>Actual travel<b>&#8377;<?= number_format($expenseSummary['travel'], 2) ?></b></div>
-          <div>All expenses<b>&#8377;<?= number_format($expenseSummary['total'], 2) ?></b></div>
+          <div>Travel budget<?= $orderTravelExpenses ? ' (' . number_format((float) $orderTravelExpenses['expense_pct'], 2) . '% of FOB)' : '' ?><b><?= $__travelBudget !== null ? '&#8377;' . \App\Helpers\MoneyFormat::indian($__travelBudget, 2) : '—' ?></b></div>
+          <div>Actual travel<b>&#8377;<?= \App\Helpers\MoneyFormat::indian($expenseSummary['travel'], 2) ?></b></div>
+          <div>All expenses<b>&#8377;<?= \App\Helpers\MoneyFormat::indian($expenseSummary['total'], 2) ?></b></div>
           <div>Receipts attached<b><?= (int) $expenseSummary['with_receipt'] ?> of <?= (int) $expenseSummary['count'] ?></b></div>
-          <?php if ($expenseSummary['to_reimburse'] > 0): ?><div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;<?= number_format($expenseSummary['to_reimburse'], 2) ?></b></div><?php endif; ?>
+          <?php if ($expenseSummary['to_reimburse'] > 0): ?><div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;<?= \App\Helpers\MoneyFormat::indian($expenseSummary['to_reimburse'], 2) ?></b></div><?php endif; ?>
         </div>
         <p class="muted small"><?= $expenseSummary['has_travel']
             ? 'Travel cost now uses the actual travel expenses below; the travel % stays only as the budget to compare against.'
             : 'Until real travel expenses are recorded, travel cost uses the travel % of FOB (provisional).' ?>
           A voucher can be added later with its real date — unless the CA has locked that financial year.
-          <?php if ($__logisticsTotal > 0): ?>Logistics partner bills (&#8377;<?= number_format($__logisticsTotal, 2) ?>) come in automatically from <a href="#logistics-bills">Group C</a>.<?php endif; ?></p>
+          <?php if ($__logisticsTotal > 0): ?>Logistics partner bills (&#8377;<?= \App\Helpers\MoneyFormat::indian($__logisticsTotal, 2) ?>) come in automatically from <a href="#logistics-bills">Group C</a>.<?php endif; ?></p>
         <?php if ($orderExpenses !== []): ?>
         <table class="list">
           <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
@@ -4159,7 +4159,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $e['expense_date'])) ?><?php if (!empty($e['added_later'])): ?><br><small class="muted">added later (entered <?= htmlspecialchars(\App\Helpers\Dates::short((string) $e['created_at'])) ?>)</small><?php endif; ?></td>
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::CATEGORIES[$e['category']] ?? (string) $e['category']) ?></td>
             <td><?= htmlspecialchars((string) $e['details']) ?></td>
-            <td style="text-align:right"><?= number_format((float) $e['amount_inr'], 2) ?></td>
+            <td style="text-align:right"><?= \App\Helpers\MoneyFormat::indian((float) $e['amount_inr'], 2) ?></td>
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?><?php if (($__ref = \App\Services\ZohoBooksService::moneyBankRef((string) $e['paid_by'], $e['bank_reference'] ?? null)) !== null): // QA ZOH-005 (rule D-212) ?><br><small class="muted"><?= htmlspecialchars($__ref) ?></small><?php endif; ?></td>
             <td><?php if (!empty($e['receipt_file_id'])): ?><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $e['receipt_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?>receipt<?php endif; ?><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
             <td>
@@ -4351,7 +4351,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <h3 style="font-size:0.95em; margin-top:12px;">LC Payment Received</h3>
       <?php $__cur = (string) ($order['currency_code'] ?? 'INR'); ?>
       <?php if (!empty($orderLcDetails['lc_received_at'])): ?>
-        <p>Paid by the bank on <strong><?= htmlspecialchars(\App\Helpers\Dates::short((string) $orderLcDetails['lc_received_at'])) ?></strong>: <?= htmlspecialchars($__cur) ?> <?= number_format((float) $orderLcDetails['lc_received_amount'], 2) ?> &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_inr_credited'], 2) ?> credited &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_bank_charges_inr'], 2) ?> bank charges<?= !empty($orderLcDetails['lc_zoho_synced_at']) ? ' &middot; <span class="muted">in Zoho Books</span>' : '' ?></p>
+        <p>Paid by the bank on <strong><?= htmlspecialchars(\App\Helpers\Dates::short((string) $orderLcDetails['lc_received_at'])) ?></strong>: <?= htmlspecialchars($__cur) ?> <?= number_format((float) $orderLcDetails['lc_received_amount'], 2) ?> &middot; &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $orderLcDetails['lc_inr_credited'], 2) ?> credited &middot; &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $orderLcDetails['lc_bank_charges_inr'], 2) ?> bank charges<?= !empty($orderLcDetails['lc_zoho_synced_at']) ? ' &middot; <span class="muted">in Zoho Books</span>' : '' ?></p>
       <?php else: ?>
         <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books at the next sync (hourly, or Sync now) as the buyer's payment against the Commercial Invoice.</p>
       <?php endif; ?>
@@ -4434,27 +4434,27 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"<?= $__finOpen('12c') ?>>
-      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?php if ($profitability): ?><?= \App\Services\OrderProfitabilityService::viewerSeesIncentives() ? 'Net profit &#8377;' . number_format($profitability['profit_after_incentive_inr'], 2) . ($profitability['incentives_locked'] ? '' : ' (estimated)') : 'Profit before incentives &#8377;' . number_format($profitability['profit_before_commission_inr'], 2) ?><?php endif; ?></span></summary>
+      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?php if ($profitability): ?><?= \App\Services\OrderProfitabilityService::viewerSeesIncentives() ? 'Net profit &#8377;' . \App\Helpers\MoneyFormat::indian($profitability['profit_after_incentive_inr'], 2) . ($profitability['incentives_locked'] ? '' : ' (estimated)') : 'Profit before incentives &#8377;' . \App\Helpers\MoneyFormat::indian($profitability['profit_before_commission_inr'], 2) ?><?php endif; ?></span></summary>
         <?php if ($profitability): ?>
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
-            <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= number_format($profitability['revenue_inr'], 2) ?></span></div>
-            <div><span class="k">Govt. Export Benefits (INR)<?= $profitability['export_benefits_is_estimated'] ? ' — claimed, not yet received' : '' ?></span><span class="v"><?= number_format($profitability['export_benefits_inr'], 2) ?></span></div>
-            <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= number_format($profitability['supplier_cost_inr'], 2) ?></span></div>
-            <div><span class="k">Ocean Freight (INR)<?= $profitability['freight_from_bills'] ? ' — from the forwarder\'s bills' : '' ?></span><span class="v"><?= number_format($profitability['freight_cost_inr'], 2) ?><?php if (!empty($profitability['freight_conversion_text'])): ?><br><small class="muted">Step 9a rate: <?= htmlspecialchars($profitability['freight_conversion_text']) ?></small><?php endif; ?></span></div>
-            <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?><?php if (!empty($profitability['insurance_conversion_text'])): ?><br><small class="muted">Step 9a: <?= htmlspecialchars($profitability['insurance_conversion_text']) ?></small><?php endif; ?></span></div>
-            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v"><?= number_format($profitability['logistics_cost_inr'], 2) ?></span></div>
-            <div><span class="k">Order Expenses (INR)</span><span class="v"><?= number_format($profitability['expenses_inr'], 2) ?></span></div>
-            <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v"><?= number_format($profitability['zoho_expenses_inr'], 2) ?></span></div>
-            <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_excl_incentives_inr'], 2) ?></span></div>
+            <div><span class="k">Revenue (INR)<?= $profitability['revenue_is_estimated'] ? ' — estimated' : '' ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['revenue_inr'], 2) ?></span></div>
+            <div><span class="k">Govt. Export Benefits (INR)<?= $profitability['export_benefits_is_estimated'] ? ' — claimed, not yet received' : '' ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['export_benefits_inr'], 2) ?></span></div>
+            <div><span class="k">Supplier Cost (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['supplier_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Ocean Freight (INR)<?= $profitability['freight_from_bills'] ? ' — from the forwarder\'s bills' : '' ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['freight_cost_inr'], 2) ?><?php if (!empty($profitability['freight_conversion_text'])): ?><br><small class="muted">Step 9a rate: <?= htmlspecialchars($profitability['freight_conversion_text']) ?></small><?php endif; ?></span></div>
+            <div><span class="k">Insurance (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['insurance_cost_inr'], 2) ?><?php if (!empty($profitability['insurance_conversion_text'])): ?><br><small class="muted">Step 9a: <?= htmlspecialchars($profitability['insurance_conversion_text']) ?></small><?php endif; ?></span></div>
+            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['logistics_cost_inr'], 2) ?></span></div>
+            <div><span class="k">Order Expenses (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['expenses_inr'], 2) ?></span></div>
+            <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['zoho_expenses_inr'], 2) ?></span></div>
+            <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['other_costs_excl_incentives_inr'], 2) ?></span></div>
             <?php // Owner decision D-245 P5: commission and incentive shown apart, estimated until the MD locks the order (the locked figure then replaces the estimate). ?>
             <?php $__st = static fn (?string $s): string => \App\Services\OrderProfitabilityService::stateLabel($s); ?>
-            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v"><?= number_format($profitability['cost_before_incentives_inr'], 2) ?></span></div>
-            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v"><?= number_format($profitability['profit_before_commission_inr'], 2) ?></span></div>
+            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['cost_before_incentives_inr'], 2) ?></span></div>
+            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['profit_before_commission_inr'], 2) ?></span></div>
             <?php if (\App\Services\OrderProfitabilityService::viewerSeesIncentives()): ?>
-            <div><span class="k">Associate Commission (INR)<?= $profitability['commission_state'] !== null ? ' — ' . $__st($profitability['commission_state']) : '' ?></span><span class="v"><?= $profitability['commission_state'] !== null ? number_format($profitability['commission_inr'], 2) : '— (no associate)' ?></span></div>
-            <div><span class="k">Team Incentive (INR) — <?= $__st($profitability['incentive_state']) ?></span><span class="v"><?= number_format($profitability['incentive_inr'], 2) ?></span></div>
-            <div><span class="k">Order Profit after Commission &amp; Incentive (INR)<?= $profitability['incentives_locked'] ? '' : ' — estimated' ?></span><span class="v"><?= number_format($profitability['profit_after_incentive_inr'], 2) ?></span></div>
+            <div><span class="k">Associate Commission (INR)<?= $profitability['commission_state'] !== null ? ' — ' . $__st($profitability['commission_state']) : '' ?></span><span class="v"><?= $profitability['commission_state'] !== null ? \App\Helpers\MoneyFormat::indian($profitability['commission_inr'], 2) : '— (no associate)' ?></span></div>
+            <div><span class="k">Team Incentive (INR) — <?= $__st($profitability['incentive_state']) ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['incentive_inr'], 2) ?></span></div>
+            <div><span class="k">Order Profit after Commission &amp; Incentive (INR)<?= $profitability['incentives_locked'] ? '' : ' — estimated' ?></span><span class="v"><?= \App\Helpers\MoneyFormat::indian($profitability['profit_after_incentive_inr'], 2) ?></span></div>
             <div><span class="k">Order Margin % (after)</span><span class="v"><?= $profitability['margin_after_pct'] !== null ? number_format($profitability['margin_after_pct'], 2) . '%' : '—' ?></span></div>
             <?php else: ?>
             <div style="grid-column:1 / -1"><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives — the profit above is before them.</span></div>
@@ -4462,7 +4462,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php // Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. ?>
             <?php if (!empty($orderPurchaseGst) && $orderPurchaseGst['total'] > 0): ?>
             <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v"><?= number_format($orderPurchaseGst['total'], 2) ?></span>
-              <small class="muted" style="display:block">Supplier &#8377;<?= number_format($orderPurchaseGst['supplier'], 2) ?> · logistics &#8377;<?= number_format($orderPurchaseGst['logistics'], 2) ?>. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
+              <small class="muted" style="display:block">Supplier &#8377;<?= \App\Helpers\MoneyFormat::indian($orderPurchaseGst['supplier'], 2) ?> · logistics &#8377;<?= \App\Helpers\MoneyFormat::indian($orderPurchaseGst['logistics'], 2) ?>. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
             <?php endif; ?>
           </div>
           <?php if (!empty($profitability['actual_money_only'])): // D-413 ?>
@@ -4802,7 +4802,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
         <?php foreach ($orderBenefitClaims as $b): ?>
           <div class="card-nested fin-correct-claim">
-            <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= number_format((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
+            <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/correct" class="field-grid">
               <?= Csrf::field() ?>
               <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>" placeholder="e.g. 25000.00"></label>
@@ -4928,7 +4928,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         $__unpaidBills = array_values(array_filter($vendorBills, static fn (array $b): bool => !$b['settled']));
       ?>
       <?php if ($__unpaidBills !== []): ?>
-        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; <?= count($__unpaidBills) ?> vendor bill<?= count($__unpaidBills) === 1 ? '' : 's' ?> still unpaid: &#8377;<?= number_format(array_sum(array_map(static fn (array $b): float => $b['remaining'], $__unpaidBills)), 2) ?> due
+        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; <?= count($__unpaidBills) ?> vendor bill<?= count($__unpaidBills) === 1 ? '' : 's' ?> still unpaid: &#8377;<?= \App\Helpers\MoneyFormat::indian(array_sum(array_map(static fn (array $b): float => $b['remaining'], $__unpaidBills)), 2) ?> due
           (<?= htmlspecialchars(implode(', ', array_map(static fn (array $b): string => ($b['vendor_kind'] === 'supplier' ? 'Supplier' : (string) ($b['partner_name'] ?? 'Logistics')) . ' ' . $b['bill_no'], $__unpaidBills))) ?>) — you can still mark the order fully settled.</p>
       <?php endif; ?>
       <?php if ($canEditLockedData): ?>

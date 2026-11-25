@@ -5,10 +5,10 @@
   <p class="muted">NexaCrest exports under LUT and sells nothing in India, so the GST paid on purchases comes back as a refund, claimed for a whole period (form RFD-01), not order by order. Each order's cost keeps its GST (it left the bank). Record each claim here, then what the bank actually credited. A credit goes to Zoho Books at the next sync (hourly, or Sync Now) as a journal: the bank account received, <em>GST Refund Receivable</em> reduced.</p>
 
   <div class="kv-grid">
-    <div><span class="k">Claimed</span><span class="v">&#8377;<?= number_format($totals['claimed'], 2) ?></span></div>
-    <div><span class="k">Credited to the bank</span><span class="v">&#8377;<?= number_format($totals['credited'], 2) ?></span></div>
-    <div><span class="k">Refused</span><span class="v">&#8377;<?= number_format($totals['refused'], 2) ?></span></div>
-    <div><span class="k">Still to come back</span><span class="v">&#8377;<?= number_format($totals['outstanding'], 2) ?></span></div>
+    <div><span class="k">Claimed</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($totals['claimed'], 2) ?></span></div>
+    <div><span class="k">Credited to the bank</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($totals['credited'], 2) ?></span></div>
+    <div><span class="k">Refused</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($totals['refused'], 2) ?></span></div>
+    <div><span class="k">Still to come back</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($totals['outstanding'], 2) ?></span></div>
   </div>
 
   <div class="section">
@@ -23,18 +23,18 @@
         <td><?= htmlspecialchars($c['period_label']) ?></td>
         <td><?= htmlspecialchars((string) $c['claim_arn']) ?></td>
         <td><?= htmlspecialchars(\App\Helpers\Dates::short((string) $c['filed_on'])) ?></td>
-        <td>&#8377;<?= number_format((float) $c['gst_on_bills'], 2) ?></td>
-        <td>&#8377;<?= number_format((float) $c['amount_claimed'], 2) ?></td>
-        <td>&#8377;<?= number_format((float) $c['amount_credited'], 2) ?>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $c['gst_on_bills'], 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $c['amount_claimed'], 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $c['amount_credited'], 2) ?>
           <?php foreach ($c['credit_rows'] as $r): ?>
-            <br><small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $r['credited_on'])) ?> · <?= htmlspecialchars($parts[$r['part']] ?? $r['part']) ?> · &#8377;<?= number_format((float) $r['amount'], 2) ?> · bank ref <?= htmlspecialchars((string) $r['bank_reference']) ?> · <?= $r['zoho_journal_id'] ? 'in Zoho Books (journal ' . htmlspecialchars((string) $r['zoho_journal_id']) . ')' : 'goes to Zoho Books at the next sync' ?></small>
+            <br><small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $r['credited_on'])) ?> · <?= htmlspecialchars($parts[$r['part']] ?? $r['part']) ?> · &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $r['amount'], 2) ?> · bank ref <?= htmlspecialchars((string) $r['bank_reference']) ?> · <?= $r['zoho_journal_id'] ? 'in Zoho Books (journal ' . htmlspecialchars((string) $r['zoho_journal_id']) . ')' : 'goes to Zoho Books at the next sync' ?></small>
             <?php if (!$r['zoho_journal_id'] && $__canEdit): ?>
               <form method="post" action="/ca/gst-refunds/credits/<?= (int) $r['id'] ?>/delete" style="display:inline" data-confirm="Remove this refund credit? Record it again with the right figures."><?= \App\Helpers\Csrf::field() ?><button type="submit" class="btn-link small">Remove</button></form>
             <?php endif; ?>
           <?php endforeach; ?>
         </td>
-        <td><?= (float) $c['amount_refused'] > 0 ? '&#8377;' . number_format((float) $c['amount_refused'], 2) . '<br><small class="muted">' . htmlspecialchars((string) $c['refused_note']) . '</small>' : '—' ?></td>
-        <td><?php if ($c['outstanding'] > 0): ?><span class="badge badge-warning"><?= (float) $c['amount_credited'] > 0 ? 'Balance pending' : 'Claimed' ?></span><br><small class="muted">&#8377;<?= number_format($c['outstanding'], 2) ?> to come</small><?php else: ?><span class="badge badge-success">Closed</span><?php endif; ?></td>
+        <td><?= (float) $c['amount_refused'] > 0 ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $c['amount_refused'], 2) . '<br><small class="muted">' . htmlspecialchars((string) $c['refused_note']) . '</small>' : '—' ?></td>
+        <td><?php if ($c['outstanding'] > 0): ?><span class="badge badge-warning"><?= (float) $c['amount_credited'] > 0 ? 'Balance pending' : 'Claimed' ?></span><br><small class="muted">&#8377;<?= \App\Helpers\MoneyFormat::indian($c['outstanding'], 2) ?> to come</small><?php else: ?><span class="badge badge-success">Closed</span><?php endif; ?></td>
       </tr>
       <?php if ($__canEdit && $c['outstanding'] > 0): ?>
       <tr>

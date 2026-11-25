@@ -21,7 +21,7 @@
     </div>
   </form>
   {% if name %}
-  <div class="section"><h2>{{ name }} — &#8377;{{ totals.amount_inr | money }}</h2>{% include "incentives/_report_table.njk" %}</div>
+  <div class="section"><h2>{{ name }} — &#8377;{{ totals.amount_inr | inr }}</h2>{% include "incentives/_report_table.njk" %}</div>
   {% else %}
   <p class="muted">Choose a staff member or an associate.</p>
   {% endif %}

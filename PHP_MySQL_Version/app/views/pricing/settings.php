@@ -44,7 +44,7 @@ $__ro = $canManage ? '' : ' disabled';
         <div class="fx-now-rate">₹<?= number_format((float) $fx['rate'], 2) ?> per USD <span class="fx-now-badge"><?= View::e($fx['badge']) ?></span></div>
         <?php if ($fx['state'] === 'auto'): ?>
           <div class="fx-now-facts">
-            <div><span>Market rate</span><b>₹<?= number_format((float) $fx['market'], 2) ?></b></div>
+            <div><span>Market rate</span><b>₹<?= \App\Helpers\MoneyFormat::indian((float) $fx['market'], 2) ?></b></div>
             <div><span>Fetched</span><b><?= View::e((string) $fx['fetched']) ?></b></div>
             <div><span>Source</span><b><?= View::e((string) $fx['source']) ?></b></div>
             <div><span>Cushion</span><b><?= View::e((string) $fx['cushion_line']) ?></b></div>
@@ -58,7 +58,7 @@ $__ro = $canManage ? '' : ' disabled';
         <p class="fx-now-note">Prices on Quotations and Proforma Invoices already issued never change.</p>
         <?php if ($fx['waiting'] !== null): $__w = $fx['waiting']; ?>
           <div class="fx-now-waiting">
-            <p><b>Waiting for the MD:</b> today's market rate ₹<?= number_format((float) $__w['market_rate'], 4) ?> (<?= View::e((string) $__w['source']) ?>, <?= View::e((string) $__w['rate_date']) ?>) moved <?= View::e(\App\Services\FxRateService::signed((float) $__w['change_pct'])) ?> — more than <?= View::e(rtrim(rtrim(number_format(\App\Services\FxRateService::JUMP_PCT, 1), '0'), '.')) ?>% in a day. It is not used for prices until approved.</p>
+            <p><b>Waiting for the MD:</b> today's market rate ₹<?= \App\Helpers\MoneyFormat::indian((float) $__w['market_rate'], 4) ?> (<?= View::e((string) $__w['source']) ?>, <?= View::e((string) $__w['rate_date']) ?>) moved <?= View::e(\App\Services\FxRateService::signed((float) $__w['change_pct'])) ?> — more than <?= View::e(rtrim(rtrim(number_format(\App\Services\FxRateService::JUMP_PCT, 1), '0'), '.')) ?>% in a day. It is not used for prices until approved.</p>
             <?php if ($canManage): ?>
               <div class="field-grid">
                 <label>Reason *<input type="text" name="reason" form="fx-decide-form" required minlength="10" maxlength="255" placeholder="e.g. Checked with the bank — the move is real"></label>

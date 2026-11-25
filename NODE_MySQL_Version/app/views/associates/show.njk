@@ -189,8 +189,8 @@
       <tr><th>Due / payout run</th><th>Order</th><th>Amount INR</th><th>Status</th><th>Paid</th><th>Invoice</th><th>Action</th></tr>
       {% for p in payouts %}{% set inv = invoiceByPayout[p.id] %}
         <tr><td>{% if p.due_on %}due {{ p.due_on | shortDate }}<br><small class="muted">run {{ p.payout_run_on | shortDate }}</small>{% else %}{{ p.incentive_month }}{% endif %}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td>
-          <td>{{ p.amount_inr | money }}{% if (p.gst_inr | float) > 0 %}<br><small class="muted">+ GST ₹{{ p.gst_inr | money }}</small>{% endif %}</td><td>{{ p.status | capitalize }}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}{% if p.block %}<br><small class="muted">{{ p.block }}</small>{% endif %}</td>
-          <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }} · ₹{{ p.paid_inr | money }}{% if (p.tds_inr | float) > 0 %} (TDS ₹{{ p.tds_inr | money }}){% endif %}{% if p.paid_reference %}<br><small>{{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+          <td>{{ p.amount_inr | inr }}{% if (p.gst_inr | float) > 0 %}<br><small class="muted">+ GST ₹{{ p.gst_inr | inr }}</small>{% endif %}</td><td>{{ p.status | capitalize }}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}{% if p.block %}<br><small class="muted">{{ p.block }}</small>{% endif %}</td>
+          <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }} · ₹{{ p.paid_inr | inr }}{% if (p.tds_inr | float) > 0 %} (TDS ₹{{ p.tds_inr | inr }}){% endif %}{% if p.paid_reference %}<br><small>{{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
           <td>{% if inv %}<a href="/associates/{{ id }}/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>{% else %}—{% endif %}</td>
           <td>
             {% if p.status == 'due' and (p.amount_inr | float) > 0 %}

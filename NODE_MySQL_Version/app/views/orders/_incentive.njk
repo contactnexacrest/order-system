@@ -17,7 +17,7 @@
 {% set rule = calc.rule %}
 <details class="step-card" id="financials-12d">
   <summary><h2>Step 12d &middot; Team Incentive</h2>
-    <span class="fin-sub-summary">&#8377;{{ (inc.team_total_inr if locked else calc.team_total) | money }} · {{ stateText[st] }}</span></summary>
+    <span class="fin-sub-summary">&#8377;{{ (inc.team_total_inr if locked else calc.team_total) | inr }} · {{ stateText[st] }}</span></summary>
   <p class="muted small">Only the MD, the ED and people with "Manage team incentives" see this box{{ ' (read-only for you — only the MD changes or locks it)' if not incentiveCanEdit }}. The team sees only their own amounts, once the order is locked.{{ ' The team incentive program is off: no global incentive — the MD may still set one by hand for this order.' if not teamOn }}</p>
   {% if associateFixed %}{% include "orders/_associate_fixed.njk" %}{% endif %}{# D-264 #}
   <p><span class="badge {{ stateClass[st] }}">{{ stateText[st] }}</span>
@@ -28,10 +28,10 @@
       <div><span class="k">Locked</span><span class="v">{{ inc.locked_at | shortDate }}</span></div>
       <div><span class="k">Buyer fully paid on</span><span class="v">{{ inc.fully_paid_on | shortDate }}</span></div>
       <div><span class="k">Staff payout run</span><span class="v">{{ incentive.monthLabel(inc.incentive_month) }}</span></div>
-      <div><span class="k">Profit used for the incentive</span><span class="v">&#8377;{{ inc.profit_basis_inr | money }}</span></div>
-      <div><span class="k">Team incentive</span><span class="v">&#8377;{{ inc.team_total_inr | money }}</span></div>
+      <div><span class="k">Profit used for the incentive</span><span class="v">&#8377;{{ inc.profit_basis_inr | inr }}</span></div>
+      <div><span class="k">Team incentive</span><span class="v">&#8377;{{ inc.team_total_inr | inr }}</span></div>
       {% if inc.associate_id %}
-        <div><span class="k">Associate commission</span><span class="v">{{ inc.associate_currency }} {{ inc.associate_amount_fc | money }} (&#8377;{{ inc.associate_amount_inr | money }})</span></div>
+        <div><span class="k">Associate commission</span><span class="v">{{ inc.associate_currency }} {{ inc.associate_amount_fc | money }} (&#8377;{{ inc.associate_amount_inr | inr }})</span></div>
       {% endif %}
     </div>
     <table class="list" style="margin-top:10px">
@@ -40,7 +40,7 @@
         <tr>
           <td>{{ p.user_name or p.associate_name or '—' }}</td>
           <td>{{ incentive.roleLabel(p.role) }}</td>
-          <td>{% if p.amount_fc !== null %}{{ p.currency_code }} {{ p.amount_fc | money }} · {% endif %}{{ p.amount_inr | money }}</td>
+          <td>{% if p.amount_fc !== null %}{{ p.currency_code }} {{ p.amount_fc | money }} · {% endif %}{{ p.amount_inr | inr }}</td>
           <td>{% if p.status == 'paid' %}Paid {{ p.paid_on | shortDate }}{% else %}Due{% if p.payout_run_on %} — {{ p.payout_run_on | shortDate }} run{% endif %}{% endif %}</td>
         </tr>
       {% endfor %}
@@ -52,10 +52,10 @@
         <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
         {% for k in incentiveKept %}
           <tr><td>{{ k.user_name }}</td><td>{{ incentive.roleLabel(k.role) }}</td>
-            <td>{{ k.by_share_inr | money }}</td><td>{{ k.paid_inr | money }}</td>
-            <td>{{ k.kept_inr | money }} &mdash; {{ k.kept_note }}</td></tr>
+            <td>{{ k.by_share_inr | inr }}</td><td>{{ k.paid_inr | inr }}</td>
+            <td>{{ k.kept_inr | inr }} &mdash; {{ k.kept_note }}</td></tr>
         {% endfor %}
-        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong>{{ ((inc.kept_not_eligible_inr | float) + (inc.kept_capped_inr | float)) | money }}</strong> (not eligible {{ inc.kept_not_eligible_inr | money }} &middot; capped {{ inc.kept_capped_inr | money }})</td></tr>
+        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong>{{ ((inc.kept_not_eligible_inr | float) + (inc.kept_capped_inr | float)) | inr }}</strong> (not eligible {{ inc.kept_not_eligible_inr | inr }} &middot; capped {{ inc.kept_capped_inr | inr }})</td></tr>
       </table>
     {% endif %}
     {% if calc.associate %}{% set c = calc.associate %}
@@ -72,14 +72,14 @@
     {% endif %}
   {% else %}
     <div class="kv-grid">
-      <div><span class="k">Order profit before incentives{{ est | safe }}</span><span class="v">&#8377;{{ calc.profit_before | money }}</span></div>
+      <div><span class="k">Order profit before incentives{{ est | safe }}</span><span class="v">&#8377;{{ calc.profit_before | inr }}</span></div>
       {% if calc.associate %}{% set a = calc.associate %}
-        <div><span class="k">&minus; Associate commission ({{ a.name }}, {{ a.level_label }}{{ ' — none: not paid in full' if a.state == 'unpaid' }})</span><span class="v">&#8377;{{ a.amount_inr | money }}</span></div>
+        <div><span class="k">&minus; Associate commission ({{ a.name }}, {{ a.level_label }}{{ ' — none: not paid in full' if a.state == 'unpaid' }})</span><span class="v">&#8377;{{ a.amount_inr | inr }}</span></div>
       {% endif %}
-      <div><span class="k">Profit used for the incentive{{ est | safe }}</span><span class="v">&#8377;{{ calc.basis | money }}{% if calc.basis_raw < 0 %} <small class="muted">(never below 0; &#8377;{{ calc.basis_raw | money }} so far)</small>{% endif %}</span></div>
-      <div><span class="k">Global rule</span><span class="v">{% if teamOn %}{{ calc.global_text }} → &#8377;{{ calc.global_amount | money }}{% else %}program off — none{% endif %}</span></div>
-      <div><span class="k"><strong>Team incentive for this order</strong></span><span class="v"><strong>&#8377;{{ calc.amount | money }}</strong> <small class="muted">{{ incentiveRuleText }}</small></span></div>
-      <div><span class="k">Profit left for NexaCrest</span><span class="v">&#8377;{{ calc.left_for_company | money }}{% if calc.margin_after_pct !== null %} <small class="muted">(margin {{ calc.margin_after_pct | money }}%)</small>{% endif %}</span></div>
+      <div><span class="k">Profit used for the incentive{{ est | safe }}</span><span class="v">&#8377;{{ calc.basis | inr }}{% if calc.basis_raw < 0 %} <small class="muted">(never below 0; &#8377;{{ calc.basis_raw | inr }} so far)</small>{% endif %}</span></div>
+      <div><span class="k">Global rule</span><span class="v">{% if teamOn %}{{ calc.global_text }} → &#8377;{{ calc.global_amount | inr }}{% else %}program off — none{% endif %}</span></div>
+      <div><span class="k"><strong>Team incentive for this order</strong></span><span class="v"><strong>&#8377;{{ calc.amount | inr }}</strong> <small class="muted">{{ incentiveRuleText }}</small></span></div>
+      <div><span class="k">Profit left for NexaCrest</span><span class="v">&#8377;{{ calc.left_for_company | inr }}{% if calc.margin_after_pct !== null %} <small class="muted">(margin {{ calc.margin_after_pct | money }}%)</small>{% endif %}</span></div>
     </div>
     {% if calc.over_profit %}
       <p class="review-banner bad">The team incentive is more than the order's profit after the associate's commission — lower it; the order cannot be locked like this.</p>
@@ -145,7 +145,7 @@
         <tr><td colspan="5"><strong>Total paid to the team</strong></td><td><strong>{{ calc.team_total | money }}</strong></td></tr>
       </table>
       {% if calc.per_person.length %}
-        <p class="small"><strong>Per person:</strong> {% for p in calc.per_person %}{{ p.name }} &#8377;{{ p.amount | money }}{{ ' · ' if not loop.last }}{% endfor %}</p>
+        <p class="small"><strong>Per person:</strong> {% for p in calc.per_person %}{{ p.name }} &#8377;{{ p.amount | inr }}{{ ' · ' if not loop.last }}{% endfor %}</p>
       {% endif %}
       {# D-259 (owner approval 6 Nov 2026): each person's share, what they get and what the company keeps. #}
       {% if calc.lines and calc.team_by_share > 0 %}
@@ -159,9 +159,9 @@
           <tr><td colspan="2"><strong>Total</strong></td><td><strong>{{ (calc.team_by_share or 0) | money }}</strong></td><td><strong>{{ calc.team_total | money }}</strong></td>
             <td><strong>{{ (calc.kept_total or 0) | money }} kept by company</strong>{% if calc.kept_total > 0 %} (not eligible {{ calc.kept_not_eligible | money }} &middot; capped {{ calc.kept_capped | money }}){% endif %}</td></tr>
         </table>
-        {% if calc.kept_total > 0 %}<p class="muted small">The company's incentive cost on this order is &#8377;{{ calc.team_total | money }}, not &#8377;{{ calc.team_by_share | money }}. Other people's amounts are not raised.</p>{% endif %}
+        {% if calc.kept_total > 0 %}<p class="muted small">The company's incentive cost on this order is &#8377;{{ calc.team_total | inr }}, not &#8377;{{ calc.team_by_share | inr }}. Other people's amounts are not raised.</p>{% endif %}
       {% endif %}
-      {% if calc.unallocated > 0 %}<p class="small">&#8377;{{ calc.unallocated | money }} has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p>{% endif %}
+      {% if calc.unallocated > 0 %}<p class="small">&#8377;{{ calc.unallocated | inr }} has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p>{% endif %}
       {% if edit %}
         <label><input type="checkbox" name="shares_customised" value="1"{{ ' checked' if calc.shares_customised }}> Use the shares typed above (they must add up to 100% over the ticked roles); otherwise unticked shares spread over the ticked roles in proportion.</label>
         <details style="margin-top:6px">

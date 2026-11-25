@@ -41,7 +41,7 @@ $__money = static fn (float $v): string => number_format($v, 2);
         <small class="muted" data-grid-hint><?php if ($__typed && abs((float) $__v['calc'] - (float) $__v['price']) > 0.005): ?>calculated would be <?= $__money((float) $__v['calc']) ?><?php endif; ?></small>
         <button type="button" class="btn-link" data-grid-use-calc<?= $__typed ? '' : ' hidden' ?>>↺ use calculated</button>
       </td>
-      <td class="num muted" data-grid-percbm><?php if ($__v !== null): ?>₹<?= $__money($__isCbm ? (float) $__v['price'] : ThicknessPrices::m2ToCbm((float) $__v['price'], (float) $__mm)) ?><?php endif; ?></td>
+      <td class="num muted" data-grid-percbm><?php if ($__v !== null): ?>₹<?= \App\Helpers\MoneyFormat::indian((float) ($__isCbm ? (float) $__v['price'] : ThicknessPrices::m2ToCbm((float) $__v['price'], (float) $__mm)), 2) ?><?php endif; ?></td>
     </tr>
   <?php endforeach; ?>
 </table>

@@ -77,7 +77,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
                     <?php foreach ($unmatchedRevenueLegs as $leg): ?>
                       <?php $legLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($leg['cleared_at']) !== null; ?>
                       <option value="<?= (int) $leg['order_id'] ?>|<?= htmlspecialchars($leg['leg']) ?>">
-                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($leg['leg'])) ?> — &#8377;<?= number_format((float) $leg['inr_actual'], 2) ?><?= $legLocked ? ' (locked FY — override)' : '' ?>
+                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($leg['leg'])) ?> — &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $leg['inr_actual'], 2) ?><?= $legLocked ? ' (locked FY — override)' : '' ?>
                       </option>
                     <?php endforeach; ?>
                   </select>

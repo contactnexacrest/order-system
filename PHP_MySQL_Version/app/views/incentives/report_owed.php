@@ -11,5 +11,5 @@
       <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/incentives/owed?date=<?= htmlspecialchars($date) ?>&format=csv">Export CSV</a>
     </div>
   </form>
-  <div class="section"><h2>Owed at <?= htmlspecialchars(\App\Helpers\Dates::short($date)) ?> — &#8377;<?= number_format($totals['amount_inr'], 2) ?></h2><?php require __DIR__ . '/_report_table.php'; ?></div>
+  <div class="section"><h2>Owed at <?= htmlspecialchars(\App\Helpers\Dates::short($date)) ?> — &#8377;<?= \App\Helpers\MoneyFormat::indian($totals['amount_inr'], 2) ?></h2><?php require __DIR__ . '/_report_table.php'; ?></div>
 </div>

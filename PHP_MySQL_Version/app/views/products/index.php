@@ -10,7 +10,7 @@
  * from here). Node twin: views/products/index.njk.
  */
 $__filters = ['active' => 'Active', 'inactive' => 'Inactive', 'all' => 'All', 'not_configured' => 'Not configured', 'no_active_supplier' => 'No active supplier', 'no_supplier_yet' => 'No supplier yet'];
-$__money = static fn (float $v): string => '₹' . number_format($v, 2);
+$__money = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::indian($v, 2);
 ?>
 <div class="card page-wide">
   <h1>Product Catalog</h1>

@@ -60,7 +60,7 @@ if ($readiness === null && $tryPrice === null) {
     <p class="muted"><?= View::e((string) $__p['missing']) ?></p>
   <?php else: $__adj = $__p['spec']['adj']; $__e = $__p['effective']; ?>
     <table class="list">
-      <tr><td><?= !empty($__p['exact']) ? 'Exact supplier price "' . View::e($__p['exact']) . '"' : 'Supplier price' ?> &#8377;<?= number_format((float) $__p['supplier_inr'], 2) ?> ÷ <?= number_format($__p['settings']['pricing_fx_rate'], 2) ?> + other costs <?= View::e(PricingService::modeLabel($__e['other_mode'], $__e['other_value'])) ?></td><td class="num"><?= $__usd($__b['supplier_usd'] + $__b['other_costs']) ?></td></tr>
+      <tr><td><?= !empty($__p['exact']) ? 'Exact supplier price "' . View::e($__p['exact']) . '"' : 'Supplier price' ?> &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $__p['supplier_inr'], 2) ?> ÷ <?= number_format($__p['settings']['pricing_fx_rate'], 2) ?> + other costs <?= View::e(PricingService::modeLabel($__e['other_mode'], $__e['other_value'])) ?></td><td class="num"><?= $__usd($__b['supplier_usd'] + $__b['other_costs']) ?></td></tr>
       <?php $__opts = []; foreach ($__adj['lines'] as $__l) {
           $__opts[] = $__l['option'] . ' ' . match ($__l['kind']) {
               'exact' => '(in the exact price)', 'included' => '(included in base price)',

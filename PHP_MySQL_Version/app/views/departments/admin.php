@@ -19,7 +19,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
         <?php foreach ($list as $d): if ($d['level'] !== $level) { continue; } ?>
           <div class="desig">
             <strong><?= htmlspecialchars((string) $d['title']) ?></strong><?= (int) $d['is_active'] === 1 ? '' : ' <span class="badge badge-inactive">off</span>' ?>
-            <small><?= (int) $d['member_count'] ?> <?= (int) $d['member_count'] === 1 ? 'person' : 'people' ?> · role: <a href="/admin/roles/<?= (int) $d['role_id'] ?>/permissions"><?= htmlspecialchars((string) $d['role_name']) ?></a><?= $d['approval_limit_inr'] !== null ? ' · approves up to ₹' . number_format((float) $d['approval_limit_inr'], 0) : '' ?></small>
+            <small><?= (int) $d['member_count'] ?> <?= (int) $d['member_count'] === 1 ? 'person' : 'people' ?> · role: <a href="/admin/roles/<?= (int) $d['role_id'] ?>/permissions"><?= htmlspecialchars((string) $d['role_name']) ?></a><?= $d['approval_limit_inr'] !== null ? ' · approves up to ₹' . \App\Helpers\MoneyFormat::indian((float) $d['approval_limit_inr'], 0) : '' ?></small>
             <form method="post" action="/admin/preview-as" style="display:inline"><?= Csrf::field() ?><input type="hidden" name="designation_id" value="<?= (int) $d['id'] ?>"><button type="submit" class="btn-link" title="See the app exactly as a <?= htmlspecialchars((string) $d['title']) ?> sees it">Preview the app as this</button></form>
           </div>
         <?php endforeach; ?>
@@ -117,7 +117,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
           <td><input form="<?= $formId ?>" type="number" name="approval_limit_inr" min="0" step="0.01" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>" placeholder="none" aria-label="Approval limit (INR)"></td>
           <?php else: ?>
           <td><input form="<?= $formId ?>" type="hidden" name="level" value="<?= htmlspecialchars((string) $d['level']) ?>"><?= htmlspecialchars($levels[$d['level']] ?? (string) $d['level']) ?></td>
-          <td><input form="<?= $formId ?>" type="hidden" name="approval_limit_inr" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>"><?= $d['approval_limit_inr'] !== null ? number_format((float) $d['approval_limit_inr'], 2) : 'none' ?><br><small class="muted"><?= empty($canLimits) ? 'Only the MD or ED changes approval limits.' : 'Your own designation — another MD/ED changes it.' ?></small></td>
+          <td><input form="<?= $formId ?>" type="hidden" name="approval_limit_inr" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>"><?= $d['approval_limit_inr'] !== null ? \App\Helpers\MoneyFormat::indian((float) $d['approval_limit_inr'], 2) : 'none' ?><br><small class="muted"><?= empty($canLimits) ? 'Only the MD or ED changes approval limits.' : 'Your own designation — another MD/ED changes it.' ?></small></td>
           <?php endif; ?>
           <?php // D-259 (owner approval 6 Nov 2026): whether this designation's people share in the team incentive (MD only). ?>
           <td><?php if (!empty($incentiveCanEdit)): ?><input form="<?= $formId ?>" type="hidden" name="incentive_eligible_present" value="1"><?php endif; ?>

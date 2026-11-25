@@ -21,8 +21,8 @@ $__cur = (string) $__inc['associate_currency'];
 $__claim = $__ap !== null && !empty($__ap['due_on']) && AssociateCommission::settings()['claim_hold'] && AssociateCommission::claimOpen($__oid, (string) $__ap['due_on']);
 ?>
 <div class="info-box" data-associate-fixed style="margin:8px 0">
-  <b>Associate commission fixed</b> — <?= htmlspecialchars($__cur) ?> <?= number_format((float) $__inc['associate_amount_fc'], 2) ?> = &#8377;<?= number_format((float) $__inc['associate_amount_inr'], 2) ?>
-  at &#8377;<?= number_format((float) $__inc['associate_fixed_rate'], 2) ?> per <?= htmlspecialchars($__cur) ?> (the rate of all the buyer's payments), fixed on <?= htmlspecialchars(Dates::short(substr((string) $__inc['associate_fixed_at'], 0, 10))) ?>.
+  <b>Associate commission fixed</b> — <?= htmlspecialchars($__cur) ?> <?= number_format((float) $__inc['associate_amount_fc'], 2) ?> = &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $__inc['associate_amount_inr'], 2) ?>
+  at &#8377;<?= \App\Helpers\MoneyFormat::indian((float) $__inc['associate_fixed_rate'], 2) ?> per <?= htmlspecialchars($__cur) ?> (the rate of all the buyer's payments), fixed on <?= htmlspecialchars(Dates::short(substr((string) $__inc['associate_fixed_at'], 0, 10))) ?>.
   This is the cost in the order's profit and it does not change.
   <?php if ($__ap !== null): ?><br><small><?= htmlspecialchars(AssociatePortalRepository::payoutLabel($__ap, $__claim, (string) $__ap['incentive_month'])) ?></small><?php endif; ?>
   <?php if ($__inc['associate_override_fc'] !== null): ?><br><small class="muted">Changed by the MD: <?= htmlspecialchars((string) $__inc['associate_override_reason']) ?></small><?php endif; ?>

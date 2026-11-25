@@ -67,7 +67,7 @@ $__afBaseMm = (int) $rules['base_mm'];
         <span class="also-amount"><span data-also-amount>₹<span data-also-price>…</span> <?= $__isCbm ? '/ CBM' : '/ SQM' ?></span>
           <small class="muted" data-also-how>type the price to see it</small></span>
         <span class="also-rule">
-          <?php if ($__typed): ?><span class="also-typed-note">you typed ₹<?= number_format((float) $__v['price'], 2) ?><?= !empty($__v['quoted_on']) ? ' on ' . View::e(\App\Helpers\Dates::short((string) $__v['quoted_on'])) : '' ?> — kept unless you tick</span><br><?php endif; ?>
+          <?php if ($__typed): ?><span class="also-typed-note">you typed ₹<?= \App\Helpers\MoneyFormat::indian((float) $__v['price'], 2) ?><?= !empty($__v['quoted_on']) ? ' on ' . View::e(\App\Helpers\Dates::short((string) $__v['quoted_on'])) : '' ?> — kept unless you tick</span><br><?php endif; ?>
           <?php if ($__isCbm): ?>× <?= View::e(ThicknessPrices::fmt((float) $rules['k'])) ?> of <?= $__afBaseMm ?> mm per SQM
           <?php elseif ($__mm === $__afBaseMm): ?>base
           <?php else: ?><?= $__p < 0 ? '−' : '+' ?><?= View::e(ThicknessPrices::fmt(abs($__p))) ?> % of <?= $__afBaseMm ?> mm<?php endif; ?>
@@ -81,7 +81,7 @@ $__afBaseMm = (int) $rules['base_mm'];
   <?php if ($__afCard !== null): ?>
     <fieldset class="thickness-base">
       <legend class="legend-sentence">Base for orders</legend>
-      <label class="inline"><input type="radio" name="base" value="keep" checked> keep <?= View::e($__afCard['base_label']) ?><?= $__afCard['base_price'] !== null ? ' ₹' . number_format((float) $__afCard['base_price'], 2) . ' / ' . View::e($__afCard['base_unit']) : ' (no price yet)' ?></label>
+      <label class="inline"><input type="radio" name="base" value="keep" checked> keep <?= View::e($__afCard['base_label']) ?><?= $__afCard['base_price'] !== null ? ' ₹' . \App\Helpers\MoneyFormat::indian((float) $__afCard['base_price'], 2) . ' / ' . View::e($__afCard['base_unit']) : ' (no price yet)' ?></label>
       <label class="inline"><input type="radio" name="base" value="this"> make this <span data-calc-from>…</span> price the base</label>
     </fieldset>
   <?php endif; ?>

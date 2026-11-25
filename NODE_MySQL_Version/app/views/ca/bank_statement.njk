@@ -64,7 +64,7 @@
                     <option value="">Match to revenue leg&hellip;</option>
                     {% for leg in unmatchedRevenueLegs %}
                       <option value="{{ leg.order_id }}|{{ leg.leg }}">
-                        {{ leg.buyer_inquiry_ref }} — {{ leg.leg | legLabel }} — &#8377;{{ leg.inr_actual | money }}{{ ' (locked FY — override)' if leg.locked else '' }}
+                        {{ leg.buyer_inquiry_ref }} — {{ leg.leg | legLabel }} — &#8377;{{ leg.inr_actual | inr }}{{ ' (locked FY — override)' if leg.locked else '' }}
                       </option>
                     {% endfor %}
                   </select>

@@ -7,7 +7,7 @@
     <div><span class="k">Status</span><span class="v">{{ statuses[r.status] or r.status }}</span></div>
     {% if r.specification %}<div><span class="k">Specification</span><span class="v">{{ r.specification }}</span></div>{% endif %}
     {% if r.note %}<div><span class="k">Note from Sales</span><span class="v">{{ r.note }}</span></div>{% endif %}
-    {% if r.awarded_supplier_name %}<div><span class="k">Awarded to</span><span class="v">{{ r.awarded_supplier_name }}{% if awardValue != null and sees.purchase %} — &#8377;{{ fmt(awardValue) }} incl. GST{% endif %}</span></div>{% endif %}
+    {% if r.awarded_supplier_name %}<div><span class="k">Awarded to</span><span class="v">{{ r.awarded_supplier_name }}{% if awardValue != null and sees.purchase %} — &#8377;{{ awardValue | inr }} incl. GST{% endif %}</span></div>{% endif %}
     {% if r.status == 'received' %}<div><span class="k">Received</span><span class="v">{{ receivedQty }} on {{ r.received_on }} · QC {{ qcResults[r.qc_result] or '' }}{% if r.qc_note %} — {{ r.qc_note }}{% endif %}</span></div>{% endif %}
   </div>
 </div>
@@ -20,10 +20,10 @@
     {% for q in quotes %}{% set isAwarded = q.id == r.awarded_quote_id %}
     <tr{% if isAwarded %} style="background:var(--success-soft)"{% endif %}>
       <td>{{ q.supplier_legal_name }}{% if loop.first %} <span class="badge badge-active">lowest</span>{% endif %}</td>
-      <td>&#8377;{{ fmt(q.unit_price_inr) }}</td>
+      <td>&#8377;{{ q.unit_price_inr | inr }}</td>
       <td>{{ q.gst_percent | float }}%</td>
-      <td>&#8377;{{ fmt(q.unit_price_with_gst_inr) }}</td>
-      <td>&#8377;{{ fmt(q.total) }}</td>
+      <td>&#8377;{{ q.unit_price_with_gst_inr | inr }}</td>
+      <td>&#8377;{{ q.total | inr }}</td>
       <td>{{ q.lead_time_days }} days</td>
       <td>{{ q.valid_until or '—' }}</td>
       <td>{{ q.quote_reference or '' }}</td>
@@ -37,7 +37,7 @@
     {% endfor %}
     {% if not quotes.length %}<tr><td colspan="9" class="muted">No quotes yet.</td></tr>{% endif %}
   </table>
-  {% if myLimit != null %}<p class="muted small">Your approval limit as {{ actingLabel }}: &#8377;{{ fmt(myLimit) }}. An award above it waits for an approver.</p>{% endif %}
+  {% if myLimit != null %}<p class="muted small">Your approval limit as {{ actingLabel }}: &#8377;{{ myLimit | inr }}. An award above it waits for an approver.</p>{% endif %}
 
   {% if canWork and r.status in ['open', 'quoted'] %}
   <h3>Record a supplier quote</h3>

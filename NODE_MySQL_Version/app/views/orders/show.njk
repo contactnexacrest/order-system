@@ -16,7 +16,7 @@
 {# Gap list G-5 (owner, 1 Nov 2026): part payments — each receipt, what is still owed, and a manager's reason to clear short. #}
 {% macro renderReceipts(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and (ps5.receipts.length or ps5.shortfall) %}
 <div class="part-payments small" data-part-payments="{{ key }}">{# R9-N01 (QA Round 9/10): the rupees the bank credited and the rate only with inr_actual_view. #}<table class="list compact"><tr><th>Received on</th><th>Amount</th>{% if canViewInrActual %}<th>INR credited</th><th>Rate</th>{% endif %}<th>Bank reference</th><th>Recorded by</th></tr>
-{% for r in ps5.receipts %}<tr><td>{{ r.received_on | shortDate }}</td><td>{{ order.currency_code or '' }} {{ r.amount | money }}{% if r.difference_reason == 'bank_charges' %} <small class="muted">+ {{ order.currency_code or '' }} {{ r.bank_charges | money }} bank charges ({% if canViewInrActual %}&#8377;{{ r.bank_charges_inr | money }}, {% endif %}order cost)</small>{% elif r.difference_reason == 'short' %} <small class="muted">· buyer paid less</small>{% elif r.difference_reason == 'excess' %} <small class="muted">· buyer paid more</small>{% endif %}{% if r.difference_reason and r.difference_reason_text %} <small class="muted">— {{ r.difference_reason_text }}{% if r.difference_reason_custom %} (typed in){% endif %}</small>{% endif %}{% if canViewInrActual and r.own_bank_charges_inr %} <small class="muted">· our bank's charges &#8377;{{ r.own_bank_charges_inr | money }} (order cost)</small>{% endif %}{# D-244 (4 Nov 2026): the rupees the bank credited, and why they differ from the bank's rate when they do. #}{% if not canViewInrActual %}{% elif r.rate_gap_choice == 'bank_charges' %} <small class="muted">· the bank kept &#8377;{{ r.rate_gap_inr | money }} at its rate &#8377;{{ r.bank_rate | float }} (order cost "Bank Charges")</small>{% elif r.rate_gap_choice == 'other' %} <small class="muted">· &#8377;{{ (r.rate_gap_inr | float | abs) | money }} apart from the bank's rate &#8377;{{ r.bank_rate | float }} — {{ r.rate_gap_reason }}</small>{% endif %}</td>{% if canViewInrActual %}<td>{% if r.inr_credited != null %}&#8377;{{ r.inr_credited | money }}{% else %}<span class="muted">not known yet</span>{% endif %}</td><td>{% if r.exchange_rate != null %}&#8377;{{ r.exchange_rate | rate4 }}{% else %}—{% endif %}</td>{% endif %}<td>{{ r.bank_reference or '—' }}</td><td>{{ r.recorded_by_name or '—' }}</td></tr>{% endfor %}
+{% for r in ps5.receipts %}<tr><td>{{ r.received_on | shortDate }}</td><td>{{ order.currency_code or '' }} {{ r.amount | money }}{% if r.difference_reason == 'bank_charges' %} <small class="muted">+ {{ order.currency_code or '' }} {{ r.bank_charges | money }} bank charges ({% if canViewInrActual %}&#8377;{{ r.bank_charges_inr | inr }}, {% endif %}order cost)</small>{% elif r.difference_reason == 'short' %} <small class="muted">· buyer paid less</small>{% elif r.difference_reason == 'excess' %} <small class="muted">· buyer paid more</small>{% endif %}{% if r.difference_reason and r.difference_reason_text %} <small class="muted">— {{ r.difference_reason_text }}{% if r.difference_reason_custom %} (typed in){% endif %}</small>{% endif %}{% if canViewInrActual and r.own_bank_charges_inr %} <small class="muted">· our bank's charges &#8377;{{ r.own_bank_charges_inr | inr }} (order cost)</small>{% endif %}{# D-244 (4 Nov 2026): the rupees the bank credited, and why they differ from the bank's rate when they do. #}{% if not canViewInrActual %}{% elif r.rate_gap_choice == 'bank_charges' %} <small class="muted">· the bank kept &#8377;{{ r.rate_gap_inr | inr }} at its rate &#8377;{{ r.bank_rate | float }} (order cost "Bank Charges")</small>{% elif r.rate_gap_choice == 'other' %} <small class="muted">· &#8377;{{ (r.rate_gap_inr | float | abs) | inr }} apart from the bank's rate &#8377;{{ r.bank_rate | float }} — {{ r.rate_gap_reason }}</small>{% endif %}</td>{% if canViewInrActual %}<td>{% if r.inr_credited != null %}&#8377;{{ r.inr_credited | inr }}{% else %}<span class="muted">not known yet</span>{% endif %}</td><td>{% if r.exchange_rate != null %}&#8377;{{ r.exchange_rate | rate4 }}{% else %}—{% endif %}</td>{% endif %}<td>{{ r.bank_reference or '—' }}</td><td>{{ r.recorded_by_name or '—' }}</td></tr>{% endfor %}
 </table><p>{% if ps5.expected != null %}Due: <strong>{{ order.currency_code or '' }} {{ ps5.expected | money }}</strong> &middot; received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong> &middot; {% if ps5.owed > 0.01 %}<strong class="text-warning">still owed: {{ order.currency_code or '' }} {{ ps5.owed | money }}</strong>{% elif ps5.owed < -0.01 %}paid {{ order.currency_code or '' }} {{ (0 - ps5.owed) | money }} more than due{% else %}received in full{% endif %}{% else %}Received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong>{% endif %}</p>
 {% if ps5.shortfall %}<p class="notice notice-warning">Cleared short by {{ order.currency_code or '' }} {{ ps5.shortfall.shortfall_amount | money }} on {{ ps5.shortfall.approved_on | shortDate }}: approved by {{ ps5.shortfall.approved_by_name or '—' }} — {{ 'carried into the balance' if ps5.shortfall.treatment == 'carried_to_balance' else 'written off' }}. Reason: {{ ps5.shortfall.reason }}</p>{% endif %}
 </div>{% endif %}{% endmacro %}
@@ -29,7 +29,7 @@
   {% if not sees.buyer_payments %}{# Owner decision D-214, phase 2: only that it came in. #}
   <p class="remit-recorded"><strong>&#10003; Remittance recorded{% if receivedAt %} on {{ receivedAt | shortDate }}{% endif %}.</strong> <span class="muted">{% if clearedAt %}Cleared on {{ clearedAt | shortDate }}.{% else %}{{ nextStep }}{% endif %}</span></p>
   {% else %}
-  <p class="remit-recorded"><strong>&#10003; Received {{ order.currency_code or '' }} {{ amount | money }}{% if receivedAt %} on {{ receivedAt | shortDate }}{% endif %}{% if not canViewInrActual %}.{# R9-N01 #}{% elif payment[leg ~ '_inr_actual'] != null and rate != null %} — &#8377;{{ payment[leg ~ '_inr_actual'] | money }} credited by the bank (exchange rate &#8377;{{ rate | rate4 }}).{% elif rate != null %} at today's exchange rate of &#8377;{{ rate | rate4 }} (= &#8377;{{ (amount * rate) | money }}).{% else %} — exchange rate not recorded yet (record it below).{% endif %}{% if payment[leg ~ '_bank_reference'] %} Bank ref {{ payment[leg ~ '_bank_reference'] }}.{% endif %}</strong> <span class="muted">{% if clearedAt %}Cleared on {{ clearedAt | shortDate }}.{% else %}{{ nextStep }}{% endif %}</span></p>
+  <p class="remit-recorded"><strong>&#10003; Received {{ order.currency_code or '' }} {{ amount | money }}{% if receivedAt %} on {{ receivedAt | shortDate }}{% endif %}{% if not canViewInrActual %}.{# R9-N01 #}{% elif payment[leg ~ '_inr_actual'] != null and rate != null %} — &#8377;{{ payment[leg ~ '_inr_actual'] | inr }} credited by the bank (exchange rate &#8377;{{ rate | rate4 }}).{% elif rate != null %} at today's exchange rate of &#8377;{{ rate | rate4 }} (= &#8377;{{ (amount * rate) | inr }}).{% else %} — exchange rate not recorded yet (record it below).{% endif %}{% if payment[leg ~ '_bank_reference'] %} Bank ref {{ payment[leg ~ '_bank_reference'] }}.{% endif %}</strong> <span class="muted">{% if clearedAt %}Cleared on {{ clearedAt | shortDate }}.{% else %}{{ nextStep }}{% endif %}</span></p>
   {% endif %}
 {% endmacro %}
 
@@ -84,7 +84,7 @@
       <div style="width:100%;">
         <strong>{{ label }} — INR Actual (CA/Accounting)</strong><br>
         {% if amount != null %}
-          <span>&#8377;{{ amount | money }} credited — recorded {{ recordedAt }}{% if recordedBy %} by {{ usersById[recordedBy] or ('User #' ~ recordedBy) }}{% endif %}</span>
+          <span>&#8377;{{ amount | inr }} credited — recorded {{ recordedAt }}{% if recordedBy %} by {{ usersById[recordedBy] or ('User #' ~ recordedBy) }}{% endif %}</span>
           {% if (lockMessage == null or canOverrideFyLock) and canDeleteInrActual %}
             {% if lockMessage != null %}
               <span class="muted small">(&#9888; override — logged)</span>
@@ -95,7 +95,7 @@
             </form>
           {% endif %}
           {% if forexGainLoss != null %}
-            <br><span class="muted small">Forex {{ 'gain' if forexGainLoss >= 0 else 'loss' }}: &#8377;{{ (forexGainLoss | abs) | money }} vs. this leg's own recorded rate.</span>
+            <br><span class="muted small">Forex {{ 'gain' if forexGainLoss >= 0 else 'loss' }}: &#8377;{{ (forexGainLoss | abs) | inr }} vs. this leg's own recorded rate.</span>
           {% endif %}
         {% elif lockMessage != null and not canOverrideFyLock %}
           <span class="muted">&#128274; {{ lockMessage }}</span>
@@ -382,26 +382,26 @@
       {% set hasPayments = b.payments.length or b.carried_payments.length %}
       <td><span class="badge {{ 'badge-proforma' if isProforma else 'badge-invoice' }}">{{ 'Proforma' if isProforma else 'Tax invoice' }}</span></td>
       <td>{{ b.bill_no }} · {{ b.bill_date | shortDate }}{% if b.bill_file_id %} · {% if fileAllowed[b.bill_file_id] !== false %}<a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% else %}bill{% endif %}{# QA R7-N06 #}{% endif %}
-        {% if isProforma and b.requested_amount_inr !== null %}<br><small class="muted">Asks for &#8377;{{ b.requested_amount_inr | money }} now</small>{% endif %}
+        {% if isProforma and b.requested_amount_inr !== null %}<br><small class="muted">Asks for &#8377;{{ b.requested_amount_inr | inr }} now</small>{% endif %}
         {% if b.replaces_bill_no !== null %}<br><small class="muted">Replaces proforma {{ b.replaces_bill_no }}</small>{% endif %}
         {% if b.replaced_by !== null %}<br><small class="muted">Replaced by tax invoice {{ b.replaced_by }}</small>{% endif %}
         {% if b.gst_reverse_charge | int %}<br><small class="muted">Reverse charge — we pay the 5% GST</small>{% endif %}
         {% if (b.id | int) in carriedIds %}<br><small class="muted">Added in Step 7e — shown here until fully paid</small>{% endif %}
         {% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
-      <td style="text-align:right">{{ b.taxable_inr | money }}</td>
-      <td style="text-align:right">{{ b.gst_inr | money }}</td>
-      <td style="text-align:right">{{ b.total_inr | money }}{% if isProforma %}<br><small class="muted">not a cost{{ ' — what is paid counts until its tax invoice arrives' if (b.replaced_by === null and b.own_paid > 0) else '' }}</small>{% endif %}</td>
+      <td style="text-align:right">{{ b.taxable_inr | inr }}</td>
+      <td style="text-align:right">{{ b.gst_inr | inr }}</td>
+      <td style="text-align:right">{{ b.total_inr | inr }}{% if isProforma %}<br><small class="muted">not a cost{{ ' — what is paid counts until its tax invoice arrives' if (b.replaced_by === null and b.own_paid > 0) else '' }}</small>{% endif %}</td>
       <td class="vendor-bill-payments">
         {% for p in b.carried_payments %}
-          <div><span class="vendor-bill-paid">&#10003; &#8377;{{ p.amount_inr | money }} on {{ p.paid_at | shortDate }}</span><br><small class="muted">advance, on proforma {{ b.replaces_bill_no }}</small></div>
+          <div><span class="vendor-bill-paid">&#10003; &#8377;{{ p.amount_inr | inr }} on {{ p.paid_at | shortDate }}</span><br><small class="muted">advance, on proforma {{ b.replaces_bill_no }}</small></div>
         {% endfor %}
         {% for p in b.payments %}
-          <div><span class="vendor-bill-paid">&#10003; &#8377;{{ p.amount_inr | money }} on {{ p.paid_at | shortDate }}</span><br><small class="muted">{{ p.payment_mode }} · {{ p.payment_ref }}</small></div>
+          <div><span class="vendor-bill-paid">&#10003; &#8377;{{ p.amount_inr | inr }} on {{ p.paid_at | shortDate }}</span><br><small class="muted">{{ p.payment_mode }} · {{ p.payment_ref }}</small></div>
         {% endfor %}
         {% if b.settled %}
           {% if b.replaced_by !== null %}<small class="muted">Nothing due — replaced</small>{% elif not hasPayments %}<small class="muted">Nothing due</small>{% endif %}
         {% else %}
-          <span class="vendor-bill-due">{% if not hasPayments %}Unpaid{% else %}Due &#8377;{{ b.remaining | money }}{% endif %}</span>
+          <span class="vendor-bill-due">{% if not hasPayments %}Unpaid{% else %}Due &#8377;{{ b.remaining | inr }}{% endif %}</span>
           {% if canPay and rowBlocked === null %}
           <details class="vendor-bill-pay">
             <summary class="btn-sm">{% if not b.payments.length %}Mark Paid{% else %}&#8377; Record another payment{% endif %}</summary>
@@ -410,7 +410,7 @@
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               {% if leg !== null %}<input type="hidden" name="leg" value="{{ leg }}">{% endif %}
               {% set tpn = vendorBillsView.toPayNow(b) %}{# Owner request (3 Nov 2026): read-only, system-calculated #}
-              <p class="full to-pay-now"><strong>To pay now: &#8377;{{ tpn.amount | money }}</strong> <small class="muted">({{ tpn.working }})</small></p>
+              <p class="full to-pay-now"><strong>To pay now: &#8377;{{ tpn.amount | inr }}</strong> <small class="muted">({{ tpn.working }})</small></p>
               <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="{{ b.remaining.toFixed(2) }}" name="paid_amount_inr" value="{{ b.remaining.toFixed(2) }}" required placeholder="e.g. 25000.00"></label>
               <label>Paid on *<input type="date" name="paid_at" value="{{ today() }}" max="{{ today() }}" required></label>
               <label>Mode *
@@ -435,7 +435,7 @@
       </td>
     </tr>
     {% endfor %}
-    <tr><td colspan="{{ 7 if showPartner else 5 }}"><strong>Total cost</strong> <small class="muted">(tax invoices; a proforma only for what is paid on it, until its tax invoice arrives)</small></td><td style="text-align:right"><strong>{{ t.cost | money }}</strong></td><td><span class="vendor-bill-paid">Paid &#8377;{{ t.paid | money }}</span><br>{% if t.due > 0 %}<span class="vendor-bill-due">Due &#8377;{{ t.due | money }}</span>{% else %}<span class="vendor-bill-paid">Nothing due</span>{% endif %}</td></tr>
+    <tr><td colspan="{{ 7 if showPartner else 5 }}"><strong>Total cost</strong> <small class="muted">(tax invoices; a proforma only for what is paid on it, until its tax invoice arrives)</small></td><td style="text-align:right"><strong>{{ t.cost | money }}</strong></td><td><span class="vendor-bill-paid">Paid &#8377;{{ t.paid | inr }}</span><br>{% if t.due > 0 %}<span class="vendor-bill-due">Due &#8377;{{ t.due | inr }}</span>{% else %}<span class="vendor-bill-paid">Nothing due</span>{% endif %}</td></tr>
   </table>
   {% if canPay and payBlocked !== null %}
     <p class="review-banner warn">&#9888; {{ payBlocked }} Bills can still be added now.</p>
@@ -474,7 +474,7 @@
       <select name="replaces_bill_id">
         <option value="">None — this invoice replaces no proforma</option>
         {% for pf in replaceable %}
-          <option value="{{ pf.id }}"{{ ' selected' if replaceable.length == 1 else '' }}>{{ (pf.partner_name + ' — ') if pf.partner_name else '' }}{{ pf.bill_no }} — &#8377;{{ pf.own_paid | money }} paid</option>
+          <option value="{{ pf.id }}"{{ ' selected' if replaceable.length == 1 else '' }}>{{ (pf.partner_name + ' — ') if pf.partner_name else '' }}{{ pf.bill_no }} — &#8377;{{ pf.own_paid | inr }} paid</option>
         {% endfor %}
       </select>
       <small class="muted">What was paid on the proforma counts towards this invoice; the proforma stops counting as a cost.</small>
@@ -497,7 +497,7 @@
     {% set legBills = vendorBillsView.supplierLeg(vendorBills, supplierPo.id, leg) %}
     {% set carriedIds = vendorBillsView.ids(vendorBillsView.supplierCarried(vendorBills, supplierPo.id, leg)) %}
     {% set replaceableBills = vendorBillsView.replaceable(vendorBillsView.supplierBills(vendorBills, supplierPo.id)) %}
-    <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>{{ ('&#8377;' + (supplierPo.total_payable_inr | money)) | safe if supplierPo.total_payable_inr !== null else '—' }}</b></div><div>{{ label }} planned<b>{{ ('&#8377;' + (supplierPo[leg + '_amount_inr'] | money)) | safe if supplierPo[leg + '_amount_inr'] !== null else '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ (supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr']) | money }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
+    <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>{{ ('&#8377;' + (supplierPo.total_payable_inr | inr)) | safe if supplierPo.total_payable_inr !== null else '—' }}</b></div><div>{{ label }} planned<b>{{ ('&#8377;' + (supplierPo[leg + '_amount_inr'] | inr)) | safe if supplierPo[leg + '_amount_inr'] !== null else '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ (supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr']) | inr }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
     {# Owner request (2 Nov 2026): the illustrated bill + payment guide. #}
     <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-{{ 'a' if leg == 'advance' else 'b' }}" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
     {% if supplierPo[leg + '_paid_at'] and not legBills.length %}
@@ -505,7 +505,7 @@
       <p class="muted small">Paid before supplier bills were recorded here.</p>
     {% else %}
       {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
-      {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + (supplierPo.advance_amount_inr | money) + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
+      {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + (supplierPo.advance_amount_inr | inr) + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
       {# Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a). #}
       {% set noAdvance = leg == 'advance' and not supplierPo.advance_paid_at and (supplierPo.advance_amount_inr | float(0)) <= 0 %}
       {% if noAdvance and not legBills.length %}
@@ -513,7 +513,7 @@
       {% else %}
         {# Owner request (3 Nov 2026): the step's own read-only "To pay now", from the Supplier PO and what is already paid. #}
         {% set legTpn = vendorBillsView.supplierLegToPayNow(vendorBills, supplierPo, leg) if not supplierPo[leg + '_paid_at'] else null %}
-        {% if legTpn %}<p class="to-pay-now"><strong>{{ label }} to pay now: &#8377;{{ legTpn.amount | money }}</strong> <small class="muted">({{ legTpn.working }})</small></p>{% endif %}
+        {% if legTpn %}<p class="to-pay-now"><strong>{{ label }} to pay now: &#8377;{{ legTpn.amount | inr }}</strong> <small class="muted">({{ legTpn.working }})</small></p>{% endif %}
         {{ vendorBillTable(legBills, false, permissions.manage_supplier_payments, payBlocked, leg, carriedIds) }}
       {% endif %}
       {% if not permissions.manage_supplier_payments %}
@@ -524,7 +524,7 @@
         <form method="post" action="/orders/{{ order.id }}/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="bill_for" value="{{ leg }}">
-          {{ vendorBillFields(gstRates, 'proforma' if leg == 'advance' else 'invoice', replaceableBills, ('the planned advance is ₹' + (supplierPo.advance_amount_inr | money)) if (leg == 'advance' and (supplierPo.advance_amount_inr | float(0)) > 0) else null, vendorBillsView.supplierPrefill(vendorBills, supplierPo, leg)) }}
+          {{ vendorBillFields(gstRates, 'proforma' if leg == 'advance' else 'invoice', replaceableBills, ('the planned advance is ₹' + (supplierPo.advance_amount_inr | inr)) if (leg == 'advance' and (supplierPo.advance_amount_inr | float(0)) > 0) else null, vendorBillsView.supplierPrefill(vendorBills, supplierPo, leg)) }}
           <div><button type="submit" class="btn-sm">Add Bill</button></div>
         </form>
       </details>
@@ -1084,8 +1084,8 @@
           <td>{{ (ev.amount | money) ~ ' ' ~ ev.currency if ev.amount != null else '—' }}</td>
           {% endif %}
           {% if ledgerTotals %}
-          <td>{% if ev.direction == 'in' and ev.inr != null %}{{ ev.inr | money }}{% elif ev.direction == 'in' %}<span class="muted small">no rate</span>{% endif %}</td>
-          <td>{% if ev.direction == 'out' %}{{ ev.inr | money }}{% endif %}</td>
+          <td>{% if ev.direction == 'in' and ev.inr != null %}{{ ev.inr | inr }}{% elif ev.direction == 'in' %}<span class="muted small">no rate</span>{% endif %}</td>
+          <td>{% if ev.direction == 'out' %}{{ ev.inr | inr }}{% endif %}</td>
           {% endif %}
           <td>{{ ev.source }}</td>
         </tr>
@@ -1095,12 +1095,12 @@
       {% endif %}
       {% if ledgerTotals %}
       <div class="kv-grid ledger-totals">
-        <div><span class="k">Received from buyer</span><span class="v">{{ ledgerTotals.buyer_foreign | money }} {{ order.currency_code or '' }} = &#8377;{{ ledgerTotals.buyer_inr | money }}</span></div>
-        <div><span class="k">Export benefits received</span><span class="v">&#8377;{{ ledgerTotals.benefits_inr | money }}</span></div>
-        <div><span class="k">Paid to supplier</span><span class="v">&#8377;{{ ledgerTotals.supplier_inr | money }}</span></div>
-        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;{{ ledgerTotals.logistics_inr | money }}</span></div>
-        <div><span class="k">Expenses</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | money }}</span></div>
-        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;{{ ledgerTotals.net_inr | money }}</strong></span></div>
+        <div><span class="k">Received from buyer</span><span class="v">{{ ledgerTotals.buyer_foreign | money }} {{ order.currency_code or '' }} = &#8377;{{ ledgerTotals.buyer_inr | inr }}</span></div>
+        <div><span class="k">Export benefits received</span><span class="v">&#8377;{{ ledgerTotals.benefits_inr | inr }}</span></div>
+        <div><span class="k">Paid to supplier</span><span class="v">&#8377;{{ ledgerTotals.supplier_inr | inr }}</span></div>
+        <div><span class="k">Paid to logistics partners</span><span class="v">&#8377;{{ ledgerTotals.logistics_inr | inr }}</span></div>
+        <div><span class="k">Expenses</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | inr }}</span></div>
+        <div class="full"><span class="k">Net so far</span><span class="v"><strong>&#8377;{{ ledgerTotals.net_inr | inr }}</strong></span></div>
       </div>
       <p class="muted small">INR uses each remittance's INR actual when recorded, otherwise the exchange rate recorded with it{% if ledgerTotals.buyer_without_rate > 0 %} — {{ ledgerTotals.buyer_without_rate }} remittance(s) have no rate yet and are left out of the INR totals{% endif %}. Shown only to staff with the Order Financials permission.</p>
       {% endif %}
@@ -1129,10 +1129,10 @@
         {% endfor %}
         {% endif %}
         {% if ledgerTotals %}
-        <div><span class="k">Supplier Advance Paid</span><span class="v">{% if supplierPo and supplierPo.advance_paid_at %}&#8377;{{ (supplierPo.advance_paid_amount_inr if supplierPo.advance_paid_amount_inr != null else (supplierPo.advance_amount_inr or 0)) | money }} on {{ supplierPo.advance_paid_at }}{% else %}—{% endif %}</span></div>
-        <div><span class="k">Supplier Balance Paid</span><span class="v">{% if supplierPo and supplierPo.balance_paid_at %}&#8377;{{ (supplierPo.balance_paid_amount_inr if supplierPo.balance_paid_amount_inr != null else (supplierPo.balance_amount_inr or 0)) | money }} on {{ supplierPo.balance_paid_at }}{% else %}—{% endif %}</span></div>
-        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | money }}</span></div>
-        <div><span class="k">Net So Far</span><span class="v">&#8377;{{ ledgerTotals.net_inr | money }}</span></div>
+        <div><span class="k">Supplier Advance Paid</span><span class="v">{% if supplierPo and supplierPo.advance_paid_at %}&#8377;{{ (supplierPo.advance_paid_amount_inr if supplierPo.advance_paid_amount_inr != null else (supplierPo.advance_amount_inr or 0)) | inr }} on {{ supplierPo.advance_paid_at }}{% else %}—{% endif %}</span></div>
+        <div><span class="k">Supplier Balance Paid</span><span class="v">{% if supplierPo and supplierPo.balance_paid_at %}&#8377;{{ (supplierPo.balance_paid_amount_inr if supplierPo.balance_paid_amount_inr != null else (supplierPo.balance_amount_inr or 0)) | inr }} on {{ supplierPo.balance_paid_at }}{% else %}—{% endif %}</span></div>
+        <div><span class="k">Expenses Recorded</span><span class="v">&#8377;{{ ledgerTotals.expenses_inr | inr }}</span></div>
+        <div><span class="k">Net So Far</span><span class="v">&#8377;{{ ledgerTotals.net_inr | inr }}</span></div>
         {% endif %}
       </div>
       {% endif %}
@@ -2267,9 +2267,9 @@
                 <tr class="{{ '' if so.offered else 'not-offered' }}">
                   <td>{{ so.supplier }}{% if not so.offered %} ({{ so.why_not }}){% endif %}</td>
                   {% if so.offered %}
-                    <td class="{{ 'lowest' if so.lowest else '' }}">₹{{ so.price | money }} {{ so.label }}{% if so.lowest %} (lowest){% endif %}</td>
+                    <td class="{{ 'lowest' if so.lowest else '' }}">₹{{ so.price | inr }} {{ so.label }}{% if so.lowest %} (lowest){% endif %}</td>
                     <td>{{ so.valid_until or '—' }}{% if so.expired %} <span class="spo-expired">expired — confirm price</span>{% endif %}</td>
-                    <td>{% if so.po_value !== null %}₹{{ so.po_value | money }}{% else %}<span class="muted small">units differ</span>{% endif %}</td>
+                    <td>{% if so.po_value !== null %}₹{{ so.po_value | inr }}{% else %}<span class="muted small">units differ</span>{% endif %}</td>
                     <td><input type="radio" name="spo_offer_pick" value="{{ so.offer_id }}" data-spo-offer data-supplier-id="{{ so.supplier_id }}" data-supplier-name="{{ so.supplier }}"
                         data-price="{{ so.price.toFixed(2) }}" data-quantity="{{ (spl.quantity | qtyTrim) if spl.quantity !== null else '' }}"
                         data-unit="{{ spl.unit }}" data-product="{{ spl.product }}" aria-label="Choose {{ so.supplier }}"></td>
@@ -3321,18 +3321,18 @@
     </form>{% endif %}
 
     <div class="fin-kpis">
-      <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | money }}{% else %}—{% endif %}</span></div>
-      <div class="fin-kpi"><span class="l">Total costs</span><span class="v">{% if profitability %}&#8377;{{ profitability.total_cost_inr | money }}{% else %}—{% endif %}</span></div>
-      <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;{{ fin.receivedBenefits | money }}{% if fin.claimedBenefits > fin.receivedBenefits %} <small class="muted">of &#8377;{{ fin.claimedBenefits | money }} claimed</small>{% endif %}</span></div>
+      <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | inr }}{% else %}—{% endif %}</span></div>
+      <div class="fin-kpi"><span class="l">Total costs</span><span class="v">{% if profitability %}&#8377;{{ profitability.total_cost_inr | inr }}{% else %}—{% endif %}</span></div>
+      <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;{{ fin.receivedBenefits | inr }}{% if fin.claimedBenefits > fin.receivedBenefits %} <small class="muted">of &#8377;{{ fin.claimedBenefits | inr }} claimed</small>{% endif %}</span></div>
       {% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}
-      <div class="fin-kpi good"><span class="l">Net profit{% if profitability and not profitability.incentives_locked %} (estimated){% endif %}</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_after_incentive_inr | money }}{% if profitability.margin_after_pct != null %} · {{ profitability.margin_after_pct | round(1) }}%{% endif %}{% else %}—{% endif %}</span></div>
+      <div class="fin-kpi good"><span class="l">Net profit{% if profitability and not profitability.incentives_locked %} (estimated){% endif %}</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_after_incentive_inr | inr }}{% if profitability.margin_after_pct != null %} · {{ profitability.margin_after_pct | round(1) }}%{% endif %}{% else %}—{% endif %}</span></div>
       {% else %}
-      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_before_commission_inr | money }}{% else %}—{% endif %}</span></div>
+      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_before_commission_inr | inr }}{% else %}—{% endif %}</span></div>
       {% endif %}
     </div>
 
     <details class="step-card" id="financials-12a"{{ fin.open('12a') }}>
-      <summary>{{ stepStatusIcon(fin.icon('12a')) }}<h2>Step 12a &middot; Order Costs</h2><span class="fin-sub-summary">{{ orderCostEntries.length }} cost{{ '' if orderCostEntries.length == 1 else 's' }} · &#8377;{{ fin.costTotal | money }}</span></summary>
+      <summary>{{ stepStatusIcon(fin.icon('12a')) }}<h2>Step 12a &middot; Order Costs</h2><span class="fin-sub-summary">{{ orderCostEntries.length }} cost{{ '' if orderCostEntries.length == 1 else 's' }} · &#8377;{{ fin.costTotal | inr }}</span></summary>
       <p class="muted small">Every cost this order carried besides the supplier, freight and insurance (those come in automatically). All amounts in INR.</p>
         {% if orderCostEntries.length == 0 %}
           <p class="muted">No other costs recorded for this order yet.</p>
@@ -3345,7 +3345,7 @@
               <td>{{ costEntryCategories[c.category] or c.category }}</td>
               <td>{{ c.description or '—' }}
                 {% if costEntryNotInZoho[c.category] %}<br><small class="muted">{{ costEntryNotInZoho[c.category] }}</small>{% elif c.zoho_expense_id %}<br><small class="muted">In Zoho Books</small>{% endif %}</td>
-              <td>{{ c.amount_inr | money }}</td>
+              <td>{{ c.amount_inr | inr }}</td>
               <td>{{ costEntryPaidFrom[c.paid_from] or '—' }}{% set bankRefText = moneyBankRef(c.paid_from or '', c.bank_reference) %}{% if bankRefText %}<br><small class="muted">{{ bankRefText }}</small>{% endif %}</td>{# QA ZOH-005 (rule D-212) #}
               <td>{{ c.recorded_by_name }}</td>
               <td>
@@ -3369,15 +3369,15 @@
       <div class="order-expenses" id="order-expenses">
         <h3 style="font-size:0.95em; margin-top:10px;">Order Expenses — travel &amp; other</h3>
         <div class="plan-bar">
-          <div>Travel budget{% if orderTravelExpenses %} ({{ orderTravelExpenses.expense_pct | money }}% of FOB){% endif %}<b>{% if orderTravelExpenses %}&#8377;{{ orderTravelExpenses.expense_amount | money }}{% else %}—{% endif %}</b></div>
-          <div>Actual travel<b>&#8377;{{ expenseSummary.travel | money }}</b></div>
-          <div>All expenses<b>&#8377;{{ expenseSummary.total | money }}</b></div>
+          <div>Travel budget{% if orderTravelExpenses %} ({{ orderTravelExpenses.expense_pct | money }}% of FOB){% endif %}<b>{% if orderTravelExpenses %}&#8377;{{ orderTravelExpenses.expense_amount | inr }}{% else %}—{% endif %}</b></div>
+          <div>Actual travel<b>&#8377;{{ expenseSummary.travel | inr }}</b></div>
+          <div>All expenses<b>&#8377;{{ expenseSummary.total | inr }}</b></div>
           <div>Receipts attached<b>{{ expenseSummary.with_receipt }} of {{ expenseSummary.count }}</b></div>
-          {% if expenseSummary.to_reimburse > 0 %}<div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;{{ expenseSummary.to_reimburse | money }}</b></div>{% endif %}
+          {% if expenseSummary.to_reimburse > 0 %}<div>Paid by staff, to reimburse<b class="vendor-bill-due">&#8377;{{ expenseSummary.to_reimburse | inr }}</b></div>{% endif %}
         </div>
         <p class="muted small">{{ 'Travel cost now uses the actual travel expenses below; the travel % stays only as the budget to compare against.' if expenseSummary.has_travel else 'Until real travel expenses are recorded, travel cost uses the travel % of FOB (provisional).' }}
           A voucher can be added later with its real date — unless the CA has locked that financial year.
-          {% if logisticsTotalForFin > 0 %}Logistics partner bills (&#8377;{{ logisticsTotalForFin | money }}) come in automatically from <a href="#logistics-bills">Group C</a>.{% endif %}</p>
+          {% if logisticsTotalForFin > 0 %}Logistics partner bills (&#8377;{{ logisticsTotalForFin | inr }}) come in automatically from <a href="#logistics-bills">Group C</a>.{% endif %}</p>
         {% if orderExpenses.length %}
         <table class="list">
           <tr><th>Date</th><th>Category</th><th>Details</th><th style="text-align:right">&#8377;</th><th>Paid by</th><th>Receipt</th><th></th></tr>
@@ -3386,7 +3386,7 @@
             <td>{{ e.expense_date | shortDate }}{% if e.added_later | int %}<br><small class="muted">added later (entered {{ e.created_at | shortDate }})</small>{% endif %}</td>
             <td>{{ expenseCategories[e.category] or e.category }}</td>
             <td>{{ e.details }}</td>
-            <td style="text-align:right">{{ e.amount_inr | money }}</td>
+            <td style="text-align:right">{{ e.amount_inr | inr }}</td>
             <td>{{ expensePaidBy[e.paid_by] or e.paid_by }}{% if e.paid_by == 'staff' and e.staff_name %} — {{ e.staff_name }}{% endif %}{% set bankRefText = moneyBankRef(e.paid_by, e.bank_reference) %}{% if bankRefText %}<br><small class="muted">{{ bankRefText }}</small>{% endif %}</td>{# QA ZOH-005 (rule D-212) #}
             <td>{% if e.receipt_file_id %}{% if fileAllowed[e.receipt_file_id] !== false %}<a href="/file-store/{{ e.receipt_file_id }}/download">receipt</a>{% else %}receipt{% endif %}{# QA R7-N06 #}{% else %}<span class="vendor-bill-due">No bill — {{ e.no_receipt_reason }}</span>{% endif %}</td>
             <td>
@@ -3579,7 +3579,7 @@
       <h3 style="font-size:0.95em; margin-top:12px;">LC Payment Received</h3>
       {% set lcCur = order.currency_code or 'INR' %}
       {% if orderLcDetails and orderLcDetails.lc_received_at %}
-        <p>Paid by the bank on <strong>{{ orderLcDetails.lc_received_at | shortDate }}</strong>: {{ lcCur }} {{ orderLcDetails.lc_received_amount | money }} &middot; &#8377;{{ orderLcDetails.lc_inr_credited | money }} credited &middot; &#8377;{{ orderLcDetails.lc_bank_charges_inr | money }} bank charges{% if orderLcDetails.lc_zoho_synced_at %} &middot; <span class="muted">in Zoho Books</span>{% endif %}</p>
+        <p>Paid by the bank on <strong>{{ orderLcDetails.lc_received_at | shortDate }}</strong>: {{ lcCur }} {{ orderLcDetails.lc_received_amount | money }} &middot; &#8377;{{ orderLcDetails.lc_inr_credited | inr }} credited &middot; &#8377;{{ orderLcDetails.lc_bank_charges_inr | inr }} bank charges{% if orderLcDetails.lc_zoho_synced_at %} &middot; <span class="muted">in Zoho Books</span>{% endif %}</p>
       {% else %}
         <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books at the next sync (hourly, or Sync now) as the buyer's payment against the Commercial Invoice.</p>
       {% endif %}
@@ -3662,26 +3662,26 @@
     <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"{{ fin.open('12c') }}>
-      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}{% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}Net profit &#8377;{{ profitability.profit_after_incentive_inr | money }}{% if not profitability.incentives_locked %} (estimated){% endif %}{% else %}Profit before incentives &#8377;{{ profitability.profit_before_commission_inr | money }}{% endif %}{% endif %}</span></summary>
+      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}{% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}Net profit &#8377;{{ profitability.profit_after_incentive_inr | inr }}{% if not profitability.incentives_locked %} (estimated){% endif %}{% else %}Profit before incentives &#8377;{{ profitability.profit_before_commission_inr | inr }}{% endif %}{% endif %}</span></summary>
         {% if profitability %}
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
-            <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
-            <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
-            <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
-            <div><span class="k">Ocean Freight (INR){{ " — from the forwarder's bills" if profitability.freight_from_bills else '' }}</span><span class="v">{{ profitability.freight_cost_inr | money }}{% if profitability.freight_conversion_text %}<br><small class="muted">Step 9a rate: {{ profitability.freight_conversion_text }}</small>{% endif %}</span></div>
-            <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}{% if profitability.insurance_conversion_text %}<br><small class="muted">Step 9a: {{ profitability.insurance_conversion_text }}</small>{% endif %}</span></div>
-            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v">{{ profitability.logistics_cost_inr | money }}</span></div>
-            <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | money }}</span></div>
-            <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v">{{ profitability.zoho_expenses_inr | money }}</span></div>
-            <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_excl_incentives_inr | money }}</span></div>
+            <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | inr }}</span></div>
+            <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | inr }}</span></div>
+            <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | inr }}</span></div>
+            <div><span class="k">Ocean Freight (INR){{ " — from the forwarder's bills" if profitability.freight_from_bills else '' }}</span><span class="v">{{ profitability.freight_cost_inr | inr }}{% if profitability.freight_conversion_text %}<br><small class="muted">Step 9a rate: {{ profitability.freight_conversion_text }}</small>{% endif %}</span></div>
+            <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | inr }}{% if profitability.insurance_conversion_text %}<br><small class="muted">Step 9a: {{ profitability.insurance_conversion_text }}</small>{% endif %}</span></div>
+            <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v">{{ profitability.logistics_cost_inr | inr }}</span></div>
+            <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | inr }}</span></div>
+            <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v">{{ profitability.zoho_expenses_inr | inr }}</span></div>
+            <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_excl_incentives_inr | inr }}</span></div>
             {# Owner decision D-245 P5: commission and incentive shown apart, estimated until the MD locks the order (the locked figure then replaces the estimate). #}
-            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.cost_before_incentives_inr | money }}</span></div>
-            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.profit_before_commission_inr | money }}</span></div>
+            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.cost_before_incentives_inr | inr }}</span></div>
+            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.profit_before_commission_inr | inr }}</span></div>
             {% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}
-            <div><span class="k">Associate Commission (INR){% if profitability.commission_state %} — {{ profitStateLabel(profitability.commission_state) }}{% endif %}</span><span class="v">{% if profitability.commission_state %}{{ profitability.commission_inr | money }}{% else %}— (no associate){% endif %}</span></div>
-            <div><span class="k">Team Incentive (INR) — {{ profitStateLabel(profitability.incentive_state) }}</span><span class="v">{{ profitability.incentive_inr | money }}</span></div>
-            <div><span class="k">Order Profit after Commission &amp; Incentive (INR){% if not profitability.incentives_locked %} — estimated{% endif %}</span><span class="v">{{ profitability.profit_after_incentive_inr | money }}</span></div>
+            <div><span class="k">Associate Commission (INR){% if profitability.commission_state %} — {{ profitStateLabel(profitability.commission_state) }}{% endif %}</span><span class="v">{% if profitability.commission_state %}{{ profitability.commission_inr | inr }}{% else %}— (no associate){% endif %}</span></div>
+            <div><span class="k">Team Incentive (INR) — {{ profitStateLabel(profitability.incentive_state) }}</span><span class="v">{{ profitability.incentive_inr | inr }}</span></div>
+            <div><span class="k">Order Profit after Commission &amp; Incentive (INR){% if not profitability.incentives_locked %} — estimated{% endif %}</span><span class="v">{{ profitability.profit_after_incentive_inr | inr }}</span></div>
             <div><span class="k">Order Margin % (after)</span><span class="v">{% if profitability.margin_after_pct != null %}{{ profitability.margin_after_pct | money }}%{% else %}—{% endif %}</span></div>
             {% else %}
             <div style="grid-column:1 / -1"><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives — the profit above is before them.</span></div>
@@ -3689,7 +3689,7 @@
             {# Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. #}
             {% if orderPurchaseGst and orderPurchaseGst.total > 0 %}
             <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v">{{ orderPurchaseGst.total | money }}</span>
-              <small class="muted" style="display:block">Supplier &#8377;{{ orderPurchaseGst.supplier | money }} · logistics &#8377;{{ orderPurchaseGst.logistics | money }}. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
+              <small class="muted" style="display:block">Supplier &#8377;{{ orderPurchaseGst.supplier | inr }} · logistics &#8377;{{ orderPurchaseGst.logistics | inr }}. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
             {% endif %}
           </div>
           {% if profitability.actual_money_only %}{# D-413 #}
@@ -4021,7 +4021,7 @@
         <summary class="muted small">Correct or delete a recorded claim (typed a wrong amount? fix it here — a reason is required)</summary>
         {% for b in orderBenefitClaims %}
           <div class="card-nested fin-correct-claim">
-            <strong>{{ b.scheme_name }}</strong> <span class="muted small">— claimed &#8377;{{ b.claimed_amount | money }} on {{ b.claimed_at }}{% if b.received_amount != null %}, received &#8377;{{ b.received_amount | money }}{% endif %}</span>
+            <strong>{{ b.scheme_name }}</strong> <span class="muted small">— claimed &#8377;{{ b.claimed_amount | inr }} on {{ b.claimed_at }}{% if b.received_amount != null %}, received &#8377;{{ b.received_amount | inr }}{% endif %}</span>
             <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/correct" class="field-grid">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="{{ b.claimed_amount }}" placeholder="e.g. 25000.00"></label>
@@ -4140,7 +4140,7 @@
       {# Owner decision (2026-10-27): unpaid supplier / logistics bills are a warning here, not a block — accounts may settle vendor bills later. #}
       {% set unpaidBills = vendorBillsView.unpaid(vendorBills) %}
       {% if unpaidBills.length %}
-        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; {{ unpaidBills.length }} vendor bill{{ '' if unpaidBills.length == 1 else 's' }} still unpaid: &#8377;{{ vendorBillsView.totals(unpaidBills).due | money }} due
+        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; {{ unpaidBills.length }} vendor bill{{ '' if unpaidBills.length == 1 else 's' }} still unpaid: &#8377;{{ vendorBillsView.totals(unpaidBills).due | inr }} due
           ({% for b in unpaidBills %}{{ 'Supplier' if b.vendor_kind == 'supplier' else (b.partner_name or 'Logistics') }} {{ b.bill_no }}{% if not loop.last %}, {% endif %}{% endfor %}) — you can still mark the order fully settled.</p>
       {% endif %}
       {% if permissions.edit_locked_data %}

@@ -1,6 +1,6 @@
 <?php use App\Helpers\Csrf;
 $qty = rtrim(rtrim((string) $r['quantity'], '0'), '.');
-$inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
+$inr = static fn ($v): string => '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $v, 2); ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/procurement">&larr; Procurement</a> · <a href="/orders/<?= (int) $r['order_id'] ?>">Order <?= htmlspecialchars((string) $r['order_reference']) ?></a></p>
   <h1>PR-<?= (int) $r['id'] ?> · <?= htmlspecialchars((string) $r['description']) ?></h1>

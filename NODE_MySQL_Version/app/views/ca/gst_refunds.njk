@@ -4,10 +4,10 @@
   <p class="muted">NexaCrest exports under LUT and sells nothing in India, so the GST paid on purchases comes back as a refund, claimed for a whole period (form RFD-01), not order by order. Each order's cost keeps its GST (it left the bank). Record each claim here, then what the bank actually credited. A credit goes to Zoho Books at the next sync (hourly, or Sync Now) as a journal: the bank account received, <em>GST Refund Receivable</em> reduced.</p>
 
   <div class="kv-grid">
-    <div><span class="k">Claimed</span><span class="v">&#8377;{{ totals.claimed | money }}</span></div>
-    <div><span class="k">Credited to the bank</span><span class="v">&#8377;{{ totals.credited | money }}</span></div>
-    <div><span class="k">Refused</span><span class="v">&#8377;{{ totals.refused | money }}</span></div>
-    <div><span class="k">Still to come back</span><span class="v">&#8377;{{ totals.outstanding | money }}</span></div>
+    <div><span class="k">Claimed</span><span class="v">&#8377;{{ totals.claimed | inr }}</span></div>
+    <div><span class="k">Credited to the bank</span><span class="v">&#8377;{{ totals.credited | inr }}</span></div>
+    <div><span class="k">Refused</span><span class="v">&#8377;{{ totals.refused | inr }}</span></div>
+    <div><span class="k">Still to come back</span><span class="v">&#8377;{{ totals.outstanding | inr }}</span></div>
   </div>
 
   <div class="section">
@@ -22,18 +22,18 @@
         <td>{{ c.period_label }}</td>
         <td>{{ c.claim_arn }}</td>
         <td>{{ c.filed_on | shortDate }}</td>
-        <td>&#8377;{{ c.gst_on_bills | money }}</td>
-        <td>&#8377;{{ c.amount_claimed | money }}</td>
-        <td>&#8377;{{ c.amount_credited | money }}
+        <td>&#8377;{{ c.gst_on_bills | inr }}</td>
+        <td>&#8377;{{ c.amount_claimed | inr }}</td>
+        <td>&#8377;{{ c.amount_credited | inr }}
           {% for r in c.credit_rows %}
-            <br><small class="muted">{{ r.credited_on | shortDate }} · {{ parts[r.part] or r.part }} · &#8377;{{ r.amount | money }} · bank ref {{ r.bank_reference }} · {% if r.zoho_journal_id %}in Zoho Books (journal {{ r.zoho_journal_id }}){% else %}goes to Zoho Books at the next sync{% endif %}</small>
+            <br><small class="muted">{{ r.credited_on | shortDate }} · {{ parts[r.part] or r.part }} · &#8377;{{ r.amount | inr }} · bank ref {{ r.bank_reference }} · {% if r.zoho_journal_id %}in Zoho Books (journal {{ r.zoho_journal_id }}){% else %}goes to Zoho Books at the next sync{% endif %}</small>
             {% if not r.zoho_journal_id and permissions.inr_actual_edit %}
               <form method="post" action="/ca/gst-refunds/credits/{{ r.id }}/delete" style="display:inline" data-confirm="Remove this refund credit? Record it again with the right figures."><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link small">Remove</button></form>
             {% endif %}
           {% endfor %}
         </td>
-        <td>{% if c.amount_refused > 0 %}&#8377;{{ c.amount_refused | money }}<br><small class="muted">{{ c.refused_note }}</small>{% else %}—{% endif %}</td>
-        <td>{% if c.outstanding > 0 %}<span class="badge badge-warning">{{ 'Balance pending' if c.amount_credited > 0 else 'Claimed' }}</span><br><small class="muted">&#8377;{{ c.outstanding | money }} to come</small>{% else %}<span class="badge badge-success">Closed</span>{% endif %}</td>
+        <td>{% if c.amount_refused > 0 %}&#8377;{{ c.amount_refused | inr }}<br><small class="muted">{{ c.refused_note }}</small>{% else %}—{% endif %}</td>
+        <td>{% if c.outstanding > 0 %}<span class="badge badge-warning">{{ 'Balance pending' if c.amount_credited > 0 else 'Claimed' }}</span><br><small class="muted">&#8377;{{ c.outstanding | inr }} to come</small>{% else %}<span class="badge badge-success">Closed</span>{% endif %}</td>
       </tr>
       {% if permissions.inr_actual_edit and c.outstanding > 0 %}
       <tr>

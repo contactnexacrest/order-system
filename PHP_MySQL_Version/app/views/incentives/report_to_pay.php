@@ -18,7 +18,7 @@
   </form>
   <?php foreach ($groups as $key => $g): ?>
   <div class="section" id="to-pay-<?= htmlspecialchars($key) ?>">
-    <h2><?= htmlspecialchars($g['label']) ?> — &#8377;<?= number_format($g['totals']['amount_inr'], 2) ?></h2>
+    <h2><?= htmlspecialchars($g['label']) ?> — &#8377;<?= \App\Helpers\MoneyFormat::indian($g['totals']['amount_inr'], 2) ?></h2>
     <?php $rows = $g['rows']; $totals = $g['totals']; require __DIR__ . '/_report_table.php'; ?>
   </div>
   <?php endforeach; ?>

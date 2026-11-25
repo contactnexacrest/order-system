@@ -9,21 +9,21 @@
     <td>{{ r.payee }}</td>
     <td>{{ 'Associate' if r.payee_kind == 'associate' else 'Staff' }}</td>
     <td>{{ r.role }}</td>
-    <td>{{ r.amount_inr | money }}</td>
-    <td>{{ r.gst_inr | money }}</td>
-    <td>{{ r.tds_inr | money }}</td>
+    <td>{{ r.amount_inr | inr }}</td>
+    <td>{{ r.gst_inr | inr }}</td>
+    <td>{{ r.tds_inr | inr }}</td>
     <td>{{ incentiveReportStates[r.state] or r.state }}</td>
     <td>{{ r.due_on | shortDate if r.due_on else '—' }}</td>
     <td>{{ r.payout_run_on | shortDate if r.payout_run_on else '—' }}</td>
     <td>{{ r.paid_on | shortDate if r.paid_on else '—' }}</td>
-    <td>{{ (r.kept_not_eligible_inr or 0) | money }}</td>
-    <td>{{ (r.kept_capped_inr or 0) | money }}</td>
+    <td>{{ (r.kept_not_eligible_inr or 0) | inr }}</td>
+    <td>{{ (r.kept_capped_inr or 0) | inr }}</td>
   </tr>
   {% else %}
   <tr><td colspan="15" class="muted">Nothing to show.</td></tr>
   {% endfor %}
   <tr class="totals-row"><td colspan="6"><strong>Total ({{ totals.count }} row{{ '' if totals.count == 1 else 's' }})</strong></td>
-    <td><strong>{{ totals.amount_inr | money }}</strong></td><td><strong>{{ totals.gst_inr | money }}</strong></td><td><strong>{{ totals.tds_inr | money }}</strong></td><td colspan="4"></td>
-    <td><strong>{{ (totals.kept_not_eligible_inr or 0) | money }}</strong></td><td><strong>{{ (totals.kept_capped_inr or 0) | money }}</strong></td></tr>
+    <td><strong>{{ totals.amount_inr | inr }}</strong></td><td><strong>{{ totals.gst_inr | inr }}</strong></td><td><strong>{{ totals.tds_inr | inr }}</strong></td><td colspan="4"></td>
+    <td><strong>{{ (totals.kept_not_eligible_inr or 0) | inr }}</strong></td><td><strong>{{ (totals.kept_capped_inr or 0) | inr }}</strong></td></tr>
 </table>
 <p class="muted small">GST on an associate's commission is paid on top against their tax invoice and comes back as input credit — not a cost. TDS is deducted from the payout and owed to the government — a liability, not a cost. Estimated rows are worked out from the order as it stands and change until the MD locks the order. "Kept" is the part of a person's share the company keeps because they are not eligible for the team incentive or reached a cap; it is not paid to anyone else.</p>

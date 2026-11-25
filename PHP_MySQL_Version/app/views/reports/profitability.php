@@ -24,13 +24,13 @@
   <div class="section">
     <h2>Totals for This Period <span class="muted small">(<?= ($filters['scope'] ?? 'all') === 'locked' ? 'locked orders only' : 'open orders included — their commission and incentive are estimates' ?>)</span></h2>
     <div class="kv-grid">
-      <div><span class="k">Total Revenue (INR)</span><span class="v"><?= number_format($totals['revenue_inr'], 2) ?></span></div>
-      <div><span class="k">Cost before commission &amp; incentive (INR)</span><span class="v"><?= number_format($totals['cost_before_incentives_inr'], 2) ?></span></div>
-      <div><span class="k">Profit before commission &amp; incentive (INR)</span><span class="v"><?= number_format($totals['profit_before_commission_inr'], 2) ?></span></div>
+      <div><span class="k">Total Revenue (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['revenue_inr'], 2) ?></span></div>
+      <div><span class="k">Cost before commission &amp; incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['cost_before_incentives_inr'], 2) ?></span></div>
+      <div><span class="k">Profit before commission &amp; incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['profit_before_commission_inr'], 2) ?></span></div>
       <?php if (!empty($seeIncentives)): ?>
-      <div><span class="k">Associate commission (INR)</span><span class="v"><?= number_format($totals['commission_inr'], 2) ?></span></div>
-      <div><span class="k">Team incentive (INR)</span><span class="v"><?= number_format($totals['incentive_inr'], 2) ?></span></div>
-      <div><span class="k">Profit after commission &amp; incentive (INR)</span><span class="v"><?= number_format($totals['profit_after_incentive_inr'], 2) ?></span></div>
+      <div><span class="k">Associate commission (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['commission_inr'], 2) ?></span></div>
+      <div><span class="k">Team incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['incentive_inr'], 2) ?></span></div>
+      <div><span class="k">Profit after commission &amp; incentive (INR)</span><span class="v"><?= \App\Helpers\MoneyFormat::indian($totals['profit_after_incentive_inr'], 2) ?></span></div>
       <div><span class="k">Overall margin after %</span><span class="v"><?= $totals['margin_after_pct'] !== null ? number_format($totals['margin_after_pct'], 2) . '%' : '—' ?></span></div>
       <?php else: ?>
       <div><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives.</span></div>
@@ -59,13 +59,13 @@
         <td><a href="/orders/<?= (int) $r['order_id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
         <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
         <td><?= htmlspecialchars((string) $r['created_at']) ?></td>
-        <td><?= number_format($r['revenue_inr'], 2) ?><?= $r['revenue_is_estimated'] ? ' <span class="muted small">(est.)</span>' : '' ?></td>
-        <td><?= number_format($r['cost_before_incentives_inr'], 2) ?></td>
-        <td><?= number_format($r['profit_before_commission_inr'], 2) ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['revenue_inr'], 2) ?><?= $r['revenue_is_estimated'] ? ' <span class="muted small">(est.)</span>' : '' ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['cost_before_incentives_inr'], 2) ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['profit_before_commission_inr'], 2) ?></td>
         <?php if (!empty($seeIncentives)): ?>
-        <td><?= $r['commission_state'] !== null ? number_format($r['commission_inr'], 2) . ' <span class="muted small">(' . $__state($r['commission_state']) . ')</span>' : '<span class="muted">—</span>' ?></td>
-        <td><?= number_format($r['incentive_inr'], 2) ?> <span class="muted small">(<?= $__state($r['incentive_state']) ?>)</span></td>
-        <td><?= number_format($r['profit_after_incentive_inr'], 2) ?></td>
+        <td><?= $r['commission_state'] !== null ? \App\Helpers\MoneyFormat::indian($r['commission_inr'], 2) . ' <span class="muted small">(' . $__state($r['commission_state']) . ')</span>' : '<span class="muted">—</span>' ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['incentive_inr'], 2) ?> <span class="muted small">(<?= $__state($r['incentive_state']) ?>)</span></td>
+        <td><?= \App\Helpers\MoneyFormat::indian($r['profit_after_incentive_inr'], 2) ?></td>
         <td><?= $r['margin_after_pct'] !== null ? number_format($r['margin_after_pct'], 2) . '%' : '—' ?></td>
         <?php endif; ?>
       </tr>

@@ -9,22 +9,22 @@
       <tr><th></th><th>In This System</th><th>In Bank Statement</th><th>Matched</th><th>Difference</th></tr>
       <tr>
         <td><strong>Revenue (Credits)</strong></td>
-        <td>&#8377;{{ totalRevenue | money }}</td>
-        <td>&#8377;{{ bankTotals.totalCredit | money }}</td>
-        <td>&#8377;{{ bankTotals.matchedCredit | money }}</td>
+        <td>&#8377;{{ totalRevenue | inr }}</td>
+        <td>&#8377;{{ bankTotals.totalCredit | inr }}</td>
+        <td>&#8377;{{ bankTotals.matchedCredit | inr }}</td>
         <td>
           {% set diff = totalRevenue - bankTotals.matchedCredit %}
-          &#8377;{{ (diff | abs) | money }} {% if diff != 0 %}{% if diff > 0 %}(revenue not yet matched){% else %}(unexpected){% endif %}{% endif %}
+          &#8377;{{ (diff | abs) | inr }} {% if diff != 0 %}{% if diff > 0 %}(revenue not yet matched){% else %}(unexpected){% endif %}{% endif %}
         </td>
       </tr>
       <tr>
         <td><strong>Expenses (Debits)</strong></td>
-        <td>&#8377;{{ totalExpenses | money }}</td>
-        <td>&#8377;{{ bankTotals.totalDebit | money }}</td>
-        <td>&#8377;{{ bankTotals.matchedDebit | money }}</td>
+        <td>&#8377;{{ totalExpenses | inr }}</td>
+        <td>&#8377;{{ bankTotals.totalDebit | inr }}</td>
+        <td>&#8377;{{ bankTotals.matchedDebit | inr }}</td>
         <td>
           {% set ediff = totalExpenses - bankTotals.matchedDebit %}
-          &#8377;{{ (ediff | abs) | money }} {% if ediff != 0 %}{% if ediff > 0 %}(expenses not yet matched){% else %}(unexpected){% endif %}{% endif %}
+          &#8377;{{ (ediff | abs) | inr }} {% if ediff != 0 %}{% if ediff > 0 %}(expenses not yet matched){% else %}(unexpected){% endif %}{% endif %}
         </td>
       </tr>
     </table>
@@ -43,7 +43,7 @@
           <td>{% if canOpenOrder(leg.order_id) %}<a href="/orders/{{ leg.order_id }}">{{ leg.buyer_inquiry_ref }}</a>{% else %}{{ leg.buyer_inquiry_ref }}{% endif %}</td>
           <td>{{ leg.leg | legLabel }}</td>
           <td>{{ leg.cleared_at }}</td>
-          <td>&#8377;{{ leg.inr_actual | money }}</td>
+          <td>&#8377;{{ leg.inr_actual | inr }}</td>
         </tr>
         {% endfor %}
       </table>

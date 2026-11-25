@@ -17,9 +17,9 @@ foreach ($payouts as $p) {
 <div class="card">
   <h1>My Incentives</h1>
   <div class="kv-grid">
-    <div><span class="k">Paid in <?= $__year ?></span><span class="v">&#8377;<?= number_format($__paidThisYear, 0) ?></span></div>
+    <div><span class="k">Paid in <?= $__year ?></span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($__paidThisYear, 0) ?></span></div>
     <?php foreach ($__due as $month => $amount): ?>
-      <div><span class="k">Your <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> payout run</span><span class="v">&#8377;<?= number_format($amount, 0) ?></span></div>
+      <div><span class="k">Your <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> payout run</span><span class="v">&#8377;<?= \App\Helpers\MoneyFormat::indian($amount, 0) ?></span></div>
     <?php endforeach; ?>
   </div>
   <table class="list" style="margin-top:12px">
@@ -29,7 +29,7 @@ foreach ($payouts as $p) {
         <td><?= htmlspecialchars((string) ($p['buyer_inquiry_ref'] ?: $p['order_reference'])) ?></td>
         <td><?= htmlspecialchars((string) $p['company_legal_name']) ?></td>
         <td><?= htmlspecialchars(IncentiveRepository::roleLabel((string) $p['role'])) ?></td>
-        <td><?= number_format((float) ($p['status'] === 'paid' ? $p['paid_inr'] : $p['amount_inr']), 0) ?></td>
+        <td><?= \App\Helpers\MoneyFormat::indian((float) ($p['status'] === 'paid' ? $p['paid_inr'] : $p['amount_inr']), 0) ?></td>
         <td><?= $p['status'] === 'paid'
             ? '<span class="badge badge-success">' . htmlspecialchars(IncentiveService::monthLabel((string) $p['incentive_month'])) . ' incentive — paid</span>'
             : '<span class="badge badge-warning">' . htmlspecialchars(IncentiveService::monthLabel((string) $p['incentive_month'])) . ' incentive</span>' ?></td>

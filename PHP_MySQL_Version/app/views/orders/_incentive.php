@@ -23,7 +23,7 @@ $__edit = !empty($incentiveCanEdit) && !$__locked;
 $__oid = (int) $order['id'];
 $__stateText = ['open' => 'Open — can be changed', 'ready' => 'Ready to lock', 'locked' => 'Locked', 'paid' => 'Paid — can never change'];
 $__stateClass = ['open' => 'badge-info', 'ready' => 'badge-warning', 'locked' => 'badge-success', 'paid' => 'badge-success'];
-$__money = static fn (float $v): string => '&#8377;' . number_format($v, 2);
+$__money = static fn (float $v): string => '&#8377;' . \App\Helpers\MoneyFormat::indian($v, 2);
 $__est = $__c['estimated'] && !$__locked ? ' <small class="muted">(estimated)</small>' : '';
 $__rule = $__c['rule'];
 ?>
@@ -52,7 +52,7 @@ $__rule = $__c['rule'];
         <tr>
           <td><?= htmlspecialchars((string) ($p['user_name'] ?? $p['associate_name'] ?? '—')) ?></td>
           <td><?= htmlspecialchars(IncentiveRepository::roleLabel((string) $p['role'])) ?></td>
-          <td><?= $p['amount_fc'] !== null ? htmlspecialchars((string) $p['currency_code']) . ' ' . number_format((float) $p['amount_fc'], 2) . ' · ' : '' ?><?= number_format((float) $p['amount_inr'], 2) ?></td>
+          <td><?= $p['amount_fc'] !== null ? htmlspecialchars((string) $p['currency_code']) . ' ' . number_format((float) $p['amount_fc'], 2) . ' · ' : '' ?><?= \App\Helpers\MoneyFormat::indian((float) $p['amount_inr'], 2) ?></td>
           <td><?= $p['status'] === 'paid' ? 'Paid ' . htmlspecialchars(Dates::short((string) $p['paid_on'])) : 'Due' . (!empty($p['payout_run_on']) ? ' — ' . htmlspecialchars(Dates::short((string) $p['payout_run_on'])) . ' run' : '') ?></td>
         </tr>
       <?php endforeach; ?>
@@ -64,10 +64,10 @@ $__rule = $__c['rule'];
         <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
         <?php foreach ($__kept as $__k): ?>
           <tr><td><?= htmlspecialchars((string) $__k['user_name']) ?></td><td><?= htmlspecialchars(IncentiveRepository::roleLabel((string) $__k['role'])) ?></td>
-            <td><?= number_format((float) $__k['by_share_inr'], 2) ?></td><td><?= number_format((float) $__k['paid_inr'], 2) ?></td>
-            <td><?= number_format((float) $__k['kept_inr'], 2) ?> &mdash; <?= htmlspecialchars((string) $__k['kept_note']) ?></td></tr>
+            <td><?= \App\Helpers\MoneyFormat::indian((float) $__k['by_share_inr'], 2) ?></td><td><?= \App\Helpers\MoneyFormat::indian((float) $__k['paid_inr'], 2) ?></td>
+            <td><?= \App\Helpers\MoneyFormat::indian((float) $__k['kept_inr'], 2) ?> &mdash; <?= htmlspecialchars((string) $__k['kept_note']) ?></td></tr>
         <?php endforeach; ?>
-        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong><?= number_format((float) $__inc['kept_not_eligible_inr'] + (float) $__inc['kept_capped_inr'], 2) ?></strong> (not eligible <?= number_format((float) $__inc['kept_not_eligible_inr'], 2) ?> &middot; capped <?= number_format((float) $__inc['kept_capped_inr'], 2) ?>)</td></tr>
+        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong><?= \App\Helpers\MoneyFormat::indian((float) $__inc['kept_not_eligible_inr'] + (float) $__inc['kept_capped_inr'], 2) ?></strong> (not eligible <?= \App\Helpers\MoneyFormat::indian((float) $__inc['kept_not_eligible_inr'], 2) ?> &middot; capped <?= \App\Helpers\MoneyFormat::indian((float) $__inc['kept_capped_inr'], 2) ?>)</td></tr>
       </table>
     <?php endif; ?>
     <?php if (!empty($__c['associate'])): $c = $__c['associate']; ?>
@@ -174,7 +174,7 @@ $__rule = $__c['rule'];
         </table>
         <?php if (($__c['kept_total'] ?? 0) > 0): ?><p class="muted small">The company's incentive cost on this order is <?= $__money($__c['team_total']) ?>, not <?= $__money((float) $__c['team_by_share']) ?>. Other people's amounts are not raised.</p><?php endif; ?>
       <?php endif; ?>
-      <?php if ($__c['unallocated'] > 0): ?><p class="small">&#8377;<?= number_format($__c['unallocated'], 2) ?> has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p><?php endif; ?>
+      <?php if ($__c['unallocated'] > 0): ?><p class="small">&#8377;<?= \App\Helpers\MoneyFormat::indian($__c['unallocated'], 2) ?> has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p><?php endif; ?>
       <?php if ($__edit): ?>
         <label><input type="checkbox" name="shares_customised" value="1"<?= $__c['shares_customised'] ? ' checked' : '' ?>> Use the shares typed above (they must add up to 100% over the ticked roles); otherwise unticked shares spread over the ticked roles in proportion.</label>
         <details style="margin-top:6px">

@@ -18,7 +18,7 @@
         {% for d in list %}{% if d.level == c[0] %}
           <div class="desig">
             <strong>{{ d.title }}</strong>{% if d.is_active != 1 %} <span class="badge badge-inactive">off</span>{% endif %}
-            <small>{{ d.member_count }} {{ 'person' if d.member_count == 1 else 'people' }} · role: <a href="/admin/roles/{{ d.role_id }}/permissions">{{ d.role_name }}</a>{% if d.approval_limit_inr !== null %} · approves up to ₹{{ d.approval_limit_inr | money0 }}{% endif %}</small>
+            <small>{{ d.member_count }} {{ 'person' if d.member_count == 1 else 'people' }} · role: <a href="/admin/roles/{{ d.role_id }}/permissions">{{ d.role_name }}</a>{% if d.approval_limit_inr !== null %} · approves up to ₹{{ d.approval_limit_inr | inr0 }}{% endif %}</small>
             <form method="post" action="/admin/preview-as" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="designation_id" value="{{ d.id }}"><button type="submit" class="btn-link" title="See the app exactly as a {{ d.title }} sees it">Preview the app as this</button></form>
           </div>
         {% endif %}{% endfor %}
@@ -116,7 +116,7 @@
           <td><input form="{{ formId }}" type="number" name="approval_limit_inr" min="0" step="0.01" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}" placeholder="none" aria-label="Approval limit (INR)"></td>
           {% else %}
           <td><input form="{{ formId }}" type="hidden" name="level" value="{{ d.level }}">{{ levels[d.level] or d.level }}</td>
-          <td><input form="{{ formId }}" type="hidden" name="approval_limit_inr" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}">{{ (d.approval_limit_inr | money) if d.approval_limit_inr !== null else 'none' }}<br><small class="muted">{{ 'Only the MD or ED changes approval limits.' if not canLimits else 'Your own designation — another MD/ED changes it.' }}</small></td>
+          <td><input form="{{ formId }}" type="hidden" name="approval_limit_inr" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}">{{ (d.approval_limit_inr | inr) if d.approval_limit_inr !== null else 'none' }}<br><small class="muted">{{ 'Only the MD or ED changes approval limits.' if not canLimits else 'Your own designation — another MD/ED changes it.' }}</small></td>
           {% endif %}
           {# D-259 (owner approval 6 Nov 2026): whether this designation's people share in the team incentive (MD only). #}
           {% set incOn = (d.incentive_eligible is not defined) or (d.incentive_eligible === null) or (d.incentive_eligible == 1) %}

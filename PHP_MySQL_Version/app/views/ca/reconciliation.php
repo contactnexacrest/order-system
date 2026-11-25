@@ -16,17 +16,17 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReconUser['id']
       <tr><th></th><th>In This System</th><th>In Bank Statement</th><th>Matched</th><th>Difference</th></tr>
       <tr>
         <td><strong>Revenue (Credits)</strong></td>
-        <td>&#8377;<?= number_format($totalRevenue, 2) ?></td>
-        <td>&#8377;<?= number_format($bankTotals['totalCredit'], 2) ?></td>
-        <td>&#8377;<?= number_format($bankTotals['matchedCredit'], 2) ?></td>
-        <td><?php $diff = $totalRevenue - $bankTotals['matchedCredit']; ?>&#8377;<?= number_format(abs($diff), 2) ?> <?= $diff == 0 ? '' : ($diff > 0 ? '(revenue not yet matched)' : '(unexpected)') ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($totalRevenue, 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($bankTotals['totalCredit'], 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($bankTotals['matchedCredit'], 2) ?></td>
+        <td><?php $diff = $totalRevenue - $bankTotals['matchedCredit']; ?>&#8377;<?= \App\Helpers\MoneyFormat::indian(abs($diff), 2) ?> <?= $diff == 0 ? '' : ($diff > 0 ? '(revenue not yet matched)' : '(unexpected)') ?></td>
       </tr>
       <tr>
         <td><strong>Expenses (Debits)</strong></td>
-        <td>&#8377;<?= number_format($totalExpenses, 2) ?></td>
-        <td>&#8377;<?= number_format($bankTotals['totalDebit'], 2) ?></td>
-        <td>&#8377;<?= number_format($bankTotals['matchedDebit'], 2) ?></td>
-        <td><?php $ediff = $totalExpenses - $bankTotals['matchedDebit']; ?>&#8377;<?= number_format(abs($ediff), 2) ?> <?= $ediff == 0 ? '' : ($ediff > 0 ? '(expenses not yet matched)' : '(unexpected)') ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($totalExpenses, 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($bankTotals['totalDebit'], 2) ?></td>
+        <td>&#8377;<?= \App\Helpers\MoneyFormat::indian($bankTotals['matchedDebit'], 2) ?></td>
+        <td><?php $ediff = $totalExpenses - $bankTotals['matchedDebit']; ?>&#8377;<?= \App\Helpers\MoneyFormat::indian(abs($ediff), 2) ?> <?= $ediff == 0 ? '' : ($ediff > 0 ? '(expenses not yet matched)' : '(unexpected)') ?></td>
       </tr>
     </table>
     <p class="muted small" style="margin-top:8px;"><?= (int) $bankTotals['lineCount'] ?> bank statement line(s) imported in total.</p>
@@ -44,7 +44,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReconUser['id']
           <td><?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $leg['order_id']) ? '<a href="/orders/' . (int) $leg['order_id'] . '">' . htmlspecialchars($leg['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($leg['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($leg['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $leg['cleared_at']) ?></td>
-          <td>&#8377;<?= number_format((float) $leg['inr_actual'], 2) ?></td>
+          <td>&#8377;<?= \App\Helpers\MoneyFormat::indian((float) $leg['inr_actual'], 2) ?></td>
         </tr>
         <?php endforeach; ?>
       </table>

@@ -38,7 +38,7 @@
         <div class="fx-now-rate">₹{{ fx.rate | money }} per USD <span class="fx-now-badge">{{ fx.badge }}</span></div>
         {% if fx.state == 'auto' %}
           <div class="fx-now-facts">
-            <div><span>Market rate</span><b>₹{{ fx.market | money }}</b></div>
+            <div><span>Market rate</span><b>₹{{ fx.market | inr }}</b></div>
             <div><span>Fetched</span><b>{{ fx.fetched }}</b></div>
             <div><span>Source</span><b>{{ fx.source }}</b></div>
             <div><span>Cushion</span><b>{{ fx.cushion_line }}</b></div>

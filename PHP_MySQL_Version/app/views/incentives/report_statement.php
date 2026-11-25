@@ -21,7 +21,7 @@
     </div>
   </form>
   <?php if ($name !== ''): ?>
-  <div class="section"><h2><?= htmlspecialchars($name) ?> — &#8377;<?= number_format($totals['amount_inr'], 2) ?></h2><?php require __DIR__ . '/_report_table.php'; ?></div>
+  <div class="section"><h2><?= htmlspecialchars($name) ?> — &#8377;<?= \App\Helpers\MoneyFormat::indian($totals['amount_inr'], 2) ?></h2><?php require __DIR__ . '/_report_table.php'; ?></div>
   <?php else: ?>
   <p class="muted">Choose a staff member or an associate.</p>
   <?php endif; ?>
