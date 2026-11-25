@@ -482,6 +482,8 @@ final class CaFinancialSnapshotService
             'benefits_received' => self::money($received),
             'pl' => $pl,
             'pl_estimated' => $plEstimated,
+            // D-422 (owner confirmed twice, 25 Nov 2026): cancelled / lost orders get a note in E. PROFIT (D-413).
+            'actual_money_label' => !empty($profit['actual_money_only']) ? ucfirst((string) $order['status']) . ' order' : null,
             'cash' => $cash,
             'open' => $open,
         ];

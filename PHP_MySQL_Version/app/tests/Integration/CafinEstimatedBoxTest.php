@@ -110,4 +110,29 @@ final class CafinEstimatedBoxTest extends DbTestCase
         self::assertStringNotContainsString('Not yet locked', $text);
         self::assertStringContainsString('locked & paid figures only', $text);
     }
+
+    public function testACancelledOrLostOrderGetsTheActualMoneyNote(): void
+    {
+        // D-422 (owner confirmed twice, 25 Nov 2026): E. PROFIT on a cancelled / lost order says only money that moved is counted (D-413).
+        IncentiveRepository::setSetting('program_enabled', '0', $this->admin);
+        $open = $this->paidOrder();
+        self::assertNull(CaFinancialSnapshotService::build($open)['actual_money_label'], 'an open order has no note');
+        foreach (['cancelled' => 'Cancelled order', 'lost' => 'Lost order'] as $status => $label) {
+            $orderId = $this->paidOrder();
+            Database::connection()->prepare('UPDATE orders SET status = :s WHERE id = :id')->execute(['s' => $status, 'id' => $orderId]);
+            self::assertSame($label, CaFinancialSnapshotService::build($orderId)['actual_money_label']);
+
+            $result = DocumentGenerationService::generateCaInternalAnnexure($orderId, $this->admin);
+            $file = FileStoreRepository::find((int) $result['pdf_file_id']);
+            $text = (string) preg_replace('/\s+/', ' ', (string) shell_exec('pdftotext ' . escapeshellarg((string) $file['server_path']) . ' -'));
+            @unlink((string) $file['server_path']);
+            self::assertStringContainsString($label . ' — only money that actually moved is counted: what the buyer paid minus any refund already paid back, what we paid the supplier, and real bills and expenses. Estimates (balance still to come, the full supplier order, freight not billed) are not counted.', $text);
+        }
+
+        $result = DocumentGenerationService::generateCaInternalAnnexure($open, $this->admin);
+        $file = FileStoreRepository::find((int) $result['pdf_file_id']);
+        $text = (string) shell_exec('pdftotext ' . escapeshellarg((string) $file['server_path']) . ' -');
+        @unlink((string) $file['server_path']);
+        self::assertStringNotContainsString('only money that actually moved', $text);
+    }
 }

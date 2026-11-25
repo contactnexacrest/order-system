@@ -46,6 +46,7 @@
   table.pl tr.sub td { font-weight: bold; background: #F2F2F2; }
   table.pl tr.grand td { font-weight: bold; background: #DDDDDD; font-size: 10pt; }
   table.pl tr.est td { color: #555555; font-style: italic; }
+  .actual-only-note { border: 1pt solid #999999; background: #F4F4F4; padding: 4pt 6pt; margin: 4pt 0; font-size: 9pt; }
   .est-note { font-size: 8pt; color: #555555; margin-top: 4pt; }
   .tag { font-size: 7.5pt; border: 1px solid #999999; padding: 0 4px; border-radius: 3px; color: #444444; }
   .warn { color: #8A1F1F; font-weight: bold; }
@@ -214,6 +215,9 @@
 {% endif %}
 
 <div class="section-title">E. PROFIT</div>
+{% if snapshot.actual_money_label %}
+<div class="actual-only-note"><b>{{ snapshot.actual_money_label }} — only money that actually moved is counted:</b> what the buyer paid minus any refund already paid back, what we paid the supplier, and real bills and expenses. Estimates (balance still to come, the full supplier order, freight not billed) are not counted.</div>
+{% endif %}
 <table class="pl">
   {% for r in snapshot.pl %}
   <tr{% if r[0] != 'line' %} class="{{ r[0] }}"{% endif %}><td>{{ r[1] }}{% if r[2] %} <span class="tag">{{ r[2] }}</span>{% endif %}</td><td class="num">{{ r[3] }}</td></tr>

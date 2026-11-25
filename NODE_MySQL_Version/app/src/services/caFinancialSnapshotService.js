@@ -425,6 +425,8 @@ async function build(orderId) {
     benefits_received: money(received),
     pl,
     pl_estimated: plEstimated,
+    // D-422 (owner confirmed twice, 25 Nov 2026): cancelled / lost orders get a note in E. PROFIT (D-413).
+    actual_money_label: profit.actual_money_only ? `${String(order.status).charAt(0).toUpperCase()}${String(order.status).slice(1)} order` : null,
     cash,
     open,
   };
