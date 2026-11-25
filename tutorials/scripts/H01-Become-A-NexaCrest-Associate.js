@@ -20,10 +20,11 @@ module.exports = {
 
   async setup(demo) {
     // Example rates only (D-415): six example levels, five counting orders each.
-    demo.sql(`DELETE FROM commission_ladder_steps`);
-    demo.sql(`DELETE FROM commission_levels`);
+    // Levels are referenced by associates, so they are updated in place (never deleted); the ladder is rebuilt.
     [10, 15, 20, 25, 30, 35].forEach((v, i) => demo.sql(
-      `INSERT INTO commission_levels (id, name, kind, value, is_active, sort_order) VALUES (${i + 1}, 'Level ${i + 1}', 'pct', ${v}, 1, ${(i + 1) * 10})`));
+      `INSERT INTO commission_levels (id, name, kind, value, is_active, sort_order) VALUES (${i + 1}, 'Level ${i + 1}', 'pct', ${v}, 1, ${(i + 1) * 10})
+       ON DUPLICATE KEY UPDATE name = VALUES(name), kind = 'pct', value = VALUES(value), is_active = 1, sort_order = VALUES(sort_order)`));
+    demo.sql(`DELETE FROM commission_ladder_steps`);
     [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, null]].forEach(([from, to], i) => demo.sql(
       `INSERT INTO commission_ladder_steps (from_order, to_order, level_id) VALUES (${from}, ${to === null ? 'NULL' : to}, ${i + 1})`));
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'full', address: 'Demo address', pan: 'ABCDE1234F' }, { withMd: false });
