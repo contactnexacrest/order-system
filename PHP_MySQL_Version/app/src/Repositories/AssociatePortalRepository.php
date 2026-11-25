@@ -50,10 +50,6 @@ final class AssociatePortalRepository
             $stmt = Database::connection()->prepare("SELECT MIN(DATE(created_at)) FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost')");
             $stmt->execute(['c' => $c['id']]);
             $c['first_order_on'] = $stmt->fetchColumn() ?: null;
-            $po = Database::connection()->prepare('SELECT MIN(buyer_po_received_on) FROM orders WHERE client_id = :c AND buyer_po_received_on IS NOT NULL');
-            $po->execute(['c' => $c['id']]);
-            $first = $po->fetchColumn();
-            $c['window_ends_on'] = $first ? date('Y-m-d', strtotime($first . ' +9 days')) : null;
             $c['came_via'] = self::cameVia($c);
             $ord = Database::connection()->prepare("SELECT order_reference FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost') AND is_test_data = 0 ORDER BY id");
             $ord->execute(['c' => $c['id']]);

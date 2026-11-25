@@ -68,14 +68,14 @@ $__codeChosen = false;
   <div class="section">
     <h2>Registered clients (<?= count($clients) ?>)</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>How they came to us</th><th>Registered</th><th>Your client until</th><?php if (!empty($access['orders'])): // D-263 ?><th>Orders</th><?php endif; ?><th>Last day for orders that earn commission</th><th></th></tr>
+      <tr><th>Client</th><th>Country</th><th>How they came to us</th><th>Registered</th><th>Your client</th><?php if (!empty($access['orders'])): // D-263 ?><th>Orders</th><?php endif; ?><th></th></tr>
       <?php foreach ($clients as $c): ?>
         <tr><td><?= htmlspecialchars((string) $c['company_legal_name']) ?></td><td><?= htmlspecialchars((string) ($c['country_of_destination'] ?? '')) ?></td>
-          <td><?= htmlspecialchars((string) ($c['came_via'] ?? '')) ?></td><td><?= $__d($c['associate_registered_on']) ?></td><td><?= $__d($c['associate_locked_until']) ?></td>
-          <?php if (!empty($access['orders'])): ?><td><?= $c['order_refs'] !== [] ? htmlspecialchars(implode(', ', $c['order_refs'])) : '<span class="muted">none yet</span>' ?></td><?php endif; ?><td><?= $__d($c['window_ends_on']) ?></td>
+          <td><?= htmlspecialchars((string) ($c['came_via'] ?? '')) ?></td><td><?= $__d($c['associate_registered_on']) ?></td><td data-client-status><?php if (!empty($c['first_order_on'])): // owner 25 Nov 2026: a client with an order stays yours (D-410) ?><b>Yours while your agreement runs</b><?php elseif (!empty($c['associate_locked_until'])): ?>Signed up — ends on <b><?= $__d($c['associate_locked_until']) ?></b> if no order by then<?php else: ?>—<?php endif; ?></td>
+          <?php if (!empty($access['orders'])): ?><td><?= $c['order_refs'] !== [] ? htmlspecialchars(implode(', ', $c['order_refs'])) : '<span class="muted">none yet</span>' ?></td><?php endif; ?>
           <td><a class="btn-sm btn-secondary" style="white-space:nowrap" href="/associate/clients/<?= (int) $c['id'] ?>/certificate" target="_blank" rel="noopener">Registration certificate</a></td></tr>
       <?php endforeach; ?>
-      <?php if ($clients === []): ?><tr><td colspan="8" class="muted">No clients yet.</td></tr><?php endif; ?>
+      <?php if ($clients === []): ?><tr><td colspan="7" class="muted">No clients yet.</td></tr><?php endif; ?>
     </table>
   </div>
 

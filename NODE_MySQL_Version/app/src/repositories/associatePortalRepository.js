@@ -32,20 +32,12 @@ function stageLabel(order) {
   return 'Shipped';
 }
 
-function addDays(ymd, days) {
-  const d = new Date(`${String(ymd).slice(0, 10)}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The associate's clients with first order and the 10-day window. */
+/** The associate's clients with their first order (a client with an order stays the associate's, D-410). */
 async function clients(associateId) {
   const out = [];
   for (const c of await associateRepository.clients(associateId)) {
     const first = await db.queryOne("SELECT MIN(DATE(created_at)) AS d FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost')", { c: c.id });
     c.first_order_on = first && first.d ? String(first.d).slice(0, 10) : null;
-    const po = await db.queryOne('SELECT MIN(buyer_po_received_on) AS d FROM orders WHERE client_id = :c AND buyer_po_received_on IS NOT NULL', { c: c.id });
-    c.window_ends_on = po && po.d ? addDays(po.d, 9) : null;
     c.came_via = await cameVia(c);
     c.order_refs = (await db.query("SELECT order_reference FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost') AND is_test_data = 0 ORDER BY id", { c: c.id })).map((r) => String(r.order_reference));
     out.push(c);

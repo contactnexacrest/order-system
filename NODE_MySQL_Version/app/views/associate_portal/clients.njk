@@ -1,4 +1,4 @@
-{# Expects: me, clients (with country_of_destination, associate_registered_on, associate_locked_until, first_order_on, window_ends_on),
+{# Expects: me, clients (with country_of_destination, associate_registered_on, associate_locked_until, first_order_on),
    invitations (each with i.usable), invitationStatuses (map), newLink, codeLink, protectionMonths, csrfToken. #}
 <div class="card page-wide">
   <h1>My clients</h1>
@@ -63,14 +63,14 @@
   <div class="section">
     <h2>Registered clients ({{ clients.length }})</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>How they came to us</th><th>Registered</th><th>Your client until</th>{% if access.orders %}<th>Orders</th>{% endif %}<th>Last day for orders that earn commission</th><th></th></tr>
+      <tr><th>Client</th><th>Country</th><th>How they came to us</th><th>Registered</th><th>Your client</th>{% if access.orders %}<th>Orders</th>{% endif %}<th></th></tr>
       {% for c in clients %}
         <tr><td>{{ c.company_legal_name }}</td><td>{{ c.country_of_destination or '' }}</td>
-          <td>{{ c.came_via or '' }}</td><td>{{ (c.associate_registered_on | shortDate) if c.associate_registered_on else '—' }}</td><td>{{ (c.associate_locked_until | shortDate) if c.associate_locked_until else '—' }}</td>
-          {% if access.orders %}<td>{% if c.order_refs.length %}{{ c.order_refs | join(', ') }}{% else %}<span class="muted">none yet</span>{% endif %}</td>{% endif %}<td>{{ (c.window_ends_on | shortDate) if c.window_ends_on else '—' }}</td>
+          <td>{{ c.came_via or '' }}</td><td>{{ (c.associate_registered_on | shortDate) if c.associate_registered_on else '—' }}</td><td data-client-status>{% if c.first_order_on %}{# owner 25 Nov 2026: a client with an order stays yours (D-410) #}<b>Yours while your agreement runs</b>{% elif c.associate_locked_until %}Signed up — ends on <b>{{ c.associate_locked_until | shortDate }}</b> if no order by then{% else %}—{% endif %}</td>
+          {% if access.orders %}<td>{% if c.order_refs.length %}{{ c.order_refs | join(', ') }}{% else %}<span class="muted">none yet</span>{% endif %}</td>{% endif %}
           <td><a class="btn-sm btn-secondary" style="white-space:nowrap" href="/associate/clients/{{ c.id }}/certificate" target="_blank" rel="noopener">Registration certificate</a></td></tr>
       {% endfor %}
-      {% if clients.length == 0 %}<tr><td colspan="8" class="muted">No clients yet.</td></tr>{% endif %}
+      {% if clients.length == 0 %}<tr><td colspan="7" class="muted">No clients yet.</td></tr>{% endif %}
     </table>
   </div>
 

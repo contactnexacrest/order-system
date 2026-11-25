@@ -183,6 +183,13 @@ final class AssociatePortalRoutesTest extends DbTestCase
         self::assertSame(200, $page['code']);
         self::assertStringContainsString("Mine Buyer {$this->tag}", $page['body']);
         self::assertStringNotContainsString("Theirs Buyer {$this->tag}", $page['body'], 'only their own clients');
+        // Owner 25 Nov 2026: no old "Last day for orders that earn commission" column (D-410: every order earns);
+        // a sign-up without an order shows when it ends, a client with an order stays the associate's.
+        self::assertStringNotContainsString('Last day for orders', $page['body']);
+        self::assertStringContainsString('Signed up — ends on', $page['body']);
+        $this->createTestOrder($mine);
+        $this->asAssociate($a);
+        self::assertStringContainsString('Yours while your agreement runs', $this->call('GET', '/associate/clients')['body']);
         $this->asAssociate($a);
         self::assertStringContainsString((string) $a['personal_code'], $this->call('GET', '/associate/clients')['body']);
 

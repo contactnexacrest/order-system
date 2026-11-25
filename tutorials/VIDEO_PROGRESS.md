@@ -73,7 +73,7 @@ From 25 Nov 2026 every new or re-recorded video is made in **English only**. Hin
 
 **Known small mismatch (D-423, 25 Nov 2026), reported to the owner, no re-recording unless asked:** B01 Part 2 and A02 Part 1 show the "payment recorded" message with rupees grouped the old Western way (₹151,380.00); the app now writes ₹1,51,380.00. Only the commas differ.
 
-**Waiting to be re-recorded (English only):** D-411 wording — F02, F03, C08, C09, C13, C15 (6 recordings; old/new sentences in the owner-approved list of 25 Nov 2026). The Hindi C08, C09, C13 and C15 are out of date on those sentences. Associate hiring video (D-417): script and storyboard first; recording stopped until the owner says go.
+**Waiting to be re-recorded (English only):** C04 (D-426: My clients now shows "Your client", the "Last day for orders that earn commission" column is gone); D-411 wording — F02, F03, C08, C09, C13, C15 (6 recordings; old/new sentences in the owner-approved list of 25 Nov 2026). The Hindi C08, C09, C13 and C15 are out of date on those sentences. Associate hiring video (D-417): script and storyboard first; recording stopped until the owner says go.
 
 **Also out of date after D-421 (25 Nov 2026, payout cut-off day; re-record in English after the push):** C09 says "We pay it 30 days after full payment, on our monthly payment day" → new rule: cleared by the 20th → paid at that month's end, otherwise next month's end; A01-2 shows Commission settings (new fields: waiting days, cut-off day, the "How it works" table); A02-2 mentions when the commission becomes due. Hindi C05/C09 out of date on the same sentence (not re-recorded, D-419).
 

@@ -153,6 +153,12 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     expect(page.text).toContain(`Mine Buyer ${tag}`);
     expect(page.text).not.toContain(`Theirs Buyer ${tag}`); // only their own clients
     expect(page.text).toContain(a.personal_code);
+    // Owner 25 Nov 2026: no old "Last day for orders that earn commission" column (D-410: every order earns);
+    // a sign-up without an order shows when it ends, a client with an order stays the associate's.
+    expect(page.text).not.toContain('Last day for orders');
+    expect(page.text).toContain('Signed up — ends on');
+    await createTestOrder(mine);
+    expect((await agent.get('/associate/clients')).text).toContain('Yours while your agreement runs');
 
     const clients = '/associate/clients';
     // D-254: a new code is proposed ("New ending"), then confirmed ("Use this code"); the old code keeps working.
