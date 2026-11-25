@@ -276,10 +276,14 @@ final class AssociateCommissionPeriodTest extends DbTestCase
         $log = Database::connection()->query("SELECT * FROM audit_log WHERE action_type = 'ASSOCIATE_SETTING_CHANGED' AND field_name = 'associate_portal_commission_months' ORDER BY id DESC LIMIT 1")->fetch();
         self::assertSame('6', $log['new_value']);
         self::assertSame($md, (int) $log['user_id']);
-        // Without "Manage pricing" (Executive Director) the commission rules are not changed.
-        $this->asStaff($ed);
+        // D-411 (24 Nov 2026): without "Manage associate rules" (Admin) the commission rules are not changed;
+        // the Executive Director holds it and may change them.
+        $this->asStaff($this->createTestUser('Admin'));
         $this->call('POST', '/associates/ladder', $fields + ['associate_portal_commission_months' => '24']);
         self::assertSame('6', IncentiveRepository::settings()['associate_portal_commission_months']);
+        $this->asStaff($ed);
+        $this->call('POST', '/associates/ladder', $fields + ['associate_portal_commission_months' => '12']);
+        self::assertSame('12', IncentiveRepository::settings()['associate_portal_commission_months']);
     }
 
     public function testNoAggregateCountOrTotalOfOrdersOrBusinessAtAnyLevel(): void

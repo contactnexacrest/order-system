@@ -238,9 +238,12 @@ describe('Associate commission period and no business totals (D-263)', () => {
     const log = await db.queryOne("SELECT * FROM audit_log WHERE action_type = 'ASSOCIATE_SETTING_CHANGED' AND field_name = 'associate_portal_commission_months' ORDER BY id DESC LIMIT 1");
     expect(log.new_value).toBe('6');
     expect(Number(log.user_id)).toBe(md);
-    // Without "Manage pricing" (Executive Director) the commission rules are not changed.
-    await save(await staff(ed), '24');
+    // D-411 (24 Nov 2026): without "Manage associate rules" (Admin) the commission rules are not changed;
+    // the Executive Director holds it and may change them.
+    await save(await staff(await user('Admin')), '24');
     expect((await incentiveRepository.settings()).associate_portal_commission_months).toBe('6');
+    await save(await staff(ed), '12');
+    expect((await incentiveRepository.settings()).associate_portal_commission_months).toBe('12');
   });
 
   it('no aggregate count or total of orders or business on any portal page or download, at every level', async () => {
