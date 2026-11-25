@@ -29,6 +29,7 @@
 
   <div class="section">
     <h2>Bank details</h2>
+    <p class="muted small" data-bank-why>{# Owner decision D-418 #}<b>Why we ask:</b> so your commission goes into the right account, in your own name; so nobody can redirect your money; and because Indian tax and foreign-payment rules require it. Only our accounts team sees these details. The account number is stored encrypted and shown everywhere else only as its last 4 digits.</p>
     <p>Payments go to: <b>{{ usableBankMasked or 'no verified account yet' }}</b></p>
     <table class="list"><tr><th>Sent</th><th>Account</th><th>Status</th></tr>
       {% for b in banks %}<tr><td>{{ (b.requested_at | shortDate) if b.requested_at else '—' }}</td><td>{{ b.masked }}</td>
@@ -51,13 +52,14 @@
     <table class="list"><tr><th>Needed</th><th>Status</th><th>Document</th></tr>
       {% for i in kyc %}
         <tr><td>{{ i.label }}</td>
-          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ kycLabels[i.status] }}</span>
+          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ i.status_label or kycLabels[i.status] }}</span>
             {% if i.status == 'rejected' and i.doc and i.doc.review_reason %}<br><small>{{ i.doc.review_reason }} — please upload it again.</small>{% endif %}</td>
-          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.id_doc_type %} — {{ idDocTypes[i.doc.id_doc_type] or i.doc.id_doc_type }}{% endif %}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}On file at NexaCrest{% else %}—{% endif %}</td></tr>
+          <td>{% if i.key == 'video' %}{% if i.video %}Done on {{ i.video.on | shortDate }}{% else %}NexaCrest will arrange a short video call with you: please keep your ID proof and address proof ready to show.{% endif %}{% elif i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.id_doc_type %} — {{ idDocTypes[i.doc.id_doc_type] or i.doc.id_doc_type }}{% endif %}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}On file at NexaCrest{% else %}—{% endif %}</td></tr>
       {% endfor %}
     </table>
-    <p class="muted small">We pay commission once we have accepted every document above.</p>
+    <p class="muted small">We pay commission once we have accepted every document above and the video check is done.</p>
     {% if addressGrace %}<p class="small" data-address-grace>{{ addressGrace }}</p>{% endif %}{# D-290 #}
+    {% if videoGrace %}<p class="small" data-video-grace>{{ videoGrace }}</p>{% endif %}{# D-417 #}
     <h3>All documents</h3>
     <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
       {% for d in documents %}<tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td>

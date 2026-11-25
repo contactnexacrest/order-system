@@ -247,6 +247,7 @@ async function home(req, res) {
     // D-252 / D-253: after the first login the associate completes the profile and the KYC documents.
     kycMissing: await associateKyc.missing(a),
     addressGrace: await associateKyc.addressGraceNote(a), // D-290
+    videoGrace: associateKyc.videoGraceNote(a), // D-417
   });
   await associateEventRepository.markNoticesRead(id);
 }
@@ -511,6 +512,7 @@ async function profile(req, res) {
     bankConfirmDays: require('../services/bankDetailsCheck').CONFIRM_DAYS,
     bankWaitFirst: await require('../services/bankDetailsCheck').waitDays(true),
     addressGrace: await associateKyc.addressGraceNote(a), // D-290
+    videoGrace: associateKyc.videoGraceNote(a), // D-417
     ...(await myCommissionData(a)),
   });
 }

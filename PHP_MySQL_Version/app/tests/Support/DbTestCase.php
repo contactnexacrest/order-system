@@ -117,6 +117,10 @@ abstract class DbTestCase extends TestCase
         $pdo = \App\Config\Database::connection();
         $a = \App\Repositories\AssociateRepository::find($associateId);
         foreach (\App\Services\AssociateKyc::requiredItems((array) $a) as $item) {
+            if ($item['kinds'] === []) { // D-417: the live video KYC is recorded by staff, not a document
+                $pdo->prepare("UPDATE associates SET video_kyc_at = NOW(), video_kyc_note = 'TEST video seen' WHERE id = :a")->execute(['a' => $associateId]);
+                continue;
+            }
             $pdo->prepare("INSERT INTO file_store (file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type) VALUES ('RECEIVED', '/tmp/none.pdf', :u, 'kyc.pdf', 10, 'application/pdf')")
                 ->execute(['u' => 'kyc-' . bin2hex(random_bytes(6)) . '.pdf']);
             $pdo->prepare("INSERT INTO associate_documents (associate_id, kind, file_id, uploaded_by_associate, status) VALUES (:a, :k, :f, 1, 'accepted')")

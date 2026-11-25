@@ -230,6 +230,10 @@ async function allowHandTypedGoodsLines() {
 async function completeAssociateKyc(associateId) {
   const a = await require('../../src/repositories/associateRepository').find(Number(associateId));
   for (const item of require('../../src/services/associateKyc').requiredItems(a)) {
+    if (item.kinds.length === 0) { // D-417: the live video KYC is recorded by staff, not a document
+      await db.execute("UPDATE associates SET video_kyc_at = NOW(), video_kyc_note = 'TEST video seen' WHERE id = :a", { a: Number(associateId) });
+      continue;
+    }
     const fileId = await createTestFile(null, null);
     await db.execute("INSERT INTO associate_documents (associate_id, kind, file_id, uploaded_by_associate, status) VALUES (:a, :k, :f, 1, 'accepted')",
       { a: Number(associateId), k: item.kinds[0], f: fileId });

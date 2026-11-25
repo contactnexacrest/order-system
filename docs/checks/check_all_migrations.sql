@@ -124,6 +124,12 @@ FROM (
             + (SELECT COUNT(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id
                 WHERE p.permission_key = 'manage_associate_rules' AND r.name IN ('Managing Director', 'Executive Director'))
               WHEN 3 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-25a',
+         'Live video KYC for associates: associates.video_kyc_at/video_kyc_by/video_kyc_note/video_kyc_due_on (D-417)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'associates' AND column_name IN ('video_kyc_at', 'video_kyc_by', 'video_kyc_note', 'video_kyc_due_on'))
+              WHEN 4 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

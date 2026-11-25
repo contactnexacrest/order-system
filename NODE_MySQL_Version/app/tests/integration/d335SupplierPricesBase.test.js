@@ -175,9 +175,9 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     expect(history).toContain('Base: 20 mm (category) → 50 mm and above');
 
     const page = (await agent.get(url)).text.replace(/&#39;/g, "'");
-    for (const s of ['4,795.12', '4,600.00 + CHA 195.12', '189,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
-      'Product price (from the base):', '₹189,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
-      'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick']) expect(page).toContain(s);
+    for (const s of ['4,795.12', '4,600.00 + CHA 195.12', '1,89,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
+      'Product price (from the base):', '₹1,89,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
+      'you typed ₹1,80,000.00 on 11 Nov 2026 — kept unless you tick']) expect(page).toContain(s);
 
     await post(agent, url, `/products/suppliers/${row.id}/thickness-price`, {
       thickness_mm: '20', thickness_price: '5000', price_quoted_on: '2026-11-11', 'also[]': ['0'], base: 'keep',
@@ -215,14 +215,14 @@ describe('D-335 supplier prices: typed wins, a base, the rules only a calculator
     let t = tryPart((await agent.get(`/products/${productId}`)).text);
     expect(t).toContain('<option value="" selected>Supplier\'s base price (50 mm and above)</option>');
     expect(t).not.toContain(`<option value="${mm20}" selected>`);
-    expect(t).toContain('Supplier price &#8377;189,756.10');
+    expect(t).toContain('Supplier price &#8377;1,89,756.10');
     expect(t).toContain('cost USD 1,997.43');
     expect(t).toContain('Per CBM, FOB, USD.');
 
     t = tryPart((await agent.get(`/products/${productId}?try[${thick.id}]=${mm20}`)).text);
     expect(t).toContain(`<option value="${mm20}" selected>`);
     expect(t).not.toContain('<option value="" selected>');
-    expect(t).toContain('Supplier price &#8377;239,756.10');
+    expect(t).toContain('Supplier price &#8377;2,39,756.10');
   });
 
   it('a row saved before D-335 keeps what it showed when switched to stored prices', async () => {

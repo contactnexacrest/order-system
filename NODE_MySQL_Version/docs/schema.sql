@@ -6926,3 +6926,12 @@ ALTER TABLE clients
   ADD COLUMN prospect_reminded_on DATE NULL,
   ADD COLUMN prospect_expired_on DATE NULL,
   ADD COLUMN prospect_expired_reason VARCHAR(255) NULL;
+
+-- ---------------------------------------------------------------------------
+-- Owner decision D-417 (25 Nov 2026): live video KYC. Staff record that they saw
+-- the associate on a live video call holding the ID proof and the address proof
+-- clearly (date, who, what was seen). An associate who already existed when this
+-- was added has until video_kyc_due_on (60 days) before payouts wait for it.
+-- ---------------------------------------------------------------------------
+ALTER TABLE associates ADD COLUMN video_kyc_at DATETIME NULL, ADD COLUMN video_kyc_by BIGINT UNSIGNED NULL,
+  ADD COLUMN video_kyc_note VARCHAR(300) NULL, ADD COLUMN video_kyc_due_on DATE NULL;

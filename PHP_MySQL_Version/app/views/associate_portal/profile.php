@@ -36,6 +36,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
 
   <div class="section">
     <h2>Bank details</h2>
+    <p class="muted small" data-bank-why><?php // Owner decision D-418 ?><b>Why we ask:</b> so your commission goes into the right account, in your own name; so nobody can redirect your money; and because Indian tax and foreign-payment rules require it. Only our accounts team sees these details. The account number is stored encrypted and shown everywhere else only as its last 4 digits.</p>
     <p>Payments go to: <b><?= $__usable ? htmlspecialchars(AssociateBankRepository::masked($__usable)) : 'no verified account yet' ?></b></p>
     <table class="list"><tr><th>Sent</th><th>Account</th><th>Status</th></tr>
       <?php foreach ($banks as $b): ?><tr><td><?= $__d($b['requested_at']) ?></td><td><?= htmlspecialchars(AssociateBankRepository::masked($b)) ?></td>
@@ -58,13 +59,14 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <table class="list"><tr><th>Needed</th><th>Status</th><th>Document</th></tr>
       <?php foreach ($kyc as $__i): ?>
         <tr><td><?= htmlspecialchars($__i['label']) ?></td>
-          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span>
+          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars($__i['status_label'] ?? \App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span>
             <?php if ($__i['status'] === 'rejected' && !empty($__i['doc']['review_reason'])): ?><br><small><?= htmlspecialchars((string) $__i['doc']['review_reason']) ?> — please upload it again.</small><?php endif; ?></td>
-          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—') ?></td></tr>
+          <td><?= $__i['key'] === 'video' ? ($__i['video'] !== null ? 'Done on ' . $__d($__i['video']['on']) : 'NexaCrest will arrange a short video call with you: please keep your ID proof and address proof ready to show.') : ($__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—')) ?></td></tr>
       <?php endforeach; ?>
     </table>
-    <p class="muted small">We pay commission once we have accepted every document above.</p>
+    <p class="muted small">We pay commission once we have accepted every document above and the video check is done.</p>
     <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($me)) !== null): // D-290 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
+    <?php if (($__vgrace = \App\Services\AssociateKyc::videoGraceNote($me)) !== null): // D-417 ?><p class="small" data-video-grace><?= htmlspecialchars($__vgrace) ?></p><?php endif; ?>
     <h3>All documents</h3>
     <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
       <?php foreach ($documents as $d): ?><tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td>

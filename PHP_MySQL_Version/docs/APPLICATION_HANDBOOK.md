@@ -3136,6 +3136,15 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
     `associates.address_proof_due_on` (60 days, set at go-live of this
     change) before payouts are held for a missing address proof
     (`AssociateKyc::missingForPayout`).
+  - **Live video KYC (D-417, 25 Nov 2026):** one more required item, India and
+    abroad, key `video`, not a document. Staff with `manage_associates` record
+    the call on the associate's page (`POST /associates/{id}/video-kyc`: date
+    not in the future, note 10–300 characters) into `associates.video_kyc_at` /
+    `video_kyc_by` / `video_kyc_note`; audit `ASSOCIATE_VIDEO_KYC_RECORDED`.
+    Existing associates have until `associates.video_kyc_due_on` (60 days,
+    set by migration 2026-11-25a) before payouts wait for it
+    (`AssociateKyc::recordVideo`, `videoGraceNote`). No recording is stored.
+  - **Why we ask for bank details (D-418):** a note above the portal bank form.
   - Self-registration link (7 days), code change (up to 3, old codes keep
     working) (D-253, D-254).
 - **Tables.** `associates`, `associate_codes`, `associate_invitations`,
@@ -4632,7 +4641,7 @@ A level may also be a fixed USD amount per unit. Per associate the MD (D-411: or
 | `associate_commission_due_days` | 30 | Due date = date of full payment + 30 days. |
 | `associate_claim_hold` | 1 (on) | Held while a buyer claim opened on or before the due date is open. |
 | `associate_payout_run`, `associate_payout_day`, `associate_payout_holiday_rule` | monthly, last, before | Paid in the first payout run on or after the due date (monthly day 1–28 or `last` = the last day of the month, or weekly day 1–7); a run day on a Sunday or a Holiday Calendar day moves to the working day before (or after) (D-292). |
-| KYC (D-252, D-290) | — | **Mark paid** is refused until the associate's KYC is complete (address proof: not before `address_proof_due_on` for associates accepted before 11 Nov 2026). |
+| KYC (D-252, D-290, D-417) | — | **Mark paid** is refused until the associate's KYC is complete, live video KYC included (address proof: not before `address_proof_due_on` for associates accepted before 11 Nov 2026; video KYC: not before `video_kyc_due_on` for associates who existed on 25 Nov 2026). |
 
 Take-back after payment only for fraud or breach, with a reason (audited).
 

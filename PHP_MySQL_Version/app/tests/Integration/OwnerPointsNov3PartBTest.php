@@ -151,15 +151,15 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         self::assertSame(['amount' => 0.0, 'working' => 'planned advance ₹196,664.70 − already paid ₹196,664.70'], OrderVendorBillRepository::supplierLegToPayNow($bills, $po, 'advance'));
 
         $page = $this->render($orderId);
-        self::assertStringContainsString('<strong>To pay now: &#8377;458,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>', $page);
-        self::assertStringContainsString('<strong>Balance to pay now: &#8377;458,884.30</strong>', $page);
+        self::assertStringContainsString('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>', $page);
+        self::assertStringContainsString('<strong>Balance to pay now: &#8377;4,58,884.30</strong>', $page);
 
         self::assertSame('success', $this->pay($orderId, $invoice, 458884.30, 'balance')['type']);
         $bills = OrderVendorBillRepository::forOrder($orderId);
         $invoiceOnly = array_values(array_filter($bills, static fn (array $b): bool => (int) $b['id'] === $invoice));
         self::assertSame(['cost' => 655549.0, 'paid' => 655549.0, 'due' => 0.0], OrderVendorBillRepository::totalsFor($invoiceOnly), '10a lists only the tax invoice: 196,664.70 + 458,884.30');
         self::assertSame(['cost' => 655549.0, 'paid' => 655549.0, 'due' => 0.0], OrderVendorBillRepository::totalsFor($bills), 'both listed: the advance is counted once');
-        self::assertStringContainsString('<span class="vendor-bill-paid">Paid &#8377;655,549.00</span><br><span class="vendor-bill-paid">Nothing due</span>', $this->render($orderId));
+        self::assertStringContainsString('<span class="vendor-bill-paid">Paid &#8377;6,55,549.00</span><br><span class="vendor-bill-paid">Nothing due</span>', $this->render($orderId));
     }
 
     public function testPoint6LogisticsProformaPaymentCountsOnceInTheTotalRow(): void

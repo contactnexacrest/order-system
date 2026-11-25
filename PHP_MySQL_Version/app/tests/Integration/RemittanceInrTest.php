@@ -220,7 +220,7 @@ final class RemittanceInrTest extends DbTestCase
         ob_start();
         (new CaController())->index([]);
         $html = (string) ob_get_clean();
-        self::assertMatchesRegularExpression('#&\#8377;150,120\.00\s*<div class="muted small">estimated at recorded rate#', $html);
+        self::assertMatchesRegularExpression('#&\#8377;1,50,120\.00\s*<div class="muted small">estimated at recorded rate#', $html);
 
         // The INR actual box fills it in later.
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 150000.0, $this->admin);

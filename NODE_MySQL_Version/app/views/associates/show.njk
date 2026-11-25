@@ -220,13 +220,23 @@
     <table class="list"><tr><th>KYC item</th><th>Status</th><th>Document</th></tr>
       {% for i in kyc %}
         <tr><td>{{ i.label }}</td>
-          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ kycLabels[i.status] }}</span></td>
-          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.id_doc_type %} — {{ idDocTypes[i.doc.id_doc_type] or i.doc.id_doc_type }}{% endif %}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}Agreement on the associate record{% else %}—{% endif %}</td></tr>
+          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ i.status_label or kycLabels[i.status] }}</span></td>
+          <td>{% if i.key == 'video' %}{% if i.video %}Seen on {{ i.video.on | shortDate }}{% if videoKycByName %} by {{ videoKycByName }}{% endif %}{% if i.video.note %} — {{ i.video.note }}{% endif %}{% else %}—{% endif %}{% elif i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.id_doc_type %} — {{ idDocTypes[i.doc.id_doc_type] or i.doc.id_doc_type }}{% endif %}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}Agreement on the associate record{% else %}—{% endif %}</td></tr>
       {% endfor %}
     </table>
     {% set __kycOk = true %}{% for i in kyc %}{% if i.status != 'accepted' %}{% set __kycOk = false %}{% endif %}{% endfor %}
     <p class="{{ 'muted' if __kycOk else 'review-banner bad' }} small">{{ 'KYC complete — commission can be paid.' if __kycOk else 'KYC not complete — commission cannot be marked paid until every item is accepted.' }}</p>
     {% if addressGrace %}<p class="small" data-address-grace>{{ addressGrace }}</p>{% endif %}{# D-290: 60 days for an associate accepted before 11 Nov 2026 #}
+    {% if videoGrace %}<p class="small" data-video-grace>{{ videoGrace }}</p>{% endif %}{# D-417 #}
+    {% if canManage %}{# D-417: staff record the live video KYC #}
+    <form method="post" action="/associates/{{ id }}/video-kyc" class="inline-form" data-video-kyc-form>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label class="small">Live video KYC seen on <input type="date" name="seen_on" required max="{{ todayIst }}" value="{{ todayIst }}"></label>
+      <input type="text" name="note" required minlength="10" maxlength="300" placeholder="e.g. Passport and electricity bill shown clearly; name and address match" aria-label="What was seen on the call" style="width:28em">
+      <button type="submit" class="btn-sm btn-secondary">{{ 'Record again' if a.video_kyc_at else 'Record video KYC' }}</button>
+    </form>
+    <p class="muted small">A short live video call in which the associate holds up the ID proof and the address proof so that both are clearly readable. Record the date and what was seen. Do not save a recording of the call in the app.</p>
+    {% endif %}
     <p class="muted small">ID proof and address proof are separate items, each checked on its own. The same document (e.g. a passport showing the address) may be uploaded under each; the app names the files "ID proof — name — date" and "Address proof — name — date".</p>
     <table class="list">
       <tr><th>Added</th><th>Document</th><th>Number / reference</th><th>From</th><th>Status</th>{% if canManage %}<th>Check</th>{% endif %}</tr>

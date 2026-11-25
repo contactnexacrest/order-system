@@ -110,6 +110,9 @@ function requiredItems(a) {
   if (india && String((a && a.gstin) || '').trim() !== '') {
     items.push({ key: 'gst', label: 'GST certificate', kinds: ['gst'] });
   }
+  // Owner decision D-417 (25 Nov 2026): a live video call in which the associate shows the ID proof and the
+  // address proof clearly. Not a document: staff record that they saw it (date, who, note).
+  items.push({ key: 'video', label: VIDEO_LABEL, kinds: [] });
   return items;
 }
 
@@ -117,6 +120,11 @@ function requiredItems(a) {
 async function checklist(a, documents = null) {
   const docs = documents || await associateDocumentRepository.forAssociate(Number(a.id));
   return requiredItems(a).map((item) => {
+    if (item.key === 'video') { // D-417: recorded by staff, no document
+      const done = !!a.video_kyc_at;
+      return { ...item, status: done ? 'accepted' : 'missing', status_label: done ? 'Done' : 'Not done yet', doc: null, by_nexacrest: false,
+        video: done ? { on: dayOf(a.video_kyc_at), by: a.video_kyc_by != null ? Number(a.video_kyc_by) : null, note: String(a.video_kyc_note || '') } : null };
+    }
     const mine = docs.filter((d) => item.kinds.includes(d.kind));
     const accepted = mine.filter((d) => d.status === 'accepted');
     const latest = mine[0] || null; // forAssociate is newest first
@@ -147,7 +155,46 @@ async function missingForPayout(a, on = null) {
   const day = String(on || new Date().toISOString()).slice(0, 10);
   const due = a.address_proof_due_on ? (a.address_proof_due_on instanceof Date ? a.address_proof_due_on.toISOString() : String(a.address_proof_due_on)).slice(0, 10) : null;
   const grace = due !== null && day <= due;
-  return (await checklist(a)).filter((i) => i.status !== 'accepted' && !(grace && i.key === 'address')).map((i) => i.label);
+  const videoDue = a.video_kyc_due_on ? dayOf(a.video_kyc_due_on) : null; // D-417
+  const videoGrace = videoDue !== null && day <= videoDue;
+  return (await checklist(a)).filter((i) => i.status !== 'accepted' && !(grace && i.key === 'address') && !(videoGrace && i.key === 'video')).map((i) => i.label);
+}
+
+/** D-417: the checklist label of the live video KYC. */
+const VIDEO_LABEL = 'Live video KYC (ID proof and address proof clearly visible)';
+
+function dayOf(v) {
+  return (v instanceof Date ? require('../helpers/dbDateTime').ymd(v) : String(v)).slice(0, 10);
+}
+
+/**
+ * D-417: an associate who already had an account when video KYC was added has until video_kyc_due_on
+ * (60 days) before payouts wait for it — the same grace as the address proof (D-290).
+ */
+function videoGraceNote(a, today = null) {
+  if (!a || !a.video_kyc_due_on || a.video_kyc_at) return null;
+  const day = String(today || require('../helpers/dbDateTime').todayIst()).slice(0, 10);
+  const due = dayOf(a.video_kyc_due_on);
+  return day <= due
+    ? `Live video KYC needed by ${short(due)} — after that, commission payouts wait until it is done.`
+    : `Live video KYC was due by ${short(due)} — commission payouts wait until it is done.`;
+}
+
+/**
+ * D-417: staff record the live video KYC — the date it was seen (not in the future) and a note on what was
+ * seen. Recording it again replaces the earlier record; both are in the audit log. Returns an error or null.
+ */
+async function recordVideo(a, seenOn, note, userId, today = null) {
+  const day = String(today || require('../helpers/dbDateTime').todayIst()).slice(0, 10);
+  const what = String(note ?? '').trim();
+  const on = String(seenOn ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(on) || on > day || on < '2020-01-01') return 'Enter the date of the video call (today or earlier).';
+  if (len(what) < 10 || len(what) > 300) return 'Say what was seen on the call, 10 to 300 characters (for example: passport and electricity bill shown, name and address match).';
+  const before = a.video_kyc_at ? `${dayOf(a.video_kyc_at)} — ${a.video_kyc_note || ''}` : '';
+  await db.execute('UPDATE associates SET video_kyc_at = :d, video_kyc_by = :u, video_kyc_note = :n WHERE id = :id',
+    { d: `${on} 00:00:00`, u: userId, n: what, id: Number(a.id) });
+  await require('../repositories/auditLogRepository').log(userId, 'ASSOCIATE_VIDEO_KYC_RECORDED', 'associates', Number(a.id), 'video_kyc', before, `${on} — ${what}`);
+  return null;
 }
 
 /** D-290: "Address proof needed by … — after that, commission payouts wait until it is accepted." or null. */
@@ -193,4 +240,5 @@ async function notifyStaffOfUpload(a, kind) {
 module.exports = {
   REFERENCE_RULES, OTHER_RULE, STATUS_LABELS, ID_DOC_TYPES, ID_KINDS, ADDRESS_PROOF_GRACE_DAYS,
   normaliseReference, requiredItems, checklist, missing, missingForPayout, addressGraceNote, appFileName, idDocType, checkUpload, review, notifyStaffOfUpload,
+  VIDEO_LABEL, videoGraceNote, recordVideo,
 };

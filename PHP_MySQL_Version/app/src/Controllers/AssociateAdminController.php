@@ -982,6 +982,18 @@ final class AssociateAdminController
         self::back((int) $a['id'], 'documents');
     }
 
+    /** Owner decision D-417: record the live video KYC (date seen + what was seen). */
+    public function recordVideoKyc(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $error = \App\Services\AssociateKyc::recordVideo($a, (string) ($_POST['seen_on'] ?? ''), (string) ($_POST['note'] ?? ''), (int) self::user()['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? 'Live video KYC recorded.');
+        self::back((int) $a['id'], 'documents');
+    }
+
     public function downloadDocument(array $params): void
     {
         $a = self::found($params);

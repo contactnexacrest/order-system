@@ -365,6 +365,9 @@ async function show(req, res) {
       docKinds: associateDocumentRepository.KINDS,
       kyc: await associateKyc.checklist(a, docs),
       addressGrace: await associateKyc.addressGraceNote(a), // D-290
+      videoGrace: associateKyc.videoGraceNote(a), // D-417
+      videoKycByName: a.video_kyc_by ? ((await require('../repositories/userRepository').findById(Number(a.video_kyc_by))) || {}).name || '' : '',
+      todayIst: require('../helpers/dbDateTime').todayIst(),
       kycLabels: associateKyc.STATUS_LABELS,
       codes: await associateCodeService.codes(id),
       docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE, allDocKinds: Object.keys(associateDocumentRepository.KINDS), idDocTypes: associateKyc.ID_DOC_TYPES,
@@ -954,6 +957,16 @@ async function reviewDocument(req, res) {
   back(res, a.id, 'documents');
 }
 
+/** Owner decision D-417: record the live video KYC (date seen + what was seen). */
+async function recordVideoKyc(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const body = req.body || {};
+  const error = await associateKyc.recordVideo(a, String(body.seen_on || ''), String(body.note || ''), req.user.id);
+  flash.set(req, error ? 'error' : 'success', error || 'Live video KYC recorded.');
+  back(res, a.id, 'documents');
+}
+
 async function downloadDocument(req, res) {
   const a = await found(req, res);
   if (!a) return;
@@ -1299,6 +1312,7 @@ async function report(req, res) {
 module.exports = {
   abroadCurrencyCodes,
   reviewDocument,
+  recordVideoKyc,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
   linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, savePriceRule, sendAdvice, paymentAdvice, revisePaymentAdvice, bankNumber, uploadDocument, downloadDocument, reply,
   holdPayout, releasePayout, clawback, ladder, saveLadder, report,

@@ -144,6 +144,9 @@ final class AssociateKyc
         if ($india && trim((string) ($a['gstin'] ?? '')) !== '') {
             $items[] = ['key' => 'gst', 'label' => 'GST certificate', 'kinds' => ['gst']];
         }
+        // Owner decision D-417 (25 Nov 2026): a live video call in which the associate shows the ID proof and the
+        // address proof clearly. Not a document: staff record that they saw it (date, who, note).
+        $items[] = ['key' => 'video', 'label' => self::VIDEO_LABEL, 'kinds' => []];
         return $items;
     }
 
@@ -158,6 +161,12 @@ final class AssociateKyc
         $documents ??= AssociateDocumentRepository::forAssociate((int) $a['id']);
         $out = [];
         foreach (self::requiredItems($a) as $item) {
+            if ($item['key'] === 'video') { // D-417: recorded by staff, no document
+                $done = !empty($a['video_kyc_at']);
+                $out[] = $item + ['status' => $done ? 'accepted' : 'missing', 'status_label' => $done ? 'Done' : 'Not done yet', 'doc' => null, 'by_nexacrest' => false,
+                    'video' => $done ? ['on' => substr((string) $a['video_kyc_at'], 0, 10), 'by' => isset($a['video_kyc_by']) ? (int) $a['video_kyc_by'] : null, 'note' => (string) ($a['video_kyc_note'] ?? '')] : null];
+                continue;
+            }
             $docs = array_values(array_filter($documents, static fn (array $d): bool => in_array($d['kind'], $item['kinds'], true)));
             $accepted = array_values(array_filter($docs, static fn (array $d): bool => $d['status'] === 'accepted'));
             $latest = $docs[0] ?? null; // forAssociate is newest first
@@ -196,11 +205,53 @@ final class AssociateKyc
     {
         $on ??= date('Y-m-d');
         $grace = !empty($a['address_proof_due_on']) && $on <= substr((string) $a['address_proof_due_on'], 0, 10);
+        $videoGrace = !empty($a['video_kyc_due_on']) && $on <= substr((string) $a['video_kyc_due_on'], 0, 10); // D-417
         return array_values(array_map(static fn (array $i): string => $i['label'], array_filter(self::checklist($a),
-            static fn (array $i): bool => $i['status'] !== 'accepted' && !($grace && $i['key'] === 'address'))));
+            static fn (array $i): bool => $i['status'] !== 'accepted' && !($grace && $i['key'] === 'address') && !($videoGrace && $i['key'] === 'video'))));
     }
 
     /** D-290: "Add your address proof by 10 Jan 2027 — after that, payouts wait for it." or null. */
+    /** D-417: the checklist label of the live video KYC. */
+    public const VIDEO_LABEL = 'Live video KYC (ID proof and address proof clearly visible)';
+
+    /**
+     * D-417: an associate who already had an account when video KYC was added has until video_kyc_due_on
+     * (60 days) before payouts wait for it — the same grace as the address proof (D-290).
+     */
+    public static function videoGraceNote(array $a, ?string $today = null): ?string
+    {
+        $today ??= date('Y-m-d');
+        if (empty($a['video_kyc_due_on']) || !empty($a['video_kyc_at'])) {
+            return null;
+        }
+        $due = substr((string) $a['video_kyc_due_on'], 0, 10);
+        return $today <= $due
+            ? 'Live video KYC needed by ' . \App\Helpers\Dates::short($due) . ' — after that, commission payouts wait until it is done.'
+            : 'Live video KYC was due by ' . \App\Helpers\Dates::short($due) . ' — commission payouts wait until it is done.';
+    }
+
+    /**
+     * D-417: staff record the live video KYC — the date it was seen (not in the future) and a note on what was
+     * seen. Recording it again replaces the earlier record; both are in the audit log.
+     * @return ?string an error, or null when saved
+     */
+    public static function recordVideo(array $a, string $seenOn, string $note, int $userId, ?string $today = null): ?string
+    {
+        $today ??= date('Y-m-d');
+        $note = trim($note);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $seenOn) || $seenOn > $today || $seenOn < '2020-01-01') {
+            return 'Enter the date of the video call (today or earlier).';
+        }
+        if (mb_strlen($note) < 10 || mb_strlen($note) > 300) {
+            return 'Say what was seen on the call, 10 to 300 characters (for example: passport and electricity bill shown, name and address match).';
+        }
+        $before = !empty($a['video_kyc_at']) ? substr((string) $a['video_kyc_at'], 0, 10) . ' — ' . (string) ($a['video_kyc_note'] ?? '') : '';
+        \App\Config\Database::connection()->prepare('UPDATE associates SET video_kyc_at = :d, video_kyc_by = :u, video_kyc_note = :n WHERE id = :id')
+            ->execute(['d' => $seenOn . ' 00:00:00', 'u' => $userId, 'n' => $note, 'id' => (int) $a['id']]);
+        \App\Repositories\AuditLogRepository::log($userId, 'ASSOCIATE_VIDEO_KYC_RECORDED', 'associates', (int) $a['id'], 'video_kyc', $before, $seenOn . ' — ' . $note);
+        return null;
+    }
+
     public static function addressGraceNote(array $a, ?string $today = null): ?string
     {
         $today ??= date('Y-m-d');

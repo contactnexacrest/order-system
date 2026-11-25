@@ -201,7 +201,7 @@ describe('D-244: INR credited on buyer remittances', () => {
     const login = await agent.post('/login').type('form').send({ _csrf: loginToken, email: admin.email, password: 'JestInr5!' });
     expect(login.headers.location).not.toBe('/login');
     const page = (await agent.get('/ca')).text;
-    expect(page).toMatch(/&#8377;150,120\.00\s*<div class="muted small">estimated at recorded rate/);
+    expect(page).toMatch(/&#8377;1,50,120\.00\s*<div class="muted small">estimated at recorded rate/);
 
     await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 150000, admin.id);
     const after = await registerRow(orderId);

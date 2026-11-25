@@ -59,7 +59,7 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
         } elseif (($__r['rate_gap_choice'] ?? null) === 'bank_charges') {
             $__why .= ' <small class="muted">· the bank kept &#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['rate_gap_inr'], 2) . ' at its rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' (order cost "Bank Charges")</small>';
         } elseif (($__r['rate_gap_choice'] ?? null) === 'other') {
-            $__why .= ' <small class="muted">· &#8377;' . number_format(abs((float) $__r['rate_gap_inr']), 2) . ' apart from the bank\'s rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' — ' . htmlspecialchars((string) $__r['rate_gap_reason']) . '</small>';
+            $__why .= ' <small class="muted">· &#8377;' . \App\Helpers\MoneyFormat::indian(abs((float) $__r['rate_gap_inr']), 2) . ' apart from the bank\'s rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' — ' . htmlspecialchars((string) $__r['rate_gap_reason']) . '</small>';
         }
         $__inrCell = ($__r['inr_credited'] ?? null) !== null ? '&#8377;' . \App\Helpers\MoneyFormat::indian((float) $__r['inr_credited'], 2) : '<span class="muted">not known yet</span>';
         echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td>'
@@ -257,7 +257,7 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
     $text .= empty($canViewInrActual) ? '.' : ($inrActual !== null && $rate !== null
         ? ' — &#8377;' . \App\Helpers\MoneyFormat::indian((float) $inrActual, 2) . ' credited by the bank (exchange rate &#8377;' . number_format((float) $rate, 4) . ').'
         : ($rate !== null
-        ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
+        ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . \App\Helpers\MoneyFormat::indian((float) $amount * (float) $rate, 2) . ').'
         : ' — exchange rate not recorded yet (record it below).'));
     // Owner rule D-212: the bank reference it was recorded with.
     if (!empty($payment[$leg . '_bank_reference'])) {
@@ -897,7 +897,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
         // Owner request (3 Nov 2026): the step's own read-only "To pay now", from the Supplier PO and what is already paid.
         $__legTpn = !$paidAt ? \App\Repositories\OrderVendorBillRepository::supplierLegToPayNow($vendorBills, $supplierPo, $leg) : null;
         if ($__legTpn !== null) {
-            echo '<p class="to-pay-now"><strong>' . $label . ' to pay now: &#8377;' . number_format($__legTpn['amount'], 2) . '</strong> <small class="muted">(' . htmlspecialchars($__legTpn['working']) . ')</small></p>';
+            echo '<p class="to-pay-now"><strong>' . $label . ' to pay now: &#8377;' . \App\Helpers\MoneyFormat::indian($__legTpn['amount'], 2) . '</strong> <small class="muted">(' . htmlspecialchars($__legTpn['working']) . ')</small></p>';
         }
         $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier), $leg, array_map(static fn (array $b): int => (int) $b['id'], $carried));
     }

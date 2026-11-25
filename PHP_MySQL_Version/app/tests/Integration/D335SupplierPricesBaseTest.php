@@ -188,9 +188,9 @@ final class D335SupplierPricesBaseTest extends DbTestCase
 
         // The price card: 20 mm costs 4,600 + CHA 195.12 = 4,795.12 per m²; the summary is from the base.
         $page = $this->render(fn () => (new PricingController())->marketPrices(['id' => (string) $productId]));
-        foreach (['4,795.12', '4,600.00 + CHA 195.12', '189,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
-            'Product price (from the base):', '₹189,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
-            'you typed ₹180,000.00 on 11 Nov 2026 — kept unless you tick'] as $s) {
+        foreach (['4,795.12', '4,600.00 + CHA 195.12', '1,89,756.10', 'BASE', 'TYPED', 'CALCULATED', 'from 20 mm − 20 %',
+            'Product price (from the base):', '₹1,89,756.10 per CBM · 50 mm and above', 'USD 1,997.43 at ₹95', 'minimum (8 % margin) USD 2,171.12',
+            'you typed ₹1,80,000.00 on 11 Nov 2026 — kept unless you tick'] as $s) {
             self::assertStringContainsString($s, $page);
         }
 
@@ -238,7 +238,7 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         $try = substr($page, (int) strpos($page, 'id="try-price"'));
         self::assertStringContainsString('<option value="" selected>Supplier&#039;s base price (50 mm and above)</option>', $try);
         self::assertStringNotContainsString('<option value="' . $mm20 . '" selected>', $try);
-        self::assertStringContainsString('Supplier price &#8377;189,756.10', $try);
+        self::assertStringContainsString('Supplier price &#8377;1,89,756.10', $try);
         self::assertStringContainsString('cost USD 1,997.43', $try);
         self::assertStringContainsString('Per CBM, FOB, USD.', $try);
 
@@ -248,7 +248,7 @@ final class D335SupplierPricesBaseTest extends DbTestCase
         $try = substr($page, (int) strpos($page, 'id="try-price"'));
         self::assertStringContainsString('<option value="' . $mm20 . '" selected>', $try);
         self::assertStringNotContainsString('<option value="" selected>', $try);
-        self::assertStringContainsString('Supplier price &#8377;239,756.10', $try);
+        self::assertStringContainsString('Supplier price &#8377;2,39,756.10', $try);
     }
 
     public function testARowSavedBeforeD335KeepsWhatItShowedWhenSwitchedToStoredPrices(): void

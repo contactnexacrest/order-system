@@ -1316,6 +1316,7 @@ app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('m
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
 // Owner decision D-252 (A3): accept / reject one KYC document.
 app.post('/associates/:id/documents/:docId/review', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.reviewDocument));
+app.post('/associates/:id/video-kyc', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.recordVideoKyc)); // D-417
 app.get('/associates/:id/documents/:docId', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.downloadDocument));
 app.post('/associates/:id/messages', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.reply));
 app.post('/associates/payouts/:payoutId/hold', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.holdPayout));

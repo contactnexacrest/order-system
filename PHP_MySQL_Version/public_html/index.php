@@ -807,6 +807,7 @@ $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNum
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
 // Owner decision D-252 (A3): accept / reject one KYC document.
 $router->post('/associates/{id}/documents/{docId}/review', [$associateAdmin, 'reviewDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/video-kyc', [$associateAdmin, 'recordVideoKyc'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]); // D-417
 $router->get('/associates/{id}/documents/{docId}', [$associateAdmin, 'downloadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank'])]);
 $router->post('/associates/{id}/messages', [$associateAdmin, 'reply'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/payouts/{payoutId}/hold', [$associateAdmin, 'holdPayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);

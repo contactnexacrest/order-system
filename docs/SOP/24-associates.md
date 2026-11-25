@@ -649,6 +649,26 @@ proof — <name> — <date>". There is no "use the same file" button.
 Associates already accepted on 11 Nov 2026 have **60 days** to add their
 address proof; after that their payouts wait until it is accepted (the date
 shows on their page and in the portal).
+**Live video KYC (D-417, 25 Nov 2026)** is one more item, in India and abroad.
+It is not a document: a member of staff with **Manage associates** has a short
+live video call with the associate, who holds up the ID proof and the address
+proof so that both are clearly readable. On the associate's page, under *KYC
+and documents*, staff enter the date of the call and what was seen (10–300
+characters, e.g. "Passport and electricity bill shown clearly; name and
+address match") and press **Record video KYC**. Do not save a recording of the
+call in the app. The item then shows *Done* with the date and who saw it; it can
+be recorded again (both records are in the audit log). Associates who already
+had an account on the day this was added have **60 days** before their payouts
+wait for it (the date shows on their page and in the portal); new associates
+need it before their first payout. In the portal the item says NexaCrest will
+arrange the call.
+
+The associate's **bank details** form in the portal says why we ask (D-418):
+so the commission goes into the right account in their own name, so nobody
+can redirect their money, and because tax and foreign-payment rules require
+it; only the accounts team sees the details; the account number is stored
+encrypted and shown elsewhere only as its last 4 digits.
+
 Each item is *Not uploaded yet*, *Pending*, *Accepted* or *Rejected* (with the
 reason). Staff with **Manage associates** accept or reject each document
 (a reason of at least 10 characters is needed to reject; the associate is

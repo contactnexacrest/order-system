@@ -224,13 +224,23 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
     <table class="list"><tr><th>KYC item</th><th>Status</th><th>Document</th></tr>
       <?php foreach ($kyc as $__i): ?>
         <tr><td><?= htmlspecialchars($__i['label']) ?></td>
-          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span></td>
-          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'Agreement on the associate record' : '—') ?></td></tr>
+          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars($__i['status_label'] ?? \App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span></td>
+          <td><?= $__i['key'] === 'video' ? ($__i['video'] !== null ? 'Seen on ' . $__d($__i['video']['on']) . ($__i['video']['by'] !== null ? ' by ' . htmlspecialchars((string) (\App\Repositories\UserRepository::findById($__i['video']['by'])['name'] ?? '')) : '') . ($__i['video']['note'] !== '' ? ' — ' . htmlspecialchars($__i['video']['note']) : '') : '—') : ($__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['id_doc_type']) ? ' — ' . htmlspecialchars(\App\Services\AssociateKyc::ID_DOC_TYPES[$__i['doc']['id_doc_type']] ?? (string) $__i['doc']['id_doc_type']) : '') . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'Agreement on the associate record' : '—')) ?></td></tr>
       <?php endforeach; ?>
     </table>
     <?php $__missing = array_filter($kyc, static fn (array $i): bool => $i['status'] !== 'accepted'); ?>
     <p class="<?= $__missing === [] ? 'muted' : 'review-banner bad' ?> small"><?= $__missing === [] ? 'KYC complete — commission can be paid.' : 'KYC not complete — commission cannot be marked paid until every item is accepted.' ?></p>
     <?php if (($__grace = \App\Services\AssociateKyc::addressGraceNote($a)) !== null): // D-290: 60 days for an associate accepted before 11 Nov 2026 ?><p class="small" data-address-grace><?= htmlspecialchars($__grace) ?></p><?php endif; ?>
+    <?php if (($__vgrace = \App\Services\AssociateKyc::videoGraceNote($a)) !== null): // D-417 ?><p class="small" data-video-grace><?= htmlspecialchars($__vgrace) ?></p><?php endif; ?>
+    <?php if ($canManage): // D-417: staff record the live video KYC ?>
+    <form method="post" action="/associates/<?= $id ?>/video-kyc" class="inline-form" data-video-kyc-form>
+      <?= Csrf::field() ?>
+      <label class="small">Live video KYC seen on <input type="date" name="seen_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+      <input type="text" name="note" required minlength="10" maxlength="300" placeholder="e.g. Passport and electricity bill shown clearly; name and address match" aria-label="What was seen on the call" style="width:28em">
+      <button type="submit" class="btn-sm btn-secondary"><?= !empty($a['video_kyc_at']) ? 'Record again' : 'Record video KYC' ?></button>
+    </form>
+    <p class="muted small">A short live video call in which the associate holds up the ID proof and the address proof so that both are clearly readable. Record the date and what was seen. Do not save a recording of the call in the app.</p>
+    <?php endif; ?>
     <p class="muted small">ID proof and address proof are separate items, each checked on its own. The same document (e.g. a passport showing the address) may be uploaded under each; the app names the files "ID proof — name — date" and "Address proof — name — date".</p>
     <table class="list">
       <tr><th>Added</th><th>Document</th><th>Number / reference</th><th>From</th><th>Status</th><?php if ($canManage): ?><th>Check</th><?php endif; ?></tr>

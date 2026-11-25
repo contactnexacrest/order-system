@@ -3058,9 +3058,10 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-22a-insurance-basis.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-24a-associate-rules.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-24b-associate-payment-advices.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-24c-manage-associate-rules.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-25a-associate-video-kyc.sql
 ```
 
-The files of 18 Nov, 20 Nov (20a), 21 Nov and 22 Nov that add columns are `PLAIN ALTER (owner D-371)`: a second run only stops with "#1060 Duplicate column
+The files of 18 Nov, 20 Nov (20a), 21 Nov, 22 Nov, 24 Nov (24a) and 25 Nov (25a) that add columns are `PLAIN ALTER (owner D-371)`: a second run only stops with "#1060 Duplicate column
 name", which is harmless. Lines already saved, documents already issued and per-order frozen T&C copies keep
 what they have.
 

@@ -129,8 +129,8 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     expect(vendorBillsView.supplierLegToPayNow(bills, po, 'advance')).toEqual({ amount: 0, working: 'planned advance ₹196,664.70 − already paid ₹196,664.70' });
 
     let html = await page(orderId);
-    expect(html).toContain('<strong>To pay now: &#8377;458,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>');
-    expect(html).toContain('<strong>Balance to pay now: &#8377;458,884.30</strong>');
+    expect(html).toContain('<strong>To pay now: &#8377;4,58,884.30</strong> <small class="muted">(bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70)</small>');
+    expect(html).toContain('<strong>Balance to pay now: &#8377;4,58,884.30</strong>');
 
     expect((await pay(orderId, invoice, 458884.30, 'balance')).type).toBe('success');
     bills = await orderVendorBillRepository.forOrder(orderId);
@@ -138,7 +138,7 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     expect(vendorBillsView.totals(invoiceOnly)).toEqual({ cost: 655549, paid: 655549, due: 0 }); // 10a lists only the tax invoice
     expect(vendorBillsView.totals(bills)).toEqual({ cost: 655549, paid: 655549, due: 0 }); // both listed: the advance counted once
     html = await page(orderId);
-    expect(html).toContain('<span class="vendor-bill-paid">Paid &#8377;655,549.00</span><br><span class="vendor-bill-paid">Nothing due</span>');
+    expect(html).toContain('<span class="vendor-bill-paid">Paid &#8377;6,55,549.00</span><br><span class="vendor-bill-paid">Nothing due</span>');
   });
 
   it('6: a logistics proforma payment counts once in the Total row', async () => {
