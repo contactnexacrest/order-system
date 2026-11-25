@@ -65,8 +65,8 @@ afterwards. No real names, e-mails or phone numbers (PII rule); the end card sho
 | 6.3 | Portal › Profile: the yellow bar "New bank details entered" (demo) | Your money cannot be redirected | If anyone ever enters new bank details for you, you see a yellow notice on every page of your portal, and we check them before any payment, so nobody can redirect your money. | 18 |
 | | **Chapter 7 — Your questions answered** | | | |
 | 7.1 | Chapter card "7 · Your questions" | — | Part seven. The questions people ask us most. | 3 |
-| 7.2 | Q card: "Do I need to invest money?" | — | Do I need to invest money? No. You pay nothing to join, and nothing to stay. | 8 |
-| 7.3 | Q card: "Do I need export experience?" | — | Do I need export experience? No. We do the export work. You need good contacts with buyers. | 8 |
+| 7.2 | Q card: "Do I need to pay anything?" | — | Do I need to pay anything? No. There is nothing to pay, to join or to stay. | 8 |
+| 7.3 | Q card: "Do I need export experience?" | — | Do I need export experience? No, we do the export work. If you have export experience, that is an advantage. | 8 |
 | 7.4 | Q card: "What if the buyer cancels?" | — | What if the buyer cancels? If an order is cancelled before the buyer has paid in full, it earns no commission. Commission already paid to you is yours. | 12 |
 | 7.5 | Q card: "What if two people introduce the same buyer?" | — | What if two people introduce the same buyer? The buyer is linked to the associate through whose link or code they registered. | 10 |
 | 7.6 | Q card: "Can I see the price the buyer pays?" | — | Can I see the price the buyer pays? You see the goods value your commission is worked out on, and the stage of each order. Prices and documents are between NexaCrest and the buyer. | 12 |
@@ -96,8 +96,4 @@ afterwards. No real names, e-mails or phone numbers (PII rule); the end card sho
 5. **Bank proof (8.2):** the example given is "a bank statement". The word "cheque" does not appear anywhere (D-416).
 6. **Recording:** the demo associate in the screen scenes is given the example rates, so the portal never shows a real rate.
 7. **End card:** placeholder only; you add the real contact details when you send the video.
-8. **Please confirm. These three answers are not in any decision yet:**
-   - **7.2:** "You pay nothing to join, and nothing to stay."
-   - **7.3:** "No export experience needed."
-   - **7.5:** "Two people, same buyer: the buyer belongs to the associate whose link or code they registered with." This is how the app links a buyer today. Staff can still move a client to another associate, but the video doesn't mention that.
-   Change or remove any of them.
+8. **Confirmed by the owner (25 Nov 2026):** 7.2 there is nothing to pay; 7.3 no export experience needed, but having it is an advantage; 7.5 the buyer belongs to the associate whose link or code they used.
