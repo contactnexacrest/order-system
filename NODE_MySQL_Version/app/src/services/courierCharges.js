@@ -25,7 +25,7 @@ function parse(body) {
   if (!Number.isFinite(n) || n < 0) return 'Courier charges must be a number of rupees (0 or more), or leave the box blank.';
   const amount = round2(n);
   if (amount > MAX_INR) {
-    return `Courier charges of ₹${num(amount)} look too high for one document courier (more than ₹${num(MAX_INR)}). Check the courier bill.`;
+    return `Courier charges of ₹${require('../helpers/moneyFormat').regroup(num(amount))} look too high for one document courier (more than ₹${require('../helpers/moneyFormat').regroup(num(MAX_INR))}). Check the courier bill.`;
   }
   if (amount <= 0) return null;
   if (!orderCostEntryRepository.PAID_FROM[paidFrom]) return 'Choose what the courier charges were paid from.';

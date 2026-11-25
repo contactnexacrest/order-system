@@ -174,13 +174,13 @@ function legInrActual(receipts) {
 /** What the success message says about the rupees. */
 function statement(currency, amount, inr, rate) {
   if (!inr || inr.inr === null || inr.inr === undefined) {
-    return `Received ${money(currency, amount)} at the exchange rate of ₹${fmt(rate, 4)} (≈ ₹${fmt(amount * rate, 2)}, estimated until the INR credited is known).`;
+    return `Received ${money(currency, amount)} at the exchange rate of ₹${require('../helpers/moneyFormat').regroup(fmt(rate, 4))} (≈ ₹${require('../helpers/moneyFormat').regroup(fmt(amount * rate, 2))}, estimated until the INR credited is known).`;
   }
-  let text = `Received ${money(currency, amount)}; ₹${fmt(inr.inr, 2)} credited by the bank — exchange rate worked out ₹${fmt(inr.effective_rate, 4)}.`;
+  let text = `Received ${money(currency, amount)}; ₹${require('../helpers/moneyFormat').regroup(fmt(inr.inr, 2))} credited by the bank — exchange rate worked out ₹${require('../helpers/moneyFormat').regroup(fmt(inr.effective_rate, 4))}.`;
   if (inr.choice === 'bank_charges') {
-    text += ` ₹${fmt(inr.gap, 2)} the bank kept (at its rate of ₹${fmt(inr.bank_rate, 4)}) is recorded as an order cost "Bank Charges".`;
+    text += ` ₹${require('../helpers/moneyFormat').regroup(fmt(inr.gap, 2))} the bank kept (at its rate of ₹${require('../helpers/moneyFormat').regroup(fmt(inr.bank_rate, 4))}) is recorded as an order cost "Bank Charges".`;
   } else if (inr.choice === 'other') {
-    text += ` Difference from the bank's rate: ₹${fmt(Math.abs(inr.gap), 2)} — ${inr.reason}.`;
+    text += ` Difference from the bank's rate: ₹${require('../helpers/moneyFormat').regroup(fmt(Math.abs(inr.gap), 2))} — ${inr.reason}.`;
   }
   return text;
 }

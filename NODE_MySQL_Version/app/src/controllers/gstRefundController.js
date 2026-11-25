@@ -111,7 +111,7 @@ async function recordCredit(req, res) {
   if (!error) error = fieldValidator.bankReference(reference, 'The bank reference (RFD-05 / UTR)');
   if (!error && !Object.prototype.hasOwnProperty.call(gstRefundRepository.PARTS, part)) error = 'Choose whether this is the provisional part or the final / balance.';
   if (!error && refused !== '' && (!isNum(refused) || refusedAmount < 0)) error = 'Enter the amount refused as a number (or leave it empty).';
-  if (!error && r2(Number(amount) + refusedAmount) > open + 0.005) error = `Credited plus refused (₹${money(Number(amount) + refusedAmount)}) is more than what is still open on this claim (₹${money(Math.max(0, open))}).`;
+  if (!error && r2(Number(amount) + refusedAmount) > open + 0.005) error = `Credited plus refused (₹${require('../helpers/moneyFormat').regroup(money(Number(amount) + refusedAmount))}) is more than what is still open on this claim (₹${require('../helpers/moneyFormat').regroup(money(Math.max(0, open)))}).`;
   if (error) {
     flash.set(req, 'error', `${error} Nothing was saved.`);
     res.redirect(BACK);
@@ -125,7 +125,7 @@ async function recordCredit(req, res) {
   const saved = await gstRefundRepository.addCreditWithinClaim(Number(claim.id), Number(amount), refusedAmount,
     `₹${money(refusedAmount)} refused (with the credit of ${longDate(creditedOn)})`, creditedOn, reference, part, req.user.id);
   if (saved.id === null) {
-    flash.set(req, 'error', `Credited plus refused (₹${money(Number(amount) + refusedAmount)}) is more than what is still open on this claim (₹${money(Math.max(0, saved.open))}). Nothing was saved.`);
+    flash.set(req, 'error', `Credited plus refused (₹${require('../helpers/moneyFormat').regroup(money(Number(amount) + refusedAmount))}) is more than what is still open on this claim (₹${require('../helpers/moneyFormat').regroup(money(Math.max(0, saved.open)))}). Nothing was saved.`);
     res.redirect(BACK);
     return;
   }

@@ -34,3 +34,24 @@ describe('D-414 rupees in Indian grouping on every screen', () => {
     expect(indian(999.5)).toBe('999.50');
   });
 });
+
+describe('D-414 follow-up: messages the app writes use Indian grouping too', () => {
+  // Owner, 25 Nov 2026 ("go ahead with 6"). Stored money descriptions, audit entries and documents are unchanged.
+  const mf = require('../../src/helpers/moneyFormat');
+  it('regroups a Western-formatted amount and leaves anything else alone', () => {
+    expect(mf.regroup('1,234,567.89')).toBe('12,34,567.89');
+    expect(mf.regroup('500,000')).toBe('5,00,000');
+    expect(mf.regroup('84.1000')).toBe('84.1000');
+    expect(mf.regroup('-12,345.50')).toBe('-12,345.50');
+    expect(mf.regroup('none')).toBe('none');
+  });
+  it('writes the messages the same as PHP', () => {
+    expect(require('../../src/services/courierCharges').parse({ courier_charges_inr: '150000' }))
+      .toBe('Courier charges of ₹1,50,000.00 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.');
+    expect(require('../../src/services/remittanceInr').statement('USD', 1800, null, 84.1))
+      .toBe('Received USD 1,800.00 at the exchange rate of ₹84.1000 (≈ ₹1,51,380.00, estimated until the INR credited is known).');
+    const w = require('../../src/helpers/vendorBillsView').toPayNow({ doc_kind: 'invoice', amount_due: 250000, requested_amount_inr: null, carried_paid: 0, paid: 0, remaining: 250000 });
+    expect(w.working).toContain('bill total ₹2,50,000.00');
+  });
+});
+

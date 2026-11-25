@@ -108,7 +108,7 @@ async function add(req, res) {
     no_receipt_reason: hasReceipt ? null : noReceiptReason.slice(0, 255),
   }, req.user.id);
   await auditLogRepository.log(req.user.id, 'ORDER_EXPENSE_ADDED', 'order_expenses', id, 'amount_inr', null, String(rounded), `${orderExpenseRepository.CATEGORIES[category]} on ${date}${hasReceipt ? '' : ` — no receipt: ${noReceiptReason}`}`);
-  back(req, res, orderId, 'success', `Expense of ₹${rounded.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} recorded.`);
+  back(req, res, orderId, 'success', `Expense of ₹${require('../helpers/moneyFormat').regroup(rounded.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))} recorded.`);
 }
 
 async function remove(req, res) {

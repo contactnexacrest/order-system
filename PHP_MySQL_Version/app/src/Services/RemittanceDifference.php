@@ -135,7 +135,7 @@ final class RemittanceDifference
         }
         $v = round((float) $raw, 2);
         if ($v > self::MAX_OWN_BANK_CHARGES_INR) {
-            return "Our bank's charges of ₹" . number_format($v, 2) . ' look too high for one credit (more than ₹' . number_format(self::MAX_OWN_BANK_CHARGES_INR, 2) . '). Check the bank advice and enter the fee only.';
+            return "Our bank's charges of ₹" . \App\Helpers\MoneyFormat::indian($v, 2) . ' look too high for one credit (more than ₹' . \App\Helpers\MoneyFormat::indian(self::MAX_OWN_BANK_CHARGES_INR, 2) . '). Check the bank advice and enter the fee only.';
         }
         return $v;
     }
@@ -221,7 +221,7 @@ final class RemittanceDifference
         $money = static fn (float $v): string => PartPaymentService::money($currency, $v);
         $lower = strtolower($label);
         return match ($eval['reason'] ?? null) {
-            'bank_charges' => 'Bank charges ' . $money((float) $eval['charges']) . ' = ₹' . number_format(round((float) $eval['charges'] * $rate, 2), 2)
+            'bank_charges' => 'Bank charges ' . $money((float) $eval['charges']) . ' = ₹' . \App\Helpers\MoneyFormat::indian(round((float) $eval['charges'] * $rate, 2), 2)
                 . " recorded as an order cost — the {$lower} counts as received in full.",
             'short' => 'Short by ' . $money(round((float) $eval['remaining'] - $amount, 2)) . ' — '
                 . ($leg === 'advance' ? 'record the rest when it arrives, or a manager clears the advance short and the difference is carried into the balance.'

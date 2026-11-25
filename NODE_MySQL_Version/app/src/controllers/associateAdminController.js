@@ -1081,7 +1081,7 @@ async function clawback(req, res) {
   if (p.status !== 'paid' || Number(p.amount_inr) <= 0) {
     flash.set(req, 'error', 'Only a paid commission can be clawed back.');
   } else if (amount === null || amount <= 0 || amount > Number(p.paid_inr) - already + 0.005) {
-    flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${fmt2(Number(p.paid_inr) - already)}).`);
+    flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${require('../helpers/moneyFormat').regroup(fmt2(Number(p.paid_inr) - already))}).`);
   } else if (len(reason) < 10 || len(reason) > 300) {
     flash.set(req, 'error', `Say what the ${kind} was (10 to 300 characters) — the associate is shown it.`);
   } else {
@@ -1090,7 +1090,7 @@ async function clawback(req, res) {
     // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
     const saved = await incentiveRepository.addClawbackWithinPaid(Number(p.id), amount, month, `Taken back for ${kind}: commission paid on order ${order ? order.order_reference : p.order_id} (payout no. ${p.id}, ref ${p.paid_reference || '—'}): ${reason}`);
     if (saved.id === null) {
-      flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${fmt2(Math.max(0, saved.left))}).`);
+      flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${require('../helpers/moneyFormat').regroup(fmt2(Math.max(0, saved.left)))}).`);
     } else {
       const id = saved.id;
       await db.execute('UPDATE incentive_payouts SET takeback_kind = :k WHERE id = :id', { k: kind, id });

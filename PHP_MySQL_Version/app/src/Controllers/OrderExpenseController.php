@@ -110,7 +110,7 @@ final class OrderExpenseController
             'no_receipt_reason' => $hasReceipt ? null : mb_substr($noReceiptReason, 0, 255),
         ], (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'ORDER_EXPENSE_ADDED', 'order_expenses', $id, 'amount_inr', null, (string) round((float) $amount, 2), OrderExpenseRepository::CATEGORIES[$category] . ' on ' . $date . ($hasReceipt ? '' : ' — no receipt: ' . $noReceiptReason));
-        $this->back($orderId, 'success', 'Expense of ₹' . number_format((float) $amount, 2) . ' recorded.');
+        $this->back($orderId, 'success', 'Expense of ₹' . \App\Helpers\MoneyFormat::indian((float) $amount, 2) . ' recorded.');
     }
 
     public function delete(array $params): void

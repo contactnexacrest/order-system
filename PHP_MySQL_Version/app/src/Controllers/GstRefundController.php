@@ -102,7 +102,7 @@ final class GstRefundController
             ($e = FieldValidator::bankReference($reference, 'The bank reference (RFD-05 / UTR)')) !== null => $e,
             !array_key_exists($part, GstRefundRepository::PARTS) => 'Choose whether this is the provisional part or the final / balance.',
             $refused !== '' && (!is_numeric($refused) || $refusedAmount < 0) => 'Enter the amount refused as a number (or leave it empty).',
-            round((float) $amount + $refusedAmount, 2) > $open + 0.005 => 'Credited plus refused (₹' . number_format((float) $amount + $refusedAmount, 2) . ') is more than what is still open on this claim (₹' . number_format(max(0, $open), 2) . ').',
+            round((float) $amount + $refusedAmount, 2) > $open + 0.005 => 'Credited plus refused (₹' . \App\Helpers\MoneyFormat::indian((float) $amount + $refusedAmount, 2) . ') is more than what is still open on this claim (₹' . \App\Helpers\MoneyFormat::indian(max(0, $open), 2) . ').',
             default => null,
         };
         if ($error !== null) {
@@ -119,7 +119,7 @@ final class GstRefundController
         $saved = GstRefundRepository::addCreditWithinClaim((int) $claim['id'], (float) $amount, $refusedAmount,
             '₹' . number_format($refusedAmount, 2) . ' refused (with the credit of ' . date('j M Y', strtotime($creditedOn)) . ')', $creditedOn, $reference, $part, (int) $user['id']);
         if ($saved['id'] === null) {
-            Flash::set('error', 'Credited plus refused (₹' . number_format((float) $amount + $refusedAmount, 2) . ') is more than what is still open on this claim (₹' . number_format(max(0, $saved['open']), 2) . '). Nothing was saved.');
+            Flash::set('error', 'Credited plus refused (₹' . \App\Helpers\MoneyFormat::indian((float) $amount + $refusedAmount, 2) . ') is more than what is still open on this claim (₹' . \App\Helpers\MoneyFormat::indian(max(0, $saved['open']), 2) . '). Nothing was saved.');
             header(self::BACK);
             return;
         }

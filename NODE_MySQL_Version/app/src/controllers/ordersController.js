@@ -3717,7 +3717,7 @@ async function saveSupplierPo(req, res) {
     const reasonError = require('../helpers/reasonValidator').check(overrideReason);
     if (reasonError) {
       const f2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      flash.set(req, 'error', `Unit price ₹${f2(agreedRaw)} is not the quoted ₹${f2(quoted)} — give the reason: ${reasonError}`);
+      flash.set(req, 'error', `Unit price ₹${require('../helpers/moneyFormat').regroup(f2(agreedRaw))} is not the quoted ₹${require('../helpers/moneyFormat').regroup(f2(quoted))} — give the reason: ${reasonError}`);
       res.redirect(`/orders/${orderId}#supplier-po-form`);
       return;
     }
@@ -3901,7 +3901,7 @@ async function markSupplierBalancePaid(req, res) {
   // Owner report (2026-10-27): the supplier advance was never recorded —
   // the balance waits for it whenever the terms plan an advance.
   if (parseFloat(supplierPo.advance_amount_inr || 0) > 0 && !supplierPo.advance_paid_at) {
-    flash.set(req, 'error', `Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${Number(supplierPo.advance_amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`);
+    flash.set(req, 'error', `Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${require('../helpers/moneyFormat').regroup(Number(supplierPo.advance_amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}.`);
     res.redirect(`/orders/${orderId}#step-7e-supplier-advance-paid`);
     return;
   }

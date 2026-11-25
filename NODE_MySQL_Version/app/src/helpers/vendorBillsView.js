@@ -51,7 +51,7 @@ function unpaid(bills) {
  * OrderVendorBillRepository::toPayNow (same wording).
  */
 function toPayNow(b) {
-  const m = (v) => `₹${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const m = (v) => `₹${require('./moneyFormat').regroup(Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`;
   const isProforma = (b.doc_kind || 'invoice') === 'proforma';
   const base = isProforma && b.requested_amount_inr !== null && b.requested_amount_inr !== undefined ? 'asked now on the proforma' : (isProforma ? 'proforma total' : 'bill total');
   const parts = [`${base} ${m(b.amount_due)}`];
@@ -70,7 +70,7 @@ function supplierLegToPayNow(bills, supplierPo, leg) {
   for (const b of supplierBills(bills, supplierPo.id)) {
     for (const p of b.payments || []) paid[p.leg === 'balance' ? 'balance' : 'advance'] += Number(p.amount_inr);
   }
-  const m = (v) => `₹${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const m = (v) => `₹${require('./moneyFormat').regroup(Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`;
   const r = (v) => round2(v);
   if (leg === 'advance') {
     const planned = Number(supplierPo.advance_amount_inr || 0);

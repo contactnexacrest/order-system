@@ -199,7 +199,7 @@ final class OrderVendorBillRepository
      */
     public static function toPayNow(array $b): array
     {
-        $m = static fn (float $v): string => '₹' . number_format($v, 2);
+        $m = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::indian($v, 2);
         $isProforma = ($b['doc_kind'] ?? 'invoice') === 'proforma';
         $base = $isProforma && $b['requested_amount_inr'] !== null ? 'asked now on the proforma' : ($isProforma ? 'proforma total' : 'bill total');
         $parts = [$base . ' ' . $m((float) $b['amount_due'])];
@@ -232,7 +232,7 @@ final class OrderVendorBillRepository
                 $paid[($p['leg'] ?? '') === 'balance' ? 'balance' : 'advance'] += (float) $p['amount_inr'];
             }
         }
-        $m = static fn (float $v): string => '₹' . number_format($v, 2);
+        $m = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::indian($v, 2);
         if ($leg === 'advance') {
             $planned = (float) ($supplierPo['advance_amount_inr'] ?? 0);
             if ($planned <= 0) {

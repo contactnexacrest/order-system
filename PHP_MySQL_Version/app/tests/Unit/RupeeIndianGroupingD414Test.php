@@ -44,4 +44,17 @@ final class RupeeIndianGroupingD414Test extends TestCase
         self::assertSame('-12,34,567.00', \App\Helpers\MoneyFormat::indian(-1234567));
         self::assertSame('999.50', \App\Helpers\MoneyFormat::indian(999.5));
     }
+
+    public function testMessagesTheAppWritesUseIndianGroupingToo(): void
+    {
+        // Owner follow-up to D-414 (25 Nov 2026, "go ahead with 6"): rupee amounts in messages, task texts and
+        // on-screen working lines read the Indian way. Stored money descriptions, audit entries and documents are unchanged.
+        self::assertSame('Courier charges of ₹1,50,000.00 look too high for one document courier (more than ₹1,00,000.00). Check the courier bill.',
+            \App\Services\CourierCharges::parse(['courier_charges_inr' => '150000']));
+        self::assertSame('Received USD 1,800.00 at the exchange rate of ₹84.1000 (≈ ₹1,51,380.00, estimated until the INR credited is known).',
+            \App\Services\RemittanceInr::statement('USD', 1800.0, null, 84.1));
+        $w = \App\Repositories\OrderVendorBillRepository::toPayNow(['doc_kind' => 'invoice', 'amount_due' => 250000.0, 'requested_amount_inr' => null, 'carried_paid' => 0, 'paid' => 0, 'remaining' => 250000.0]);
+        self::assertStringContainsString('bill total ₹2,50,000.00', $w['working']);
+    }
 }
+

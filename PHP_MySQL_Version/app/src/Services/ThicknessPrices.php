@@ -686,10 +686,10 @@ final class ThicknessPrices
     {
         $f = self::chaFallback($row, $product);
         if ($f['source'] === 'supplier') {
-            return 'Empty = supplier\'s ₹' . number_format((float) $f['value'], 2) . ($f['port'] !== null ? ' (' . $f['port'] . ')' : '');
+            return 'Empty = supplier\'s ₹' . \App\Helpers\MoneyFormat::indian((float) $f['value'], 2) . ($f['port'] !== null ? ' (' . $f['port'] . ')' : '');
         }
         if ($f['source'] === 'product') {
-            return 'Empty = product default ₹' . number_format((float) $f['value'], 2);
+            return 'Empty = product default ₹' . \App\Helpers\MoneyFormat::indian((float) $f['value'], 2);
         }
         return 'Empty = no CHA + transport';
     }

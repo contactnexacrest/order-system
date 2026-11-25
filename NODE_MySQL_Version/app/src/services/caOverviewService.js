@@ -143,7 +143,7 @@ async function attention(summary, canManageCa, allLevel, today) {
   }
   if (allLevel) {
     const tds = await tdsForMonth(today);
-    boxes.push({ key: 'tds', value: `₹${format2(tds.amount)}`,
+    boxes.push({ key: 'tds', value: `₹${require('../helpers/moneyFormat').regroup(format2(tds.amount))}`,
       label: `TDS on this month's expenses — deposit by ${shortDay(tds.due)}`,
       button: 'Summary', href: '/ca/tds-summary', tone: tone(tds.amount, 'warn') });
   }

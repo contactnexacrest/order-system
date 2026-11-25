@@ -266,7 +266,7 @@ final class AssociateTds
             $stmt->execute(['f' => $prevStart, 't' => $prevEnd]);
             $r = $stmt->fetch();
             if ((float) $r['tds'] > 0) {
-                $out[] = ['type' => 'associate_tds_deposit', 'message' => 'Deposit the TDS of ₹' . number_format((float) $r['tds'], 2) . ' deducted on associate commission in '
+                $out[] = ['type' => 'associate_tds_deposit', 'message' => 'Deposit the TDS of ₹' . \App\Helpers\MoneyFormat::indian((float) $r['tds'], 2) . ' deducted on associate commission in '
                     . date('F Y', strtotime($prevStart)) . ' (' . (int) $r['n'] . ' payment(s)) by ' . date('j F Y', strtotime(substr($today, 0, 7) . '-07'))
                     . ' with challan 281, then enter the challan no. in Associates → TDS register.'];
             }
@@ -280,7 +280,7 @@ final class AssociateTds
             $tds = array_sum(array_map(static fn (array $r): float => (float) ($r['tds_inr'] ?? 0), $rows));
             if ($tds > 0) {
                 $out[] = ['type' => 'associate_tds_26q', 'message' => 'File Form 26Q for Q' . $q . ' of FY ' . $fyStartYear . '-' . substr((string) ($fyStartYear + 1), 2)
-                    . ' (TDS on associate commission ₹' . number_format($tds, 2) . ') by ' . date('j F Y', strtotime(date('Y-m-t', strtotime($today))))
+                    . ' (TDS on associate commission ₹' . \App\Helpers\MoneyFormat::indian($tds, 2) . ') by ' . date('j F Y', strtotime(date('Y-m-t', strtotime($today))))
                     . ', then upload each associate\'s Form 16A.'];
             }
         }

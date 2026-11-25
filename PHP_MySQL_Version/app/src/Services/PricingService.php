@@ -686,7 +686,7 @@ final class PricingService
                 : $market . '?basis=cbm' . ($target !== null && ($target['supplier_id'] ?? null) !== null ? '&supplier_id=' . (int) $target['supplier_id'] : '') . '#add-price';
             $byKey['cbm'] = ['key' => 'cbm', 'ok' => $cbm !== null, 'supplier' => true,
                 'label' => $cbm !== null ? "Supplier price per CBM (needed: sold at {$cbmFrom} mm and above)" : "No price for {$cbmFrom} mm and above (per CBM)",
-                'detail' => $cbm !== null ? '₹' . number_format((float) (self::fobParts($product, $cbm, 'cbm', null, $settings)['total'] ?? 0), 2) . ' per CBM'
+                'detail' => $cbm !== null ? '₹' . \App\Helpers\MoneyFormat::indian((float) (self::fobParts($product, $cbm, 'cbm', null, $settings)['total'] ?? 0), 2) . ' per CBM'
                     : "needed because this product is sold at {$cbmFrom} mm and above — orders at {$cbmFrom} mm+ cannot be priced",
                 'link' => $cbm !== null ? $market : $addCbm, 'link_text' => $cbm !== null ? 'Market prices' : "Add a {$cbmFrom} mm+ price"];
             if ($cbm === null && $thickSpec !== null) {

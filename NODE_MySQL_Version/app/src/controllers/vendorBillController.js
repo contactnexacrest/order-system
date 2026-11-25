@@ -93,7 +93,7 @@ async function docKindFields(req, orderId, vendorKind, fields, sameVendor) {
     if (asked === '') return { doc_kind: 'proforma', requested_amount_inr: null, replaces_bill_id: null };
     if (Number.isNaN(Number(asked)) || Number(asked) <= 0) return 'Enter the amount the proforma asks for now (₹), or leave it blank when it asks for the whole bill.';
     const rounded = round2(Number(asked));
-    if (rounded > total + 0.004) return `The amount asked now cannot be more than the bill total (₹${money(total)}).`;
+    if (rounded > total + 0.004) return `The amount asked now cannot be more than the bill total (₹${require('../helpers/moneyFormat').regroup(money(total))}).`;
     return { doc_kind: 'proforma', requested_amount_inr: rounded, replaces_bill_id: null };
   }
   const replaces = parseInt(req.body.replaces_bill_id, 10) || 0;
@@ -250,7 +250,7 @@ async function payBill(req, res) {
     }
     // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
     if (leg === 'balance' && Number(supplierPo.advance_amount_inr || 0) > 0 && !supplierPo.advance_paid_at) {
-      back(req, res, orderId, anchor, 'error', `Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${money(supplierPo.advance_amount_inr)}.`);
+      back(req, res, orderId, anchor, 'error', `Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹${require('../helpers/moneyFormat').regroup(money(supplierPo.advance_amount_inr))}.`);
       return;
     }
   } else if ((bill.payment_kind || 'final') !== 'advance') {
@@ -272,7 +272,7 @@ async function payBill(req, res) {
     return;
   }
   if (round2(Number(amount)) > bill.remaining + 0.004) {
-    back(req, res, orderId, anchor, 'error', `That is more than is still due on bill ${bill.bill_no} (₹${money(bill.remaining)}).`);
+    back(req, res, orderId, anchor, 'error', `That is more than is still due on bill ${bill.bill_no} (₹${require('../helpers/moneyFormat').regroup(money(bill.remaining))}).`);
     return;
   }
   const mode = str(req.body.payment_mode);
@@ -306,7 +306,7 @@ async function payBill(req, res) {
     await auditLogRepository.log(req.user.id, leg === 'advance' ? 'SUPPLIER_ADVANCE_PAID' : 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', supplierPo.id, `${leg}_paid_date`, null, paidAt, `Against bill ${bill.bill_no} — ${mode} ${reference}`);
   }
   await auditLogRepository.log(req.user.id, 'VENDOR_BILL_PAID', 'order_vendor_bills', bill.id, 'paid_at', null, paidAt, `₹${money(paid)} — ${mode} ${reference}`);
-  back(req, res, orderId, anchor, 'success', `Payment of ₹${money(paid)} against bill ${bill.bill_no} recorded.`);
+  back(req, res, orderId, anchor, 'success', `Payment of ₹${require('../helpers/moneyFormat').regroup(money(paid))} against bill ${bill.bill_no} recorded.`);
 }
 
 async function deleteBill(req, res) {

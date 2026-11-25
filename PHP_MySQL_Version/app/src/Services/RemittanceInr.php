@@ -187,14 +187,14 @@ final class RemittanceInr
     {
         if ($inr === null || $inr['inr'] === null) {
             return sprintf('Received %s at the exchange rate of ₹%s (≈ ₹%s, estimated until the INR credited is known).',
-                PartPaymentService::money($currency, $amount), number_format($rate, 4), number_format($amount * $rate, 2));
+                PartPaymentService::money($currency, $amount), number_format($rate, 4), \App\Helpers\MoneyFormat::indian($amount * $rate, 2));
         }
         $text = sprintf('Received %s; ₹%s credited by the bank — exchange rate worked out ₹%s.',
-            PartPaymentService::money($currency, $amount), number_format((float) $inr['inr'], 2), number_format((float) $inr['effective_rate'], 4));
+            PartPaymentService::money($currency, $amount), \App\Helpers\MoneyFormat::indian((float) $inr['inr'], 2), number_format((float) $inr['effective_rate'], 4));
         if ($inr['choice'] === 'bank_charges') {
-            $text .= ' ₹' . number_format((float) $inr['gap'], 2) . " the bank kept (at its rate of ₹" . number_format((float) $inr['bank_rate'], 4) . ') is recorded as an order cost "Bank Charges".';
+            $text .= ' ₹' . \App\Helpers\MoneyFormat::indian((float) $inr['gap'], 2) . " the bank kept (at its rate of ₹" . \App\Helpers\MoneyFormat::indian((float) $inr['bank_rate'], 4) . ') is recorded as an order cost "Bank Charges".';
         } elseif ($inr['choice'] === 'other') {
-            $text .= ' Difference from the bank\'s rate: ₹' . number_format(abs((float) $inr['gap']), 2) . ' — ' . $inr['reason'] . '.';
+            $text .= ' Difference from the bank\'s rate: ₹' . \App\Helpers\MoneyFormat::indian(abs((float) $inr['gap']), 2) . ' — ' . $inr['reason'] . '.';
         }
         return $text;
     }

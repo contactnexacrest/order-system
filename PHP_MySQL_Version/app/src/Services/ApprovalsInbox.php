@@ -459,7 +459,7 @@ final class ApprovalsInbox
                     continue;
                 }
                 $out[] = self::row('purchase:' . $r['id'], 'Purchase approval', (string) $r['awarded_at'], (int) $r['order_id'], (string) $r['order_reference'], 'PR-' . (int) $r['id'],
-                    (string) $r['supplier_legal_name'] . ' · ₹' . number_format($value, 2) . ' · ' . self::short((string) $r['description']),
+                    (string) $r['supplier_legal_name'] . ' · ₹' . \App\Helpers\MoneyFormat::indian($value, 2) . ' · ' . self::short((string) $r['description']),
                     '/procurement/' . (int) $r['id'], 'Review purchase', 'purchase PR-' . (int) $r['id'] . ' (' . $r['supplier_legal_name'] . ') waits for approval.');
             }
         }

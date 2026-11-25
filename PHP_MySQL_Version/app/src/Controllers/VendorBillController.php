@@ -113,7 +113,7 @@ final class VendorBillController
                 return 'Enter the amount the proforma asks for now (₹), or leave it blank when it asks for the whole bill.';
             }
             if (round((float) $asked, 2) > $total + 0.004) {
-                return 'The amount asked now cannot be more than the bill total (₹' . number_format($total, 2) . ').';
+                return 'The amount asked now cannot be more than the bill total (₹' . \App\Helpers\MoneyFormat::indian($total, 2) . ').';
             }
             return ['doc_kind' => 'proforma', 'requested_amount_inr' => round((float) $asked, 2), 'replaces_bill_id' => null];
         }
@@ -293,7 +293,7 @@ final class VendorBillController
             }
             // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
             if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
-                $this->back($orderId, $anchor, 'error', 'Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.');
+                $this->back($orderId, $anchor, 'error', 'Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . \App\Helpers\MoneyFormat::indian((float) $supplierPo['advance_amount_inr'], 2) . '.');
                 return;
             }
         } elseif (($bill['payment_kind'] ?? 'final') !== 'advance' && ($blocked = self::logisticsPaymentBlockedReason($order)) !== null) {
@@ -312,7 +312,7 @@ final class VendorBillController
             return;
         }
         if (round((float) $amount, 2) > $bill['remaining'] + 0.004) {
-            $this->back($orderId, $anchor, 'error', 'That is more than is still due on bill ' . $bill['bill_no'] . ' (₹' . number_format($bill['remaining'], 2) . ').');
+            $this->back($orderId, $anchor, 'error', 'That is more than is still due on bill ' . $bill['bill_no'] . ' (₹' . \App\Helpers\MoneyFormat::indian($bill['remaining'], 2) . ').');
             return;
         }
         $mode = (string) ($_POST['payment_mode'] ?? '');
@@ -346,7 +346,7 @@ final class VendorBillController
             AuditLogRepository::log((int) $user['id'], $leg === 'advance' ? 'SUPPLIER_ADVANCE_PAID' : 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], $leg . '_paid_date', null, $paidAt, 'Against bill ' . $bill['bill_no'] . ' — ' . $mode . ' ' . $reference);
         }
         AuditLogRepository::log((int) $user['id'], 'VENDOR_BILL_PAID', 'order_vendor_bills', (int) $bill['id'], 'paid_at', null, $paidAt, '₹' . number_format((float) $amount, 2) . ' — ' . $mode . ' ' . $reference);
-        $this->back($orderId, $anchor, 'success', 'Payment of ₹' . number_format((float) $amount, 2) . ' against bill ' . $bill['bill_no'] . ' recorded.');
+        $this->back($orderId, $anchor, 'success', 'Payment of ₹' . \App\Helpers\MoneyFormat::indian((float) $amount, 2) . ' against bill ' . $bill['bill_no'] . ' recorded.');
     }
 
     public function deleteBill(array $params): void

@@ -619,7 +619,7 @@ async function readiness(product, s = null) {
     byKey.cbm = {
       key: 'cbm', ok: cbm !== null, supplier: true,
       label: cbm !== null ? `Supplier price per CBM (needed: sold at ${cbmFrom} mm and above)` : `No price for ${cbmFrom} mm and above (per CBM)`,
-      detail: cbm !== null ? `₹${numberFormat(((await fobParts(product, cbm, 'cbm', null, s)) || {}).total || 0)} per CBM`
+      detail: cbm !== null ? `₹${require('../helpers/moneyFormat').regroup(numberFormat(((await fobParts(product, cbm, 'cbm', null, s)) || {}).total || 0))} per CBM`
         : `needed because this product is sold at ${cbmFrom} mm and above — orders at ${cbmFrom} mm+ cannot be priced`,
       link: cbm !== null ? market : addCbm, link_text: cbm !== null ? 'Market prices' : `Add a ${cbmFrom} mm+ price`,
     };

@@ -3416,7 +3416,7 @@ final class OrderController
         $__overrideReason = trim((string) ($_POST['price_override_reason'] ?? ''));
         $__overridden = $__quoted !== null && is_numeric($__agreedRaw) && abs((float) $__agreedRaw - $__quoted) > 0.004;
         if ($__overridden && ($__reasonError = \App\Helpers\ReasonValidator::check($__overrideReason)) !== null) {
-            Flash::set('error', 'Unit price ₹' . number_format((float) $__agreedRaw, 2) . ' is not the quoted ₹' . number_format($__quoted, 2) . ' — give the reason: ' . $__reasonError);
+            Flash::set('error', 'Unit price ₹' . \App\Helpers\MoneyFormat::indian((float) $__agreedRaw, 2) . ' is not the quoted ₹' . \App\Helpers\MoneyFormat::indian($__quoted, 2) . ' — give the reason: ' . $__reasonError);
             header("Location: /orders/{$orderId}#supplier-po-form");
             return;
         }
@@ -3602,7 +3602,7 @@ final class OrderController
         // Owner report (2026-10-27): the supplier advance was never recorded
         // — the balance waits for it whenever the terms plan an advance.
         if ((float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
-            Flash::set('error', 'Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.');
+            Flash::set('error', 'Record the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . \App\Helpers\MoneyFormat::indian((float) $supplierPo['advance_amount_inr'], 2) . '.');
             header("Location: /orders/{$orderId}#step-7e-supplier-advance-paid");
             return;
         }

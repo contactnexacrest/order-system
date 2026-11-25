@@ -170,7 +170,7 @@ final class CaOverviewService
         }
         if ($allLevel) {
             $tds = self::tdsForMonth($today);
-            $boxes[] = ['key' => 'tds', 'value' => '₹' . number_format($tds['amount'], 2),
+            $boxes[] = ['key' => 'tds', 'value' => '₹' . \App\Helpers\MoneyFormat::indian($tds['amount'], 2),
                 'label' => 'TDS on this month\'s expenses — deposit by ' . date('j M Y', (int) strtotime($tds['due'])),
                 'button' => 'Summary', 'href' => '/ca/tds-summary', 'tone' => $tone($tds['amount'], 'warn')];
         }

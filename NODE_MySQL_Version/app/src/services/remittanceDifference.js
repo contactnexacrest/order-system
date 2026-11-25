@@ -84,7 +84,7 @@ function outcome(leg, label, currency, ev, amount, rate) {
   const lower = String(label).toLowerCase();
   const m = (v) => money(currency, v);
   if (ev.reason === 'bank_charges') {
-    return `Bank charges ${m(ev.charges)} = ₹${num(round2(ev.charges * rate))} recorded as an order cost — the ${lower} counts as received in full.`;
+    return `Bank charges ${m(ev.charges)} = ₹${require('../helpers/moneyFormat').regroup(num(round2(ev.charges * rate)))} recorded as an order cost — the ${lower} counts as received in full.`;
   }
   if (ev.reason === 'short') {
     return `Short by ${m(round2(ev.remaining - amount))} — ` + (leg === 'advance'
@@ -115,7 +115,7 @@ function postedOwnBankCharges(body) {
   }
   const r = round2(v);
   if (r > MAX_OWN_BANK_CHARGES_INR) {
-    return { error: `Our bank's charges of ₹${num(r)} look too high for one credit (more than ₹${num(MAX_OWN_BANK_CHARGES_INR)}). Check the bank advice and enter the fee only.` };
+    return { error: `Our bank's charges of ₹${require('../helpers/moneyFormat').regroup(num(r))} look too high for one credit (more than ₹${require('../helpers/moneyFormat').regroup(num(MAX_OWN_BANK_CHARGES_INR))}). Check the bank advice and enter the fee only.` };
   }
   return { value: r };
 }

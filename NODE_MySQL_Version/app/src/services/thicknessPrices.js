@@ -287,8 +287,8 @@ const rupees2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits
  */
 function chaFallbackText(row, product) {
   const f = chaFallback(row, product);
-  if (f.source === 'supplier') return `Empty = supplier's ₹${rupees2(f.value)}${f.port !== null ? ` (${f.port})` : ''}`;
-  if (f.source === 'product') return `Empty = product default ₹${rupees2(f.value)}`;
+  if (f.source === 'supplier') return `Empty = supplier's ₹${require('../helpers/moneyFormat').regroup(rupees2(f.value))}${f.port !== null ? ` (${f.port})` : ''}`;
+  if (f.source === 'product') return `Empty = product default ₹${require('../helpers/moneyFormat').regroup(rupees2(f.value))}`;
   return 'Empty = no CHA + transport';
 }
 

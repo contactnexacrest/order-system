@@ -1123,7 +1123,7 @@ final class AssociateAdminController
             return;
         }
         $already = (float) Database::connection()->query('SELECT COALESCE(-SUM(amount_inr), 0) FROM incentive_payouts WHERE clawback_of_payout_id = ' . (int) $p['id'])->fetchColumn();
-        $leftMessage = static fn (float $left): string => 'Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹' . number_format($left, 2) . ').';
+        $leftMessage = static fn (float $left): string => 'Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹' . \App\Helpers\MoneyFormat::indian($left, 2) . ').';
         if ($p['status'] !== 'paid' || (float) $p['amount_inr'] <= 0) {
             Flash::set('error', 'Only a paid commission can be clawed back.');
         } elseif ($amount === false || $amount <= 0 || $amount > (float) $p['paid_inr'] - $already + 0.005) {

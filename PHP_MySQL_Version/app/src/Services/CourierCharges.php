@@ -37,7 +37,7 @@ final class CourierCharges
         }
         $amount = round((float) $raw, 2);
         if ($amount > self::MAX_INR) {
-            return 'Courier charges of ₹' . number_format($amount, 2) . ' look too high for one document courier (more than ₹' . number_format(self::MAX_INR, 2) . '). Check the courier bill.';
+            return 'Courier charges of ₹' . \App\Helpers\MoneyFormat::indian($amount, 2) . ' look too high for one document courier (more than ₹' . \App\Helpers\MoneyFormat::indian(self::MAX_INR, 2) . '). Check the courier bill.';
         }
         if ($amount <= 0.0) {
             return null;

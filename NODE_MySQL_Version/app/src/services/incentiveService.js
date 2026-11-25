@@ -489,7 +489,7 @@ async function applyEligibilityAndCaps(orderId, role, roleLabel, person, share, 
   if (capOrder !== null && capOrder !== undefined && line.gets > capOrder) {
     line.gets = round2(capOrder);
     line.reason = 'cap_order';
-    line.note = `capped at ₹${inr0(capOrder)} per order`;
+    line.note = `capped at ₹${require('../helpers/moneyFormat').regroup(inr0(capOrder))} per order`;
   }
   const capMonth = roleRow ? roleRow.cap_per_month : null;
   if (capMonth !== null && capMonth !== undefined) {
@@ -498,7 +498,7 @@ async function applyEligibilityAndCaps(orderId, role, roleLabel, person, share, 
     if (line.gets > room) {
       line.gets = room;
       line.reason = 'cap_month';
-      line.note = `capped: ₹${inr0(already)} already this month, monthly cap ₹${inr0(capMonth)}`;
+      line.note = `capped: ₹${require('../helpers/moneyFormat').regroup(inr0(already))} already this month, monthly cap ₹${require('../helpers/moneyFormat').regroup(inr0(capMonth))}`;
     }
   }
   line.kept = round2(line.by_share - line.gets);
@@ -607,7 +607,7 @@ async function lockIfReady(orderId, userId, note = null) {
   if (reason !== null) return reason;
   const calc = await calculate(orderId);
   if (calc.over_profit) {
-    return `The team incentive (₹${fmt2(calc.amount)}) is more than the order's profit (₹${fmt2(calc.basis)}) — lower it before locking.`;
+    return `The team incentive (₹${require('../helpers/moneyFormat').regroup(fmt2(calc.amount))}) is more than the order's profit (₹${require('../helpers/moneyFormat').regroup(fmt2(calc.basis))}) — lower it before locking.`;
   }
   if (!(await lock(orderId, String(await fullyPaidOn(orderId)), userId, calc, note))) return 'This order\'s incentive is already locked.';
   return null;

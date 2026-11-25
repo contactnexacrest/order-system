@@ -277,7 +277,7 @@ final class IncentiveController
                 $calc = IncentiveService::calculate($orderId);
                 $amount = $mode === 'fixed' ? (float) $value : round($calc['basis'] * (float) $value / 100, 2);
                 if ($amount > $calc['basis'] + 0.005) {
-                    self::back($orderId, 'error', 'The team incentive (₹' . number_format($amount, 2) . ') cannot be more than the order\'s profit after the associate\'s commission (₹' . number_format($calc['basis'], 2) . ').');
+                    self::back($orderId, 'error', 'The team incentive (₹' . \App\Helpers\MoneyFormat::indian($amount, 2) . ') cannot be more than the order\'s profit after the associate\'s commission (₹' . \App\Helpers\MoneyFormat::indian($calc['basis'], 2) . ').');
                     return;
                 }
             }
@@ -606,13 +606,13 @@ final class IncentiveController
                 if (abs((float) ($tds ?? 0) - $tdsCalc['tds']) > 0.5) {
                     $overrideReason = trim((string) ($_POST['tds_override_reason'] ?? ''));
                     if (mb_strlen($overrideReason) < 10) {
-                        Flash::set('error', 'The TDS worked out for this payment is ₹' . number_format($tdsCalc['tds'], 2) . ' (' . $tdsCalc['reason'] . '). To record a different TDS, give the reason (at least 10 characters), e.g. the CA\'s advice or a lower-deduction certificate.');
+                        Flash::set('error', 'The TDS worked out for this payment is ₹' . \App\Helpers\MoneyFormat::indian($tdsCalc['tds'], 2) . ' (' . $tdsCalc['reason'] . '). To record a different TDS, give the reason (at least 10 characters), e.g. the CA\'s advice or a lower-deduction certificate.');
                         header('Location: /incentives/payouts?month=' . rawurlencode($month));
                         return;
                     }
                 }
                 if ($paidInr + (float) ($tds ?? 0) > $tdsCalc['gross'] + 0.005) {
-                    Flash::set('error', 'The amount paid plus the TDS cannot be more than the commission (₹' . number_format($tdsCalc['gross'], 2) . ').');
+                    Flash::set('error', 'The amount paid plus the TDS cannot be more than the commission (₹' . \App\Helpers\MoneyFormat::indian($tdsCalc['gross'], 2) . ').');
                     header('Location: /incentives/payouts?month=' . rawurlencode($month));
                     return;
                 }
@@ -627,7 +627,7 @@ final class IncentiveController
             }
             // QA Round 6, R6-N10: never more than the payout, never before its month.
             if ($paidInr > (float) $payout['amount_inr'] + 0.005) {
-                Flash::set('error', 'The amount paid cannot be more than the payout (₹' . number_format((float) $payout['amount_inr'], 2) . ').');
+                Flash::set('error', 'The amount paid cannot be more than the payout (₹' . \App\Helpers\MoneyFormat::indian((float) $payout['amount_inr'], 2) . ').');
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
                 return;
             }

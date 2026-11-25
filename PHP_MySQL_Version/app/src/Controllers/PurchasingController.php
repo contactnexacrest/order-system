@@ -211,7 +211,7 @@ final class PurchasingController
         }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_AWARDED', 'purchase_requirements', (int) $r['id'], 'awarded_quote_id', $r['awarded_quote_id'] !== null ? (string) $r['awarded_quote_id'] : null,
             "{$quote['supplier_legal_name']} ₹" . number_format($value, 2) . ($needsApproval ? ' (waiting for approval)' : ''));
-        Flash::set('success', "Awarded to {$quote['supplier_legal_name']} for ₹" . number_format($value, 2) . '. '
+        Flash::set('success', "Awarded to {$quote['supplier_legal_name']} for ₹" . \App\Helpers\MoneyFormat::indian($value, 2) . '. '
             . ($needsApproval ? 'It is above your approval limit and waits for an approver.' : 'Approved — within your approval limit.'));
         self::back((int) $r['id']);
     }
@@ -245,7 +245,7 @@ final class PurchasingController
             // QA Round 8, R8-N09: an award approved by the person who made it.
             AuditLogRepository::log((int) $user['id'], 'PURCHASE_AWARD_SELF_APPROVED', 'purchase_requirements', (int) $r['id'], null, null, null, 'Approved a purchase award they made themselves (Admin → Self-approval rules).');
         }
-        Flash::set('success', "Purchase PR-{$r['id']} approved: {$r['awarded_supplier_name']}, ₹" . number_format($value, 2) . '.');
+        Flash::set('success', "Purchase PR-{$r['id']} approved: {$r['awarded_supplier_name']}, ₹" . \App\Helpers\MoneyFormat::indian($value, 2) . '.');
         self::back((int) $r['id']);
     }
 

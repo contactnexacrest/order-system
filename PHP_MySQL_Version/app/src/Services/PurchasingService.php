@@ -76,7 +76,7 @@ final class PurchasingService
         }
         $limit = self::limitFor($userId);
         if ($limit !== null && $value > $limit) {
-            return 'This award (₹' . number_format($value, 2) . ') is above your approval limit of ₹' . number_format($limit, 2) . ' — a higher approver must approve it.';
+            return 'This award (₹' . \App\Helpers\MoneyFormat::indian($value, 2) . ') is above your approval limit of ₹' . \App\Helpers\MoneyFormat::indian($limit, 2) . ' — a higher approver must approve it.';
         }
         if ((int) $requirement['awarded_by'] === $userId && !MakerCheckerGuard::selfApprovalAllowed('purchase_award', $userId)) {
             return 'You awarded this purchase, so someone else must approve it.';

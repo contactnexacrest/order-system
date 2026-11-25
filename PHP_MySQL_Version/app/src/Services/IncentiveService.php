@@ -568,7 +568,7 @@ final class IncentiveService
         if ($capOrder !== null && $line['gets'] > $capOrder) {
             $line['gets'] = round((float) $capOrder, 2);
             $line['reason'] = 'cap_order';
-            $line['note'] = 'capped at ₹' . number_format((float) $capOrder, 0) . ' per order';
+            $line['note'] = 'capped at ₹' . \App\Helpers\MoneyFormat::indian((float) $capOrder, 0) . ' per order';
         }
         $capMonth = $roleRow['cap_per_month'] ?? null;
         if ($capMonth !== null) {
@@ -577,7 +577,7 @@ final class IncentiveService
             if ($line['gets'] > $room) {
                 $line['gets'] = $room;
                 $line['reason'] = 'cap_month';
-                $line['note'] = 'capped: ₹' . number_format($already, 0) . ' already this month, monthly cap ₹' . number_format((float) $capMonth, 0);
+                $line['note'] = 'capped: ₹' . \App\Helpers\MoneyFormat::indian($already, 0) . ' already this month, monthly cap ₹' . \App\Helpers\MoneyFormat::indian((float) $capMonth, 0);
             }
         }
         $line['kept'] = round($line['by_share'] - $line['gets'], 2);
@@ -640,7 +640,7 @@ final class IncentiveService
         }
         $calc = self::calculate($orderId);
         if ($calc['over_profit']) {
-            return 'The team incentive (₹' . number_format($calc['amount'], 2) . ') is more than the order\'s profit (₹' . number_format($calc['basis'], 2) . ') — lower it before locking.';
+            return 'The team incentive (₹' . \App\Helpers\MoneyFormat::indian($calc['amount'], 2) . ') is more than the order\'s profit (₹' . \App\Helpers\MoneyFormat::indian($calc['basis'], 2) . ') — lower it before locking.';
         }
         if (!self::lock($orderId, (string) self::fullyPaidOn($orderId), $userId, $calc, $note)) {
             return 'This order\'s incentive is already locked.';

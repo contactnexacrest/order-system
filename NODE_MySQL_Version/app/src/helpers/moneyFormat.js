@@ -48,4 +48,16 @@ function amount(value, currency, decimals = 2) {
   return Number(value).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-module.exports = { usesIndianGrouping, indian, amount };
+/**
+ * Owner follow-up to D-414 (25 Nov 2026): a rupee amount already written the Western way ("1,234,567.89")
+ * regrouped the Indian way ("12,34,567.89") for the messages, task texts and hints the app writes.
+ * Anything that is not a plain number is returned unchanged. PHP: MoneyFormat::indian().
+ */
+function regroup(text) {
+  const t = String(text);
+  const m = t.match(/^(-?)([\d,]+)(\.\d+)?$/);
+  if (!m) return t;
+  return m[1] + indian(m[2].replace(/,/g, ''), 0) + (m[3] || '');
+}
+
+module.exports = { usesIndianGrouping, indian, amount, regroup };

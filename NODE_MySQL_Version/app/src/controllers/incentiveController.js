@@ -283,7 +283,7 @@ async function saveOrder(req, res) {
       const calc = await incentiveService.calculate(orderId);
       const amount = mode === 'fixed' ? value : incentiveService.round2(calc.basis * value / 100);
       if (amount > calc.basis + 0.005) {
-        return back(req, res, orderId, 'error', `The team incentive (₹${incentiveService.fmt2(amount)}) cannot be more than the order's profit after the associate's commission (₹${incentiveService.fmt2(calc.basis)}).`);
+        return back(req, res, orderId, 'error', `The team incentive (₹${require('../helpers/moneyFormat').regroup(incentiveService.fmt2(amount))}) cannot be more than the order's profit after the associate's commission (₹${require('../helpers/moneyFormat').regroup(incentiveService.fmt2(calc.basis))}).`);
       }
     }
     Object.assign(fields, { incentive_mode: mode, incentive_value: value, incentive_reason: mode === 'global' ? null : reason });
@@ -606,13 +606,13 @@ async function markPaid(req, res) {
       if (Math.abs(Number(tds || 0) - tdsCalc.tds) > 0.5) {
         overrideReason = String(body.tds_override_reason || '').trim();
         if ([...overrideReason].length < 10) {
-          flash.set(req, 'error', `The TDS worked out for this payment is ₹${money(tdsCalc.tds)} (${tdsCalc.reason}). To record a different TDS, give the reason (at least 10 characters), e.g. the CA's advice or a lower-deduction certificate.`);
+          flash.set(req, 'error', `The TDS worked out for this payment is ₹${require('../helpers/moneyFormat').regroup(money(tdsCalc.tds))} (${tdsCalc.reason}). To record a different TDS, give the reason (at least 10 characters), e.g. the CA's advice or a lower-deduction certificate.`);
           res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
           return;
         }
       }
       if (paidInr + Number(tds || 0) > tdsCalc.gross + 0.005) {
-        flash.set(req, 'error', `The amount paid plus the TDS cannot be more than the commission (₹${money(tdsCalc.gross)}).`);
+        flash.set(req, 'error', `The amount paid plus the TDS cannot be more than the commission (₹${require('../helpers/moneyFormat').regroup(money(tdsCalc.gross))}).`);
         res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
         return;
       }
@@ -627,7 +627,7 @@ async function markPaid(req, res) {
     }
     // QA Round 6, R6-N10: never more than the payout, never before its month.
     if (paidInr > Number(payout.amount_inr) + 0.005) {
-      flash.set(req, 'error', `The amount paid cannot be more than the payout (₹${Number(payout.amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+      flash.set(req, 'error', `The amount paid cannot be more than the payout (₹${require('../helpers/moneyFormat').regroup(Number(payout.amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}).`);
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
       return;
     }

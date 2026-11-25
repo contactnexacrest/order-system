@@ -321,7 +321,7 @@ async function other(req) {
       const value = purchasing.awardValue({ unit_price_inr: r.unit_price_inr, gst_percent: r.gst_percent }, Number(r.quantity));
       if ((await purchasing.approvalRefusal(req, r, value)) !== null) continue;
       out.push(row(`purchase:${r.id}`, 'Purchase approval', String(r.awarded_at), Number(r.order_id), String(r.order_reference), `PR-${r.id}`,
-        `${r.supplier_legal_name || ''} · ₹${fmt2(value)} · ${shorten(r.description)}`, `/procurement/${r.id}`, 'Review purchase',
+        `${r.supplier_legal_name || ''} · ₹${require('../helpers/moneyFormat').regroup(fmt2(value))} · ${shorten(r.description)}`, `/procurement/${r.id}`, 'Review purchase',
         `purchase PR-${r.id} (${r.supplier_legal_name || ''}) waits for approval.`));
     }
   }

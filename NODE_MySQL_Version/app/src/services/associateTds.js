@@ -208,7 +208,7 @@ async function reminders(today) {
           AND paid_on BETWEEN :f AND :t`, { f: prevStart, t: prevEnd }
     );
     if (Number(r.tds) > 0) {
-      out.push({ type: 'associate_tds_deposit', message: `Deposit the TDS of ₹${money(r.tds)} deducted on associate commission in ${MONTHS[pm - 1]} ${py} (${Number(r.n)} payment(s)) by 7 ${MONTHS[month - 1]} ${year} with challan 281, then enter the challan no. in Associates → TDS register.` });
+      out.push({ type: 'associate_tds_deposit', message: `Deposit the TDS of ₹${require('../helpers/moneyFormat').regroup(money(r.tds))} deducted on associate commission in ${MONTHS[pm - 1]} ${py} (${Number(r.n)} payment(s)) by 7 ${MONTHS[month - 1]} ${year} with challan 281, then enter the challan no. in Associates → TDS register.` });
     }
   }
   const dueMonths = { 7: 1, 10: 2, 1: 3, 5: 4 };
@@ -218,7 +218,7 @@ async function reminders(today) {
     const rows = await register(`${fyStartYear}-04-01`, q);
     const tds = rows.reduce((sum, r) => sum + Number(r.tds_inr || 0), 0);
     if (tds > 0) {
-      out.push({ type: 'associate_tds_26q', message: `File Form 26Q for Q${q} of FY ${fyStartYear}-${String(fyStartYear + 1).slice(2)} (TDS on associate commission ₹${money(tds)}) by ${lastDayOfMonth(today)} ${MONTHS[month - 1]} ${year}, then upload each associate's Form 16A.` });
+      out.push({ type: 'associate_tds_26q', message: `File Form 26Q for Q${q} of FY ${fyStartYear}-${String(fyStartYear + 1).slice(2)} (TDS on associate commission ₹${require('../helpers/moneyFormat').regroup(money(tds))}) by ${lastDayOfMonth(today)} ${MONTHS[month - 1]} ${year}, then upload each associate's Form 16A.` });
     }
   }
   return out;

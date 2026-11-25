@@ -196,7 +196,7 @@ async function award(req, res) {
   }
   await auditLogRepository.log(req.user.id, 'PURCHASE_AWARDED', 'purchase_requirements', r.id, 'awarded_quote_id', r.awarded_quote_id !== null ? String(r.awarded_quote_id) : null,
     `${quote.supplier_legal_name} ₹${fmt(value)}${needsApproval ? ' (waiting for approval)' : ''}`);
-  flash.set(req, 'success', `Awarded to ${quote.supplier_legal_name} for ₹${fmt(value)}. `
+  flash.set(req, 'success', `Awarded to ${quote.supplier_legal_name} for ₹${require('../helpers/moneyFormat').regroup(fmt(value))}. `
     + (needsApproval ? 'It is above your approval limit and waits for an approver.' : 'Approved — within your approval limit.'));
   res.redirect(back);
 }
@@ -224,7 +224,7 @@ async function approve(req, res) {
   if (Number(r.awarded_by) === Number(req.user.id)) {
     await auditLogRepository.log(req.user.id, 'PURCHASE_AWARD_SELF_APPROVED', 'purchase_requirements', r.id, null, null, null, 'Approved a purchase award they made themselves (Admin → Self-approval rules).');
   }
-  flash.set(req, 'success', `Purchase PR-${r.id} approved: ${r.awarded_supplier_name}, ₹${fmt(value)}.`);
+  flash.set(req, 'success', `Purchase PR-${r.id} approved: ${r.awarded_supplier_name}, ₹${require('../helpers/moneyFormat').regroup(fmt(value))}.`);
   res.redirect(back);
 }
 

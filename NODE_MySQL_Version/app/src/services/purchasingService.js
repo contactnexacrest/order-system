@@ -57,7 +57,7 @@ async function approvalRefusal(req, requirement, value) {
   }
   const limit = await limitFor(req, req.user.id);
   if (limit !== null && value > limit) {
-    return `This award (₹${fmt(value)}) is above your approval limit of ₹${fmt(limit)} — a higher approver must approve it.`;
+    return `This award (₹${require('../helpers/moneyFormat').regroup(fmt(value))}) is above your approval limit of ₹${require('../helpers/moneyFormat').regroup(fmt(limit))} — a higher approver must approve it.`;
   }
   if (Number(requirement.awarded_by) === Number(req.user.id) && !(await makerCheckerGuard.selfApprovalAllowed('purchase_award', req.user.id))) {
     return 'You awarded this purchase, so someone else must approve it.';
