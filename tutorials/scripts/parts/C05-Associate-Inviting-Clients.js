@@ -84,13 +84,13 @@ module.exports = {
 
       { card: 'chapter', title: 'NexaCrest accepts', subtitle: 'From that moment, the client is yours.', say: 'Part four. NexaCrest reviews the new buyer.' },
       { as: 'md', goto: '/client-intake?view=list', caption: 'Staff: Orders › Quotation requests', say: 'On the staff side, the request appears under Orders, Quotation requests. Notice the badge: Associate, your name, buyer\'s e-mail verified. Staff can see at a glance that this buyer came through you.', do: async (d) => { await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(2000); } },
-      { caption: 'Accept', say: 'They accept it. And the message confirms: linked to the associate, protected until a date six months from now. At the same moment you get a notice: the company is now registered as your client, and stays your client until that date.', do: async (d) => {
+      { caption: 'Accept', say: 'They accept it. And the message confirms: linked to the associate, protected until a date six months from now. At the same moment you get a notice: the company is now registered as your client. Once it places an order, it stays your client while your agreement runs. If it places no order by that date, the registration ends.', do: async (d) => {
         await d.clickNav(d.page.locator('tr', { hasText: BUYER }).getByRole('button', { name: /Accept/ }).first());
         await d.point('.alert-success', 1800);
       } },
 
       { card: 'chapter', title: 'Your new client', say: 'Part five. Back to you.' },
-      { as: 'associate', goto: '/associate/clients', caption: 'Registered clients (1)', say: 'Your new client is in your list, with the date it registered and the date it stays your client until. And in your links list, the status now says: Accepted, your client.', do: async (d) => {
+      { as: 'associate', goto: '/associate/clients', caption: 'Registered clients (1)', say: 'Your new client is in your list, with the date it registered. Until its first order, it shows the date the registration ends if no order comes; after that: yours while your agreement runs. And in your links list, the status now says: Accepted, your client.', do: async (d) => {
         await d.scrollTo(d.page.getByRole('heading', { name: /Registered clients/ }));
         await d.ring(d.page.locator('tr', { hasText: BUYER }).first()); await d.wait(1800);
       } },
