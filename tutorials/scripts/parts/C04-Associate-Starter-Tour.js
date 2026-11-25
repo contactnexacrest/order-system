@@ -60,7 +60,7 @@ module.exports = {
       'Quoting adds: order value, commission %, catalogue, get a price, price requests, statements.',
     ], say: 'So how do you move up? Once a few of your orders are completed and fully paid, the Managing Director gets a suggestion on the dashboard: ready for the Quoting level? Quoting adds the order value, your commission percentage, the catalogue, get a price, price requests, and commission statements. Part three of video C04 covers all levels.' },
     { card: 'list', kicker: 'Recap', title: 'Starter in a nutshell', items: [
-      'My clients: who is yours, until when, the last day for orders that earn commission.',
+      'My clients: who you introduced, when, and whether they are yours while your agreement runs.',
       'Orders: stage, paid in full, commission status; no order value.',
       'Commission: lines, your invoice per line, TDS certificates.',
       'Locked pages say so; good results unlock the Quoting level.',
