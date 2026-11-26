@@ -128,7 +128,8 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page.locator('body')).toContainText('is now registered as your client');
     await page.getByRole('link', { name: 'My clients' }).click();
-    const row = page.locator('tr', { hasText: BUYER });
+    // The buyer is in "Registered clients" and in "My buyer registration links and codes used": check the first (the client list).
+    const row = page.locator('tr', { hasText: BUYER }).first();
     await expect(row).toBeVisible();
     // D-428 (owner 25 Nov 2026): no registration certificate to print or download.
     await expect(page.getByRole('link', { name: 'Registration certificate' })).toHaveCount(0);

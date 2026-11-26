@@ -578,3 +578,7 @@ Buyer links now open at plain `/quotation-details` (the recordings show no addre
 
 ## After the 26 Nov 2026 build D-432 (brand managers) — no video affected
 Admin › Users shows the new Brand card only once a brand exists, and brand managers only exist once a person is given a brand. The tutorial database has no brand, so no recorded video changes.
+
+## Videos on hold (owner 26 Nov 2026)
+"video we will keep it on hold for now … but make sure to update the video script as and when needed to keep it up-to-date — so whenever we want to record / re-record the video, it will have all the needed things."
+Recording is paused: H01, C01, C03, C04, C06, F01 (decided above) are **not** re-recorded now. Standing rule from now on: every change that alters what a video shows or says updates that video's script in `tutorials/scripts/` (and its storyboard) in the same commit, and this file lists which videos are out of date, so a later recording is right first time. The scripts already include everything decided up to 26 Nov 2026 (H01: D-430 company slide, "Your buyer deals with NexaCrest directly", the buyer-check line; the D-431 buyer tip shows by itself on Home and My clients).
