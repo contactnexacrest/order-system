@@ -173,7 +173,7 @@ async function savePricing(req, res) {
   const errors = [];
   for (const [k, [label, max]] of Object.entries(repo.PRICING)) {
     if (action === 'copy_all') {
-      values['pricing_' + k] = String(Number(Number(company[k] || 0).toFixed(2)));
+      values['pricing_' + k] = String(require('../helpers/money').phpRound(Number(company[k] || 0), 2)); // HNT-L01: PHP round()
     } else if (action === 'clear_all') {
       values['pricing_' + k] = null;
     } else {
