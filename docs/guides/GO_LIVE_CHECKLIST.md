@@ -136,7 +136,7 @@ Menu paths follow the menus of 11 Nov 2026 (D-320): the left menu has 13 entries
 - [ ] **Products › HS codes › Fix HS codes on products** shows nothing left: every product's HS code is on the master list (D-302).
 - [ ] **Products › Link these prices** is gone from the Products page (nothing left to link): every product price is linked to a supplier in the directory (D-303 / D-361). Complete the details of any supplier marked *Details pending*.
 - [ ] **"Try a price"** on 2–3 products gives the figures you expect, including a line in PCS with its piece size (Length × Width × Thickness in cm) and a 30 mm line (D-270, D-300).
-- [ ] Give associates access only to the categories and forms they should price. Check the daily limit (10) and validity (7 days). An associate also needs the Quoting (or Full) level to see Get price.
+- [ ] Give associates access only to the categories and forms they should price. Check the daily limit (10) and validity (30 days, D-437). An associate also needs the Quoting (or Full) level to see Get price.
 
 ## F. Dry run (still on the live server, using test mode)
 

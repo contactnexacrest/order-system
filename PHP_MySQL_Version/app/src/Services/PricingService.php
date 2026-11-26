@@ -32,7 +32,7 @@ final class PricingService
         // D-255 (5 Nov 2026)
         'cbm_from_mm' => '50',
         'price_request_daily_limit' => '10',
-        'price_request_valid_days' => '7',
+        'price_request_valid_days' => '30', // D-437: 30 days, the same as the Quotation
         // D-301 (11 Nov 2026): the exchange rate is fetched daily; pricing rate = market × (1 − cushion %).
         'fx_mode' => 'auto',
         'fx_cushion_pct' => '2.0',

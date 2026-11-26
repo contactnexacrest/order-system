@@ -31,6 +31,7 @@ describe('Factory/Quarry reference documents seed', () => {
     'Quarry Block Supply Agreement (Template)',
     'International Sales & Supply Agreement (Template)',
     'Mutual NDA — Commercial Counterparty (Template)',
+    'Associate Agreement — Commission Structure (Template)', // D-438
     'Staff Confidentiality & NDA (Template)',
     // Owner points 11/12 (2 Nov 2026): the payment guide sits with the other guidelines.
     'Supplier & Logistics Payments Guide (PDF)',
@@ -62,6 +63,6 @@ describe('Factory/Quarry reference documents seed', () => {
       checked += 1;
     }
 
-    expect(checked).toBe(9);
+    expect(checked).toBe(10);
   });
 });

@@ -1509,6 +1509,7 @@ INSERT INTO reference_library_documents (title, file_path, file_original_name, f
   ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('International Sales & Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/sales_supply_agreement_template.docx', 'International Sales & Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('Mutual NDA — Commercial Counterparty (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_commercial_counterparty_template.docx', 'Mutual NDA - Commercial Counterparty (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('Associate Agreement — Commission Structure (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/associate_agreement_template.docx', 'Associate Agreement - Commission Structure (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('Staff Confidentiality & NDA (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_staff_template.docx', 'Staff Confidentiality and NDA (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('Supplier & Logistics Payments Guide (PDF)', '__STORAGE_BASE_PATH__/assets/reference_library/supplier_and_logistics_payments_guide.pdf', 'Supplier_and_Logistics_Payments_Guide.pdf', 'application/pdf'),
   ('Supplier & Logistics Payments Guide (Word)', '__STORAGE_BASE_PATH__/assets/reference_library/supplier_and_logistics_payments_guide.docx', 'Supplier_and_Logistics_Payments_Guide.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -2320,7 +2321,7 @@ SELECT k, l, p, 1, o FROM (
 INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
   ('cbm_from_mm', '50'),                -- 50 mm and above is priced per CBM
   ('price_request_daily_limit', '10'),  -- an associate's automatic price requests per day
-  ('price_request_valid_days', '7');    -- how long an associate's price stays valid
+  ('price_request_valid_days', '30');   -- how long an associate's price stays valid (D-437: 30 days, as the Quotation)
 
 INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
   ('manage_product_specifications', 'Manage a product''s specifications', 'Change one product''s specifications: hide a specification or option, change an option''s value, add options or specifications for that product only, reset to the category. D-255: privileged roles (Admin, MD to start).', 'catalog');

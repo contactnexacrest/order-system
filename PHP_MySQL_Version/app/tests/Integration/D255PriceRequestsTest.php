@@ -186,7 +186,7 @@ final class D255PriceRequestsTest extends DbTestCase
         self::assertNull($err);
         $r = PriceRequestService::find($id);
         self::assertMatchesRegularExpression('/^PR-\d{2}-\d{2}-\d{4}$/', $r['number']);
-        self::assertSame(['auto', 'valid', date('Y-m-d', strtotime('+7 days'))], [$r['kind'], $r['status'], $r['valid_until']]);
+        self::assertSame(['auto', 'valid', date('Y-m-d', strtotime('+30 days'))], [$r['kind'], $r['status'], $r['valid_until']]);
         self::assertSame(0, PriceRequestService::leftToday($this->me()));
         [, $err2] = PriceRequestService::create($this->me(), $product, $this->sel(self::SQM), false, null);
         self::assertNotNull($err2, 'over the daily limit');

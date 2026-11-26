@@ -31,6 +31,7 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
         'Quarry Block Supply Agreement (Template)',
         'International Sales & Supply Agreement (Template)',
         'Mutual NDA — Commercial Counterparty (Template)',
+        'Associate Agreement — Commission Structure (Template)', // D-438
         'Staff Confidentiality & NDA (Template)',
         // Owner points 11/12 (2 Nov 2026): the payment guide sits with the other guidelines.
         'Supplier & Logistics Payments Guide (PDF)',
@@ -67,6 +68,6 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
             $checked++;
         }
 
-        self::assertSame(9, $checked, 'expected exactly 9 seeded reference-library documents backed by a committed file');
+        self::assertSame(10, $checked, 'expected exactly 10 seeded reference-library documents backed by a committed file');
     }
 }

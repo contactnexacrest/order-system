@@ -3027,7 +3027,7 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
     price** form per supplier price. Details: §7.1 "Suppliers, offers and the
     configured base price".
   - **Price requests (associates):** Get price returns at once (number
-    `PR-YY-DD-NNNN`, quote, lowest price, valid 7 days, max 10 a day). An
+    `PR-YY-DD-NNNN`, quote, lowest price, valid 30 days like the Quotation (D-437), max 10 a day). An
     "Other" request goes to staff, priced within 24 h by the MD. Staff can
     type the request number on an order line.
 - **Tables.** `pricing_settings`, `commission_levels`,
@@ -5134,7 +5134,7 @@ Seeded in `document_types` (`docs/seed.sql`). "Category" decides who may see it:
 | IPO | Import purchase order | Division numbering | Import "ordered" stage (D-257 Phase 3) | `ImportDocumentService` | Yes | No | staff of IMP; downloaded from the import page |
 | MTT invoice / PO | Merchant trade sale invoice and purchase order | Division numbering | Merchant deal (D-257 Phase 4) | `MerchantDocumentService` | Yes | No | staff of MTT; downloaded from the deal page |
 
-Every Export format is `SC/<X>/{YY}/{DDMM}{NNN}` (2-digit year since 29 Oct 2026, D-177; daily counter). The Reference Library also holds custom entries (uploaded PDF/Word/Excel/text files, optionally filed under a category that requires a permission) managed by `ReferenceDocController`.
+Every Export format is `SC/<X>/{YY}/{DDMM}{NNN}` (2-digit year since 29 Oct 2026, D-177; daily counter). The Reference Library also holds custom entries (uploaded PDF/Word/Excel/text files, optionally filed under a category that requires a permission) managed by `ReferenceDocController`. Seeded blank agreement templates (Word): Sales & Supply, Commercial NDA, Staff NDA, Factory Processing, Quarry Block Supply and the Associate Agreement — Commission Structure (D-438, 26 Nov 2026; built by `docs/legal/associate_agreement/build_associate_agreement.py`, NDA house style, NexaCrest logo, company seal and signature kept per D-333, no stamp-duty clause). In every template each value to fill in is a `[placeholder]` with a yellow background (`docs/legal/templates_tools/highlight_placeholders.py`); the company phone number is the placeholder `[+91-0000000000]`. Migration `2026-11-26d` adds the Associate Agreement row on an existing install.
 
 Generating needs `generate_documents`; approving needs `approve_documents`; downloading needs `download_pdf` (CAFIN: `view_cafin`, D-109). The server checks the stage (`stageSequenceFor` / `STAGE_DOCUMENTS`), not only the UI.
 
@@ -5539,7 +5539,7 @@ SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests i
 | `require_product_pick` | 1 | Goods lines on USD orders must be picked from Products |
 | `cbm_from_mm` | 50 | Per-CBM pricing from this thickness |
 | `price_request_daily_limit` | 10 | Associate automatic price requests per day |
-| `price_request_valid_days` | 7 | Associate price validity |
+| `price_request_valid_days` | 30 | Associate price validity (D-437: same as the Quotation) |
 | `weight_t_per_cbm` / `container_max_t` / `container_cbm` / `thick_k_factor` | 2.70 / 27.00 / 8.00 / 40 | D-359 / D-361: default physical values, used when neither the category (Category price rules) nor the product (Configure) has one |
 | `insurance_cover_pct` / `insurance_rate_pct` / `insurance_cover_wording` / `insurance_min_premium` / `insurance_rounding` / `insurance_add_gst` | 110.00 / 0.2000 / ICC (A) all risks / (none) / up / 0 | D-402: marine insurance on CIF orders (Global pricing settings › Marine Insurance); a category may set its own rate and wording (`product_categories.insurance_rate_pct`, `insurance_cover_wording`; Natural Stone 0.30 % "ICC (A) incl. breakage") |
 

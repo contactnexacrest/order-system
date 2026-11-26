@@ -152,7 +152,7 @@ describe('D-255 specifications and associate price requests', () => {
     const r = await priceRequestService.find(id);
     expect(r.number).toMatch(/^PR-\d{2}-\d{2}-\d{4}$/);
     const d = new Date();
-    expect([r.kind, r.status, r.valid_until]).toEqual(['auto', 'valid', ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))]);
+    expect([r.kind, r.status, r.valid_until]).toEqual(['auto', 'valid', ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 30))]); // D-437
     expect(await priceRequestService.leftToday(await me())).toBe(0);
     expect((await priceRequestService.create(await me(), await p(), await sel(SQM), false, null))[1]).not.toBeNull();
     const [m, err3] = await priceRequestService.create(await me(), await p(), await sel(SQM), true, 'Buyer needs 25 mm for a hotel lobby');

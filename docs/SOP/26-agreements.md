@@ -63,6 +63,19 @@ page", so it is complete, and the reminders cover them too (the client agreement
 reminder before). Nothing about how they work has changed: the client footer still prints
 exactly as it did.
 
+### Blank templates (Reference Library)
+
+The blank agreements to start from are in the **Reference Library**: Sales & Supply,
+Commercial NDA, Staff NDA, Factory Processing, Quarry Block Supply and, since 26 Nov 2026,
+the **Associate Agreement (Commission Structure)** (D-438). Every value you must fill in is
+shown in **[square brackets] on a yellow background** — replace each one, and remove the
+yellow, before the agreement is sent. The company seal and the authorised signature already
+printed on the templates stay as they are (D-333). On the Associate Agreement the associate
+fills in their own details by hand on the signature page, so that page has no yellow fields.
+The Associate Agreement's commission rates match the app (2 / 5 / 7 / 10 %), and a Price
+Answer is valid for 30 days, the same as the Quotation (D-437). Once signed, upload the
+agreement on the associate's page as before.
+
 ## Add an agreement
 
 1. **Clients › Agreements → Add an agreement**, or **Add agreement** on the party's

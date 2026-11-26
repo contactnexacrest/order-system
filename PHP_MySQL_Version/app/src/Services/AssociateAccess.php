@@ -32,7 +32,7 @@ final class AssociateAccess
         'commission_pct' => ['Show commission % on screen', 'The rate behind each amount'],
         'registration_links' => ['Registration links', 'Invite clients, personal code'],
         'catalogue' => ['Catalogue (no prices)', 'Products in the categories opened for them'],
-        'get_price' => ['Get price / quoting', 'Within Price access categories; 10 a day, valid 7 days'],
+        'get_price' => ['Get price / quoting', 'Within Price access categories; 10 a day, valid 30 days (D-437)'],
         'price_requests' => ['Price requests ("Other")', 'Ask staff for a price not in the list'],
         'messages' => ['Messages', 'Messages with NexaCrest'],
         'order_documents' => ['Documents of their orders', 'PI, CI and other issued documents'],

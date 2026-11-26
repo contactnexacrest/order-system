@@ -656,7 +656,7 @@ challans →** opens `/associates/tds` (D-235).
    commission level, in the right unit (per CBM from 50 mm, with an ≈ per-SQM
    figure for comparison), what each option did to the price, separate
    charges (edge work per running metre, A-frame per container), and the date
-   it is **valid until** (7 days, setting). At most **10 automatic requests a
+   it is **valid until** (30 days, the same as the Quotation, D-437; setting). At most **10 automatic requests a
    day** (setting; the MD can give one associate another limit). Ticking
    **The buyer needs something not listed here** (with a note of at least 10
    characters), an unlisted thickness of 50 mm or more, or a product without
