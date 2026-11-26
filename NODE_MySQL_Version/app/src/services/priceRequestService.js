@@ -287,7 +287,7 @@ async function create(associate, product, selection, other, note) {
 
 /** Manual requests waiting for a price (shown beside the "Price requests" link). */
 async function pendingCount() {
-  return Number((await db.queryOne(`SELECT COUNT(*) AS n FROM price_requests WHERE status = 'pending'${require('./divisionService').sql('division_id')}`)).n);
+  return Number((await db.queryOne(`SELECT COUNT(*) AS n FROM price_requests r JOIN associates a ON a.id = r.associate_id WHERE r.status = 'pending'${require('./divisionService').sql('r.division_id')}${require('./associateBrands').scopeSql('a.brand_id')}`)).n);
 }
 
 async function find(id) {
@@ -320,7 +320,7 @@ async function queue(filter = 'all', limit = 200) {
   return db.query(
     `SELECT r.*, p.name AS product_name, a.name AS associate_name FROM price_requests r
      JOIN catalog_products p ON p.id = r.product_id JOIN associates a ON a.id = r.associate_id
-     ${where || 'WHERE 1 = 1'}${require('./divisionService').sql('r.division_id')} ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT ${parseInt(limit, 10) || 200}`);
+     ${where || 'WHERE 1 = 1'}${require('./divisionService').sql('r.division_id')}${require('./associateBrands').scopeSql('a.brand_id')} ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT ${parseInt(limit, 10) || 200}`);
 }
 
 /** Requests against orders per associate over the last 90 days. */
@@ -333,7 +333,7 @@ async function report(today = null) {
             (SELECT COUNT(*) FROM orders o JOIN clients c ON c.id = o.client_id
               WHERE c.associate_id = a.id AND o.created_at >= :f2 AND o.is_test_data = 0${require('./divisionService').sql('o.division_id')}) AS orders_count
        FROM associates a
-      WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)${require('./divisionService').sql('a.division_id')}
+      WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)${require('./divisionService').sql('a.division_id')}${require('./associateBrands').scopeSql('a.brand_id')}
       ORDER BY requests DESC, a.name`, { f1: from, f2: from, f3: from }); // D-257 (fresh-eyes review L1): the associates of the request's division(s)
   return rows.map((r) => {
     const req = Number(r.requests);

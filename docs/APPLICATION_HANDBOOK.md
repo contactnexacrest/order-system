@@ -728,7 +728,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 | **Procurement** | `purchase_requirements`, `purchase_quotes` |
 | **Coordination** | `department_task_types` |
 | **Agreements** | `agreements`, `agreement_alerts_sent` |
-| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps`, `associate_ladder_steps` (D-291), `associate_brands`, `associate_brand_settings`, `associate_brand_ladder_steps` (D-431), `vendor_bank_changes` (D-294) |
+| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps`, `associate_ladder_steps` (D-291), `associate_brands`, `associate_brand_settings`, `associate_brand_ladder_steps` (D-431), `users.brand_id` (D-432), `vendor_bank_changes` (D-294) |
 | **Team incentive** | `incentive_settings`, `incentive_roles`, `user_incentive_roles`, `order_incentives`, `order_incentive_people`, `order_incentive_roles`, `order_incentive_history`, `incentive_payouts`, `incentive_kept` |
 | **Reference library** | `internal_reference_docs`, `reference_library_documents`, `reference_library_categories` |
 | **Domestic Trade (DOM)** | `indian_states`, `gst_rates`, `domestic_orders`, `domestic_order_lines`, `domestic_payments`, `domestic_documents`, `domestic_counters` |
@@ -4763,6 +4763,8 @@ the client portal stay NexaCrest. The buyer link keeps a clean address bar:
 `/quotation-details?code=…` or `?inv=…` keeps the code for the visit
 (session `_intake_introducer`) and redirects (303) to `/quotation-details`;
 the hidden fields carry it on submit. Old links keep working.
+
+**Brand managers (D-432).** Admin › Users › **Brand** (`users.brand_id`, migration 2026-11-26b; `POST /users/{id}/brand`, "Manage divisions", only by someone who looks after all brands, never for oneself or a protected account; Audit Log `USER_BRAND_SET`). Empty = all brands, as before. A staff member with a brand sees and changes only that brand: `AssociateBrands::scopeSql()` narrows the associate list and board, the Associates report, Registrations, price requests and Admin › Brands; Incentive Payouts shows only that brand's associate lines; `AssociateBrands::refusalForPath()` (run in the router's check before every handler, Node `missingRecordGuard`) answers "Not found." for another brand's associate, payout, price request, registration or link, for brand details (`POST /admin/brands/{id}`), adding a brand, moving an associate (`POST /associates/{id}/brand`) and the company-wide settings (Associates › Settings, access levels, commission levels / ladder, the client-price rule, registration settings). Associates and registration links a brand manager creates get their brand. The brand's rules and ladder need "Manage associate rules" as always. Orders, clients and buyers are unchanged.
 
 ### 7.4 Team incentive (D-245 P4, D-259)
 

@@ -593,6 +593,26 @@ payment advices and personal codes (NXA-…) stay NexaCrest.
 documents always come from NexaCrest. Never tell a buyer about your
 commission."
 
+**Brand managers (owner decision 26 Nov 2026, D-432).** A staff member can
+look after one brand only — for example a StoneCrest manager. The MD or
+Admin opens **Admin › Users › (the person) › Brand** and chooses the brand
+(empty = all brands, as before). From then on that person:
+
+- sees only their brand's associates (list, board, associate pages,
+  registrations, price requests, Associates report, and their brand's
+  lines in Incentive Payouts), and only their brand in Admin › Brands;
+- can change their brand's rules and ladder and their associates' own
+  rules if they have "Manage associate rules" — always with a reason;
+- gets their brand automatically on associates and registration links
+  they create;
+- can never see another brand, change brand details, add a brand, move an
+  associate to another brand, or change a company-wide setting
+  (Associates › Settings, access levels, commission levels and ladder,
+  the client-price rule, registration settings). Those stay with the MD
+  and the staff who look after all brands.
+
+Orders, clients and buyers are not affected.
+
 **Buyer links keep a clean address bar.** When a buyer opens the
 associate's link (`/quotation-details?code=…` or `?inv=…`), the form opens
 at plain `/quotation-details`; the associate stays attached behind the

@@ -143,6 +143,66 @@ async function email(associate, subject, body) {
   return [s, `${name} — ${brand.tagline}\n\n${b}\n\n${legalLine(brand)}`];
 }
 
+// ------------------------------------------------------------ D-432 brand managers
+
+/** D-432 (owner 26 Nov 2026): the brand a staff member looks after (users.brand_id); null = all brands, as before. */
+function userBrandId(user = null) {
+  const u = user || ((require('../helpers/requestContext').get() || {}).divisionUser) || null;
+  const b = Number((u && u.brand_id) || 0);
+  return b > 0 ? b : null;
+}
+
+/** " AND {col} = {brand}" for a brand manager, else "" (the brand id is an integer, safe to inline). */
+function scopeSql(column = 'a.brand_id') {
+  const b = userBrandId();
+  return b === null ? '' : ` AND ${column} = ${b}`;
+}
+
+/** Whether the signed-in staff member may see this associate (always, unless they manage another brand). */
+function inScope(associate, user = null) {
+  const b = userBrandId(user);
+  return b === null || (!!associate && Number(associate.brand_id || 0) === b);
+}
+
+/** Company-wide pages a brand manager may not change (D-432: they change only their own brand). */
+const COMPANY_WIDE_POSTS = ['/associates/ladder', '/associates/access-levels', '/associates/registrations/settings',
+  '/pricing/commission-levels', '/pricing/commission-ladder', '/pricing/settings/associate-price-rule', '/admin/brands'];
+
+/**
+ * D-432: for a brand manager, the refusal (404 text) for a page or action of another brand, a company-wide setting or
+ * brand details; null = allowed. Runs after the route's own sign-in / permission / CSRF checks. PHP twin: refusalForPath().
+ */
+async function refusalForPath(path, method, user) {
+  const mine = userBrandId(user);
+  if (mine === null) return null;
+  const brandOf = async (sql, id) => {
+    const r = await db.queryOne(sql, { id: Number(id) });
+    const v = r ? Object.values(r)[0] : null;
+    return v === null || v === undefined ? null : Number(v);
+  };
+  const other = 'Not found.';
+  let m;
+  if (method === 'POST' && (COMPANY_WIDE_POSTS.includes(path) || /^\/pricing\/commission-levels\/\d+/.test(path)
+      || /^\/associates\/\d+\/brand$/.test(path) || /^\/admin\/brands\/\d+$/.test(path))) {
+    return other; // a company-wide setting or brand details — only staff who look after all brands change them
+  }
+  if ((m = path.match(/^\/admin\/brands\/(\d+)/))) return Number(m[1]) === mine ? null : other;
+  if ((m = path.match(/^\/associates\/(\d+)(\/|$)/))) return (await brandOf('SELECT brand_id AS b FROM associates WHERE id = :id', m[1])) === mine ? null : other;
+  if ((m = path.match(/^\/associates\/(?:payouts|tds)\/(\d+)\//))) {
+    return (await brandOf('SELECT a.brand_id AS b FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id WHERE p.id = :id', m[1])) === mine ? null : other;
+  }
+  if ((m = path.match(/^\/associates\/price-requests\/(\d+)\//))) {
+    return (await brandOf('SELECT a.brand_id AS b FROM price_requests r JOIN associates a ON a.id = r.associate_id WHERE r.id = :id', m[1])) === mine ? null : other;
+  }
+  if ((m = path.match(/^\/associates\/registrations\/links\/(\d+)\//))) {
+    return (await brandOf('SELECT brand_id AS b FROM associate_registration_links WHERE id = :id', m[1])) === mine ? null : other;
+  }
+  if ((m = path.match(/^\/associates\/registrations\/(\d+)\//))) {
+    return (await brandOf('SELECT l.brand_id AS b FROM associate_registrations r JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id', m[1])) === mine ? null : other;
+  }
+  return null;
+}
+
 /** Login address codes that are already pages of the portal. */
 const RESERVED_CODES = ['code'];
 
@@ -183,5 +243,5 @@ async function loginBrand(req) {
 module.exports = {
   STATUSES, RULES, BUYER_TIP, DEFAULT_TAGLINE, RESERVED_CODES, SESSION_KEY, COOKIE,
   reset, forAssociateId, forAssociate, settings, rule, companyValues, ladderFor, displayName, tagline, legalLine,
-  validateRules, email, validCode, rememberLoginBrand, loginBrand,
+  validateRules, email, validCode, rememberLoginBrand, loginBrand, userBrandId, scopeSql, inScope, refusalForPath,
 };

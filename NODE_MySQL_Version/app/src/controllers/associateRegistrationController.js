@@ -46,7 +46,9 @@ async function index(req, res) {
 
 async function createLink(req, res) {
   const note = String((req.body || {}).note || '').trim();
-  const brandRaw = String((req.body || {}).brand_id || '').trim(); // D-431: the brand the applicant joins (empty = NexaCrest)
+  const mine = require('../services/associateBrands').userBrandId(req.user);
+  // D-431: the brand the applicant joins (empty = NexaCrest); D-432: a brand manager's links are always for their brand.
+  const brandRaw = mine !== null ? String(mine) : String((req.body || {}).brand_id || '').trim();
   const brand = brandRaw !== '' ? await require('../repositories/associateBrandRepository').find(parseInt(brandRaw, 10) || 0) : null;
   if (len(note) > 200) {
     flash.set(req, 'error', 'The note can be up to 200 characters.');

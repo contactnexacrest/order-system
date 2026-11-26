@@ -323,7 +323,7 @@ async function show(req, res) {
     commissionLevel,
     canManage,
     canBank,
-    canBrand: can(req, 'manage_divisions'), // D-431: only the MD (and Admin) moves an associate to another brand
+    canBrand: can(req, 'manage_divisions') && require('../services/associateBrands').userBrandId(req.user) === null, // D-431/D-432: only the MD (and Admin), never a brand manager
     brandOf: await require('../services/associateBrands').forAssociate(a),
     usableBrands: await require('../repositories/associateBrandRepository').usable(),
     // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
@@ -1353,7 +1353,8 @@ async function report(req, res) {
   // D-431: the Brand filter ('' = all, 'none' = NexaCrest / no brand, or a brand id).
   const brands = await require('../repositories/associateBrandRepository').all();
   const brand = brandFilter(req, brands);
-  const brandSql = brand === '' ? '' : (brand === 'none' ? ' AND a.brand_id IS NULL' : ` AND a.brand_id = ${parseInt(brand, 10) || 0}`);
+  const brandSql = (brand === '' ? '' : (brand === 'none' ? ' AND a.brand_id IS NULL' : ` AND a.brand_id = ${parseInt(brand, 10) || 0}`))
+    + require('../services/associateBrands').scopeSql('a.brand_id'); // D-432: a brand manager sees only their brand
   const perf = [];
   for (const a of await associateRepository.all()) {
     if (!brandMatches(a.brand_id, brand)) continue;

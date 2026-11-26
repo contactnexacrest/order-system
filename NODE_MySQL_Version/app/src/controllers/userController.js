@@ -113,7 +113,10 @@ async function editForm(req, res) {
     incentiveEligible: await incentiveService.isEligible(target.id),
     incentiveDesignation: await incentiveService.designationEligibility(target.id),
     incentiveCanEdit: await incentiveService.isMd(req.user),
-    incentiveFirstName: String(target.name || '').split(' ')[0] }, 'layout/base');
+    incentiveFirstName: String(target.name || '').split(' ')[0],
+    // D-432: the Brand card — staff who see all brands, with "Manage divisions", once a brand exists.
+    brandsAll: (req.permissions && req.permissions.manage_divisions && require('../services/associateBrands').userBrandId(req.user) === null)
+      ? await require('../repositories/associateBrandRepository').all() : [] }, 'layout/base');
 }
 
 /** D-378: a real calendar date written as YYYY-MM-DD (PHP: createFromFormat('!Y-m-d') round trip). */

@@ -22,7 +22,7 @@ const body = (req) => req.body || {};
 
 async function index(req, res) {
   res.renderView('brands/index', {
-    brands: await repo.all(), canEdit: can(req, 'manage_divisions'), statuses: brands.STATUSES, defaultTagline: brands.DEFAULT_TAGLINE,
+    brands: await repo.all(), canEdit: can(req, 'manage_divisions') && brands.userBrandId(req.user) === null, // D-432: a brand manager never edits brand details statuses: brands.STATUSES, defaultTagline: brands.DEFAULT_TAGLINE,
   }, 'layout/base');
 }
 
@@ -46,7 +46,7 @@ function ladderText(rows) {
 
 async function show(req, res) {
   const brand = await repo.find(parseInt(req.params.id, 10) || 0);
-  if (!brand) {
+  if (!brand || !brands.inScope({ brand_id: brand.id }, req.user)) { // D-432
     res.status(404).send('Brand not found.');
     return;
   }
@@ -67,7 +67,7 @@ async function show(req, res) {
     ladderText: ladder.length ? ladderText(ladder) : 'the company ladder',
     companyLadderText: ladderText(companyLadder),
     levels: levels.map((l) => ({ id: String(l.id), label: `${l.name} — ${pricingService.levelLabel(l)}` })),
-    canEdit: can(req, 'manage_divisions'),
+    canEdit: can(req, 'manage_divisions') && brands.userBrandId(req.user) === null, // D-432: a brand manager never edits brand details
     canRules: await associateRules.canManage(req.user),
     statuses: brands.STATUSES, defaultTagline: brands.DEFAULT_TAGLINE,
     priceRules: associateRules.PRICE_RULES, whoChanges: associateRules.WHO_CHANGES,
@@ -191,6 +191,36 @@ async function saveRules(req, res) {
   res.redirect(`/admin/brands/${id}#rules`);
 }
 
+/**
+ * D-432 (owner 26 Nov 2026): the brand a staff member looks after (Admin › Users › Brand). Empty = all brands, as before.
+ * "Manage divisions" (MD, Admin), not for yourself, not for a protected account, and not by someone who looks after one brand.
+ */
+async function setUserBrand(req, res) {
+  const userId = parseInt(req.params.id, 10) || 0;
+  const target = await require('../repositories/userRepository').findById(userId);
+  if (!target) {
+    res.status(404).send('User not found.');
+    return;
+  }
+  const raw = String(body(req).brand_id || '').trim();
+  const brand = raw !== '' ? await repo.find(parseInt(raw, 10) || 0) : null;
+  let refusal = null;
+  if (raw !== '' && !brand) refusal = 'Choose a brand from the list.';
+  else if (userId === Number(req.user.id) && !(await require('../services/superAdminService').isEffective(req.user.id))) refusal = 'You cannot change your own brand — ask another administrator.';
+  else if (Number(target.is_protected_account || 0) === 1) refusal = 'This is a protected account: its brand cannot be changed here.';
+  else if (brands.userBrandId(req.user) !== null) refusal = 'Only staff who look after all brands can give people a brand.';
+  if (refusal) {
+    flash.set(req, 'error', refusal);
+    res.redirect(`/users/${userId}/edit`);
+    return;
+  }
+  const old = target.brand_id ? await repo.find(Number(target.brand_id)) : null;
+  await require('../config/db').execute('UPDATE users SET brand_id = :b WHERE id = :id', { b: brand ? Number(brand.id) : null, id: userId });
+  await auditLogRepository.log(req.user.id, 'USER_BRAND_SET', 'users', userId, 'brand_id', old ? String(old.name) : 'all brands', brand ? String(brand.name) : 'all brands');
+  flash.set(req, 'success', brand ? `Saved: this person now looks after ${brand.name} only.` : 'Saved: this person sees all brands.');
+  res.redirect(`/users/${userId}/edit`);
+}
+
 async function saveLadder(req, res) {
   const brand = await repo.find(parseInt(req.params.id, 10) || 0);
   if (!brand) {
@@ -233,4 +263,4 @@ async function saveLadder(req, res) {
   res.redirect(`/admin/brands/${id}#ladder`);
 }
 
-module.exports = { index, show, create, update, saveRules, saveLadder, showValue, ladderText };
+module.exports = { index, show, create, update, saveRules, saveLadder, setUserBrand, showValue, ladderText };

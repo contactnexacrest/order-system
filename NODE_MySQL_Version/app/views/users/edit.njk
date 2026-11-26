@@ -111,6 +111,22 @@
   </form>
 </div>
 {% endif %}
+{% if brandsAll and brandsAll.length %}{# D-432 #}
+<div class="card" data-testid="user-brand">
+  <h2>Brand</h2>
+  <p class="muted">A brand manager looks after one brand only: they see and change only that brand's associates, rules and ladder, and never company-wide settings. All brands = as today.</p>
+  <form method="post" action="/users/{{ target.id }}/brand" class="field-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Brand
+      <select name="brand_id">
+        <option value="">All brands</option>
+        {% for b in brandsAll %}<option value="{{ b.id }}"{{ ' selected' if target.brand_id == b.id else '' }}>{{ b.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save brand</button></div>
+  </form>
+</div>
+{% endif %}
 {% include "agreements/_party_card.njk" %}
 {% include "users/_sop_extras.njk" %}{# D-266 #}
 {% include "users/_report_extras.njk" %}{# D-379 #}

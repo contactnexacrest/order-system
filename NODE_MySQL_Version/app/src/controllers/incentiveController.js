@@ -467,7 +467,8 @@ async function payouts(req, res) {
   // D-431: the Brand filter shows only the associate lines of that brand (staff lines are not part of a brand).
   const brands = await require('../repositories/associateBrandRepository').all();
   const aac = require('./associateAdminController');
-  const brand = aac.brandFilter(req, brands);
+  const mineBrand = require('../services/associateBrands').userBrandId(req.user);
+  const brand = mineBrand !== null ? String(mineBrand) : aac.brandFilter(req, brands); // D-432: a brand manager sees only their brand's associate lines
   if (brand !== '') {
     const brandOf = {};
     for (const r of rows) {

@@ -12,12 +12,12 @@ function reset() {}
 async function all() {
   return db.query(
     `SELECT b.*, (SELECT COUNT(*) FROM associates a WHERE a.brand_id = b.id) AS associate_count
-       FROM associate_brands b ORDER BY FIELD(b.status, 'active', 'planned', 'inactive'), b.name`
+       FROM associate_brands b WHERE 1 = 1${require('../services/associateBrands').scopeSql('b.id')} ORDER BY FIELD(b.status, 'active', 'planned', 'inactive'), b.name`
   );
 }
 
 async function usable() {
-  return db.query("SELECT * FROM associate_brands WHERE status <> 'inactive' ORDER BY name");
+  return db.query(`SELECT * FROM associate_brands WHERE status <> 'inactive'${require('../services/associateBrands').scopeSql('id')} ORDER BY name`); // D-432
 }
 
 async function find(id) {

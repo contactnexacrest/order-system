@@ -654,7 +654,8 @@ function registerIdParams() {
 async function missingRecordGuard(req, res, next) {
   if (!req.user) return next();
   try {
-    const missing = await orderAccessService.missingRecordForPath(req.path);
+    const missing = (await orderAccessService.missingRecordForPath(req.path))
+      ?? (await require('./services/associateBrands').refusalForPath(req.path, req.method, req.user)); // D-432: a brand manager stays in their brand
     if (missing === null) return next();
     res.status(404).send(missing);
   } catch (err) {
@@ -1047,6 +1048,7 @@ app.post('/admin/brands', requireAuth, requirePermission('manage_divisions'), ve
 app.get('/admin/brands/:id', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules']), asyncHandler(brandController.show));
 app.post('/admin/brands/:id', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.update));
 app.post('/admin/brands/:id/rules', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveRules));
+app.post('/users/:id/brand', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.setUserBrand)); // D-432
 app.post('/admin/brands/:id/ladder', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveLadder));
 app.get('/admin/divisions/:id', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.show));
 app.post('/admin/divisions/:id/modules', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveModules));

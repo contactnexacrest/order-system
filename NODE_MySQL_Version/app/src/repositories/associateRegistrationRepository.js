@@ -40,7 +40,7 @@ async function cancelLink(linkId) {
 }
 
 async function links() {
-  return db.query('SELECT l.*, u.name AS created_by_name, (l.expires_at <= NOW()) AS expired FROM associate_registration_links l JOIN users u ON u.id = l.created_by ORDER BY l.id DESC LIMIT 100');
+  return db.query(`SELECT l.*, u.name AS created_by_name, (l.expires_at <= NOW()) AS expired FROM associate_registration_links l JOIN users u ON u.id = l.created_by WHERE 1 = 1${require('../services/associateBrands').scopeSql('l.brand_id')} ORDER BY l.id DESC LIMIT 100`); // D-432
 }
 
 async function create(linkId, d, ip) {
@@ -55,10 +55,11 @@ async function find(id) {
 }
 
 async function all(status) {
-  let sql = 'SELECT r.*, u.name AS reviewed_by_name FROM associate_registrations r LEFT JOIN users u ON u.id = r.reviewed_by';
+  let sql = `SELECT r.*, u.name AS reviewed_by_name FROM associate_registrations r LEFT JOIN users u ON u.id = r.reviewed_by
+             LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE 1 = 1${require('../services/associateBrands').scopeSql('l.brand_id')}`; // D-432
   const params = {};
   if (status && STATUSES[status]) {
-    sql += ' WHERE r.status = :s';
+    sql += ' AND r.status = :s';
     params.s = status;
   }
   return db.query(`${sql} ORDER BY r.id DESC LIMIT 200`, params);
@@ -72,7 +73,7 @@ async function decide(id, status, reason, userId, associateId) {
 }
 
 async function pendingCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS n FROM associate_registrations WHERE status = 'pending'");
+  const row = await db.queryOne(`SELECT COUNT(*) AS n FROM associate_registrations r LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE r.status = 'pending'${require('../services/associateBrands').scopeSql('l.brand_id')}`);
   return Number(row ? row.n : 0);
 }
 

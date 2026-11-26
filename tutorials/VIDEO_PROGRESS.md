@@ -575,3 +575,6 @@ Buyer links now open at plain `/quotation-details` (the recordings show no addre
 | A02 Part 1 (EN + HI) | The first scene (associate My clients) shows the tip line. | Keep as is (owner 26 Nov 2026: "will go with your recommendation") |
 | Staff associate page (C01, C03, C04, C05, C06 staff scenes; F02, F04) | The Profile and agreement table starts with a new row "Brand: NexaCrest (no brand)" (the "Change brand" link only for the MD / Admin). Small, near the top of the page. | Keep as is (owner 26 Nov 2026: "will go with your recommendation") |
 | All other staff and buyer videos | Not affected: Admin › Brands is new (no video shows it); the Brand column on the Associates list / board and the Brand filters appear only once a brand exists. | No change needed |
+
+## After the 26 Nov 2026 build D-432 (brand managers) — no video affected
+Admin › Users shows the new Brand card only once a brand exists, and brand managers only exist once a person is given a brand. The tutorial database has no brand, so no recorded video changes.

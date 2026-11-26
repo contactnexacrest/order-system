@@ -35,7 +35,7 @@ async function all() {
     `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name,
             cl.name AS commission_level_name
      FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id
-     WHERE 1 = 1${require('../services/divisionService').sql('a.division_id')} ORDER BY a.status, a.name`
+     WHERE 1 = 1${require('../services/divisionService').sql('a.division_id')}${require('../services/associateBrands').scopeSql('a.brand_id')} ORDER BY a.status, a.name` // D-432
   );
 }
 
@@ -51,6 +51,9 @@ async function create(data, userId) {
   const divisionService = require('../services/divisionService');
   const division = await divisionService.forNewRecord();
   if (division !== divisionService.EXPORT_ID) await db.execute('UPDATE associates SET division_id = :d WHERE id = :id', { d: division, id: result.insertId });
+  // D-432: an associate added by a brand manager belongs to that brand.
+  const brand = require('../services/associateBrands').userBrandId();
+  if (brand !== null) await db.execute('UPDATE associates SET brand_id = :b WHERE id = :id', { b: brand, id: result.insertId });
   return result.insertId;
 }
 

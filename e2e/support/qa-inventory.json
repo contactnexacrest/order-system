@@ -14638,6 +14638,39 @@
   },
   {
    "method": "POST",
+   "path": "/users/{id}/brand",
+   "controller": "BrandController",
+   "action": "setUserBrand",
+   "requires_all": [
+    "manage_divisions"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "brandController.setUserBrand",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "BrandManagersD432Test.php"
+    ],
+    "node": [
+     "brandManagersD432.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
    "path": "/admin/departments/{id}/division",
    "controller": "DivisionController",
    "action": "setDepartmentDivision",
