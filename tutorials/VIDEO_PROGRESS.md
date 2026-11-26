@@ -594,3 +594,7 @@ Recording is paused: H01, C01, C03, C04, C06, F01 (decided above) are **not** re
 - **C06 Get a price** (recorded, EN + HI) says "Empty means the company default: ten a day, valid seven days." The script now says "thirty days". The recorded video no longer matches: **ask the owner before re-recording** (videos on hold, D-434).
 - **C04 Prices, requests and levels:** its row above notes "(7 days)"; check the narration for the validity period when recording resumes.
 - D-438 (Associate Agreement template in the Reference Library) changes no recorded screen.
+
+### Owner 26 Nov 2026: option B — hiring video first, then A–F checked
+- **H01 Become a NexaCrest Associate** recorded on the 26 Nov app (tutorial stack synced, migrations 26a–26d applied to both tutorial snapshots): 10.73 min, frames and subtitles checked (D-436 clean), **sent 26 Nov 2026** under "Hiring video". English only.
+- Next: check every video A–F (English and Hindi) against the current app, list what differs, ask the owner which to re-record, then re-record and send all under their headings.
