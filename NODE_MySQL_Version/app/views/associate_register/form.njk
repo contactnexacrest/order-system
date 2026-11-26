@@ -1,6 +1,11 @@
 {% macro err(f) %}{% if errors[f] %}<small class="form-field-error">{{ errors[f] }}</small>{% endif %}{% endmacro %}
 <div class="card card-narrow">
+  {% if brand %}{# D-431: the division the applicant joins (name only) #}
+  <h1 data-register-brand>Register as a {{ brand.name }} associate</h1>
+  <p class="muted small">{{ brand.name }} — {{ brand.tagline }}. Your agreement and your payments are with NexaCrest International Private Limited.</p>
+  {% else %}
   <h1>Register as a NexaCrest associate</h1>
+  {% endif %}
   <p class="muted">A few details to start. Once NexaCrest accepts your registration you get your own portal, where you add the rest (address, PAN, bank details and documents).</p>
   {% if errors.form %}<div class="alert alert-error">{{ errors.form }}</div>{% endif %}
   <form method="post" action="/associate-register/{{ token }}">

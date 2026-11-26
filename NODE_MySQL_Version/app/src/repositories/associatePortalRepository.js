@@ -133,7 +133,7 @@ async function commission(associateId, o) {
   const order = (await orderRepository.find(Number(o.id))) || {};
   const c = await associateCommission.forOrder(Number(o.id), order);
   if (!c) return none((await require('../services/associateRules').newRules(order)) ? 'No commission on this order' : NONE_REPEAT);
-  if (c.below_min) return { ...none(await belowMinLabel()), ladder_text: c.ladder_text }; // D-410: below the minimum (staff still see why it does not count)
+  if (c.below_min) return { ...none(await belowMinLabel(associateId)), ladder_text: c.ladder_text }; // D-410: below the minimum (staff still see why it does not count)
   // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
   const fullyPaidOn = await incentive().fullyPaidOn(Number(o.id));
   const label = fullyPaidOn !== null
@@ -153,8 +153,8 @@ const NOT_EARNED_LABEL = 'Not earned yet — buyer still paying';
 const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
 
 /** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
-async function belowMinLabel() {
-  const min = await require('../services/associateRules').minOrderInr();
+async function belowMinLabel(associateId = null) {
+  const min = await require('../services/associateRules').minOrderInr(associateId);
   return `No commission — the value of the goods (FOB) is below ₹${require('../helpers/moneyFormat').indian(min, 0)} (only the client's first order earns whatever its size)`;
 }
 

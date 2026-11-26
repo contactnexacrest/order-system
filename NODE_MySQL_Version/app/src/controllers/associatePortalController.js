@@ -42,7 +42,13 @@ async function me(req) {
 }
 
 async function layoutData(req, a) {
+  const brands = require('../services/associateBrands');
+  // D-431: the associate's brand (name only); before login the brand of the login address used or remembered. None = NexaCrest, as before.
+  const brand = a && a.id ? await brands.forAssociate(a) : await brands.loginBrand(req);
   return {
+    portalBrand: brand,
+    portalBrandLegal: brands.legalLine(brand),
+    buyerTip: brands.BUYER_TIP,
     me: a && a.id ? a : null,
     unread: a && a.id ? await associateEventRepository.unreadNotices(Number(a.id)) : 0,
     viewAs: associatePortalService.viewAsStaffId(req) !== null,
@@ -108,7 +114,7 @@ function totalsText(totals) {
 async function render(req, res, view, data = {}) {
   const a = await me(req);
   // D-410: the minimum order value (orders intro) and the status badge helper, on every portal page.
-  res.renderView(`associate_portal/${view}`, { ...(await layoutData(req, a)), minOrderInr: await require('../services/associateRules').minOrderInr(),
+  res.renderView(`associate_portal/${view}`, { ...(await layoutData(req, a)), minOrderInr: await require('../services/associateRules').minOrderInr(a ? Number(a.id) : null),
     badgeOf: associatePortalRepository.badge, ...data }, LAYOUT);
 }
 
@@ -165,7 +171,17 @@ async function verifyCode(req, res) {
     res.redirect('/associate/login/code');
     return;
   }
+  const brands = require('../services/associateBrands');
+  const brand = await brands.forAssociate(await me(req)); // D-431: the login page shows this brand next time in this browser
+  if (brand) brands.rememberLoginBrand(req, res, brand);
   res.redirect('/associate');
+}
+
+/** D-431: a brand's own login address (/associate/login/:code): the login page with the brand's name, remembered in this browser. */
+async function showBrandLogin(req, res) {
+  const brand = await require('../repositories/associateBrandRepository').findByCode(String(req.params.code || ''));
+  if (brand) require('../services/associateBrands').rememberLoginBrand(req, res, brand);
+  res.redirect('/associate/login');
 }
 
 async function logout(req, res) {
@@ -822,7 +838,7 @@ async function priceRequest(req, res) {
 
 module.exports = {
   proposeCode,
-  codeLink, showLogin, login, showCode, verifyCode, logout, showForgotPassword, forgotPassword, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
+  codeLink, showLogin, showBrandLogin, login, showCode, verifyCode, logout, showForgotPassword, forgotPassword, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement, paymentAdvice,
   showBankConfirm, sendBankCode, confirmBank, bankNotMe, commissionHeadline,
   messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,

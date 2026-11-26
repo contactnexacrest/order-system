@@ -283,7 +283,7 @@ async function levelForAssociate(associate, excludeOrderId, orderInRangeInr = nu
   }
   const count = await countingOrders(Number(associate.id), excludeOrderId);
   const set = await settings();
-  const position = (orderInRangeInr === null || orderInRangeInr >= set.threshold_inr) ? count + 1 : Math.max(count, 1);
+  const position = (orderInRangeInr === null || orderInRangeInr >= (await rules().minOrderInr(Number(associate.id)))) ? count + 1 : Math.max(count, 1); // D-431: the brand's minimum
   for (const step of await ladderFor(associate)) { // D-291: their own ladder overrides the standard one
     if (position >= Number(step.from_order) && (step.to_order === null || position <= Number(step.to_order))) {
       return [await pricingRepository.findLevel(Number(step.level_id)), count];
@@ -301,7 +301,8 @@ async function ladderFor(associate) {
     const own = await pricingRepository.ownLadder(Number(associate.id));
     if (own.length) return own;
   }
-  return pricingRepository.ladder();
+  const brand = await require('./associateBrands').ladderFor(associate); // D-431: the brand's own ladder, else the company ladder
+  return brand.length ? brand : pricingRepository.ladder();
 }
 
 function stepLabel(step) {
@@ -553,7 +554,7 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
   const isNew = await rules().newRules(order);
   // The minimum applies to every order, also one the MD set to "associate: yes" (owner, 24 Nov 2026).
-  const belowMin = isNew && !(await rules().earnsOnValue(order, basisInr));
+  const belowMin = isNew && !(await rules().earnsOnValue(order, basisInr, Number(a.id)));
   if (belowMin && override === null) {
     commissionFc = 0;
     commissionInr = 0;
@@ -578,10 +579,10 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     state, fully_paid_on: fullyPaidOn,
     due_on: due, payout_run_on: due !== null ? await associateRunOn(due, set) : null,
     claim_hold: due !== null && set.claim_hold && await claimOpen(orderId, due),
-    counts, threshold_inr: set.threshold_inr,
+    counts, threshold_inr: await rules().minOrderInr(Number(a.id)),
     counting_number: counts ? Number(ladder.step) : null,
     // D-410
-    new_rules: isNew, below_min: belowMin, ladder, ladder_text: await rules().stepText(ladder),
+    new_rules: isNew, below_min: belowMin, ladder, ladder_text: await rules().stepText(ladder, Number(a.id)),
     included_pct: included, margin_pct: mPct,
     margin_fc: ratePct > 0 && mPct > 0 ? round2(commissionFc * mPct / ratePct) : 0,
     margin_inr: ratePct > 0 && mPct > 0 ? round2(commissionInr * mPct / ratePct) : 0,

@@ -247,6 +247,10 @@ fieldset.intake-step{padding-top:1.25rem;}
 .client-topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;row-gap:0.4rem;background:var(--navy);color:#fff;padding:0.85rem 1.5rem;}
 .client-topbar .topbar-brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.05rem;letter-spacing:-0.01em;}
 .topbar-brand span{color:rgba(255,255,255,0.72);font-weight:400;}
+/* D-431: the associate's brand — name, the line under it, and the legal footer */
+.topbar-brand [data-portal-brand]{color:#fff;font-weight:700;}
+.topbar-brand .topbar-brand-line{display:block;font-size:.72rem;font-weight:400;color:rgba(255,255,255,0.78);letter-spacing:0;}
+.portal-brand-footer{text-align:center;font-size:.8rem;color:#6b7280;padding:14px 16px 22px;}
 .topbar-nav{display:flex;flex-wrap:wrap;align-items:center;row-gap:0.3rem;gap:1.25rem;}
 .topbar-nav a{color:#fff;text-decoration:none;opacity:0.85;}
 .topbar-nav a:hover{opacity:1;text-decoration:underline;}

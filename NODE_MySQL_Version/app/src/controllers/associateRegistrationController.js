@@ -38,6 +38,7 @@ async function index(req, res) {
     registrations: await associateRegistrationRepository.all(status === 'all' ? null : status),
     links: await associateRegistrationRepository.links(),
     linkDays: await associateRegistrationRepository.linkDays(),
+    brands: await require('../repositories/associateBrandRepository').usable(), // D-431
     statuses: associateRegistrationRepository.STATUSES,
     newLink,
   }, 'layout/base');
@@ -45,10 +46,14 @@ async function index(req, res) {
 
 async function createLink(req, res) {
   const note = String((req.body || {}).note || '').trim();
+  const brandRaw = String((req.body || {}).brand_id || '').trim(); // D-431: the brand the applicant joins (empty = NexaCrest)
+  const brand = brandRaw !== '' ? await require('../repositories/associateBrandRepository').find(parseInt(brandRaw, 10) || 0) : null;
   if (len(note) > 200) {
     flash.set(req, 'error', 'The note can be up to 200 characters.');
+  } else if (brandRaw !== '' && (!brand || brand.status === 'inactive')) {
+    flash.set(req, 'error', 'Choose a brand from the list.');
   } else {
-    const raw = await associateRegistrationRepository.createLink(note !== '' ? note : null, req.user.id);
+    const raw = await associateRegistrationRepository.createLink(note !== '' ? note : null, req.user.id, brand ? Number(brand.id) : null);
     req.session._associate_registration_link = linkUrl(raw);
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_REGISTRATION_LINK_CREATED', 'associate_registration_links', 0, 'note', null, note);
     flash.set(req, 'success', `Associate registration link created — valid ${await associateRegistrationRepository.linkDays()} days, for one registration. Copy it below.`);
@@ -95,6 +100,9 @@ async function accept(req, res) {
     email: r.email, phone: r.phone, status: 'invited', notes: 'Registered themselves through an associate registration link (D-253).',
   }, userId);
   await associateRepository.setFields(id, { city: r.city, access_level: 'starter' }); // D-261: a new associate starts on Starter
+  if (r.brand_id) { // D-431: the brand of the link the applicant joined through
+    await require('../repositories/associateBrandRepository').setAssociateBrand(id, Number(r.brand_id));
+  }
   if (!await associateRegistrationRepository.decide(Number(r.id), 'accepted', null, userId, id)) {
     flash.set(req, 'error', 'This registration was already reviewed.');
     res.redirect('/associates/registrations');
@@ -122,9 +130,9 @@ async function reject(req, res) {
     flash.set(req, 'error', 'Give the reason (10 to 300 characters) — it is e-mailed to the person.');
   } else if (await associateRegistrationRepository.decide(Number(r.id), 'rejected', reason, req.user.id, null)) {
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_REGISTRATION_REJECTED', 'associate_registrations', Number(r.id), 'reason', null, reason);
-    const sent = await emailService.sendPlainText(String(r.email), 'Your NexaCrest associate registration',
-      `Hello ${r.name},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n${reason}\n\nNexaCrest International Private Limited`,
-      { kind: 'associate_registration_declined', audience: 'associate' });
+    const [subject, body] = await require('../services/associateBrands').email({ brand_id: r.brand_id ?? null }, 'Your NexaCrest associate registration', // D-431
+      `Hello ${r.name},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n${reason}\n\nNexaCrest International Private Limited`);
+    const sent = await emailService.sendPlainText(String(r.email), subject, body, { kind: 'associate_registration_declined', audience: 'associate' });
     // D-280: "e-mailed" only when it was.
     flash.set(req, 'success', sent
       ? `Registration rejected — the reason was e-mailed to ${r.email}.`
@@ -135,13 +143,18 @@ async function reject(req, res) {
 
 // ------------------------------------------------------------ public (no login)
 
+/** D-431: the brand an applicant joins through this link (null = NexaCrest). */
+async function linkBrand(link) {
+  return link && link.brand_id ? require('../repositories/associateBrandRepository').find(Number(link.brand_id)) : null;
+}
+
 async function show(req, res) {
   const link = await associateRegistrationRepository.usableLink(String(req.params.token || ''));
   if (!link) {
     res.renderView('associate_register/unavailable', {}, 'layout/bare');
     return;
   }
-  res.renderView('associate_register/form', { token: String(req.params.token), old: {}, errors: {} }, 'layout/bare');
+  res.renderView('associate_register/form', { token: String(req.params.token), old: {}, errors: {}, brand: await linkBrand(link) }, 'layout/bare');
 }
 
 /** [data, errors by field] */
@@ -168,7 +181,7 @@ async function submit(req, res) {
   }
   if (await rateLimiter.tooManyRequests('associate_registration_submit', req.ip || '', 5, 15)) {
     res.status(429);
-    res.renderView('associate_register/form', { token, old: req.body || {}, errors: { form: 'Too many attempts from this connection — please try again in 15 minutes.' } }, 'layout/bare');
+    res.renderView('associate_register/form', { token, old: req.body || {}, errors: { form: 'Too many attempts from this connection — please try again in 15 minutes.' }, brand: await linkBrand(link) }, 'layout/bare');
     return;
   }
   const [d, errors] = validate(req.body);
@@ -177,7 +190,7 @@ async function submit(req, res) {
   }
   if (Object.keys(errors).length) {
     res.status(422);
-    res.renderView('associate_register/form', { token, old: { ...d, consent: String((req.body || {}).consent || '') }, errors }, 'layout/bare');
+    res.renderView('associate_register/form', { token, old: { ...d, consent: String((req.body || {}).consent || '') }, errors, brand: await linkBrand(link) }, 'layout/bare');
     return;
   }
   if (!await associateRegistrationRepository.claimLink(Number(link.id))) {

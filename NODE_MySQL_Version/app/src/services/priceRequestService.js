@@ -45,13 +45,15 @@ const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 
 const isSet = (v) => v !== null && v !== undefined && v !== '';
 
 async function dailyLimit(associate) {
-  return isSet(associate.price_request_daily_limit)
-    ? Math.max(0, parseInt(associate.price_request_daily_limit, 10) || 0) : (await pricingService.settings()).price_request_daily_limit;
+  if (isSet(associate.price_request_daily_limit)) return Math.max(0, parseInt(associate.price_request_daily_limit, 10) || 0);
+  const brand = await require('./associateBrands').rule(associate.id != null ? Number(associate.id) : null, 'price_requests_per_day'); // D-431
+  return brand !== null ? Math.max(0, parseInt(brand, 10) || 0) : (await pricingService.settings()).price_request_daily_limit;
 }
 
 async function validDays(associate) {
-  return isSet(associate.price_valid_days)
-    ? Math.max(1, parseInt(associate.price_valid_days, 10) || 0) : (await pricingService.settings()).price_request_valid_days;
+  if (isSet(associate.price_valid_days)) return Math.max(1, parseInt(associate.price_valid_days, 10) || 0);
+  const brand = await require('./associateBrands').rule(associate.id != null ? Number(associate.id) : null, 'price_valid_days'); // D-431
+  return brand !== null ? Math.max(1, parseInt(brand, 10) || 0) : (await pricingService.settings()).price_request_valid_days;
 }
 
 /** { category id: allowed forms ([] = all forms of that category) } */

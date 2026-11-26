@@ -67,6 +67,18 @@ async function found(req, res) {
   return a;
 }
 
+/** D-431: the Brand filter value ('' = all, 'none' = no brand, or the id of a listed brand). */
+function brandFilter(req, brands) {
+  const b = String(req.query.brand || '');
+  if (b !== '' && b !== 'none' && !brands.some((x) => Number(x.id) === (parseInt(b, 10) || 0))) return '';
+  return b;
+}
+
+function brandMatches(brandId, brand) {
+  if (brand === '') return true;
+  return brand === 'none' ? !brandId : Number(brandId || 0) === (parseInt(brand, 10) || 0);
+}
+
 /** D-245 P3: "Fixed: Level 2" or "Ladder" (or no commission) — the register's terms column. */
 function termsText(a) {
   if (Number(a.no_commission) === 1) return 'No commission';
@@ -83,7 +95,13 @@ async function index(req, res) {
     status = 'all';
   }
   const q = String(req.query.q || '').trim();
+  // D-431: the Brand filter ('' = all, 'none' = NexaCrest / no brand, or a brand id) — list and board alike.
+  const brands = await require('../repositories/associateBrandRepository').all();
+  const brand = brandFilter(req, brands);
+  const brandNames = {};
+  for (const b of brands) brandNames[Number(b.id)] = String(b.name);
   const rows = (await associateRepository.all()).filter((a) => (status === 'all' || a.status === status)
+    && brandMatches(a.brand_id, brand)
     && (q === '' || `${a.name} ${a.email || ''} ${a.personal_code || ''} ${a.country || ''}`.toLowerCase().includes(q.toLowerCase())));
   for (const r of rows) {
     r.clients = await associateRepository.clients(Number(r.id));
@@ -96,6 +114,7 @@ async function index(req, res) {
     rows,
     status,
     q,
+    brands, brand, brandNames, // D-431
     counts: await associateRepository.statusCounts(),
     statuses: associateRepository.STATUSES,
     canManage: can(req, 'manage_associates'),
@@ -304,6 +323,9 @@ async function show(req, res) {
     commissionLevel,
     canManage,
     canBank,
+    canBrand: can(req, 'manage_divisions'), // D-431: only the MD (and Admin) moves an associate to another brand
+    brandOf: await require('../services/associateBrands').forAssociate(a),
+    usableBrands: await require('../repositories/associateBrandRepository').usable(),
     // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
     rule: can(req, 'view_associate_commission_rules') ? await require('../services/associateCommission').ruleProgress(a) : null,
     // D-410: the price rule, what comes from the margin, and the ladder status per order (same permission as the rule).
@@ -315,8 +337,8 @@ async function show(req, res) {
     priceRules: require('../services/associateRules').PRICE_RULES,
     priceRuleText: require('../services/associateRules').PRICE_RULE_TEXT,
     companyPriceRule: (await require('../services/associateRules').companyPriceRule()).rule,
-    groupDays: await require('../services/associateRules').groupDays(),
-    minOrderInr: await require('../services/associateRules').minOrderInr(),
+    groupDays: await require('../services/associateRules').groupDays(Number(a.id)), // D-431: the brand's value
+    minOrderInr: await require('../services/associateRules').minOrderInr(Number(a.id)),
     canPricing: can(req, 'manage_associate_rules'), // D-411
     canChangeLink: await associateService.canChangeLink(req),
     clients: await associatePortalRepository.clients(id),
@@ -385,7 +407,7 @@ async function show(req, res) {
       })(),
       rm: a.relationship_manager_id ? await userRepository.findById(Number(a.relationship_manager_id)) : null,
       codeLink: a.personal_code ? `${associateService.appUrl()}/quotation-details?code=${encodeURIComponent(a.personal_code)}` : null,
-      associateLoginUrl: associateService.loginUrl(), // D-282: the permanent login page, with Copy
+      associateLoginUrl: await associateService.loginUrlFor(a), // D-282; D-431: the brand's own login address: the permanent login page, with Copy
       tdsPct: await associateService.tdsPct(),
       tdsPctText: trimPct(await associateService.tdsPct()),
       // D-261: portal access level, track record and the "Ready for Quoting?" suggestion.
@@ -433,6 +455,32 @@ async function changeStatus(req, res) {
     }
     await associateService.notify(a, 'status_changed', `Your associate status is now: ${STATUSES[status]}. Reason: ${reason}`, null, null, null, user.id);
     flash.set(req, 'success', `Status changed to ${STATUSES[status]}.`);
+  }
+  back(res, a.id);
+}
+
+/** D-431: only the MD (and Admin, "Manage divisions") moves an associate to another brand, with a reason. New orders follow the new brand's rules. */
+async function changeBrand(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const repo = require('../repositories/associateBrandRepository');
+  const brands = require('../services/associateBrands');
+  const raw = String((req.body || {}).brand_id || '').trim();
+  const reason = String((req.body || {}).reason || '').trim();
+  const brand = raw !== '' ? await repo.find(parseInt(raw, 10) || 0) : null;
+  const oldBrand = await brands.forAssociate(a);
+  const len = (v) => [...v].length;
+  if (raw !== '' && (!brand || brand.status === 'inactive')) {
+    flash.set(req, 'error', 'Choose a brand from the list.');
+  } else if (Number((oldBrand && oldBrand.id) || 0) === Number((brand && brand.id) || 0)) {
+    flash.set(req, 'error', 'The associate already has this brand.');
+  } else if (len(reason) < 10 || len(reason) > 300) {
+    flash.set(req, 'error', 'Give the reason for the change (10 to 300 characters).');
+  } else {
+    await repo.setAssociateBrand(Number(a.id), brand ? Number(brand.id) : null);
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_BRAND_CHANGED', 'associates', Number(a.id), 'brand_id',
+      oldBrand ? String(oldBrand.name) : 'NexaCrest', brand ? String(brand.name) : 'NexaCrest', reason);
+    flash.set(req, 'success', `Brand changed to ${brand ? brand.name : 'NexaCrest (no brand)'}. New orders follow its rules; existing orders keep theirs.`);
   }
   back(res, a.id);
 }
@@ -1127,7 +1175,7 @@ async function ladder(req, res) {
     thresholdValue: commission.threshold_inr.toFixed(0),
     gstValue: commission.gst_pct.toFixed(2),
     // D-410: orders of one client within N days are one ladder step (7–45).
-    groupDays: await require('../services/associateRules').groupDays(),
+    groupDays: await require('../services/associateRules').companyGroupDays(),
     groupDaysMin: require('../services/associateRules').GROUP_DAYS_MIN,
     groupDaysMax: require('../services/associateRules').GROUP_DAYS_MAX,
     canPricing: can(req, 'manage_associate_rules'), // D-411
@@ -1302,8 +1350,13 @@ async function report(req, res) {
   }
   const from = `${year}-04-01`;
   const to = `${parseInt(year, 10) + 1}-03-31`;
+  // D-431: the Brand filter ('' = all, 'none' = NexaCrest / no brand, or a brand id).
+  const brands = await require('../repositories/associateBrandRepository').all();
+  const brand = brandFilter(req, brands);
+  const brandSql = brand === '' ? '' : (brand === 'none' ? ' AND a.brand_id IS NULL' : ` AND a.brand_id = ${parseInt(brand, 10) || 0}`);
   const perf = [];
   for (const a of await associateRepository.all()) {
+    if (!brandMatches(a.brand_id, brand)) continue;
     const orders = await associatePortalRepository.orders(Number(a.id));
     const inYear = orders.filter((o) => String(o.created_at).slice(0, 10) >= from && String(o.created_at).slice(0, 10) <= to);
     const m = await db.queryOne(
@@ -1322,12 +1375,12 @@ async function report(req, res) {
     `SELECT p.id, p.incentive_month, p.amount_inr, p.status, p.hold_reason, a.name, a.id AS associate_id, o.order_reference,
             DATEDIFF(CURDATE(), STR_TO_DATE(CONCAT(p.incentive_month, '-01'), '%Y-%m-%d')) AS age_days
        FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id JOIN orders o ON o.id = p.order_id
-      WHERE p.payee_kind = 'associate' AND p.status IN ('due','held') ORDER BY p.incentive_month, a.name`
+      WHERE p.payee_kind = 'associate' AND p.status IN ('due','held')${brandSql} ORDER BY p.incentive_month, a.name`
   );
   const tdsRows = await db.query(
     `SELECT p.id, p.paid_on, p.paid_inr, p.tds_inr, p.paid_reference, a.name, a.pan, a.based_in, a.country, o.order_reference
        FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id JOIN orders o ON o.id = p.order_id
-      WHERE p.payee_kind = 'associate' AND p.status = 'paid' AND p.amount_inr > 0 AND p.paid_on BETWEEN :f AND :t ORDER BY p.paid_on, a.name`,
+      WHERE p.payee_kind = 'associate' AND p.status = 'paid' AND p.amount_inr > 0 AND p.paid_on BETWEEN :f AND :t${brandSql} ORDER BY p.paid_on, a.name`,
     { f: from, t: to }
   );
   const format = String(req.query.format || '');
@@ -1346,7 +1399,7 @@ async function report(req, res) {
       tdsRows.map((r) => [r.paid_on, r.name, r.pan, r.based_in === 'india' ? 'India' : `Abroad ${r.country || ''}`, r.order_reference, r.paid_inr, r.tds_inr, r.paid_reference]));
     return;
   }
-  res.renderView('associates/report', { year, yearEndShort: String(parseInt(year, 10) + 1).slice(2), perf, ageing, tds: tdsRows }, 'layout/base');
+  res.renderView('associates/report', { year, yearEndShort: String(parseInt(year, 10) + 1).slice(2), perf, ageing, tds: tdsRows, brands, brand }, 'layout/base');
 }
 
 module.exports = {
@@ -1355,5 +1408,5 @@ module.exports = {
   recordVideoKyc,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
   linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, remindBank, commissionRule, saveCommissionRule, savePriceRule, sendAdvice, paymentAdvice, revisePaymentAdvice, bankNumber, uploadDocument, downloadDocument, reply,
-  holdPayout, releasePayout, clawback, ladder, saveLadder, report,
+  holdPayout, releasePayout, clawback, ladder, saveLadder, report, changeBrand, brandFilter, brandMatches,
 };

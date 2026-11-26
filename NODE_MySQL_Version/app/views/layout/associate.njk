@@ -5,7 +5,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NexaCrest International — Associate Portal</title>
+{# D-431: portalBrand = the associate's brand (name only); before login the brand of the login address used or remembered. None = NexaCrest, as before. #}
+<title>{{ (portalBrand.name ~ ' — Associate Portal') if portalBrand else 'NexaCrest International — Associate Portal' }}</title>
 <link rel="icon" href="/img/favicon.ico?v=2" sizes="any">
 <link rel="stylesheet" href="{{ asset('/css/app.css') }}">
 <script src="{{ asset('/js/app.js') }}" defer></script>
@@ -22,7 +23,11 @@
 <header class="client-topbar">
   <div class="topbar-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/img/logo.jpg" alt=""></span>
+    {% if portalBrand %}
+    <span data-portal-brand>{{ portalBrand.name }} <span>Associate Portal</span><small class="topbar-brand-line">{{ portalBrand.tagline }}</small></span>
+    {% else %}
     NexaCrest <span>Associate Portal</span>
+    {% endif %}
   </div>
   {% if me and me.id %}
   <nav class="topbar-nav">
@@ -52,5 +57,8 @@
   {% endfor %}
   {{ content | safe }}
 </main>
+{% if portalBrand %}
+<footer class="portal-brand-footer" data-portal-brand-footer>{{ portalBrandLegal }}</footer>
+{% endif %}
 </body>
 </html>

@@ -37,7 +37,19 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
  * queue (clientIntakeReviewController).
  */
 
+/** D-431 (owner 26 Nov 2026): the associate's link or code is kept for this visit, so the address bar shows only /quotation-details. */
+const INTRO_SESSION = '_intake_introducer';
+
 async function show(req, res) {
+  if (req.query.code !== undefined || req.query.inv !== undefined) {
+    const str = (v) => (typeof v === 'string' ? v : '');
+    req.session[INTRO_SESSION] = { code: [...str(req.query.code).trim()].slice(0, 60).join(''), inv: [...str(req.query.inv).trim()].slice(0, 100).join('') };
+    res.redirect(303, '/quotation-details');
+    return;
+  }
+  const given = (req.session && req.session[INTRO_SESSION]) || { code: '', inv: '' };
+  req.query.code = given.code !== '' ? given.code : undefined;
+  req.query.inv = given.inv !== '' ? given.inv : undefined;
   // Owner decision 1 Nov 2026 (AS-5): the associate's link (?inv=) or personal code (?code=).
   const intro = await associateIntakeService.introducer(typeof req.query.code === 'string' ? req.query.code : null, typeof req.query.inv === 'string' ? req.query.inv : null);
   if (intro.invitation && intro.invitation.status === 'created') {
@@ -64,6 +76,7 @@ async function show(req, res) {
 }
 
 async function submit(req, res) {
+  if (req.session) delete req.session[INTRO_SESSION]; // D-431: the hidden fields carry it from here; a form sent back with errors keeps it again
   if (await rateLimiter.tooManyRequests(RATE_LIMIT_BUCKET, req.ip || '', RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MINUTES)) {
     flash.set(req, 'error', 'We have received too many forms from your network in a short time. Please wait a few minutes and try again.');
     res.redirect('/quotation-details');

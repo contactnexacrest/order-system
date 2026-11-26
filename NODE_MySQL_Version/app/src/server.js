@@ -101,6 +101,7 @@ const permissionAdminController = require('./controllers/permissionAdminControll
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
 const divisionController = require('./controllers/divisionController'); // D-257
+const brandController = require('./controllers/brandController'); // D-431
 const domesticOrderController = require('./controllers/domesticOrderController'); // D-257 Phase 2
 const gstRateController = require('./controllers/gstRateController'); // D-257 Phase 2
 const importController = require('./controllers/importController'); // D-257 Phase 3
@@ -1040,6 +1041,13 @@ app.post('/preview/exit', requireAuth, verifyCsrf, asyncHandler(departmentContro
 // Owner decision D-257 (5 Nov 2026): divisions.
 app.post('/divisions/choose', requireAuth, requirePermission('see_all_divisions'), verifyCsrf, asyncHandler(divisionController.choose));
 app.get('/admin/divisions', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.index));
+// D-431 (owner 25–26 Nov 2026): Admin › Brands — division names associates see; rules per brand (D-411 permission).
+app.get('/admin/brands', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules']), asyncHandler(brandController.index));
+app.post('/admin/brands', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.create));
+app.get('/admin/brands/:id', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules']), asyncHandler(brandController.show));
+app.post('/admin/brands/:id', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.update));
+app.post('/admin/brands/:id/rules', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveRules));
+app.post('/admin/brands/:id/ladder', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveLadder));
 app.get('/admin/divisions/:id', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.show));
 app.post('/admin/divisions/:id/modules', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveModules));
 app.post('/admin/divisions/:id/settings', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveSetting));
@@ -1292,6 +1300,7 @@ app.get('/associates/:id', requireAuth, requirePermissionAny(['view_associates',
 app.get('/associates/:id/edit', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.edit));
 app.post('/associates/:id/update', requireAuth, requirePermission('manage_associates'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(associateAdminController.save));
 app.post('/associates/:id/status', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.changeStatus));
+app.post('/associates/:id/brand', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(associateAdminController.changeBrand)); // D-431
 app.post('/associates/:id/portal/invite', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.invitePortal));
 app.post('/associates/:id/portal/disable', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.disablePortal));
 app.post('/associates/:id/code', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.setCode));
@@ -1761,6 +1770,7 @@ app.get('/associate/login', asyncHandler(associatePortalController.showLogin));
 app.post('/associate/login', verifyCsrf, asyncHandler(associatePortalController.login));
 app.get('/associate/login/code', asyncHandler(associatePortalController.showCode));
 app.post('/associate/login/code', verifyCsrf, asyncHandler(associatePortalController.verifyCode));
+app.get('/associate/login/:code', asyncHandler(associatePortalController.showBrandLogin)); // D-431: a brand's login address (after /associate/login/code)
 app.get('/associate/forgot-password', asyncHandler(associatePortalController.showForgotPassword)); // D-282
 app.post('/associate/forgot-password', verifyCsrf, asyncHandler(associatePortalController.forgotPassword)); // D-282
 app.post('/associate/keep-alive', requireAssociateAuth, verifyCsrf, asyncHandler(require('./controllers/sessionController').associateKeepAlive)); // D-283

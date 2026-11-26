@@ -1,0 +1,91 @@
+{# D-431 (owner 25–26 Nov 2026): one brand — Details, Rules (empty = the company setting; "Copy all company settings" /
+   "Clear all (follow company)"), and its Ladder (empty = the company ladder). PHP twin: views/brands/show.php #}
+<div class="card page-wide">
+  <p><a href="/admin/brands">&larr; Brands</a></p>
+  <h1>{{ brand.name }} <span class="badge {{ 'badge-success' if brand.status == 'active' else 'badge-inactive' }}">{{ statuses[brand.status] or brand.status }}</span></h1>
+  <p class="muted" data-brand-tagline>{{ brand.tagline }}</p>
+
+  <div class="section" id="details">
+    <h2>Details</h2>
+    <p class="muted small">Associates see the name and the line under it on their login page (<code>/associate/login/{{ brand.code }}</code>), portal and e-mails. Buyers never see it.</p>
+    {% if canEdit %}
+    <form method="post" action="/admin/brands/{{ brand.id }}" data-brand-form>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {% include "brands/_details_fields.njk" %}
+      <button type="submit">Save details</button>
+    </form>
+    {% else %}
+    <table class="list"><tr><th>Products it covers</th><td>{{ brand.products or '—' }}</td></tr><tr><th>Website</th><td>{{ brand.website or '—' }}</td></tr><tr><th>E-mail shown to associates</th><td>{{ brand.email or '—' }}</td></tr></table>
+    {% endif %}
+  </div>
+
+  <div class="section" id="rules">
+    <h2>Rules</h2>
+    <p class="muted small">Each rule: empty = follows the company setting (Associates › Settings and Admin › Pricing — also when that changes later), or this brand's own value. A changed rule applies to new orders; an order keeps the rules it had at its Proforma Invoice. {{ whoChanges }}</p>
+    {% if canRules %}
+    <form method="post" action="/admin/brands/{{ brand.id }}/rules" data-brand-rules>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <p class="actions">
+        <button type="submit" name="action" value="copy_all" class="btn-secondary" data-copy-all>Copy all company settings</button>
+        <span class="muted small">fills every rule with today's company value — then change only what this brand needs (a copied value no longer follows later company changes)</span>
+        <button type="submit" name="action" value="clear_all" class="btn-secondary" data-clear-all>Clear all (follow company)</button>
+      </p>
+    {% endif %}
+      <table class="list" data-brand-rules-table>
+        <tr><th>Rule</th><th>This brand</th><th>Source</th><th>Company setting today</th></tr>
+        {% for r in ruleRows %}
+        <tr data-rule="{{ r.key }}">
+          <td>{{ r.label }}</td>
+          <td>
+            {% if not canRules %}
+              {% if r.own !== null %}{{ r.ownText }}{% else %}<span class="muted">empty</span>{% endif %}
+            {% elif r.kind == 'choice' %}
+              <select name="{{ r.key }}" aria-label="{{ r.label }}">
+                <option value="">— follow company —</option>
+                {% for k, l in priceRules %}<option value="{{ k }}"{{ ' selected' if r.own == k else '' }}>{{ l }}</option>{% endfor %}
+              </select>
+            {% else %}
+              <input type="number" name="{{ r.key }}" min="{{ r.min }}" max="{{ r.max }}" step="{{ '1' if r.kind == 'int' else '0.01' }}" value="{{ r.own if r.own !== null else '' }}" placeholder="empty = company" aria-label="{{ r.label }}">
+            {% endif %}
+          </td>
+          <td>{% if r.own !== null %}<span class="badge badge-notyet">Own value</span>{% else %}<span class="badge badge-active">Company</span>{% endif %}</td>
+          <td class="muted">{{ r.companyText }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% if canRules %}
+      <label>Reason for the change * <small class="muted">(kept in the Audit Log)</small><textarea name="reason" required minlength="10" maxlength="300" rows="2" placeholder="e.g. larger orders in this division — minimum raised"></textarea></label>
+      <button type="submit" name="action" value="save">Save rules</button>
+    </form>
+    {% endif %}
+    <p class="muted small" data-company-wide><strong>The same for every brand</strong> (set once in Associates › Settings, not here): payout run and day, cut-off day, waiting days, Sunday/holiday rule, TDS, KYC and video KYC, bank checks, payout abroad.</p>
+  </div>
+
+  <div class="section" id="ladder">
+    <h2>Ladder</h2>
+    <p class="muted small">Empty = the company ladder ({{ companyLadderText }}). An associate with their own ladder keeps it. This brand today: <strong data-brand-ladder>{{ ladderText }}</strong>.</p>
+    {% if canRules %}
+    <form method="post" action="/admin/brands/{{ brand.id }}/ladder">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <table class="list">
+        <tr><th>From order no.</th><th>To order no.</th><th>Level</th><th>Remove</th></tr>
+        {% for s in ladderRows %}
+        {% set i = loop.index0 %}
+        <tr>
+          <td><input type="number" name="from[{{ i }}]" min="1" step="1" value="{{ s.from_order }}" aria-label="From order number, step {{ i + 1 }}" placeholder="e.g. 1"></td>
+          <td><input type="number" name="to[{{ i }}]" min="1" step="1" value="{{ s.to_order }}" aria-label="To order number, step {{ i + 1 }} (empty = onward)" placeholder="empty = onward"></td>
+          <td><select name="level_id[{{ i }}]" aria-label="Level, step {{ i + 1 }}">
+              <option value="">—</option>
+              {% for l in levels %}<option value="{{ l.id }}"{{ ' selected' if s.level_id == l.id else '' }}>{{ l.label }}</option>{% endfor %}
+            </select></td>
+          <td>{% if s.from_order != '' %}<label class="inline"><input type="checkbox" name="remove[{{ i }}]" value="1"> Remove</label>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <label>Reason for the change * <small class="muted">(kept in the Audit Log)</small><textarea name="reason" required minlength="10" maxlength="300" rows="2" placeholder="e.g. this division's margins allow a different ladder"></textarea></label>
+      <button type="submit" name="action" value="save">Save brand ladder</button>
+      {% if ladder.length %}<button type="submit" name="action" value="clear" class="btn-secondary" data-ladder-clear>Use the company ladder</button>{% endif %}
+    </form>
+    {% endif %}
+  </div>
+</div>

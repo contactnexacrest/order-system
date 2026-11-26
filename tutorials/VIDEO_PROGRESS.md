@@ -554,3 +554,24 @@ Checked against every script in `tutorials/scripts/` (and `scripts/parts/`). Not
 | A01 Part 2 (Clients scene), English and Hindi | Each client card's footer shows **+ New Order** next to Edit. | Owner to decide |
 | All videos (Quotation / Proforma Invoice) | Not affected: no video shows the inside of a CIF / CFR QT or PI, where the LC sentence is now printed only on LC orders. | No change needed |
 | C05, C13 (associate My clients) | Not affected: the associate portal's client list is a different page. | No change needed |
+
+## Out of date after the 26 Nov 2026 build — D-431 Brands — OWNER TO DECIDE
+
+Checked against every script in `tutorials/scripts/` (and `scripts/parts/`). Nothing re-recorded (ask the owner first).
+The tutorial database has no brand, so the brand name, header line, footer and Brand column do not appear in any video.
+What every associate now sees is the tip line "When you talk to buyers, introduce NexaCrest International. Prices and
+documents always come from NexaCrest. Never tell a buyer about your commission." at the top of **Home** and **My clients**.
+Buyer links now open at plain `/quotation-details` (the recordings show no address bar, so nothing visible changes).
+
+| Video | What now differs on screen | Decision |
+|---|---|---|
+| H01 Become a NexaCrest associate | My clients scenes show the tip line. | Being re-recorded anyway (owner OK 1–4, 26 Nov) |
+| C01 Associate welcome (EN + HI) | Home scenes (Home, menu bar, back to you, log out) show the tip line above the totals. | Owner to decide |
+| C03 Starter level and first client (EN + HI; parts C03 profile, C04 starter tour, C05 inviting clients) | Home and My clients scenes show the tip line. | Owner to decide |
+| C04 Prices, requests and levels (EN + HI; part C08 access levels) | Home scenes ("A Starter menu", "Catalogue appears") show the tip line. | Owner to decide |
+| C06 Messages, changes, privacy, FAQ (EN + HI; parts C12–C15) | Home and My clients scenes show the tip line. | Owner to decide |
+| F01 Associate life-cycle 1 (EN + HI) | The first scene (associate Home) shows the tip line. | Owner to decide |
+| A01 Part 1 (EN + HI) | The "What an associate sees" scene (associate Home) shows the tip line. | Owner to decide |
+| A02 Part 1 (EN + HI) | The first scene (associate My clients) shows the tip line. | Owner to decide |
+| Staff associate page (C01, C03, C04, C05, C06 staff scenes; F02, F04) | The Profile and agreement table starts with a new row "Brand: NexaCrest (no brand)" (the "Change brand" link only for the MD / Admin). Small, near the top of the page. | Owner to decide |
+| All other staff and buyer videos | Not affected: Admin › Brands is new (no video shows it); the Brand column on the Associates list / board and the Brand filters appear only once a brand exists. | No change needed |

@@ -2,6 +2,7 @@
    events (notices: created_at, message, read_at, is_notice), openInvitations (count of created/opened/registered invitations). #}
 <div class="card page-wide">
   <h1>Welcome, {{ me.name }}</h1>
+  <p class="alert alert-info small" data-buyer-tip>{{ buyerTip }}</p>{# D-431 #}
   {% if me.status != 'active' %}<div class="alert alert-warning">Your account is {{ (statuses[me.status] or me.status) | lower }}. {{ 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' if me.status == 'invited' else 'Contact your relationship manager.' }}</div>{% endif %}
   {% if kycMissing.length or not me.address %}
     {# Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. #}

@@ -7,6 +7,11 @@
           <option value="{{ m }}"{{ ' selected' if m == month else '' }}>{{ incentive.monthLabel(m) }} payout run — orders locked before it</option>
         {% endfor %}
       </select></label>
+    {% if brands and brands.length %}{# D-431 #}
+    <label>Brand <select name="brand" onchange="this.form.submit()" data-brand-filter><option value="">All (staff and associates)</option><option value="none"{{ ' selected' if brand == 'none' else '' }}>Associates of NexaCrest (no brand)</option>
+      {% for __b in brands %}<option value="{{ __b.id }}"{{ ' selected' if brand == (__b.id | string) else '' }}>Associates of {{ __b.name }}</option>{% endfor %}
+    </select></label>
+    {% endif %}
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
   <p class="muted">Pay these in the {{ incentive.monthLabel(month) }} payout run ({{ runLabel }}; staff with the salary, associates against their invoice on or after their due date), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section {{ tdsSettings.section }} at {{ tdsRatePct }} once the financial year passes &#8377;{{ tdsSettings.threshold | inr0 }}) — pay the net amount and deposit the TDS by the 7th of next month.</p>

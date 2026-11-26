@@ -75,7 +75,9 @@ async function sendResetLink(req, email) {
   const raw = await issueToken(Number(a.id), 'set_password', 72 * 60);
   const link = `${String(env.get('APP_URL', '')).replace(/\/+$/, '')}/associate/set-password/${raw}`;
   try {
-    await emailService.sendPlainText(String(a.email), 'Reset your NexaCrest associate portal password', resetBody(a, link), { isSecurityEmail: true, kind: 'forgot_password', audience: 'associate' });
+    const brands = require('./associateBrands'); // D-431
+    const [subject, body] = await brands.email(a, 'Reset your NexaCrest associate portal password', resetBody(a, link, await brands.forAssociate(a)));
+    await emailService.sendPlainText(String(a.email), subject, body, { isSecurityEmail: true, kind: 'forgot_password', audience: 'associate' });
   } catch (err) {
     // the screen gives the same answer either way
   }
@@ -84,11 +86,11 @@ async function sendResetLink(req, email) {
 }
 
 /** D-282: the associate's forgot-password e-mail. */
-function resetBody(a, link) {
+function resetBody(a, link, brand = null) {
   return `Hello ${a.name},\n\nA new password was requested for your NexaCrest associate portal (${a.email}).\n\n`
     + `To set a new password, open this link within 72 hours (it works once):\n${link}\n\n`
     + 'If you did not ask for this, you can ignore this e-mail — your password stays as it is.\n\n'
-    + `Log in any time at:\n${require('./associateService').loginUrl()}\n\nNexaCrest International Private Limited`;
+    + `Log in any time at:\n${require('./associateService').loginUrl(brand)}\n\nNexaCrest International Private Limited`;
 }
 
 async function associateForSetPassword(raw) {
@@ -136,7 +138,8 @@ async function attemptLogin(req, email, password) {
   }
   const code = await issueToken(Number(a.id), 'login_code', 10);
   try {
-    await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`, { isSecurityEmail: true, kind: 'login_code', audience: 'associate' }); // QA batch 3 MAIL-13: a one-time login code is security mail
+    const [subject, body] = await require('./associateBrands').email(a, 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`); // D-431
+    await emailService.sendPlainText(String(a.email), subject, body, { isSecurityEmail: true, kind: 'login_code', audience: 'associate' }); // QA batch 3 MAIL-13: a one-time login code is security mail
   } catch (e) {
     // shown on screen in development; otherwise the associate asks again
   }

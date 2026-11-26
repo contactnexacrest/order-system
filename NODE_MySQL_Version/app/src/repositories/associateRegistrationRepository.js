@@ -18,10 +18,10 @@ async function linkDays() {
 }
 
 /** Creates a link; returns the raw token (shown once). */
-async function createLink(note, userId) {
+async function createLink(note, userId, brandId = null) {
   const raw = crypto.randomBytes(24).toString('hex');
-  await db.execute('INSERT INTO associate_registration_links (token_hash, note, created_by, expires_at) VALUES (:h, :n, :u, DATE_ADD(NOW(), INTERVAL :d DAY))',
-    { h: sha256(raw), n: note || null, u: userId, d: await linkDays() });
+  await db.execute('INSERT INTO associate_registration_links (token_hash, note, created_by, expires_at, brand_id) VALUES (:h, :n, :u, DATE_ADD(NOW(), INTERVAL :d DAY), :b)',
+    { h: sha256(raw), n: note || null, u: userId, d: await linkDays(), b: brandId ? Number(brandId) : null });
   return raw;
 }
 
@@ -51,7 +51,7 @@ async function create(linkId, d, ip) {
 }
 
 async function find(id) {
-  return db.queryOne('SELECT * FROM associate_registrations WHERE id = :id', { id });
+  return db.queryOne('SELECT r.*, l.brand_id FROM associate_registrations r LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id', { id });
 }
 
 async function all(status) {

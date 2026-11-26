@@ -103,9 +103,9 @@ async function notify(associate, event, message, clientId = null, orderId = null
       ? "\n\nIf this wasn't you, tell us at once: reply to this e-mail or call your NexaCrest relationship manager."
       : '';
     try {
-      return await emailService.sendPlainText(String(associate.email), `NexaCrest associate portal — ${SUBJECTS[event] || 'update'}`,
-        `Hello ${associate.name},\n\n${message}${extra}\n\nSee the details in your associate portal: ${appUrl()}/associate\n\nNexaCrest International Private Limited`,
-        { kind, audience: 'associate' });
+      const [subject, body] = await require('./associateBrands').email(associate, `NexaCrest associate portal — ${SUBJECTS[event] || 'update'}`, // D-431
+        `Hello ${associate.name},\n\n${message}${extra}\n\nSee the details in your associate portal: ${appUrl()}/associate\n\nNexaCrest International Private Limited`);
+      return await emailService.sendPlainText(String(associate.email), subject, body, { kind, audience: 'associate' });
     } catch (e) {
       // The notice is in the portal either way; a mail failure must not undo the action.
     }
@@ -113,9 +113,14 @@ async function notify(associate, event, message, clientId = null, orderId = null
   return false;
 }
 
-/** D-282: the permanent associate login page (shown on the associate page and in the invite e-mail). */
-function loginUrl() {
-  return `${appUrl()}/associate/login`;
+/** D-282: the permanent associate login page (shown on the associate page and in the invite e-mail). D-431: a brand's own login address. */
+function loginUrl(brand = null) {
+  return `${appUrl()}/associate/login${brand ? `/${brand.code}` : ''}`;
+}
+
+/** D-431: the login page of one associate (their brand's own address, else the NexaCrest one). */
+async function loginUrlFor(associate) {
+  return loginUrl(await require('./associateBrands').forAssociate(associate));
 }
 
 /** D-280: the staff message after a set-password link was made — "e-mailed" only when it was. */
@@ -126,10 +131,10 @@ function inviteOutcome(email, sent) {
 }
 
 /** D-282: the invite e-mail text (set-password link, valid 72 hours, once; and the permanent login page). */
-function inviteBody(a, link) {
+function inviteBody(a, link, brand = null) {
   return `Hello ${a.name},\n\nNexaCrest has opened your associate portal. There you can see the clients you introduced, their orders and stages, your commission and payments, and invite new clients.\n\n`
     + `Set your password within 72 hours (the link works once):\n${link}\n\nYour login e-mail: ${a.email}\n\n`
-    + `After that, log in any time at:\n${loginUrl()}\n(Forgot your password later? Use "Forgot password?" on that page.)\n\nNexaCrest International Private Limited`;
+    + `After that, log in any time at:\n${loginUrl(brand)}\n(Forgot your password later? Use "Forgot password?" on that page.)\n\nNexaCrest International Private Limited`;
 }
 
 /** Sends (or resends) the set-password link and switches the portal on; makes the personal code if there is none. */
@@ -149,7 +154,9 @@ async function invitePortal(associateId, userId, out = {}) {
   // D-282: it also gives the permanent login page, for every later visit.
   let sent = false;
   try {
-    sent = await emailService.sendPlainText(String(a.email), 'Your NexaCrest associate portal', inviteBody(a, link), { kind: 'set_password_invite', audience: 'associate' });
+    const brands = require('./associateBrands'); // D-431
+    const [subject, body] = await brands.email(a, 'Your NexaCrest associate portal', inviteBody(a, link, await brands.forAssociate(a)));
+    sent = await emailService.sendPlainText(String(a.email), subject, body, { kind: 'set_password_invite', audience: 'associate' });
   } catch (e) {
     // the link is shown to staff to copy either way
   }
@@ -272,5 +279,5 @@ async function dailyReminders(today = null) {
 module.exports = {
   bankPaymentsSentence, cleanReason,
   todayIst, addMonths, addDays, jMY, appUrl, protectionMonths, bankWaitDays, tdsPct, notify, invitePortal, linkClient, canChangeLink,
-  onOrderCreated, onPayoutPaid, dailyReminders, loginUrl, inviteOutcome, inviteBody,
+  onOrderCreated, onPayoutPaid, dailyReminders, loginUrl, loginUrlFor, inviteOutcome, inviteBody,
 };

@@ -73,6 +73,7 @@ removed from this folder; git history keeps them (last commit with them:
 | `2026-11-25a-associate-video-kyc.sql` | D-417 | Live video KYC for associates: `associates.video_kyc_at`, `video_kyc_by`, `video_kyc_note`, `video_kyc_due_on`; existing associates get 60 days before payouts wait for it. PLAIN ALTER (D-371). |
 | `2026-11-25b-associate-payout-cutoff.sql` | D-421 | Associate payout cut-off day: `incentive_settings.associate_payout_cutoff_day` = 20, waiting days (`associate_commission_due_days`) = 0. Plain INSERT/UPDATE. |
 | `2026-11-25c-associate-video-kyc-upload.sql` | D-417 | Upload context `associate_video_kyc` (mp4, mov, webm, 3gp, jpg, jpeg, png, pdf; 25 MB) for the optional video KYC recording / screenshots. Plain INSERT. Needs the server's PHP upload limit ≥ 25 MB. |
+| `2026-11-26a-associate-brands.sql` | D-431 | Brands for divisions (associate side): tables `associate_brands`, `associate_brand_settings`, `associate_brand_ladder_steps`; `associates.brand_id` and `associate_registration_links.brand_id` (with foreign keys). PLAIN ALTER (owner D-371) — a second run stops at "#1060 Duplicate column name", which is harmless. Check row '2026-11-26a' in `docs/checks/check_all_migrations.sql`. |
 
 ### Rules for every migration file (enforced by tests)
 

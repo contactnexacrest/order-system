@@ -728,7 +728,7 @@ Tests that enforce the conventions: `FormValidationConventionsTest` / `formValid
 | **Procurement** | `purchase_requirements`, `purchase_quotes` |
 | **Coordination** | `department_task_types` |
 | **Agreements** | `agreements`, `agreement_alerts_sent` |
-| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps`, `associate_ladder_steps` (D-291), `vendor_bank_changes` (D-294) |
+| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps`, `associate_ladder_steps` (D-291), `associate_brands`, `associate_brand_settings`, `associate_brand_ladder_steps` (D-431), `vendor_bank_changes` (D-294) |
 | **Team incentive** | `incentive_settings`, `incentive_roles`, `user_incentive_roles`, `order_incentives`, `order_incentive_people`, `order_incentive_roles`, `order_incentive_history`, `incentive_payouts`, `incentive_kept` |
 | **Reference library** | `internal_reference_docs`, `reference_library_documents`, `reference_library_categories` |
 | **Domestic Trade (DOM)** | `indian_states`, `gst_rates`, `domestic_orders`, `domestic_order_lines`, `domestic_payments`, `domestic_documents`, `domestic_counters` |
@@ -3165,7 +3165,14 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
   `associate_bank_accounts`, `associate_documents`, `associate_events`,
   `associate_messages`, `associate_tokens`, `associate_access_features`,
   `associate_access_level_settings`, `associate_access_log`,
-  `associate_price_access`, `incentive_payouts`.
+  `associate_price_access`, `incentive_payouts`; `associate_brands`,
+  `associate_brand_settings`, `associate_brand_ladder_steps` (D-431).
+  - **Brand (D-431):** the associate page shows the Brand (name and the line
+    under it, or "NexaCrest (no brand)"); "Change brand" with a reason for
+    `manage_divisions` only (`POST /associates/{id}/brand`, Audit Log
+    `ASSOCIATE_BRAND_CHANGED`). The list and the board have a Brand column /
+    line and a Brand filter; the Associates report and Incentive Payouts
+    filter by brand too.
 - **Code.** `AssociateAdminController`, `AssociatePortalController`,
   `AssociateBankConfirmation`, `BankDetailsCheck` (D-293),
   `AssociateRegistrationController`, `AssociateAccessController`,
@@ -4694,6 +4701,68 @@ About **section 195** (payments to non-residents): the code has **no section-195
 **Shortfall carry example.** Earlier this FY: ₹19,900 paid, no TDS. New payout ₹400 → TDS due = round((400 + 19,900) × 2 %) = ₹406 → TDS = ₹400 (capped), net ₹0, ₹6 carried to the next payout.
 
 **Other rules.** Forcing "associate: yes" on an order is MD only with a 10–300 character reason. A buyer registration with no order within `associate_protection_months` (6) lapses in the daily job. The order's cost is always the **gross** commission; GST on commission is input credit (not a cost) and TDS is a liability.
+
+### 7.3a Brands for divisions — associate side only (D-431)
+
+**What it is.** A **Brand** is the name of a division as associates see it
+(name only, no logo — owner 26 Nov 2026), with the line under it (default
+"a division of NexaCrest International Private Limited"). Admin › Brands
+(`/admin/brands`, open to `manage_divisions` or `manage_associate_rules`;
+`BrandController`, Node `brandController.js`). Tables (migration
+2026-11-26a, PLAIN ALTER): `associate_brands` (code = the login address
+code, name, tagline, products, website, e-mail, status active / planned /
+inactive), `associate_brand_settings` (brand_id, setting_key,
+setting_value), `associate_brand_ladder_steps`, plus
+`associates.brand_id` and `associate_registration_links.brand_id`.
+
+**Who changes what.** Details (name, line, code, products, website, e-mail,
+status): `manage_divisions` (Admin, MD). Rules and ladder:
+`manage_associate_rules` (MD, ED — D-411), each change with a 10–300
+character reason (Audit Log `ASSOCIATE_BRAND_RULE_CHANGED`,
+`ASSOCIATE_BRAND_LADDER_CHANGED`; details `ASSOCIATE_BRAND_CREATED` /
+`_UPDATED`). One associate = one brand; only `manage_divisions` moves an
+associate to another brand, with a reason. A registration link can carry a
+brand; the associate accepted from it gets that brand. No brand = NexaCrest,
+exactly as before.
+
+**Rules per brand** (`AssociateBrands::RULES`): minimum order value (FOB, ₹)
+that earns and counts as a step, same-client days (7–45), commission in the
+client's price (starting / fixed % / ladder) and its fixed %, price
+requests per day, price validity (days), and an own ladder. Each rule:
+empty = follows the company setting (also when the company setting changes
+later); "Copy all company settings" fills every rule with today's company
+value (a fixed copy); "Clear all (follow company)" empties them. Lookup
+order everywhere (`AssociateRules::minOrderInr($associateId)`,
+`groupDays($associateId)`, `priceRuleFor`, `PriceRequestService::dailyLimit`
+/ `validDays`, `AssociateCommission::ladderFor`): the associate's own value,
+then the brand's, then the company's. A changed rule applies to new orders;
+an order keeps the rules it had at its Proforma Invoice. **Company-wide
+only** (Associates › Settings, not per brand): payout run and day, cut-off,
+waiting days, Sunday/holiday rule, TDS, KYC and video KYC, bank checks,
+payout abroad.
+
+**What the associate sees.** The login page at the brand's own address
+`/associate/login/{code}` (remembered in the session and for a year in the
+browser, cookie `nx_assoc_brand` on `/associate`; 'code' is reserved),
+then `/associate/login` shows "For {brand} associates". After login: the
+portal title and header show the brand name with its line, and a footer
+"{brand} is a division of NexaCrest International Private Limited. Your
+agreement and your payments are with NexaCrest International Private
+Limited." Associate e-mails (invite, password reset, login code, bank
+confirmation code, portal notices, registration declined) carry the brand
+name in the subject and the first line and end with the same legal line
+(`AssociateBrands::email`). The registration form of a branded link says
+"Register as a {brand} associate". Home and My clients show the tip
+"When you talk to buyers, introduce NexaCrest International. Prices and
+documents always come from NexaCrest. Never tell a buyer about your
+commission." (all associates). Agreements, payment advices, invoices and
+personal codes ("NXA-") stay NexaCrest.
+
+**What the buyer sees: nothing of it.** Buyer form, e-mails, documents and
+the client portal stay NexaCrest. The buyer link keeps a clean address bar:
+`/quotation-details?code=…` or `?inv=…` keeps the code for the visit
+(session `_intake_introducer`) and redirects (303) to `/quotation-details`;
+the hidden fields carry it on submit. Old links keep working.
 
 ### 7.4 Team incentive (D-245 P4, D-259)
 

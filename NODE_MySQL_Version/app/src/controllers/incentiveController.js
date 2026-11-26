@@ -463,7 +463,21 @@ async function payouts(req, res) {
   if (!incentiveService.isMonth(month)) {
     month = months[0] || await incentiveService.incentiveMonth(todayIso());
   }
-  const rows = await incentiveRepository.payoutsForMonth(month);
+  let rows = await incentiveRepository.payoutsForMonth(month);
+  // D-431: the Brand filter shows only the associate lines of that brand (staff lines are not part of a brand).
+  const brands = await require('../repositories/associateBrandRepository').all();
+  const aac = require('./associateAdminController');
+  const brand = aac.brandFilter(req, brands);
+  if (brand !== '') {
+    const brandOf = {};
+    for (const r of rows) {
+      if (r.payee_kind === 'associate' && r.associate_id && !(r.associate_id in brandOf)) {
+        const b = await require('../services/associateBrands').forAssociateId(Number(r.associate_id));
+        brandOf[r.associate_id] = b ? Number(b.id) : null;
+      }
+    }
+    rows = rows.filter((r) => r.payee_kind === 'associate' && aac.brandMatches(brandOf[r.associate_id] ?? null, brand));
+  }
   if ((req.query || {}).format === 'csv') {
     csv.stream(res, `incentives-${month}.csv`,
       ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason', 'Fixed at (INR per unit)', 'Bank debited (INR)', 'Bank charges (INR)', 'Payout difference (INR)'],
@@ -500,6 +514,7 @@ async function payouts(req, res) {
   // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.
   const payoutCosts = await require('../services/associatePayoutService').payoutCostsForMonth(month);
   res.renderView('incentives/payouts', {
+    brands, brand, // D-431
     // D-410 (8): "Bank transfers made this run" — one line per transfer (payment advice) to an associate.
     transfers: await require('../services/associatePaymentAdvice').forMonth(month),
     payoutCosts,

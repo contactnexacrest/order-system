@@ -1,6 +1,6 @@
 {# Owner hard rule 2026-11-01: the same filters on the list and on the board.
    Expects: status, q, counts (map status → n), statuses (STATUSES map), listOfBoard (bool), canBank, pendingBank. #}
-{% set __q = ('&amp;q=' ~ (q | urlencode)) if q else '' %}
+{% set __q = (('&amp;q=' ~ (q | urlencode)) if q else '') ~ (('&amp;brand=' ~ (brand | urlencode)) if brand else '') %}{# D-431: the Brand filter is kept #}
 {% set __view = '&amp;view=list' if listOfBoard else '' %}
 {% set __total = 0 %}{% for k, n in counts %}{% set __total = __total + n %}{% endfor %}
 <div class="filter-chip-row">
@@ -13,6 +13,11 @@
   <input type="hidden" name="status" value="{{ status }}">
   {% if listOfBoard %}<input type="hidden" name="view" value="list">{% endif %}
   <input type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Name, e-mail, code or country" aria-label="Search associates">
+  {% if brands and brands.length %}{# D-431 #}
+  <label>Brand <select name="brand" data-brand-filter><option value="">All brands</option><option value="none"{{ ' selected' if brand == 'none' else '' }}>NexaCrest (no brand)</option>
+    {% for __b in brands %}<option value="{{ __b.id }}"{{ ' selected' if brand == (__b.id | string) else '' }}>{{ __b.name }}</option>{% endfor %}
+  </select></label>
+  {% endif %}
   <button type="submit" class="btn-sm">Search</button>
 </form>
 {% if canBank and pendingBank > 0 %}<div class="alert alert-warning">{{ pendingBank }} bank-detail change(s) wait for checking — open the associate, section "Bank details".</div>{% endif %}

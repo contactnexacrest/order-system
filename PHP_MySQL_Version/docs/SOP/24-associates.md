@@ -536,6 +536,68 @@ Payouts (due date, payout run, GST; hold with reason, release, take back for fra
 Messages (the associate writes to their relationship manager; replies are
 e-mailed) · History (nobody can edit it).
 
+## Brands for divisions (owner decision 25–26 Nov 2026, D-431)
+
+A **brand** is the name of one of our divisions as associates see it — the
+name only (no logo), with the line under it, e.g. "a division of NexaCrest
+International Private Limited". It is for **associates only**. Buyers never
+see a brand: their form, e-mails, documents and portal always say NexaCrest,
+because every sale is made by NexaCrest International Private Limited.
+
+**Admin › Brands** (`/admin/brands`):
+
+1. The MD or Admin (permission "Manage divisions") adds a brand: name, the
+   line under it, the **login address code** (e.g. `stone` gives the login
+   page `/associate/login/stone`), products, website, e-mail shown to
+   associates, status (Active / Planned / Not used).
+2. Open the brand › **Rules**. The MD or ED ("Manage associate rules")
+   either clicks **Copy all company settings** and then changes only what
+   this brand needs, or fills in only the rules that differ. An **empty**
+   rule follows the company setting (Associates › Settings and Admin ›
+   Pricing), also when that changes later. A copied value is a fixed copy.
+   **Clear all (follow company)** empties every rule. Every change needs a
+   reason (10–300 characters), kept in the Audit Log.
+   Rules a brand can set: minimum order value that earns and counts as a
+   step, same-client days, commission in the client's price (and its fixed
+   %), price requests per day, how long a price stays valid.
+3. **Ladder**: empty = the company ladder; or set the brand's own steps
+   (with a reason). "Use the company ladder" goes back.
+4. Always the same for every brand (set only in Associates › Settings):
+   payout run and day, cut-off day, waiting days, Sunday/holiday rule, TDS,
+   KYC and video KYC, bank checks, payout abroad.
+
+Which rule applies to an associate: **their own** value (set on the
+associate page) first, then their **brand's**, then the **company's**. A
+changed rule applies to new orders; an order keeps the rules it had at its
+Proforma Invoice.
+
+**One associate = one brand.** A registration link can be made for a brand
+(Associates › Registrations › "Brand the applicant joins"); the person
+accepted from it gets that brand. Only the MD / Admin ("Manage divisions")
+can move an associate to another brand: associate page › Profile › Brand ›
+**Change brand**, with a reason. No brand = NexaCrest, exactly as before.
+The Associates list and board show a **Brand** column / line and a Brand
+filter; the Associates report and Incentive Payouts can be filtered by
+brand.
+
+**What a branded associate sees:** the login page with the brand name
+(through the brand's login address, remembered by their browser), the
+brand name and its line at the top of every portal page, and at the bottom
+"… is a division of NexaCrest International Private Limited. Your agreement
+and your payments are with NexaCrest International Private Limited." Their
+e-mails carry the brand name and end with the same line. Agreements,
+payment advices and personal codes (NXA-…) stay NexaCrest.
+
+**Every associate** (with or without a brand) sees on Home and My clients:
+"When you talk to buyers, introduce NexaCrest International. Prices and
+documents always come from NexaCrest. Never tell a buyer about your
+commission."
+
+**Buyer links keep a clean address bar.** When a buyer opens the
+associate's link (`/quotation-details?code=…` or `?inv=…`), the form opens
+at plain `/quotation-details`; the associate stays attached behind the
+scenes. Old links keep working.
+
 ## Report
 
 **Associates › Report** (`/reports/associates`), per financial year:

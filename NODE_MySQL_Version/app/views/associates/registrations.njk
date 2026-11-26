@@ -14,6 +14,11 @@
     <form method="post" action="/associates/registrations/links" class="inline-form">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>For whom (note, optional)<input type="text" name="note" maxlength="200" placeholder="e.g. Met at a trade fair"></label>
+      {% if brands and brands.length %}{# D-431 #}
+      <label>Brand the applicant joins <select name="brand_id"><option value="">NexaCrest (no brand)</option>
+        {% for __b in brands %}<option value="{{ __b.id }}">{{ __b.name }}</option>{% endfor %}
+      </select></label>
+      {% endif %}
       <button type="submit" class="btn-sm">Create link</button>
     </form>
     <form method="post" action="/associates/registrations/settings" class="inline-form">

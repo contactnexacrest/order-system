@@ -14,10 +14,11 @@
   </div>
   {% include "associates/_filters.njk" %}
   <table class="list">
-    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th>{% if canRules %}<th>Commission rule</th>{% endif %}{# D-292 #}{% if canManage or canBank %}<th>Bank</th>{% endif %}<th></th></tr>
+    <tr><th>Associate</th>{% if brands and brands.length %}<th>Brand</th>{% endif %}{# D-431 #}<th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th>{% if canRules %}<th>Commission rule</th>{% endif %}{# D-292 #}{% if canManage or canBank %}<th>Bank</th>{% endif %}<th></th></tr>
     {% for a in rows %}
       <tr>
         <td><a href="/associates/{{ a.id }}">{{ a.name }}</a>{% if a.email %}<br><small class="muted">{{ a.email }}</small>{% endif %}</td>
+        {% if brands and brands.length %}<td data-brand-cell>{{ (brandNames[a.brand_id] or '—') if a.brand_id else 'NexaCrest' }}</td>{% endif %}
         <td>{% set __st = a.status %}{% include "associates/_status_badge.njk" %}</td>
         <td>{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}</td>
         <td>{{ a.personal_code or '—' }}</td>
@@ -27,6 +28,6 @@
         <td><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></td>
       </tr>
     {% endfor %}
-    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No associates match.</td></tr>{% endif %}
+    {% if rows.length == 0 %}<tr><td colspan="{{ 9 if (brands and brands.length) else 8 }}" class="muted">No associates match.</td></tr>{% endif %}
   </table>
 </div>

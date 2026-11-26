@@ -25,6 +25,19 @@
   <div class="section" id="profile">
     <h2>Profile and agreement</h2>
     <table class="kv">
+      <tr data-associate-brand><th>Brand</th><td>{% if brandOf %}<strong>{{ brandOf.name }}</strong> <span class="muted small">— {{ brandOf.tagline }}</span>{% else %}NexaCrest <span class="muted small">(no brand)</span>{% endif %}{# D-431 #}
+        {% if canBrand and (usableBrands.length or brandOf) %}
+        <details class="inline-details"><summary class="small">Change brand</summary>
+          <form method="post" action="/associates/{{ a.id }}/brand" class="inline-form" data-brand-change>
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Brand <select name="brand_id"><option value="">NexaCrest (no brand)</option>
+              {% for __b in usableBrands %}<option value="{{ __b.id }}"{{ ' selected' if brandOf and brandOf.id == __b.id else '' }}>{{ __b.name }}</option>{% endfor %}
+            </select></label>
+            <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="At least 10 characters — say why"></label>
+            <button type="submit" class="btn-sm">Change brand</button>
+          </form>
+        </details>
+        {% endif %}</td></tr>
       <tr><th>E-mail / phone</th><td>{{ a.email or '—' }} · {{ a.phone or '—' }}</td></tr>
       {% set __tax = [a.pan, a.gstin, a.tax_id] | select | join(' · ') %}
       <tr><th>PAN / GSTIN / tax ID</th><td>{{ __tax or '—' }}</td></tr>

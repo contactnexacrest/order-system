@@ -58,15 +58,34 @@ const inrWhole = (v) => require('../helpers/moneyFormat').indian(Number(v), 0); 
 
 function reset() {}
 
-/** Same client within this many days of the first order of a group = one ladder step (default 15, 7–45). */
-async function groupDays() {
+const brands = () => require('./associateBrands');
+
+/** Same client within this many days of the first order of a group = one ladder step (default 15, 7–45). D-431: the associate's brand first. */
+async function groupDays(associateId = null) {
+  const brand = await brands().rule(associateId, 'group_days');
+  if (brand === null) return companyGroupDays();
+  return Math.max(GROUP_DAYS_MIN, Math.min(GROUP_DAYS_MAX, parseInt(brand, 10) || 0));
+}
+
+/** The company setting (Associates › Settings). */
+async function companyGroupDays() {
   const v = parseInt((await incentiveRepository.settings()).associate_group_days ?? '15', 10);
   return Math.max(GROUP_DAYS_MIN, Math.min(GROUP_DAYS_MAX, v > 0 ? v : 15));
 }
 
-/** The minimum value of the goods (FOB, ₹) an order needs to earn commission and to count on the ladder. */
-async function minOrderInr() {
-  return Number((await incentiveRepository.settings()).associate_counting_threshold_inr ?? 500000);
+/** The minimum value of the goods (FOB, ₹) an order needs to earn commission and to count on the ladder. D-431: the associate's brand first. */
+async function minOrderInr(associateId = null) {
+  const brand = await brands().rule(associateId, 'min_order_inr');
+  return brand !== null ? Number(brand) : Number((await incentiveRepository.settings()).associate_counting_threshold_inr ?? 500000);
+}
+
+/** The associate an order earns for: the order's own, else the client's. */
+async function associateIdOf(order) {
+  if (order && order.associate_id) return Number(order.associate_id);
+  if (!order || !order.client_id) return null;
+  const r = await db.queryOne('SELECT associate_id FROM clients WHERE id = :id', { id: Number(order.client_id) });
+  const a = r ? Number(r.associate_id) || 0 : 0;
+  return a > 0 ? a : null;
 }
 
 /** The day the D-410 rules started (migration 2026-11-24a); null = the rules apply to every order. */
@@ -116,8 +135,8 @@ async function historyUncached(associateId) {
       ORDER BY COALESCE(o.buyer_po_received_on, DATE(o.created_at)), o.id`,
     { a: associateId, a2: associateId }
   );
-  const gd = await groupDays();
-  const min = await minOrderInr();
+  const gd = await groupDays(associateId);
+  const min = await minOrderInr(associateId);
   const start = {};
   let step = 0;
   const out = [];
@@ -168,24 +187,24 @@ async function stepFor(associateId, orderId) {
 /** A counted group of the same client whose window covers this order (it then shares that group's step and level). */
 async function groupCovering(associateId, order) {
   const po = incentiveService().poDate(order);
-  const gd = await groupDays();
+  const gd = await groupDays(associateId);
   return (await history(associateId)).find((r) => r.status === 'counted' && r.order_id !== Number(order.id) && r.client_id === Number(order.client_id)
     && r.po_date <= po && days(r.po_date, po) < gd) || null;
 }
 
 /** Whether this order earns: at least the minimum, or the client's first order. */
-async function earnsOnValue(order, valueInr) {
+async function earnsOnValue(order, valueInr, associateId = null) {
   if (await incentiveService().isClientsFirstOrder(order)) return true;
-  return valueInr !== null && valueInr !== undefined && valueInr >= (await minOrderInr());
+  return valueInr !== null && valueInr !== undefined && valueInr >= (await minOrderInr(associateId ?? (await associateIdOf(order))));
 }
 
 /** One-line ladder status for staff screens (the "Ladder step" column). */
-async function stepText(row) {
+async function stepText(row, associateId = null) {
   if (!row) return '—';
   switch (row.status) {
     case 'counted': return `Step ${row.step}`;
-    case 'same_group': return `Same step as ${row.group_reference || `#${row.group_order_id}`} (same client within ${await groupDays()} days)`;
-    case 'below_min': return `Does not count — below ₹${inrWhole(await minOrderInr())}`;
+    case 'same_group': return `Same step as ${row.group_reference || `#${row.group_order_id}`} (same client within ${await groupDays(associateId)} days)`;
+    case 'below_min': return `Does not count — below ₹${inrWhole(await minOrderInr(associateId))}`;
     default: return 'Counts when the advance has cleared';
   }
 }
@@ -200,13 +219,19 @@ async function companyPriceRule() {
   return { rule, pct: rule === 'fixed' ? Number(s.associate_price_fixed_pct ?? 5) : null };
 }
 
-/** The rule that applies to one associate: their own (D-410 override) or the company's; `own` says which. */
+/** The rule that applies to one associate: their own (D-410 override), then their brand's (D-431), then the company's; `own` / `brand` say which. */
 async function priceRuleFor(associate) {
   const own = String(associate.price_rule_override || '');
   if (PRICE_RULES[own]) {
-    return { rule: own, pct: own === 'fixed' ? Number(associate.price_rule_fixed_pct || 0) : null, own: true };
+    return { rule: own, pct: own === 'fixed' ? Number(associate.price_rule_fixed_pct || 0) : null, own: true, brand: false };
   }
-  return { ...(await companyPriceRule()), own: false };
+  const b = await brands().forAssociate(associate);
+  if (b) {
+    const s = await brands().settings(b.id);
+    const rule = String(s.price_rule || '');
+    if (PRICE_RULES[rule]) return { rule, pct: rule === 'fixed' ? Number(s.price_fixed_pct || 0) : null, own: false, brand: true };
+  }
+  return { ...(await companyPriceRule()), own: false, brand: false };
 }
 
 /** The first step's % of the associate's ladder (their fixed level when they have a fixed %). */
@@ -337,7 +362,7 @@ async function ownRuleCount() {
 module.exports = {
   MANAGE_PERMISSION, WHO_CHANGES, canManage,
   PRICE_RULES, PRICE_RULE_TEXT, GROUP_DAYS_MIN, GROUP_DAYS_MAX,
-  reset, groupDays, minOrderInr, cutover, newRules, stepTriggered, orderValueInr, history, stepsCounted, stepFor, groupCovering,
+  reset, groupDays, companyGroupDays, minOrderInr, associateIdOf, cutover, newRules, stepTriggered, orderValueInr, history, stepsCounted, stepFor, groupCovering,
   earnsOnValue, stepText, companyPriceRule, priceRuleFor, startingPct, includedPct, companyIncludedPct, levelPrices, marginPct,
   rightNow, marginSoFar, whatIf, ownRuleCount,
 };
