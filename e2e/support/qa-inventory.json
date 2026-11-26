@@ -14188,6 +14188,41 @@
   },
   {
    "method": "GET",
+   "path": "/admin/brands",
+   "controller": "BrandController",
+   "action": "index",
+   "requires_all": [],
+   "requires_any": [
+    "manage_divisions",
+    "manage_associate_rules"
+   ],
+   "guards": [
+    "session"
+   ],
+   "php_line": 552,
+   "node_line": 1045,
+   "node_handler": "brandController.index",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
    "path": "/admin/divisions/{id}",
    "controller": "DivisionController",
    "action": "show",

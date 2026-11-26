@@ -302,7 +302,8 @@ final class AssociatePortalRoutesTest extends DbTestCase
         $inv = AssociateInvitationRepository::createLink((int) $a['id'], "Link Buyer {$this->tag}", 'Netherlands');
         $r = $this->call('GET', '/invite/' . $inv['token']);
         self::assertSame([302, ''], [$r['code'], $r['body']], 'a redirect to /quotation-details?inv=… (the Location header is not visible in the CLI; the Node test checks it)');
-        $form = $this->call('GET', '/quotation-details?inv=' . $inv['token']);
+        self::assertSame(303, $this->call('GET', '/quotation-details?inv=' . $inv['token'])['code'], 'D-431: the link is kept for the visit; the address bar shows only /quotation-details');
+        $form = $this->call('GET', '/quotation-details');
         self::assertStringContainsString('<input type="hidden" name="associate_inv" value="' . $inv['token'] . '">', $form['body'], 'where the redirect lands: the form carries the link');
 
         $_SESSION = [];

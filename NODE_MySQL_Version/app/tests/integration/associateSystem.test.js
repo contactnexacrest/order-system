@@ -4,6 +4,13 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const request = require('supertest');
 const app = require('../../src/server');
+
+/** D-431: /quotation-details?code=… / ?inv=… keeps the code for the visit and redirects to plain /quotation-details; this follows it. */
+async function openIntake(url, agent = null) {
+  const ag = agent || request.agent(app);
+  const first = await ag.get(url);
+  return first.status === 303 ? ag.get('/quotation-details') : first;
+}
 const db = require('../../src/config/db');
 const associateAdminController = require('../../src/controllers/associateAdminController');
 const associatePortalController = require('../../src/controllers/associatePortalController');
@@ -411,7 +418,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
   it('a one-off link: the buyer verifies and confirms, staff accept, and the twelve-month lock starts', async () => {
     const a = await associate();
     const inv = await associateInvitationRepository.createLink(Number(a.id), 'Link Buyer BV', 'Netherlands');
-    const form = (await request(app).get(`/quotation-details?inv=${inv.token}`)).text;
+    const form = (await openIntake(`/quotation-details?inv=${inv.token}`)).text;
     // Owner decision 1 Nov 2026 (revised): the link travels as a hidden field — nothing for the buyer to tick or type.
     expect(form).toContain(`<input type="hidden" name="associate_inv" value="${inv.token}">`);
     expect(form).not.toContain('introduction_confirmed');
@@ -436,7 +443,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(await associateEventRepository.hasEvent(Number(a.id), 'client_accepted', Number(c.id), null)).toBe(true);
 
     // A6 (4 Nov 2026): a used link shows the buyer the normal form, no error; it travels silently so staff see it.
-    const usedForm = (await request(app).get(`/quotation-details?inv=${inv.token}`)).text;
+    const usedForm = (await openIntake(`/quotation-details?inv=${inv.token}`)).text;
     expect(usedForm).not.toContain('expired');
     expect(usedForm).toContain(`<input type="hidden" name="associate_inv" value="${inv.token}">`);
   });
@@ -473,7 +480,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
       expect(plain).not.toContain(never);
     }
     const a = await associate();
-    const withCode = (await request(app).get(`/quotation-details?code=${encodeURIComponent(a.personal_code)}`)).text;
+    const withCode = (await openIntake(`/quotation-details?code=${encodeURIComponent(a.personal_code)}`)).text;
     expect(withCode).toContain(`<input type="hidden" name="associate_code" value="${a.personal_code}">`);
     expect(withCode).not.toContain('type="checkbox" name="introduction_confirmed"');
     const company = `Hidden Code Buyer ${tag}`;

@@ -20,6 +20,7 @@ const EXPECTED = [
   'GET /associate/documents/{} associate',
   'GET /associate/login public',
   'GET /associate/login/code public',
+  'GET /associate/login/{} public', // D-431: a brand's login address (remembers the brand, then to /associate/login)
   'GET /associate/logout public',
   'GET /associate/messages associate',
   'GET /associate/orders associate',
@@ -445,7 +446,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(62); // D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/:token, POST /vendor-bank-confirm/:token/not-us
+    expect(checked).toBe(63); // D-431: + GET /associate/login/:code; D-428: − GET /associate/clients/{id}/certificate; D-410: + GET /associate/payment-advices/{id}/{format}; D-294: + GET/POST /vendor-bank-confirm/:token, POST /vendor-bank-confirm/:token/not-us
     expect(failed).toEqual([]);
   }, 120000);
 

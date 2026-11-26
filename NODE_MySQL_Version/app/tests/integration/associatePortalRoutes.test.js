@@ -7,6 +7,13 @@ const os = require('os');
 const path = require('path');
 const request = require('supertest');
 const app = require('../../src/server');
+
+/** D-431: /quotation-details?code=… / ?inv=… keeps the code for the visit and redirects to plain /quotation-details; this follows it. */
+async function openIntake(url, agent = null) {
+  const ag = agent || request.agent(app);
+  const first = await ag.get(url);
+  return first.status === 303 ? ag.get('/quotation-details') : first;
+}
 const db = require('../../src/config/db');
 const associateDocumentRepository = require('../../src/repositories/associateDocumentRepository');
 const associateEventRepository = require('../../src/repositories/associateEventRepository');
@@ -261,13 +268,13 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     const inv = await associateInvitationRepository.createLink(Number(a.id), `Link Buyer ${tag}`, 'Netherlands');
     const r = await request(app).get(`/invite/${inv.token}`);
     expect([r.status, r.headers.location]).toEqual([302, `/quotation-details?inv=${inv.token}`]);
-    const form = await request(app).get(`/quotation-details?inv=${inv.token}`);
+    const form = await openIntake(`/quotation-details?inv=${inv.token}`);
     expect(form.text).toContain(`<input type="hidden" name="associate_inv" value="${inv.token}">`); // where the redirect lands: the form carries the link
 
     expect((await request(app).get('/quotation-details/verify')).text).toContain('Link No Longer Valid'); // no submission in this browser
     // A submission made in this browser through the link: the form puts its id in the session and sends the buyer here.
     const agent = request.agent(app);
-    const formPage = (await agent.get(`/quotation-details?inv=${inv.token}`)).text;
+    const formPage = (await openIntake(`/quotation-details?inv=${inv.token}`, agent)).text;
     const company = `Verify Buyer ${tag}`;
     const submitted = await agent.post('/quotation-details/submit').type('form').send({
       _csrf: csrfOf(formPage), associate_inv: inv.token, company_legal_name: company, billing_address_line1: '1 Harbour Road', billing_city: 'Rotterdam',

@@ -5,6 +5,13 @@ const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const request = require('supertest');
 const app = require('../../src/server');
+
+/** D-431: /quotation-details?code=… / ?inv=… keeps the code for the visit and redirects to plain /quotation-details; this follows it. */
+async function openIntake(url, agent = null) {
+  const ag = agent || request.agent(app);
+  const first = await ag.get(url);
+  return first.status === 303 ? ag.get('/quotation-details') : first;
+}
 const db = require('../../src/config/db');
 const associateAdminController = require('../../src/controllers/associateAdminController');
 const associatePortalController = require('../../src/controllers/associatePortalController');
@@ -236,7 +243,7 @@ describe('QA Round 8, part 1', () => {
     const direct = await db.queryOne('SELECT associate_id, associate_note FROM client_intake_submissions WHERE company_legal_name = :c', { c: `Someone Else GmbH ${tag}` });
     expect(direct.associate_id).toBeNull();
     expect(direct.associate_note).toContain('given but not applied');
-    expect((await request(app).get(`/quotation-details?inv=${inv.token}`)).text).not.toContain('has expired or was already used'); // A6: the form opens normally
+    expect((await openIntake(`/quotation-details?inv=${inv.token}`)).text).not.toContain('has expired or was already used'); // A6: the form opens normally
 
     const inv2 = await associateInvitationRepository.createLink(Number(a.id), `Race BV ${tag}`, 'Netherlands');
     const claims = await Promise.all([associateInvitationRepository.claim(inv2.id, Number(subs[0].id)), associateInvitationRepository.claim(inv2.id, Number(subs[0].id) + 1)]);

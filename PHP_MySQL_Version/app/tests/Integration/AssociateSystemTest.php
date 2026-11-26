@@ -122,6 +122,18 @@ final class AssociateSystemTest extends DbTestCase
         return Flash::pull()[0] ?? ['type' => '', 'message' => ''];
     }
 
+    /** D-431: /quotation-details?code=… / ?inv=… keeps the code for the visit and redirects to plain /quotation-details; this follows that redirect. */
+    private function showIntake(): string
+    {
+        if (isset($_GET['code']) || isset($_GET['inv'])) {
+            $this->render(fn () => (new ClientIntakeController())->show([]));
+            $_GET = [];
+        } else {
+            unset($_SESSION['_intake_introducer']);
+        }
+        return $this->render(fn () => (new ClientIntakeController())->show([]));
+    }
+
     private function render(callable $call): string
     {
         ob_start();
@@ -407,7 +419,7 @@ final class AssociateSystemTest extends DbTestCase
         $a = $this->associate();
         $inv = AssociateInvitationRepository::createLink((int) $a['id'], 'Link Buyer BV', 'Netherlands');
         $_GET = ['inv' => $inv['token']];
-        $form = $this->render(fn () => (new ClientIntakeController())->show([]));
+        $form = $this->showIntake();
         // Owner decision 1 Nov 2026 (revised): the link travels as a hidden field — nothing for the buyer to tick or type.
         self::assertStringContainsString('<input type="hidden" name="associate_inv" value="' . $inv['token'] . '">', $form);
         self::assertStringNotContainsString('introduction_confirmed', $form);
@@ -434,7 +446,7 @@ final class AssociateSystemTest extends DbTestCase
         $_POST = [];
         $_GET = ['inv' => $inv['token']];
         // A6: a used link shows the buyer the normal form, no error; it travels silently so staff see it.
-        $usedForm = $this->render(fn () => (new ClientIntakeController())->show([]));
+        $usedForm = $this->showIntake();
         self::assertStringNotContainsString('expired', $usedForm);
         self::assertStringContainsString('<input type="hidden" name="associate_inv" value="' . $inv['token'] . '">', $usedForm);
     }
@@ -468,13 +480,13 @@ final class AssociateSystemTest extends DbTestCase
     public function testTheQuotationFormHasNoAssociateCheckboxOrCodeField(): void
     {
         $_GET = [];
-        $plain = $this->render(fn () => (new ClientIntakeController())->show([]));
+        $plain = $this->showIntake();
         foreach (['associate_code', 'associate_inv', 'introduction_confirmed', 'Associate code'] as $never) {
             self::assertStringNotContainsString($never, $plain, "the plain form has no {$never}");
         }
         $a = $this->associate();
         $_GET = ['code' => (string) $a['personal_code']];
-        $withCode = $this->render(fn () => (new ClientIntakeController())->show([]));
+        $withCode = $this->showIntake();
         self::assertStringContainsString('<input type="hidden" name="associate_code" value="' . $a['personal_code'] . '">', $withCode);
         self::assertStringNotContainsString('type="checkbox" name="introduction_confirmed"', $withCode);
         $_GET = [];
