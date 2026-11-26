@@ -1,6 +1,7 @@
 <?php $__m = static fn ($v): string => '₹' . \App\Helpers\MoneyFormat::indian((float) $v, 2); ?>
 <div class="card page-wide">
   <h1>Welcome, <?= htmlspecialchars((string) $me['name']) ?></h1>
+  <p class="alert alert-info small" data-buyer-tip><?= htmlspecialchars(\App\Services\AssociateBrands::BUYER_TIP) ?></p> <?php // D-431 ?>
   <?php if ($me['status'] !== 'active'): ?><div class="alert alert-warning">Your account is <?= htmlspecialchars(strtolower(\App\Repositories\AssociateRepository::STATUSES[$me['status']] ?? $me['status'])) ?>. <?= $me['status'] === 'invited' ? 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' : 'Contact your relationship manager.' ?></div><?php endif; ?>
   <?php $__kycMissing = \App\Services\AssociateKyc::missing($me); if ($__kycMissing !== [] || empty($me['address'])): ?>
     <?php // Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. ?>

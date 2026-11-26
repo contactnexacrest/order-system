@@ -79,10 +79,21 @@ final class AssociateAdminController
             $status = 'all';
         }
         $q = trim((string) ($_GET['q'] ?? ''));
-        $rows = array_values(array_filter(AssociateRepository::all(), static function (array $a) use ($status, $q): bool {
+        // D-431: the Brand filter ('' = all, 'none' = NexaCrest / no brand, or a brand id) — list and board alike.
+        $brands = \App\Repositories\AssociateBrandRepository::all();
+        $brand = (string) ($_GET['brand'] ?? '');
+        if ($brand !== '' && $brand !== 'none' && !in_array((int) $brand, array_map(static fn (array $b): int => (int) $b['id'], $brands), true)) {
+            $brand = '';
+        }
+        $rows = array_values(array_filter(AssociateRepository::all(), static function (array $a) use ($status, $q, $brand): bool {
             return ($status === 'all' || $a['status'] === $status)
+                && ($brand === '' || ($brand === 'none' ? empty($a['brand_id']) : (int) ($a['brand_id'] ?? 0) === (int) $brand))
                 && ($q === '' || stripos($a['name'] . ' ' . ($a['email'] ?? '') . ' ' . ($a['personal_code'] ?? '') . ' ' . ($a['country'] ?? ''), $q) !== false);
         }));
+        $brandNames = [];
+        foreach ($brands as $b) {
+            $brandNames[(int) $b['id']] = (string) $b['name'];
+        }
         foreach ($rows as &$r) {
             $r['clients'] = AssociateRepository::clients((int) $r['id']);
             $r['pending_bank'] = (int) Database::connection()->query("SELECT COUNT(*) FROM associate_bank_accounts WHERE status = 'pending' AND associate_id = " . (int) $r['id'])->fetchColumn();
@@ -94,6 +105,7 @@ final class AssociateAdminController
             'rows' => $rows,
             'status' => $status,
             'q' => $q,
+            'brands' => $brands, 'brand' => $brand, 'brandNames' => $brandNames, // D-431
             'counts' => AssociateRepository::statusCounts(),
             'canManage' => self::can('manage_associates'),
             'canBank' => self::can('manage_associate_bank'),
@@ -1366,8 +1378,18 @@ final class AssociateAdminController
         $from = $year . '-04-01';
         $to = ((int) $year + 1) . '-03-31';
         $pdo = Database::connection();
+        // D-431: the Brand filter ('' = all, 'none' = NexaCrest / no brand, or a brand id).
+        $brands = \App\Repositories\AssociateBrandRepository::all();
+        $brand = (string) ($_GET['brand'] ?? '');
+        if ($brand !== '' && $brand !== 'none' && !in_array((int) $brand, array_map(static fn (array $b): int => (int) $b['id'], $brands), true)) {
+            $brand = '';
+        }
+        $brandSql = $brand === '' ? '' : ($brand === 'none' ? ' AND a.brand_id IS NULL' : ' AND a.brand_id = ' . (int) $brand);
         $perf = [];
         foreach (AssociateRepository::all() as $a) {
+            if ($brand !== '' && ($brand === 'none' ? !empty($a['brand_id']) : (int) ($a['brand_id'] ?? 0) !== (int) $brand)) {
+                continue;
+            }
             $orders = AssociatePortalRepository::orders((int) $a['id']);
             $inYear = array_filter($orders, static fn (array $o): bool => substr((string) $o['created_at'], 0, 10) >= $from && substr((string) $o['created_at'], 0, 10) <= $to);
             $s = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN status='paid' THEN paid_inr END),0) AS paid, COALESCE(SUM(CASE WHEN status='paid' THEN tds_inr END),0) AS tds,
@@ -1382,10 +1404,10 @@ final class AssociateAdminController
         $ageing = $pdo->query("SELECT p.id, p.incentive_month, p.amount_inr, p.status, p.hold_reason, a.name, a.id AS associate_id, o.order_reference,
                 DATEDIFF(CURDATE(), STR_TO_DATE(CONCAT(p.incentive_month, '-01'), '%Y-%m-%d')) AS age_days
               FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id JOIN orders o ON o.id = p.order_id
-             WHERE p.payee_kind = 'associate' AND p.status IN ('due','held') ORDER BY p.incentive_month, a.name")->fetchAll();
+             WHERE p.payee_kind = 'associate' AND p.status IN ('due','held')" . $brandSql . ' ORDER BY p.incentive_month, a.name')->fetchAll();
         $tds = $pdo->prepare("SELECT p.id, p.paid_on, p.paid_inr, p.tds_inr, p.paid_reference, a.name, a.pan, a.based_in, a.country, o.order_reference
               FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id JOIN orders o ON o.id = p.order_id
-             WHERE p.payee_kind = 'associate' AND p.status = 'paid' AND p.amount_inr > 0 AND p.paid_on BETWEEN :f AND :t ORDER BY p.paid_on, a.name");
+             WHERE p.payee_kind = 'associate' AND p.status = 'paid' AND p.amount_inr > 0 AND p.paid_on BETWEEN :f AND :t" . $brandSql . ' ORDER BY p.paid_on, a.name');
         $tds->execute(['f' => $from, 't' => $to]);
         $tdsRows = $tds->fetchAll();
         $format = (string) ($_GET['format'] ?? '');
@@ -1401,6 +1423,6 @@ final class AssociateAdminController
             \App\Helpers\Csv::stream("associate-tds-register-FY{$year}.csv", ['Paid on', 'Associate', 'PAN', 'Based in', 'Order', 'Paid INR', 'TDS INR', 'Bank reference'],
                 array_map(static fn (array $r): array => [$r['paid_on'], $r['name'], $r['pan'], $r['based_in'] === 'india' ? 'India' : 'Abroad ' . $r['country'], $r['order_reference'], $r['paid_inr'], $r['tds_inr'], $r['paid_reference']], $tdsRows));
         }
-        View::render('associates/report', ['year' => $year, 'perf' => $perf, 'ageing' => $ageing, 'tds' => $tdsRows], 'layout/base');
+        View::render('associates/report', ['year' => $year, 'perf' => $perf, 'ageing' => $ageing, 'tds' => $tdsRows, 'brands' => $brands, 'brand' => $brand], 'layout/base');
     }
 }

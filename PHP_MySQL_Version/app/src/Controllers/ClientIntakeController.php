@@ -24,8 +24,19 @@ use App\Services\EmailService;
  */
 final class ClientIntakeController
 {
+    /** D-431 (owner 26 Nov 2026): the associate's link or code is kept for this visit, so the address bar shows only /quotation-details. */
+    private const INTRO_SESSION = '_intake_introducer';
+
     public function show(array $params): void
     {
+        if (isset($_GET['code']) || isset($_GET['inv'])) {
+            $_SESSION[self::INTRO_SESSION] = ['code' => mb_substr(trim((string) ($_GET['code'] ?? '')), 0, 60), 'inv' => mb_substr(trim((string) ($_GET['inv'] ?? '')), 0, 100)];
+            header('Location: /quotation-details', true, 303);
+            return;
+        }
+        $given = $_SESSION[self::INTRO_SESSION] ?? ['code' => '', 'inv' => ''];
+        $_GET['code'] = $given['code'] !== '' ? $given['code'] : null;
+        $_GET['inv'] = $given['inv'] !== '' ? $given['inv'] : null;
         // Owner decision 1 Nov 2026 (AS-5): the associate's link (?inv=) or personal code (?code=).
         $intro = \App\Services\AssociateIntakeService::introducer($_GET['code'] ?? null, $_GET['inv'] ?? null);
         if ($intro['invitation'] !== null && $intro['invitation']['status'] === 'created') {
@@ -57,6 +68,7 @@ final class ClientIntakeController
 
     public function submit(array $params): void
     {
+        unset($_SESSION[self::INTRO_SESSION]); // D-431: the hidden fields carry it from here; a form sent back with errors keeps it again
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
         if (RateLimiter::tooManyRequests(self::RATE_LIMIT_BUCKET, $ip, self::RATE_LIMIT_MAX_REQUESTS, self::RATE_LIMIT_WINDOW_MINUTES)) {
             Flash::set('error', 'We have received too many forms from your network in a short time. Please wait a few minutes and try again.');

@@ -12,10 +12,11 @@
   </div>
   <?php require __DIR__ . '/_filters.php'; ?>
   <table class="list">
-    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th><?php if ($canRules): // D-292 ?><th>Commission rule</th><?php endif; ?><?php if ($canManage || $canBank): ?><th>Bank</th><?php endif; ?><th></th></tr>
+    <tr><th>Associate</th><?php if (!empty($brands)): // D-431 ?><th>Brand</th><?php endif; ?><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th><?php if ($canRules): // D-292 ?><th>Commission rule</th><?php endif; ?><?php if ($canManage || $canBank): ?><th>Bank</th><?php endif; ?><th></th></tr>
     <?php foreach ($rows as $a): ?>
       <tr>
         <td><a href="/associates/<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name']) ?></a><?php if (!empty($a['email'])): ?><br><small class="muted"><?= htmlspecialchars((string) $a['email']) ?></small><?php endif; ?></td>
+        <?php if (!empty($brands)): ?><td data-brand-cell><?= htmlspecialchars(!empty($a['brand_id']) ? ($brandNames[(int) $a['brand_id']] ?? '—') : 'NexaCrest') ?></td><?php endif; ?>
         <td><?php $__st = (string) $a['status']; require __DIR__ . '/_status_badge.php'; ?></td>
         <td><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?></td>
         <td><?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></td>
@@ -25,6 +26,6 @@
         <td><a class="btn-sm" href="/associates/<?= (int) $a['id'] ?>">Open</a></td>
       </tr>
     <?php endforeach; ?>
-    <?php if ($rows === []): ?><tr><td colspan="8" class="muted">No associates match.</td></tr><?php endif; ?>
+    <?php if ($rows === []): ?><tr><td colspan="<?= !empty($brands) ? 9 : 8 ?>" class="muted">No associates match.</td></tr><?php endif; ?>
   </table>
 </div>

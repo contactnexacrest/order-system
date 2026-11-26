@@ -498,6 +498,21 @@ final class IncentiveController
             $month = $months[0] ?? IncentiveService::incentiveMonth(date('Y-m-d'));
         }
         $rows = IncentiveRepository::payoutsForMonth($month);
+        // D-431: the Brand filter shows only the associate lines of that brand (staff lines are not part of a brand).
+        $brands = \App\Repositories\AssociateBrandRepository::all();
+        $brand = (string) ($_GET['brand'] ?? '');
+        if ($brand !== '' && $brand !== 'none' && !in_array((int) $brand, array_map(static fn (array $b): int => (int) $b['id'], $brands), true)) {
+            $brand = '';
+        }
+        if ($brand !== '') {
+            $rows = array_values(array_filter($rows, static function (array $r) use ($brand): bool {
+                if ($r['payee_kind'] !== 'associate') {
+                    return false;
+                }
+                $b = \App\Services\AssociateBrands::forAssociateId(isset($r['associate_id']) ? (int) $r['associate_id'] : null);
+                return $brand === 'none' ? $b === null : (int) ($b['id'] ?? 0) === (int) $brand;
+            }));
+        }
         if (($_GET['format'] ?? '') === 'csv') {
             \App\Helpers\Csv::stream('incentives-' . $month . '.csv',
                 ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason', 'Fixed at (INR per unit)', 'Bank debited (INR)', 'Bank charges (INR)', 'Payout difference (INR)'],
@@ -516,6 +531,7 @@ final class IncentiveController
         View::render('incentives/payouts', [
             'tdsCalc' => $tdsCalc,
             'month' => $month,
+            'brands' => $brands, 'brand' => $brand, // D-431
             'months' => array_values(array_unique(array_merge([$month], $months))),
             'rows' => $rows,
             // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.

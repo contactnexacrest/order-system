@@ -7,6 +7,7 @@ $__codeChosen = false;
 ?>
 <div class="card page-wide">
   <h1>My clients</h1>
+  <p class="alert alert-info small" data-buyer-tip><?= htmlspecialchars(\App\Services\AssociateBrands::BUYER_TIP) ?></p> <?php // D-431 ?>
   <p class="muted">Your buyer registers with NexaCrest using your buyer registration link or your quotation link (which has your personal code). They fill in their own details and confirm that you introduced them. When we accept the registration, the company is your client, however they contact us later. Once they have placed an order, they stay your client while your agreement runs; if they place no order within <?= (int) \App\Services\AssociateService::protectionMonths() ?> months, the registration ends and you can invite them again. If two people register the same company, the first one finished counts.</p>
 
   <?php if (!empty($newLink)): ?>

@@ -6,6 +6,7 @@ $renderKanbanCard = static function (array $a) use ($canManage, $canBank, $canRu
     <div class="entity-card kanban-card">
       <div class="entity-card-header"><a class="entity-card-title" href="/associates/<?= (int) $a['id'] ?>"><?= htmlspecialchars((string) $a['name']) ?></a></div>
       <?php if (!empty($a['email'])): ?><div class="muted small"><?= htmlspecialchars((string) $a['email']) ?></div><?php endif; ?>
+      <?php if (!empty($brands)): // D-431: the same Brand as the list ?><div class="small" data-brand-cell>Brand: <?= htmlspecialchars(!empty($a['brand_id']) ? ($brandNames[(int) $a['brand_id']] ?? '—') : 'NexaCrest') ?></div><?php endif; ?>
       <div class="entity-card-sub"><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?> · Code <?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></div>
       <div class="small">Clients: <?= count($a['clients']) ?><?php foreach (array_slice($a['clients'], 0, 3) as $c): ?><br><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a><?php endforeach; ?></div>
       <?php if ($canRules): // D-292 ?><div class="muted small"><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed %: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : (($a['commission_mode'] ?? 'ladder') === 'own_ladder' ? 'Own ladder' : 'Standard ladder')) ?></div><?php endif; ?>

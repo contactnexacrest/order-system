@@ -30,6 +30,11 @@ foreach ($rows as $r) {
           <option value="<?= htmlspecialchars($m) ?>"<?= $m === $month ? ' selected' : '' ?>><?= htmlspecialchars(IncentiveService::monthLabel($m)) ?> payout run — orders locked before it</option>
         <?php endforeach; ?>
       </select></label>
+    <?php if (!empty($brands)): // D-431 ?>
+    <label>Brand <select name="brand" onchange="this.form.submit()" data-brand-filter><option value="">All (staff and associates)</option><option value="none"<?= $brand === 'none' ? ' selected' : '' ?>>Associates of NexaCrest (no brand)</option>
+      <?php foreach ($brands as $__b): ?><option value="<?= (int) $__b['id'] ?>"<?= $brand === (string) $__b['id'] ? ' selected' : '' ?>>Associates of <?= htmlspecialchars((string) $__b['name']) ?></option><?php endforeach; ?>
+    </select></label>
+    <?php endif; ?>
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
   <p class="muted">Pay these in the <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel()) ?>; staff with the salary, associates against their invoice on or after their due date), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section <?= htmlspecialchars(\App\Services\AssociateTds::settings()['section']) ?> at <?= htmlspecialchars(\App\Services\AssociateTds::pct(\App\Services\AssociateTds::settings()['rate'])) ?> once the financial year passes &#8377;<?= \App\Helpers\MoneyFormat::indian(\App\Services\AssociateTds::settings()['threshold'], 0) ?>) — pay the net amount and deposit the TDS by the 7th of next month.</p>

@@ -1,6 +1,6 @@
 <?php
 /** Owner hard rule 2026-11-01: the same filters on the list and on the board. */
-$__q = $q !== '' ? '&amp;q=' . rawurlencode($q) : '';
+$__q = ($q !== '' ? '&amp;q=' . rawurlencode($q) : '') . (($brand ?? '') !== '' ? '&amp;brand=' . rawurlencode((string) $brand) : ''); // D-431: the Brand filter is kept
 $__view = !empty($listOfBoard) ? '&amp;view=list' : '';
 ?>
 <div class="filter-chip-row">
@@ -13,6 +13,11 @@ $__view = !empty($listOfBoard) ? '&amp;view=list' : '';
   <input type="hidden" name="status" value="<?= htmlspecialchars($status) ?>">
   <?php if (!empty($listOfBoard)): ?><input type="hidden" name="view" value="list"><?php endif; ?>
   <input type="search" name="q" value="<?= htmlspecialchars($q) ?>" maxlength="100" placeholder="Name, e-mail, code or country" aria-label="Search associates">
+  <?php if (!empty($brands)): // D-431 ?>
+  <label>Brand <select name="brand" data-brand-filter><option value="">All brands</option><option value="none"<?= ($brand ?? '') === 'none' ? ' selected' : '' ?>>NexaCrest (no brand)</option>
+    <?php foreach ($brands as $__b): ?><option value="<?= (int) $__b['id'] ?>"<?= ($brand ?? '') === (string) $__b['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__b['name']) ?></option><?php endforeach; ?>
+  </select></label>
+  <?php endif; ?>
   <button type="submit" class="btn-sm">Search</button>
 </form>
 <?php if ($canBank && $pendingBank > 0): ?><div class="alert alert-warning"><?= (int) $pendingBank ?> bank-detail change(s) wait for checking — open the associate, section "Bank details".</div><?php endif; ?>

@@ -32,6 +32,9 @@ final class AssociateBrands
         'price_valid_days' => ['A price stays valid for (days)', 1, 365, 'int'],
     ];
 
+    /** D-431 (owner 26 Nov 2026): the reminder on the associate's Home and My clients pages. */
+    public const BUYER_TIP = 'When you talk to buyers, introduce NexaCrest International. Prices and documents always come from NexaCrest. Never tell a buyer about your commission.';
+
     /** The company default for the line under a brand's name. */
     public const DEFAULT_TAGLINE = 'a division of NexaCrest International Private Limited';
 
