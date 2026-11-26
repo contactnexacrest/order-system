@@ -131,3 +131,8 @@ card says: write to us by e-mail; the address is on our website (owner 25 Nov 20
    with the same buyer, no margin, "no commission on an order cancelled before full payment", NexaCrest Group,
    prices from the portal, FOB value of the goods on the order, we always pay the fixed rupee amount, orders not
    clients, the minimum order value and the number of days, very simple language, told as a story that motivates.
+
+## Additions of 26 Nov 2026 (owner, D-431 "OK 1–4")
+
+- New slide after "Your link and your code" — **Your buyer deals with NexaCrest directly**: "Your buyer fills in NexaCrest's own form and works with NexaCrest directly. They get one clear price from NexaCrest. Nothing is added on top for you. You stay in the background. Your buyer simply sees a trusted company. That gives your buyer confidence, and buyers who feel confident order again."
+- Slide "Two people bring the same buyer?" gets the line: "We check that every new buyer is real before they become your client. So nobody can fake a buyer, or take yours."
