@@ -5,7 +5,12 @@ $__v = static fn (string $f): string => htmlspecialchars((string) ($old[$f] ?? '
 $__err = static fn (string $f): string => isset($errors[$f]) ? '<small class="form-field-error">' . htmlspecialchars($errors[$f]) . '</small>' : '';
 ?>
 <div class="card card-narrow">
+  <?php if (!empty($brand)): // D-431: the division the applicant joins (name only) ?>
+  <h1 data-register-brand>Register as a <?= htmlspecialchars((string) $brand['name']) ?> associate</h1>
+  <p class="muted small"><?= htmlspecialchars((string) $brand['name']) ?> — <?= htmlspecialchars((string) $brand['tagline']) ?>. Your agreement and your payments are with NexaCrest International Private Limited.</p>
+  <?php else: ?>
   <h1>Register as a NexaCrest associate</h1>
+  <?php endif; ?>
   <p class="muted">A few details to start. Once NexaCrest accepts your registration you get your own portal, where you add the rest (address, PAN, bank details and documents).</p>
   <?php if (!empty($errors['form'])): ?><div class="alert alert-error"><?= htmlspecialchars($errors['form']) ?></div><?php endif; ?>
   <form method="post" action="/associate-register/<?= htmlspecialchars($token) ?>">

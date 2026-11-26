@@ -83,7 +83,8 @@ final class AssociatePortalService
         }
         $raw = self::issueToken((int) $a['id'], 'set_password', 72 * 60);
         $link = rtrim((string) Env::get('APP_URL', ''), '/') . '/associate/set-password/' . $raw;
-        EmailService::sendPlainText((string) $a['email'], 'Reset your NexaCrest associate portal password', self::resetBody($a, $link), true, 'forgot_password', 'associate');
+        [$subject, $body] = AssociateBrands::email($a, 'Reset your NexaCrest associate portal password', self::resetBody($a, $link)); // D-431
+        EmailService::sendPlainText((string) $a['email'], $subject, $body, true, 'forgot_password', 'associate');
         AuditLogRepository::log(null, 'ASSOCIATE_PASSWORD_RESET_REQUESTED', 'associates', (int) $a['id'], null, null, null, 'Requested from IP ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         return $link;
     }
@@ -94,7 +95,7 @@ final class AssociatePortalService
         return "Hello {$a['name']},\n\nA new password was requested for your NexaCrest associate portal ({$a['email']}).\n\n"
             . "To set a new password, open this link within 72 hours (it works once):\n{$link}\n\n"
             . "If you did not ask for this, you can ignore this e-mail — your password stays as it is.\n\n"
-            . "Log in any time at:\n" . AssociateService::loginUrl() . "\n\nNexaCrest International Private Limited";
+            . "Log in any time at:\n" . AssociateService::loginUrl($a) . "\n\nNexaCrest International Private Limited";
     }
 
     /** The associate a valid set-password token belongs to (not used, not expired). */
@@ -149,7 +150,8 @@ final class AssociatePortalService
             return ['status' => 'too_many_codes'];
         }
         $code = self::issueToken((int) $a['id'], 'login_code', 10);
-        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.", true, 'login_code', 'associate'); // QA batch 3 MAIL-13: a one-time login code is security mail
+        [$subject, $body] = AssociateBrands::email($a, 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password."); // D-431
+        EmailService::sendPlainText((string) $a['email'], $subject, $body, true, 'login_code', 'associate'); // QA batch 3 MAIL-13: a one-time login code is security mail
         self::regenerate();
         unset($_SESSION[self::SESSION_ID], $_SESSION[self::SESSION_VIEW_AS]);
         $_SESSION[self::SESSION_PENDING] = (int) $a['id'];

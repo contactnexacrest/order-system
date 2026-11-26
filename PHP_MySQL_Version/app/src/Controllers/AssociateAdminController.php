@@ -307,6 +307,7 @@ final class AssociateAdminController
             'a' => $a,
             'canManage' => $canManage,
             'canBank' => $canBank,
+            'canBrand' => self::can('manage_divisions'), // D-431: only the MD (and Admin) moves an associate to another brand
             'canChangeLink' => AssociateService::canChangeLink(self::user()),
             // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
             'rule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateCommission::ruleProgress($a) : null,
@@ -547,6 +548,34 @@ final class AssociateAdminController
             }
             AssociateService::notify($a, 'status_changed', 'Your associate status is now: ' . AssociateRepository::STATUSES[$status] . ". Reason: {$reason}", null, null, null, (int) $user['id']);
             Flash::set('success', 'Status changed to ' . AssociateRepository::STATUSES[$status] . '.');
+        }
+        self::back((int) $a['id']);
+    }
+
+    /** D-431: only the MD (and Admin, "Manage divisions") moves an associate to another brand, with a reason. New orders follow the new brand's rules. */
+    public function changeBrand(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $user = self::user();
+        $raw = trim((string) ($_POST['brand_id'] ?? ''));
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        $brand = $raw !== '' ? \App\Repositories\AssociateBrandRepository::find((int) $raw) : null;
+        $oldBrand = \App\Services\AssociateBrands::forAssociate($a);
+        if ($raw !== '' && ($brand === null || $brand['status'] === 'inactive')) {
+            Flash::set('error', 'Choose a brand from the list.');
+        } elseif ((int) ($oldBrand['id'] ?? 0) === (int) ($brand['id'] ?? 0)) {
+            Flash::set('error', 'The associate already has this brand.');
+        } elseif (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
+            Flash::set('error', 'Give the reason for the change (10 to 300 characters).');
+        } else {
+            \App\Repositories\AssociateBrandRepository::setAssociateBrand((int) $a['id'], $brand !== null ? (int) $brand['id'] : null);
+            \App\Services\AssociateBrands::reset();
+            AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_BRAND_CHANGED', 'associates', (int) $a['id'], 'brand_id',
+                (string) ($oldBrand['name'] ?? 'NexaCrest'), (string) ($brand['name'] ?? 'NexaCrest'), $reason);
+            Flash::set('success', 'Brand changed to ' . ($brand['name'] ?? 'NexaCrest (no brand)') . '. New orders follow its rules; existing orders keep theirs.');
         }
         self::back((int) $a['id']);
     }

@@ -1,10 +1,12 @@
-<?php use App\Helpers\Flash; $__viewAs = \App\Services\AssociatePortalService::viewAsStaffId() !== null; ?>
+<?php use App\Helpers\Flash; $__viewAs = \App\Services\AssociatePortalService::viewAsStaffId() !== null;
+// D-431: the associate's brand (name only); before login the brand of the login address used or remembered. No brand = NexaCrest, as before.
+$__brand = !empty($me) ? \App\Services\AssociateBrands::forAssociate($me) : \App\Services\AssociateBrands::loginBrand(); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NexaCrest International — Associate Portal</title>
+<title><?= $__brand !== null ? htmlspecialchars((string) $__brand['name']) . ' — Associate Portal' : 'NexaCrest International — Associate Portal' ?></title>
 <link rel="icon" href="/assets/img/favicon.ico?v=2" sizes="any">
 <link rel="stylesheet" href="<?= \App\Helpers\View::asset('/assets/css/app.css') ?>">
 <script src="<?= \App\Helpers\View::asset('/assets/js/app.js') ?>" defer></script>
@@ -21,7 +23,11 @@
 <header class="client-topbar">
   <div class="topbar-brand">
     <span class="bare-brand-mark" aria-hidden="true"><img src="/assets/img/logo.jpg" alt=""></span>
+    <?php if ($__brand !== null): ?>
+    <span data-portal-brand><?= htmlspecialchars((string) $__brand['name']) ?> <span>Associate Portal</span><small class="topbar-brand-line"><?= htmlspecialchars((string) $__brand['tagline']) ?></small></span>
+    <?php else: ?>
     NexaCrest <span>Associate Portal</span>
+    <?php endif; ?>
   </div>
   <?php if (!empty($me)): ?>
   <nav class="topbar-nav">
@@ -51,5 +57,8 @@
   <?php endforeach; ?>
   <?= $content ?>
 </main>
+<?php if ($__brand !== null): ?>
+<footer class="portal-brand-footer" data-portal-brand-footer><?= htmlspecialchars(\App\Services\AssociateBrands::legalLine($__brand)) ?></footer>
+<?php endif; ?>
 </body>
 </html>

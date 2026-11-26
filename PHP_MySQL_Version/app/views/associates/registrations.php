@@ -26,6 +26,11 @@ $__linkState = static function (array $l): string {
     <form method="post" action="/associates/registrations/links" class="inline-form">
       <?= Csrf::field() ?>
       <label>For whom (note, optional)<input type="text" name="note" maxlength="200" placeholder="e.g. Met at a trade fair"></label>
+      <?php $__brands = \App\Repositories\AssociateBrandRepository::usable(); if ($__brands !== []): // D-431 ?>
+      <label>Brand the applicant joins <select name="brand_id"><option value="">NexaCrest (no brand)</option>
+        <?php foreach ($__brands as $__b): ?><option value="<?= (int) $__b['id'] ?>"><?= htmlspecialchars((string) $__b['name']) ?></option><?php endforeach; ?>
+      </select></label>
+      <?php endif; ?>
       <button type="submit" class="btn-sm">Create link</button>
     </form>
     <form method="post" action="/associates/registrations/settings" class="inline-form">

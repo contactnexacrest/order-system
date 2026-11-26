@@ -30,6 +30,20 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
   <div class="section" id="profile">
     <h2>Profile and agreement</h2>
     <table class="kv">
+      <?php $__brand = \App\Services\AssociateBrands::forAssociate($a); // D-431 ?>
+      <tr data-associate-brand><th>Brand</th><td><?= $__brand !== null ? '<strong>' . htmlspecialchars((string) $__brand['name']) . '</strong> <span class="muted small">— ' . htmlspecialchars((string) $__brand['tagline']) . '</span>' : 'NexaCrest <span class="muted small">(no brand)</span>' ?>
+        <?php if (!empty($canBrand)): $__brands = \App\Repositories\AssociateBrandRepository::usable(); if ($__brands !== [] || $__brand !== null): ?>
+        <details class="inline-details"><summary class="small">Change brand</summary>
+          <form method="post" action="/associates/<?= $id ?>/brand" class="inline-form" data-brand-change>
+            <?= Csrf::field() ?>
+            <label>Brand <select name="brand_id"><option value="">NexaCrest (no brand)</option>
+              <?php foreach ($__brands as $__b): ?><option value="<?= (int) $__b['id'] ?>"<?= $__brand !== null && (int) $__brand['id'] === (int) $__b['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__b['name']) ?></option><?php endforeach; ?>
+            </select></label>
+            <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="At least 10 characters — say why"></label>
+            <button type="submit" class="btn-sm">Change brand</button>
+          </form>
+        </details>
+        <?php endif; endif; ?></td></tr>
       <tr><th>E-mail / phone</th><td><?= htmlspecialchars((string) ($a['email'] ?? '—')) ?> · <?= htmlspecialchars((string) ($a['phone'] ?? '—')) ?></td></tr>
       <tr><th>PAN / GSTIN / tax ID</th><td><?= htmlspecialchars(implode(' · ', array_filter([(string) $a['pan'], (string) $a['gstin'], (string) $a['tax_id']])) ?: '—') ?></td></tr>
       <tr><th>Address</th><td><?= nl2br(htmlspecialchars((string) ($a['address'] ?? '—'))) ?></td></tr>
@@ -60,7 +74,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       <p>Portal: <span class="badge <?= (int) $a['portal_enabled'] === 1 ? 'badge-active' : 'badge-optional' ?>"><?= (int) $a['portal_enabled'] === 1 ? 'On' : 'Off' ?></span>
         <span class="muted small"><?= !empty($a['password_hash']) ? 'Password set' : 'Password not set yet' ?> · <?= !empty($a['last_login_at']) ? 'last login ' . htmlspecialchars(Dates::human((string) $a['last_login_at'])) : 'never logged in' ?></span></p>
       <p class="small"><b>Login page — send this to the associate any time</b></p>
-      <?php $__copyLink = \App\Services\AssociateService::loginUrl(); $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; ?>
+      <?php $__copyLink = \App\Services\AssociateService::loginUrl($a); $__copyNote = null; require dirname(__DIR__) . '/partials/copy_link.php'; ?>
       <p class="muted small">On this page they log in, or click "Forgot password?" to get a new link by e-mail themselves.</p>
       <div class="btn-row">
         <form method="post" action="/associates/<?= $id ?>/portal/invite" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Send set-password link</button></form>

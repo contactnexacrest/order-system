@@ -173,9 +173,50 @@ final class AssociateBrands
         return [$out, $errors];
     }
 
+    /**
+     * D-431: an e-mail to an associate in their brand's name — the subject's "NexaCrest" becomes the brand name, the
+     * body starts with the brand and its line and ends with the legal line. No brand: unchanged.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function email(?array $associate, string $subject, string $body): array
+    {
+        $brand = self::forAssociate($associate);
+        if ($brand === null) {
+            return [$subject, $body];
+        }
+        $name = (string) $brand['name'];
+        $subject = str_replace('NexaCrest', $name, $subject);
+        $body = str_replace('NexaCrest relationship manager', $name . ' relationship manager', $body);
+        $body = preg_replace('/\n\nNexaCrest International Private Limited$/', "\n\n{$name} associates team", $body) ?? $body;
+        return [$subject, $name . ' — ' . $brand['tagline'] . "\n\n" . $body . "\n\n" . self::legalLine($brand)];
+    }
+
+    /** Login address codes that are already pages of the portal. */
+    public const RESERVED_CODES = ['code'];
+
     /** A login address code: lower-case letters, digits and hyphens, 2–30 characters. */
     public static function validCode(string $code): bool
     {
-        return (bool) preg_match('/^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/', $code) && strlen($code) >= 2;
+        return (bool) preg_match('/^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/', $code) && strlen($code) >= 2 && !in_array($code, self::RESERVED_CODES, true);
+    }
+
+    public const SESSION_KEY = '_associate_login_brand';
+    public const COOKIE = 'nx_assoc_brand';
+
+    /** Remembers the brand of a login address in the session and, for a year, in the browser. */
+    public static function rememberLoginBrand(array $brand): void
+    {
+        $_SESSION[self::SESSION_KEY] = (string) $brand['code'];
+        if (!headers_sent() && PHP_SAPI !== 'cli') {
+            setcookie(self::COOKIE, (string) $brand['code'], ['expires' => time() + 365 * 86400, 'path' => '/associate', 'secure' => !\App\Config\Env::isLocal(), 'httponly' => true, 'samesite' => 'Lax']);
+        }
+    }
+
+    /** The brand shown on the login pages before the associate is known (login address used, or remembered); null = NexaCrest. */
+    public static function loginBrand(): ?array
+    {
+        $code = (string) ($_SESSION[self::SESSION_KEY] ?? ($_COOKIE[self::COOKIE] ?? ''));
+        return $code !== '' && self::validCode($code) ? AssociateBrandRepository::findByCode($code) : null;
     }
 }

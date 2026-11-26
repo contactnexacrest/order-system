@@ -22,11 +22,11 @@ final class AssociateRegistrationRepository
     }
 
     /** Creates a link; returns the raw token (shown once). */
-    public static function createLink(?string $note, int $userId): string
+    public static function createLink(?string $note, int $userId, ?int $brandId = null): string
     {
         $raw = bin2hex(random_bytes(24));
-        Database::connection()->prepare('INSERT INTO associate_registration_links (token_hash, note, created_by, expires_at) VALUES (:h, :n, :u, DATE_ADD(NOW(), INTERVAL :d DAY))')
-            ->execute(['h' => hash('sha256', $raw), 'n' => $note, 'u' => $userId, 'd' => self::linkDays()]);
+        Database::connection()->prepare('INSERT INTO associate_registration_links (token_hash, note, created_by, expires_at, brand_id) VALUES (:h, :n, :u, DATE_ADD(NOW(), INTERVAL :d DAY), :b)')
+            ->execute(['h' => hash('sha256', $raw), 'n' => $note, 'u' => $userId, 'd' => self::linkDays(), 'b' => $brandId]);
         return $raw;
     }
 
@@ -70,7 +70,7 @@ final class AssociateRegistrationRepository
 
     public static function find(int $id): ?array
     {
-        $stmt = Database::connection()->prepare('SELECT * FROM associate_registrations WHERE id = :id');
+        $stmt = Database::connection()->prepare('SELECT r.*, l.brand_id FROM associate_registrations r LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id');
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }

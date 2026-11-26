@@ -547,6 +547,14 @@ $router->get('/admin/divisions/{id}', [$divisions, 'show'], [SessionAuth::requir
 $router->post('/admin/divisions/{id}/modules', [$divisions, 'saveModules'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/settings', [$divisions, 'saveSetting'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/settings/delete', [$divisions, 'deleteSetting'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+// D-431 (owner 25–26 Nov 2026): Admin › Brands — division names associates see; rules per brand (D-411 permission).
+$brands = new \App\Controllers\BrandController();
+$router->get('/admin/brands', [$brands, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules'])]);
+$router->post('/admin/brands', [$brands, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->get('/admin/brands/{id}', [$brands, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules'])]);
+$router->post('/admin/brands/{id}', [$brands, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/brands/{id}/rules', [$brands, 'saveRules'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/admin/brands/{id}/ladder', [$brands, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/activate', [$divisions, 'activate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/deactivate', [$divisions, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/users/{id}/division', [$divisions, 'setUserDivision'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
@@ -783,6 +791,7 @@ $router->get('/associates/{id}', [$associateAdmin, 'show'], [SessionAuth::requir
 $router->get('/associates/{id}/edit', [$associateAdmin, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
 $router->post('/associates/{id}/update', [$associateAdmin, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/status', [$associateAdmin, 'changeStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/brand', [$associateAdmin, 'changeBrand'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]); // D-431
 $router->post('/associates/{id}/portal/invite', [$associateAdmin, 'invitePortal'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/portal/disable', [$associateAdmin, 'disablePortal'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/code', [$associateAdmin, 'setCode'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
@@ -1140,6 +1149,7 @@ $router->get('/associate/login', [$associatePortal, 'showLogin']);
 $router->post('/associate/login', [$associatePortal, 'login'], [CsrfCheck::verify()]);
 $router->get('/associate/login/code', [$associatePortal, 'showCode']);
 $router->post('/associate/login/code', [$associatePortal, 'verifyCode'], [CsrfCheck::verify()]);
+$router->get('/associate/login/{code}', [$associatePortal, 'showBrandLogin']); // D-431: a brand's login address (after /associate/login/code)
 $router->get('/associate/forgot-password', [$associatePortal, 'showForgotPassword']);                 // D-282
 $router->post('/associate/forgot-password', [$associatePortal, 'forgotPassword'], [CsrfCheck::verify()]); // D-282
 $router->get('/associate/set-password/{token}', [$associatePortal, 'showSetPassword']);

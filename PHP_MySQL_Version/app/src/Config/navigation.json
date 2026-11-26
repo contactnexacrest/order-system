@@ -245,6 +245,7 @@
           { "label": "Reference library categories", "href": "/reference-docs/categories", "when": { "any": ["manage_company_settings"] } }
         ] },
         { "label": "Divisions", "href": "/admin/divisions", "when": { "any": ["manage_divisions"] } },
+        { "label": "Brands", "href": "/admin/brands", "when": { "any": ["manage_divisions", "manage_associate_rules"] } },
         { "label": "Admin overrides", "href": "/admin/overrides", "when": { "any": ["edit_locked_data"] } },
         { "label": "Data export", "href": "/admin/data-export", "when": { "any": ["data_export_run"] } },
         { "label": "Sample data", "href": "/sample-data", "when": { "any": ["manage_sample_data"] } },

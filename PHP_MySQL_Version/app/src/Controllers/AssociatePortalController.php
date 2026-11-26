@@ -67,6 +67,16 @@ final class AssociatePortalController
         View::render('associate_portal/login', [], self::LAYOUT);
     }
 
+    /** D-431: a brand's own login address (/associate/login/{code}): the login page with the brand's name, remembered in this browser. */
+    public function showBrandLogin(array $params): void
+    {
+        $brand = \App\Repositories\AssociateBrandRepository::findByCode((string) ($params['code'] ?? ''));
+        if ($brand !== null) {
+            \App\Services\AssociateBrands::rememberLoginBrand($brand);
+        }
+        header('Location: /associate/login');
+    }
+
     public function login(array $params): void
     {
         $r = AssociatePortalService::attemptLogin(trim((string) ($_POST['email'] ?? '')), (string) ($_POST['password'] ?? ''));
@@ -101,6 +111,10 @@ final class AssociatePortalController
             Flash::set('error', 'That code is not correct or has expired. Log in again to get a new code.');
             header('Location: /associate/login/code');
             return;
+        }
+        $brand = \App\Services\AssociateBrands::forAssociate(self::me()); // D-431: the login page shows this brand next time in this browser
+        if ($brand !== null) {
+            \App\Services\AssociateBrands::rememberLoginBrand($brand);
         }
         header('Location: /associate');
     }

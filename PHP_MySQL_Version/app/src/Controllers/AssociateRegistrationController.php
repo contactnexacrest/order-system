@@ -59,10 +59,14 @@ final class AssociateRegistrationController
     public function createLink(array $params): void
     {
         $note = trim((string) ($_POST['note'] ?? ''));
+        $brandRaw = trim((string) ($_POST['brand_id'] ?? '')); // D-431: the brand the applicant joins (empty = NexaCrest)
+        $brand = $brandRaw !== '' ? \App\Repositories\AssociateBrandRepository::find((int) $brandRaw) : null;
         if (mb_strlen($note) > 200) {
             Flash::set('error', 'The note can be up to 200 characters.');
+        } elseif ($brandRaw !== '' && ($brand === null || $brand['status'] === 'inactive')) {
+            Flash::set('error', 'Choose a brand from the list.');
         } else {
-            $raw = AssociateRegistrationRepository::createLink($note !== '' ? $note : null, (int) self::user()['id']);
+            $raw = AssociateRegistrationRepository::createLink($note !== '' ? $note : null, (int) self::user()['id'], $brand !== null ? (int) $brand['id'] : null);
             $_SESSION['_associate_registration_link'] = self::linkUrl($raw);
             AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_REGISTRATION_LINK_CREATED', 'associate_registration_links', 0, 'note', null, $note);
             Flash::set('success', 'Associate registration link created — valid ' . AssociateRegistrationRepository::linkDays() . ' days, for one registration. Copy it below.');
@@ -111,6 +115,9 @@ final class AssociateRegistrationController
             'email' => $r['email'], 'phone' => $r['phone'], 'status' => 'invited', 'notes' => 'Registered themselves through an associate registration link (D-253).',
         ], $userId);
         AssociateRepository::setFields($id, ['city' => $r['city'], 'access_level' => 'starter']); // D-261: a new associate starts on Starter
+        if (!empty($r['brand_id'])) { // D-431: the brand of the link the applicant joined through
+            \App\Repositories\AssociateBrandRepository::setAssociateBrand($id, (int) $r['brand_id']);
+        }
         if (!AssociateRegistrationRepository::decide((int) $r['id'], 'accepted', null, $userId, $id)) {
             Flash::set('error', 'This registration was already reviewed.');
             header('Location: /associates/registrations');
@@ -138,9 +145,9 @@ final class AssociateRegistrationController
             Flash::set('error', 'Give the reason (10 to 300 characters) — it is e-mailed to the person.');
         } elseif (AssociateRegistrationRepository::decide((int) $r['id'], 'rejected', $reason, (int) self::user()['id'], null)) {
             AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_REGISTRATION_REJECTED', 'associate_registrations', (int) $r['id'], 'reason', null, $reason);
-            $sent = EmailService::sendPlainText((string) $r['email'], 'Your NexaCrest associate registration',
-                "Hello {$r['name']},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n{$reason}\n\nNexaCrest International Private Limited",
-                false, 'associate_registration_declined', 'associate');
+            [$subject, $body] = \App\Services\AssociateBrands::email(['brand_id' => $r['brand_id'] ?? null], 'Your NexaCrest associate registration', // D-431
+                "Hello {$r['name']},\n\nThank you for registering as a NexaCrest associate. We cannot accept the registration at this time:\n{$reason}\n\nNexaCrest International Private Limited");
+            $sent = EmailService::sendPlainText((string) $r['email'], $subject, $body, false, 'associate_registration_declined', 'associate');
             // D-280: "e-mailed" only when it was.
             Flash::set('success', $sent
                 ? 'Registration rejected — the reason was e-mailed to ' . $r['email'] . '.'
@@ -151,6 +158,12 @@ final class AssociateRegistrationController
 
     // ------------------------------------------------------------ public (no login)
 
+    /** D-431: the brand an applicant joins through this link (null = NexaCrest). */
+    private static function linkBrand(?array $link): ?array
+    {
+        return $link !== null && !empty($link['brand_id']) ? \App\Repositories\AssociateBrandRepository::find((int) $link['brand_id']) : null;
+    }
+
     public function show(array $params): void
     {
         $link = AssociateRegistrationRepository::usableLink((string) $params['token']);
@@ -158,7 +171,7 @@ final class AssociateRegistrationController
             View::render('associate_register/unavailable', [], 'layout/bare');
             return;
         }
-        View::render('associate_register/form', ['token' => (string) $params['token'], 'old' => [], 'errors' => []], 'layout/bare');
+        View::render('associate_register/form', ['token' => (string) $params['token'], 'old' => [], 'errors' => [], 'brand' => self::linkBrand($link)], 'layout/bare');
     }
 
     /** @return array{0: array<string,string>, 1: array<string,string>} [data, errors by field] */
@@ -203,7 +216,7 @@ final class AssociateRegistrationController
         }
         if (RateLimiter::tooManyRequests('associate_registration_submit', (string) ($_SERVER['REMOTE_ADDR'] ?? ''), 5, 15)) {
             http_response_code(429);
-            View::render('associate_register/form', ['token' => $token, 'old' => $_POST, 'errors' => ['form' => 'Too many attempts from this connection — please try again in 15 minutes.']], 'layout/bare');
+            View::render('associate_register/form', ['token' => $token, 'old' => $_POST, 'errors' => ['form' => 'Too many attempts from this connection — please try again in 15 minutes.'], 'brand' => self::linkBrand(AssociateRegistrationRepository::usableLink($token))], 'layout/bare');
             return;
         }
         [$d, $errors] = self::validate($_POST);
@@ -212,7 +225,7 @@ final class AssociateRegistrationController
         }
         if ($errors !== []) {
             http_response_code(422);
-            View::render('associate_register/form', ['token' => $token, 'old' => $d + ['consent' => $_POST['consent'] ?? ''], 'errors' => $errors], 'layout/bare');
+            View::render('associate_register/form', ['token' => $token, 'old' => $d + ['consent' => $_POST['consent'] ?? ''], 'errors' => $errors, 'brand' => self::linkBrand(AssociateRegistrationRepository::usableLink($token))], 'layout/bare');
             return;
         }
         if (!AssociateRegistrationRepository::claimLink((int) $link['id'])) {
