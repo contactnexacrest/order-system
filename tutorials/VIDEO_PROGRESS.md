@@ -591,10 +591,44 @@ Recording is paused: H01, C01, C03, C04, C06, F01 (decided above) are **not** re
 
 ### D-437 Price Answer valid 30 days (26 Nov 2026) — script updated, recording on hold (D-434)
 
-- **C06 Get a price** (recorded, EN + HI) says "Empty means the company default: ten a day, valid seven days." The script now says "thirty days". The recorded video no longer matches: **ask the owner before re-recording** (videos on hold, D-434).
+- **C04 Prices, requests and levels** (its part C06 Get a price; recorded EN + HI) says "Empty means the company default: ten a day, valid seven days." The script now says "thirty days". The recorded video no longer matches: **ask the owner before re-recording** (videos on hold, D-434).
 - **C04 Prices, requests and levels:** its row above notes "(7 days)"; check the narration for the validity period when recording resumes.
 - D-438 (Associate Agreement template in the Reference Library) changes no recorded screen.
 
 ### Owner 26 Nov 2026: option B — hiring video first, then A–F checked
 - **H01 Become a NexaCrest Associate** recorded on the 26 Nov app (tutorial stack synced, migrations 26a–26d applied to both tutorial snapshots): 10.73 min, frames and subtitles checked (D-436 clean), **sent 26 Nov 2026** under "Hiring video". English only.
 - Next: check every video A–F (English and Hindi) against the current app, list what differs, ask the owner which to re-record, then re-record and send all under their headings.
+
+## A–F check against the 26 Nov 2026 app (owner option B, 26 Nov 2026)
+
+Method: each video's last recording time (file / subtitle time stamps; the A02-1, C01, C02 and D01–D05 rows above say
+7–8 Nov but those videos were re-recorded 19 Nov, English and Hindi), every script change after it, and every app change
+after it (this file's notes, register D-394…D-438, `git log` of views), checked against the pages each script visits.
+Scripts corrected now so a new take is right: **C02** (part C03: the checklist's last row, the D-417 video call) and
+**B09-2** (commission levels "% of the FOB value of the goods or a fixed amount per unit", plus the ladder; D-410).
+
+| Video | Last take | What differs from today's app | Recommendation / decision |
+|---|---|---|---|
+| A01-1 (EN+HI) | 20 Nov, sent | Associate Home tip line (D-431) | Keep (owner 26 Nov, D-419 list) |
+| A01-2 EN | 25 Nov, not sent | Products › Categories (brand column, sub-categories), Approvals › New products, Settings bar "Brands" (D-431/D-435) | Re-record before sending (not sent yet) |
+| A02-1 (EN+HI) | 19 Nov, sent | Tip line; ₹ commas (D-423) | Keep (owner 26 Nov; D-423) |
+| A02-2 EN | 25 Nov, not sent | Nothing found | Send as recorded |
+| B01-1 (EN+HI) | 20 Nov, sent | Longer Dimensions hint (D-396; not narrated) | Keep (recommended 20 Nov) |
+| B01-2 (EN+HI) | 22 Nov, sent | ₹ commas (D-423) | Keep (D-423) |
+| B02, B03, B06-1, B06-2, B07, B08, B11 (EN+HI) | 19–20 Nov, sent | Nothing found | Keep |
+| B04, B05, B09-1 (EN+HI) | 19–20 Nov, sent | Approvals bar has the new "New products" tab (D-435) | Keep (one extra tab, nothing said is wrong) |
+| B09-2 (EN+HI) | 19 Nov, sent | Commission-levels page: "% of FOB / Fixed USD per unit", ladder; Settings bar "Brands"; price validity field 7 → 30 | Owner to decide (narration "% of the order value" now slightly off) |
+| B10 (EN+HI) | 20 Nov, sent | Settings bar "Brands" (D-431) | Keep |
+| C01 EN | 19 Nov, sent | Tip line (D-431) | Re-record EN (owner 26 Nov, D-419 list) |
+| C02 EN | 19 Nov, sent | KYC checklist has the video-call row (D-417); bank form note (D-418) | Owner to decide (D-418 alone: not re-recorded, owner 25 Nov) |
+| C03 EN | 25 Nov, not sent | Tip line (D-431) | Re-record EN (owner 26 Nov) |
+| C04 EN | 25 Nov, not sent | Tip line (D-431); "valid seven days" → 30 (D-437) | Re-record EN (owner 26 Nov) |
+| C05 EN | 25 Nov, not sent | Nothing found | Send as recorded |
+| C06 EN | 25 Nov, not sent | Tip line (D-431) | Re-record EN (owner 26 Nov) |
+| D01–D05 (EN+HI) | 19 Nov, sent | Nothing found | Keep |
+| E01, E02, E03 (EN+HI) | 22 Nov, sent | Settings bar "Brands"; E01/E02 rupee commas (D-414) | Keep (D-423) |
+| F01 EN | 24 Nov, not sent | Tip line (D-431); My clients without the Registration certificate button (D-428) | Re-record EN (owner 26 Nov) |
+| F02 EN | 25 Nov, not sent | Staff associate page row "Brand: NexaCrest (no brand)" | Send as recorded (owner 26 Nov: brand row keep) |
+| F03 EN | 25 Nov, not sent | Pricing settings validity field 7 → 30 (D-437); product page brand pricing (D-435) | Re-record before sending (not sent yet) |
+| F04 EN | 24 Nov, not sent | Brand row (keep); rupee commas on two report pages (D-414) | Send as recorded (D-423) |
+| Hindi of C01–C06, A01-2, A02-2, F01 | 19–24 Nov | Older rules (D-410, D-411, D-421, D-426, D-428) and the tip line | Not re-recorded (D-419: Hindi only when the owner asks) |

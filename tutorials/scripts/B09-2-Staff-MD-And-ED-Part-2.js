@@ -38,7 +38,7 @@ module.exports = {
 
     // ---------- 2. Rewards ----------
     { card: 'chapter', title: 'Commission and incentives', subtitle: 'Associates · Team.', say: 'Chapter two. Rewarding people.' },
-    { goto: '/pricing/commission-levels', caption: 'Associate commission levels', say: 'Associate commission levels: each level is a percentage of the order value, or a fixed amount. The level is fixed on each order when its proforma invoice is issued, and the commission is earned only when the buyer has paid in full.', do: async (d) => { await d.point('h1', 1200); await d.point(d.page.locator('table').first(), 1800); } },
+    { goto: '/pricing/commission-levels', caption: 'Associate commission levels', say: 'Associate commission levels: each level is a percentage of the FOB value of the goods, or a fixed amount in dollars per unit. Below them, the ladder sets the level for each order an associate brings. The level is fixed on each order when its proforma invoice is issued, and the commission is earned only when the buyer has paid in full.', do: async (d) => { await d.point('h1', 1200); await d.point(d.page.locator('table').first(), 1800); } },
     { goto: '/incentives/settings', caption: 'Team incentive settings', say: 'Team incentives: the program switch, the incentive roles and their usual shares, the caps, and each person\'s incentive role. When an order is finished, you lock its team incentive in Step 12 d, and it is paid in the monthly payout run.', do: async (d) => { await d.point('h1', 1000); for (const t of ['Program', 'Incentive roles', 'Caps']) { const l = legend(d, t); if (await l.count()) await d.point(l, 900); } } },
 
     // ---------- 3. People and rights ----------
