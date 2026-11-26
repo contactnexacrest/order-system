@@ -102,7 +102,7 @@ module.exports = {
         'Once the company has ordered, it stays your client while your agreement runs; with no order within 6 months, the registration ends.',
         'Every order of your client can earn commission while your agreement runs.',
         'You can cancel an unused link at any time.',
-      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. Once the company has placed an order, it stays your client while your agreement runs. If they place no order within six months, the registration ends. And every order of your client can earn commission, for as long as your agreement runs. And you can cancel a link you no longer need.' },
+      ], say: 'A few rules that protect you. The first completed registration of a company counts, so invite early. Once the company has placed an order, it stays your client while your agreement runs. If they place no order within six months, the registration ends. And every order of your client can earn commission: the first order always, and every later order whose goods are worth at least the minimum order value, for as long as your agreement runs. And you can cancel a link you no longer need.' },
       { card: 'list', kicker: 'Recap', title: 'Inviting, step by step', items: [
         'My clients → Company + country → Create buyer registration link → send it.',
         'Or share your personal code / quotation link with any buyer.',

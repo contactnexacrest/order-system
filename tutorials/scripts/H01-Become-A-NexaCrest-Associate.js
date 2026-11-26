@@ -104,8 +104,8 @@ module.exports = {
       'March: your buyer orders. You earn.',
       'June: they order again. You earn again.',
       'September, December: again and again.',
-      'You brought the buyer once. You earn on every order, for as long as your agreement runs.',
-    ], say: 'Your buyer was happy. So in three months, they order again. You earn again. Three months later, again. You earn again. You did the work once, when you brought the buyer. But you earn on every order this client places, for as long as your agreement runs.' },
+      'You brought the buyer once. You earn on every order that meets the minimum order value, for as long as your agreement runs.',
+    ], say: 'Your buyer was happy. So in three months, they order again. You earn again. Three months later, again. You earn again. You did the work once, when you brought the buyer. But you earn on every order this client places that meets the minimum order value in your agreement, for as long as your agreement runs.' },
     { card: 'list', kicker: EXAMPLE, title: 'One client in one year', items: [
       '4 orders × ₹80,000',
       '= ₹3,20,000 from one client',
@@ -113,8 +113,8 @@ module.exports = {
     { card: 'list', kicker: 'Bring more buyers', title: 'Earn more', items: [
       'Bring a second buyer. And a third.',
       'Each of them orders again and again.',
-      'You earn on all of their orders.',
-    ], say: 'Now imagine you bring a second buyer. And a third. Each of them orders again and again. And you earn on all of their orders.' },
+      'You earn on all of their orders that meet the minimum order value.',
+    ], say: 'Now imagine you bring a second buyer. And a third. Each of them orders again and again. And you earn on all of their orders that meet the minimum order value.' },
     { card: 'list', kicker: EXAMPLE, title: 'More orders, a higher rate', items: [
       'Level 1 · 10 %  →  15 %  →  20 %  →  25 %  →  30 %  →  35 %',
       'The more orders you bring, the higher your level.',
@@ -142,8 +142,8 @@ module.exports = {
       'Your agreement says: 10 days (example).',
       '1 March and 5 March, same client → count as one for your level.',
       '20 March → more than 10 days after 1 March → a new order for your level.',
-      'Each order still earns its own commission.',
-    ], say: 'Rule three. Orders from the same client that come close together count as one, for your level. How close is written in your agreement as a number of days. Example: your agreement says ten days. Your client orders on the first of March and again on the fifth of March. That is within ten days, so for your level they count as one. On the twentieth of March the client orders again. That is more than ten days after the first of March, so it counts as a new order. And remember: each order still earns its own commission. This rule is only about your level.' },
+      'Each order still earns its own commission, if it meets rule 1.',
+    ], say: 'Rule three. Orders from the same client that come close together count as one, for your level. How close is written in your agreement as a number of days. Example: your agreement says ten days. Your client orders on the first of March and again on the fifth of March. That is within ten days, so for your level they count as one. On the twentieth of March the client orders again. That is more than ten days after the first of March, so it counts as a new order. And remember: each order still earns its own commission, as long as rule one allows it: it is the client\'s first order, or it is at or above the minimum order value. This rule is only about your level.' },
     { card: 'list', kicker: 'Rule 4', title: 'Your rate for an order is fixed', items: [
       'It is fixed when we send the buyer the Proforma Invoice.',
       'Later changes to your level do not change it.',
@@ -180,14 +180,14 @@ module.exports = {
     { card: 'list', kicker: 'Questions', title: 'Joining and earning', items: [
       'Do I have to pay anything? No. Not to join, not to stay.',
       'Do I need export experience? No. We do the export work. If you have it, that helps.',
-      'Can I earn from the same client again? Yes, on every order, for as long as your agreement runs.',
+      'Can I earn from the same client again? Yes, on every order that meets the minimum order value, for as long as your agreement runs.',
       'Is there a limit to what I can earn? No.',
-    ], say: 'Do I have to pay anything? No. There is nothing to pay. Not to join, and not to stay. Do I need export experience? No. We do the export work. If you do have export experience, that helps. Can I earn from the same client again? Yes. On every order they place, for as long as your agreement runs. Is there a limit to what I can earn? No. The more business you bring, the more you earn.' },
+    ], say: 'Do I have to pay anything? No. There is nothing to pay. Not to join, and not to stay. Do I need export experience? No. We do the export work. If you do have export experience, that helps. Can I earn from the same client again? Yes. On every order they place that meets the minimum order value, for as long as your agreement runs. Is there a limit to what I can earn? No. The more business you bring, the more you earn.' },
     { card: 'list', kicker: 'Questions', title: 'Orders and levels', items: [
       'Does every order earn? The first order of each client always does. After that, orders at or above the minimum order value.',
-      'Two orders from one client in a few days counted as one? That is the number of days in your agreement. Each still earns its own commission.',
+      'Two orders from one client in a few days counted as one? That is the number of days in your agreement. Each still earns its own commission, if it meets the minimum order value.',
       'The buyer cancels? Cancelled before full payment: no commission. Already paid to you: yours.',
-    ], say: 'Does every order earn? The first order of each client always earns. After that, orders at or above the minimum order value in your agreement earn. Two orders from one client in a few days. Why did they count as one for my level? Because orders from the same client within the number of days in your agreement count as one for your level. Each one still earns its own commission. What if the buyer cancels? If the order is cancelled before the buyer has paid everything, there is no commission on it. Commission we have already paid you is yours.' },
+    ], say: 'Does every order earn? The first order of each client always earns. After that, orders at or above the minimum order value in your agreement earn. Two orders from one client in a few days. Why did they count as one for my level? Because orders from the same client within the number of days in your agreement count as one for your level. Each one still earns its own commission, if it meets the minimum order value. What if the buyer cancels? If the order is cancelled before the buyer has paid everything, there is no commission on it. Commission we have already paid you is yours.' },
     { card: 'list', kicker: 'Questions', title: 'Safety', items: [
       'Can I work from another country? Yes. We send your money by bank transfer.',
       'Who can see my bank details? Only our accounts team. Elsewhere, only the last 4 digits.',
@@ -210,9 +210,9 @@ module.exports = {
     ], say: 'When you are approved, you get your own portal. You log in with your password and a code we send to your e-mail. You start with the basic portal, and more opens up as your orders are completed.' },
     { card: 'list', kicker: 'Your story', title: 'Remember', items: [
       'You bring a buyer. We do all the work.',
-      'The buyer pays, and you earn. The buyer orders again, and you earn again.',
+      'The buyer pays, and you earn. The buyer orders again, and you earn again, on every order that meets the minimum order value.',
       'Bring more buyers, and earn more. There is no limit.',
-    ], say: 'So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again. Bring more buyers, and earn more. There is no limit.' },
+    ], say: 'So, remember your story. You bring a buyer. We do all the work. The buyer pays, and you earn. The buyer orders again, and you earn again, on every order that meets the minimum order value. Bring more buyers, and earn more. There is no limit.' },
     { card: 'list', kicker: 'Start your story today', title: 'Contact us', items: [
       'Write to us by e-mail. You will find our e-mail address on our website.',
       EXAMPLE,
