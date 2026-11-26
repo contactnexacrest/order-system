@@ -487,6 +487,10 @@ final class SupplierController
                 $fail('Category: choose the new product\'s category.');
                 return;
             }
+            if (!in_array($categoryId, array_map('intval', array_column(\App\Repositories\ProductCategoryRepository::pickable(\App\Services\AssociateBrands::userBrandId()), 'id')), true)) {
+                $fail('Category: choose one of your brand\'s categories.'); // D-435
+                return;
+            }
             $hs = trim((string) ($_POST['new_hs_code'] ?? ''));
             if ($hs !== '' && !\App\Repositories\HsCodeRepository::isActiveCode($hs)) {
                 $fail("HS code \"{$hs}\" is not on the HS Code Master List — pick one from the list, or leave it empty.");

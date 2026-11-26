@@ -30,6 +30,7 @@ final class ApprovalsInbox
         'documents' => 'Documents',
         'emails' => 'E-mails',
         'bank' => 'Bank details',
+        'products' => 'New products', // D-435
         'other' => 'Other',
     ];
 
@@ -38,6 +39,7 @@ final class ApprovalsInbox
         'manage_pricing', 'approve_payment_terms', 'approve_email_send', 'approve_documents', 'edit_locked_data', 'approve_purchases',
         'approve_short_payment', 'manage_associate_bank', 'manage_associates', 'manage_field_protection',
         'approve_buyer_details_change', // D-337
+        'approve_new_products', // D-435
     ];
 
     /** Payment legs: where on the order page each one is cleared. */
@@ -81,6 +83,9 @@ final class ApprovalsInbox
         }
         $items = array_merge($items, self::bank($userId, $can));
         $items = array_merge($items, self::other($userId, $roleId, $can));
+        if ($can('approve_new_products')) {
+            $items = array_merge($items, self::newProducts($userId));
+        }
         usort($items, static fn (array $a, array $b): int => [(string) $a['since'], $a['key']] <=> [(string) $b['since'], $b['key']]);
         return self::$cache[$cacheKey] = $items;
     }
@@ -542,6 +547,22 @@ final class ApprovalsInbox
                 $out[] = self::row('reorder:' . $r['id'], 'Reorder request', (string) $r['submitted_at'], null, (string) $r['order_reference'], 'from the buyer',
                     self::short((string) ($r['notes'] ?? '')), '/reorder-requests/' . (int) $r['id'], 'Review reorder', '');
             }
+        }
+        return $out;
+    }
+
+    /** D-435: products added by a brand manager, waiting for approval — not the approver's own. */
+    private static function newProducts(int $userId): array
+    {
+        $out = [];
+        foreach (ProductApproval::pending() as $p) {
+            if ((int) ($p['submitted_by'] ?? 0) === $userId || (int) ($p['created_by'] ?? 0) === $userId) {
+                continue;
+            }
+            $row = self::row('product:' . $p['id'], 'New product', (string) $p['updated_at'], null, '', (string) ($p['submitted_by_name'] ?? ''),
+                self::short($p['name'] . ($p['category'] !== '' ? ' — ' . $p['category'] : '')), '/products/' . (int) $p['id'] . '#approval', 'Review product', '');
+            $row['tab'] = 'products';
+            $out[] = $row;
         }
         return $out;
     }

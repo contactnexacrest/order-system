@@ -51,16 +51,16 @@
   {# D-361 (13 Nov 2026, mockup p6): the category's own %s — empty = follow the global value (Global pricing settings). #}
   <h2>Margin, other costs and buffer</h2>
   <div class="field-grid">
-    <label>Margin %{{ rg('margin_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="{{ v.marginPct }}" placeholder="empty = {{ v.g.margin }} (global)"{{ ro }}></label>
-    <label>Other costs %{{ rg('other_cost_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="other_cost_pct" data-max-decimals="2" data-max-value="100" value="{{ v.otherCostPct }}" placeholder="empty = {{ v.g.other }} (global)"{{ ro }}></label>
-    <label>Buffer %{{ rg('buffer_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="buffer_pct" data-max-decimals="2" data-max-value="100" value="{{ v.bufferPct }}" placeholder="empty = {{ v.g.buffer }} (global)"{{ ro }}></label>
+    <label>Margin %{{ rg('margin_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="{{ v.marginPct }}" placeholder="{{ v.ph.margin_pct }}"{{ ro }}></label>
+    <label>Other costs %{{ rg('other_cost_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="other_cost_pct" data-max-decimals="2" data-max-value="100" value="{{ v.otherCostPct }}" placeholder="{{ v.ph.other_cost_pct }}"{{ ro }}></label>
+    <label>Buffer %{{ rg('buffer_pct', canManagePricing) }}<input type="text" inputmode="decimal" name="buffer_pct" data-max-decimals="2" data-max-value="100" value="{{ v.bufferPct }}" placeholder="{{ v.ph.buffer_pct }}"{{ ro }}></label>
   </div>
 
   <h2>Container and weight</h2>
   <div class="field-grid">
-    <label>One container holds (CBM){{ rg('container_cbm', canManagePricing) }}<input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="{{ v.containerCbm }}" placeholder="empty = {{ v.g.cbm }} (global)"{{ ro }}></label>
-    <label>Maximum (tonnes){{ rg('container_max_t', canManagePricing) }}<input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="{{ v.containerMaxT }}" placeholder="empty = {{ v.g.maxT }} (global)"{{ ro }}></label>
-    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small>{{ rg('weight_t_per_cbm', canManagePricing) }}<input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="{{ v.weight }}" placeholder="empty = {{ v.g.weight }} (global)"{{ ro }}></label>
+    <label>One container holds (CBM){{ rg('container_cbm', canManagePricing) }}<input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="{{ v.containerCbm }}" placeholder="{{ v.ph.container_cbm }}"{{ ro }}></label>
+    <label>Maximum (tonnes){{ rg('container_max_t', canManagePricing) }}<input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="{{ v.containerMaxT }}" placeholder="{{ v.ph.container_max_t }}"{{ ro }}></label>
+    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small>{{ rg('weight_t_per_cbm', canManagePricing) }}<input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="{{ v.weight }}" placeholder="{{ v.ph.weight_t_per_cbm }}"{{ ro }}></label>
   </div>
   <p class="small muted">A value typed here applies to every product in the category that has not changed it for itself; empty = the global value (Global pricing settings). "reset to global" empties the value — then Save. The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
   {% if canManagePricing %}

@@ -84,8 +84,21 @@ async function allowedForms(acc, product) {
   return forms.filter((f) => allowed.includes(f));
 }
 
+/**
+ * D-435 (owner 26 Nov 2026): an associate sees approved products of their brand's categories and of the company-wide
+ * ones (and products with no category); an associate with no brand sees all. A product waiting for approval, or not
+ * approved, is never shown.
+ */
+async function inAssociateBrand(associate, product) {
+  if ((product.approval_status || 'approved') !== 'approved') return false;
+  if (!product.category_id || !associate.brand_id) return true; // no category = company-wide; an associate with no brand sees every brand (D-435 point 7)
+  const c = await require('../repositories/productCategoryRepository').find(product.category_id);
+  const brand = c && c.brand_id ? Number(c.brand_id) : null;
+  return brand === null || brand === (associate.brand_id ? Number(associate.brand_id) : 0);
+}
+
 async function mayPrice(associate, product) {
-  if (Number(product.is_active ?? 0) !== 1) return false;
+  if (Number(product.is_active ?? 0) !== 1 || !(await inAssociateBrand(associate, product))) return false;
   const forms = await allowedForms(await access(Number(associate.id)), product);
   return forms === null || forms.length > 0;
 }
@@ -96,7 +109,7 @@ async function catalogue(associate) {
   if (!Object.keys(acc).length) return [];
   const out = [];
   for (const p of await productRepository.all(false)) {
-    if (Number(p.is_active ?? 0) !== 1) continue;
+    if (Number(p.is_active ?? 0) !== 1 || !(await inAssociateBrand(associate, p))) continue; // D-435
     const forms = await allowedForms(acc, p);
     if (forms !== null && !forms.length) continue;
     let finishes = [];
@@ -400,6 +413,6 @@ async function markOrdered(id, orderId) {
 }
 
 module.exports = {
-  WARN_REQUESTS, dailyLimit, validDays, access, saveAccess, allowedForms, mayPrice, catalogue, requestsToday, leftToday, work,
+  WARN_REQUESTS, dailyLimit, validDays, access, saveAccess, allowedForms, inAssociateBrand, mayPrice, catalogue, requestsToday, leftToday, work,
   create, pendingCount, find, findByNumber, displayStatus, forAssociate, queue, report, priceManual, usableForOrder, markOrdered,
 };

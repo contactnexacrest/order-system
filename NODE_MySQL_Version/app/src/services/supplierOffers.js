@@ -656,8 +656,9 @@ async function addProductChoices(supplierId, s = null) {
   products.sort((a, b) => (a.no_supplier === b.no_supplier ? 0 : (a.no_supplier ? -1 : 1))
     || (a.name.toLowerCase() < b.name.toLowerCase() ? -1 : (a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0)));
   const categories = [];
-  for (const c of await require('../repositories/productCategoryRepository').all(true)) {
-    categories.push({ id: Number(c.id), name: String(c.name), shape: await priceShape({ id: 0, category_id: Number(c.id) }, s, true) });
+  const pcr = require('../repositories/productCategoryRepository');
+  for (const c of await pcr.pickable(require('./associateBrands').userBrandId())) { // D-435
+    categories.push({ id: Number(c.id), name: pcr.displayName(c), shape: await priceShape({ id: 0, category_id: Number(c.id) }, s, true) });
   }
   return { products, categories };
 }
@@ -674,6 +675,7 @@ async function createProduct(name, categoryId, hsCode, unit, userId) {
   // Not configured: configured_at stays empty until Configure (D-361).
   await require('../repositories/specRepository').setProductFields(id, categoryId, null, null, null);
   await auditLogRepository.log(userId, 'PRODUCT_CREATED', 'products', id, null, null, `${name} (from a supplier, Inactive, not configured)`);
+  await require('./productApproval').afterCreate(id, userId, ((require('../helpers/requestContext').get() || {}).divisionUser) || null); // D-435
   return id;
 }
 
@@ -747,7 +749,8 @@ const NO_SUPPLIER_YET_SQL = '(p.legacy_no_supplier = 1 AND NOT EXISTS (SELECT 1 
 
 /** SQL: product (alias p) may be active and quoted (plan rule 4 with the decision-1 exception). */
 function quotableSql() {
-  return `(${NO_SUPPLIER_YET_SQL} OR (${CONFIGURED_SQL} AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ${USABLE_SQL})))`;
+  // D-435: a product waiting for approval (or not approved) is never quotable.
+  return `(${require('./productApproval').APPROVED_SQL} AND (${NO_SUPPLIER_YET_SQL} OR (${CONFIGURED_SQL} AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ${USABLE_SQL}))))`;
 }
 
 /** Whether the product's base price is configured (fixed). */

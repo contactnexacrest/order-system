@@ -58,6 +58,7 @@ if ($current) {
         'approvals_prices' => (int) ($__tabCounts['prices'] ?? 0),
         'approvals_payment_terms' => (int) ($__tabCounts['payment_terms'] ?? 0),
         'approvals_bank' => (int) ($__tabCounts['bank'] ?? 0),
+        'approvals_products' => (int) ($__tabCounts['products'] ?? 0), // D-435
         'approvals_other' => (int) ($__tabCounts['other'] ?? 0),
         'myReviews' => \App\Repositories\DocumentReviewRepository::pendingCountForReviewer($__uid),
         // The bar's "E-mails" counts what this person may approve — the same rule as the Approvals page's chip and the left-menu badge

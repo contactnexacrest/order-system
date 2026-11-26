@@ -30,6 +30,7 @@
         { "label": "Documents", "href": "/reviews", "count": "myReviews" },
         { "label": "E-mails", "href": "/email-approvals", "when": { "any": ["approve_email_send"] }, "count": "approvals_emails" },
         { "label": "Bank details", "href": "/approvals?tab=bank", "when": { "flags": ["approver"] }, "count": "approvals_bank" },
+        { "label": "New products", "href": "/approvals?tab=products", "when": { "any": ["approve_new_products"], "flags": ["approver"] }, "count": "approvals_products" },
         { "label": "Other", "href": "/approvals?tab=other", "when": { "flags": ["approver"] }, "count": "approvals_other" }
       ]
     },

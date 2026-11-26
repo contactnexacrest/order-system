@@ -7,7 +7,9 @@
 {% set returnTo = '/products/categories/' + c.id + '?tab=general' %}
 <div class="card page-wide">
   <p class="muted small"><a href="/products/categories">&larr; Categories</a></p>
-  <h1>Category: {{ c.name }}{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</h1>
+  <h1>{{ 'Sub-category' if main else 'Category' }}: {{ c.name }}{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</h1>
+  {# D-435: where the category sits — brand › main category › sub-category. #}
+  <p class="muted small">Brand: <strong>{{ brandName if brandName else 'Company-wide' }}</strong>{% if main %} · Main category: <a href="/products/categories/{{ main.id }}">{{ main.name }}</a> — an empty setting here uses {{ main.name }}'s value.{% endif %}</p>
   <nav class="tab-pills" aria-label="Category sections">
     {% for t in tabs %}
       <a class="btn-sm{{ ' btn-accent' if tab == t[0] else ' btn-secondary' }}" href="/products/categories/{{ c.id }}?tab={{ t[0] }}"{% if tab == t[0] %} aria-current="page"{% endif %}>{{ t[1] }}</a>
@@ -27,17 +29,43 @@
         <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ c.name }}" placeholder="e.g. Granite slabs"{{ ro }}></label>
         {% set hints = ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'] %}
         {% for i in range(0, maxAttributes) %}
-        <label{% if i == 0 %} class="cat-attr-first"{% endif %}>Attribute {{ i + 1 }}{% if i == 0 %} *{% endif %}<input type="text" name="attributes[]" maxlength="60" {% if i == 0 %}required{% endif %} value="{{ c.attributes[i] or '' }}" placeholder="{{ hints[i] or 'e.g. Finish' }}"{{ ro }}></label>
+        {% set req = i == 0 and not main %}
+        <label{% if i == 0 %} class="cat-attr-first"{% endif %}>Attribute {{ i + 1 }}{% if req %} *{% endif %}<input type="text" name="attributes[]" maxlength="60" {% if req %}required{% endif %} value="{{ c.attributes[i] or '' }}" placeholder="{{ main.attributePlaceholders[i] if main else (hints[i] or 'e.g. Finish') }}"{{ ro }}></label>
         {% endfor %}
         </div>
+        {% if canSetBrand %}
+        <label>Brand <small class="muted">(its sub-categories and products follow; empty = company-wide)</small><select name="brand_id">
+          <option value="">Company-wide (no brand)</option>
+          {% for b in brands %}<option value="{{ b.id }}"{% if c.brand_id == b.id %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
+        </select></label>
+        {% endif %}
         <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" {% if c.is_active == 1 %}checked{% endif %}{{ ro }}> Active (offered on new order lines)</label>
         {% if canManageCatalog %}<div class="btn-row"><button type="submit" class="btn-sm btn-success">Save {{ c.name }}</button></div>{% endif %}
       </form>
     {% else %}
       <p class="muted">Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
+      {% if canSetBrand %}
+      <form method="post" action="/products/categories/{{ c.id }}" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ returnTo }}">
+        <input type="hidden" name="brand_only" value="1">
+        <label>Brand <small class="muted">(its sub-categories and products follow; empty = company-wide)</small><select name="brand_id">
+          <option value="">Company-wide (no brand)</option>
+          {% for b in brands %}<option value="{{ b.id }}"{% if c.brand_id == b.id %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
+        </select></label>
+        <button type="submit" class="btn-sm btn-success">Save brand</button>
+      </form>
+      {% endif %}
     {% endif %}
 
+    {% if subCategories.length %}
+      <h2>Sub-categories</h2>
+      <p class="muted small">{% for s in subCategories %}{{ ' · ' if not loop.first }}<a href="/products/categories/{{ s.id }}">{{ s.name }}</a>{% endfor %} — each uses this category's settings where it has none of its own.</p>
+    {% endif %}
     <h2>Settings</h2>
+    {% if main %}
+      <p class="muted small">Empty here = {{ main.name }}'s value. Now in use: unit {{ effective.default_unit or 'any' }}, HS code {{ effective.default_hs_code or '—' }}, packing {{ effective.packing_type or '—' }}, T&amp;C clauses {{ tcClauseSets[effective.tc_clause_set] if (effective.tc_clause_set and tcClauseSets[effective.tc_clause_set]) else '—' }}.</p>
+    {% endif %}
     <p class="muted small">What an order line of the category starts with: its unit (and the only units it may use), its HS code for goods, its packing type, the quality documents its orders must collect, and the T&amp;C clause set.</p>
     <form method="post" action="/products/categories/{{ c.id }}/settings">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -76,6 +104,7 @@
     <datalist id="category_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description or '' }}</option>{% endfor %}</datalist>
 
   {% elif tab == 'options' %}
+    {% if inheritedSpecs and inheritedSpecs.length %}<p class="muted small" data-inherited-specs>Also from {{ main.name if main else 'the main category' }} (change them there): {{ inheritedSpecs | join(', ') }}.</p>{% endif %}
     {% include "pricing/_spec_table.njk" %}
 
   {% elif tab == 'rules' %}

@@ -118,4 +118,35 @@ for ($i = 0; $i < 2; $i++) {
     </form>
     <?php endif; ?>
   </div>
+
+  <?php // D-435 (owner 26 Nov 2026): the brand's price settings — between its categories and the company settings. ?>
+  <div class="section" id="pricing">
+    <h2>Pricing</h2>
+    <p class="muted small">Margin, other costs and buffer for this brand's products. A product's own value comes first, then its sub-category, its main category, then this brand; empty here = the company setting (Admin › Pricing). Changes apply to prices worked out from now on; quotes already sent keep their prices.</p>
+    <?php if ($canPricing): ?>
+    <form method="post" action="/admin/brands/<?= (int) $b['id'] ?>/pricing" data-brand-pricing>
+      <?= Csrf::field() ?>
+      <p class="actions">
+        <button type="submit" name="action" value="copy_all" class="btn-secondary">Copy all company settings</button>
+        <button type="submit" name="action" value="clear_all" class="btn-secondary">Clear all (follow company)</button>
+      </p>
+    <?php endif; ?>
+      <table class="list" data-brand-pricing-table>
+        <tr><th>Setting</th><th>This brand</th><th>Source</th><th>Company setting today</th></tr>
+        <?php foreach (\App\Repositories\AssociateBrandRepository::PRICING as $key => [$label, $max]):
+            $own = $rules['pricing_' . $key] ?? null; $own = $own !== null && $own !== '' ? $own : null; ?>
+        <tr data-pricing="<?= $key ?>">
+          <td><?= View::e($label) ?></td>
+          <td><?php if ($canPricing): ?><input type="number" name="<?= $key ?>" min="0" max="<?= $max ?>" step="0.01" value="<?= View::e((string) ($own ?? '')) ?>" placeholder="empty = company" aria-label="<?= View::e($label) ?>"><?php else: ?><?= $own !== null ? View::e($own) . ' %' : '<span class="muted">empty</span>' ?><?php endif; ?></td>
+          <td><?= $own !== null ? '<span class="badge badge-notyet">Own value</span>' : '<span class="badge badge-active">Company</span>' ?></td>
+          <td class="muted"><?= View::e(number_format((float) ($companyPricing[$key] ?? 0), 2)) ?> %</td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    <?php if ($canPricing): ?>
+      <label>Reason for the change * <small class="muted">(kept in the Audit Log)</small><textarea name="reason" required minlength="10" maxlength="300" rows="2" placeholder="e.g. textile margins are lower than stone"></textarea></label>
+      <button type="submit" name="action" value="save">Save pricing</button>
+    </form>
+    <?php endif; ?>
+  </div>
 </div>

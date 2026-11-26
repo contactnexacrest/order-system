@@ -58,6 +58,9 @@ final class BrandController
             'levels' => PricingRepository::levels(),
             'canEdit' => self::can('manage_divisions') && AssociateBrands::userBrandId() === null, // D-432: a brand manager never edits brand details
             'canRules' => AssociateRules::canManage(self::user()),
+            // D-435: the brand's pricing — "Manage pricing" by staff who look after all brands; a brand manager reads it.
+            'canPricing' => self::can('manage_pricing') && AssociateBrands::userBrandId() === null,
+            'companyPricing' => PricingService::settings(),
         ], 'layout/base');
     }
 
@@ -198,6 +201,64 @@ final class BrandController
             default => 'Brand rules saved. They apply to new orders; an order keeps the rules it had at its Proforma Invoice.',
         });
         header("Location: /admin/brands/{$id}#rules");
+    }
+
+    /** D-435: POST /admin/brands/{id}/pricing — margin, other costs and buffer for the brand (empty = company), with a reason. */
+    public function savePricing(array $params): void
+    {
+        $brand = AssociateBrandRepository::find((int) $params['id']);
+        if ($brand === null || AssociateBrands::userBrandId() !== null) {
+            Flash::set('error', $brand === null ? 'That brand no longer exists.' : 'Only staff who look after all brands change brand pricing.');
+            header('Location: /admin/brands' . ($brand !== null ? '/' . (int) $brand['id'] . '#pricing' : ''));
+            return;
+        }
+        $id = (int) $brand['id'];
+        $back = "Location: /admin/brands/{$id}#pricing";
+        $action = (string) ($_POST['action'] ?? 'save');
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
+            Flash::set('error', 'Give the reason for the change (10 to 300 characters) — it is kept in the Audit Log.');
+            header($back);
+            return;
+        }
+        $company = PricingService::settings();
+        $values = [];
+        $errors = [];
+        foreach (AssociateBrandRepository::PRICING as $k => [$label, $max]) {
+            if ($action === 'copy_all') {
+                $values['pricing_' . $k] = rtrim(rtrim(number_format((float) ($company[$k] ?? 0), 2, '.', ''), '0'), '.');
+            } elseif ($action === 'clear_all') {
+                $values['pricing_' . $k] = null;
+            } else {
+                $raw = trim((string) ($_POST[$k] ?? ''));
+                if ($raw !== '' && (!is_numeric($raw) || (float) $raw < 0 || (float) $raw > $max || preg_match('/\.\d{3,}$/', $raw))) {
+                    $errors[] = "{$label} must be a number from 0 to {$max} with at most 2 decimals.";
+                }
+                $values['pricing_' . $k] = $raw === '' ? null : $raw;
+            }
+        }
+        if ($errors !== []) {
+            Flash::set('error', implode(' ', $errors));
+            header($back);
+            return;
+        }
+        $userId = (int) self::user()['id'];
+        $before = AssociateBrandRepository::settings($id);
+        AssociateBrandRepository::saveSettings($id, $values, $userId);
+        $after = AssociateBrandRepository::settings($id);
+        foreach (array_keys($values) as $k) {
+            $b = $before[$k] ?? '';
+            $a = $after[$k] ?? '';
+            if ($b !== $a) {
+                AuditLogRepository::log($userId, 'BRAND_PRICING_CHANGED', 'associate_brands', $id, $k, $b === '' ? '(company setting)' : $b, $a === '' ? '(company setting)' : $a, $reason);
+            }
+        }
+        Flash::set('success', match ($action) {
+            'copy_all' => 'Company pricing copied to this brand. Change only what this brand needs.',
+            'clear_all' => 'This brand\'s pricing now follows the company settings.',
+            default => 'Brand pricing saved. It applies to prices worked out from now on.',
+        });
+        header($back);
     }
 
     /**

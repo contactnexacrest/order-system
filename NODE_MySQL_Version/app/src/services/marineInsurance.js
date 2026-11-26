@@ -85,7 +85,7 @@ function premium(fob, freight, ratePct, s) {
 
 /** @returns {Promise<Array<object>>} */
 async function categories() {
-  return db.query('SELECT id, name, is_system, insurance_rate_pct, insurance_cover_wording FROM product_categories ORDER BY id');
+  return db.query('SELECT id, name, is_system, parent_id, insurance_rate_pct, insurance_cover_wording FROM product_categories ORDER BY id');
 }
 
 /**
@@ -97,10 +97,11 @@ async function rateFor(categoryIds, s = null) {
   s = s ?? (await settings());
   let best = { rate_pct: s.rate_pct, wording: s.cover_wording, category: null };
   let found = false;
-  for (const c of await categories()) {
+  for (let c of await categories()) {
     const id = Number(c.id);
     const wanted = categoryIds.includes(id) || (Number(c.is_system) === 1 && categoryIds.includes(null));
     if (!wanted) continue;
+    if (c.parent_id) c = (await require('../repositories/productCategoryRepository').find(id)) || c; // D-435: a sub-category follows its main category
     const rate = c.insurance_rate_pct !== null && c.insurance_rate_pct !== '' ? parseFloat(c.insurance_rate_pct) : s.rate_pct;
     const w = String(c.insurance_cover_wording ?? '').trim();
     const wording = w !== '' ? w : s.cover_wording;

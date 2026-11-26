@@ -3254,3 +3254,15 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_associate_rules'
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- D-435 (26 Nov 2026): permission "Approve new products" (MD, ED) and the approval setting (on by default).
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'approve_new_products', 'Approve new products', 'Approve or reject a product a brand manager added, before it can be quoted, ordered or seen by associates (reason kept)', 'catalog'
+WHERE NOT EXISTS (SELECT 1 FROM permissions x WHERE x.permission_key = 'approve_new_products');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_new_products'
+ WHERE r.name IN ('Managing Director', 'Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
+SELECT 'brand_products_need_approval', '1', 'boolean', 'products', 'On = a product added by a brand manager waits in Approvals › New products until someone with "Approve new products" approves it; it cannot be quoted, ordered or seen by associates before that. Off = live at once (Audit Log only).', 0
+ WHERE NOT EXISTS (SELECT 1 FROM company_settings WHERE setting_key = 'brand_products_need_approval');

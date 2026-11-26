@@ -21,6 +21,12 @@ $__k = $__r['k'];
 $__fmt = static fn (?float $v): string => $v === null ? '' : ThicknessPrices::fmt($v);
 // D-361: the global values (shown in empty fields) and a "reset to global" per value.
 $__g = $__r['global'];
+// D-435: an empty value follows the main category, then the brand, then global — the placeholder says which.
+$__ph = static function (string $k, ?int $dec) use ($__r, $__g): string {
+    $i = $__r['inherited'][$k] ?? ['value' => isset($__g[$k]) ? (float) $__g[$k] : null, 'from' => 'global'];
+    $v = $i['value'] === null ? '—' : ($dec === null ? ThicknessPrices::fmt((float) $i['value']) : number_format((float) $i['value'], $dec));
+    return View::e('empty = ' . $v . ' (' . $i['from'] . ')');
+};
 $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="button" class="btn-link small" data-clear-field="' . $n . '">reset to global</button>' : '';
 ?>
 <?php // D-362 (13 Nov 2026, owner request): named "Category price rules" — per category, not global. ?>
@@ -65,16 +71,16 @@ $__rg = static fn (string $n): string => $canManagePricing ? ' <button type="but
   <?php // D-361 (13 Nov 2026, mockup p6): the category's own %s — empty = follow the global value (Global pricing settings). ?>
   <h2>Margin, other costs and buffer</h2>
   <div class="field-grid">
-    <label>Margin %<?= $__rg('margin_pct') ?><input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="<?= View::e((string) ($__old['margin_pct'] ?? $__fmt($__r['margin_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['margin_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
-    <label>Other costs %<?= $__rg('other_cost_pct') ?><input type="text" inputmode="decimal" name="other_cost_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['other_cost_pct'] ?? $__fmt($__r['other_cost_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['other_cost_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
-    <label>Buffer %<?= $__rg('buffer_pct') ?><input type="text" inputmode="decimal" name="buffer_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['buffer_pct'] ?? $__fmt($__r['buffer_pct']))) ?>" placeholder="empty = <?= View::e(number_format((float) $__g['buffer_pct'], 2)) ?> (global)"<?= $__ro ?>></label>
+    <label>Margin %<?= $__rg('margin_pct') ?><input type="text" inputmode="decimal" name="margin_pct" data-max-decimals="2" data-max-value="89.99" value="<?= View::e((string) ($__old['margin_pct'] ?? $__fmt($__r['margin_pct']))) ?>" placeholder="<?= $__ph('margin_pct', 2) ?>"<?= $__ro ?>></label>
+    <label>Other costs %<?= $__rg('other_cost_pct') ?><input type="text" inputmode="decimal" name="other_cost_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['other_cost_pct'] ?? $__fmt($__r['other_cost_pct']))) ?>" placeholder="<?= $__ph('other_cost_pct', 2) ?>"<?= $__ro ?>></label>
+    <label>Buffer %<?= $__rg('buffer_pct') ?><input type="text" inputmode="decimal" name="buffer_pct" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['buffer_pct'] ?? $__fmt($__r['buffer_pct']))) ?>" placeholder="<?= $__ph('buffer_pct', 2) ?>"<?= $__ro ?>></label>
   </div>
 
   <h2>Container and weight</h2>
   <div class="field-grid">
-    <label>One container holds (CBM)<?= $__rg('container_cbm') ?><input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_cbm'] ?? $__fmt($__r['container_cbm']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['container_cbm'])) ?> (global)"<?= $__ro ?>></label>
-    <label>Maximum (tonnes)<?= $__rg('container_max_t') ?><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_max_t'] ?? $__fmt($__r['container_max_t']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['container_max_t'])) ?> (global)"<?= $__ro ?>></label>
-    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><?= $__rg('weight_t_per_cbm') ?><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="<?= View::e((string) ($__old['weight_t_per_cbm'] ?? $__fmt($__r['weight']))) ?>" placeholder="empty = <?= View::e(ThicknessPrices::fmt((float) $__g['weight_t_per_cbm'])) ?> (global)"<?= $__ro ?>></label>
+    <label>One container holds (CBM)<?= $__rg('container_cbm') ?><input type="text" inputmode="decimal" name="container_cbm" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_cbm'] ?? $__fmt($__r['container_cbm']))) ?>" placeholder="<?= $__ph('container_cbm', null) ?>"<?= $__ro ?>></label>
+    <label>Maximum (tonnes)<?= $__rg('container_max_t') ?><input type="text" inputmode="decimal" name="container_max_t" data-max-decimals="2" data-max-value="100" value="<?= View::e((string) ($__old['container_max_t'] ?? $__fmt($__r['container_max_t']))) ?>" placeholder="<?= $__ph('container_max_t', null) ?>"<?= $__ro ?>></label>
+    <label>Stone weight (tonnes per CBM) <small class="muted">(used for Ton prices and the weight limit)</small><?= $__rg('weight_t_per_cbm') ?><input type="text" inputmode="decimal" name="weight_t_per_cbm" data-max-decimals="3" data-max-value="20" value="<?= View::e((string) ($__old['weight_t_per_cbm'] ?? $__fmt($__r['weight']))) ?>" placeholder="<?= $__ph('weight_t_per_cbm', null) ?>"<?= $__ro ?>></label>
   </div>
   <p class="small muted">A value typed here applies to every product in the category that has not changed it for itself; empty = the global value (Global pricing settings). "reset to global" empties the value — then Save. The example column updates as you type. Changes apply to prices worked out from now on; quotes already sent keep their prices. A product can have its own values — shown on that product with a yellow "own rule" badge.</p>
   <?php if ($canManagePricing): ?>

@@ -21,14 +21,30 @@ final class SpecRepository
         return $id === false ? null : (int) $id;
     }
 
-    /** @return list<array<string,mixed>> a category's specifications (not the product-only ones), in order */
-    public static function categorySpecs(int $categoryId, bool $activeOnly = false): array
+    /**
+     * @return list<array<string,mixed>> a category's specifications (not the product-only ones), in order.
+     * D-435: a sub-category has its main category's specifications plus its own ($ownOnly: just its own, for its settings page).
+     */
+    public static function categorySpecs(int $categoryId, bool $activeOnly = false, bool $ownOnly = false): array
     {
-        $stmt = Database::connection()->prepare(
-            'SELECT * FROM spec_definitions WHERE category_id = :c AND product_id IS NULL' . ($activeOnly ? ' AND is_active = 1' : '') . ' ORDER BY sort_order, id'
-        );
-        $stmt->execute(['c' => $categoryId]);
-        return $stmt->fetchAll();
+        $ids = [$categoryId];
+        if (!$ownOnly) {
+            $p = Database::connection()->prepare('SELECT parent_id FROM product_categories WHERE id = :c');
+            $p->execute(['c' => $categoryId]);
+            $parent = (int) ($p->fetchColumn() ?: 0);
+            if ($parent > 0) {
+                array_unshift($ids, $parent);
+            }
+        }
+        $rows = [];
+        foreach ($ids as $cid) {
+            $stmt = Database::connection()->prepare(
+                'SELECT * FROM spec_definitions WHERE category_id = :c AND product_id IS NULL' . ($activeOnly ? ' AND is_active = 1' : '') . ' ORDER BY sort_order, id'
+            );
+            $stmt->execute(['c' => $cid]);
+            $rows = array_merge($rows, $stmt->fetchAll());
+        }
+        return $rows;
     }
 
     /** @return list<array<string,mixed>> */

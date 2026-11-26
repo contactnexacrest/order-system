@@ -91,11 +91,29 @@ final class PriceRequestService
 
     public static function mayPrice(array $associate, array $product): bool
     {
-        if ((int) ($product['is_active'] ?? 0) !== 1) {
+        if ((int) ($product['is_active'] ?? 0) !== 1 || !self::inAssociateBrand($associate, $product)) {
             return false;
         }
         $forms = self::allowedForms(self::access((int) $associate['id']), $product);
         return $forms === null || $forms !== [];
+    }
+
+    /**
+     * D-435 (owner 26 Nov 2026): an associate sees approved products of their brand's categories and of the company-wide
+     * ones (and products with no category); an associate with no brand sees all. A product waiting for approval, or
+     * not approved, is never shown.
+     */
+    public static function inAssociateBrand(array $associate, array $product): bool
+    {
+        if (($product['approval_status'] ?? 'approved') !== 'approved') {
+            return false;
+        }
+        if (empty($product['category_id']) || empty($associate['brand_id'])) {
+            return true; // no category = company-wide; an associate with no brand sees every brand (D-435 point 7)
+        }
+        $c = \App\Repositories\ProductCategoryRepository::find((int) $product['category_id']);
+        $brand = !empty($c['brand_id']) ? (int) $c['brand_id'] : null;
+        return $brand === null || $brand === (!empty($associate['brand_id']) ? (int) $associate['brand_id'] : 0);
     }
 
     /**
@@ -112,7 +130,7 @@ final class PriceRequestService
         }
         $out = [];
         foreach (ProductRepository::all() as $p) {
-            if ((int) ($p['is_active'] ?? 0) !== 1) {
+            if ((int) ($p['is_active'] ?? 0) !== 1 || !self::inAssociateBrand($associate, $p)) { // D-435
                 continue;
             }
             $forms = self::allowedForms($access, $p);

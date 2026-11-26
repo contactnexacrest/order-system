@@ -5,6 +5,29 @@
   <p class="muted">HS Code: <strong><?= View::e($product['hs_code']) ?></strong> &nbsp;·&nbsp; Origin: <?= View::e($product['origin'] ?? '—') ?></p>
 
   <?php // Owner decision D-358 (13 Nov 2026): a copy made by Duplicate says where it came from while it is still inactive. ?>
+  <?php // D-435: a product added by a brand manager waits for approval before it can be quoted or seen by associates. ?>
+  <?php $__ap = (string) ($product['approval_status'] ?? 'approved'); if ($__ap !== 'approved'): ?>
+    <div class="alert<?= $__ap === 'rejected' ? ' alert-error' : '' ?>" id="approval" data-approval="<?= View::e($__ap) ?>">
+      <strong><?= $__ap === 'pending' ? 'Waiting for approval' : 'Not approved' ?></strong> —
+      <?= $__ap === 'pending' ? 'it cannot be quoted, ordered or seen by associates until someone with "Approve new products" approves it (Approvals › New products).'
+          : 'reason: ' . View::e((string) ($product['approval_reason'] ?? '')) . '. Change what is asked, then send it again.' ?>
+      <?php if ($approvalRefusal === ''): ?>
+      <form method="post" action="/products/<?= (int) $product['id'] ?>/approval" class="field-grid">
+        <?= \App\Helpers\Csrf::field() ?>
+        <label>Note or reason <small class="muted">(needed to refuse; the brand manager sees it)</small><textarea name="reason" rows="2" maxlength="300" placeholder="e.g. HS code should be 680293 — please correct"></textarea></label>
+        <div class="btn-row">
+          <button type="submit" name="decision" value="approve" class="btn-sm btn-success">Approve product</button>
+          <button type="submit" name="decision" value="reject" class="btn-sm btn-danger">Do not approve</button>
+        </div>
+      </form>
+      <?php elseif ($__ap === 'rejected' && $canManage): ?>
+      <form method="post" action="/products/<?= (int) $product['id'] ?>/resubmit" class="inline-form">
+        <?= \App\Helpers\Csrf::field() ?>
+        <button type="submit" class="btn-sm">Send for approval again</button>
+      </form>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
   <?php if (!empty($copiedFrom)): ?>
     <div class="alert" data-copied-from style="background:var(--navy-soft);color:var(--ink);border-left:4px solid var(--navy)">Copied from <?php if ($copiedFrom['source_exists']): ?><a href="/products/<?= (int) $copiedFrom['source_id'] ?>"><?= View::e((string) $copiedFrom['source_name']) ?></a><?php else: ?>product #<?= (int) $copiedFrom['source_id'] ?> (since deleted)<?php endif; ?> on <?= View::e($copiedFrom['copied_at']) ?> by <?= View::e($copiedFrom['by']) ?>. Check the details, update the supplier price, then switch it to <strong>Active</strong>.</div>
   <?php endif; ?>

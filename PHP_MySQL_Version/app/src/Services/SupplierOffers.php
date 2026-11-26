@@ -790,8 +790,8 @@ final class SupplierOffers
         }
         usort($products, static fn (array $a, array $b): int => [$a['no_supplier'] ? 0 : 1, mb_strtolower($a['name'])] <=> [$b['no_supplier'] ? 0 : 1, mb_strtolower($b['name'])]);
         $categories = [];
-        foreach (\App\Repositories\ProductCategoryRepository::all(true) as $c) {
-            $categories[] = ['id' => (int) $c['id'], 'name' => (string) $c['name'],
+        foreach (\App\Repositories\ProductCategoryRepository::pickable(AssociateBrands::userBrandId()) as $c) { // D-435
+            $categories[] = ['id' => (int) $c['id'], 'name' => \App\Repositories\ProductCategoryRepository::displayName($c),
                 'shape' => self::priceShape(['id' => 0, 'category_id' => (int) $c['id']], $settings, true)];
         }
         return ['products' => $products, 'categories' => $categories];
@@ -810,6 +810,7 @@ final class SupplierOffers
         // Not configured: configured_at stays empty until Configure (D-361).
         \App\Repositories\SpecRepository::setProductFields($id, $categoryId, null, null, null);
         AuditLogRepository::log($userId, 'PRODUCT_CREATED', 'products', $id, null, null, $name . ' (from a supplier, Inactive, not configured)');
+        ProductApproval::afterCreate($id, $userId); // D-435
         return $id;
     }
 
@@ -898,8 +899,9 @@ final class SupplierOffers
     /** SQL: product (alias p) may be active and quoted (plan rule 4 with the decision-1 exception). */
     public static function quotableSql(): string
     {
-        return '(' . self::NO_SUPPLIER_YET_SQL . ' OR (' . self::CONFIGURED_SQL
-            . ' AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ' . self::USABLE_SQL . ')))';
+        // D-435: a product waiting for approval (or not approved) is never quotable.
+        return '(' . ProductApproval::APPROVED_SQL . ' AND (' . self::NO_SUPPLIER_YET_SQL . ' OR (' . self::CONFIGURED_SQL
+            . ' AND EXISTS (SELECT 1 FROM catalog_product_suppliers cps WHERE cps.product_id = p.id AND ' . self::USABLE_SQL . '))))';
     }
 
     /** Whether the product's base price is configured (fixed). */

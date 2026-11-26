@@ -537,6 +537,11 @@ async function addProduct(req, res) {
       fail('Category: choose the new product\'s category.');
       return;
     }
+    const pickableIds = (await require('../repositories/productCategoryRepository').pickable(require('../services/associateBrands').userBrandId(req.user))).map((c) => Number(c.id));
+    if (!pickableIds.includes(categoryId)) {
+      fail('Category: choose one of your brand\'s categories.'); // D-435
+      return;
+    }
     hs = String(req.body.new_hs_code || '').trim();
     if (hs !== '' && !(await require('../repositories/hsCodeRepository').isActiveCode(hs))) {
       fail(`HS code "${hs}" is not on the HS Code Master List — pick one from the list, or leave it empty.`);

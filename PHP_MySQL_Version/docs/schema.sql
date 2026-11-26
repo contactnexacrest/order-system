@@ -6998,3 +6998,14 @@ ALTER TABLE associate_registration_links ADD CONSTRAINT fk_associate_registratio
 -- D-432 (26 Nov 2026): brand managers — a staff member who looks after one brand (empty = all brands).
 ALTER TABLE users ADD COLUMN brand_id BIGINT UNSIGNED NULL;
 ALTER TABLE users ADD CONSTRAINT fk_users_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);
+
+-- D-435 (26 Nov 2026): brand catalogue — sub-categories, a category's brand (empty = company-wide), product approval.
+ALTER TABLE product_categories ADD COLUMN parent_id BIGINT UNSIGNED NULL;
+ALTER TABLE product_categories ADD CONSTRAINT fk_product_categories_parent FOREIGN KEY (parent_id) REFERENCES product_categories(id);
+ALTER TABLE product_categories ADD COLUMN brand_id BIGINT UNSIGNED NULL;
+ALTER TABLE product_categories ADD CONSTRAINT fk_product_categories_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);
+ALTER TABLE catalog_products ADD COLUMN approval_status ENUM('approved','pending','rejected') NOT NULL DEFAULT 'approved';
+ALTER TABLE catalog_products ADD COLUMN approval_reason VARCHAR(300) NULL;
+ALTER TABLE catalog_products ADD COLUMN submitted_by BIGINT UNSIGNED NULL;
+ALTER TABLE catalog_products ADD COLUMN approved_by BIGINT UNSIGNED NULL;
+ALTER TABLE catalog_products ADD COLUMN approved_at DATETIME NULL;

@@ -27,15 +27,25 @@ $__money = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::ind
   <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
     <input type="text" name="q" value="<?= View::e($query) ?>" placeholder="Search by name, HS code, specification or supplier…" style="flex:1" aria-label="Search by name, HS code, specification or supplier">
     <?php if ($status !== 'active'): ?><input type="hidden" name="status" value="<?= View::e($status) ?>"><?php endif; ?>
+    <?php // D-435: brand and category (a main category includes its sub-categories). ?>
+    <select name="brand" aria-label="Brand">
+      <option value="">All brands</option>
+      <option value="none"<?= $catalogFilter['brand'] === 'none' ? ' selected' : '' ?>>Company-wide</option>
+      <?php foreach ($catalogFilter['brands'] as $__b): ?><option value="<?= (int) $__b['id'] ?>"<?= $catalogFilter['brand'] === (string) $__b['id'] ? ' selected' : '' ?>><?= View::e((string) $__b['name']) ?></option><?php endforeach; ?>
+    </select>
+    <select name="category" aria-label="Category">
+      <option value="">All categories</option>
+      <?php foreach ($catalogFilter['categories'] as $__c): ?><option value="<?= (int) $__c['id'] ?>"<?= $catalogFilter['category'] === (string) $__c['id'] ? ' selected' : '' ?>><?= (int) ($__c['level'] ?? 1) === 2 ? '— ' : '' ?><?= View::e((string) $__c['name']) ?></option><?php endforeach; ?>
+    </select>
     <button type="submit" class="btn-sm">Search</button>
-    <?php if ($searched): ?><a class="btn-sm" href="/products<?= $status !== 'active' ? '?status=' . View::e($status) : '' ?>">Clear</a><?php endif; ?>
+    <?php if ($searched || $catalogFilter['qs'] !== ''): ?><a class="btn-sm" href="/products<?= $status !== 'active' ? '?status=' . View::e($status) : '' ?>">Clear</a><?php endif; ?>
   </form>
   <?php // Owner (12 Nov 2026): Active · Inactive · All; D-361: Not configured · No active supplier · No supplier yet. ?>
   <?php if ($statusCounts !== null): ?>
     <div class="filter-chip-row" aria-label="Show products by status">
       <?php foreach ($__filters as $__k => $__label): ?>
         <?php if (in_array($__k, ['active', 'inactive', 'all'], true) || (int) $statusCounts[$__k] > 0 || $status === $__k): ?>
-        <a class="filter-chip<?= $status === $__k ? ' active' : '' ?>" href="/products?status=<?= $__k ?><?= $searched ? '&amp;q=' . View::e(rawurlencode($query)) : '' ?>" data-filter="<?= $__k ?>"><?= $__label ?> (<?= (int) $statusCounts[$__k] ?>)</a>
+        <a class="filter-chip<?= $status === $__k ? ' active' : '' ?>" href="/products?status=<?= $__k ?><?= $searched ? '&amp;q=' . View::e(rawurlencode($query)) : '' ?><?= View::e($catalogFilter['qs']) ?>" data-filter="<?= $__k ?>"><?= $__label ?> (<?= (int) $statusCounts[$__k] ?>)</a>
         <?php endif; ?>
       <?php endforeach; ?>
     </div>
@@ -80,6 +90,7 @@ $__money = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::ind
     <div class="table-scroll product-list-scroll">
     <table class="list product-list<?= !empty($showAll) ? ' show-all' : '' ?>" id="product-list">
       <tr>
+        <?php if ($canManage): // D-435: tick products to move them to another (sub-)category of the same brand ?><th class="col-select"><span class="sr-only">Select</span></th><?php endif; ?>
         <th class="name-col">Name</th>
         <?php if ($canViewPricing): ?><th>Suppliers</th><th>Supplier prices (₹)</th><th>Base price</th><?php endif; ?>
         <?php // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. ?>
@@ -97,7 +108,8 @@ $__money = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::ind
       <?php foreach ($products as $p): $__st = $p['standing']; $__o = $p['offers_view'] ?? null; $__u = $__unitOf($p);
         $__sub = array_values(array_filter([(string) ($p['hs_code'] ?? ''), (string) ($p['origin'] ?? '')], static fn (string $v): bool => trim($v) !== '')); $__sub[] = 'per ' . $__u; ?>
         <tr data-product-row="<?= (int) $p['id'] ?>">
-          <td class="name-col"><a class="product-name" href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && ($p['pricing']['overrides'] ?? []) !== []): ?> <span class="badge badge-warning" title="This product overrides a pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?>
+          <?php if ($canManage): ?><td class="col-select"><input type="checkbox" name="product_ids[]" value="<?= (int) $p['id'] ?>" form="move-category-form" aria-label="Select <?= View::e($p['name']) ?>"></td><?php endif; ?>
+          <td class="name-col"><a class="product-name" href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (($p['approval_status'] ?? 'approved') !== 'approved'): // D-435 ?> <a class="badge <?= $p['approval_status'] === 'pending' ? 'badge-warning' : 'badge-danger' ?>" href="/products/<?= (int) $p['id'] ?>#approval" data-approval-badge><?= $p['approval_status'] === 'pending' ? 'Waiting for approval' : 'Not approved' ?></a><?php endif; ?><?= ($p['category_label'] ?? '') !== '' ? ' <small class="muted" data-category-label>' . View::e($p['category_label']) . '</small>' : '' ?><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && ($p['pricing']['overrides'] ?? []) !== []): ?> <span class="badge badge-warning" title="This product overrides a pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?>
             <span class="name-sub"><?= View::e(implode(' · ', $__sub)) ?></span>
             <span class="name-sub sold-as-line" data-testid="sold-as-<?= (int) $p['id'] ?>">Sold as: <?= isset($__soldAs[(int) $p['id']]) ? View::e(implode(', ', array_column($__soldAs[(int) $p['id']], 'name'))) : '<span class="muted">not ticked (every specification)</span>' ?></span></td>
           <?php if ($canViewPricing): ?>
@@ -159,6 +171,18 @@ $__money = static fn (float $v): string => '₹' . \App\Helpers\MoneyFormat::ind
         </tr>
       <?php endforeach; ?>
     </table>
+    <?php if ($canManage && $products !== []): // D-435 ?>
+    <form method="post" action="/products/move-category" id="move-category-form" class="field-grid" data-move-category>
+      <?= Csrf::field() ?>
+      <input type="hidden" name="return_to" value="<?= View::e('/products?status=' . $status . ($searched ? '&q=' . rawurlencode($query) : '') . $catalogFilter['qs']) ?>">
+      <label>Move the ticked products to *<select name="category_id" required>
+        <option value="">Choose…</option>
+        <?php foreach ($moveTargets as $__c): ?><option value="<?= (int) $__c['id'] ?>"><?= View::e(\App\Repositories\ProductCategoryRepository::displayName($__c) . (($__c['brand_name'] ?? '') !== '' ? ' (' . $__c['brand_name'] . ')' : '')) ?></option><?php endforeach; ?>
+      </select></label>
+      <div class="btn-row"><button type="submit" class="btn-sm">Move to category</button></div>
+      <p class="muted small">Only within the same brand. Their documents print from the new category's settings for orders priced from now on; orders already priced keep theirs.</p>
+    </form>
+    <?php endif; ?>
     </div>
     <?php if (!empty($canBuildup)): ?><p class="muted small"><b>Cost</b> = the configured base price + CHA &amp; transport + other costs, in USD — what the stone really costs us at the port. <b>Min price</b> = cost + the minimum margin — never quote below it. "Show all columns" adds Associate lowest and the Latest supplier quote.</p><?php endif; ?>
     <p class="muted small">"Supplier prices" are the active suppliers' lowest – highest prices, quoted the same way as the base price. The <b>configured base price</b> is fixed when the product is configured (default = the highest supplier price) and never changes by itself; all USD columns are worked out from it. A product that is not configured, or has no active supplier, is not offered on orders. <span class="badge badge-danger">No supplier yet</span> = a product from before suppliers were linked: it keeps working until a supplier is linked.</p>

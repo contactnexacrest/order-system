@@ -83,7 +83,10 @@ final class SpecController
      */
     public static function categoryData(int $categoryId): array
     {
-        $specs = SpecRepository::categorySpecs($categoryId);
+        $specs = SpecRepository::categorySpecs($categoryId, false, true); // D-435: a sub-category edits its own; its main category's are listed read-only
+        $all = SpecRepository::categorySpecs($categoryId);
+        $ownIds = array_map(static fn (array $x): int => (int) $x['id'], $specs);
+        $inherited = array_values(array_map(static fn (array $x): string => (string) $x['name'], array_filter($all, static fn (array $x): bool => !in_array((int) $x['id'], $ownIds, true))));
         $options = SpecRepository::optionsFor(array_map(static fn (array $s): int => (int) $s['id'], $specs));
         foreach ($specs as &$s) {
             $s['options'] = array_values(array_filter($options[(int) $s['id']] ?? [], static fn (array $o): bool => $o['product_id'] === null));
@@ -94,7 +97,7 @@ final class SpecController
             unset($o);
         }
         unset($s);
-        return ['categoryId' => $categoryId, 'specs' => $specs];
+        return ['categoryId' => $categoryId, 'specs' => $specs, 'inheritedSpecs' => $inherited];
     }
 
     public function addSpec(array $params): void
@@ -362,7 +365,7 @@ final class SpecController
         View::render('products/specifications', [
             'product' => $product, 'tree' => $tree,
             'soldAsSpecs' => $__soldAs, 'soldAsTicked' => $__ticked,
-            'categories' => ProductCategoryRepository::all(true),
+            'categories' => self::categoryChoices(ProductSpecs::categoryIdFor($product)), // D-435: brand › main › sub
             'categoryId' => ProductSpecs::categoryIdFor($product),
             'canEdit' => self::can('manage_product_specifications'),
             'cbmFrom' => \App\Services\PricingService::settings()['cbm_from_mm'],
@@ -380,6 +383,21 @@ final class SpecController
         return $product;
     }
 
+    /** D-435: the categories a product may be put in (a brand manager: their brand's), plus the one it is in now. */
+    private static function categoryChoices(?int $currentId): array
+    {
+        $list = ProductCategoryRepository::pickable(\App\Services\AssociateBrands::userBrandId());
+        foreach ($list as &$c) {
+            $c['name'] = ProductCategoryRepository::displayName($c);
+        }
+        unset($c);
+        if ($currentId !== null && !in_array($currentId, array_map('intval', array_column($list, 'id')), true) && ($cur = ProductCategoryRepository::find($currentId)) !== null) {
+            $cur['name'] = ProductCategoryRepository::displayName($cur);
+            array_unshift($list, $cur);
+        }
+        return $list;
+    }
+
     public function saveProductFields(array $params): void
     {
         if (($product = self::productOr404($params)) === null) {
@@ -390,6 +408,9 @@ final class SpecController
         $categoryId = (int) ($_POST['category_id'] ?? 0);
         if ($categoryId <= 0 || ProductCategoryRepository::find($categoryId) === null) {
             $errors[] = 'Choose a category.';
+        } elseif (!in_array($categoryId, array_map('intval', array_column(ProductCategoryRepository::pickable(\App\Services\AssociateBrands::userBrandId()), 'id')), true)
+            && (int) ($product['category_id'] ?? 0) !== $categoryId) {
+            $errors[] = 'Choose one of your brand\'s categories.'; // D-435
         }
         // D-384 (18 Nov 2026): the old "Forms" ticks are replaced by "Sold as" (its own form, /products/{id}/sold-as);
         // the product's old forms value is kept as it is (read-only) — it still applies while nothing is ticked.

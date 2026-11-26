@@ -20,7 +20,9 @@ $__return = "/products/categories/{$__id}?tab=general";
 ?>
 <div class="card page-wide">
   <p class="muted small"><a href="/products/categories">&larr; Categories</a></p>
-  <h1>Category: <?= View::e((string) $__c['name']) ?><?= (int) $__c['is_system'] === 1 ? ' <small class="muted">(today\'s products)</small>' : '' ?></h1>
+  <h1><?= $main !== null ? 'Sub-category' : 'Category' ?>: <?= View::e((string) $__c['name']) ?><?= (int) $__c['is_system'] === 1 ? ' <small class="muted">(today\'s products)</small>' : '' ?></h1>
+  <?php // D-435: where the category sits — brand › main category › sub-category. ?>
+  <p class="muted small">Brand: <strong><?= ($effective['brand_id'] ?? null) ? View::e((string) (array_column($brands, 'name', 'id')[(int) $effective['brand_id']] ?? '')) : 'Company-wide' ?></strong><?php if ($main !== null): ?> · Main category: <a href="/products/categories/<?= (int) $main['id'] ?>"><?= View::e((string) $main['name']) ?></a> — an empty setting here uses <?= View::e((string) $main['name']) ?>'s value.<?php endif; ?></p>
   <nav class="tab-pills" aria-label="Category sections">
     <?php foreach ($__tabs as $__k => $__l): ?>
       <a class="btn-sm<?= $tab === $__k ? ' btn-accent' : ' btn-secondary' ?>" href="/products/categories/<?= $__id ?>?tab=<?= $__k ?>"<?= $tab === $__k ? ' aria-current="page"' : '' ?>><?= View::e($__l) ?></a>
@@ -37,18 +39,43 @@ $__return = "/products/categories/{$__id}?tab=general";
         <?php // D-363 (13 Nov 2026): same layout as "Add a category" — name alone, then the attributes two per row. ?>
         <div class="cat-attr-grid">
         <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" value="<?= View::e((string) $__c['name']) ?>" placeholder="e.g. Granite slabs"<?= $__ro ?>></label>
-        <?php for ($i = 0; $i < $maxAttributes; $i++): ?>
-        <label<?= $i === 0 ? ' class="cat-attr-first"' : '' ?>>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> value="<?= View::e((string) ($__c['attributes'][$i] ?? '')) ?>" placeholder="<?= ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'][$i] ?? 'e.g. Finish' ?>"<?= $__ro ?>></label>
+        <?php for ($i = 0; $i < $maxAttributes; $i++): $__req = $i === 0 && $main === null; ?>
+        <label<?= $i === 0 ? ' class="cat-attr-first"' : '' ?>>Attribute <?= $i + 1 ?><?= $__req ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $__req ? 'required' : '' ?> value="<?= View::e((string) ($__c['attributes'][$i] ?? '')) ?>" placeholder="<?= $main !== null ? View::e('As ' . $main['name'] . ': ' . ((string) ($main['attributes'][$i] ?? '') !== '' ? (string) $main['attributes'][$i] : 'none')) : (['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'][$i] ?? 'e.g. Finish') ?>"<?= $__ro ?>></label>
         <?php endfor; ?>
         </div>
+        <?php if ($canSetBrand): ?>
+        <label>Brand <small class="muted">(its sub-categories and products follow; empty = company-wide)</small><select name="brand_id">
+          <option value="">Company-wide (no brand)</option>
+          <?php foreach ($brands as $b): ?><option value="<?= (int) $b['id'] ?>"<?= (int) ($__c['brand_id'] ?? 0) === (int) $b['id'] ? ' selected' : '' ?>><?= View::e((string) $b['name']) ?></option><?php endforeach; ?>
+        </select></label>
+        <?php endif; ?>
         <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" <?= (int) $__c['is_active'] === 1 ? 'checked' : '' ?><?= $__ro ?>> Active (offered on new order lines)</label>
         <?php if ($canManageCatalog): ?><div class="btn-row"><button type="submit" class="btn-sm btn-success">Save <?= View::e((string) $__c['name']) ?></button></div><?php endif; ?>
       </form>
     <?php else: ?>
       <p class="muted">Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
+      <?php if ($canSetBrand): ?>
+      <form method="post" action="/products/categories/<?= $__id ?>" class="inline-form">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="return_to" value="<?= View::e($__return) ?>">
+        <input type="hidden" name="brand_only" value="1">
+        <label>Brand <small class="muted">(its sub-categories and products follow; empty = company-wide)</small><select name="brand_id">
+          <option value="">Company-wide (no brand)</option>
+          <?php foreach ($brands as $b): ?><option value="<?= (int) $b['id'] ?>"<?= (int) ($__c['brand_id'] ?? 0) === (int) $b['id'] ? ' selected' : '' ?>><?= View::e((string) $b['name']) ?></option><?php endforeach; ?>
+        </select></label>
+        <button type="submit" class="btn-sm btn-success">Save brand</button>
+      </form>
+      <?php endif; ?>
     <?php endif; ?>
 
+    <?php if ($subCategories !== []): ?>
+      <h2>Sub-categories</h2>
+      <p class="muted small"><?php foreach ($subCategories as $__i => $__s): ?><?= $__i > 0 ? ' · ' : '' ?><a href="/products/categories/<?= (int) $__s['id'] ?>"><?= View::e((string) $__s['name']) ?></a><?php endforeach; ?> — each uses this category's settings where it has none of its own.</p>
+    <?php endif; ?>
     <h2>Settings</h2>
+    <?php if ($main !== null): ?>
+      <p class="muted small">Empty here = <?= View::e((string) $main['name']) ?>'s value. Now in use: unit <?= View::e((string) (($effective['default_unit'] ?? '') ?: 'any')) ?>, HS code <?= View::e((string) (($effective['default_hs_code'] ?? '') ?: '—')) ?>, packing <?= View::e((string) (($effective['packing_type'] ?? '') ?: '—')) ?>, T&amp;C clauses <?= View::e((string) ($tcClauseSets[$effective['tc_clause_set'] ?? ''] ?? '—')) ?>.</p>
+    <?php endif; ?>
     <p class="muted small">What an order line of the category starts with: its unit (and the only units it may use), its HS code for goods, its packing type, the quality documents its orders must collect, and the T&amp;C clause set.</p>
     <form method="post" action="/products/categories/<?= $__id ?>/settings">
       <?= Csrf::field() ?>
@@ -87,6 +114,7 @@ $__return = "/products/categories/{$__id}?tab=general";
     <datalist id="category_hs_codes"><?php foreach ($hsCodes as $h): ?><option value="<?= View::e((string) $h['code']) ?>"><?= View::e((string) ($h['description'] ?? '')) ?></option><?php endforeach; ?></datalist>
 
   <?php elseif ($tab === 'options'): ?>
+    <?php if (!empty($inheritedSpecs)): // D-435 ?><p class="muted small" data-inherited-specs>Also from <?= View::e((string) ($main['name'] ?? 'the main category')) ?> (change them there): <?= View::e(implode(', ', $inheritedSpecs)) ?>.</p><?php endif; ?>
     <?php include __DIR__ . '/../pricing/_spec_table.php'; ?>
 
   <?php elseif ($tab === 'rules'): ?>

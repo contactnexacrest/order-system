@@ -232,10 +232,8 @@ final class OrderLinePricing
         if ($categoryId === null) {
             return null;
         }
-        $stmt = Database::connection()->prepare('SELECT weight_t_per_cbm FROM product_categories WHERE id = :id');
-        $stmt->execute(['id' => $categoryId]);
-        $v = $stmt->fetchColumn();
-        return $v !== false && $v !== null && (float) $v > 0 ? (float) $v : null;
+        $v = \App\Repositories\ProductCategoryRepository::find($categoryId)['weight_t_per_cbm'] ?? null; // D-435: a sub-category follows its main category
+        return $v !== null && $v !== '' && (float) $v > 0 ? (float) $v : null;
     }
 
     /** D-270: the line's piece size in cm, [length, width, thickness] (null = not given). */

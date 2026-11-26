@@ -33,6 +33,7 @@ final class SettingLabels
         'mail_redirect' => 'E-mail copies and redirect',
         'order_defaults' => 'New order defaults',
         'orders' => 'Orders',
+        'products' => 'Products and brands', // D-435
         'prospects' => 'Quick-quote prospects', // D-394
         'rbi' => 'RBI purpose codes',
         'security' => 'Security and logging in',
@@ -98,6 +99,7 @@ final class SettingLabels
         'pi_validity_days' => ['Proforma Invoice valid for … days', 'Days a Proforma Invoice stays valid from its issue date.'],
         'quotation_validity_days' => ['Quotation valid for … days', 'Days a Quotation stays valid from its issue date.'],
         // Owner decision D-394 (20 Nov 2026): quick-quote prospects — their own expiry, separate from the Quotation's validity above.
+        'brand_products_need_approval' => ['New products added by brand managers need approval', 'On (default) = a product a brand manager adds waits in Approvals › New products until someone with "Approve new products" (MD, ED) approves it; until then it cannot be quoted, ordered or seen by associates. Off = it is live at once (the Audit Log still records it). D-435.'],
         'prospect_expiry_days' => ['Close a prospect\'s quotation after (days)', 'Days after a prospect is added (or kept, or reactivated) before its quotation order moves to "Did not go ahead" and the client to Deactivated, unless an order goes ahead. 7 to 365; default 60. Nothing is deleted, and a client can be activated again. Separate from "Quotation valid for … days", which prints on the Quotation.'],
         'prospect_reminder_days' => ['Remind the order\'s owner before (days)', 'Days before that date the order\'s owner gets one reminder: a notification, a line in My tasks and an e-mail. 1 to 30; default 7.'],
         'prospect_auto_close' => ['Automatic closing', 'On = on that date the daily job moves the order to "Did not go ahead" and the client to Deactivated. Off = only remind; nothing closes on its own.'],

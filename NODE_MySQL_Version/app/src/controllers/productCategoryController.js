@@ -4,6 +4,8 @@ const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const productCategoryRepository = require('../repositories/productCategoryRepository');
 const lookupRepository = require('../repositories/lookupRepository');
+const associateBrands = require('../services/associateBrands');
+const associateBrandRepository = require('../repositories/associateBrandRepository');
 
 // Port of App\Controllers\ProductCategoryController. Owner decision D-215
 // (5a): Products → Categories — each category names the attributes its
@@ -18,13 +20,19 @@ async function nameError(name, id) {
 }
 
 async function index(req, res) {
-  const categories = await productCategoryRepository.all();
+  const mine = associateBrands.userBrandId(req.user);
+  // D-435: the tree — main categories with their sub-categories and brand; a brand manager sees their brand + company-wide.
+  const categories = await productCategoryRepository.tree(false, mine);
   for (const c of categories) {
     c.allowedUnits = productCategoryRepository.allowedUnits(c);
     c.qualityDocuments = productCategoryRepository.qualityDocuments(c);
   }
   res.renderView('products/categories', {
     categories,
+    mainCategories: (await productCategoryRepository.tree(true, mine)).filter((c) => Number(c.level) === 1 && (mine === null || Number(c.brand_id || 0) === mine)),
+    brands: await associateBrandRepository.usable(),
+    brandScope: mine,
+    brandFilter: String(req.query.brand || ''),
     maxQualityDocuments: productCategoryRepository.MAX_QUALITY_DOCUMENTS,
     maxAttributes: productCategoryRepository.MAX_ATTRIBUTES,
     // D-257 0B: each category's units, HS code, packing, quality documents and T&C clause set.
@@ -35,19 +43,54 @@ async function index(req, res) {
   }, 'layout/base');
 }
 
+function hasLabels(raw) {
+  return [].concat(raw || []).some((v) => String(v ?? '').trim() !== '');
+}
+
 async function store(req, res) {
   const name = String(req.body.name ?? '').trim();
-  const [labels, labelError] = productCategoryRepository.parseLabels(req.body.attributes);
+  // D-435: a sub-category names its main category; its attributes are optional (empty = the main category's).
+  const mine = associateBrands.userBrandId(req.user);
+  const parentRaw = String(req.body.parent_id ?? '').trim();
+  const parent = parentRaw !== '' ? await productCategoryRepository.findOwn(parseInt(parentRaw, 10) || 0) : null;
+  let [labels, labelError] = parent !== null && !hasLabels(req.body.attributes) ? [[], null] : productCategoryRepository.parseLabels(req.body.attributes);
+  if (parentRaw !== '' && (parent === null || parent.parent_id)) {
+    labelError = 'Choose the main category for the sub-category.';
+  } else if (parent !== null && mine !== null && Number(parent.brand_id || 0) !== mine) {
+    labelError = "You can add sub-categories only to your own brand's categories.";
+  }
+  let brandId = null;
+  if (parent === null) {
+    const brandRaw = String(req.body.brand_id ?? '').trim();
+    brandId = mine ?? (brandRaw !== '' ? parseInt(brandRaw, 10) || 0 : null); // a brand manager's categories are always their brand's
+    if (brandId !== null && !(await associateBrandRepository.find(brandId))) labelError = 'Choose a brand from the list.';
+  }
   const error = (await nameError(name, null)) ?? labelError;
   if (error !== null) {
     flash.set(req, 'error', error);
     res.redirect('/products/categories');
     return;
   }
-  const id = await productCategoryRepository.create(name, labels, req.user.id);
-  await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_CREATED', 'product_categories', id, 'attributes', null, `${name}: ${labels.join(', ')}`);
-  flash.set(req, 'success', `Category "${name}" added with ${labels.join(', ')}.`);
+  const id = await productCategoryRepository.create(name, labels, req.user.id, parent !== null ? Number(parent.id) : null, brandId);
+  await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_CREATED', 'product_categories', id, 'attributes', null,
+    `${parent !== null ? `${parent.name} › ` : ''}${name}: ${labels.length === 0 ? `(attributes of ${parent ? parent.name : ''})` : labels.join(', ')}`);
+  flash.set(req, 'success', parent !== null
+    ? `Sub-category "${name}" added under ${parent.name}. It follows ${parent.name}'s settings until you change them.`
+    : `Category "${name}" added with ${labels.join(', ')}.`);
   res.redirect('/products/categories');
+}
+
+/** D-435: a main category's brand (empty = company-wide); only staff who look after all brands change it. Sub-categories follow. */
+async function saveBrand(req, id, own) {
+  if (own.parent_id || !Object.prototype.hasOwnProperty.call(req.body, 'brand_id') || associateBrands.userBrandId(req.user) !== null) return;
+  const brandRaw = String(req.body.brand_id ?? '').trim();
+  const newBrand = brandRaw !== '' && (await associateBrandRepository.find(parseInt(brandRaw, 10) || 0)) ? parseInt(brandRaw, 10) : null;
+  const oldBrand = own.brand_id ? Number(own.brand_id) : null;
+  if (newBrand !== oldBrand) {
+    await productCategoryRepository.setBrand(id, newBrand);
+    await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_BRAND_SET', 'product_categories', id, 'brand_id',
+      String(oldBrand ?? 'company-wide'), String(newBrand ?? 'company-wide'));
+  }
 }
 
 async function update(req, res) {
@@ -57,13 +100,20 @@ async function update(req, res) {
     res.status(404).send('Category not found.');
     return;
   }
+  const own = (await productCategoryRepository.findOwn(id)) || category;
+  if (req.body.brand_only) { // D-435: the brand alone (Natural Stone keeps its name and attributes)
+    await saveBrand(req, id, own);
+    flash.set(req, 'success', `Brand saved for ${own.name}.`);
+    res.redirect(backTo(req, '/products/categories'));
+    return;
+  }
   if (Number(category.is_system) === 1) {
     flash.set(req, 'error', "Natural Stone is today's products — its Dimensions and Finish stay as they are.");
     res.redirect(backTo(req, '/products/categories'));
     return;
   }
   const name = String(req.body.name ?? '').trim();
-  const [labels, labelError] = productCategoryRepository.parseLabels(req.body.attributes);
+  const [labels, labelError] = own.parent_id && !hasLabels(req.body.attributes) ? [[], null] : productCategoryRepository.parseLabels(req.body.attributes);
   const error = (await nameError(name, id)) ?? labelError;
   if (error !== null) {
     flash.set(req, 'error', error);
@@ -72,6 +122,7 @@ async function update(req, res) {
   }
   const active = Boolean(req.body.is_active);
   await productCategoryRepository.update(id, name, labels, active);
+  await saveBrand(req, id, own);
   await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_UPDATED', 'product_categories', id, 'attributes',
     `${category.name}: ${category.attributes.join(', ')}`, `${name}: ${labels.join(', ')}${active ? '' : ' (inactive)'}`);
   flash.set(req, 'success', `Category "${name}" saved.`);
@@ -86,7 +137,7 @@ async function update(req, res) {
  */
 async function settings(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
-  const category = await productCategoryRepository.find(id);
+  const category = await productCategoryRepository.findOwn(id); // D-435: a sub-category saves only its own values (empty = its main category's)
   if (!category) {
     res.status(404).send('Category not found.');
     return;
@@ -135,12 +186,26 @@ async function show(req, res) {
   for (const p of await require('../repositories/productRepository').all(false)) {
     if (Number(await productSpecs.categoryIdFor(p)) === id) products.push(p);
   }
-  category.allowedUnits = productCategoryRepository.allowedUnits(category);
+  // D-435: the form shows the category's own values; 'main' is what a sub-category follows when a value is empty.
+  const own = await productCategoryRepository.findOwn(id);
+  const main = own.parent_id ? await productCategoryRepository.find(own.parent_id) : null;
+  const effective = category;
+  const editable = (await associateBrands.refusalForPath(`/products/categories/${id}`, 'POST', req.user)) === null;
+  const brands = await associateBrandRepository.usable();
+  own.allowedUnits = productCategoryRepository.allowedUnits(own);
+  if (main) {
+    main.attributePlaceholders = Array.from({ length: productCategoryRepository.MAX_ATTRIBUTES }, (_, i) => `As ${main.name}: ${main.attributes[i] || 'none'}`);
+  }
+  const brandName = effective.brand_id ? String((brands.find((b) => Number(b.id) === Number(effective.brand_id)) || (await associateBrandRepository.find(effective.brand_id)) || {}).name || '') : '';
   const tabs = [['general', 'General (name, units, HS code, packing, documents)']];
   if (seesPricing) tabs.push(['options', 'Options and their price effect'], ['rules', 'Category price rules (thickness %, container)']);
   tabs.push(['products', `Products in this category (${products.length})`]);
   const data = {
-    category, tab, tabs, seesPricing, canManageCatalog: can('manage_product_catalog'), canManagePricing: can('manage_pricing'), products,
+    category: own, tab, tabs, seesPricing, products,
+    // D-435: a brand manager only views a company-wide category (or another brand's — the router refuses those).
+    canManageCatalog: can('manage_product_catalog') && editable, canManagePricing: can('manage_pricing') && editable,
+    main, effective, brandName, subCategories: await productCategoryRepository.children(id), brands,
+    canSetBrand: can('manage_product_catalog') && associateBrands.userBrandId(req.user) === null && main === null,
     maxQualityDocuments: productCategoryRepository.MAX_QUALITY_DOCUMENTS,
     maxAttributes: productCategoryRepository.MAX_ATTRIBUTES,
     units: (await lookupRepository.dropdownOptions('unit')).map((o) => String(o.option_value)),
@@ -171,6 +236,8 @@ async function show(req, res) {
       marginPct: String(old.margin_pct ?? (r.margin_pct !== null ? fmt(r.margin_pct) : '')),
       otherCostPct: String(old.other_cost_pct ?? (r.other_cost_pct !== null ? fmt(r.other_cost_pct) : '')),
       bufferPct: String(old.buffer_pct ?? (r.buffer_pct !== null ? fmt(r.buffer_pct) : '')),
+      // D-435: an empty value follows the main category, then the brand, then global — the placeholder says which.
+      ph: Object.fromEntries(Object.entries(r.inherited).map(([k, i]) => [k, `empty = ${i.value === null ? '—' : (['margin_pct', 'other_cost_pct', 'buffer_pct'].includes(k) ? Number(i.value).toFixed(2) : fmt(i.value))} (${i.from})`])),
       g: {
         margin: Number(r.global.margin_pct).toFixed(2), other: Number(r.global.other_cost_pct).toFixed(2), buffer: Number(r.global.buffer_pct).toFixed(2),
         cbm: fmt(r.global.container_cbm), maxT: fmt(r.global.container_max_t), weight: fmt(r.global.weight_t_per_cbm), k: fmt(r.global.thick_k_factor),

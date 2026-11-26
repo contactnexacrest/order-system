@@ -186,9 +186,9 @@ async function weightPerCbm(product) {
   if (product.weight_t_per_cbm !== null && product.weight_t_per_cbm !== undefined && Number(product.weight_t_per_cbm) > 0) return Number(product.weight_t_per_cbm);
   const categoryId = await require('./productSpecs').categoryIdFor(product);
   if (categoryId === null || categoryId === undefined) return null;
-  const row = await db.queryOne('SELECT weight_t_per_cbm FROM product_categories WHERE id = :id', { id: categoryId });
+  const row = await require('../repositories/productCategoryRepository').find(categoryId); // D-435: a sub-category follows its main category
   const v = row ? row.weight_t_per_cbm : null;
-  return v !== null && v !== undefined && Number(v) > 0 ? Number(v) : null;
+  return v !== null && v !== undefined && v !== '' && Number(v) > 0 ? Number(v) : null;
 }
 
 /** D-270: the line's piece size in cm, [length, width, thickness] (null = not given). */

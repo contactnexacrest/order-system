@@ -476,7 +476,7 @@ final class AssociatePortalController
             return;
         }
         $product = \App\Repositories\ProductRepository::find($productId);
-        if ($product === null) {
+        if ($product === null || !\App\Services\PriceRequestService::inAssociateBrand($me, $product)) { // D-435
             Flash::set('error', 'That product is not in your catalogue.');
             header('Location: /associate/catalogue');
             return;

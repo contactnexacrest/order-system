@@ -14194,7 +14194,8 @@
    "requires_all": [],
    "requires_any": [
     "manage_divisions",
-    "manage_associate_rules"
+    "manage_associate_rules",
+    "manage_pricing"
    ],
    "guards": [
     "session"
@@ -14334,7 +14335,8 @@
    "requires_all": [],
    "requires_any": [
     "manage_divisions",
-    "manage_associate_rules"
+    "manage_associate_rules",
+    "manage_pricing"
    ],
    "guards": [
     "session"
@@ -37708,6 +37710,146 @@
      "e2e/tests/13-associate-rules-d410.spec.js"
     ]
    }
+  },
+  {
+   "method": "POST",
+   "path": "/admin/brands/{id}/pricing",
+   "controller": "BrandController",
+   "action": "savePricing",
+   "requires_all": [
+    "manage_pricing"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "brandController.savePricing",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "BrandCatalogueD435Test.php"
+    ],
+    "node": [
+     "brandCatalogueD435.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/move-category",
+   "controller": "ProductController",
+   "action": "moveCategory",
+   "requires_all": [
+    "manage_product_catalog"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "productsController.moveCategory",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "BrandCatalogueD435Test.php"
+    ],
+    "node": [
+     "brandCatalogueD435.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/{id}/approval",
+   "controller": "ProductController",
+   "action": "decideApproval",
+   "requires_all": [
+    "approve_new_products"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "productsController.decideApproval",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "BrandCatalogueD435Test.php"
+    ],
+    "node": [
+     "brandCatalogueD435.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/products/{id}/resubmit",
+   "controller": "ProductController",
+   "action": "resubmitApproval",
+   "requires_all": [
+    "manage_product_catalog"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "productsController.resubmitApproval",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "BrandCatalogueD435Test.php"
+    ],
+    "node": [
+     "brandCatalogueD435.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
   }
  ],
  "payment_presets": [

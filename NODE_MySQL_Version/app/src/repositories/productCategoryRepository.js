@@ -24,11 +24,109 @@ async function all(activeOnly = false) {
   return rows;
 }
 
-async function find(id) {
-  const row = await db.queryOne('SELECT * FROM product_categories WHERE id = :id', { id });
+/**
+ * D-435 (owner 26 Nov 2026): the settings a sub-category takes from its main category when it does not set its own,
+ * and the price settings that then fall back to the category's brand (empty = the company setting).
+ */
+const INHERITED = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set',
+  'weight_t_per_cbm', 'insurance_rate_pct', 'insurance_cover_wording', 'thick_k_factor', 'container_cbm', 'container_max_t',
+  'margin_pct', 'other_cost_pct', 'buffer_pct'];
+const BRAND_PRICING = ['margin_pct', 'other_cost_pct', 'buffer_pct'];
+
+/** The category as it is stored (a sub-category's own values only). */
+async function findOwn(id) {
+  const row = await db.queryOne('SELECT * FROM product_categories WHERE id = :id', { id: Number(id) || 0 });
   if (!row) return null;
-  row.attributes = await attributeLabels(id);
+  row.attributes = await attributeLabels(row.id);
   return row;
+}
+
+/**
+ * The category every reader uses (order lines, documents, pricing, specifications): a sub-category's own values,
+ * else its main category's (D-435); a price setting still empty then follows the category's brand, else the
+ * company setting as before. A main category with no brand and no sub-categories reads exactly as before.
+ */
+async function find(id) {
+  const row = await findOwn(id);
+  if (!row) return null;
+  row.main_category_id = Number(row.id);
+  row.main_category_name = String(row.name);
+  if (row.parent_id) {
+    const main = await findOwn(row.parent_id);
+    if (main) {
+      for (const k of INHERITED) {
+        if (!(k in row) || row[k] === null || row[k] === '') row[k] = main[k] ?? null;
+      }
+      if (row.attributes.length === 0) row.attributes = main.attributes;
+      row.brand_id = main.brand_id ?? null;
+      row.main_category_id = Number(main.id);
+      row.main_category_name = String(main.name);
+      row.parent_is_system = Number(main.is_system || 0);
+    }
+  }
+  if (row.brand_id) {
+    const brand = await require('./associateBrandRepository').settings(row.brand_id);
+    for (const k of BRAND_PRICING) {
+      if (row[k] === null || row[k] === undefined || row[k] === '') {
+        const v = brand['pricing_' + k];
+        if (v !== null && v !== undefined && v !== '') {
+          row[k] = v;
+          row[k + '_from_brand'] = true;
+        }
+      }
+    }
+  }
+  return row;
+}
+
+/** "Natural Stones › Granite" (or just the name for a main category). */
+function displayName(category) {
+  if (!category) return '';
+  const main = String(category.main_category_name || '');
+  return main !== '' && main !== String(category.name) ? `${main} › ${category.name}` : String(category.name);
+}
+
+/**
+ * D-435: the category tree — each main category followed by its sub-categories, with its brand id and name.
+ * brandScope: a brand manager's brand (their brand + company-wide main categories); null = every category.
+ */
+async function tree(activeOnly = false, brandScope = null) {
+  const rows = await all(activeOnly);
+  const brands = {};
+  for (const b of await require('./associateBrandRepository').allUnscoped()) brands[Number(b.id)] = String(b.name);
+  const out = [];
+  for (const m of rows.filter((r) => !r.parent_id)) {
+    const brandId = m.brand_id ? Number(m.brand_id) : null;
+    if (brandScope !== null && brandId !== null && brandId !== Number(brandScope)) continue;
+    out.push({ ...m, level: 1, brand_name: brandId !== null ? (brands[brandId] || '') : '', main_category_name: String(m.name) });
+    for (const r of rows) {
+      if (Number(r.parent_id || 0) === Number(m.id)) {
+        out.push({ ...r, level: 2, brand_id: brandId, brand_name: brandId !== null ? (brands[brandId] || '') : '', main_category_name: String(m.name) });
+      }
+    }
+  }
+  return out;
+}
+
+/** D-435: the categories a product may be put in — every active one, or for a brand manager only their brand's. */
+async function pickable(brandScope) {
+  return (await tree(true, brandScope)).filter((c) => brandScope === null || Number(c.brand_id || 0) === Number(brandScope));
+}
+
+/** D-435: the category ids a brand manager / a brand's associate may use (their brand + company-wide); null = all. */
+async function idsForBrand(brandId) {
+  if (brandId === null || brandId === undefined) return null;
+  return (await tree(false, brandId)).map((r) => Number(r.id));
+}
+
+/** D-435: a main category's brand (empty = company-wide); its sub-categories follow. */
+async function setBrand(mainId, brandId) {
+  await db.execute('UPDATE product_categories SET brand_id = :b WHERE id = :id OR parent_id = :id2', { b: brandId, id: mainId, id2: mainId });
+}
+
+/** A main category's sub-categories. */
+async function children(mainId) {
+  return db.query('SELECT * FROM product_categories WHERE parent_id = :p ORDER BY sort_order, name', { p: mainId });
 }
 
 async function nameTaken(name, exceptId = null) {
@@ -42,9 +140,15 @@ async function writeLabels(tx, categoryId, labels) {
   }
 }
 
-async function create(name, labels, userId) {
+async function create(name, labels, userId, parentId = null, brandId = null) {
+  // D-435: a sub-category carries its main category's brand.
+  if (parentId !== null) {
+    const main = await findOwn(parentId);
+    brandId = main && main.brand_id ? Number(main.brand_id) : null;
+  }
   return db.transaction(async (tx) => {
-    const result = await tx.execute('INSERT INTO product_categories (name, is_system, is_active, sort_order, created_by) VALUES (:n, 0, 1, 10, :u)', { n: name, u: userId });
+    const result = await tx.execute('INSERT INTO product_categories (name, is_system, is_active, sort_order, created_by, parent_id, brand_id) VALUES (:n, 0, 1, 10, :u, :p, :b)',
+      { n: name, u: userId, p: parentId, b: brandId });
     await writeLabels(tx, result.insertId, labels);
     return result.insertId;
   });
@@ -258,6 +362,7 @@ async function applyLineDefaults(body) {
 }
 
 module.exports = {
+  INHERITED, BRAND_PRICING, findOwn, displayName, tree, pickable, idsForBrand, setBrand, children,
   MAX_ATTRIBUTES, all, find, attributeLabels, nameTaken, create, update, parseLabels, setLineCategory, documentAttributes,
   TC_CLAUSE_SETS, MAX_QUALITY_DOCUMENTS, allowedUnits, qualityDocuments, parseSettings, updateSettings, settingsSummary, lineOptionAttributes, applyLineDefaults, weightInput,
 };

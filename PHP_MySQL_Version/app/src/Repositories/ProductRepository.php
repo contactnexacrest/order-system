@@ -75,9 +75,9 @@ final class ProductRepository
      *
      * @return array<int, array<string,mixed>>
      */
-    public static function listing(string $status = 'active', ?string $term = null): array
+    public static function listing(string $status = 'active', ?string $term = null, ?string $scopeSql = null): array
     {
-        [$where, $params] = self::listingWhere($term);
+        [$where, $params] = self::listingWhere($term, $scopeSql);
         if (($cond = self::statusSql($status)) !== null) {
             $where[] = $cond;
         }
@@ -91,9 +91,9 @@ final class ProductRepository
      *
      * @return array<string,int>
      */
-    public static function statusCounts(?string $term = null): array
+    public static function statusCounts(?string $term = null, ?string $scopeSql = null): array
     {
-        [$where, $params] = self::listingWhere($term);
+        [$where, $params] = self::listingWhere($term, $scopeSql);
         $sums = [];
         foreach (self::STATUSES as $st) {
             $cond = self::statusSql($st);
@@ -110,25 +110,39 @@ final class ProductRepository
     }
 
     /** @return array{0: list<string>, 1: array<string,string>} */
-    private static function listingWhere(?string $term): array
+    private static function listingWhere(?string $term, ?string $scopeSql = null): array
     {
         $term = trim((string) $term);
         if ($term === '') {
-            return [[], []];
+            return [$scopeSql !== null ? [$scopeSql] : [], []];
         }
         // Distinct placeholders, not :term reused — PDO::ATTR_EMULATE_PREPARES is off (native
         // prepares), which doesn't allow binding one named parameter to multiple positions.
         // D-361: a supplier's name (typed, or the directory supplier's legal name) matches too.
         $needle = '%' . $term . '%';
-        return [['(p.name LIKE :term1 OR p.hs_code LIKE :term2 OR p.specifications LIKE :term3 OR EXISTS (SELECT 1 FROM catalog_product_suppliers cs
-            LEFT JOIN suppliers sx ON sx.id = cs.supplier_id WHERE cs.product_id = p.id AND (cs.supplier_name LIKE :term4 OR sx.supplier_legal_name LIKE :term5)))'],
+        return [array_merge($scopeSql !== null ? [$scopeSql] : [], ['(p.name LIKE :term1 OR p.hs_code LIKE :term2 OR p.specifications LIKE :term3 OR EXISTS (SELECT 1 FROM catalog_product_suppliers cs
+            LEFT JOIN suppliers sx ON sx.id = cs.supplier_id WHERE cs.product_id = p.id AND (cs.supplier_name LIKE :term4 OR sx.supplier_legal_name LIKE :term5)))']),
             ['term1' => $needle, 'term2' => $needle, 'term3' => $needle, 'term4' => $needle, 'term5' => $needle]];
     }
 
     /** @return array<int, array<string,mixed>> products matching the term (active ones unless a status is given) */
-    public static function search(string $term, string $status = 'active'): array
+    public static function search(string $term, string $status = 'active', ?string $scopeSql = null): array
     {
-        return self::listing($status, $term);
+        return self::listing($status, $term, $scopeSql);
+    }
+
+    /**
+     * D-435: the condition (alias p) for products in these categories; $withUncategorised adds products with no
+     * category (company-wide). null ids = no condition. Ids are integers, so they are inlined safely.
+     */
+    public static function categorySql(?array $ids, bool $withUncategorised = false): ?string
+    {
+        if ($ids === null) {
+            return null;
+        }
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        $in = $ids === [] ? '0' : implode(',', $ids);
+        return $withUncategorised ? "(p.category_id IS NULL OR p.category_id IN ({$in}))" : "p.category_id IN ({$in})";
     }
 
     /**
@@ -200,10 +214,22 @@ final class ProductRepository
      */
     public static function forPicker(): array
     {
-        return Database::connection()->query(
-            'SELECT p.id, p.name, p.hs_code, p.specifications, p.reference_unit FROM catalog_products p WHERE p.is_active = 1 AND '
+        $rows = Database::connection()->query(
+            'SELECT p.id, p.name, p.hs_code, p.specifications, p.reference_unit, p.category_id FROM catalog_products p WHERE p.is_active = 1 AND '
             . \App\Services\SupplierOffers::quotableSql() . ' ORDER BY p.name'
         )->fetchAll();
+        // D-435: each product's group in the picker — "Brand › Main category › Sub-category" (company-wide: no brand).
+        $groups = [];
+        foreach (\App\Repositories\ProductCategoryRepository::tree() as $c) {
+            $groups[(int) $c['id']] = (($c['brand_name'] ?? '') !== '' ? $c['brand_name'] . ' › ' : '') . \App\Repositories\ProductCategoryRepository::displayName($c);
+        }
+        foreach ($rows as &$r) {
+            $r['group'] = !empty($r['category_id']) ? ($groups[(int) $r['category_id']] ?? '') : '';
+        }
+        unset($r);
+        usort($rows, static fn (array $a, array $b): int => [$a['group'] === '' ? 1 : 0, $a['group'], mb_strtolower((string) $a['name'])]
+            <=> [$b['group'] === '' ? 1 : 0, $b['group'], mb_strtolower((string) $b['name'])]);
+        return $rows;
     }
 
     /**
@@ -216,10 +242,15 @@ final class ProductRepository
     public static function notQuotable(): array
     {
         $o = \App\Services\SupplierOffers::class;
-        $rows = Database::connection()->query('SELECT p.id, p.name, ' . $o::CONFIGURED_SQL . ' AS configured FROM catalog_products p WHERE NOT '
+        $rows = Database::connection()->query('SELECT p.id, p.name, p.approval_status, ' . $o::CONFIGURED_SQL . ' AS configured FROM catalog_products p WHERE NOT '
             . $o::quotableSql() . ' ORDER BY p.name')->fetchAll();
         return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name'],
-            'reason' => (int) $r['configured'] === 1 ? 'no active supplier — ask Procurement' : 'not configured yet — ask the product manager'], $rows);
+            'reason' => match (true) { // D-435
+                $r['approval_status'] === 'pending' => 'waiting for approval (Approvals › New products)',
+                $r['approval_status'] === 'rejected' => 'not approved — ask the brand manager',
+                (int) $r['configured'] === 1 => 'no active supplier — ask Procurement',
+                default => 'not configured yet — ask the product manager',
+            }], $rows);
     }
 
     /** D-361: whether the product may be quoted now (active and quotable). */

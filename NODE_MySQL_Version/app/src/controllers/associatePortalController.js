@@ -782,7 +782,7 @@ async function requestPrice(req, res) {
   const productId = parseInt(req.params.id, 10) || 0;
   if (refuseWhenSuspended(req, res, a, `/associate/catalogue/${productId}`)) return;
   const product = await require('../repositories/productRepository').find(productId);
-  if (!product) {
+  if (!product || !(await require('../services/priceRequestService').inAssociateBrand(a, product))) { // D-435
     flash.set(req, 'error', 'That product is not in your catalogue.');
     res.redirect('/associate/catalogue');
     return;

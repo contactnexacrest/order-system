@@ -34,7 +34,10 @@ final class PriceRules
      */
     public static function forCategory(int $categoryId): array
     {
-        $category = ProductCategoryRepository::find($categoryId) ?? [];
+        // D-435: the form edits the category's own values; what an empty value falls back to (its main category,
+        // its brand, else the global setting) is in 'inherited' with where it comes from.
+        $effective = ProductCategoryRepository::find($categoryId) ?? [];
+        $category = ProductCategoryRepository::findOwn($categoryId) ?? $effective;
         $cbmFrom = (int) PricingService::settings()['cbm_from_mm'];
         $spec = null;
         foreach (SpecRepository::categorySpecs($categoryId, true) as $s) {
@@ -72,7 +75,30 @@ final class PriceRules
             'other_cost_pct' => $num($category['other_cost_pct'] ?? null),
             'buffer_pct' => $num($category['buffer_pct'] ?? null),
             'global' => PricingService::settings(),
+            'inherited' => self::inherited($category, $effective),
         ];
+    }
+
+    /**
+     * D-435: for each value left empty on this category, the value it uses and from where ('main category', 'brand',
+     * 'global'). Keys: margin_pct, other_cost_pct, buffer_pct, thick_k_factor, container_cbm, container_max_t, weight_t_per_cbm.
+     *
+     * @return array<string,array{value:?float,from:string}>
+     */
+    private static function inherited(array $own, array $effective): array
+    {
+        $global = PricingService::settings();
+        $out = [];
+        foreach (['margin_pct', 'other_cost_pct', 'buffer_pct', 'thick_k_factor', 'container_cbm', 'container_max_t', 'weight_t_per_cbm'] as $k) {
+            $ev = $effective[$k] ?? null;
+            if ($ev !== null && $ev !== '' && ($own[$k] ?? null) === null) {
+                $from = !empty($effective["{$k}_from_brand"]) ? 'brand' : 'main category';
+                $out[$k] = ['value' => (float) $ev, 'from' => $from];
+            } else {
+                $out[$k] = ['value' => isset($global[$k]) ? (float) $global[$k] : null, 'from' => 'global'];
+            }
+        }
+        return $out;
     }
 
     /**

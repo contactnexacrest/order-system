@@ -754,6 +754,31 @@ Everything here needs a reason and is in the Audit Log. Quotations and orders al
   associate, so this order's prices are higher" — no associate name, level or %.
 - Associates see no prices in the catalogue; **Get price** gives their own quote and lowest (as before).
 
+## Brand catalogue: categories, sub-categories, brand pricing and new-product approval (D-435, 26 Nov 2026)
+
+Each brand has its own catalogue: **brand → main category → sub-category → product**. Example: StoneCrest → Natural Stones → Granite.
+
+**Add categories (Products › Categories).**
+1. "Add a main category": name, attributes and the **Brand** (empty = company-wide, for every brand). A brand manager's main categories are always their brand's.
+2. "Add a sub-category": choose the main category, give the name. Attributes may stay empty — then it uses the main category's.
+3. Open a sub-category to set anything of its own. An empty field uses the main category's value; the box shows it ("As Natural Stones: Size"), and "Now in use" lists what applies.
+
+**Brand pricing (Admin › Brands › the brand › Pricing).** Margin, other costs and buffer for the brand. Order of use: the product's own value → its sub-category → its main category → the brand → the company setting (Admin › Pricing). "Copy all company settings" fills today's company values; "Clear all" follows the company again. A reason is needed and kept in the Audit Log. Changed by staff with "Manage pricing" who look after all brands; a brand manager sees it.
+
+**New products need approval.** When a brand manager adds a product (Add product, Duplicate, or "+ Add product" on a supplier), it shows **Waiting for approval**. Until approved it cannot be quoted or picked on an order line, and associates do not see it.
+1. The MD, ED or anyone given "Approve new products" opens **Approvals › New products** and clicks Review product.
+2. On the product: **Approve product**, or **Do not approve** with the reason (10–300 characters).
+3. Not approved: the brand manager sees the reason, corrects the product and clicks **Send for approval again**.
+Nobody approves a product they added. Settings › Products and brands › "New products added by brand managers need approval" switches this off (then products are live at once).
+
+**Brand managers.** They see their brand's categories and products and the company-wide ones; they change only their brand's. Another brand's pages answer "Not found." They put products only into their brand's categories.
+
+**Move products to another category.** On the Products list, tick the products, choose the category under the table and click **Move to category**. Only within the same brand.
+
+**Associates** see only approved products of their brand and the company-wide ones in Catalogue and Get price.
+
+**Documents.** Only the values change (HS code, packing, quality documents, clause set from the product's category). The layout is the same and category or brand names never print.
+
 ## One page per category (D-306)
 
 Products › Categories › <category>: **General** (name, units, HS code, packing, documents) · **Options and

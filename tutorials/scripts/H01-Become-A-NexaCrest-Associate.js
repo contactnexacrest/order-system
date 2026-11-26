@@ -66,7 +66,7 @@ module.exports = {
       'We check that every new buyer is real before they become your client. So nobody can fake a buyer, or take yours.',
       'So send your link early.',
     ], say: 'What if someone else also knows this buyer? The buyer belongs to the person whose link or code the buyer used. We check that every new buyer is real before they become your client. So nobody can fake a buyer, or take yours. So send your link early.' },
-    { as: 'associate', goto: '/associate/catalogue', caption: 'Prices come from your portal', say: 'The buyer asks you: how much? Easy. In your portal you pick the product and its details, like size and thickness. The portal shows the price. You give that price to the buyer. You never have to work out a price yourself.' },
+    { as: 'associate', goto: '/associate/catalogue', caption: 'Prices come from your portal', say: 'The buyer asks you: how much? Easy. In your portal you pick the product and its details, like size and thickness. You see the products of the division you work with. The portal shows the price. You give that price to the buyer. You never have to work out a price yourself.' },
     { card: 'list', kicker: 'We do the rest', title: 'You bring the buyer, we do the work', items: [
       'We send the quotation, make the export papers and ship the goods.',
       'The buyer pays NexaCrest, straight into our bank.',

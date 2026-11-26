@@ -88,4 +88,34 @@
     </form>
     {% endif %}
   </div>
+
+  {# D-435 (owner 26 Nov 2026): the brand's price settings — between its categories and the company settings. #}
+  <div class="section" id="pricing">
+    <h2>Pricing</h2>
+    <p class="muted small">Margin, other costs and buffer for this brand's products. A product's own value comes first, then its sub-category, its main category, then this brand; empty here = the company setting (Admin › Pricing). Changes apply to prices worked out from now on; quotes already sent keep their prices.</p>
+    {% if canPricing %}
+    <form method="post" action="/admin/brands/{{ brand.id }}/pricing" data-brand-pricing>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <p class="actions">
+        <button type="submit" name="action" value="copy_all" class="btn-secondary">Copy all company settings</button>
+        <button type="submit" name="action" value="clear_all" class="btn-secondary">Clear all (follow company)</button>
+      </p>
+    {% endif %}
+      <table class="list" data-brand-pricing-table>
+        <tr><th>Setting</th><th>This brand</th><th>Source</th><th>Company setting today</th></tr>
+        {% for r in pricingRows %}
+        <tr data-pricing="{{ r.key }}">
+          <td>{{ r.label }}</td>
+          <td>{% if canPricing %}<input type="number" name="{{ r.key }}" min="0" max="{{ r.max }}" step="0.01" value="{{ r.own if r.own !== null else '' }}" placeholder="empty = company" aria-label="{{ r.label }}">{% elif r.own !== null %}{{ r.own }} %{% else %}<span class="muted">empty</span>{% endif %}</td>
+          <td>{% if r.own !== null %}<span class="badge badge-notyet">Own value</span>{% else %}<span class="badge badge-active">Company</span>{% endif %}</td>
+          <td class="muted">{{ r.company }} %</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% if canPricing %}
+      <label>Reason for the change * <small class="muted">(kept in the Audit Log)</small><textarea name="reason" required minlength="10" maxlength="300" rows="2" placeholder="e.g. textile margins are lower than stone"></textarea></label>
+      <button type="submit" name="action" value="save">Save pricing</button>
+    </form>
+    {% endif %}
+  </div>
 </div>

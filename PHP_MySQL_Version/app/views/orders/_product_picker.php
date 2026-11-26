@@ -22,7 +22,10 @@ $__pickerSpecName = str_ends_with((string) $__pickerName, '[]') ? 'product_spec_
 <label class="full">Pick from Products <small class="muted"><?= !empty($pickRequiredWhen) ? '(needed for a goods line on a USD order — fills the line; you can still change anything)' : '(optional — fills the line; you can still change anything)' ?></small>
   <select name="<?= htmlspecialchars($__pickerName) ?>" class="product-picker"<?= !empty($__pickerOrderId) ? ' data-order-id="' . (int) $__pickerOrderId . '"' : '' ?><?= isset($__pickerCurrency) ? ' data-order-currency="' . htmlspecialchars((string) $__pickerCurrency) . '"' : '' ?><?= isset($__pickerKey) ? ' data-price-key="' . htmlspecialchars((string) $__pickerKey) . '"' : '' ?><?= !empty($sees['selling']) ? ' data-selling="1"' : '' ?><?= !empty($pickRequiredWhen) ? ' data-required-when="' . htmlspecialchars((string) $pickRequiredWhen) . '" data-required-when-message="Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can)."' : '' ?>>
     <option value="">— Type the line by hand —</option>
+    <?php // D-435: grouped by brand › main category › sub-category when there is more than one group. ?>
+    <?php $__groups = array_unique(array_map(static fn (array $p): string => (string) ($p['group'] ?? ''), $pickerProducts ?? [])); $__grouped = count($__groups) > 1; $__open = null; ?>
     <?php foreach ($pickerProducts ?? [] as $__pp): ?>
+      <?php if ($__grouped && (string) ($__pp['group'] ?? '') !== $__open): ?><?= $__open !== null ? '</optgroup>' : '' ?><optgroup label="<?= htmlspecialchars((string) (($__pp['group'] ?? '') !== '' ? $__pp['group'] : 'Other products')) ?>"><?php $__open = (string) ($__pp['group'] ?? ''); endif; ?>
       <?php $__prices = $pickerPrices[(int) $__pp['id']] ?? null; ?>
       <option value="<?= (int) $__pp['id'] ?>"
         data-name="<?= htmlspecialchars((string) $__pp['name']) ?>"
@@ -35,6 +38,7 @@ $__pickerSpecName = str_ends_with((string) $__pickerName, '[]') ? 'product_spec_
         <?php if (!empty($pickerSoldAs[(int) $__pp['id']])): ?>data-sold-as="<?= htmlspecialchars((string) json_encode(array_values($pickerSoldAs[(int) $__pp['id']]))) ?>"<?php endif; ?>
         <?= $__pickerSelected === (int) $__pp['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__pp['name']) ?> (HS <?= htmlspecialchars((string) $__pp['hs_code']) ?>)</option>
     <?php endforeach; ?>
+    <?php if ($__grouped && $__open !== null): ?></optgroup><?php endif; ?>
     <?php // D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. ?>
     <?php if (!empty($pickerBlocked)): ?>
       <optgroup label="Not offered yet">

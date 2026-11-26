@@ -53,21 +53,23 @@ final class ProductController
         $status = ProductRepository::statusFilter($_GET['status'] ?? 'active');
         $statusCounts = null;
 
+        // D-435: a brand manager sees their brand's products and the company-wide ones; anyone may filter by brand and category.
+        [$scopeSql, $catalogFilter] = self::catalogScope();
         if ($searched) {
-            $statusCounts = ProductRepository::statusCounts($query);
+            $statusCounts = ProductRepository::statusCounts($query, $scopeSql);
         } elseif ($canBrowse) {
-            $statusCounts = ProductRepository::statusCounts();
+            $statusCounts = ProductRepository::statusCounts(null, $scopeSql);
         }
         // D-362 (13 Nov 2026, owner request): a tab or filter chip with 0 products opens Active
         // instead (All when Active is 0 too); the flash message is kept for the next page.
         if ($statusCounts !== null && ($__open = ProductRepository::openTab($status, $statusCounts)) !== $status) {
-            header('Location: /products?status=' . $__open . ($searched ? '&q=' . rawurlencode($query) : ''));
+            header('Location: /products?status=' . $__open . ($searched ? '&q=' . rawurlencode($query) : '') . $catalogFilter['qs']);
             return;
         }
         if ($searched) {
-            $products = ProductRepository::search($query, $status);
+            $products = ProductRepository::search($query, $status, $scopeSql);
         } elseif ($canBrowse) {
-            $products = ProductRepository::listing($status);
+            $products = ProductRepository::listing($status, null, $scopeSql);
         } else {
             // Search-only user with no query submitted yet — no full-list
             // query executes at all. This is the actual enforcement point;
@@ -75,7 +77,12 @@ final class ProductController
             $products = [];
         }
         // An inactive product says where it is used, so it is clear whether it may be deleted.
+        $__cats = [];
+        foreach (\App\Repositories\ProductCategoryRepository::tree() as $__c) {
+            $__cats[(int) $__c['id']] = \App\Repositories\ProductCategoryRepository::displayName($__c) . (($__c['brand_name'] ?? '') !== '' ? ' · ' . $__c['brand_name'] : '');
+        }
         foreach ($products as &$product) {
+            $product['category_label'] = !empty($product['category_id']) ? ($__cats[(int) $product['category_id']] ?? '') : ''; // D-435
             if (empty($product['is_active'])) {
                 $product['usage'] = ProductRepository::usage((int) $product['id']);
                 $product['usage_text'] = ProductRepository::usageText($product['usage']);
@@ -138,6 +145,8 @@ final class ProductController
 
         View::render('products/index', [
             'products'       => $products,
+            'catalogFilter'  => $catalogFilter, // D-435: brand / category filter
+            'moveTargets'    => \App\Repositories\ProductCategoryRepository::pickable(\App\Services\AssociateBrands::userBrandId()),
             'query'          => $query,
             'searched'       => $searched,
             'status'         => $status,
@@ -253,7 +262,10 @@ final class ProductController
         $id = ProductRepository::create($data, (int) $user['id']);
         ProductRepository::setPriceRuleFields($id, $ruleFields);
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_CREATED', 'products', $id, null, null, $data['name']);
-        Flash::set('success', 'Product added to the catalog.');
+        \App\Services\ProductApproval::afterCreate($id, (int) $user['id'], $user); // D-435
+        Flash::set('success', \App\Services\ProductApproval::needsApproval($user)
+            ? 'Product added. It waits for approval (Approvals › New products) before it can be quoted or seen by associates.'
+            : 'Product added to the catalog.');
         header("Location: /products/{$id}");
     }
 
@@ -362,13 +374,134 @@ final class ProductController
             'suppliers'      => $details['suppliers'],
             'miscCharges'    => $details['misc_charges'],
             'canViewPricing' => $canViewPricing,
-            'canManage'      => $canManage,
+            'canManage'      => $canManage && \App\Services\AssociateBrands::refusalForPath("/products/{$id}", 'POST') === null, // D-435: company-wide = view only for a brand manager
             'canSeeSuppliers' => $canSeeSuppliers,
             'pricingFull'    => $pricingFull,
             'pricingStaff'   => $pricingStaff,
             'canManagePricing' => $this->can('manage_pricing'),
             'canMarketPrices' => $this->can('record_market_prices') || $canBuildup,
+            'approvalRefusal' => \App\Services\ProductApproval::refusal($details['product'], (int) (AuthService::currentUser()['id'] ?? 0), isset(AuthService::currentUser()['role_id']) ? (int) AuthService::currentUser()['role_id'] : null),
         ], 'layout/base');
+    }
+
+    /** D-435: POST /products/{id}/approval — approve, or refuse with a reason ("Approve new products"; never your own). */
+    public function decideApproval(array $params): void
+    {
+        $product = ProductRepository::find((int) ($params['id'] ?? 0));
+        if (!$product) {
+            http_response_code(404);
+            echo 'Product not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        [$ok, $msg] = \App\Services\ProductApproval::decide($product, ($_POST['decision'] ?? '') === 'approve', (string) ($_POST['reason'] ?? ''),
+            (int) $user['id'], isset($user['role_id']) ? (int) $user['role_id'] : null);
+        Flash::set($ok ? 'success' : 'error', $msg);
+        header('Location: ' . ($ok ? '/approvals?tab=products' : "/products/{$product['id']}#approval"));
+    }
+
+    /** D-435: POST /products/{id}/resubmit — a product that was not approved, sent again after the changes. */
+    public function resubmitApproval(array $params): void
+    {
+        $product = ProductRepository::find((int) ($params['id'] ?? 0));
+        if (!$product || !\App\Services\AssociateBrands::inScope(['brand_id' => self::productBrandId($product)])) {
+            http_response_code(404);
+            echo 'Product not found.';
+            return;
+        }
+        $ok = \App\Services\ProductApproval::resubmit($product, (int) AuthService::currentUser()['id']);
+        Flash::set($ok ? 'success' : 'error', $ok ? 'Sent for approval again.' : 'This product is not waiting to be sent again.');
+        header("Location: /products/{$product['id']}");
+    }
+
+    /**
+     * D-435: the Products list's brand scope and filter. A brand manager: their brand's categories + products with no
+     * category or a company-wide one. ?brand= (id or "none") and ?category= (a main category includes its sub-categories).
+     *
+     * @return array{0: ?string, 1: array{brand:string, category:string, qs:string, brands:list<array<string,mixed>>, categories:list<array<string,mixed>>, brandScope:?int}}
+     */
+    private static function catalogScope(): array
+    {
+        $mine = \App\Services\AssociateBrands::userBrandId();
+        $tree = \App\Repositories\ProductCategoryRepository::tree(false, $mine);
+        $conds = [];
+        if ($mine !== null) {
+            $conds[] = ProductRepository::categorySql(array_column($tree, 'id'), true);
+        }
+        $brand = (string) ($_GET['brand'] ?? '');
+        if ($brand === 'none') {
+            $conds[] = ProductRepository::categorySql(array_column(array_filter($tree, static fn (array $c): bool => empty($c['brand_id'])), 'id'), true);
+        } elseif (ctype_digit($brand)) {
+            $conds[] = ProductRepository::categorySql(array_column(array_filter($tree, static fn (array $c): bool => (int) ($c['brand_id'] ?? 0) === (int) $brand), 'id'));
+        } else {
+            $brand = '';
+        }
+        $category = ctype_digit((string) ($_GET['category'] ?? '')) ? (string) $_GET['category'] : '';
+        if ($category !== '') {
+            $conds[] = ProductRepository::categorySql(array_column(array_filter($tree, static fn (array $c): bool => (int) $c['id'] === (int) $category
+                || (int) ($c['parent_id'] ?? 0) === (int) $category), 'id'));
+        }
+        $qs = ($brand !== '' ? '&brand=' . rawurlencode($brand) : '') . ($category !== '' ? '&category=' . $category : '');
+        return [$conds === [] ? null : implode(' AND ', $conds), ['brand' => $brand, 'category' => $category, 'qs' => $qs,
+            'brands' => array_values(array_filter(\App\Repositories\AssociateBrandRepository::usable(), static fn (array $b): bool => $mine === null || (int) $b['id'] === $mine)),
+            'categories' => $tree, 'brandScope' => $mine]];
+    }
+
+    /** D-435: POST /products/move-category — ticked products into another category of the same brand (Audit Log per product). */
+    public function moveCategory(array $params): void
+    {
+        $back = (string) ($_POST['return_to'] ?? '/products');
+        $back = str_starts_with($back, '/products') ? $back : '/products';
+        $target = \App\Repositories\ProductCategoryRepository::find((int) ($_POST['category_id'] ?? 0));
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['product_ids'] ?? [])))));
+        $mine = \App\Services\AssociateBrands::userBrandId();
+        if ($target === null || !in_array((int) $target['id'], array_map('intval', array_column(\App\Repositories\ProductCategoryRepository::pickable($mine), 'id')), true)) {
+            Flash::set('error', 'Choose the category to move the products to.');
+            header('Location: ' . $back);
+            return;
+        }
+        if ($ids === []) {
+            Flash::set('error', 'Tick the products to move first.');
+            header('Location: ' . $back);
+            return;
+        }
+        $targetBrand = !empty($target['brand_id']) ? (int) $target['brand_id'] : null;
+        $userId = (int) AuthService::currentUserId();
+        $moved = 0;
+        $refused = [];
+        foreach ($ids as $pid) {
+            $p = ProductRepository::find($pid);
+            if ($p === null) {
+                continue;
+            }
+            $from = self::productBrandId($p);
+            $mayChange = \App\Services\AssociateBrands::refusalForPath("/products/{$pid}", 'POST') === null;
+            if (!$mayChange || ($from !== null && $from !== $targetBrand)) {
+                $refused[] = (string) $p['name'];
+                continue;
+            }
+            if ((int) ($p['category_id'] ?? 0) === (int) $target['id']) {
+                continue;
+            }
+            \App\Config\Database::connection()->prepare('UPDATE catalog_products SET category_id = :c, updated_by = :u WHERE id = :id')
+                ->execute(['c' => (int) $target['id'], 'u' => $userId, 'id' => $pid]);
+            AuditLogRepository::log($userId, 'PRODUCT_CATEGORY_MOVED', 'catalog_products', $pid, 'category_id', (string) ($p['category_id'] ?? ''), (string) $target['id']);
+            $moved++;
+        }
+        $name = \App\Repositories\ProductCategoryRepository::displayName($target);
+        Flash::set($refused === [] ? 'success' : 'error', "{$moved} product(s) moved to {$name}."
+            . ($refused !== [] ? ' Not moved (another brand, or view only for you): ' . implode(', ', array_slice($refused, 0, 10)) . (count($refused) > 10 ? '…' : '') . '.' : ''));
+        header('Location: ' . $back);
+    }
+
+    /** D-435: the brand a product belongs to (through its category); null = company-wide. */
+    public static function productBrandId(array $product): ?int
+    {
+        if (empty($product['category_id'])) {
+            return null;
+        }
+        $c = \App\Repositories\ProductCategoryRepository::find((int) $product['category_id']);
+        return !empty($c['brand_id']) ? (int) $c['brand_id'] : null;
     }
 
     public function edit(array $params): void
@@ -456,6 +589,7 @@ final class ProductController
         $user = AuthService::currentUser();
         try {
             $newId = \App\Services\ProductDuplicateService::duplicate($id, $name, (int) $user['id']);
+            \App\Services\ProductApproval::afterCreate($newId, (int) $user['id'], $user); // D-435
         } catch (\Throwable $e) {
             error_log('PRODUCT_DUPLICATE_FAILED: ' . $e->getMessage());
             http_response_code(500);

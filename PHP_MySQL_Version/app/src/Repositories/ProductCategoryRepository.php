@@ -30,7 +30,17 @@ final class ProductCategoryRepository
         return $rows;
     }
 
-    public static function find(int $id): ?array
+    /**
+     * D-435 (owner 26 Nov 2026): the settings a sub-category takes from its main category when it does not set its own,
+     * and the price settings that then fall back to the category's brand (empty = the company setting).
+     */
+    public const INHERITED = ['default_unit', 'allowed_units', 'default_hs_code', 'packing_type', 'quality_documents', 'tc_clause_set',
+        'weight_t_per_cbm', 'insurance_rate_pct', 'insurance_cover_wording', 'thick_k_factor', 'container_cbm', 'container_max_t',
+        'margin_pct', 'other_cost_pct', 'buffer_pct'];
+    public const BRAND_PRICING = ['margin_pct', 'other_cost_pct', 'buffer_pct'];
+
+    /** The category as it is stored (a sub-category's own values only). */
+    public static function findOwn(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM product_categories WHERE id = :id');
         $stmt->execute(['id' => $id]);
@@ -40,6 +50,118 @@ final class ProductCategoryRepository
         }
         $row['attributes'] = self::attributeLabels($id);
         return $row;
+    }
+
+    /**
+     * The category every reader uses (order lines, documents, pricing, specifications): a sub-category's own values,
+     * else its main category's (D-435); a price setting still empty then follows the category's brand (D-435), else the
+     * company setting as before. A main category with no brand and no sub-categories reads exactly as before.
+     */
+    public static function find(int $id): ?array
+    {
+        $row = self::findOwn($id);
+        if ($row === null) {
+            return null;
+        }
+        $row['main_category_id'] = (int) $row['id'];
+        $row['main_category_name'] = (string) $row['name'];
+        if (!empty($row['parent_id'])) {
+            $main = self::findOwn((int) $row['parent_id']);
+            if ($main !== null) {
+                foreach (self::INHERITED as $k) {
+                    if (!array_key_exists($k, $row) || $row[$k] === null || $row[$k] === '') {
+                        $row[$k] = $main[$k] ?? null;
+                    }
+                }
+                if ($row['attributes'] === []) {
+                    $row['attributes'] = $main['attributes'];
+                }
+                $row['brand_id'] = $main['brand_id'] ?? null;
+                $row['main_category_id'] = (int) $main['id'];
+                $row['main_category_name'] = (string) $main['name'];
+                $row['parent_is_system'] = (int) ($main['is_system'] ?? 0);
+            }
+        }
+        if (!empty($row['brand_id'])) {
+            $brand = \App\Repositories\AssociateBrandRepository::settings((int) $row['brand_id']);
+            foreach (self::BRAND_PRICING as $k) {
+                if (($row[$k] ?? null) === null || $row[$k] === '') {
+                    $v = $brand['pricing_' . $k] ?? null;
+                    if ($v !== null && $v !== '') {
+                        $row[$k] = $v;
+                        $row[$k . '_from_brand'] = true;
+                    }
+                }
+            }
+        }
+        return $row;
+    }
+
+    /** "Natural Stones › Granite" (or just the name for a main category). */
+    public static function displayName(?array $category): string
+    {
+        if ($category === null) {
+            return '';
+        }
+        $main = (string) ($category['main_category_name'] ?? '');
+        return $main !== '' && $main !== (string) $category['name'] ? $main . ' › ' . $category['name'] : (string) $category['name'];
+    }
+
+    /**
+     * D-435: the category tree — each main category followed by its sub-categories, with its brand id and name.
+     * $brandScope: a brand manager's brand (their brand + company-wide main categories); null = every category.
+     *
+     * @return list<array<string,mixed>> rows with 'level' (1 = main, 2 = sub), 'brand_name', 'main_category_name'
+     */
+    public static function tree(bool $activeOnly = false, ?int $brandScope = null): array
+    {
+        $rows = self::all($activeOnly);
+        $brands = [];
+        foreach (\App\Repositories\AssociateBrandRepository::allUnscoped() as $b) {
+            $brands[(int) $b['id']] = (string) $b['name'];
+        }
+        $mains = array_values(array_filter($rows, static fn (array $r): bool => empty($r['parent_id'])));
+        $out = [];
+        foreach ($mains as $m) {
+            $brandId = !empty($m['brand_id']) ? (int) $m['brand_id'] : null;
+            if ($brandScope !== null && $brandId !== null && $brandId !== $brandScope) {
+                continue;
+            }
+            $m['level'] = 1;
+            $m['brand_name'] = $brandId !== null ? ($brands[$brandId] ?? '') : '';
+            $m['main_category_name'] = (string) $m['name'];
+            $out[] = $m;
+            foreach ($rows as $r) {
+                if ((int) ($r['parent_id'] ?? 0) === (int) $m['id']) {
+                    $r['level'] = 2;
+                    $r['brand_id'] = $brandId;
+                    $r['brand_name'] = $m['brand_name'];
+                    $r['main_category_name'] = (string) $m['name'];
+                    $out[] = $r;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * D-435: the categories a product may be put in — every active one, or for a brand manager only their brand's
+     * (a product in a company-wide category would be view-only for them).
+     *
+     * @return list<array<string,mixed>> tree rows (level, brand_name, main_category_name)
+     */
+    public static function pickable(?int $brandScope): array
+    {
+        return array_values(array_filter(self::tree(true, $brandScope), static fn (array $c): bool => $brandScope === null || (int) ($c['brand_id'] ?? 0) === $brandScope));
+    }
+
+    /** D-435: the category ids a brand manager / a brand's associate may use (their brand + company-wide); null = all. */
+    public static function idsForBrand(?int $brandId): ?array
+    {
+        if ($brandId === null) {
+            return null;
+        }
+        return array_map(static fn (array $r): int => (int) $r['id'], self::tree(false, $brandId));
     }
 
     /** @return list<string> */
@@ -58,16 +180,36 @@ final class ProductCategoryRepository
     }
 
     /** @param list<string> $labels */
-    public static function create(string $name, array $labels, int $userId): int
+    public static function create(string $name, array $labels, int $userId, ?int $parentId = null, ?int $brandId = null): int
     {
-        return (int) Database::transaction(static function () use ($name, $labels, $userId): int {
+        return (int) Database::transaction(static function () use ($name, $labels, $userId, $parentId, $brandId): int {
             $pdo = Database::connection();
-            $pdo->prepare('INSERT INTO product_categories (name, is_system, is_active, sort_order, created_by) VALUES (:n, 0, 1, 10, :u)')
-                ->execute(['n' => $name, 'u' => $userId]);
+            // D-435: a sub-category carries its main category's brand.
+            if ($parentId !== null) {
+                $main = self::findOwn($parentId);
+                $brandId = $main !== null && !empty($main['brand_id']) ? (int) $main['brand_id'] : null;
+            }
+            $pdo->prepare('INSERT INTO product_categories (name, is_system, is_active, sort_order, created_by, parent_id, brand_id) VALUES (:n, 0, 1, 10, :u, :p, :b)')
+                ->execute(['n' => $name, 'u' => $userId, 'p' => $parentId, 'b' => $brandId]);
             $id = (int) $pdo->lastInsertId();
             self::writeLabels($id, $labels);
             return $id;
         });
+    }
+
+    /** D-435: a main category's brand (empty = company-wide); its sub-categories follow. */
+    public static function setBrand(int $mainId, ?int $brandId): void
+    {
+        Database::connection()->prepare('UPDATE product_categories SET brand_id = :b WHERE id = :id OR parent_id = :id2')
+            ->execute(['b' => $brandId, 'id' => $mainId, 'id2' => $mainId]);
+    }
+
+    /** @return list<array<string,mixed>> a main category's sub-categories */
+    public static function children(int $mainId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM product_categories WHERE parent_id = :p ORDER BY sort_order, name');
+        $stmt->execute(['p' => $mainId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     /** @param list<string> $labels */

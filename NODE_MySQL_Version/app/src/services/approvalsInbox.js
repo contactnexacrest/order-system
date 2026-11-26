@@ -25,6 +25,7 @@ const TABS = {
   documents: 'Documents',
   emails: 'E-mails',
   bank: 'Bank details',
+  products: 'New products', // D-435
   other: 'Other',
 };
 
@@ -33,6 +34,7 @@ const APPROVER_PERMISSIONS = [
   'manage_pricing', 'approve_payment_terms', 'approve_email_send', 'approve_documents', 'edit_locked_data', 'approve_purchases',
   'approve_short_payment', 'manage_associate_bank', 'manage_associates', 'manage_field_protection',
   'approve_buyer_details_change', // D-337
+  'approve_new_products', // D-435
 ];
 
 /** Payment legs: where on the order page each one is cleared. */
@@ -92,6 +94,20 @@ function counts(items) {
 function row(key, what, since, orderId, orderRef, who, details, url, button, bar) {
   return { key, tab: 'other', what, tone: 'amber', since, order_id: orderId, order_ref: orderRef, line_no: null, who, details, url, button,
     bar, bar_button: bar !== '' ? button : '' };
+}
+
+/** D-435: products added by a brand manager, waiting for approval — not the approver's own. */
+async function newProducts(req) {
+  const me = Number(req.user.id);
+  const out = [];
+  for (const p of await require('./productApproval').pending()) {
+    if (Number(p.submitted_by || 0) === me || Number(p.created_by || 0) === me) continue;
+    const r = row(`product:${p.id}`, 'New product', String(p.updated_at), null, '', String(p.submitted_by_name || ''),
+      shorten(p.name + (p.category !== '' ? ` — ${p.category}` : '')), `/products/${p.id}#approval`, 'Review product', '');
+    r.tab = 'products';
+    out.push(r);
+  }
+  return out;
 }
 
 function visibility(req) {
@@ -407,6 +423,7 @@ async function items(req) {
   if (p.approve_email_send) list = list.concat(await emails(req));
   list = list.concat(await bank(req));
   list = list.concat(await other(req));
+  if (p.approve_new_products) list = list.concat(await newProducts(req));
   list.sort((a, b) => (String(a.since) < String(b.since) ? -1 : String(a.since) > String(b.since) ? 1 : (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)));
   req._approvalItems = list;
   return list;

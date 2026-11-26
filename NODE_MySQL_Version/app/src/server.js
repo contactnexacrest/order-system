@@ -655,7 +655,7 @@ async function missingRecordGuard(req, res, next) {
   if (!req.user) return next();
   try {
     const missing = (await orderAccessService.missingRecordForPath(req.path))
-      ?? (await require('./services/associateBrands').refusalForPath(req.path, req.method, req.user)); // D-432: a brand manager stays in their brand
+      ?? (await require('./services/associateBrands').refusalForPath(req.path, req.method, req.user, req.body || {})); // D-432: a brand manager stays in their brand
     if (missing === null) return next();
     res.status(404).send(missing);
   } catch (err) {
@@ -1043,12 +1043,13 @@ app.post('/preview/exit', requireAuth, verifyCsrf, asyncHandler(departmentContro
 app.post('/divisions/choose', requireAuth, requirePermission('see_all_divisions'), verifyCsrf, asyncHandler(divisionController.choose));
 app.get('/admin/divisions', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.index));
 // D-431 (owner 25–26 Nov 2026): Admin › Brands — division names associates see; rules per brand (D-411 permission).
-app.get('/admin/brands', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules']), asyncHandler(brandController.index));
+app.get('/admin/brands', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules', 'manage_pricing']), asyncHandler(brandController.index));
 app.post('/admin/brands', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.create));
-app.get('/admin/brands/:id', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules']), asyncHandler(brandController.show));
+app.get('/admin/brands/:id', requireAuth, requirePermissionAny(['manage_divisions', 'manage_associate_rules', 'manage_pricing']), asyncHandler(brandController.show));
 app.post('/admin/brands/:id', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.update));
 app.post('/admin/brands/:id/rules', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveRules));
 app.post('/users/:id/brand', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(brandController.setUserBrand)); // D-432
+app.post('/admin/brands/:id/pricing', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(brandController.savePricing)); // D-435
 app.post('/admin/brands/:id/ladder', requireAuth, requirePermission('manage_associate_rules'), verifyCsrf, asyncHandler(brandController.saveLadder));
 app.get('/admin/divisions/:id', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.show));
 app.post('/admin/divisions/:id/modules', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveModules));
@@ -1545,11 +1546,15 @@ app.post('/products/:id/configure/reset', requireAuth, requirePermission('manage
 app.post('/products/:id/configure/use-price', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productConfigureController.usePrice));
 app.get('/products/:id/link-supplier', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), asyncHandler(productConfigureController.linkSupplierForm));
 app.post('/products/:id/link-supplier', requireAuth, requirePermission('manage_suppliers'), requirePermission('record_market_prices'), verifyCsrf, asyncHandler(productConfigureController.linkSupplier));
+app.post('/products/move-category', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.moveCategory)); // D-435
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 // Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).
 app.get('/products/:id/duplicate', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.duplicateForm));
 app.post('/products/:id/duplicate', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.duplicate));
+// D-435 (owner 26 Nov 2026): a product added by a brand manager — approve / refuse ("Approve new products"), or send again.
+app.post('/products/:id/approval', requireAuth, requirePermission('approve_new_products'), verifyCsrf, asyncHandler(productsController.decideApproval));
+app.post('/products/:id/resubmit', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.resubmitApproval));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));
 app.post('/products/:id/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.remove));
 // Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).

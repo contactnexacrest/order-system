@@ -71,7 +71,9 @@ async function index(req, res) {
 
 /** A category's specifications and options with whether each is used (for its Options tab). */
 async function categoryData(categoryId) {
-  const specs = await specRepository.categorySpecs(categoryId);
+  const specs = await specRepository.categorySpecs(categoryId, false, true); // D-435: a sub-category edits its own; its main category's are listed read-only
+  const ownIds = specs.map((x) => Number(x.id));
+  const inheritedSpecs = (await specRepository.categorySpecs(categoryId)).filter((x) => !ownIds.includes(Number(x.id))).map((x) => String(x.name));
   const options = await specRepository.optionsFor(specs.map((x) => Number(x.id)));
   for (const sp of specs) {
     sp.options = (options[Number(sp.id)] || []).filter((o) => o.product_id === null);
@@ -84,7 +86,18 @@ async function categoryData(categoryId) {
     sp.forms_label = productSpecs.formsLabel(sp.applies_to);
     sp.applies_list = productSpecs.splitForms(sp.applies_to);
   }
-  return { categoryId, specs, forms: productSpecs.FORMS, kinds: productSpecs.KINDS, changeTypes: productSpecs.CHANGE_TYPES };
+  return { categoryId, specs, inheritedSpecs, forms: productSpecs.FORMS, kinds: productSpecs.KINDS, changeTypes: productSpecs.CHANGE_TYPES };
+}
+
+/** D-435: the categories a product may be put in (a brand manager: their brand's), plus the one it is in now. */
+async function categoryChoices(req, currentId) {
+  const list = (await productCategoryRepository.pickable(require('../services/associateBrands').userBrandId(req.user)))
+    .map((c) => ({ ...c, name: productCategoryRepository.displayName(c) }));
+  if (currentId !== null && currentId !== undefined && !list.some((c) => Number(c.id) === Number(currentId))) {
+    const cur = await productCategoryRepository.find(currentId);
+    if (cur) list.unshift({ ...cur, name: productCategoryRepository.displayName(cur) });
+  }
+  return list;
 }
 
 async function addSpec(req, res) {
@@ -323,7 +336,7 @@ async function product(req, res) {
     product: p, tree,
     soldAsSpecs, soldAsTicked,
     soldAsGroupsText: require('./productFormController').groupsText(soldAsSpecs.filter((s) => soldAsTicked.includes(Number(s.id)))),
-    oldFormsLabel: productSpecs.formsLabel(p.forms ?? null), oldForms: productSpecs.splitForms(p.forms ?? null), categories: await productCategoryRepository.all(true),
+    oldFormsLabel: productSpecs.formsLabel(p.forms ?? null), oldForms: productSpecs.splitForms(p.forms ?? null), categories: await categoryChoices(req, await productSpecs.categoryIdFor(p)), // D-435: brand › main › sub
     categoryId: await productSpecs.categoryIdFor(p), canEdit: can(req, 'manage_product_specifications'),
     // D-306 (point 20): "From category X — edit for all products in X".
     categoryName: String(((await productCategoryRepository.find(await productSpecs.categoryIdFor(p))) || {}).name || ''),
@@ -350,6 +363,8 @@ async function saveProductFields(req, res) {
   const errors = [];
   const categoryId = id(body.category_id);
   if (categoryId <= 0 || !(await productCategoryRepository.find(categoryId))) errors.push('Choose a category.');
+  else if (!(await productCategoryRepository.pickable(require('../services/associateBrands').userBrandId(req.user))).map((c) => Number(c.id)).includes(categoryId)
+    && Number(p.category_id || 0) !== categoryId) errors.push("Choose one of your brand's categories."); // D-435
   // D-384 (18 Nov 2026): the old "Forms" ticks are replaced by "Sold as" (its own form, /products/{id}/sold-as);
   // the product's old forms value is kept as it is (read-only) — it still applies while nothing is ticked.
   const forms = productSpecs.splitForms(p.forms ?? null);

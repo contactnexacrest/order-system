@@ -11,7 +11,11 @@
 <label class="full">Pick from Products <small class="muted">{{ '(needed for a goods line on a USD order — fills the line; you can still change anything)' if pickRequiredWhen else '(optional — fills the line; you can still change anything)' }}</small>
   <select name="{{ pickerName }}" class="product-picker"{% if pickerOrderId %} data-order-id="{{ pickerOrderId }}"{% endif %}{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}{% if pickerKey %} data-price-key="{{ pickerKey }}"{% endif %}{% if sees.selling %} data-selling="1"{% endif %}{% if pickRequiredWhen %} data-required-when="{{ pickRequiredWhen }}" data-required-when-message="Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can)."{% endif %}>
     <option value="">— Type the line by hand —</option>
+    {# D-435: grouped by brand › main category › sub-category when there is more than one group (the list is sorted by group). #}
+    {% set grouped = pickerProducts and pickerProducts.length > 1 and (pickerProducts[0].group or '') != (pickerProducts[pickerProducts.length - 1].group or '') %}
     {% for pp in pickerProducts %}
+      {% set prevGroup = (pickerProducts[loop.index0 - 1].group or '') if loop.index0 > 0 else null %}
+      {% if grouped and (loop.first or (pp.group or '') != prevGroup) %}{% if not loop.first %}</optgroup>{% endif %}<optgroup label="{{ pp.group if pp.group else 'Other products' }}">{% endif %}
       {% set ppPrices = pickerPrices[pp.id] if pickerPrices else null %}
       <option value="{{ pp.id }}"
         data-name="{{ pp.name }}"
@@ -24,6 +28,7 @@
         {% if pickerSoldAs and pickerSoldAs[pp.id] and pickerSoldAs[pp.id].length %}data-sold-as="{{ pickerSoldAs[pp.id] | dump }}"{% endif %}
         {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
     {% endfor %}
+    {% if grouped %}</optgroup>{% endif %}
     {# D-361 (mockup p7): products not offered yet stay findable, greyed, with the reason. #}
     {% if pickerBlocked and pickerBlocked.length %}
       <optgroup label="Not offered yet">

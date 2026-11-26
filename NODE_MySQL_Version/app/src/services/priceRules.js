@@ -47,7 +47,26 @@ async function forCategory(categoryId) {
     other_cost_pct: num(category ? category.other_cost_pct : null),
     buffer_pct: num(category ? category.buffer_pct : null),
     global: await require('./pricingService').settings(),
+    inherited: await inherited(category || {}, (await require('../repositories/productCategoryRepository').find(categoryId)) || {}),
   };
+}
+
+/**
+ * D-435: for each value left empty on this category, the value it uses and from where ('main category', 'brand',
+ * 'global'). Keys: margin_pct, other_cost_pct, buffer_pct, thick_k_factor, container_cbm, container_max_t, weight_t_per_cbm.
+ */
+async function inherited(own, effective) {
+  const global = await require('./pricingService').settings();
+  const out = {};
+  for (const k of ['margin_pct', 'other_cost_pct', 'buffer_pct', 'thick_k_factor', 'container_cbm', 'container_max_t', 'weight_t_per_cbm']) {
+    const ev = effective[k];
+    if (ev !== null && ev !== undefined && ev !== '' && (own[k] === null || own[k] === undefined)) {
+      out[k] = { value: Number(ev), from: effective[`${k}_from_brand`] ? 'brand' : 'main category' };
+    } else {
+      out[k] = { value: global[k] !== undefined && global[k] !== null ? Number(global[k]) : null, from: 'global' };
+    }
+  }
+  return out;
 }
 
 /** Saves the page with a reason, each change in the Audit Log: [number of changes, error]. Same messages as PHP. */

@@ -582,3 +582,9 @@ Admin › Users shows the new Brand card only once a brand exists, and brand man
 ## Videos on hold (owner 26 Nov 2026)
 "video we will keep it on hold for now … but make sure to update the video script as and when needed to keep it up-to-date — so whenever we want to record / re-record the video, it will have all the needed things."
 Recording is paused: H01, C01, C03, C04, C06, F01 (decided above) are **not** re-recorded now. Standing rule from now on: every change that alters what a video shows or says updates that video's script in `tutorials/scripts/` (and its storyboard) in the same commit, and this file lists which videos are out of date, so a later recording is right first time. The scripts already include everything decided up to 26 Nov 2026 (H01: D-430 company slide, "Your buyer deals with NexaCrest directly", the buyer-check line; the D-431 buyer tip shows by itself on Home and My clients).
+
+### D-435 brand catalogue (26 Nov 2026) — scripts updated, recording on hold (D-434)
+
+- **H01**: scene 2.5 says "You see the products of the division you work with." (script and storyboard updated). Record with the demo associate in a brand.
+- Screens that look different after D-435 (no narration changes needed; next recording shows them as they are): Products › Categories (Brand column and filter, sub-categories, "Add a sub-category") — A01-2, B04, B05, B09-1; Approvals menu gains **New products** — A01-2, B09-2; Products list (Brand and Category filters, tick boxes, "Move to category") — F03. Associate catalogue shows only the associate's brand and company-wide products — C04, F01 (same demo data shows the same products).
+

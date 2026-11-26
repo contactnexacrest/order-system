@@ -97,6 +97,9 @@ final class MarineInsurance
             if (!$wanted) {
                 continue;
             }
+            if (!empty($c['parent_id'])) {
+                $c = \App\Repositories\ProductCategoryRepository::find($id) ?? $c; // D-435: a sub-category follows its main category
+            }
             $rate = $c['insurance_rate_pct'] !== null && $c['insurance_rate_pct'] !== '' ? (float) $c['insurance_rate_pct'] : $s['rate_pct'];
             $wording = trim((string) ($c['insurance_cover_wording'] ?? '')) !== '' ? trim((string) $c['insurance_cover_wording']) : $s['cover_wording'];
             if (!$found || $rate > $best['rate_pct']) {
@@ -111,7 +114,7 @@ final class MarineInsurance
     public static function categories(): array
     {
         return Database::connection()->query(
-            'SELECT id, name, is_system, insurance_rate_pct, insurance_cover_wording FROM product_categories ORDER BY id'
+            'SELECT id, name, is_system, parent_id, insurance_rate_pct, insurance_cover_wording FROM product_categories ORDER BY id'
         )->fetchAll(\PDO::FETCH_ASSOC);
     }
 

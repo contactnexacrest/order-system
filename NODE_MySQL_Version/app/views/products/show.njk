@@ -4,6 +4,29 @@
   <p class="muted">HS Code: <strong>{{ product.hs_code }}</strong> &nbsp;·&nbsp; Origin: {{ product.origin or '—' }}</p>
 
   {# Owner decision D-358 (13 Nov 2026): a copy made by Duplicate says where it came from while it is still inactive. #}
+  {# D-435: a product added by a brand manager waits for approval before it can be quoted or seen by associates. #}
+  {% set ap = product.approval_status or 'approved' %}
+  {% if ap != 'approved' %}
+    <div class="alert{{ ' alert-error' if ap == 'rejected' }}" id="approval" data-approval="{{ ap }}">
+      <strong>{{ 'Waiting for approval' if ap == 'pending' else 'Not approved' }}</strong> —
+      {% if ap == 'pending' %}it cannot be quoted, ordered or seen by associates until someone with "Approve new products" approves it (Approvals › New products).{% else %}reason: {{ product.approval_reason or '' }}. Change what is asked, then send it again.{% endif %}
+      {% if approvalRefusal == '' %}
+      <form method="post" action="/products/{{ product.id }}/approval" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Note or reason <small class="muted">(needed to refuse; the brand manager sees it)</small><textarea name="reason" rows="2" maxlength="300" placeholder="e.g. HS code should be 680293 — please correct"></textarea></label>
+        <div class="btn-row">
+          <button type="submit" name="decision" value="approve" class="btn-sm btn-success">Approve product</button>
+          <button type="submit" name="decision" value="reject" class="btn-sm btn-danger">Do not approve</button>
+        </div>
+      </form>
+      {% elif ap == 'rejected' and canManage %}
+      <form method="post" action="/products/{{ product.id }}/resubmit" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm">Send for approval again</button>
+      </form>
+      {% endif %}
+    </div>
+  {% endif %}
   {% if copiedFrom %}
     <div class="alert" data-copied-from style="background:var(--navy-soft);color:var(--ink);border-left:4px solid var(--navy)">Copied from {% if copiedFrom.source_exists %}<a href="/products/{{ copiedFrom.source_id }}">{{ copiedFrom.source_name }}</a>{% else %}product #{{ copiedFrom.source_id }} (since deleted){% endif %} on {{ copiedFrom.copied_at }} by {{ copiedFrom.by }}. Check the details, update the supplier price, then switch it to <strong>Active</strong>.</div>
   {% endif %}

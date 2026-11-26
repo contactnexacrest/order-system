@@ -3,32 +3,55 @@
 <div class="card page-wide">
   <h1>Product categories</h1>
   <p class="muted">Each category names the attributes an order line of that category carries — they print on the Quotation, Proforma Invoice and Commercial Invoice in the line's detail row, in this order, followed by the HS code. Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
+  {# D-435 (26 Nov 2026): brand → main category → sub-category. A sub-category follows its main category's settings until it sets its own. #}
+  <form method="get" action="/products/categories" class="filter-row">
+    <label>Brand<select name="brand" onchange="this.form.submit()">
+      <option value="">All brands</option>
+      <option value="none"{% if brandFilter == 'none' %} selected{% endif %}>Company-wide (no brand)</option>
+      {% for b in brands %}{% if not brandScope or b.id == brandScope %}<option value="{{ b.id }}"{% if brandFilter == (b.id | string) %} selected{% endif %}>{{ b.name }}</option>{% endif %}{% endfor %}
+    </select></label>
+    <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+  </form>
   <table class="list">
-    <tr><th>Category</th><th>Attributes</th><th>Units</th><th>HS code</th><th>Packing</th><th>Quality documents</th><th>T&amp;C clauses</th><th>Status</th><th></th></tr>
+    <tr><th>Category</th><th>Brand</th><th>Attributes</th><th>Units</th><th>HS code</th><th>Packing</th><th>Quality documents</th><th>T&amp;C clauses</th><th>Status</th><th></th></tr>
     {% for c in categories %}
-    <tr>
-      <td><a href="/products/categories/{{ c.id }}">{{ c.name }}</a>{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</td>
-      <td>{{ c.attributes | join(' · ') }}</td>
-      {# D-257 0B: the category's units, HS code, packing, quality documents and T&C clause set. #}
-      <td>{% if c.default_unit %}{{ c.default_unit }}{% if c.allowed_units %} ({{ c.allowed_units | replace(',', ', ') }}){% endif %}{% elif c.allowed_units %}{{ c.allowed_units | replace(',', ', ') }}{% else %}Any (as today){% endif %}</td>
-      <td>{{ c.default_hs_code or '—' }}</td>
-      <td>{{ c.packing_type or '—' }}</td>
-      <td>{{ (c.qualityDocuments | join(' · ')) or 'None' }}</td>
-      <td>{{ tcClauseSets[c.tc_clause_set] if (c.tc_clause_set and tcClauseSets[c.tc_clause_set]) else '—' }}</td>
+    {% set rowBrand = (c.brand_id | string) if c.brand_id else 'none' %}
+    {% if brandFilter == '' or brandFilter == rowBrand %}
+    {% set isSub = c.level == 2 %}
+    {% set inh = '<small class="muted">as main</small>' %}
+    <tr{% if isSub %} class="cat-sub"{% endif %}>
+      <td>{% if isSub %}<span class="muted">↳</span> {% endif %}<a href="/products/categories/{{ c.id }}">{{ c.name }}</a>{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}{% if isSub %} <small class="muted">sub-category of {{ c.main_category_name }}</small>{% endif %}</td>
+      <td>{% if c.brand_name %}{{ c.brand_name }}{% else %}<span class="muted">Company-wide</span>{% endif %}</td>
+      <td>{% if c.attributes.length %}{{ c.attributes | join(' · ') }}{% elif isSub %}{{ inh | safe }}{% endif %}</td>
+      {# D-257 0B: the category's units, HS code, packing, quality documents and T&C clause set. A sub-category's empty value = its main category's. #}
+      <td>{% if isSub and not c.default_unit and not c.allowed_units %}{{ inh | safe }}{% elif c.default_unit %}{{ c.default_unit }}{% if c.allowed_units %} ({{ c.allowed_units | replace(',', ', ') }}){% endif %}{% elif c.allowed_units %}{{ c.allowed_units | replace(',', ', ') }}{% else %}Any (as today){% endif %}</td>
+      <td>{% if isSub and not c.default_hs_code %}{{ inh | safe }}{% else %}{{ c.default_hs_code or '—' }}{% endif %}</td>
+      <td>{% if isSub and not c.packing_type %}{{ inh | safe }}{% else %}{{ c.packing_type or '—' }}{% endif %}</td>
+      <td>{% if isSub and not c.quality_documents %}{{ inh | safe }}{% else %}{{ (c.qualityDocuments | join(' · ')) or 'None' }}{% endif %}</td>
+      <td>{% if isSub and not c.tc_clause_set %}{{ inh | safe }}{% else %}{{ tcClauseSets[c.tc_clause_set] if (c.tc_clause_set and tcClauseSets[c.tc_clause_set]) else '—' }}{% endif %}</td>
       <td>{{ 'Active' if c.is_active == 1 else 'Inactive' }}</td>
       <td><a class="btn-sm" href="/products/categories/{{ c.id }}">Open</a></td>
     </tr>
+    {% endif %}
     {% endfor %}
   </table>
 
   <p class="muted small">Open a category to change its name, attributes and settings (units, HS code, packing, quality documents, T&amp;C clauses), the options that change its prices, and its Category price rules.</p>
 
-  <h2>Add a category</h2>
+  <h2>Add a main category</h2>
   <form method="post" action="/products/categories">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     {# D-363 (13 Nov 2026): the name alone on row 1 (half width), then the attributes two per row (1 | 2, 3 | 4, 5 | 6); one column on a phone. Still exactly MAX_ATTRIBUTES (6) boxes. #}
     <div class="cat-attr-grid">
     <label class="cat-name">Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
+    {% if not brandScope %}
+    <label>Brand<select name="brand_id">
+      <option value="">Company-wide (no brand)</option>
+      {% for b in brands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+    </select></label>
+    {% else %}
+    <p class="muted small">The category is added to your brand.</p>
+    {% endif %}
     {% set hints = ['e.g. Size', 'e.g. Grade', 'e.g. Colour', 'e.g. Finish', 'e.g. Thickness', 'e.g. Packing'] %}
     {% for i in range(0, maxAttributes) %}
     <label{% if i == 0 %} class="cat-attr-first"{% endif %}>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} placeholder="{{ hints[i] or 'e.g. Finish' }}"></label>
@@ -36,4 +59,23 @@
     </div>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Add Category</button></div>
   </form>
+
+  {% if mainCategories.length %}
+  <h2>Add a sub-category</h2>
+  <p class="muted small">A sub-category sits under a main category (e.g. Natural Stones › Granite). It uses the main category's brand, attributes and settings; open it afterwards to set anything of its own.</p>
+  <form method="post" action="/products/categories">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="cat-attr-grid">
+    <label class="cat-name">Main category *<select name="parent_id" required>
+      <option value="">Choose…</option>
+      {% for m in mainCategories %}<option value="{{ m.id }}">{{ m.name }}{% if m.brand_name %} ({{ m.brand_name }}){% endif %}</option>{% endfor %}
+    </select></label>
+    <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Granite"></label>
+    {% for i in range(0, maxAttributes) %}
+    <label>Attribute {{ i + 1 }}<input type="text" name="attributes[]" maxlength="60" placeholder="{{ "Empty = the main category's attributes" if i == 0 else 'e.g. Finish' }}"></label>
+    {% endfor %}
+    </div>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Add Sub-category</button></div>
+  </form>
+  {% endif %}
 </div>

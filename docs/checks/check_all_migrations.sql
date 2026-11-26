@@ -148,6 +148,12 @@ FROM (
   SELECT '2026-11-26b',
          'Brand managers: users.brand_id (D-432)',
          IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'brand_id') = 1, 'already done', 'NEEDED')
+  UNION ALL
+  SELECT '2026-11-26c',
+         'Brand catalogue: product_categories.parent_id / brand_id, catalog_products approval columns, permission approve_new_products, setting brand_products_need_approval (D-435)',
+         CASE (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'product_categories' AND column_name IN ('parent_id', 'brand_id'))
+            + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'catalog_products' AND column_name IN ('approval_status', 'approval_reason', 'submitted_by', 'approved_by', 'approved_at'))
+              WHEN 7 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

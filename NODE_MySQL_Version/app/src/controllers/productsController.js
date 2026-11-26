@@ -1,4 +1,6 @@
 'use strict';
+const productApproval = require('../services/productApproval'); // D-435
+const brandsSvc = require('../services/associateBrands'); // D-435
 
 const fs = require('fs');
 const path = require('path');
@@ -67,21 +69,23 @@ async function index(req, res) {
   let statusCounts = null;
 
   let products;
-  if (searched) statusCounts = await productRepository.statusCounts(query);
-  else if (canBrowse) statusCounts = await productRepository.statusCounts();
+  // D-435: a brand manager sees their brand's products and the company-wide ones; anyone may filter by brand and category.
+  const [scopeSql, catalogFilter] = await catalogScope(req);
+  if (searched) statusCounts = await productRepository.statusCounts(query, scopeSql);
+  else if (canBrowse) statusCounts = await productRepository.statusCounts(null, scopeSql);
   // D-362 (13 Nov 2026, owner request): a tab or filter chip with 0 products opens Active
   // instead (All when Active is 0 too); the flash message is kept for the next page.
   if (statusCounts !== null) {
     const open = productRepository.openTab(status, statusCounts);
     if (open !== status) {
-      res.redirect(`/products?status=${open}${searched ? `&q=${encodeURIComponent(query)}` : ''}`);
+      res.redirect(`/products?status=${open}${searched ? `&q=${encodeURIComponent(query)}` : ''}${catalogFilter.qs}`);
       return;
     }
   }
   if (searched) {
-    products = await productRepository.search(query, status);
+    products = await productRepository.search(query, status, scopeSql);
   } else if (canBrowse) {
-    products = await productRepository.listing(status);
+    products = await productRepository.listing(status, null, scopeSql);
   } else {
     // Search-only user with no query submitted yet — no full-list query
     // executes at all. This is the actual enforcement point; everything
@@ -89,7 +93,11 @@ async function index(req, res) {
     products = [];
   }
   // An inactive product says where it is used, so it is clear whether it may be deleted.
+  const pcr = require('../repositories/productCategoryRepository');
+  const catLabels = {};
+  for (const c of await pcr.tree()) catLabels[Number(c.id)] = pcr.displayName(c) + (c.brand_name ? ` · ${c.brand_name}` : '');
   for (const product of products) {
+    product.category_label = product.category_id ? (catLabels[Number(product.category_id)] || '') : ''; // D-435
     if (!Number(product.is_active)) {
       product.usage = await productRepository.usage(product.id);
       product.usage_text = productRepository.usageText(product.usage);
@@ -148,6 +156,8 @@ async function index(req, res) {
 
   res.renderView('products/index', {
     products,
+    catalogFilter, // D-435: brand / category filter
+    moveTargets: (await pcr.pickable(brandsSvc.userBrandId(req.user))).map((c) => ({ id: Number(c.id), label: pcr.displayName(c) + (c.brand_name ? ` (${c.brand_name})` : '') })),
     query,
     searched,
     status,
@@ -293,7 +303,10 @@ async function store(req, res) {
   const id = await productRepository.create(data, user.id);
   await productRepository.setPriceRuleFields(id, ruleFields);
   await auditLogRepository.log(user.id, 'PRODUCT_CREATED', 'products', id, null, null, data.name);
-  flash.set(req, 'success', 'Product added to the catalog.');
+  await productApproval.afterCreate(id, user.id, user); // D-435
+  flash.set(req, 'success', (await productApproval.needsApproval(user))
+    ? 'Product added. It waits for approval (Approvals › New products) before it can be quoted or seen by associates.'
+    : 'Product added to the catalog.');
   res.redirect(`/products/${id}`);
 }
 
@@ -419,7 +432,8 @@ async function show(req, res) {
     suppliers: details.suppliers,
     miscCharges: details.misc_charges,
     canViewPricing,
-    canManage,
+    canManage: canManage && (await brandsSvc.refusalForPath(`/products/${id}`, 'POST', req.user)) === null, // D-435: company-wide = view only for a brand manager
+    approvalRefusal: productApproval.refusal(details.product, req.user.id, req.permissions),
     canSeeSuppliers,
     pricingFull,
     pricingStaff,
@@ -514,6 +528,7 @@ async function duplicate(req, res) {
   let newId;
   try {
     newId = await productDuplicateService.duplicate(id, name, req.user.id);
+    await productApproval.afterCreate(newId, req.user.id, req.user); // D-435
   } catch (e) {
     require('../helpers/logger').error('PRODUCT_DUPLICATE_FAILED', e);
     res.status(500);
@@ -953,7 +968,103 @@ function isNumeric(value) {
   return value !== '' && !isNaN(Number(value));
 }
 
+/**
+ * D-435: the Products list's brand scope and filter. A brand manager: their brand's categories + products with no
+ * category or a company-wide one. ?brand= (id or "none") and ?category= (a main category includes its sub-categories).
+ */
+async function catalogScope(req) {
+  const pcr = require('../repositories/productCategoryRepository');
+  const mine = brandsSvc.userBrandId(req.user);
+  const tree = await pcr.tree(false, mine);
+  const conds = [];
+  if (mine !== null) conds.push(productRepository.categorySql(tree.map((c) => c.id), true));
+  let brand = String(req.query.brand || '');
+  if (brand === 'none') conds.push(productRepository.categorySql(tree.filter((c) => !c.brand_id).map((c) => c.id), true));
+  else if (/^\d+$/.test(brand)) conds.push(productRepository.categorySql(tree.filter((c) => Number(c.brand_id || 0) === Number(brand)).map((c) => c.id)));
+  else brand = '';
+  const category = /^\d+$/.test(String(req.query.category || '')) ? String(req.query.category) : '';
+  if (category !== '') conds.push(productRepository.categorySql(tree.filter((c) => Number(c.id) === Number(category) || Number(c.parent_id || 0) === Number(category)).map((c) => c.id)));
+  const qs = (brand !== '' ? `&brand=${encodeURIComponent(brand)}` : '') + (category !== '' ? `&category=${category}` : '');
+  return [conds.length ? conds.join(' AND ') : null, {
+    brand, category, qs, brandScope: mine, categories: tree,
+    brands: (await require('../repositories/associateBrandRepository').usable()).filter((b) => mine === null || Number(b.id) === mine),
+  }];
+}
+
+/** D-435: the brand a product belongs to (through its category); null = company-wide. */
+async function productBrandId(product) {
+  if (!product.category_id) return null;
+  const c = await require('../repositories/productCategoryRepository').find(product.category_id);
+  return c && c.brand_id ? Number(c.brand_id) : null;
+}
+
+/** D-435: POST /products/:id/approval — approve, or refuse with a reason ("Approve new products"; never your own). */
+async function decideApproval(req, res) {
+  const product = await productRepository.find(parseInt(req.params.id, 10) || 0);
+  if (!product) {
+    res.status(404).send('Product not found.');
+    return;
+  }
+  const [ok, msg] = await productApproval.decide(product, String((req.body || {}).decision || '') === 'approve', String((req.body || {}).reason || ''), req.user.id, req.permissions);
+  flash.set(req, ok ? 'success' : 'error', msg);
+  res.redirect(ok ? '/approvals?tab=products' : `/products/${product.id}#approval`);
+}
+
+/** D-435: POST /products/:id/resubmit — a product that was not approved, sent again after the changes. */
+async function resubmitApproval(req, res) {
+  const product = await productRepository.find(parseInt(req.params.id, 10) || 0);
+  if (!product || !brandsSvc.inScope({ brand_id: await productBrandId(product) }, req.user)) {
+    res.status(404).send('Product not found.');
+    return;
+  }
+  const ok = await productApproval.resubmit(product, req.user.id);
+  flash.set(req, ok ? 'success' : 'error', ok ? 'Sent for approval again.' : 'This product is not waiting to be sent again.');
+  res.redirect(`/products/${product.id}`);
+}
+
+/** D-435: POST /products/move-category — ticked products into another category of the same brand (Audit Log per product). */
+async function moveCategory(req, res) {
+  const pcr = require('../repositories/productCategoryRepository');
+  const body = req.body || {};
+  let back = String(body.return_to || '/products');
+  if (!back.startsWith('/products')) back = '/products';
+  const target = await pcr.find(parseInt(body.category_id, 10) || 0);
+  const ids = [...new Set([].concat(body.product_ids || body['product_ids[]'] || []).map((v) => parseInt(v, 10) || 0).filter((v) => v > 0))];
+  const mine = brandsSvc.userBrandId(req.user);
+  if (!target || !(await pcr.pickable(mine)).some((c) => Number(c.id) === Number(target.id))) {
+    flash.set(req, 'error', 'Choose the category to move the products to.');
+    res.redirect(back);
+    return;
+  }
+  if (!ids.length) {
+    flash.set(req, 'error', 'Tick the products to move first.');
+    res.redirect(back);
+    return;
+  }
+  const targetBrand = target.brand_id ? Number(target.brand_id) : null;
+  let moved = 0;
+  const refused = [];
+  for (const pid of ids) {
+    const p = await productRepository.find(pid);
+    if (!p) continue;
+    const from = await productBrandId(p);
+    const mayChange = (await brandsSvc.refusalForPath(`/products/${pid}`, 'POST', req.user)) === null;
+    if (!mayChange || (from !== null && from !== targetBrand)) {
+      refused.push(String(p.name));
+      continue;
+    }
+    if (Number(p.category_id || 0) === Number(target.id)) continue;
+    await require('../config/db').execute('UPDATE catalog_products SET category_id = :c, updated_by = :u WHERE id = :id', { c: Number(target.id), u: req.user.id, id: pid });
+    await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_MOVED', 'catalog_products', pid, 'category_id', String(p.category_id ?? ''), String(target.id));
+    moved += 1;
+  }
+  flash.set(req, refused.length ? 'error' : 'success', `${moved} product(s) moved to ${pcr.displayName(target)}.`
+    + (refused.length ? ` Not moved (another brand, or view only for you): ${refused.slice(0, 10).join(', ')}${refused.length > 10 ? '…' : ''}.` : ''));
+  res.redirect(back);
+}
+
 module.exports = {
+  decideApproval, resubmitApproval, moveCategory, productBrandId, // D-435
   COST_PARTS_REFUSAL,
   readSupplierForm, validateSupplier, // D-338 (exported for its test)
   index,

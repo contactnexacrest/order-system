@@ -69,6 +69,15 @@ async function show(req, res) {
     levels: levels.map((l) => ({ id: String(l.id), label: `${l.name} — ${pricingService.levelLabel(l)}` })),
     canEdit: can(req, 'manage_divisions') && brands.userBrandId(req.user) === null, // D-432: a brand manager never edits brand details
     canRules: await associateRules.canManage(req.user),
+    // D-435: the brand's pricing — "Manage pricing" by staff who look after all brands; a brand manager reads it.
+    canPricing: can(req, 'manage_pricing') && brands.userBrandId(req.user) === null,
+    pricingRows: await (async () => {
+      const company = await pricingService.settings();
+      return Object.entries(repo.PRICING).map(([key, [label, max]]) => {
+        const own = rules['pricing_' + key] !== undefined && rules['pricing_' + key] !== '' ? rules['pricing_' + key] : null;
+        return { key, label, max, own, company: Number(company[key] || 0).toFixed(2) };
+      });
+    })(),
     statuses: brands.STATUSES, defaultTagline: brands.DEFAULT_TAGLINE,
     priceRules: associateRules.PRICE_RULES, whoChanges: associateRules.WHO_CHANGES,
   }, 'layout/base');
@@ -140,6 +149,57 @@ async function update(req, res) {
   if (changed.length) await repo.save(id, d, req.user.id);
   flash.set(req, 'success', changed.length ? 'Brand saved.' : 'Nothing changed.');
   res.redirect(`/admin/brands/${id}`);
+}
+
+/** D-435: POST /admin/brands/:id/pricing — margin, other costs and buffer for the brand (empty = company), with a reason. */
+async function savePricing(req, res) {
+  const brand = await repo.find(parseInt(req.params.id, 10) || 0);
+  if (!brand || brands.userBrandId(req.user) !== null) {
+    flash.set(req, 'error', !brand ? 'That brand no longer exists.' : 'Only staff who look after all brands change brand pricing.');
+    res.redirect(brand ? `/admin/brands/${brand.id}#pricing` : '/admin/brands');
+    return;
+  }
+  const id = Number(brand.id);
+  const back = `/admin/brands/${id}#pricing`;
+  const action = String(body(req).action || 'save');
+  const reason = String(body(req).reason || '').trim();
+  if (len(reason) < 10 || len(reason) > 300) {
+    flash.set(req, 'error', 'Give the reason for the change (10 to 300 characters) — it is kept in the Audit Log.');
+    res.redirect(back);
+    return;
+  }
+  const company = await pricingService.settings();
+  const values = {};
+  const errors = [];
+  for (const [k, [label, max]] of Object.entries(repo.PRICING)) {
+    if (action === 'copy_all') {
+      values['pricing_' + k] = String(Number(Number(company[k] || 0).toFixed(2)));
+    } else if (action === 'clear_all') {
+      values['pricing_' + k] = null;
+    } else {
+      const raw = String(body(req)[k] ?? '').trim();
+      if (raw !== '' && (!/^\d+(\.\d+)?$/.test(raw) || Number(raw) < 0 || Number(raw) > max || /\.\d{3,}$/.test(raw))) {
+        errors.push(`${label} must be a number from 0 to ${max} with at most 2 decimals.`);
+      }
+      values['pricing_' + k] = raw === '' ? null : raw;
+    }
+  }
+  if (errors.length) {
+    flash.set(req, 'error', errors.join(' '));
+    res.redirect(back);
+    return;
+  }
+  const before = await repo.settings(id);
+  await repo.saveSettings(id, values, req.user.id);
+  const after = await repo.settings(id);
+  for (const k of Object.keys(values)) {
+    const b = before[k] ?? '';
+    const a = after[k] ?? '';
+    if (b !== a) await auditLogRepository.log(req.user.id, 'BRAND_PRICING_CHANGED', 'associate_brands', id, k, b === '' ? '(company setting)' : b, a === '' ? '(company setting)' : a, reason);
+  }
+  flash.set(req, 'success', action === 'copy_all' ? 'Company pricing copied to this brand. Change only what this brand needs.'
+    : action === 'clear_all' ? "This brand's pricing now follows the company settings." : 'Brand pricing saved. It applies to prices worked out from now on.');
+  res.redirect(back);
 }
 
 async function saveRules(req, res) {
@@ -263,4 +323,4 @@ async function saveLadder(req, res) {
   res.redirect(`/admin/brands/${id}#ladder`);
 }
 
-module.exports = { index, show, create, update, saveRules, saveLadder, setUserBrand, showValue, ladderText };
+module.exports = { index, show, create, update, saveRules, savePricing, saveLadder, setUserBrand, showValue, ladderText };

@@ -75,6 +75,7 @@ removed from this folder; git history keeps them (last commit with them:
 | `2026-11-25c-associate-video-kyc-upload.sql` | D-417 | Upload context `associate_video_kyc` (mp4, mov, webm, 3gp, jpg, jpeg, png, pdf; 25 MB) for the optional video KYC recording / screenshots. Plain INSERT. Needs the server's PHP upload limit ≥ 25 MB. |
 | `2026-11-26a-associate-brands.sql` | D-431 | Brands for divisions (associate side): tables `associate_brands`, `associate_brand_settings`, `associate_brand_ladder_steps`; `associates.brand_id` and `associate_registration_links.brand_id` (with foreign keys). PLAIN ALTER (owner D-371) — a second run stops at "#1060 Duplicate column name", which is harmless. Check row '2026-11-26a' in `docs/checks/check_all_migrations.sql`. |
 | `2026-11-26b-brand-managers.sql` | D-432 | Brand managers: `users.brand_id` (with a foreign key to `associate_brands`); empty = all brands, as before. Run after 2026-11-26a. PLAIN ALTER (owner D-371). Check row '2026-11-26b'. |
+| `2026-11-26c-brand-catalogue.sql` | D-435 | Brand catalogue: `product_categories.parent_id` / `brand_id` (foreign keys), `catalog_products.approval_status` (default approved) / `approval_reason` / `submitted_by` / `approved_by` / `approved_at`, permission `approve_new_products` (MD, ED), setting `brand_products_need_approval` = 1. Run after 2026-11-26b. PLAIN ALTER (owner D-371). Check row '2026-11-26c'. |
 
 ### Rules for every migration file (enforced by tests)
 

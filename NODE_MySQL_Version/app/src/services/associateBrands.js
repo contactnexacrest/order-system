@@ -172,7 +172,7 @@ const COMPANY_WIDE_POSTS = ['/associates/ladder', '/associates/access-levels', '
  * D-432: for a brand manager, the refusal (404 text) for a page or action of another brand, a company-wide setting or
  * brand details; null = allowed. Runs after the route's own sign-in / permission / CSRF checks. PHP twin: refusalForPath().
  */
-async function refusalForPath(path, method, user) {
+async function refusalForPath(path, method, user, body = {}) {
   const mine = userBrandId(user);
   if (mine === null) return null;
   const brandOf = async (sql, id) => {
@@ -199,6 +199,54 @@ async function refusalForPath(path, method, user) {
   }
   if ((m = path.match(/^\/associates\/registrations\/(\d+)\//))) {
     return (await brandOf('SELECT l.brand_id AS b FROM associate_registrations r JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id', m[1])) === mine ? null : other;
+  }
+  // D-435: the catalogue. A brand manager sees their brand's and the company-wide categories and products,
+  // and changes only their brand's (and a product they added that has no category yet).
+  const catBrand = 'SELECT COALESCE(c.brand_id, mc.brand_id) AS b FROM product_categories c LEFT JOIN product_categories mc ON mc.id = c.parent_id WHERE c.id = :id';
+  const catExists = async (id) => !!(await db.queryOne('SELECT id FROM product_categories WHERE id = :id', { id: Number(id) }));
+  const decide = (brand, own = false) => {
+    if (brand !== null && brand !== mine) return other;
+    if (brand === null && method === 'POST' && !own) return 'Not found.'; // company-wide: view only for a brand manager
+    return null;
+  };
+  if (method === 'POST' && ['/pricing/settings', '/pricing/specifications'].includes(path)) {
+    if (path === '/pricing/specifications') {
+      const cid = Number((body || {}).category_id || 0);
+      return cid > 0 && (await catExists(cid)) ? decide(await brandOf(catBrand, cid)) : null; // no category: the controller refuses it
+    }
+    return 'Not found.';
+  }
+  if ((m = path.match(/^\/products\/categories\/(\d+)(\/|$)/))) {
+    return (await catExists(m[1])) ? decide(await brandOf(catBrand, m[1])) : null;
+  }
+  const productBrand = async (pid) => {
+    const p = await db.queryOne('SELECT category_id, created_by, submitted_by FROM catalog_products WHERE id = :id', { id: Number(pid) });
+    if (!p) return [false, null, false];
+    const me = Number((user && user.id) || -1);
+    const mineToo = Number(p.created_by || 0) === me || Number(p.submitted_by || 0) === me;
+    return [true, p.category_id !== null ? await brandOf(catBrand, p.category_id) : null, mineToo && p.category_id === null];
+  };
+  if ((m = path.match(/^\/products\/(\d+)(\/|$)/))) {
+    const [found, brand, own] = await productBrand(m[1]);
+    return found ? decide(brand, own) : null;
+  }
+  if ((m = path.match(/^\/pricing\/specifications\/(\d+)(\/|$)/))) {
+    const d = await db.queryOne('SELECT category_id, product_id FROM spec_definitions WHERE id = :id', { id: Number(m[1]) });
+    if (!d) return null;
+    if (d.product_id !== null) {
+      const [, brand, own] = await productBrand(d.product_id);
+      return decide(brand, own);
+    }
+    return d.category_id !== null ? decide(await brandOf(catBrand, d.category_id)) : decide(null);
+  }
+  if ((m = path.match(/^\/pricing\/spec-options\/(\d+)(\/|$)/))) {
+    const d = await db.queryOne('SELECT d.category_id, COALESCE(o.product_id, d.product_id) AS product_id FROM spec_options o JOIN spec_definitions d ON d.id = o.spec_id WHERE o.id = :id', { id: Number(m[1]) });
+    if (!d) return null;
+    if (d.product_id !== null) {
+      const [, brand, own] = await productBrand(d.product_id);
+      return decide(brand, own);
+    }
+    return d.category_id !== null ? decide(await brandOf(catBrand, d.category_id)) : decide(null);
   }
   return null;
 }

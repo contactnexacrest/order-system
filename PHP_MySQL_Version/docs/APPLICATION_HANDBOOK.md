@@ -2947,6 +2947,51 @@ Quotation's printed validity. Tests: `ProspectD394Test` /
   `override_line_hs_code` (D-385).
 - **SOP / decisions.** SOP 01 (order lines), 15 (Settings › Lists finishes), 27; D-215, D-255, D-256, D-257 (Phase 0B/1), D-334, D-358, D-380 … D-389 (D-380, D-386 – D-388 documents in §8.12; D-381 and the per-tonne price in §7.1).
 
+
+### 6.2a Brand catalogue: brand → main category → sub-category → product (D-435)
+
+- **Purpose.** Each brand (D-431) has its own catalogue, managed by its brand manager (D-432).
+- **Tables.** `product_categories.parent_id` (a sub-category's main category) and `.brand_id` (a main
+  category's brand; empty = company-wide; a sub-category carries its main category's brand);
+  `catalog_products.approval_status` (`approved` | `pending` | `rejected`, default approved), `approval_reason`,
+  `submitted_by`, `approved_by`, `approved_at`; brand price settings in `associate_brand_settings`
+  (`pricing_margin_pct`, `pricing_other_cost_pct`, `pricing_buffer_pct`); permission `approve_new_products`
+  (MD, ED by default, grantable); setting `brand_products_need_approval` (default on, Settings › Products and brands).
+  Migration 2026-11-26c.
+- **Inheritance (one place).** `ProductCategoryRepository::find()` / Node `productCategoryRepository.find()` returns a
+  sub-category's own values, else its main category's (units, HS code, packing, quality documents, T&C clause set,
+  weight per CBM, insurance rate and wording, × K, container, margin, other costs, buffer, attributes). A price
+  setting still empty then follows the brand's pricing, else the company setting. Every reader (order lines,
+  documents, pricing, price rules, insurance) uses `find()`; settings forms edit `findOwn()` and show the inherited
+  value as the placeholder ("empty = 30.00 (brand)"). A sub-category's Options tab lists its main category's
+  specifications as read-only and its own below; pricing uses both.
+- **Screens.** Products › Categories: Brand filter and column, sub-categories under their main category ("as main"
+  where a value is inherited), "Add a main category" (with Brand) and "Add a sub-category" (main category required,
+  attributes optional). Category page: brand line, Brand select (main category, staff who see all brands), list of
+  sub-categories, "Empty here = …'s value. Now in use: …". Admin › Brands › **Pricing** (margin, other costs, buffer;
+  Copy all / Clear all; reason; "Manage pricing" by staff who see all brands; brand managers read it;
+  `POST /admin/brands/{id}/pricing`, Audit Log `BRAND_PRICING_CHANGED`). Products list: Brand and Category filters,
+  category label under each name, "Waiting for approval" / "Not approved" badge, tick boxes + "Move to category"
+  (`POST /products/move-category`, same brand only, Audit Log `PRODUCT_CATEGORY_MOVED`). Pick from Products on an
+  order line is grouped "Brand › Main › Sub".
+- **Approval.** A product added by a brand manager (Add product, Duplicate, a supplier's "+ Add product") is
+  `pending` when the setting is on (`ProductApproval::afterCreate`). Pending or rejected products are never
+  quotable (`SupplierOffers::quotableSql()` requires `approval_status = 'approved'`), never in Pick from Products
+  (listed greyed with the reason) and never seen by associates. Approvals › **New products** (tab `products`,
+  menu count `approvals_products`, Standard and Kanban) lists them for "Approve new products", never one you
+  added; the product page has Approve / Do not approve (reason 10–300 characters, the brand manager sees it)
+  (`POST /products/{id}/approval`) and, when not approved, "Send for approval again" (`POST /products/{id}/resubmit`).
+  Audit Log `PRODUCT_SUBMITTED_FOR_APPROVAL`, `PRODUCT_APPROVED`, `PRODUCT_REJECTED`.
+- **Brand managers.** `AssociateBrands::refusalForPath()` also covers `/products/categories/{id}*`, `/products/{id}*`,
+  `/pricing/specifications*`, `/pricing/spec-options/*` and `POST /pricing/settings`: another brand's = "Not found.";
+  company-wide categories and products are view-only (a product they added with no category yet stays theirs).
+  Their new main categories are always their brand's; they put products only into their brand's categories
+  (`ProductCategoryRepository::pickable()`).
+- **Associates.** `PriceRequestService::inAssociateBrand()`: the catalogue, Get price and price requests show approved
+  products of the associate's brand and the company-wide ones only.
+- **Documents.** Only values change (HS code, packing, quality documents, clause set from the product's category,
+  inherited where empty). Layout unchanged; category and brand names never print (owner confirmed twice, mockup 8).
+
 ### 6.3 Pricing engine and price requests
 
 - **Purpose.** Work out a safe selling price per unit (FOB, USD) from the

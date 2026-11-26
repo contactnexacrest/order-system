@@ -30,6 +30,12 @@ final class AssociateBrandRepository
         )->fetchAll();
     }
 
+    /** @return list<array<string,mixed>> every brand, whoever asks (names for lists; D-435) */
+    public static function allUnscoped(): array
+    {
+        return Database::connection()->query('SELECT * FROM associate_brands ORDER BY name')->fetchAll();
+    }
+
     /** @return list<array<string,mixed>> brands that can be given to an associate */
     public static function usable(): array
     {
@@ -86,6 +92,13 @@ final class AssociateBrandRepository
         unset(self::$byId[$id]);
         return $id;
     }
+
+    /** D-435: the brand's price settings (stored as pricing_<key>), label and highest value. */
+    public const PRICING = [
+        'margin_pct' => ['Margin %', 89.99],
+        'other_cost_pct' => ['Other costs %', 100],
+        'buffer_pct' => ['Buffer %', 100],
+    ];
 
     /** @return array<string,string> the brand's own rule values (missing = follows the company setting) */
     public static function settings(int $brandId): array

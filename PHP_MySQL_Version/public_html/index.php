@@ -550,12 +550,13 @@ $router->post('/admin/divisions/{id}/settings', [$divisions, 'saveSetting'], [Se
 $router->post('/admin/divisions/{id}/settings/delete', [$divisions, 'deleteSetting'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 // D-431 (owner 25–26 Nov 2026): Admin › Brands — division names associates see; rules per brand (D-411 permission).
 $brands = new \App\Controllers\BrandController();
-$router->get('/admin/brands', [$brands, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules'])]);
+$router->get('/admin/brands', [$brands, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules', 'manage_pricing'])]);
 $router->post('/admin/brands', [$brands, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
-$router->get('/admin/brands/{id}', [$brands, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules'])]);
+$router->get('/admin/brands/{id}', [$brands, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules', 'manage_pricing'])]);
 $router->post('/admin/brands/{id}', [$brands, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/brands/{id}/rules', [$brands, 'saveRules'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/users/{id}/brand', [$brands, 'setUserBrand'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]); // D-432
+$router->post('/admin/brands/{id}/pricing', [$brands, 'savePricing'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]); // D-435
 $router->post('/admin/brands/{id}/ladder', [$brands, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/activate', [$divisions, 'activate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/deactivate', [$divisions, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
@@ -1255,6 +1256,10 @@ $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(
 // Owner decision D-358 (13 Nov 2026): duplicate a product — confirm screen, then the copy (Inactive).
 $router->get('/products/{id}/duplicate', [$products, 'duplicateForm'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/{id}/duplicate', [$products, 'duplicate'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// D-435 (owner 26 Nov 2026): a product added by a brand manager — approve / refuse ("Approve new products"), or send again.
+$router->post('/products/move-category', [$products, 'moveCategory'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/{id}/approval', [$products, 'decideApproval'], [SessionAuth::required(), PermissionCheck::requires('approve_new_products'), CsrfCheck::verify()]);
+$router->post('/products/{id}/resubmit', [$products, 'resubmitApproval'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/delete', [$products, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 // Owner (12 Nov 2026): deactivate / reactivate a product (a used product is never deleted).

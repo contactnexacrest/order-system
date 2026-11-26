@@ -55,12 +55,13 @@ function statusSql(status) {
   }
 }
 
-function listingWhere(term) {
+function listingWhere(term, scopeSql = null) {
   const t = String(term ?? '').trim();
-  if (t === '') return { where: [], params: {} };
+  const scope = scopeSql ? [scopeSql] : [];
+  if (t === '') return { where: scope, params: {} };
   // D-361: a supplier's name (typed, or the directory supplier's legal name) matches too.
   return {
-    where: [`(p.name LIKE :term OR p.hs_code LIKE :term OR p.specifications LIKE :term OR EXISTS (SELECT 1 FROM catalog_product_suppliers cs
+    where: [...scope, `(p.name LIKE :term OR p.hs_code LIKE :term OR p.specifications LIKE :term OR EXISTS (SELECT 1 FROM catalog_product_suppliers cs
       LEFT JOIN suppliers sx ON sx.id = cs.supplier_id WHERE cs.product_id = p.id AND (cs.supplier_name LIKE :term OR sx.supplier_legal_name LIKE :term)))`],
     params: { term: `%${t}%` },
   };
@@ -71,16 +72,16 @@ function listingWhere(term) {
  * supplier / no supplier yet), optionally narrowed by a search term (name, HS code,
  * specification or — D-361 — a supplier's name).
  */
-async function listing(status = 'active', term = null) {
-  const { where, params } = listingWhere(term);
+async function listing(status = 'active', term = null, scopeSql = null) {
+  const { where, params } = listingWhere(term, scopeSql);
   const cond = statusSql(status);
   if (cond !== null) where.push(cond);
   return db.query(`SELECT p.* FROM catalog_products p${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY p.name`, params);
 }
 
 /** The numbers on the filter chips — the same rows listing() returns. */
-async function statusCounts(term = null) {
-  const { where, params } = listingWhere(term);
+async function statusCounts(term = null, scopeSql = null) {
+  const { where, params } = listingWhere(term, scopeSql);
   const sums = STATUSES.map((st) => {
     const cond = statusSql(st);
     return cond === null ? 'COUNT(*) AS `all`' : `COALESCE(SUM(${cond}), 0) AS \`${st}\``;
@@ -92,8 +93,19 @@ async function statusCounts(term = null) {
 }
 
 /** Products matching the term (active ones unless a status is given). */
-async function search(term, status = 'active') {
-  return listing(status, term);
+async function search(term, status = 'active', scopeSql = null) {
+  return listing(status, term, scopeSql);
+}
+
+/**
+ * D-435: the condition (alias p) for products in these categories; withUncategorised adds products with no
+ * category (company-wide). null ids = no condition. Ids are integers, so they are inlined safely.
+ */
+function categorySql(ids, withUncategorised = false) {
+  if (ids === null || ids === undefined) return null;
+  const list = [...new Set(ids.map((i) => Number(i) || 0))];
+  const inList = list.length ? list.join(',') : '0';
+  return withUncategorised ? `(p.category_id IS NULL OR p.category_id IN (${inList}))` : `p.category_id IN (${inList})`;
 }
 
 /**
@@ -148,7 +160,20 @@ async function setActive(id, active, userId) {
  * 13b that has no supplier yet.
  */
 async function forPicker() {
-  return db.query(`SELECT p.id, p.name, p.hs_code, p.specifications, p.reference_unit FROM catalog_products p WHERE p.is_active = 1 AND ${offersSql().quotableSql()} ORDER BY p.name`);
+  const rows = await db.query(`SELECT p.id, p.name, p.hs_code, p.specifications, p.reference_unit, p.category_id FROM catalog_products p WHERE p.is_active = 1 AND ${offersSql().quotableSql()} ORDER BY p.name`);
+  // D-435: each product's group in the picker — "Brand › Main category › Sub-category" (company-wide: no brand).
+  const pcr = require('./productCategoryRepository');
+  const groups = {};
+  for (const c of await pcr.tree()) groups[Number(c.id)] = (c.brand_name ? `${c.brand_name} › ` : '') + pcr.displayName(c);
+  for (const r of rows) r.group = r.category_id ? (groups[Number(r.category_id)] || '') : '';
+  const key = (r) => [r.group === '' ? 1 : 0, r.group, String(r.name).toLowerCase()];
+  rows.sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    for (let i = 0; i < 3; i += 1) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+    return 0;
+  });
+  return rows;
 }
 
 /**
@@ -158,8 +183,11 @@ async function forPicker() {
  */
 async function notQuotable() {
   const o = offersSql();
-  const rows = await db.query(`SELECT p.id, p.name, ${o.CONFIGURED_SQL} AS configured FROM catalog_products p WHERE NOT ${o.quotableSql()} ORDER BY p.name`);
-  return rows.map((r) => ({ id: Number(r.id), name: String(r.name), reason: Number(r.configured) === 1 ? 'no active supplier — ask Procurement' : 'not configured yet — ask the product manager' }));
+  const rows = await db.query(`SELECT p.id, p.name, p.approval_status, ${o.CONFIGURED_SQL} AS configured FROM catalog_products p WHERE NOT ${o.quotableSql()} ORDER BY p.name`);
+  return rows.map((r) => ({ id: Number(r.id), name: String(r.name), // D-435
+    reason: r.approval_status === 'pending' ? 'waiting for approval (Approvals › New products)'
+      : r.approval_status === 'rejected' ? 'not approved — ask the brand manager'
+        : Number(r.configured) === 1 ? 'no active supplier — ask Procurement' : 'not configured yet — ask the product manager' }));
 }
 
 /** D-361: whether the product may be quoted now (active and quotable). */
@@ -259,7 +287,7 @@ async function setPriceRuleFields(id, f) {
 }
 
 module.exports = {
-  notQuotable, isQuotable,
+  notQuotable, isQuotable, categorySql,
   STATUSES, all, statusFilter, openTab, listing, statusCounts, search, usage, usageText, deleteRefusal, setActive,
   find, create, update, remove, forPicker, setPriceRuleFields,
 };

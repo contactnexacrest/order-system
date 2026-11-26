@@ -16,6 +16,18 @@ async function all() {
   );
 }
 
+/** D-435: every brand, whoever asks (the category tree names each category's brand). */
+async function allUnscoped() {
+  return db.query('SELECT * FROM associate_brands ORDER BY name');
+}
+
+/** D-435: the brand's price settings (stored as pricing_<key>), label and highest value. */
+const PRICING = {
+  margin_pct: ['Margin %', 89.99],
+  other_cost_pct: ['Other costs %', 100],
+  buffer_pct: ['Buffer %', 100],
+};
+
 async function usable() {
   return db.query(`SELECT * FROM associate_brands WHERE status <> 'inactive'${require('../services/associateBrands').scopeSql('id')} ORDER BY name`); // D-432
 }
@@ -95,4 +107,4 @@ async function setAssociateBrand(associateId, brandId) {
   await db.execute('UPDATE associates SET brand_id = :b WHERE id = :id', { b: brandId ? Number(brandId) : null, id: Number(associateId) });
 }
 
-module.exports = { reset, all, usable, find, findByCode, nameTaken, codeTaken, save, settings, saveSettings, ladder, replaceLadder, setAssociateBrand };
+module.exports = { PRICING, allUnscoped, reset, all, usable, find, findByCode, nameTaken, codeTaken, save, settings, saveSettings, ladder, replaceLadder, setAssociateBrand };

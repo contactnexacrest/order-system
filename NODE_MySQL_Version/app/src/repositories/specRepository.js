@@ -16,8 +16,21 @@ async function systemCategoryId() {
 }
 
 /** A category's specifications (not the product-only ones), in order. */
-async function categorySpecs(categoryId, activeOnly = false) {
-  return db.query(`SELECT * FROM spec_definitions WHERE category_id = :c AND product_id IS NULL${activeOnly ? ' AND is_active = 1' : ''} ORDER BY sort_order, id`, { c: categoryId });
+/**
+ * A category's specifications (not the product-only ones), in order.
+ * D-435: a sub-category has its main category's specifications plus its own (ownOnly: just its own, for its settings page).
+ */
+async function categorySpecs(categoryId, activeOnly = false, ownOnly = false) {
+  const ids = [categoryId];
+  if (!ownOnly) {
+    const p = await db.queryOne('SELECT parent_id FROM product_categories WHERE id = :c', { c: categoryId });
+    if (p && Number(p.parent_id) > 0) ids.unshift(Number(p.parent_id));
+  }
+  let rows = [];
+  for (const cid of ids) {
+    rows = rows.concat(await db.query(`SELECT * FROM spec_definitions WHERE category_id = :c AND product_id IS NULL${activeOnly ? ' AND is_active = 1' : ''} ORDER BY sort_order, id`, { c: cid }));
+  }
+  return rows;
 }
 
 async function productOnlySpecs(productId) {

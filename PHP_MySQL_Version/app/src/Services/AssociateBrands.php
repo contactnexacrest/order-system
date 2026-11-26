@@ -263,6 +263,73 @@ final class AssociateBrands
         if (preg_match('#^/associates/registrations/(\d+)/#', $path, $m)) {
             return $brandOf('SELECT l.brand_id FROM associate_registrations r JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id', (int) $m[1]) === $mine ? null : $other;
         }
+        // D-435: the catalogue. A brand manager sees their brand's and the company-wide categories and products,
+        // and changes only their brand's (and a product they added that has no category yet).
+        $catBrand = 'SELECT COALESCE(c.brand_id, m.brand_id) FROM product_categories c LEFT JOIN product_categories m ON m.id = c.parent_id WHERE c.id = :id';
+        $catExists = static function (int $id) use ($pdo): bool {
+            $st = $pdo->prepare('SELECT COUNT(*) FROM product_categories WHERE id = :id');
+            $st->execute(['id' => $id]);
+            return (int) $st->fetchColumn() > 0;
+        };
+        $decide = static function (?int $brand, bool $own = false) use ($mine, $method, $other): ?string {
+            if ($brand !== null && $brand !== $mine) {
+                return $other;
+            }
+            if ($brand === null && $method === 'POST' && !$own) {
+                return 'Not found.'; // company-wide: view only for a brand manager
+            }
+            return null;
+        };
+        if ($method === 'POST' && in_array($path, ['/pricing/settings', '/pricing/specifications'], true)) {
+            if ($path === '/pricing/specifications') {
+                $cid = (int) ($_POST['category_id'] ?? 0);
+                return $cid > 0 && $catExists($cid) ? $decide($brandOf($catBrand, $cid)) : null; // no category: the controller refuses it
+            }
+            return 'Not found.';
+        }
+        if (preg_match('#^/products/categories/(\d+)(/|$)#', $path, $m)) {
+            return $catExists((int) $m[1]) ? $decide($brandOf($catBrand, (int) $m[1])) : null;
+        }
+        $productBrand = static function (int $pid) use ($pdo, $brandOf, $catBrand): array {
+            $st = $pdo->prepare('SELECT category_id, created_by, submitted_by FROM catalog_products WHERE id = :id');
+            $st->execute(['id' => $pid]);
+            $p = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($p === false) {
+                return [false, null, false];
+            }
+            $mineToo = (int) ($p['created_by'] ?? 0) === (int) (AuthService::currentUser()['id'] ?? -1) || (int) ($p['submitted_by'] ?? 0) === (int) (AuthService::currentUser()['id'] ?? -1);
+            return [true, $p['category_id'] !== null ? $brandOf($catBrand, (int) $p['category_id']) : null, $mineToo && $p['category_id'] === null];
+        };
+        if (preg_match('#^/products/(?:(\d+)|\{pid\})(/|$)#', $path, $m) || preg_match('#^/products/(\d+)/own-specs/#', $path, $m)) {
+            [$found, $brand, $own] = $productBrand((int) $m[1]);
+            return $found ? $decide($brand, $own) : null;
+        }
+        if (preg_match('#^/pricing/specifications/(\d+)(/|$)#', $path, $m)) {
+            $st = $pdo->prepare('SELECT category_id, product_id FROM spec_definitions WHERE id = :id');
+            $st->execute(['id' => (int) $m[1]]);
+            $d = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($d === false) {
+                return null;
+            }
+            if ($d['product_id'] !== null) {
+                [, $brand, $own] = $productBrand((int) $d['product_id']);
+                return $decide($brand, $own);
+            }
+            return $d['category_id'] !== null ? $decide($brandOf($catBrand, (int) $d['category_id'])) : $decide(null);
+        }
+        if (preg_match('#^/pricing/spec-options/(\d+)(/|$)#', $path, $m)) {
+            $st = $pdo->prepare('SELECT d.category_id, COALESCE(o.product_id, d.product_id) AS product_id FROM spec_options o JOIN spec_definitions d ON d.id = o.spec_id WHERE o.id = :id');
+            $st->execute(['id' => (int) $m[1]]);
+            $d = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($d === false) {
+                return null;
+            }
+            if ($d['product_id'] !== null) {
+                [, $brand, $own] = $productBrand((int) $d['product_id']);
+                return $decide($brand, $own);
+            }
+            return $d['category_id'] !== null ? $decide($brandOf($catBrand, (int) $d['category_id'])) : $decide(null);
+        }
         return null;
     }
 

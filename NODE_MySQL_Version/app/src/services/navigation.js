@@ -221,6 +221,7 @@ function forRequest(req) {
     approvals_prices: tabs.prices || 0,
     approvals_payment_terms: tabs.payment_terms || 0,
     approvals_bank: tabs.bank || 0,
+    approvals_products: tabs.products || 0, // D-435
     approvals_other: tabs.other || 0,
     myReviews: req.myReviewsPendingCount || 0,
     // The bar's "E-mails" counts what this person may approve — the same rule as the Approvals page's chip and the left-menu badge
