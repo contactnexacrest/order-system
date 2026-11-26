@@ -30,7 +30,7 @@ final class AssociateRepository
             'SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name,
                     cl.name AS commission_level_name
              FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id
-             WHERE 1 = 1' . \App\Services\DivisionService::sql('a.division_id') . ' ORDER BY a.status, a.name'
+             WHERE 1 = 1' . \App\Services\DivisionService::sql('a.division_id') . \App\Services\AssociateBrands::scopeSql('a.brand_id') . ' ORDER BY a.status, a.name' // D-432
         )->fetchAll();
     }
 
@@ -53,6 +53,10 @@ final class AssociateRepository
         $division = \App\Services\DivisionService::forNewRecord();
         if ($division !== \App\Services\DivisionService::EXPORT_ID) {
             $pdo->prepare('UPDATE associates SET division_id = :d WHERE id = :id')->execute(['d' => $division, 'id' => $associateId]);
+        }
+        // D-432: an associate added by a brand manager belongs to that brand.
+        if (($brand = \App\Services\AssociateBrands::userBrandId()) !== null) {
+            $pdo->prepare('UPDATE associates SET brand_id = :b WHERE id = :id')->execute(['b' => $brand, 'id' => $associateId]);
         }
         return $associateId;
     }

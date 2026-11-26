@@ -6994,3 +6994,7 @@ ALTER TABLE associates ADD CONSTRAINT fk_associates_brand FOREIGN KEY (brand_id)
 -- The brand an applicant joins through: chosen by the MD on the associate registration link.
 ALTER TABLE associate_registration_links ADD COLUMN brand_id BIGINT UNSIGNED NULL;
 ALTER TABLE associate_registration_links ADD CONSTRAINT fk_associate_registration_links_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);
+
+-- D-432 (26 Nov 2026): brand managers — a staff member who looks after one brand (empty = all brands).
+ALTER TABLE users ADD COLUMN brand_id BIGINT UNSIGNED NULL;
+ALTER TABLE users ADD CONSTRAINT fk_users_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);

@@ -114,6 +114,22 @@
   </form>
 </div>
 <?php endif; ?>
+<?php $__brandsAll = \App\Repositories\AssociateBrandRepository::all(); if ($__brandsAll !== [] && \App\Services\PermissionService::can((int) \App\Services\AuthService::currentUser()['id'], \App\Services\AuthService::currentUser()['role_id'] !== null ? (int) \App\Services\AuthService::currentUser()['role_id'] : null, 'manage_divisions') && \App\Services\AssociateBrands::userBrandId() === null): // D-432 ?>
+<div class="card" data-testid="user-brand">
+  <h2>Brand</h2>
+  <p class="muted">A brand manager looks after one brand only: they see and change only that brand's associates, rules and ladder, and never company-wide settings. All brands = as today.</p>
+  <form method="post" action="/users/<?= (int) $target['id'] ?>/brand" class="field-grid">
+    <?= \App\Helpers\Csrf::field() ?>
+    <label>Brand
+      <select name="brand_id">
+        <option value="">All brands</option>
+        <?php foreach ($__brandsAll as $__b): ?><option value="<?= (int) $__b['id'] ?>"<?= (int) ($target['brand_id'] ?? 0) === (int) $__b['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__b['name']) ?></option><?php endforeach; ?>
+      </select>
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save brand</button></div>
+  </form>
+</div>
+<?php endif; ?>
 <?php $__partyType = "staff"; $__partyId = (int) $target["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>
 <?php require __DIR__ . '/_sop_extras.php'; // D-266 ?>
 <?php require __DIR__ . '/_report_extras.php'; // D-379 ?>

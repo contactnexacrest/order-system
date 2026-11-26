@@ -319,7 +319,7 @@ final class AssociateAdminController
             'a' => $a,
             'canManage' => $canManage,
             'canBank' => $canBank,
-            'canBrand' => self::can('manage_divisions'), // D-431: only the MD (and Admin) moves an associate to another brand
+            'canBrand' => self::can('manage_divisions') && \App\Services\AssociateBrands::userBrandId() === null, // D-432: never a brand manager // D-431: only the MD (and Admin) moves an associate to another brand
             'canChangeLink' => AssociateService::canChangeLink(self::user()),
             // D-292: the rule, level and progress only with "See associate commission rules"; others see "Set by the MD".
             'rule' => self::can('view_associate_commission_rules') ? \App\Services\AssociateCommission::ruleProgress($a) : null,
@@ -1384,7 +1384,8 @@ final class AssociateAdminController
         if ($brand !== '' && $brand !== 'none' && !in_array((int) $brand, array_map(static fn (array $b): int => (int) $b['id'], $brands), true)) {
             $brand = '';
         }
-        $brandSql = $brand === '' ? '' : ($brand === 'none' ? ' AND a.brand_id IS NULL' : ' AND a.brand_id = ' . (int) $brand);
+        $brandSql = ($brand === '' ? '' : ($brand === 'none' ? ' AND a.brand_id IS NULL' : ' AND a.brand_id = ' . (int) $brand))
+            . \App\Services\AssociateBrands::scopeSql('a.brand_id'); // D-432: a brand manager sees only their brand
         $perf = [];
         foreach (AssociateRepository::all() as $a) {
             if ($brand !== '' && ($brand === 'none' ? !empty($a['brand_id']) : (int) ($a['brand_id'] ?? 0) !== (int) $brand)) {

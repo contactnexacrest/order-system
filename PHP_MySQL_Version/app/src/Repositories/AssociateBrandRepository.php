@@ -26,14 +26,14 @@ final class AssociateBrandRepository
     {
         return Database::connection()->query(
             "SELECT b.*, (SELECT COUNT(*) FROM associates a WHERE a.brand_id = b.id) AS associate_count
-               FROM associate_brands b ORDER BY FIELD(b.status, 'active', 'planned', 'inactive'), b.name"
+               FROM associate_brands b WHERE 1 = 1" . \App\Services\AssociateBrands::scopeSql('b.id') . " ORDER BY FIELD(b.status, 'active', 'planned', 'inactive'), b.name"
         )->fetchAll();
     }
 
     /** @return list<array<string,mixed>> brands that can be given to an associate */
     public static function usable(): array
     {
-        return Database::connection()->query("SELECT * FROM associate_brands WHERE status <> 'inactive' ORDER BY name")->fetchAll();
+        return Database::connection()->query("SELECT * FROM associate_brands WHERE status <> 'inactive'" . \App\Services\AssociateBrands::scopeSql('id') . ' ORDER BY name')->fetchAll();
     }
 
     public static function find(int $id): ?array

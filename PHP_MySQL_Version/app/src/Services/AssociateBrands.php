@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Config\Database;
+use App\Services\AuthService;
 use App\Repositories\AssociateBrandRepository;
 use App\Repositories\IncentiveRepository;
 use App\Repositories\PricingRepository;
@@ -193,6 +194,76 @@ final class AssociateBrands
         $body = str_replace('NexaCrest relationship manager', $name . ' relationship manager', $body);
         $body = preg_replace('/\n\nNexaCrest International Private Limited$/', "\n\n{$name} associates team", $body) ?? $body;
         return [$subject, $name . ' — ' . $brand['tagline'] . "\n\n" . $body . "\n\n" . self::legalLine($brand)];
+    }
+
+    // ------------------------------------------------------------ D-432 brand managers
+
+    /** D-432 (owner 26 Nov 2026): the brand a staff member looks after (users.brand_id); null = all brands, as before. */
+    public static function userBrandId(?array $user = null): ?int
+    {
+        $user ??= AuthService::currentUser();
+        $b = (int) ($user['brand_id'] ?? 0);
+        return $b > 0 ? $b : null;
+    }
+
+    /** " AND {col} = {brand}" for a brand manager, else "" (the brand id is an integer, safe to inline). */
+    public static function scopeSql(string $column = 'a.brand_id'): string
+    {
+        $b = self::userBrandId();
+        return $b === null ? '' : " AND {$column} = {$b}";
+    }
+
+    /** Whether the signed-in staff member may see this associate (always, unless they manage another brand). */
+    public static function inScope(?array $associate): bool
+    {
+        $b = self::userBrandId();
+        return $b === null || ($associate !== null && (int) ($associate['brand_id'] ?? 0) === $b);
+    }
+
+    /** Company-wide pages a brand manager may not change (D-432: they change only their own brand). */
+    private const COMPANY_WIDE_POSTS = ['/associates/ladder', '/associates/access-levels', '/associates/registrations/settings',
+        '/pricing/commission-levels', '/pricing/commission-ladder', '/pricing/settings/associate-price-rule', '/admin/brands'];
+
+    /**
+     * D-432: for a brand manager, the refusal (404 text) for a page or action of another brand, or of a company-wide setting;
+     * null = allowed. Run by the router after the route's own sign-in / permission / CSRF checks.
+     */
+    public static function refusalForPath(string $path, string $method): ?string
+    {
+        $mine = self::userBrandId();
+        if ($mine === null) {
+            return null;
+        }
+        $pdo = Database::connection();
+        $brandOf = static function (string $sql, int $id) use ($pdo): ?int {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['id' => $id]);
+            $v = $stmt->fetchColumn();
+            return $v === false || $v === null ? null : (int) $v;
+        };
+        $other = 'Not found.';
+        if ($method === 'POST' && (in_array($path, self::COMPANY_WIDE_POSTS, true) || preg_match('#^/pricing/commission-levels/\d+#', $path) || preg_match('#^/associates/\d+/brand$#', $path) || preg_match('#^/admin/brands/\d+$#', $path))) { // also brand details: never a brand manager
+            return 'Not found.'; // a company-wide setting or brand details — only staff who look after all brands change them
+        }
+        if (preg_match('#^/admin/brands/(\d+)#', $path, $m)) {
+            return (int) $m[1] === $mine ? null : $other;
+        }
+        if (preg_match('#^/associates/(\d+)(/|$)#', $path, $m)) {
+            return $brandOf('SELECT brand_id FROM associates WHERE id = :id', (int) $m[1]) === $mine ? null : $other;
+        }
+        if (preg_match('#^/associates/(?:payouts|tds)/(\d+)/#', $path, $m)) {
+            return $brandOf('SELECT a.brand_id FROM incentive_payouts p JOIN associates a ON a.id = p.associate_id WHERE p.id = :id', (int) $m[1]) === $mine ? null : $other;
+        }
+        if (preg_match('#^/associates/price-requests/(\d+)/#', $path, $m)) {
+            return $brandOf('SELECT a.brand_id FROM price_requests r JOIN associates a ON a.id = r.associate_id WHERE r.id = :id', (int) $m[1]) === $mine ? null : $other;
+        }
+        if (preg_match('#^/associates/registrations/links/(\d+)/#', $path, $m)) {
+            return $brandOf('SELECT brand_id FROM associate_registration_links WHERE id = :id', (int) $m[1]) === $mine ? null : $other;
+        }
+        if (preg_match('#^/associates/registrations/(\d+)/#', $path, $m)) {
+            return $brandOf('SELECT l.brand_id FROM associate_registrations r JOIN associate_registration_links l ON l.id = r.link_id WHERE r.id = :id', (int) $m[1]) === $mine ? null : $other;
+        }
+        return null;
     }
 
     /** Login address codes that are already pages of the portal. */

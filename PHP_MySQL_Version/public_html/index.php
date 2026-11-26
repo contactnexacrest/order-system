@@ -92,7 +92,8 @@ $router->beforeHandler(static function (string $path): bool {
     if (\App\Services\AuthService::currentUser() === null) {
         return true;
     }
-    $missing = \App\Services\OrderAccessService::missingRecordForPath($path);
+    $missing = \App\Services\OrderAccessService::missingRecordForPath($path)
+        ?? \App\Services\AssociateBrands::refusalForPath($path, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')); // D-432: a brand manager stays in their brand
     if ($missing === null) {
         return true;
     }
@@ -554,6 +555,7 @@ $router->post('/admin/brands', [$brands, 'create'], [SessionAuth::required(), Pe
 $router->get('/admin/brands/{id}', [$brands, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_divisions', 'manage_associate_rules'])]);
 $router->post('/admin/brands/{id}', [$brands, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/brands/{id}/rules', [$brands, 'saveRules'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
+$router->post('/users/{id}/brand', [$brands, 'setUserBrand'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]); // D-432
 $router->post('/admin/brands/{id}/ladder', [$brands, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_rules'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/activate', [$divisions, 'activate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/divisions/{id}/deactivate', [$divisions, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);

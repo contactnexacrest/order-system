@@ -55,7 +55,7 @@ final class AssociateRegistrationRepository
     public static function links(): array
     {
         return Database::connection()->query(
-            'SELECT l.*, u.name AS created_by_name FROM associate_registration_links l JOIN users u ON u.id = l.created_by ORDER BY l.id DESC LIMIT 100'
+            'SELECT l.*, u.name AS created_by_name FROM associate_registration_links l JOIN users u ON u.id = l.created_by WHERE 1 = 1' . \App\Services\AssociateBrands::scopeSql('l.brand_id') . ' ORDER BY l.id DESC LIMIT 100' // D-432
         )->fetchAll();
     }
 
@@ -78,10 +78,11 @@ final class AssociateRegistrationRepository
     /** @return list<array<string,mixed>> */
     public static function all(?string $status): array
     {
-        $sql = 'SELECT r.*, u.name AS reviewed_by_name FROM associate_registrations r LEFT JOIN users u ON u.id = r.reviewed_by';
+        $sql = 'SELECT r.*, u.name AS reviewed_by_name FROM associate_registrations r LEFT JOIN users u ON u.id = r.reviewed_by
+                 LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE 1 = 1' . \App\Services\AssociateBrands::scopeSql('l.brand_id'); // D-432
         $params = [];
         if ($status !== null && isset(self::STATUSES[$status])) {
-            $sql .= ' WHERE r.status = :s';
+            $sql .= ' AND r.status = :s';
             $params['s'] = $status;
         }
         $stmt = Database::connection()->prepare($sql . ' ORDER BY r.id DESC LIMIT 200');
@@ -99,6 +100,6 @@ final class AssociateRegistrationRepository
 
     public static function pendingCount(): int
     {
-        return (int) Database::connection()->query("SELECT COUNT(*) FROM associate_registrations WHERE status = 'pending'")->fetchColumn();
+        return (int) Database::connection()->query("SELECT COUNT(*) FROM associate_registrations r LEFT JOIN associate_registration_links l ON l.id = r.link_id WHERE r.status = 'pending'" . \App\Services\AssociateBrands::scopeSql('l.brand_id'))->fetchColumn();
     }
 }

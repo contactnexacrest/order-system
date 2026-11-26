@@ -501,6 +501,9 @@ final class IncentiveController
         // D-431: the Brand filter shows only the associate lines of that brand (staff lines are not part of a brand).
         $brands = \App\Repositories\AssociateBrandRepository::all();
         $brand = (string) ($_GET['brand'] ?? '');
+        if (($mine = \App\Services\AssociateBrands::userBrandId()) !== null) {
+            $brand = (string) $mine; // D-432: a brand manager sees only their brand's associate lines
+        }
         if ($brand !== '' && $brand !== 'none' && !in_array((int) $brand, array_map(static fn (array $b): int => (int) $b['id'], $brands), true)) {
             $brand = '';
         }

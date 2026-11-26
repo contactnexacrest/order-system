@@ -144,6 +144,10 @@ FROM (
          CASE (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('associate_brands', 'associate_brand_settings', 'associate_brand_ladder_steps'))
             + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN ('associates', 'associate_registration_links') AND column_name = 'brand_id')
               WHEN 5 THEN 'already done' WHEN 0 THEN 'NEEDED' ELSE 'PARTLY done - run it again' END
+  UNION ALL
+  SELECT '2026-11-26b',
+         'Brand managers: users.brand_id (D-432)',
+         IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'brand_id') = 1, 'already done', 'NEEDED')
   -- UNION ALL
   -- SELECT '2026-12-01a', 'Example: new column orders.example_col',
   --        IF((SELECT COUNT(*) FROM information_schema.columns

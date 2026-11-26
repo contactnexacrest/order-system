@@ -364,7 +364,7 @@ final class PriceRequestService
     /** Manual requests waiting for a price (shown beside the "Price requests" link). */
     public static function pendingCount(): int
     {
-        return (int) Database::connection()->query("SELECT COUNT(*) FROM price_requests WHERE status = 'pending'" . DivisionService::sql('division_id'))->fetchColumn();
+        return (int) Database::connection()->query("SELECT COUNT(*) FROM price_requests r JOIN associates a ON a.id = r.associate_id WHERE r.status = 'pending'" . DivisionService::sql('r.division_id') . AssociateBrands::scopeSql('a.brand_id'))->fetchColumn();
     }
 
     public static function find(int $id): ?array
@@ -417,7 +417,7 @@ final class PriceRequestService
         return Database::connection()->query(
             "SELECT r.*, p.name AS product_name, a.name AS associate_name FROM price_requests r
              JOIN catalog_products p ON p.id = r.product_id JOIN associates a ON a.id = r.associate_id
-             {$where}" . ($where === '' ? ' WHERE 1 = 1' : '') . DivisionService::sql('r.division_id') . " ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT " . (int) $limit
+             {$where}" . ($where === '' ? ' WHERE 1 = 1' : '') . DivisionService::sql('r.division_id') . AssociateBrands::scopeSql('a.brand_id') . " ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT " . (int) $limit
         )->fetchAll();
     }
 
@@ -439,7 +439,7 @@ final class PriceRequestService
                FROM associates a
               WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)'
             // D-257 (fresh-eyes review L1): the associates of the request's division(s).
-            . DivisionService::sql('a.division_id') . '
+            . DivisionService::sql('a.division_id') . AssociateBrands::scopeSql('a.brand_id') . '
               ORDER BY requests DESC, a.name'
         );
         $stmt->execute(['f1' => $from, 'f2' => $from, 'f3' => $from]);

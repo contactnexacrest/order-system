@@ -37,13 +37,13 @@ final class BrandController
 
     public function index(array $params): void
     {
-        View::render('brands/index', ['brands' => AssociateBrandRepository::all(), 'canEdit' => self::can('manage_divisions')], 'layout/base');
+        View::render('brands/index', ['brands' => AssociateBrandRepository::all(), 'canEdit' => self::can('manage_divisions') && AssociateBrands::userBrandId() === null], 'layout/base');
     }
 
     public function show(array $params): void
     {
         $brand = AssociateBrandRepository::find((int) $params['id']);
-        if ($brand === null) {
+        if ($brand === null || !AssociateBrands::inScope(['brand_id' => $brand['id']])) { // D-432
             http_response_code(404);
             echo 'Brand not found.';
             return;
@@ -56,7 +56,7 @@ final class BrandController
             'ladder' => AssociateBrandRepository::ladder($id),
             'companyLadder' => PricingRepository::ladder(),
             'levels' => PricingRepository::levels(),
-            'canEdit' => self::can('manage_divisions'),
+            'canEdit' => self::can('manage_divisions') && AssociateBrands::userBrandId() === null, // D-432: a brand manager never edits brand details
             'canRules' => AssociateRules::canManage(self::user()),
         ], 'layout/base');
     }
@@ -198,6 +198,44 @@ final class BrandController
             default => 'Brand rules saved. They apply to new orders; an order keeps the rules it had at its Proforma Invoice.',
         });
         header("Location: /admin/brands/{$id}#rules");
+    }
+
+    /**
+     * D-432 (owner 26 Nov 2026): the brand a staff member looks after (Admin › Users › Brand). Empty = all brands, as before.
+     * "Manage divisions" (MD, Admin), not for yourself, not for a protected account, and not by someone who looks after one brand.
+     */
+    public function setUserBrand(array $params): void
+    {
+        $userId = (int) $params['id'];
+        $me = self::user();
+        $target = \App\Repositories\UserRepository::findById($userId);
+        if ($target === null) {
+            http_response_code(404);
+            echo 'User not found.';
+            return;
+        }
+        $raw = trim((string) ($_POST['brand_id'] ?? ''));
+        $brand = $raw !== '' ? AssociateBrandRepository::find((int) $raw) : null;
+        $refusal = null;
+        if ($raw !== '' && $brand === null) {
+            $refusal = 'Choose a brand from the list.';
+        } elseif ($userId === (int) $me['id'] && !\App\Services\SuperAdminService::isEffective((int) $me['id'])) {
+            $refusal = 'You cannot change your own brand — ask another administrator.';
+        } elseif ((int) ($target['is_protected_account'] ?? 0) === 1) {
+            $refusal = 'This is a protected account: its brand cannot be changed here.';
+        } elseif (AssociateBrands::userBrandId($me) !== null) {
+            $refusal = 'Only staff who look after all brands can give people a brand.';
+        }
+        if ($refusal !== null) {
+            Flash::set('error', $refusal);
+            header("Location: /users/{$userId}/edit");
+            return;
+        }
+        $old = !empty($target['brand_id']) ? AssociateBrandRepository::find((int) $target['brand_id']) : null;
+        \App\Config\Database::connection()->prepare('UPDATE users SET brand_id = :b WHERE id = :id')->execute(['b' => $brand !== null ? (int) $brand['id'] : null, 'id' => $userId]);
+        AuditLogRepository::log((int) $me['id'], 'USER_BRAND_SET', 'users', $userId, 'brand_id', (string) ($old['name'] ?? 'all brands'), (string) ($brand['name'] ?? 'all brands'));
+        Flash::set('success', $brand !== null ? "Saved: this person now looks after {$brand['name']} only." : 'Saved: this person sees all brands.');
+        header("Location: /users/{$userId}/edit");
     }
 
     public function saveLadder(array $params): void

@@ -60,6 +60,9 @@ final class AssociateRegistrationController
     {
         $note = trim((string) ($_POST['note'] ?? ''));
         $brandRaw = trim((string) ($_POST['brand_id'] ?? '')); // D-431: the brand the applicant joins (empty = NexaCrest)
+        if (($mine = \App\Services\AssociateBrands::userBrandId()) !== null) {
+            $brandRaw = (string) $mine; // D-432: a brand manager's links are always for their brand
+        }
         $brand = $brandRaw !== '' ? \App\Repositories\AssociateBrandRepository::find((int) $brandRaw) : null;
         if (mb_strlen($note) > 200) {
             Flash::set('error', 'The note can be up to 200 characters.');
