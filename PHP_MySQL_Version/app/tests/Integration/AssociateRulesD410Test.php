@@ -202,7 +202,7 @@ final class AssociateRulesD410Test extends DbTestCase
         self::assertSame('success', $r['type']);
         $row = AssociateRepository::find((int) $a['id']);
         self::assertSame(['fixed', '6.00'], [$row['price_rule_override'], (string) $row['price_rule_fixed_pct']]);
-        self::assertSame(['rule' => 'fixed', 'pct' => 6.0, 'own' => true], AssociateRules::priceRuleFor($row));
+        self::assertSame(['rule' => 'fixed', 'pct' => 6.0, 'own' => true, 'brand' => false], AssociateRules::priceRuleFor($row));
         $audit = Database::connection()->query("SELECT new_value FROM audit_log WHERE action_type = 'ASSOCIATE_PRICE_RULE_CHANGED' AND entity_id = {$a['id']} ORDER BY id DESC LIMIT 1")->fetchColumn();
         self::assertSame('fixed 6.00% — reason: Agreed for the new market', $audit);
         $this->call('POST', "/associates/{$a['id']}/price-rule", ['price_rule' => 'company', 'price_rule_reason' => 'Back to the company setting']);

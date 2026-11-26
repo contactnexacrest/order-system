@@ -163,7 +163,7 @@ describe('Associate commission rules (D-410)', () => {
     expect(r.type).toBe('success');
     const row = await associateRepository.find(Number(a.id));
     expect([row.price_rule_override, Number(row.price_rule_fixed_pct).toFixed(2)]).toEqual(['fixed', '6.00']);
-    expect(await associateRules.priceRuleFor(row)).toEqual({ rule: 'fixed', pct: 6, own: true });
+    expect(await associateRules.priceRuleFor(row)).toEqual({ rule: 'fixed', pct: 6, own: true, brand: false });
     const audit = await db.queryOne("SELECT new_value FROM audit_log WHERE action_type = 'ASSOCIATE_PRICE_RULE_CHANGED' AND entity_id = :id ORDER BY id DESC LIMIT 1", { id: a.id });
     expect(audit.new_value).toBe('fixed 6.00% — reason: Agreed for the new market');
     await post(agent, `/associates/${a.id}`, `/associates/${a.id}/price-rule`, { price_rule: 'company', price_rule_reason: 'Back to the company setting' });

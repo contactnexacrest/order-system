@@ -13,6 +13,7 @@ $__b = $b ?? [];
   <label>Website<input type="text" name="website" maxlength="190" value="<?= View::e((string) ($__b['website'] ?? '')) ?>" placeholder="e.g. www.example.com"></label>
   <label>E-mail shown to associates<input type="email" name="email" maxlength="190" value="<?= View::e((string) ($__b['email'] ?? '')) ?>" placeholder="e.g. info@email.com"></label>
   <label>Status *<select name="status" required>
+    <option value="">Choose…</option>
     <?php foreach (AssociateBrands::STATUSES as $k => $label): ?><option value="<?= $k ?>"<?= ($__b['status'] ?? 'active') === $k ? ' selected' : '' ?>><?= View::e($label) ?></option><?php endforeach; ?>
   </select></label>
 </div>

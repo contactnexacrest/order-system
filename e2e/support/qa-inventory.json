@@ -14222,6 +14222,181 @@
    "cafin_route": false
   },
   {
+   "method": "POST",
+   "path": "/admin/brands/{id}/ladder",
+   "controller": "BrandController",
+   "action": "saveLadder",
+   "requires_all": [
+    "manage_associate_rules"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 557,
+   "node_line": null,
+   "node_handler": "brandController.saveLadder",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/brands/{id}/rules",
+   "controller": "BrandController",
+   "action": "saveRules",
+   "requires_all": [
+    "manage_associate_rules"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 556,
+   "node_line": null,
+   "node_handler": "brandController.saveRules",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/brands/{id}",
+   "controller": "BrandController",
+   "action": "update",
+   "requires_all": [
+    "manage_divisions"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 555,
+   "node_line": null,
+   "node_handler": "brandController.update",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/admin/brands/{id}",
+   "controller": "BrandController",
+   "action": "show",
+   "requires_all": [],
+   "requires_any": [
+    "manage_divisions",
+    "manage_associate_rules"
+   ],
+   "guards": [
+    "session"
+   ],
+   "php_line": 554,
+   "node_line": null,
+   "node_handler": "brandController.show",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/brands",
+   "controller": "BrandController",
+   "action": "create",
+   "requires_all": [
+    "manage_divisions"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 553,
+   "node_line": null,
+   "node_handler": "brandController.create",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
    "method": "GET",
    "path": "/admin/divisions/{id}",
    "controller": "DivisionController",
@@ -22157,6 +22332,39 @@
      "routeBehaviour.test.js"
     ],
     "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/associates/{id}/brand",
+   "controller": "AssociateAdminController",
+   "action": "changeBrand",
+   "requires_all": [
+    "manage_divisions"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": 794,
+   "node_line": null,
+   "node_handler": "associateAdminController.changeBrand",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
    },
    "money_route": false,
    "cafin_route": false
@@ -31821,6 +32029,34 @@
      "associatePortalRoutes.test.js"
     ],
     "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/associate/login/{code}",
+   "controller": "AssociatePortalController",
+   "action": "showBrandLogin",
+   "requires_all": [],
+   "requires_any": [],
+   "guards": [],
+   "php_line": 1152,
+   "node_line": null,
+   "node_handler": "associatePortalController.showBrandLogin",
+   "node_difference": null,
+   "sweep_coverage": [],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": true,
+   "actor": "public/token",
+   "specific_test_files": {
+    "php": [
+     "AssociateBrandsD431Test.php"
+    ],
+    "node": [
+     "associateBrandsD431.test.js"
+    ]
    },
    "money_route": false,
    "cafin_route": false

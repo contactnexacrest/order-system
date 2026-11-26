@@ -8,6 +8,7 @@
   <label>Website<input type="text" name="website" maxlength="190" value="{{ __b.website or '' }}" placeholder="e.g. www.example.com"></label>
   <label>E-mail shown to associates<input type="email" name="email" maxlength="190" value="{{ __b.email or '' }}" placeholder="e.g. info@email.com"></label>
   <label>Status *<select name="status" required>
+    <option value="">Choose…</option>
     {% for k, label in statuses %}<option value="{{ k }}"{{ ' selected' if (__b.status or 'active') == k else '' }}>{{ label }}</option>{% endfor %}
   </select></label>
 </div>
