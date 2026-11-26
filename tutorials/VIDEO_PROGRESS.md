@@ -632,3 +632,12 @@ Scripts corrected now so a new take is right: **C02** (part C03: the checklist's
 | F03 EN | 25 Nov, not sent | Pricing settings validity field 7 → 30 (D-437); product page brand pricing (D-435) | Re-record before sending (not sent yet) |
 | F04 EN | 24 Nov, not sent | Brand row (keep); rupee commas on two report pages (D-414) | Send as recorded (D-423) |
 | Hindi of C01–C06, A01-2, A02-2, F01 | 19–24 Nov | Older rules (D-410, D-411, D-421, D-426, D-428) and the tip line | Not re-recorded (D-419: Hindi only when the owner asks) |
+
+## Full A–F set sent 26 Nov 2026 (D-439) — English, 26 Nov app
+Re-recorded on the tutorial stack (synced 26 Nov, migrations 26a–26d, SOP docs linked) and checked (length = subtitles,
+frames, key wording): A01-1, A01-2, A02-1, B01-1, B02–B11, C01–C04, C06, D01–D05, F01, F03. Sent as already recorded
+(they match today's app): A02-2, B01-2, C05, E01–E03, F02, F04. **All sent to the owner 26 Nov 2026 under headings A–F.**
+H01 re-recorded the same day with the minimum-order-value wording (owner: "each order earns its commission if the
+order value is more than the minimum order value") and sent as the replacement; the same condition was added to F01
+and C03 (part C05) before they were recorded. Hindi: unchanged (D-419) — the Hindi files on record are older and now
+out of date in the places listed in the A–F check table above.
