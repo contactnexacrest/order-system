@@ -6937,3 +6937,60 @@ ALTER TABLE clients
 -- ---------------------------------------------------------------------------
 ALTER TABLE associates ADD COLUMN video_kyc_at DATETIME NULL, ADD COLUMN video_kyc_by BIGINT UNSIGNED NULL,
   ADD COLUMN video_kyc_note VARCHAR(300) NULL, ADD COLUMN video_kyc_due_on DATE NULL;
+
+-- ---------------------------------------------------------------------------
+-- D-431 (owner 25-26 Nov 2026): Brands for divisions — associate side only.
+-- A brand is the division name an associate sees (name only, no logo) on the
+-- associate login, portal, e-mails and statement, always with the line under
+-- it ("a division of NexaCrest International Private Limited"). Buyers see
+-- nothing of it. associates.brand_id empty = NexaCrest, exactly as before.
+-- Per-brand associate rules (empty = the company setting in Associates ›
+-- Settings): associate_brand_settings (minimum order value, same-client days,
+-- commission in the client's price, price requests per day, price validity)
+-- and associate_brand_ladder_steps (the brand's own ladder).
+-- ---------------------------------------------------------------------------
+CREATE TABLE associate_brands (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code        VARCHAR(30) NOT NULL,                 -- in the brand's login address: /associate/login/{code}
+  name        VARCHAR(80) NOT NULL,
+  tagline     VARCHAR(200) NOT NULL,                -- e.g. "a division of NexaCrest International Private Limited"
+  products    VARCHAR(200) NULL,                    -- what it covers, e.g. "Natural Stone" (shown to staff)
+  website     VARCHAR(190) NULL,
+  email       VARCHAR(190) NULL,                    -- shown to the brand's associates
+  status      ENUM('active','planned','inactive') NOT NULL DEFAULT 'active',
+  created_by  BIGINT UNSIGNED NULL,
+  updated_by  BIGINT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_associate_brands_code (code),
+  UNIQUE KEY uq_associate_brands_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE associate_brand_settings (
+  brand_id      BIGINT UNSIGNED NOT NULL,
+  setting_key   VARCHAR(60) NOT NULL,
+  setting_value VARCHAR(100) NOT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (brand_id, setting_key),
+  CONSTRAINT fk_associate_brand_settings_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE associate_brand_ladder_steps (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  brand_id    BIGINT UNSIGNED NOT NULL,
+  from_order  INT NOT NULL,
+  to_order    INT NULL,                              -- NULL = the open-ended last step
+  level_id    BIGINT UNSIGNED NOT NULL,
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_associate_brand_ladder_from (brand_id, from_order),
+  CONSTRAINT fk_associate_brand_ladder_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id),
+  CONSTRAINT fk_associate_brand_ladder_level FOREIGN KEY (level_id) REFERENCES commission_levels(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE associates ADD COLUMN brand_id BIGINT UNSIGNED NULL;
+ALTER TABLE associates ADD CONSTRAINT fk_associates_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);
+-- The brand an applicant joins through: chosen by the MD on the associate registration link.
+ALTER TABLE associate_registration_links ADD COLUMN brand_id BIGINT UNSIGNED NULL;
+ALTER TABLE associate_registration_links ADD CONSTRAINT fk_associate_registration_links_brand FOREIGN KEY (brand_id) REFERENCES associate_brands(id);

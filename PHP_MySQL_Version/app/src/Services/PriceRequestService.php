@@ -32,14 +32,20 @@ final class PriceRequestService
 
     public static function dailyLimit(array $associate): int
     {
-        return $associate['price_request_daily_limit'] !== null && $associate['price_request_daily_limit'] !== ''
-            ? max(0, (int) $associate['price_request_daily_limit']) : PricingService::settings()['price_request_daily_limit'];
+        if ($associate['price_request_daily_limit'] !== null && $associate['price_request_daily_limit'] !== '') {
+            return max(0, (int) $associate['price_request_daily_limit']);
+        }
+        $brand = AssociateBrands::rule(isset($associate['id']) ? (int) $associate['id'] : null, 'price_requests_per_day'); // D-431
+        return $brand !== null ? max(0, (int) $brand) : PricingService::settings()['price_request_daily_limit'];
     }
 
     public static function validDays(array $associate): int
     {
-        return $associate['price_valid_days'] !== null && $associate['price_valid_days'] !== ''
-            ? max(1, (int) $associate['price_valid_days']) : PricingService::settings()['price_request_valid_days'];
+        if ($associate['price_valid_days'] !== null && $associate['price_valid_days'] !== '') {
+            return max(1, (int) $associate['price_valid_days']);
+        }
+        $brand = AssociateBrands::rule(isset($associate['id']) ? (int) $associate['id'] : null, 'price_valid_days'); // D-431
+        return $brand !== null ? max(1, (int) $brand) : PricingService::settings()['price_request_valid_days'];
     }
 
     /** @return array<int, list<string>> category id => allowed forms ([] = all forms of that category) */

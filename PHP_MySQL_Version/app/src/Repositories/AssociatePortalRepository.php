@@ -162,7 +162,7 @@ final class AssociatePortalRepository
         // D-292: "Not earned yet — buyer still paying"; once paid in full (fixed the same day by itself, or by the daily job) "Earned — will be paid on <date>".
         $fullyPaidOn = IncentiveService::fullyPaidOn((int) $o['id']);
         if (!empty($c['below_min'])) { // D-410: below the minimum order value (not the client's first order)
-            return ['ladder_text' => $c['ladder_text']] + $none(self::belowMinLabel()); // staff still see why it does not count
+            return ['ladder_text' => $c['ladder_text']] + $none(self::belowMinLabel($associateId)); // staff still see why it does not count
         }
         $label = $fullyPaidOn !== null
             ? 'Will be paid to you on ' . \App\Helpers\Dates::short(AssociateCommission::associateRunOn(AssociateCommission::dueOn((string) $fullyPaidOn)))
@@ -198,9 +198,9 @@ final class AssociatePortalRepository
     public const CLAIM_LABEL = 'On hold — a buyer claim on this order is open';
 
     /** D-410: an order below the minimum value earns nothing (the client's first order always earns). */
-    public static function belowMinLabel(): string
+    public static function belowMinLabel(?int $associateId = null): string
     {
-        return 'No commission — the value of the goods (FOB) is below ₹' . \App\Helpers\MoneyFormat::indian(\App\Services\AssociateRules::minOrderInr(), 0) . ' (only the client\'s first order earns whatever its size)';
+        return 'No commission — the value of the goods (FOB) is below ₹' . \App\Helpers\MoneyFormat::indian(\App\Services\AssociateRules::minOrderInr($associateId), 0) . ' (only the client\'s first order earns whatever its size)';
     }
 
     /** D-410: the status badge for a commission line — 'to_be_paid' (🔵), 'paid' (🟢), or null. */

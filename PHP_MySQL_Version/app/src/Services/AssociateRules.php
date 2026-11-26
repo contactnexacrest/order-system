@@ -64,17 +64,43 @@ final class AssociateRules
         self::$cache = [];
     }
 
-    /** Same client within this many days of the first order of a group = one ladder step (default 15, 7–45). */
-    public static function groupDays(): int
+    /** Same client within this many days of the first order of a group = one ladder step (default 15, 7–45). D-431: the associate's brand first. */
+    public static function groupDays(?int $associateId = null): int
+    {
+        $brand = AssociateBrands::rule($associateId, 'group_days');
+        if ($brand === null) {
+            return self::companyGroupDays();
+        }
+        return max(self::GROUP_DAYS_MIN, min(self::GROUP_DAYS_MAX, (int) $brand));
+    }
+
+    /** The company setting (Associates › Settings). */
+    public static function companyGroupDays(): int
     {
         $v = (int) (IncentiveRepository::settings()['associate_group_days'] ?? 15);
         return max(self::GROUP_DAYS_MIN, min(self::GROUP_DAYS_MAX, $v > 0 ? $v : 15));
     }
 
-    /** The minimum value of the goods (FOB, ₹) an order needs to earn commission and to count on the ladder. */
-    public static function minOrderInr(): float
+    /** The minimum value of the goods (FOB, ₹) an order needs to earn commission and to count on the ladder. D-431: the associate's brand first. */
+    public static function minOrderInr(?int $associateId = null): float
     {
-        return (float) (IncentiveRepository::settings()['associate_counting_threshold_inr'] ?? 500000);
+        $brand = AssociateBrands::rule($associateId, 'min_order_inr');
+        return $brand !== null ? (float) $brand : (float) (IncentiveRepository::settings()['associate_counting_threshold_inr'] ?? 500000);
+    }
+
+    /** The associate an order earns for: the order's own, else the client's. */
+    public static function associateIdOf(array $order): ?int
+    {
+        if (!empty($order['associate_id'])) {
+            return (int) $order['associate_id'];
+        }
+        if (empty($order['client_id'])) {
+            return null;
+        }
+        $stmt = Database::connection()->prepare('SELECT associate_id FROM clients WHERE id = :id');
+        $stmt->execute(['id' => (int) $order['client_id']]);
+        $a = (int) ($stmt->fetchColumn() ?: 0);
+        return $a > 0 ? $a : null;
     }
 
     /** The day the D-410 rules started (migration 2026-11-24a); null = the rules apply to every order. */
@@ -139,8 +165,8 @@ final class AssociateRules
               ORDER BY COALESCE(o.buyer_po_received_on, DATE(o.created_at)), o.id"
         );
         $stmt->execute(['a' => $associateId, 'a2' => $associateId]);
-        $days = self::groupDays();
-        $min = self::minOrderInr();
+        $days = self::groupDays($associateId);
+        $min = self::minOrderInr($associateId);
         $start = [];
         $step = 0;
         $out = [];
@@ -197,7 +223,7 @@ final class AssociateRules
     public static function groupCovering(int $associateId, array $order): ?array
     {
         $po = IncentiveService::poDate($order);
-        $days = self::groupDays();
+        $days = self::groupDays($associateId);
         foreach (self::history($associateId) as $r) {
             if ($r['status'] === 'counted' && $r['order_id'] !== (int) $order['id'] && $r['client_id'] === (int) $order['client_id']
                 && $r['po_date'] <= $po && self::days($r['po_date'], $po) < $days) {
@@ -208,24 +234,24 @@ final class AssociateRules
     }
 
     /** Whether this order earns: at least the minimum, or the client's first order. */
-    public static function earnsOnValue(array $order, ?float $valueInr): bool
+    public static function earnsOnValue(array $order, ?float $valueInr, ?int $associateId = null): bool
     {
         if (IncentiveService::isClientsFirstOrder($order)) {
             return true;
         }
-        return $valueInr !== null && $valueInr >= self::minOrderInr();
+        return $valueInr !== null && $valueInr >= self::minOrderInr($associateId ?? self::associateIdOf($order));
     }
 
     /** One-line ladder status for staff screens (the "Ladder step" column). */
-    public static function stepText(?array $row): string
+    public static function stepText(?array $row, ?int $associateId = null): string
     {
         if ($row === null) {
             return '—';
         }
         return match ($row['status']) {
             'counted' => 'Step ' . $row['step'],
-            'same_group' => 'Same step as ' . ($row['group_reference'] ?? ('#' . $row['group_order_id'])) . ' (same client within ' . self::groupDays() . ' days)',
-            'below_min' => 'Does not count — below ₹' . \App\Helpers\MoneyFormat::indian(self::minOrderInr(), 0),
+            'same_group' => 'Same step as ' . ($row['group_reference'] ?? ('#' . $row['group_order_id'])) . ' (same client within ' . self::groupDays($associateId) . ' days)',
+            'below_min' => 'Does not count — below ₹' . \App\Helpers\MoneyFormat::indian(self::minOrderInr($associateId), 0),
             default => 'Counts when the advance has cleared',
         };
     }
@@ -241,14 +267,22 @@ final class AssociateRules
         return ['rule' => $rule, 'pct' => $rule === 'fixed' ? (float) ($s['associate_price_fixed_pct'] ?? 5) : null];
     }
 
-    /** The rule that applies to one associate: their own (D-410 override) or the company's; 'own' says which. */
+    /** The rule that applies to one associate: their own (D-410 override), then their brand's (D-431), then the company's; 'own' / 'brand' say which. */
     public static function priceRuleFor(array $associate): array
     {
         $own = (string) ($associate['price_rule_override'] ?? '');
         if (isset(self::PRICE_RULES[$own])) {
-            return ['rule' => $own, 'pct' => $own === 'fixed' ? (float) ($associate['price_rule_fixed_pct'] ?? 0) : null, 'own' => true];
+            return ['rule' => $own, 'pct' => $own === 'fixed' ? (float) ($associate['price_rule_fixed_pct'] ?? 0) : null, 'own' => true, 'brand' => false];
         }
-        return self::companyPriceRule() + ['own' => false];
+        $b = AssociateBrands::forAssociate($associate);
+        if ($b !== null) {
+            $s = AssociateBrands::settings((int) $b['id']);
+            $rule = (string) ($s['price_rule'] ?? '');
+            if (isset(self::PRICE_RULES[$rule])) {
+                return ['rule' => $rule, 'pct' => $rule === 'fixed' ? (float) ($s['price_fixed_pct'] ?? 0) : null, 'own' => false, 'brand' => true];
+            }
+        }
+        return self::companyPriceRule() + ['own' => false, 'brand' => false];
     }
 
     /** The first step's % of the associate's ladder (their fixed level when they have a fixed %). */

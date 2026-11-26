@@ -316,7 +316,7 @@ final class AssociateCommission
             }
         }
         $count = self::countingOrders((int) $associate['id'], $excludeOrderId);
-        $position = ($orderInRangeInr === null || $orderInRangeInr >= self::settings()['threshold_inr']) ? $count + 1 : max($count, 1);
+        $position = ($orderInRangeInr === null || $orderInRangeInr >= AssociateRules::minOrderInr((int) $associate['id'])) ? $count + 1 : max($count, 1); // D-431: the brand's minimum
         foreach (self::ladderFor($associate) as $step) { // D-291: their own ladder overrides the standard one
             if ($position >= (int) $step['from_order'] && ($step['to_order'] === null || $position <= (int) $step['to_order'])) {
                 return [PricingRepository::findLevel((int) $step['level_id']), $count];
@@ -337,7 +337,8 @@ final class AssociateCommission
                 return $own;
             }
         }
-        return PricingRepository::ladder();
+        $brand = AssociateBrands::ladderFor($associate); // D-431: the brand's own ladder, else the company ladder
+        return $brand !== [] ? $brand : PricingRepository::ladder();
     }
 
     /** "Orders 1–5" / "Orders 6 onwards" / "Order 1". */
@@ -661,7 +662,7 @@ final class AssociateCommission
         // D-410: below the minimum value an order earns nothing — except the client's first order (orders under the new rules).
         $newRules = AssociateRules::newRules($order);
         // The minimum applies to every order, also one the MD set to "associate: yes" (owner, 24 Nov 2026).
-        $belowMin = $newRules && !AssociateRules::earnsOnValue($order, $basisInr);
+        $belowMin = $newRules && !AssociateRules::earnsOnValue($order, $basisInr, (int) $a['id']);
         if ($belowMin && $override === null) {
             $commissionFc = 0.0;
             $commissionInr = 0.0;
@@ -687,10 +688,10 @@ final class AssociateCommission
             'state' => $state, 'fully_paid_on' => $fullyPaidOn,
             'due_on' => $dueOn, 'payout_run_on' => $dueOn !== null ? self::associateRunOn($dueOn, $set) : null,
             'claim_hold' => $dueOn !== null && $set['claim_hold'] && self::claimOpen($orderId, $dueOn),
-            'counts' => $counts, 'threshold_inr' => $set['threshold_inr'],
+            'counts' => $counts, 'threshold_inr' => AssociateRules::minOrderInr((int) $a['id']),
             'counting_number' => $counts ? (int) $ladder['step'] : null,
             // D-410
-            'new_rules' => $newRules, 'below_min' => $belowMin, 'ladder' => $ladder, 'ladder_text' => AssociateRules::stepText($ladder),
+            'new_rules' => $newRules, 'below_min' => $belowMin, 'ladder' => $ladder, 'ladder_text' => AssociateRules::stepText($ladder, (int) $a['id']),
             'included_pct' => $included, 'margin_pct' => $marginPct,
             'margin_fc' => $ratePct > 0 && $marginPct > 0 ? round($commissionFc * $marginPct / $ratePct, 2) : 0.0,
             'margin_inr' => $ratePct > 0 && $marginPct > 0 ? round($commissionInr * $marginPct / $ratePct, 2) : 0.0,
