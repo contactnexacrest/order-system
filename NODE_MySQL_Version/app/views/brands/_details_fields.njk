@@ -2,7 +2,7 @@
 {% set __b = b or {} %}
 <div class="form-grid">
   <label>Brand name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ __b.name or '' }}" placeholder="e.g. Stone division name"></label>
-  <label>Login address code * <small class="muted">(/associate/login/<em>code</em>)</small><input type="text" name="code" required minlength="2" maxlength="30" pattern="[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?" value="{{ __b.code or '' }}" placeholder="e.g. stone"></label>
+  <label>Login address code * <small class="muted">(/associate/login/<em>code</em>)</small><input type="text" name="code" required minlength="2" maxlength="30" pattern="[a-z0-9](?:[a-z0-9\-]{0,28}[a-z0-9])?" value="{{ __b.code or '' }}" placeholder="e.g. stone"></label>
   <label>Line under the name *<input type="text" name="tagline" required maxlength="200" value="{{ __b.tagline if __b.tagline else defaultTagline }}" placeholder="e.g. {{ defaultTagline }}"></label>
   <label>Products it covers<input type="text" name="products" maxlength="200" value="{{ __b.products or '' }}" placeholder="e.g. Natural Stone"></label>
   <label>Website<input type="text" name="website" maxlength="190" value="{{ __b.website or '' }}" placeholder="e.g. www.example.com"></label>
