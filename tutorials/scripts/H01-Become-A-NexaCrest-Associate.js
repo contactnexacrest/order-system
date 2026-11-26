@@ -55,10 +55,17 @@ module.exports = {
       'You tell them about NexaCrest. That is your job.',
     ], say: 'You know a shop owner in another country. They need goods that we sell. You tell them about NexaCrest. That is your job: bring us a buyer.' },
     { as: 'associate', goto: '/associate/clients', caption: 'Your link and your code', say: 'You send the buyer your own link, or give them your own code. The buyer signs up with it. Now this buyer is your client.' },
+    { card: 'list', kicker: 'Trust', title: 'Your buyer deals with NexaCrest directly', items: [
+      'Your buyer fills in NexaCrest\'s own form and works with NexaCrest directly.',
+      'They get one clear price from NexaCrest. Nothing is added on top for you.',
+      'You stay in the background. Your buyer simply sees a trusted company.',
+      'That gives your buyer confidence, and buyers who feel confident order again.',
+    ], say: 'Your buyer deals with NexaCrest directly. They fill in our own form, and they get one clear price from us. Nothing is added on top for you. You stay in the background, and your buyer simply sees a trusted company. That gives your buyer confidence. And buyers who feel confident come back and order again.' },
     { card: 'list', kicker: 'One buyer, one associate', title: 'Two people bring the same buyer?', items: [
       'The buyer belongs to the person whose link or code the buyer used.',
+      'We check that every new buyer is real before they become your client. So nobody can fake a buyer, or take yours.',
       'So send your link early.',
-    ], say: 'What if someone else also knows this buyer? The buyer belongs to the person whose link or code the buyer used. So send your link early.' },
+    ], say: 'What if someone else also knows this buyer? The buyer belongs to the person whose link or code the buyer used. We check that every new buyer is real before they become your client. So nobody can fake a buyer, or take yours. So send your link early.' },
     { as: 'associate', goto: '/associate/catalogue', caption: 'Prices come from your portal', say: 'The buyer asks you: how much? Easy. In your portal you pick the product and its details, like size and thickness. The portal shows the price. You give that price to the buyer. You never have to work out a price yourself.' },
     { card: 'list', kicker: 'We do the rest', title: 'You bring the buyer, we do the work', items: [
       'We send the quotation, make the export papers and ship the goods.',
