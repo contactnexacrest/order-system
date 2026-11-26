@@ -20,7 +20,7 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
-SELECT 'brand_products_need_approval', '1', 'boolean', 'products', 'On = a product added by a brand manager waits in Approvals › New products until someone with "Approve new products" approves it; it cannot be quoted, ordered or seen by associates before that. Off = live at once (Audit Log only).', 0
+SELECT 'brand_products_need_approval', '1', 'boolean', 'products', 'On (default) = a product a brand manager adds waits in Approvals › New products until someone with "Approve new products" (MD, ED) approves it; until then it cannot be quoted, ordered or seen by associates. Off = it is live at once (the Audit Log still records it).', 0
  WHERE NOT EXISTS (SELECT 1 FROM company_settings WHERE setting_key = 'brand_products_need_approval');
 
 ALTER TABLE product_categories ADD COLUMN parent_id BIGINT UNSIGNED NULL;
